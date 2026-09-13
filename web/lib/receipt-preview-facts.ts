@@ -13,18 +13,20 @@ export function receiptPreviewFacts(payload: PublicReceiptDocument, language: Ar
   const countText = count > 1 ? interpolate(copy.selection.turns, { count }) : null;
   const research = first?.kind === "research_answer" ? first : null;
   const calculation = first?.kind === "calculation" ? first : null;
+  // A turn weighing several calculations states every headline, in order.
+  const calculationHeadlines = presentation.calculations?.map((entry) => entry.headline).filter(Boolean).join(" · ");
   const stamp = research ? interpolate(copy.research.preview_stamp, { date: formatReceiptDate(research.retrieved_at, language) ?? "", count: research.sources.length }) : calculation ? presentation.stamp : null;
   const headline = payload.schema_version === 1 ? headlineReceiptMetric(payload) : null;
   const description = payload.schema_version === 1 ? [
     payload.symbols.join(", "), formatReceiptDateRange(payload.date_range, copy, language),
     headline ? `${copy.metric_labels[headline.key] ?? headline.key}: ${headline.value}` : null, copy.framing.short,
   ].filter(Boolean).join(" · ") : [
-    research ? stamp : calculation ? [stamp, presentation.headline].filter(Boolean).join(" · ") : presentation.rows.map((row) => row.value).join(" · "),
+    research ? stamp : calculation ? [stamp, calculationHeadlines ?? presentation.headline].filter(Boolean).join(" · ") : presentation.rows.map((row) => row.value).join(" · "),
     countText, research ? copy.research.short : calculation ? copy.calculation.short : copy.framing.short,
   ].filter(Boolean).join(" · ");
   return {
     title: presentation.title, language: presentation.language, description,
-    metricValue: headline?.value ?? presentation.headline ?? "", verdict: presentation.verdict ?? "",
+    metricValue: headline?.value ?? presentation.headline ?? "", verdict: calculationHeadlines ?? presentation.verdict ?? "",
     research: Boolean(research), stamp, countText,
     imageTitle: presentation.title.length > 130 ? `${presentation.title.slice(0, 127).trimEnd()}...` : presentation.title,
     framing: research ? copy.research.short : calculation ? copy.calculation.short : copy.framing.short,

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, Check, CircleX, Eye, FileText, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import type { DecisionAttachment, DecisionNote } from "@/lib/decision-contract";
+import { comparableComputationKind, type DecisionAttachment, type DecisionNote } from "@/lib/decision-contract";
 import {
   DECISION_NOTE_MAX_LENGTH,
   decisionNoteCharacterCount,
@@ -319,6 +319,7 @@ export function ComputedAnswerDecision({
   });
   const [rerunOpen, setRerunOpen] = useState(false);
   if (!attachment) return null;
+  const comparableKind = message.computation ? comparableComputationKind(message.computation) : null;
   const visibleState = visibleDecisionState(message.decisionState, savedState);
   const decisionId = message.decisionNoteId ?? savedDecisionId;
   return (
@@ -334,9 +335,9 @@ export function ComputedAnswerDecision({
         )}
       </div>
       {!visibleState && draft.open ? <DecisionEditorPanel draft={draft} /> : null}
-      {attachment.kind === "message" && message.computation ? (
+      {attachment.kind === "message" && (comparableKind || onOpenConversation) ? (
         <div className="border-t border-[#c9c9cd]/30 px-4 py-3.5 dark:border-white/[0.06] sm:px-5">
-          <ComputedAnswerActions conversationId={attachment.conversationId} messageId={attachment.messageId} kind={message.computation.kind}
+          <ComputedAnswerActions conversationId={attachment.conversationId} messageId={attachment.messageId} kind={comparableKind}
             onOpenConversation={onOpenConversation} t={t} locale={i18n.resolvedLanguage ?? i18n.language ?? "en"} />
         </div>
       ) : null}

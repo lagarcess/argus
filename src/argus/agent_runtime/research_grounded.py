@@ -75,6 +75,7 @@ from argus.domain.research.contracts import (
     combined_research_usage,
 )
 from argus.domain.research.source_selection import (
+    answer_sources,
     question_date,
     select_public_sources,
 )
@@ -151,9 +152,9 @@ def _cache_key_for(
 ) -> str:
     """One key recipe for every shape, so a packet stored by the thorough job
     finalizer serves the same question asked inline later. Packets carry the
-    answer's calculation, so a key never serves one stored under the older
-    contract without it."""
-    contract = ("scenario" if scenario else "retrieval") + ":answer_calculation:reader"
+    answer's calculations and the pages it cites, so a key never serves one
+    stored under an older contract without them."""
+    contract = ("scenario" if scenario else "retrieval") + ":answer_calculations:cited"
     return research_cache_key(
         capability_class=capability_class,
         shape=shape,
@@ -1325,7 +1326,7 @@ def _scenario_inputs_code(packet: ResearchPacket, *, scenario: bool) -> str | No
     """A computed scenario publishes only through the calculation its answer
     returns (decision 10): without one, any figure it states is the provider's
     own arithmetic."""
-    if not scenario or packet.calculation is not None:
+    if not scenario or packet.calculations:
         return None
     logger.info(
         "Scenario withheld: the answer returned no calculation"
@@ -1374,7 +1375,7 @@ def _packet_has_public_sources(
 ) -> bool:
     return bool(
         select_public_sources(
-            packet.sources,
+            answer_sources(packet),
             question_kind=freshness_kind(query.question_kind, survey=survey),
             period_start=_coerce_date(query.period_start_date),
             question_as_of=question_as_of_date,
@@ -1442,7 +1443,7 @@ def _research_prompt(
     if lookup_inputs:
         lines.append(
             "Look up the current published value of each of these calculation "
-            "inputs and return them in calculation, each with its page and date: "
+            "inputs and return them in calculations, each with its page and date: "
             + ", ".join(lookup_inputs)
             + "."
         )
@@ -2140,12 +2141,12 @@ def typed_sources(
     Same fields grounded discovery already emits, so one surface serves every
     shape. The title is the publisher's domain because the packet carries no
     title, and inventing one would be the same defect as letting the model
-    write its own citation line. Only URLs the packet returned appear here.
+    write its own citation line. Only the pages the answer cites appear here.
     """
     from urllib.parse import urlparse
 
     selected = select_public_sources(
-        packet.sources,
+        answer_sources(packet),
         question_kind=question_kind,
         period_start=_coerce_date(period_start_date),
         question_as_of=_coerce_date(question_as_of_date),

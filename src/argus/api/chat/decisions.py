@@ -28,7 +28,6 @@ from argus.domain.computations import (
     InvalidComputationInputs,
     RerunContext,
     rerun_computation,
-    unavailable_rerun,
 )
 from argus.domain.decision_attachment import (
     computation_from_message_metadata,
@@ -118,7 +117,7 @@ def create_decision_for_message(
         attributes={
             "decision_state": decision.decision_state,
             "attachment": "message",
-            "computation_kind": decision.computation.kind
+            "computation_kind": ",".join(decision.computation.kinds)
             if decision.computation is not None
             else None,
             "note_present": bool(decision.note),
@@ -132,8 +131,10 @@ def open_decision(
     user: User,
     decision_id: str,
     overrides: Mapping[str, Any] | None = None,
-) -> tuple[DecisionNote, DecisionComputation, DecisionRerun]:
-    """Load a decision and re-run its computation, with optional overrides.
+    calculation: int = 0,
+) -> tuple[DecisionNote, DecisionComputation, list[DecisionRerun]]:
+    """Load a decision and re-run every calculation of its computation, with
+    optional overrides for the one at ``calculation``.
 
     Overrides that fail the kernel's typed model are a client error; stored
     inputs that fail it are a typed unavailable state, because the row, not
@@ -150,12 +151,12 @@ def open_decision(
     computation = decision_computation(decision, artifact=artifact)
     context = RerunContext(load_run=_run_loader(user.id), today=new_york_today())
     try:
-        rerun = rerun_computation(computation, overrides=overrides, context=context)
+        reruns = rerun_computation(
+            computation, overrides=overrides, context=context, index=calculation
+        )
     except InvalidComputationInputs as exc:
-        if overrides:
-            raise DecisionRerunInputsError(exc.errors) from exc
-        rerun = unavailable_rerun(computation, reason_code="invalid_inputs")
-    return decision, computation, rerun
+        raise DecisionRerunInputsError(exc.errors) from exc
+    return decision, computation, reruns
 
 
 def rerun_message_computation(
@@ -164,8 +165,10 @@ def rerun_message_computation(
     conversation_id: str,
     message_id: str,
     overrides: Mapping[str, Any] | None = None,
-) -> tuple[DecisionComputation, DecisionRerun]:
-    """Re-run an owned computed answer from Search, decided or not.
+    calculation: int = 0,
+) -> tuple[DecisionComputation, list[DecisionRerun]]:
+    """Re-run every calculation of an owned computed answer from Search, decided
+    or not, with optional overrides for the one at ``calculation``.
 
     The stored answer is never rewritten: the result comes back beside it.
     Invalid overrides are the client's error; stored inputs that drifted are
@@ -185,12 +188,12 @@ def rerun_message_computation(
         )
     context = RerunContext(load_run=_run_loader(user.id), today=new_york_today())
     try:
-        rerun = rerun_computation(computation, overrides=overrides, context=context)
+        reruns = rerun_computation(
+            computation, overrides=overrides, context=context, index=calculation
+        )
     except InvalidComputationInputs as exc:
-        if overrides:
-            raise DecisionRerunInputsError(exc.errors) from exc
-        rerun = unavailable_rerun(computation, reason_code="invalid_inputs")
-    return computation, rerun
+        raise DecisionRerunInputsError(exc.errors) from exc
+    return computation, reruns
 
 
 def _decision_by_id(*, user_id: str, decision_id: str) -> DecisionNote | None:

@@ -17,11 +17,18 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from argus.domain.computation_marker import computation_from_tool_card
+from argus.api.decision_contract import DecisionComputation
+from argus.api.public_excerpt_schemas import PublicExcerptCalculationTurn
+from argus.domain.computation_marker import (
+    computation_from_tool_card,
+    computation_from_tool_cards,
+)
+from argus.domain.public_excerpt_turns import _public_calculation
 
 from tests.domain.calculations import WORKED_ARGUMENTS
 from tests.domain.calculations.support import run_calculation
@@ -60,7 +67,7 @@ class _ComputedAnswer:
         self.conversation_id = uuid4()
         self.message_id = uuid4()
 
-    def seed(self) -> _ComputedAnswer:
+    def seed(self, metadata: dict[str, Any] | None = None) -> _ComputedAnswer:
         from psycopg.types.json import Jsonb
 
         email = f"calculation-receipt-{self.owner_id}@example.test"
@@ -85,12 +92,14 @@ class _ComputedAnswer:
                 self.owner_id,
                 self.conversation_id,
                 "Apple trades at 25 times earnings.",
-                Jsonb(_computed_answer_metadata()),
+                Jsonb(metadata or _computed_answer_metadata()),
             ),
         )
         return self
 
-    def insert_receipt(self, *, kind: str) -> UUID:
+    def insert_receipt(self, *, kind: str, payload: dict[str, Any] | None = None) -> UUID:
+        from psycopg.types.json import Jsonb
+
         message_ids = [self.message_id]
         selection_key = hashlib.sha256(
             json.dumps(
@@ -101,7 +110,7 @@ class _ComputedAnswer:
             "insert into public.public_excerpt_snapshots"
             " (public_id, owner_id, source_conversation_id, source_message_ids,"
             "  selection_key, kind, title, payload, payload_digest)"
-            " values (%s, %s, %s, %s, %s, %s, %s, '{}'::jsonb, %s)"
+            " values (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
             " returning id",
             (
                 _public_id(),
@@ -111,6 +120,7 @@ class _ComputedAnswer:
                 selection_key,
                 kind,
                 "Is Apple expensive at this P/E?",
+                Jsonb(payload or {}),
                 DIGEST,
             ),
         )
@@ -224,5 +234,53 @@ def test_deleting_the_computed_answer_revokes_its_calculation_receipt() -> None:
                 assert message_ids == [
                     answer.message_id
                 ], "provenance outlives the source"
+        finally:
+            connection.rollback()
+
+
+def test_a_receipt_freezes_every_calculation_of_an_answer_weighing_options() -> None:
+    cards = [
+        run_calculation(
+            "price_multiple", {**WORKED_ARGUMENTS["price_multiple"], **changes}
+        ).model_copy(update={"artifact_id": str(uuid4()), "call_id": str(uuid4())})
+        for changes in ({}, {"symbol": "MSFT", "price": 410})
+    ]
+    computation = computation_from_tool_cards(cards)
+    assert computation is not None
+    turn = PublicExcerptCalculationTurn(
+        question="Apple or Microsoft at these multiples?",
+        calculations=[_public_calculation(card) for card in cards],
+        computed_at=datetime(2026, 9, 12, tzinfo=timezone.utc),
+    )
+    with psycopg.connect(DSN) as connection:
+        try:
+            with connection.cursor() as cursor:
+                answer = _ComputedAnswer(cursor).seed(
+                    metadata={
+                        "tool_result_cards": [
+                            card.model_dump(mode="json") for card in cards
+                        ],
+                        "computation": computation.model_dump(mode="json"),
+                    }
+                )
+                cursor.execute(
+                    "select metadata from public.messages where id = %s",
+                    (answer.message_id,),
+                )
+                marker = DecisionComputation.model_validate(
+                    cursor.fetchone()[0]["computation"]
+                )
+                assert marker.kinds == ["price_multiple", "price_multiple"]
+                cursor.execute("set local role service_role")
+                receipt_id = answer.insert_receipt(
+                    kind="calculation", payload=turn.model_dump(mode="json")
+                )
+                cursor.execute(
+                    "select payload from public.public_excerpt_snapshots where id = %s",
+                    (receipt_id,),
+                )
+                frozen = PublicExcerptCalculationTurn.model_validate(cursor.fetchone()[0])
+                assert len(frozen.calculations) == 2
+                assert frozen == turn
         finally:
             connection.rollback()

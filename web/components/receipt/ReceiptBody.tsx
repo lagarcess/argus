@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { PublicReceiptDocument } from "@/lib/public-receipt-turns";
 import { receiptDocumentKind } from "@/lib/public-receipt-turns";
 import { type ReceiptCopy, formatReceiptDay, interpolate } from "@/lib/receipt-copy";
-import { receiptPresentations } from "@/lib/receipt-presentation";
+import { type ReceiptFigures, receiptPresentations } from "@/lib/receipt-presentation";
 import type { ArgusLanguage } from "@/lib/language-features";
 import { RECEIPT_ACTION_BAR_CLEARANCE } from "@/lib/receipt-layout";
 import ProvenanceMark from "./ProvenanceMark";
@@ -32,6 +32,39 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** A headline figure, its verdict and its rows. */
+function Figures({ figures }: { figures: ReceiptFigures }) {
+  const isNegative = Boolean(figures.headline?.trim().startsWith("-"));
+  return (
+    <>
+      <div className={`font-display text-[52px] font-medium leading-[0.98] tracking-[-1.9px] tabular-nums sm:text-[62px] sm:tracking-[-2.4px] ${figures.neutralHeadline ? "break-words text-white" : isNegative ? "text-[#d66d75]" : "text-[#5ba897]"}`}>{figures.headline}</div>
+      {figures.verdict && (
+        <p className="font-display mt-2.5 text-[15px] font-medium tabular-nums text-white">
+          {figures.verdict}
+          {figures.benchmark && figures.benchmarkSymbol && <span className="font-medium text-white/45">{" · "}{figures.benchmarkSymbol} {figures.benchmark}</span>}
+        </p>
+      )}
+      <dl className="mt-4">{figures.rows.map((row) => <Row key={row.label} {...row} />)}</dl>
+    </>
+  );
+}
+
+function Plan({ plan }: { plan: NonNullable<ReceiptFigures["plan"]> }) {
+  return (
+    <section className={`mt-4 pt-5 ${RULE}`}>
+      <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#5ba897]">{plan.heading}</h2>
+      <div className="mt-2.5 flex flex-col">
+        {plan.rows.map((row, rowIndex) => <div key={row.text} className={rowIndex === 0 ? "pb-2.5" : `py-2.5 ${RULE}`}>
+          <p className="text-[14px] leading-[1.45] text-white">{row.text}</p>
+          {row.exact && <p className="mt-1 text-[11px] tabular-nums tracking-[0.02em] text-white/40">{row.exact}</p>}
+        </div>)}
+      </div>
+      {plan.assumptions.length > 0 && <ul className="mt-3.5 flex flex-col gap-1 text-[11.5px] leading-[1.5] text-white/40">{plan.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul>}
+      {plan.footer && <p className="mt-2 text-[11.5px] leading-[1.5] text-white/40">{plan.footer}</p>}
+    </section>
+  );
+}
+
 /** One receipt form, fed by the shared presentation projection for every kind. */
 export default function ReceiptBody({ payload, createdAt, copy, language, preview = false }: ReceiptBodyProps) {
   const entries = receiptPresentations(payload, createdAt, language);
@@ -43,7 +76,6 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
         {entries.length > 1 && <p className={`mb-4 ${LABEL}`}>{interpolate(copy.selection.turns, { count: entries.length })}</p>}
         {entries.map((entry, index) => {
           const Heading = index === 0 ? "h1" : "h2";
-          const isNegative = Boolean(entry.headline?.trim().startsWith("-"));
           return (
             <Fragment key={index}>
               {index > 0 && <hr className="my-10 border-white/20" />}
@@ -52,18 +84,16 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
                 {entry.stamp && <span className={LABEL}>{entry.stamp}</span>}
               </div>
               <Heading lang={entry.language} className="font-display mt-4 text-[23px] font-medium leading-[1.16] tracking-[-0.5px] text-white sm:text-[30px] sm:tracking-[-0.8px]">{entry.title}</Heading>
-              {!entry.research && (
-                <div className={`mt-4 pt-5 ${RULE}`}>
-                  <div className={`font-display text-[52px] font-medium leading-[0.98] tracking-[-1.9px] tabular-nums sm:text-[62px] sm:tracking-[-2.4px] ${entry.neutralHeadline ? "break-words text-white" : isNegative ? "text-[#d66d75]" : "text-[#5ba897]"}`}>{entry.headline}</div>
-                  {entry.verdict && (
-                    <p className="font-display mt-2.5 text-[15px] font-medium tabular-nums text-white">
-                      {entry.verdict}
-                      {entry.benchmark && entry.benchmarkSymbol && <span className="font-medium text-white/45">{" · "}{entry.benchmarkSymbol} {entry.benchmark}</span>}
-                    </p>
-                  )}
-                  <dl className="mt-4">{entry.rows.map((row) => <Row key={row.label} {...row} />)}</dl>
-                </div>
-              )}
+              {!entry.research && !entry.calculations && <div className={`mt-4 pt-5 ${RULE}`}><Figures figures={entry} /></div>}
+              {entry.calculations?.map((calculation, calculationIndex) => (
+                <Fragment key={calculationIndex}>
+                  <section className={`mt-4 pt-5 ${RULE}`}>
+                    <h2 className={LABEL}>{calculation.title}</h2>
+                    <div className="mt-3"><Figures figures={calculation} /></div>
+                  </section>
+                  {calculation.plan && <Plan plan={calculation.plan} />}
+                </Fragment>
+              ))}
               {entry.research && (
                 <>
                   <div lang={entry.language} className={`mt-4 min-w-0 pt-5 text-[15px] leading-relaxed text-white/90 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_h2]:my-4 [&_h2]:font-medium [&_h3]:my-3 [&_h3]:font-medium [&_a]:underline [&_a]:underline-offset-4 ${RULE}`}>
@@ -85,19 +115,7 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
                 </>
               )}
               {entry.visual && entry.visual.series.length > 1 && <div className={`mt-4 -mx-5 pt-4 sm:-mx-8 ${RULE}`}><ReceiptChart visual={entry.visual} /></div>}
-              {entry.plan && (
-                <section className={`mt-4 pt-5 ${RULE}`}>
-                  <h2 className="text-[10px] font-medium uppercase tracking-[0.1em] text-[#5ba897]">{entry.plan.heading}</h2>
-                  <div className="mt-2.5 flex flex-col">
-                    {entry.plan.rows.map((row, rowIndex) => <div key={row.text} className={rowIndex === 0 ? "pb-2.5" : `py-2.5 ${RULE}`}>
-                      <p className="text-[14px] leading-[1.45] text-white">{row.text}</p>
-                      {row.exact && <p className="mt-1 text-[11px] tabular-nums tracking-[0.02em] text-white/40">{row.exact}</p>}
-                    </div>)}
-                  </div>
-                  {entry.plan.assumptions.length > 0 && <ul className="mt-3.5 flex flex-col gap-1 text-[11.5px] leading-[1.5] text-white/40">{entry.plan.assumptions.map((assumption) => <li key={assumption}>{assumption}</li>)}</ul>}
-                  {entry.plan.footer && <p className="mt-2 text-[11.5px] leading-[1.5] text-white/40">{entry.plan.footer}</p>}
-                </section>
-              )}
+              {entry.plan && <Plan plan={entry.plan} />}
               {entry.ownerNote && <blockquote lang={payload.schema_version === 1 ? undefined : entry.language} className="mt-6 border-l-2 border-white/15 pl-4 text-[14px] leading-relaxed text-white/70">{entry.ownerNote}</blockquote>}
               <div className={`mt-5 pt-4 ${RULE}`}><p className="text-[12.5px] leading-relaxed text-[#c2a44d]">{entry.framing}</p></div>
             </Fragment>

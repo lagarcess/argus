@@ -639,12 +639,13 @@ typed receipt kinds and a closed `turns` wrapper, with one or more turns from
 one owned conversation in conversation order; nothing bounds the count but the
 conversation itself. The research payload is exactly the
 closed field list in that spec's section 4.2. Any grounded math adds the
-`calculation` kind: a computed answer (`metadata.computation` with its card) is
-its own closed leaf, whatever else the turn carries (`docs/DATA_MODEL.md`
-section 12.1.3). A declaration whose rows restate its inputs
-(`ranked_comparison`, receipt policy `cited_facts`) is eligible only when every
-input it holds was cited; otherwise the candidate's reason is
-`private_inputs`.
+`calculation` kind: a computed answer (`metadata.computation` with its cards) is
+its own closed leaf, whatever else the turn carries, with one frozen calculation
+per card (`docs/DATA_MODEL.md` section 12.1.3). A declaration whose rows restate
+its inputs (`ranked_comparison`, receipt policy `cited_facts`) is eligible only
+when every input it holds was cited; otherwise the candidate's reason is
+`private_inputs`. Every card of an answer must be eligible, or the answer is
+refused.
 
 The owner can read share candidates, preview a selection, and create its receipt
 under `/conversations/{conversation_id}/public-excerpt-candidates`,
@@ -3408,9 +3409,13 @@ Missing/foreign results return 404, dead artifacts return
 returns `422 tool_inputs_not_editable`.
 
 When the recomputed card belongs to a free calculation, the same write stores
-`metadata.computation` derived from that card by its one owner
-(`argus.domain.computation_marker`), so the marker and the card never
-disagree and a decision saved afterward stores the recomputed inputs.
+`metadata.computation` derived from every free calculation card the message
+carries, in order, by its one owner (`argus.domain.computation_marker`), so the
+marker and the cards never disagree and a decision saved afterward stores every
+option's current inputs. When the answer stated its figures through
+`metadata.answer_text_template`, `content` is re-rendered from every card the
+template names; a card that no longer computes hands the prose to Argus's own
+lead.
 
 ### Structured Action Semantics
 
@@ -4226,9 +4231,14 @@ Contract rules:
   that one panel. The model never authors a citation line: prompts forbid
   source lines and links, and only URLs the packet returned can enter the
   typed path. Provider-owned hosts remain excluded. Parsing retains a bounded
-  internal citation pool; the public selection step then drops an explicitly
-  dated source published before the period implied by the question, keeps at
-  most one page per publisher, and caps the drawer at five. An undated live
+  internal citation pool. A typed answer's candidates are only the pooled pages
+  it cites, in the order it cites them: the pages it names in `source_urls`,
+  each row's page and each page input of its calculations. A search hit the
+  answer never cites, or a page the response never retrieved, is not
+  published; prose names no pages, so its pool stands. The public selection
+  step then drops an explicitly dated source published before the period
+  implied by the question, keeps at most one page per publisher, and caps the
+  drawer at five. An undated live
   page remains eligible because it can plausibly describe the current period.
   The question date is the date the question is asked on by the New York
   calendar, never the server's date or UTC's; one owner dates it for the
@@ -5098,10 +5108,14 @@ A decision attaches to a computation and carries what a re-run needs. Every
   its inputs after the message is gone.
 
 A computed answer declares its computation in message metadata:
-`metadata.computation = {"kind": "<registered kind>", "inputs": {...}}`. `kind`
-is a lowercase slug of at most 80 characters; `inputs` is a JSON object of at
-most 32 keys that serializes to at most 8,192 characters. Only the backend
-writes this field. On every transcript read, the backend derives
+`metadata.computation = {"kind": "<registered kind>", "inputs": {...}}` for one
+calculation, and `{"calculations": [{"kind", "inputs"}, ...]}` for an answer
+that weighs options, one per card in order (two to four); both shapes read
+alike, and a computation stored in the first shape keeps reading. Each `kind`
+is a lowercase slug of at most 80 characters; each `inputs` is a JSON object of
+at most 32 keys that serializes to at most 8,192 characters. The answer stays
+the unit: one decision stores the whole computation, and opening it re-runs
+every calculation. Only the backend writes this field. On every transcript read, the backend derives
 `decision_note_id` and `decision_state` for the message from `decision_notes`,
 the one owner of that fact, exactly as it does for a result card; a stored copy
 on the message is never trusted, and a decision the owner no longer holds is
@@ -5131,26 +5145,29 @@ computation and `created_at`.
 
 ### `GET /decisions/{decision_id}`
 
-Open an owned decision. The backend re-runs its computation from the stored
-inputs and returns the decision, the effective computation, and the outcome.
+Open an owned decision. The backend re-runs every calculation of its
+computation from the stored inputs and returns the decision, the effective
+computation, and one outcome per calculation in `reruns`, in order.
 The re-run happens only when the decision is opened; nothing reaches out.
 
 ```json
 {
   "decision": { "...": "DecisionNote" },
   "computation": { "kind": "backtest", "inputs": { "source_run_id": "uuid" } },
-  "rerun": {
-    "kind": "backtest",
-    "inputs": { "source_run_id": "uuid" },
-    "status": "confirmation_required",
-    "result": null,
-    "retest": { "type": "retest_run", "source_run_id": "uuid", "...": "..." },
-    "reason_code": null
-  }
+  "reruns": [
+    {
+      "kind": "backtest",
+      "inputs": { "source_run_id": "uuid" },
+      "status": "confirmation_required",
+      "result": null,
+      "retest": { "type": "retest_run", "source_run_id": "uuid", "...": "..." },
+      "reason_code": null
+    }
+  ]
 }
 ```
 
-`rerun.status`:
+`reruns[].status`:
 - `computed`: `result` carries the kind's typed result; `retest` is `null`.
 - `confirmation_required`: the backtest kind. `retest` is the same typed
   `retest_run` action the run dossier offers, because a backtest earns its
@@ -5164,11 +5181,14 @@ The re-run happens only when the decision is opened; nothing reaches out.
 
 ### `POST /decisions/{decision_id}/rerun`
 
-Re-run with changed inputs. Body: `{"inputs": {...}}`, overrides merged over
-the stored inputs under the same bounds as a declared computation. Returns
+Re-run with changed inputs. Body: `{"inputs": {...}, "calculation": 0}`,
+overrides merged over the stored inputs of the calculation at that index
+(default `0`) under the same bounds as a declared computation, while every
+other calculation re-runs from its stored inputs. Returns
 `DecisionOpenResponse`. A re-run never changes the decision or its stored
-computation. Overrides that fail the kind's typed inputs return `422
-validation_error` with the field errors in `context.errors`. The backtest
+computation. Overrides that fail the kind's typed inputs, or an index with no
+calculation, return `422 validation_error` with the field errors in
+`context.errors`. The backtest
 kind's inputs are not editable: overrides answer `unavailable` with
 `inputs_not_editable` rather than minting a run.
 
@@ -5189,13 +5209,14 @@ external call and has editable fields (`argus.domain.calculations`). Each is
 exactly four artifacts: its `ToolDeclaration`, its compute function, its tests
 and its presenter, and each registers a decision kernel of the same name in
 `argus.domain.computations` that calls the declaration's one compute function.
-Its computed answer declares `metadata.computation = {"kind": <tool name>,
-"inputs": <the card's arguments>}`, derived from the card by the marker owner.
+Its computed answer declares `{"kind": <tool name>, "inputs": <the card's
+arguments>}` in `metadata.computation` for each of its cards, derived from the
+cards by the marker owner.
 The computation may carry `symbols`, at most five upper-case asset identities
 derived from typed `symbol` inputs; a computation about no asset omits the key,
 so earlier computations serialize unchanged.
 
-For a calculation kind, `rerun.status` is `computed` and `rerun.result` is the
+For a calculation kind, a rerun's `status` is `computed` and its `result` is the
 declaration's tool result card (`kind: "tool_result"`, identity
 `decision_rerun`), including its `outcome`: inputs with no solution are a
 computed card whose outcome is `invalid` with the field and any typed repair,
@@ -5211,10 +5232,11 @@ the calculation's `currency`, an ISO 4217 code in use; zero is a known input.
 ### `POST /conversations/{conversation_id}/messages/{message_id}/computation/rerun`
 
 Re-run an owned computed answer from Search, decided or not, without touching
-it. Body: `{"inputs": {...}}`, overrides merged over the answer's declared
-computation under the same rules as a decision re-run; an empty object re-runs
-the stored inputs. Returns `{"computation": DecisionComputation, "rerun":
-DecisionRerun}` and stores nothing: the answer, its card and its marker are
+it. Body: `{"inputs": {...}, "calculation": 0}`, overrides merged over that
+calculation of the answer's declared computation under the same rules as a
+decision re-run; an empty object re-runs the stored inputs. Returns
+`{"computation": DecisionComputation, "reruns": [DecisionRerun, ...]}`, one per
+calculation, and stores nothing: the answer, its card and its marker are
 never rewritten. In-chat edits of the latest answer keep the tool-results
 recompute route, which does rewrite the card. `404 not_found` when the message
 is missing, not owned, not in the conversation or not an assistant message;
@@ -5225,12 +5247,15 @@ provider call.
 ### Calculation turns
 
 The answer step owns the math. Where Argus already answers, the answering model
-returns its prose and at most one typed calculation request, and Argus computes
-it: the research provider under the strict answer schema `argus_typed_answer`
-for a question that needs published figures, and the no-search voicing answer
-(`CalculatedVoicedAnswer`) when the user's own figures are enough. The request
-is `{kind, solve_for, inputs: [{name, value, source, source_url, as_of,
-currency}]}`: `kind` is a registered calculation, `solve_for` names the one
+returns its prose and a short list of typed calculation requests, one per option
+the reader weighs (at most four, bounded at parse time), and Argus computes each:
+the research provider under the strict answer schema
+`argus_typed_answer_calculations` for a question that needs published figures,
+and the no-search voicing answer (`CalculatedVoicedAnswer`) when the user's own
+figures are enough. A response recorded under the one-calculation schema reads
+as a list of one. Each request is `{name, kind, solve_for, inputs: [{name,
+value, source, source_url, as_of, currency}]}`: `name` is the calculation's
+short name, `kind` is a registered calculation, `solve_for` names the one
 blank for a kind with an unknown rule, and each input's `source` is `page` (read
 from a page retrieved for this answer, with its URL and date), `market_data` (a
 current price Argus fills from its own market data), `user` (the user's words)
@@ -5271,9 +5296,12 @@ malformed request computes nothing (`answer_calculation_kind_unknown`,
 names, else the profile's resolved currency, else `USD`
 (`calculation_currency_defaulted`).
 
-The prose states the calculation's figures only as `{{name}}` references to the
-card's answer, rows and inputs, filled from the computed card; a cited figure a
-page published may stand in digits beside them, held to its row. A reference
+The prose states each calculation's figures only as references to its card's
+answer, rows and inputs, `{{name}}` with one calculation or
+`{{calculation.name}}` with several, filled from the computed cards; a reference
+more than one card could fill is never guessed, and nothing publishes until
+every calculation computes. A cited figure a page published may stand in digits
+beside them, held to its row. A reference
 that does not resolve, or an assumption that drives the result and that the
 prose never references, replaces the prose with Argus's own lead
 (`answer_figures_replaced`); a plan that does not solve keeps its card under
@@ -5283,11 +5311,12 @@ calculation is recorded with `answer_figures_unsourced` and a log line with the
 count and the figures, and nothing is replaced. Dates, years, a day number beside its year,
 numbers inside words and a number that names a cited product or a model are not
 counted. A computed answer answers `ready_to_respond`:
-`final_response_payload.tool_result_cards` holds the card, the stored message
-carries `tool_result_cards`, the `metadata.computation` derived from it and
-`metadata.answer_text_template = {artifact_id, text, language}`, the prose with
-its references, which the recompute route re-renders into `content` from the
-recomputed card. When the inputs state an amount and a whole-year horizon,
+`final_response_payload.tool_result_cards` holds one card per calculation, the
+stored message carries `tool_result_cards`, the `metadata.computation` derived
+from them and `metadata.answer_text_template = {cards: {<calculation name>:
+<artifact_id>}, text, language}` (a template stored as `{artifact_id, text,
+language}` reads as its one card), the prose with its references, which the
+recompute route re-renders into `content` from the current cards. When the inputs state an amount and a whole-year horizon,
 `next_experiments` offers one `calculation_market_counterfactual` row that runs
 only when tapped, and `next_steps` lists it.
 
@@ -5296,8 +5325,8 @@ lead as `assistant_prompt`, `requested_field` naming the first missing argument,
 no card, and `clarification = {kind: "clarification", reason_code:
 "calculation_input_missing", prompt_source: "degraded_fallback", requested_field,
 requested_fields, missing_inputs: [{name, label}], semantic_needs: [], payload:
-{calculation, requested_field, requested_fields, evidence, retrieved}, options:
-[]}`. Each missing input carries the declaration's `LocalizedText` label key and
+{calculations, requested_field, requested_fields, evidence, retrieved}, options:
+[]}`; a payload stored with one `calculation` reads as a list of one. Each missing input carries the declaration's `LocalizedText` label key and
 the app writes the question from them (`tools.calc.missing_inputs.ask`), so the
 question names exactly the figures only the user knows. `retrieved` keeps the
 pages the answer read and `evidence` the figures it cited from finance data, so
@@ -5307,12 +5336,13 @@ answer; a research turn whose lookup failed and whose fallback asks keeps its
 job in that case stores the same `clarification` and `requested_field` on its
 message with `last_stage_outcome = "await_user_reply"`.
 
-A research answer never turns into a question. When its calculation needs a
+A research answer never turns into a question. When a calculation needs a
 figure only the reader knows, the answer keeps its prose, with any reference to
 an input it already holds filled (a sentence or table row that leans on a result the offer cannot show is left
 out, `offer_prose_results_dropped`; only prose with nothing left is not
 published: `calculation_inputs_not_found`), stores
-`metadata.calculation_offer = {calculation, requested_field, retrieved}` with the
+`metadata.calculation_offer = {calculations, requested_field, requested_fields,
+evidence, retrieved}` with the
 cited inputs and the pages it read, records `calculation_offered`, and leads its
 `next_steps` with a `calculation_offer` row. Tapping the row sends the typed chat
 action `calculation_offer` with the row's label as its display text: the turn asks
@@ -5348,7 +5378,8 @@ retrieval or provider.
 | `POST` | `/conversations/{conversation_id}/messages/{message_id}/computation/refresh` | Look the answer's cited inputs up again |
 
 Listing returns `{items: [{conversation_id, message_id, kind, asked,
-computed_at, symbols}]}`.
+computed_at, symbols}]}`. Only an answer with one calculation is listed: an
+answer that weighs options is not a result of one kind.
 
 Compare takes `{left, right}`, each `{conversation_id, message_id}`, and
 returns `{kind, left, right, differences}`. Each side is `{conversation_id,
@@ -5357,13 +5388,13 @@ message_id, asked, computed_at, card}`; each difference is `{section: "answer"
 exists only for a fact both cards state as a number in the same section and
 unit, so money in another currency has none. `difference` is right minus left,
 computed once in Python and rounded as the card rounds that unit; the client
-only formats it. The same answer twice or two kinds answer `422
-invalid_selection`; a missing or foreign answer answers `404 not_found`; a
+only formats it. The same answer twice, two kinds, or an answer with more than
+one calculation answer `422 invalid_selection`; a missing or foreign answer answers `404 not_found`; a
 message with no computation answers `409 decision_attachment_unsupported`.
 
 Continue creates a conversation and one assistant message whose metadata
-carries the card under a new `artifact_id` at input revision 0, the same
-`computation`, and `continued_from: {conversation_id, message_id}`. The source
+carries every card under a new `artifact_id` at input revision 0, the
+`computation` derived from those copies, and `continued_from: {conversation_id, message_id}`. The source
 conversation is unchanged. It returns `{conversation, message_id}` and is for
 registered accounts only (`can_create_additional_conversation`); a guest
 answers `403 account_conversion_required`.
@@ -5372,9 +5403,12 @@ Refresh looks up again only the inputs whose `source.kind` is `page`, on the
 balanced research configuration under the scenario contract. It is claimed
 under the research allowance before any provider work and recorded in the cost
 ledger. Stated inputs keep their values, and a cited input no page states today
-keeps its stored value and date. It returns `{computation, status, rerun,
-sources}`: `refreshed` carries the recomputed card in `rerun.result` (identity
-`decision_rerun`), and `inputs_not_found` carries none. The stored answer, its
+keeps its stored value and date. An answer with several calculations asks for
+each one's cited inputs under the calculation name its template gave it and
+takes each looked-up calculation back by that name. It returns `{computation,
+status, reruns, sources}`: `refreshed` carries one recomputed card per
+calculation in `reruns[].result` (identity `decision_rerun`), and
+`inputs_not_found` carries none. The stored answer, its
 card and its marker are never rewritten. It answers `409 nothing_to_refresh`
 when no input is cited, `429 research_capacity_exhausted` (context
 `guest_exhausted`) when the allowance refuses, and `503 research_unavailable`
@@ -5392,9 +5426,8 @@ assistant message in the conversation whose marker and card agree:
   "conversation_id": "uuid",
   "asked": "Is Apple expensive at this P/E?",
   "computed_at": "timestamp",
-  "kind": "price_multiple",
   "symbols": ["AAPL"],
-  "card": { "kind": "tool_result", "...": "..." },
+  "cards": [{ "kind": "tool_result", "...": "..." }],
   "decision": { "state": "watching", "note": "Wait for earnings.", "run_label": null },
   "decision_id": "uuid",
   "actions": [
@@ -5405,8 +5438,9 @@ assistant message in the conversation whose marker and card agree:
 ```
 
 `asked` is the owner's own user message just before the answer, bounded to 500
-characters, and the only prose in the dossier. `card` is the answer's tool
-result card: what Argus used, each input with its source, and what came out.
+characters, and the only prose in the dossier. `cards` holds the answer's tool
+result cards, one per calculation in order: what Argus used, each input with
+its source, and what came out.
 `decision` and `decision_id` come from `decision_notes`; `actions` carries at
 most one `answer_decision` whose `availability` follows the same client
 capability negotiation as the run dossier's decision action and which posts to

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { Message } from "@/components/chat/types";
 import type { ToolResultCard } from "@/lib/tool-result-card";
 import {
-  computedAnswerCard,
+  computedAnswerCards,
   deriveConversationRailTicks,
 } from "@/lib/conversation-rail";
 import { hydrateMessagesFromApi } from "@/components/chat/chat-message-projection";
@@ -44,10 +44,11 @@ describe("computed answers on the conversation rail", () => {
     ]);
     const ticks = deriveConversationRailTicks(messages);
     expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([["a1", "result"]]);
-    expect(ticks[0].calculation?.kind).toBe("time_value");
-    expect(ticks[0].calculation?.title.locale_key).toBe("tools.calc.time_value.title_borrow");
-    expect(ticks[0].calculation?.headline?.name).toBe("payment");
-    expect(ticks[0].calculation?.headline?.value).toBeCloseTo(1199.1, 2);
+    expect(ticks[0].calculations).toHaveLength(1);
+    expect(ticks[0].calculations?.[0].kind).toBe("time_value");
+    expect(ticks[0].calculations?.[0].title.locale_key).toBe("tools.calc.time_value.title_borrow");
+    expect(ticks[0].calculations?.[0].headline?.name).toBe("payment");
+    expect(ticks[0].calculations?.[0].headline?.value).toBeCloseTo(1199.1, 2);
     expect(ticks[0].symbols).toEqual([]);
     expect(ticks[0].strategyTitle).toBeNull();
   });
@@ -60,7 +61,7 @@ describe("computed answers on the conversation rail", () => {
     expect(tick.kind).toBe("decision_saved");
     expect(tick.decisionState).toBe("watching");
     expect(tick.symbols).toEqual(["AAPL"]);
-    expect(tick.calculation?.headline?.value).toBe(25);
+    expect(tick.calculations?.[0].headline?.value).toBe(25);
   });
 
   test("an unsuccessful card needs attention and hands its outcome to the treatment owner", () => {
@@ -69,7 +70,7 @@ describe("computed answers on the conversation rail", () => {
     expect(tick.kind).toBe("error_recovery");
     expect(tick.toolOutcome?.status).toBe("invalid");
     expect(tick.toolOutcome?.failure?.code).toBe("payment_below_interest");
-    expect(tick.calculation).toBeUndefined();
+    expect(tick.calculations).toBeUndefined();
   });
 
   test("a card without a backend-declared computation never ticks, however it reads", () => {
@@ -79,7 +80,7 @@ describe("computed answers on the conversation rail", () => {
       { id: "a2", conversation_id: "c1", role: "assistant", content: "Research answer with sources.", created_at: "2026-09-11T12:01:00Z", metadata: { research: { schema_version: "argus_research/v1", sources: [{ url: "https://example.com", title: "Example" }] } } },
     ]);
     expect(deriveConversationRailTicks(messages)).toEqual([]);
-    expect(computedAnswerCard(messages[0])).toBeNull();
+    expect(computedAnswerCards(messages[0])).toBeNull();
   });
 
   test("a marker whose kind names no card on the message is not a result", () => {

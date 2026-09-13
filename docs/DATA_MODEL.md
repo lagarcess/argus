@@ -515,19 +515,24 @@ Represents individual messages within a conversation.
   artifact identity; repeated calls remain independent through completion and
   reload. The message remains the durable owner after direct edits, rather than
   writing a competing checkpoint copy.
-- A computed answer is an artifact without a run. Its card lives in
-  `metadata.tool_result_cards` and its marker in `metadata.computation`, which
-  the chat turn, the recompute route and the continue route all write from the
-  card; nothing else is stored. A research or no-search answer that computed
-  its calculation carries the same pair, beside its `research` sidecar when it
-  retrieved, and `metadata.answer_text_template` (`{artifact_id, text,
-  language}`), the prose with its `{{name}}` figure references, which the
-  recompute route re-renders into `content` from the recomputed card. A pending
-  calculation question keeps `{calculation, requested_field, retrieved}` in its
-  clarification payload until the reply completes it. A research answer whose
-  calculation needs figures only the reader knows stores the same shape as
-  `metadata.calculation_offer` instead; the typed `calculation_offer` action turns
-  it into that question.
+- A computed answer is an artifact without a run. Its cards, one per
+  calculation, live in `metadata.tool_result_cards` and its one marker in
+  `metadata.computation`, which the chat turn, the recompute route and the
+  continue route all write from every card in order; nothing else is stored.
+  The marker is `{kind, inputs}` for one calculation and `{calculations: [{kind,
+  inputs}, ...]}` for an answer that weighs options; both read alike. A
+  research or no-search answer that computed its calculations carries the same
+  pair, beside its `research` sidecar when it retrieved, and
+  `metadata.answer_text_template` (`{cards: {<calculation name>: <artifact_id>},
+  text, language}`; one stored as `{artifact_id, text, language}` reads as its
+  one card), the prose with its figure references, which the recompute route
+  re-renders into `content` from the current cards. A pending calculation
+  question keeps `{calculations, requested_field, requested_fields, evidence,
+  retrieved}` in its clarification payload until the reply completes it; a
+  payload stored with one `calculation` reads as a list of one. A research
+  answer whose calculations need figures only the reader knows stores the same
+  shape as `metadata.calculation_offer` instead; the typed `calculation_offer`
+  action turns it into that question.
   `metadata.continued_from` (`{conversation_id, message_id}`) marks a result
   continued in a new chat; the source message is never changed. Comparing,
   refreshing and re-running a computed answer store nothing: the stored card
@@ -1083,7 +1088,10 @@ computation owner and stores the current decision, not an append-only history:
 - A computed-answer decision attaches to the assistant message that carried
   the answer. `source_message_id` and `computation` are set; the three lineage
   columns are null. The computation is stored so the decision survives the
-  message and can be re-run when opened.
+  message and can be re-run when opened. An answer that weighs options still
+  takes one decision, which stores every calculation and re-runs each when
+  opened; the column has no shape check, so this needed no migration, and
+  `UNIQUE(user_id, source_message_id)` still holds.
 
 Fields:
 - `id`: `uuid` (Primary Key)
@@ -1093,7 +1101,8 @@ Fields:
 - `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
 - `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
 - `source_message_id`: `uuid` (Nullable, references `messages.id` ON DELETE SET NULL)
-- `computation`: `jsonb` (Nullable; `{"kind": <slug>, "inputs": <object>}`)
+- `computation`: `jsonb` (Nullable; `{"kind": <slug>, "inputs": <object>}`, or
+  `{"calculations": [{"kind", "inputs"}, ...]}` for an answer that weighs options)
 - `decision_state`: `text` (`watching`, `promising`, `rejected`, `revisit_later`)
 - `note`: `text` (Nullable)
 - `created_at`: `timestamptz`
@@ -1457,7 +1466,11 @@ same result fact and display owners as the result card.
 
 The calculation leaf is `{kind: "calculation", question, title, answer, rows,
 inputs, notes, computed_at, owner_note, content_language, framing:
-"calculation_not_advice", provenance_mark}`. The title and every label, unit,
+"calculation_not_advice", provenance_mark}` for one calculation. For an answer
+that weighs options it carries `calculations: [{title, answer, rows, inputs,
+notes}, ...]` in place of those five fields, one per card in order; every card
+must pass its receipt policy or the answer is refused, and a leaf frozen in the
+first shape still renders. The title and every label, unit,
 `value_text` and note is `{locale_key, interpolation_args}`. A fact is `{label,
 value, value_text, unit, source}`, where `source` is `{title, url, date}` and
 exists only for a page. `inputs` holds only the inputs a public page stated or a

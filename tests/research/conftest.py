@@ -193,13 +193,16 @@ def typed_answer_text(
     calculation: dict[str, Any] | None = None,
     follow_up_questions: list[str] | None = None,
     declined: bool = False,
+    source_urls: list[str] | None = None,
 ) -> str:
-    """The provider's message text under the strict typed answer schema."""
+    """The provider's message text under the strict typed answer schema: the
+    pages it names, and its one calculation, when given, as a list of one."""
     return json.dumps(
         {
             "answer_markdown": answer,
             "rows": rows,
-            "calculation": calculation,
+            "source_urls": source_urls or [],
+            "calculations": [calculation] if calculation else [],
             "follow_up_questions": follow_up_questions or [],
             "declined": declined,
         }

@@ -76,9 +76,9 @@ def test_search_carries_the_answer_dossier_beside_an_unchanged_run_dossier() -> 
     assert dossier["message_id"] == message_id
     assert dossier["conversation_id"] == conversation["id"]
     assert dossier["asked"] == "Is Apple expensive at this P/E?"
-    assert dossier["kind"] == "price_multiple"
+    assert dossier["cards"][0]["tool_name"] == "price_multiple"
     assert dossier["symbols"] == ["AAPL"]
-    assert dossier["card"] == card
+    assert dossier["cards"] == [card]
     assert dossier["decision"] is None
     assert dossier["actions"] == [
         {
@@ -154,7 +154,7 @@ def test_the_latest_computed_answer_wins_and_a_prefix_resolves_the_asset() -> No
     row = next(item for item in items if item["type"] == "conversation")
     assert row["answer_dossier"]["message_id"] == later_id
     assert row["answer_dossier"]["asked"] == "And at 180?"
-    assert row["answer_dossier"]["card"]["arguments"]["price"] == 180
+    assert row["answer_dossier"]["cards"][0]["arguments"]["price"] == 180
 
 
 def test_an_answer_without_a_marker_or_with_a_disagreeing_card_has_no_dossier() -> None:
@@ -209,16 +209,16 @@ def test_recompute_from_search_returns_the_new_result_beside_an_untouched_answer
     assert changed.status_code == 200, changed.text
     body = changed.json()
     assert body["computation"]["inputs"] == card["arguments"]
-    assert body["rerun"]["status"] == "computed"
-    assert body["rerun"]["inputs"]["price"] == 300
-    assert body["rerun"]["result"]["presentation"]["answer"]["value"] == pytest.approx(
-        50.0
-    )
+    assert body["reruns"][0]["status"] == "computed"
+    assert body["reruns"][0]["inputs"]["price"] == 300
+    assert body["reruns"][0]["result"]["presentation"]["answer"][
+        "value"
+    ] == pytest.approx(50.0)
     stored = api_state.store.messages[conversation["id"]][-1].metadata
     assert stored["tool_result_cards"][0]["arguments"]["price"] == 150
     assert stored["computation"]["inputs"]["price"] == 150
     same = client.post(path, json={"inputs": {}})
-    assert same.json()["rerun"]["result"]["presentation"]["answer"][
+    assert same.json()["reruns"][0]["result"]["presentation"]["answer"][
         "value"
     ] == pytest.approx(25.0)
     unknown = client.post(path, json={"inputs": {"multiple": 30}})

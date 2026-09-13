@@ -309,11 +309,14 @@ class ResearchPacket(BaseModel):
     # cited rows; the turn names them under the answer as figures it could
     # not tie to a source, from their own typed subject and label.
     unsourced_rows: tuple[RetrievedRow, ...] = ()
-    # The one calculation the answer asks Argus to compute, as the provider
-    # wrote it under the typed answer schema; the answer step validates and
-    # computes it. JSON here because the calculation catalogue imports the
-    # tool contracts that import this module.
-    calculation: dict[str, Any] | None = None
+    # The calculations the answer asks Argus to compute, one per option, as the
+    # provider wrote them under the typed answer schema; the answer step
+    # validates and computes them. JSON here because the calculation catalogue
+    # imports the tool contracts that import this module.
+    calculations: tuple[dict[str, Any], ...] = ()
+    # The retrieved pages the answer says it relies on, as the provider wrote
+    # them; source selection publishes only pages the answer cites.
+    source_urls: tuple[str, ...] = ()
     # Questions the answer suggests the reader may ask next, as the provider
     # wrote them; the next-steps list cleans and bounds them.
     follow_up_questions: tuple[str, ...] = ()

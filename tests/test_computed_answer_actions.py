@@ -340,7 +340,7 @@ def test_refresh_looks_up_the_cited_inputs_and_never_rewrites_the_answer(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["status"] == "refreshed"
-    card = body["rerun"]["result"]
+    card = body["reruns"][0]["result"]
     assert card["outcome"]["status"] == "succeeded"
     assert card["arguments"]["price"] == 218.36
     assert card["arguments"]["per_share"] == 4.5

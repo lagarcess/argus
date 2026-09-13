@@ -53,8 +53,17 @@ def _resolve(request, *, retrieved=(RATE_PAGE,), currency="DOP", notes=None):
 
 
 def _published(template, *, inputs=LOAN, solve_for="payment", notes=None, language="en"):
-    return ac.publish_calculation(
-        _request("time_value", inputs, solve_for),
+    return _published_many(
+        template,
+        [_request("time_value", inputs, solve_for)],
+        notes=notes,
+        language=language,
+    )
+
+
+def _published_many(template, requests, *, notes=None, language="en"):
+    return ac.publish_calculations(
+        requests,
         template=template,
         language=language,
         catalog=get_tool_catalog(),
@@ -189,7 +198,7 @@ def test_the_prose_states_the_computed_payment_through_its_reference() -> None:
         f"Paying DOP 180,000 at 14% over 48 months costs **{payment}** a month."
     )
     assert published.template == {
-        "artifact_id": card.artifact_id,
+        "cards": {"calculation_1": card.artifact_id},
         "text": template,
         "language": "en",
     }
@@ -265,7 +274,7 @@ def test_a_declared_input_held_as_text_is_stated_as_the_card_received_it() -> No
         f"Starting 2026-10-01, the payment is **{payment}** a month."
     )
     assert published.template is not None
-    assert ac.unresolved_references(template, card) == []
+    assert ac.unresolved_references(template, {"calculation_1": card}) == []
 
 
 def test_a_currency_written_before_a_money_reference_is_not_stated_twice() -> None:
@@ -333,7 +342,7 @@ def test_an_offer_keeps_its_prose_and_leaves_out_what_leans_on_a_result() -> Non
         "You owe {{present_value}}. At that balance the payment is {{nowhere}}.\n\n"
         "| Input | Value |\n|---|---|\n| Payment | {{nowhere}} |\n| Rate | {{annual_rate_pct}} |"
     )
-    text, dropped = ac.render_offer_prose(template, card)
+    text, dropped = ac.render_offer_prose(template, {"calculation_1": card})
     assert text.startswith("You owe DOP 180,000.")
     assert "{{" not in text and "| Rate | 14% |" in text
     assert dropped == 2
@@ -405,3 +414,107 @@ def test_a_figure_from_finance_data_is_cited_without_the_provider_url() -> None:
         notes=[],
     )
     assert unevidenced is not None and "per_share" in unevidenced.not_looked_up
+
+
+LOAN_AT_12 = [
+    {**item, "value": 12} if item["name"] == "annual_rate_pct" else item for item in LOAN
+]
+
+
+def _named(name: str, inputs: list[dict[str, Any]], solve_for: str = "payment"):
+    return AnswerCalculation.model_validate(
+        {"name": name, "kind": "time_value", "solve_for": solve_for, "inputs": inputs}
+    )
+
+
+def test_each_option_computes_its_own_card_and_the_prose_names_each() -> None:
+    template = (
+        "At {{bank_a.annual_rate_pct}} the payment is {{bank_a.payment}}; at "
+        "{{bank_b.annual_rate_pct}} it is {{bank_b.payment}}."
+    )
+    published = _published_many(
+        template, [_named("Bank A", LOAN), _named("Bank B", LOAN_AT_12)]
+    )
+    cards = ac.cards_in(published.patch)
+    assert [card.arguments["annual_rate_pct"] for card in cards] == [14, 12]
+    first, second = (ac.figure_text(card.presentation.answer) for card in cards)
+    assert first != second
+    assert (
+        published.answer_text == f"At 14% the payment is {first}; at 12% it is {second}."
+    )
+    assert published.template == {
+        "cards": {"bank_a": cards[0].artifact_id, "bank_b": cards[1].artifact_id},
+        "text": template,
+        "language": "en",
+    }
+
+
+def test_a_reference_two_options_both_hold_is_never_guessed() -> None:
+    notes: list[str] = []
+    published = _published_many(
+        "The payment is {{payment}}.",
+        [_named("a", LOAN), _named("b", LOAN_AT_12)],
+        notes=notes,
+    )
+    assert published.template is None
+    assert published.answer_text == ac.fallback_answer_lead("en", succeeded=True)
+    assert ac.FIGURE_CHECK_REASON_CODE in notes
+
+
+def test_an_option_that_cannot_compute_holds_back_every_card() -> None:
+    uncited = [
+        {**item, "source_url": "https://elsewhere.example"}
+        if item["name"] == "annual_rate_pct"
+        else item
+        for item in LOAN
+    ]
+    held = _published_many(
+        "{{a.payment}} or {{b.payment}}", [_named("a", LOAN), _named("b", uncited)]
+    )
+    assert held.patch == {} and held.not_looked_up == ("annual_rate_pct",)
+    owing = [
+        {"name": "periods", "value": None, "source": "user"}
+        if item["name"] == "periods"
+        else item
+        for item in LOAN
+    ]
+    asked = _published_many(
+        "{{a.payment}} or {{b.payment}}",
+        [
+            _named("a", owing),
+            _named(
+                "b",
+                [
+                    {**item, "value": 12} if item["name"] == "annual_rate_pct" else item
+                    for item in owing
+                ],
+            ),
+        ],
+    )
+    assert asked.patch == {} and asked.owed == ("periods",)
+
+
+def test_a_calculation_named_in_the_readers_language_still_reads() -> None:
+    published = _published_many(
+        "En dólares paga {{dólares.payment}} al mes.",
+        [_named("Dólares", LOAN)],
+        language="es-419",
+    )
+    card = ac.card_in(published.patch)
+    payment = ac.figure_text(card.presentation.answer)
+    assert published.answer_text == f"En dólares paga {payment} al mes."
+    assert published.template is not None
+    assert ac.template_cards(published.template) == {"dolares": card.artifact_id}
+
+
+def test_a_template_stored_before_answers_carried_several_reads_its_one_card() -> None:
+    card = ac.card_in(_published("It costs {{payment}}.").patch)
+    stored = {
+        "artifact_id": card.artifact_id,
+        "text": "It costs {{payment}}.",
+        "language": "en",
+    }
+    assert ac.template_cards(stored) == {"calculation": card.artifact_id}
+    text, failure = ac.render_answer_text(stored["text"], {"calculation": card})
+    assert failure is None
+    assert text == f"It costs {ac.figure_text(card.presentation.answer)}."

@@ -1,7 +1,7 @@
 """A research answer's calculation, and the answer when a lookup fails.
 
-The research provider returns prose and at most one calculation; it computes
-here through the answer step, with the pages this answer retrieved as the only
+The research provider returns prose and its calculations; they compute here
+through the answer step, with the pages this answer retrieved as the only
 pages an input may cite. When the lookup fails or a page input was not found,
 the no-search step answers from Argus market data and stated assumptions and
 says what it could not look up: a failed lookup never becomes the answer.
@@ -17,19 +17,20 @@ from loguru import logger
 from pydantic import ValidationError
 
 from argus.agent_runtime.answer_calculation import (
+    calculation_names,
     card_in,
     computed_answer_patch,
     latest_market_close,
-    publish_calculation,
+    publish_calculations,
     render_offer_prose,
     resolve_calculation,
 )
 from argus.agent_runtime.calculated_answer import (
     CALCULATION_OFFERED_REASON_CODE,
-    PENDING_PAYLOAD_KEY,
     CalculatedAnswer,
     answer_from_published,
     calculated_answer,
+    pending_requests,
 )
 from argus.agent_runtime.state.models import UserState
 from argus.domain.calculations.answer_request import AnswerCalculation
@@ -65,15 +66,17 @@ def packet_answer(
     language: str,
     notes: list[str],
 ) -> CalculatedAnswer | NotComputed | None:
-    """The answer's computed calculation, what it could not compute, or None
-    when it returned no calculation and its prose stands on its own."""
-    if packet.calculation is None:
+    """The answer's computed calculations, what they could not compute, or None
+    when it returned none and its prose stands on its own."""
+    if not packet.calculations:
         if "{{" in packet.answer_markdown:
             _note(notes, MALFORMED_CALCULATION_REASON_CODE)
             return NotComputed(CALCULATION_NOT_COMPUTED_CODE, ())
         return None
     try:
-        request = AnswerCalculation.model_validate(packet.calculation)
+        requests = [
+            AnswerCalculation.model_validate(item) for item in packet.calculations
+        ]
     except ValidationError:
         _note(notes, MALFORMED_CALCULATION_REASON_CODE)
         return NotComputed(CALCULATION_NOT_COMPUTED_CODE, ())
@@ -81,8 +84,8 @@ def packet_answer(
 
     retrieved = retrieved_pages(packet)
     evidence = cited_evidence(packet)
-    published = publish_calculation(
-        request,
+    published = publish_calculations(
+        requests,
         template=packet.answer_markdown,
         language=language,
         catalog=get_tool_catalog(),
@@ -98,7 +101,7 @@ def packet_answer(
     if published.not_looked_up:
         return NotComputed(CALCULATION_NOT_COMPUTED_CODE, published.not_looked_up)
     return answer_from_published(
-        request,
+        requests,
         published,
         prose=packet.answer_markdown,
         language=language,
@@ -115,7 +118,7 @@ def offered_calculation(
     user: UserState,
     notes: list[str],
 ) -> tuple[str, dict[str, Any]] | None:
-    """A research answer never turns into a question: its calculation is offered
+    """A research answer never turns into a question: its calculations are offered
     on the reader's own figures, and the prose stands with any input it already
     holds filled and each sentence that leans on a result the offer cannot show
     left out. None only when nothing of the prose is left."""
@@ -123,28 +126,34 @@ def offered_calculation(
         from argus.domain.capability_registry import get_tool_catalog
 
         try:
-            request = AnswerCalculation.model_validate(offer.get(PENDING_PAYLOAD_KEY))
-            resolved = resolve_calculation(
-                request,
-                catalog=get_tool_catalog(),
-                retrieved=[
-                    ResearchSource.model_validate(page)
-                    for page in offer.get("retrieved") or []
-                ],
-                currency=user.currency,
-                subject_symbol=_first_symbol(subjects),
-                market_close=latest_market_close,
-                notes=notes,
-                evidence=[
-                    RetrievedRow.model_validate(row)
-                    for row in offer.get("evidence") or []
-                ],
-            )
-            if resolved is None:
+            requests = [
+                AnswerCalculation.model_validate(item) for item in pending_requests(offer)
+            ]
+            retrieved = [
+                ResearchSource.model_validate(page)
+                for page in offer.get("retrieved") or []
+            ]
+            evidence = [
+                RetrievedRow.model_validate(row) for row in offer.get("evidence") or []
+            ]
+            if not requests:
                 return None
-            prose, dropped = render_offer_prose(
-                prose, card_in(computed_answer_patch(resolved))
-            )
+            cards = {}
+            for name, request in zip(calculation_names(requests), requests, strict=True):
+                resolved = resolve_calculation(
+                    request,
+                    catalog=get_tool_catalog(),
+                    retrieved=retrieved,
+                    currency=user.currency,
+                    subject_symbol=_first_symbol(subjects),
+                    market_close=latest_market_close,
+                    notes=notes,
+                    evidence=evidence,
+                )
+                if resolved is None:
+                    return None
+                cards[name] = card_in(computed_answer_patch(resolved))
+            prose, dropped = render_offer_prose(prose, cards)
         except (ValidationError, KeyError, ValueError):
             return None
         if not prose.strip():
@@ -155,7 +164,7 @@ def offered_calculation(
         notes.append(CALCULATION_OFFERED_REASON_CODE)
     logger.info(
         "Calculation offered on the reader's own figures",
-        kind=(offer.get(PENDING_PAYLOAD_KEY) or {}).get("kind"),
+        kinds=[item.get("kind") for item in pending_requests(offer)],
         requested_field=offer.get("requested_field"),
     )
     return prose, offer

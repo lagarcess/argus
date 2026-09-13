@@ -13,6 +13,7 @@ from argus.domain.computations import (
     RerunContext,
     kernel_for,
     registered_kinds,
+    rerun_calculation,
     rerun_computation,
 )
 from argus.domain.tool_contracts import ToolResultCard
@@ -39,7 +40,7 @@ def test_a_kernel_re_run_is_the_same_card_the_chat_turn_produced(declaration) ->
 
     arguments = worked_arguments(declaration.name)
     card = run_calculation(declaration.name, arguments)
-    rerun = rerun_computation(
+    (rerun,) = rerun_computation(
         DecisionComputation(kind=declaration.name, inputs=card.arguments),
         overrides=None,
         context=_CONTEXT,
@@ -65,7 +66,7 @@ def test_an_override_re_runs_through_the_declaration_and_keeps_the_unknown() -> 
         },
     )
     computation = DecisionComputation(kind="time_value", inputs=card.arguments)
-    changed = rerun_computation(
+    (changed,) = rerun_computation(
         computation, overrides={"annual_rate_pct": 5}, context=_CONTEXT
     )
     assert changed.status == "computed"
@@ -91,7 +92,7 @@ def test_a_no_solution_re_run_is_computed_with_the_typed_outcome_on_the_card() -
             "periods": None,
         },
     )
-    rerun = rerun_computation(
+    (rerun,) = rerun_computation(
         DecisionComputation(kind="time_value", inputs=card.arguments),
         overrides={"payment": 2_000},
         context=_CONTEXT,
@@ -103,9 +104,9 @@ def test_a_no_solution_re_run_is_computed_with_the_typed_outcome_on_the_card() -
 
 
 def test_stored_inputs_that_no_longer_fit_the_kind_are_invalid_inputs() -> None:
+    computation = DecisionComputation(kind="time_value", inputs={"nonsense": 1})
     with pytest.raises(InvalidComputationInputs):
-        rerun_computation(
-            DecisionComputation(kind="time_value", inputs={"nonsense": 1}),
-            overrides=None,
-            context=_CONTEXT,
-        )
+        rerun_calculation(computation.calculations[0], overrides=None, context=_CONTEXT)
+    (rerun,) = rerun_computation(computation, overrides=None, context=_CONTEXT)
+    assert rerun.status == "unavailable"
+    assert rerun.reason_code == "invalid_inputs"

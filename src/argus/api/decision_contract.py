@@ -17,6 +17,7 @@ The same rule is a check constraint on ``decision_notes``.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from datetime import date, datetime
 from typing import Any, Literal
 
@@ -48,6 +49,8 @@ DECISION_NOTE_WRITE_MAX_LENGTH = 500
 COMPUTATION_KIND_MAX_LENGTH = 80
 COMPUTATION_INPUTS_MAX_KEYS = 32
 COMPUTATION_INPUTS_MAX_SERIALIZED_LENGTH = 8_192
+# Calculations one computation holds: an answer carries at most this many.
+MAX_COMPUTATION_CALCULATIONS = 4
 
 
 def bounded_computation_inputs(value: dict[str, Any]) -> dict[str, Any]:
@@ -68,13 +71,8 @@ def bounded_computation_inputs(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-class DecisionComputation(BaseModel):
-    """What a decision can re-run: a registered kind and its typed inputs.
-
-    ``symbols`` names the assets the computation is about, derived from its
-    typed inputs by the marker owner, so Search can count a computed answer
-    under an asset without reading its card.
-    """
+class DecisionCalculation(BaseModel):
+    """One calculation a computation re-runs: a registered kind and its typed inputs."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -84,20 +82,59 @@ class DecisionComputation(BaseModel):
         pattern=r"^[a-z][a-z0-9_]*$",
     )
     inputs: dict[str, Any] = Field(default_factory=dict)
-    symbols: list[str] = Field(default_factory=list, max_length=5)
 
     @field_validator("inputs")
     @classmethod
     def bound_inputs(cls, value: dict[str, Any]) -> dict[str, Any]:
         return bounded_computation_inputs(value)
 
-    @model_serializer(mode="wrap")
-    def _omit_absent_symbols(self, handler: SerializerFunctionWrapHandler):
-        # A computation about no asset serializes exactly as it did before.
-        data = handler(self)
-        if not data.get("symbols"):
-            data.pop("symbols", None)
+
+class DecisionComputation(BaseModel):
+    """What a decision can re-run: every calculation of the answer, in order.
+
+    One calculation serializes as ``{kind, inputs}``, exactly as every
+    computation stored before answers carried several, and more as
+    ``{calculations: [{kind, inputs}, ...]}``; both shapes read back alike.
+    ``symbols`` names the assets the computation is about, derived from its
+    typed inputs by the marker owner, so Search can count a computed answer
+    under an asset without reading its cards.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    calculations: list[DecisionCalculation] = Field(
+        min_length=1, max_length=MAX_COMPUTATION_CALCULATIONS
+    )
+    symbols: list[str] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _one_calculation_shape(cls, data: Any) -> Any:
+        if isinstance(data, Mapping) and "calculations" not in data and "kind" in data:
+            rest = {
+                key: value for key, value in data.items() if key not in ("kind", "inputs")
+            }
+            single = {"kind": data["kind"], "inputs": data.get("inputs", {})}
+            return {**rest, "calculations": [single]}
         return data
+
+    @model_serializer(mode="wrap")
+    def _stored_shape(self, handler: SerializerFunctionWrapHandler):
+        # One calculation, or one about no asset, serializes exactly as before.
+        data = handler(self)
+        calculations = data.pop("calculations")
+        shaped = (
+            dict(calculations[0])
+            if len(calculations) == 1
+            else {"calculations": calculations}
+        )
+        if data.get("symbols"):
+            shaped["symbols"] = data["symbols"]
+        return shaped
+
+    @property
+    def kinds(self) -> list[str]:
+        return [calculation.kind for calculation in self.calculations]
 
 
 class DecisionNote(BaseModel):
@@ -151,11 +188,13 @@ class MessageDecisionResponse(BaseModel):
 
 
 class DecisionRerunRequest(BaseModel):
-    """Input overrides merged over the stored inputs; the decision is unchanged."""
+    """Input overrides merged over one calculation's stored inputs, by its index
+    in the computation; the decision is unchanged."""
 
     model_config = ConfigDict(extra="forbid")
 
     inputs: dict[str, Any] = Field(default_factory=dict)
+    calculation: int = Field(default=0, ge=0, lt=MAX_COMPUTATION_CALCULATIONS)
 
     @field_validator("inputs")
     @classmethod
@@ -262,13 +301,16 @@ class DecisionRerun(BaseModel):
 
 
 class DecisionOpenResponse(BaseModel):
+    """A decision and one re-run per calculation, in the computation's order."""
+
     decision: DecisionNote
     computation: DecisionComputation
-    rerun: DecisionRerun
+    reruns: list[DecisionRerun] = Field(max_length=MAX_COMPUTATION_CALCULATIONS)
 
 
 class MessageComputationRerunResponse(BaseModel):
-    """A computed answer re-run from Search; the stored answer is untouched."""
+    """A computed answer re-run from Search, one re-run per calculation; the
+    stored answer is untouched."""
 
     computation: DecisionComputation
-    rerun: DecisionRerun
+    reruns: list[DecisionRerun] = Field(max_length=MAX_COMPUTATION_CALCULATIONS)

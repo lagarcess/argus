@@ -20,7 +20,7 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.answer_dossiers import (
-    computed_answer_card,
+    computed_answer_cards,
     computed_symbols,
     current_answer_decision,
     latest_computed_answer,
@@ -52,11 +52,11 @@ def attach_answer_dossiers(
         if found is None:
             attached.append(item)
             continue
-        message, card = found
+        message, cards = found
         decision = decisions.get(str(message["id"]))
         dossier = project_answer_dossier(
             message=message,
-            card=card,
+            cards=cards,
             asked=question_for_answer(user, message),
             decision=decision.model_dump(mode="python") if decision else None,
             decision_action_availability=decision_action_availability,
@@ -137,9 +137,9 @@ def _latest_answers(
             user_id=user.id, conversation_ids=ids
         )
         for conversation_id, row in rows.items():
-            card = computed_answer_card(row)
-            if card is not None:
-                found[conversation_id] = (row, card)
+            cards = computed_answer_cards(row)
+            if cards is not None:
+                found[conversation_id] = (row, cards)
         return found
     for conversation_id in ids:
         if api_state.store.conversation_owners.get(conversation_id) != user.id:

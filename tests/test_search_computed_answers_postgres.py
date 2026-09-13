@@ -22,9 +22,15 @@ from uuid import UUID, uuid4
 
 import pytest
 from argus.api import state as api_state
+from argus.api.decision_contract import DecisionComputation
 from argus.api.schemas import User
 from argus.api.search_computed import with_computed_results
-from argus.domain.computation_marker import computation_from_tool_card
+from argus.domain.answer_dossiers import computed_answer_cards
+from argus.domain.computation_marker import (
+    computation_from_tool_card,
+    computation_from_tool_cards,
+)
+from argus.domain.tool_contracts import ToolResultCard
 from psycopg.types.json import Jsonb
 from test_search_postgres import (
     _connect,
@@ -344,3 +350,75 @@ def test_answers_of_one_kind_are_the_owners_newest_in_live_conversations(
         user_id=str(owner_id), kind="time_value", limit=10
     )
     assert [row["id"] for row in loans] == [str(loan_answer)]
+
+
+def _weighing(*answers: dict[str, Any]) -> dict[str, Any]:
+    """The metadata an answer weighing options stores: every card and one marker."""
+    cards = [
+        ToolResultCard.model_validate(card).model_copy(update={"call_id": str(uuid4())})
+        for answer in answers
+        for card in answer["tool_result_cards"]
+    ]
+    computation = computation_from_tool_cards(cards)
+    assert computation is not None
+    return {
+        "tool_result_cards": [card.model_dump(mode="json") for card in cards],
+        "computation": computation.model_dump(mode="json"),
+    }
+
+
+def test_an_answer_weighing_options_reads_back_whole_and_is_not_one_kind(
+    search_identities,  # noqa: F811 - pytest fixture
+) -> None:
+    owner_id = search_identities["owner"]
+    options = _weighing(
+        _computed_answer("price_multiple"),
+        _computed_answer("price_multiple", symbol="MSFT", price=410),
+    )
+    single = _computed_answer("price_multiple")
+    assert set(options["computation"]) == {"calculations", "symbols"}
+    assert options["computation"]["symbols"] == ["AAPL", "MSFT"]
+    with _connect() as connection, connection.cursor() as cursor:
+        weighed = _insert_conversation(
+            cursor, user_id=owner_id, timestamp=NOW, title="Apple or Microsoft"
+        )
+        alone = _insert_conversation(
+            cursor, user_id=owner_id, timestamp=NOW, title="Apple alone"
+        )
+        options_answer = _message(cursor, owner_id, weighed, 30, options)
+        single_answer = _message(cursor, owner_id, alone, 20, single)
+        _insert_answer_decision(
+            cursor,
+            user_id=owner_id,
+            conversation_id=weighed,
+            message_id=options_answer,
+            computation=options["computation"],
+            decision_state="promising",
+            timestamp=NOW - timedelta(minutes=10),
+        )
+
+    gateway = _gateway()
+    latest = gateway.latest_computed_answers(
+        user_id=str(owner_id), conversation_ids=[str(weighed)]
+    )
+    row = latest[str(weighed)]
+    assert row["id"] == str(options_answer)
+    cards = computed_answer_cards(row)
+    assert cards is not None and len(cards) == 2
+    marker = DecisionComputation.model_validate(row["metadata"]["computation"])
+    assert marker.kinds == ["price_multiple", "price_multiple"]
+    symbol_rows = gateway.computed_answer_rows_for_symbols(
+        user_id=str(owner_id), conversation_id=str(weighed)
+    )
+    assert [symbol_row["id"] for symbol_row in symbol_rows] == [str(options_answer)]
+    listed = gateway.computed_answers_of_kind(
+        user_id=str(owner_id), kind="price_multiple", limit=10
+    )
+    assert [listed_row["id"] for listed_row in listed] == [
+        str(single_answer)
+    ], "an answer weighing options is not a result of one kind"
+    decisions = gateway.current_decisions_for_attachments(
+        user_id=str(owner_id), artifact_ids=[], message_ids=[str(options_answer)]
+    )
+    stored = decisions[str(options_answer)].computation
+    assert stored is not None and stored == marker

@@ -1,10 +1,10 @@
-"""The one typed calculation an answer asks Argus to compute.
+"""The typed calculations an answer asks Argus to compute.
 
 An answering model, the research provider or the no-search voicing model,
-returns its prose and at most one ``AnswerCalculation``: a declared kind and
-each input with its source. The kinds, argument names and result names come
-from the declarations, so the catalogue a model reads and the math that runs
-share one owner. Names are advertised as enums and parsed leniently: one stray
+returns its prose and a short list of ``AnswerCalculation``, one per option the
+reader weighs: each a declared kind and each input with its source. The kinds,
+argument names and result names come from the declarations, so the catalogue a
+model reads and the math that runs share one owner. Names are advertised as enums and parsed leniently: one stray
 name never fails the whole answer, and the runtime drops it on record.
 """
 
@@ -20,6 +20,8 @@ from argus.domain.tool_declaration import ToolDeclaration
 # Arguments the runtime supplies, never a model.
 RUNTIME_ARGUMENTS = frozenset({"sources"})
 MAX_ANSWER_INPUTS = 16
+# Calculations one answer carries, bounded at parse time like its inputs.
+MAX_ANSWER_CALCULATIONS = 4
 
 
 def calculation_kinds() -> tuple[str, ...]:
@@ -110,10 +112,18 @@ class AnswerCalculationInput(BaseModel):
 
 
 class AnswerCalculation(BaseModel):
-    """The one calculation Argus computes for this answer."""
+    """One calculation Argus computes for this answer."""
 
     model_config = ConfigDict(frozen=True, json_schema_extra=all_properties_required)
 
+    name: str = Field(
+        default="",
+        description=(
+            "A short lowercase name for this calculation, such as the option it "
+            "computes; with more than one calculation, each figure reference starts "
+            "with it."
+        ),
+    )
     kind: Annotated[
         str, WithJsonSchema({"type": "string", "enum": list(calculation_kinds())})
     ] = Field(
@@ -154,13 +164,16 @@ class AnswerCalculation(BaseModel):
 # Model-facing contract shared by every answering model; frozen by the
 # fingerprint and, for research, by the recorded retrieval probe.
 ANSWER_CALCULATION_INSTRUCTIONS = (
-    "Fill calculation only when the answer computes on specific figures, such as "
+    "Fill calculations only when the answer computes on specific figures, such as "
     "what a plan, loan or purchase costs, what an amount earns or grows to, "
     "how many years a sum takes to double, which option costs less or what "
-    "a dividend yields at today's price, with the one kind listed below that computes "
-    "it. Argus computes it: never compute a figure yourself, such as a change, a "
-    "percentage, a ratio or a total; state each figure as its source gives it, or "
-    "let the calculation produce it. List every input the kind needs with its "
+    "a dividend yields at today's price, each with the one kind listed below that "
+    "computes it. When the reader weighs options, fill one calculation for each "
+    "option under its own short name, with the same kind when one kind computes "
+    "them all, and never say which option to choose. Argus computes each one: never "
+    "compute a figure yourself, such as a change, a percentage, a ratio or a total; "
+    "state each figure as its source gives it, or let a calculation produce it. "
+    "List every input the kind needs with its "
     "source: page for a figure read from a page retrieved for this answer, with "
     "that page's URL and date; market_data for the current price of the named "
     "asset, which Argus fills from its own market data; user for a figure the user "
@@ -168,11 +181,13 @@ ANSWER_CALCULATION_INSTRUCTIONS = (
     "state plainly as an assumption. Count every money input in one currency, give "
     "its ISO 4217 code, and add that code as the currency input. A figure only the "
     "user knows that the user did not state is listed with source user and a null "
-    "value. Only when you fill calculation, write each figure it uses or produces "
-    "as {{name}}, with its input or result name, never as digits, including in a "
-    "worked example; Argus fills each one from the computed result. Every other "
-    "figure is written in digits and is never a reference. Leave calculation null "
-    "when the answer computes nothing. Kinds, their inputs and their results:\n"
+    "value. Only when you fill calculations, write each figure a calculation uses or "
+    "produces as {{name}}, with its input or result name, or as "
+    "{{calculation_name.name}} when there is more than one calculation, never as "
+    "digits, including in a worked example; Argus fills each one from the computed "
+    "result. Every other figure is written in digits and is never a reference. "
+    "Leave calculations empty when the answer computes nothing. Kinds, their inputs "
+    "and their results:\n"
 )
 
 

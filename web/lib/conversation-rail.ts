@@ -2,6 +2,7 @@ import type { Message } from "@/components/chat/types";
 import type { DecisionState } from "@/lib/argus-api";
 import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
 import { isSettledStrategyResult } from "@/lib/chat-result-message";
+import { computationCalculations } from "@/lib/decision-contract";
 import type {
   LocalizedToolText,
   ToolFact,
@@ -27,7 +28,7 @@ export type ConversationRailTickKind =
   | "decision_saved"
   | "error_recovery";
 
-/** A computed answer's preview: its card title and headline figure. */
+/** One calculation's preview on a computed answer's tick: its card title and headline figure. */
 export type ConversationRailCalculation = {
   kind: string;
   title: LocalizedToolText;
@@ -50,9 +51,9 @@ export type ConversationRailTick = {
   decisionState: DecisionState | null;
   recovery: RecoveryDisplay | null;
   failedJobStatus: "failed" | "canceled" | "expired" | null;
-  /** Present on a computed answer's tick; the rail reads it, never prose. */
-  calculation?: ConversationRailCalculation | null;
-  /** The unsuccessful outcome of a computed answer's card, for the treatment owner. */
+  /** Present on a computed answer's tick, one per calculation in marker order; the rail reads them, never prose. */
+  calculations?: ConversationRailCalculation[] | null;
+  /** The first unsuccessful outcome among a computed answer's cards, for the treatment owner. */
   toolOutcome?: ToolOutcome | null;
 };
 
@@ -379,20 +380,32 @@ function unresolvedClarification(
   );
 }
 
-/** The card the backend-declared computation names, or null. */
-export function computedAnswerCard(message: Message): ToolResultCard | null {
-  const computation = message.computation;
-  if (!computation) return null;
-  return (
-    message.toolResultCards?.find((card) => card.tool_name === computation.kind) ??
-    null
-  );
+/**
+ * The cards the backend-declared computation names, one per calculation in
+ * marker order: each calculation takes the next unmatched card whose
+ * tool_name is its kind. Null when any calculation has no card.
+ */
+export function computedAnswerCards(message: Message): ToolResultCard[] | null {
+  if (!message.computation) return null;
+  const cards = message.toolResultCards ?? [];
+  const taken = new Set<number>();
+  const matched: ToolResultCard[] = [];
+  for (const calculation of computationCalculations(message.computation)) {
+    const position = cards.findIndex(
+      (card, cardIndex) =>
+        !taken.has(cardIndex) && card.tool_name === calculation.kind,
+    );
+    if (position < 0) return null;
+    taken.add(position);
+    matched.push(cards[position]);
+  }
+  return matched;
 }
 
 function computedAnswerTick(
   message: Message,
   index: number,
-  card: ToolResultCard,
+  cards: ToolResultCard[],
 ): ConversationRailTick {
   const base = {
     messageId: message.id,
@@ -405,17 +418,18 @@ function computedAnswerTick(
     recovery: null,
     failedJobStatus: null,
   };
-  if (card.outcome.status !== "succeeded") {
-    return { ...base, kind: "error_recovery", decisionState: null, toolOutcome: card.outcome };
+  const unsuccessful = cards.find((card) => card.outcome.status !== "succeeded");
+  if (unsuccessful) {
+    return { ...base, kind: "error_recovery", decisionState: null, toolOutcome: unsuccessful.outcome };
   }
   return {
     ...base,
     kind: message.decisionState ? "decision_saved" : "result",
-    calculation: {
+    calculations: cards.map((card) => ({
       kind: card.tool_name,
       title: card.presentation.title,
       headline: card.presentation.answer,
-    },
+    })),
   };
 }
 
@@ -463,9 +477,9 @@ export function deriveConversationRailTicks(
       });
       return;
     }
-    const computedCard = computedAnswerCard(message);
-    if (computedCard) {
-      ticks.push(computedAnswerTick(message, index, computedCard));
+    const computedCards = computedAnswerCards(message);
+    if (computedCards) {
+      ticks.push(computedAnswerTick(message, index, computedCards));
       return;
     }
     if (message.kind === "backtest_job" && message.backtestJob) {

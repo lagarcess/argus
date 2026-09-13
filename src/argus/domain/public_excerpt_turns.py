@@ -22,6 +22,7 @@ from argus.api.public_excerpt_fact_schemas import (
 )
 from argus.api.public_excerpt_schemas import (
     PublicExcerptBacktestTurn,
+    PublicExcerptCalculation,
     PublicExcerptCalculationFact,
     PublicExcerptCalculationSource,
     PublicExcerptCalculationText,
@@ -339,40 +340,30 @@ def project_calculation_turn(
     language: str,
     private_ids: tuple[str, ...],
 ) -> PublicExcerptCalculationTurn:
-    """A computed answer as a frozen receipt: its card's typed facts, no recompute.
+    """A computed answer as a frozen receipt: each card's typed facts, no recompute.
 
-    The question, the title, the computed answer and rows and the notes
-    publish, with the inputs a public page stated and that page. An input the
-    user typed stays private; a declaration whose rows restate its inputs
-    publishes only when every input it holds was cited.
+    The question and, for each calculation, the title, the computed answer and
+    rows and the notes publish, with the inputs a public page stated and that
+    page. An input the user typed stays private; a declaration whose rows
+    restate its inputs publishes only when every input it holds was cited. One
+    card that cannot publish refuses the whole answer.
     """
-    from argus.domain.answer_dossiers import computed_answer_card
+    from argus.domain.answer_dossiers import computed_answer_cards
     from argus.domain.capability_registry import get_tool_catalog
 
-    card = computed_answer_card(message.model_dump(mode="python"))
-    if card is None:
+    cards = computed_answer_cards(message.model_dump(mode="python"))
+    if not cards:
         refuse("unsupported_turn")
-    assert card is not None
-    declaration = get_tool_catalog(include_unavailable=True).get(card.tool_name)
-    policy = declaration.policy.public_receipt if declaration is not None else "disabled"
-    if policy == "disabled":
-        refuse("unsupported_turn")
-    presentation = card.presentation
-    if card.outcome.status != "succeeded" or presentation.answer is None:
-        refuse("not_completed")
-    stated = [fact for fact in presentation.inputs if fact.value is not None]
-    if policy == "cited_facts" and not all(_publicly_sourced(fact) for fact in stated):
-        refuse("private_inputs")
+    assert cards is not None
+    catalog = get_tool_catalog(include_unavailable=True)
+    for card in cards:
+        _refuse_unpublishable(card, catalog)
     asked = audit_text(question, field="question", private_ids=private_ids)
     note = audit_text(owner_note, field="owner_note", private_ids=private_ids)
     try:
         payload = PublicExcerptCalculationTurn(
             question=asked,
-            title=_public_text(presentation.title),
-            answer=_public_fact(presentation.answer),
-            rows=[_public_fact(fact) for fact in presentation.rows],
-            inputs=[_public_fact(fact) for fact in stated if _publicly_sourced(fact)],
-            notes=[_public_text(item) for item in presentation.notes],
+            calculations=[_public_calculation(card) for card in cards],
             computed_at=message.created_at,
             owner_note=note,
             content_language=language,
@@ -385,6 +376,31 @@ def project_calculation_turn(
         refuse("unsupported_turn")
     except PublicExcerptSanitizationError:
         refuse("unsafe_text")
+
+
+def _refuse_unpublishable(card: Any, catalog: Any) -> None:
+    declaration = catalog.get(card.tool_name)
+    policy = declaration.policy.public_receipt if declaration is not None else "disabled"
+    if policy == "disabled":
+        refuse("unsupported_turn")
+    presentation = card.presentation
+    if card.outcome.status != "succeeded" or presentation.answer is None:
+        refuse("not_completed")
+    stated = [fact for fact in presentation.inputs if fact.value is not None]
+    if policy == "cited_facts" and not all(_publicly_sourced(fact) for fact in stated):
+        refuse("private_inputs")
+
+
+def _public_calculation(card: Any) -> PublicExcerptCalculation:
+    presentation = card.presentation
+    stated = [fact for fact in presentation.inputs if fact.value is not None]
+    return PublicExcerptCalculation(
+        title=_public_text(presentation.title),
+        answer=_public_fact(presentation.answer),
+        rows=[_public_fact(fact) for fact in presentation.rows],
+        inputs=[_public_fact(fact) for fact in stated if _publicly_sourced(fact)],
+        notes=[_public_text(item) for item in presentation.notes],
+    )
 
 
 def _publicly_sourced(fact: Any) -> bool:

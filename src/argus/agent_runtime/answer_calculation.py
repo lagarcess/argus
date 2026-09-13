@@ -1,20 +1,22 @@
 """The answer step owns the math.
 
 An answering model, the research provider or the no-search voicing model,
-returns its prose and at most one ``AnswerCalculation``. Each input is held to
-its source: a page retrieved for this answer, Argus's own market data for a
-current price, the user's words, or an assumption the answer states. The
-declaration computes. The prose states figures only as ``{{name}}`` references
-filled from the computed card; a reference that does not resolve, a money or
-percent figure written outside a reference, or an assumption the prose never
-states hands the answer to Argus's own lead. Every guard that changes what the
+returns its prose and its ``AnswerCalculation`` list, one per option the reader
+weighs. Each input is held to its source: a page retrieved for this answer,
+Argus's own market data for a current price, the user's words, or an assumption
+the answer states. Each declaration computes its own card. The prose states
+figures only as references filled from those cards, ``{{name}}`` or, with more
+than one calculation, ``{{calculation.name}}``; a reference that does not
+resolve, a money or percent figure written outside a reference, or an
+assumption the prose never states hands the answer to Argus's own lead. Every guard that changes what the
 model wrote records a reason code.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Sequence
+import unicodedata
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
@@ -67,13 +69,13 @@ FIGURE_CHECK_REASON_CODE = "answer_figures_replaced"
 UNSOURCED_FIGURE_REASON_CODE = "answer_figures_unsourced"
 
 _ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
-_REFERENCE = re.compile(r"\{\{\s*([a-z][a-z0-9_]*)\s*\}\}")
+# A figure reference: a name, or a calculation's name then a name.
+_REFERENCE_TEXT = r"\{\{\s*([^\W\d]\w*(?:\.[^\W\d]\w*)?)\s*\}\}"
+_REFERENCE = re.compile(_REFERENCE_TEXT)
 _WRITTEN_CURRENCY = re.compile(
-    r"(?:\b([A-Z]{3})|[A-Z]{0,3}\$|€|£)\s?(\{\{\s*([a-z][a-z0-9_]*)\s*\}\})"
+    r"(?:\b([A-Z]{3})|[A-Z]{0,3}\$|€|£)\s?(" + _REFERENCE_TEXT + ")"
 )
-_WRITTEN_UNIT_AFTER = re.compile(
-    r"(\{\{\s*([a-z][a-z0-9_]*)\s*\}\})\s?([A-Z]{3}\b|%|x\b)"
-)
+_WRITTEN_UNIT_AFTER = re.compile("(" + _REFERENCE_TEXT + r")\s?([A-Z]{3}\b|%|x\b)")
 _SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+")
 _YEAR = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
 _PERCENT_FIGURE = re.compile(r"\d\s?%")
@@ -82,6 +84,8 @@ _CODE_MONEY = re.compile(r"\b([A-Z]{3})\s?\d|\d\s?([A-Z]{3})\b")
 _MARKET_WINDOW_DAYS = 14
 
 MarketClose = Callable[[str], tuple[float, str] | None]
+# An answer's computed cards by calculation name, in the answer's order.
+AnswerCards = Mapping[str, ToolResultCard]
 
 
 @dataclass
@@ -101,19 +105,19 @@ class ResolvedCalculation:
 
 @dataclass(frozen=True)
 class PublishedCalculation:
-    """What an answer publishes: the card patch and prose, the template a
-    recompute re-renders, the one figure to ask for, or what was not found."""
+    """What an answer publishes: the cards' patch and prose, the template a
+    recompute re-renders, the figures to ask for, or what was not found."""
 
     patch: dict[str, Any]
     answer_text: str | None
-    template: dict[str, str] | None
+    template: dict[str, Any] | None
     question_field: str | None
     not_looked_up: tuple[str, ...]
     owed: tuple[str, ...] = ()
 
 
-def publish_calculation(
-    request: AnswerCalculation,
+def publish_calculations(
+    requests: Sequence[AnswerCalculation],
     *,
     template: str,
     language: str,
@@ -125,48 +129,68 @@ def publish_calculation(
     notes: list[str],
     evidence: Sequence[RetrievedRow] = (),
 ) -> PublishedCalculation | None:
-    """The card and prose for an answer's request, or None for an unknown kind."""
-    resolved = resolve_calculation(
-        request,
-        catalog=catalog,
-        retrieved=retrieved,
-        currency=currency,
-        subject_symbol=subject_symbol,
-        market_close=market_close,
-        notes=notes,
-        evidence=evidence,
-    )
-    if resolved is None:
-        return None
-    if not resolved.computable:
+    """The cards and prose for an answer's calculations, or None when one names an
+    unknown kind. Nothing publishes until every calculation computes: an option
+    left out would change what the answer lays side by side."""
+    resolved: list[ResolvedCalculation] = []
+    for request in requests:
+        one = resolve_calculation(
+            request,
+            catalog=catalog,
+            retrieved=retrieved,
+            currency=currency,
+            subject_symbol=subject_symbol,
+            market_close=market_close,
+            notes=notes,
+            evidence=evidence,
+        )
+        if one is None:
+            return None
+        resolved.append(one)
+    owed = list(dict.fromkeys(name for one in resolved for name in one.user_owed))
+    not_looked_up = tuple(name for one in resolved for name in one.not_looked_up)
+    if owed or not_looked_up:
         return PublishedCalculation(
             patch={},
             answer_text=None,
             template=None,
-            question_field=resolved.user_owed[0] if resolved.user_owed else None,
-            not_looked_up=tuple(resolved.not_looked_up),
-            owed=tuple(resolved.user_owed),
+            question_field=owed[0] if owed else None,
+            not_looked_up=not_looked_up,
+            owed=tuple(owed),
         )
-    patch = computed_answer_patch(resolved)
-    card = card_in(patch)
-    succeeded = card.outcome.status == "succeeded"
-    driving = {fact.name for fact in card.presentation.inputs if fact.driving}
-    text, failure = render_answer_text(
-        template,
-        card,
-        assumed=[name for name in resolved.assumed if name in driving],
-    )
+    patches = [computed_answer_patch(one) for one in resolved]
+    cards = dict(zip(calculation_names(requests), map(card_in, patches), strict=True))
+    succeeded = all(card.outcome.status == "succeeded" for card in cards.values())
+    assumed = {
+        name: [
+            input_name
+            for input_name in one.assumed
+            if input_name
+            in {fact.name for fact in card.presentation.inputs if fact.driving}
+        ]
+        for (name, card), one in zip(cards.items(), resolved, strict=True)
+    }
+    text, failure = render_answer_text(template, cards, assumed=assumed)
+    patch = combined_patch(patches)
     if succeeded and failure is None:
-        stored = {"artifact_id": card.artifact_id, "text": template, "language": language}
+        stored = {
+            "cards": {name: card.artifact_id for name, card in cards.items()},
+            "text": template,
+            "language": language,
+        }
         return PublishedCalculation(patch, text, stored, None, ())
     _note(
         notes,
         FIGURE_CHECK_REASON_CODE,
         failure=failure,
-        status=card.outcome.status,
-        unresolved=unresolved_references(template, card),
+        status=[card.outcome.status for card in cards.values()],
+        unresolved=unresolved_references(template, cards),
         references=sorted(set(_REFERENCE.findall(template))),
-        card_facts=sorted(_reference_facts(card)),
+        card_facts=sorted(
+            f"{name}.{fact}"
+            for name, card in cards.items()
+            for fact in _reference_facts(card)
+        ),
     )
     return PublishedCalculation(
         patch, fallback_answer_lead(language, succeeded=succeeded), None, None, ()
@@ -273,43 +297,138 @@ def card_in(patch: dict[str, Any]) -> ToolResultCard:
 
 
 def render_answer_text(
-    template: str, card: ToolResultCard, *, assumed: Sequence[str] = ()
+    template: str,
+    cards: AnswerCards,
+    *,
+    assumed: Mapping[str, Sequence[str]] | None = None,
 ) -> tuple[str, str | None]:
-    """The prose with each reference filled from the card, and the check's
-    failure code when a figure did not come from the card."""
-    facts = _reference_facts(card)
+    """The prose with each reference filled from its card, and the check's
+    failure code when a figure did not come from a card."""
     unresolved: list[str] = []
 
     def fill(match: re.Match[str]) -> str:
-        name = match.group(1)
-        fact = facts.get(name)
-        if fact is not None:
-            return figure_text(fact)
-        stated = _stated_argument(card, name)
-        if stated is None:
-            unresolved.append(name)
+        value = _resolved(match.group(1), cards)
+        if value is None:
+            unresolved.append(match.group(1))
             return match.group(0)
-        return stated
+        return value if isinstance(value, str) else figure_text(value)
 
-    text = _REFERENCE.sub(fill, _without_written_currency(template, facts))
-    if unresolved:
+    text = _REFERENCE.sub(fill, _without_written_currency(template, cards))
+    if unresolved or "{{" in text:
         return text, "invalid_figure_reference"
-    referenced = set(_REFERENCE.findall(template))
-    if any(name not in referenced for name in assumed):
+    referenced = _referenced_inputs(template, cards)
+    if any(
+        (name, input_name) not in referenced
+        for name, inputs in (assumed or {}).items()
+        for input_name in inputs
+    ):
         return text, "assumption_not_stated"
     return text, None
 
 
-def unresolved_references(template: str, card: ToolResultCard) -> list[str]:
-    """The ``{{name}}`` references a card cannot fill, for the guard's record."""
-    facts = _reference_facts(card)
+def unresolved_references(template: str, cards: AnswerCards) -> list[str]:
+    """The references no card fills, for the guard's record."""
     return sorted(
         {
-            name
-            for name in _REFERENCE.findall(template)
-            if name not in facts and _stated_argument(card, name) is None
+            reference
+            for reference in _REFERENCE.findall(template)
+            if _resolved(reference, cards) is None
         }
     )
+
+
+def calculation_names(requests: Sequence[AnswerCalculation]) -> list[str]:
+    """Each calculation's reference name, folded and unique in its answer; one
+    that gave no name takes its position."""
+    names: list[str] = []
+    for index, request in enumerate(requests, start=1):
+        base = folded_name(request.name) or f"calculation_{index}"
+        if base[0].isdigit():
+            base = f"calculation_{base}"
+        name, suffix = base, 2
+        while name in names:
+            name, suffix = f"{base}_{suffix}", suffix + 1
+        names.append(name)
+    return names
+
+
+def combined_patch(patches: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Every card's patch as one, in the answer's order."""
+    return {
+        "tool_call_records": [
+            record for patch in patches for record in patch["tool_call_records"]
+        ],
+        "final_response_payload": {
+            "tool_result_cards": [
+                card
+                for patch in patches
+                for card in patch["final_response_payload"]["tool_result_cards"]
+            ]
+        },
+        "artifact_references": [
+            reference for patch in patches for reference in patch["artifact_references"]
+        ],
+    }
+
+
+def template_cards(template: Mapping[str, Any]) -> dict[str, str]:
+    """The artifact each calculation name reads in a stored template; a template
+    stored before answers carried several names its one card."""
+    cards = template.get("cards")
+    if isinstance(cards, Mapping):
+        return {folded_name(str(name)): str(artifact) for name, artifact in cards.items()}
+    artifact = template.get("artifact_id")
+    return {"calculation": str(artifact)} if artifact else {}
+
+
+def _located(reference: str, cards: AnswerCards) -> tuple[str, ToolFact | str] | None:
+    """Where a reference reads: its named calculation, or the one calculation that
+    holds the name; None when none does or several do."""
+    calculation, _, name = reference.rpartition(".")
+    key = folded_name(name)
+    if calculation:
+        owner = folded_name(calculation)
+        card = cards.get(owner)
+        value = None if card is None else _card_value(card, key)
+        return None if value is None else (owner, value)
+    found = [
+        (owner, value)
+        for owner, card in cards.items()
+        if (value := _card_value(card, key)) is not None
+    ]
+    return found[0] if len(found) == 1 else None
+
+
+def _resolved(reference: str, cards: AnswerCards) -> ToolFact | str | None:
+    located = _located(reference, cards)
+    return None if located is None else located[1]
+
+
+def _card_value(card: ToolResultCard, name: str) -> ToolFact | str | None:
+    fact = _reference_facts(card).get(name)
+    return fact if fact is not None else _stated_argument(card, name)
+
+
+def _as_fact(value: ToolFact | str | None) -> ToolFact | None:
+    return value if isinstance(value, ToolFact) else None
+
+
+def _referenced_inputs(template: str, cards: AnswerCards) -> set[tuple[str, str]]:
+    """Each calculation and name a template's references read."""
+    found: set[tuple[str, str]] = set()
+    for reference in _REFERENCE.findall(template):
+        located = _located(reference, cards)
+        if located is not None:
+            found.add((located[0], folded_name(reference.rpartition(".")[2])))
+    return found
+
+
+def folded_name(text: str) -> str:
+    """A name as references and calculations match it: lowercase, with accents
+    and spacing folded, so a calculation named in the reader's language reads."""
+    folded = unicodedata.normalize("NFKD", str(text).strip().lower())
+    plain = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    return re.sub(r"\W+", "_", plain).strip("_")
 
 
 def figure_text(fact: ToolFact) -> str:
@@ -422,19 +541,19 @@ def _money_code(fact: ToolFact | None) -> str | None:
     return str(fact.unit.interpolation_args.get("code") or "").strip() or None
 
 
-def _without_written_currency(template: str, facts: dict[str, ToolFact]) -> str:
+def _without_written_currency(template: str, cards: AnswerCards) -> str:
     """A reference renders with its own unit, so a currency the prose wrote just
     before or after a money reference, or a % or x written after a percent or
     multiple reference, is not stated twice."""
 
     def drop(match: re.Match[str]) -> str:
-        code = _money_code(facts.get(match.group(3)))
+        code = _money_code(_as_fact(_resolved(match.group(3), cards)))
         if code is None or (match.group(1) and match.group(1) != code):
             return match.group(0)
         return match.group(2)
 
     def drop_after(match: re.Match[str]) -> str:
-        fact = facts.get(match.group(2))
+        fact = _as_fact(_resolved(match.group(2), cards))
         unit = match.group(3)
         key = fact.unit.locale_key if fact is not None and fact.unit is not None else None
         if (
@@ -448,20 +567,18 @@ def _without_written_currency(template: str, facts: dict[str, ToolFact]) -> str:
     return _WRITTEN_UNIT_AFTER.sub(drop_after, _WRITTEN_CURRENCY.sub(drop, template))
 
 
-def render_offer_prose(template: str, card: ToolResultCard) -> tuple[str, int]:
-    """The prose of an offered calculation: references to figures the card holds
+def render_offer_prose(template: str, cards: AnswerCards) -> tuple[str, int]:
+    """The prose of an offered calculation: references to figures its cards hold
     filled, and each sentence or table row that leans on a result the offer
     cannot show left out. Returns the text and how many were left out."""
-    facts = _reference_facts(card)
 
     def fill(match: re.Match[str]) -> str:
-        fact = facts.get(match.group(1))
-        if fact is not None:
-            return figure_text(fact)
-        stated = _stated_argument(card, match.group(1))
-        return stated if stated is not None else match.group(0)
+        value = _resolved(match.group(1), cards)
+        if value is None:
+            return match.group(0)
+        return value if isinstance(value, str) else figure_text(value)
 
-    filled = _REFERENCE.sub(fill, _without_written_currency(template, facts))
+    filled = _REFERENCE.sub(fill, _without_written_currency(template, cards))
     kept: list[str] = []
     dropped = 0
     for line in filled.split("\n"):

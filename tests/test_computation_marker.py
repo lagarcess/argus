@@ -44,8 +44,8 @@ def test_a_calculation_card_declares_its_kind_inputs_and_symbols() -> None:
     )
     computation = computation_from_tool_card(card)
     assert computation is not None
-    assert computation.kind == "price_multiple"
-    assert computation.inputs == card.arguments
+    assert computation.kinds == ["price_multiple"]
+    assert computation.calculations[0].inputs == card.arguments
     assert computation.symbols == ["AAPL"]
     assert computation_from_tool_cards([card]) == computation
 
@@ -128,7 +128,7 @@ def test_recompute_then_decide_stores_the_recomputed_inputs(surface) -> None:
 
     opened = client.get(f"/api/v1/decisions/{decided.json()['decision']['id']}")
     assert opened.status_code == 200
-    rerun = opened.json()["rerun"]
+    rerun = opened.json()["reruns"][0]
     assert rerun["status"] == "computed"
     assert rerun["result"]["kind"] == "tool_result"
     assert rerun["result"]["presentation"]["answer"]["value"] == pytest.approx(899.33)

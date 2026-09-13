@@ -46,7 +46,7 @@ export async function saveDecision(
   );
 }
 
-/** Open a decision: the backend re-runs its computation from the stored inputs. */
+/** Open a decision: the backend re-runs every calculation from the stored inputs. */
 export async function openDecision(
   decisionId: string,
 ): Promise<DecisionOpenResponse> {
@@ -55,33 +55,41 @@ export async function openDecision(
   );
 }
 
-/** Re-run a decision's computation with input overrides; the decision is unchanged. */
+/**
+ * Re-run a decision's computation with overrides for the calculation at
+ * `calculation`, its marker index; every calculation re-runs and the decision
+ * is unchanged.
+ */
 export async function rerunDecision(
   decisionId: string,
   inputs: Record<string, unknown>,
+  calculation = 0,
 ): Promise<DecisionOpenResponse> {
   return apiFetch<DecisionOpenResponse>(
     `/decisions/${encodeURIComponent(decisionId)}/rerun`,
-    { method: "POST", body: JSON.stringify({ inputs }) },
+    { method: "POST", body: JSON.stringify({ inputs, calculation }) },
   );
 }
 
 export type MessageComputationRerunResponse = {
   computation: DecisionComputation;
-  rerun: DecisionRerun;
+  /** One re-run per calculation, in marker order. */
+  reruns: DecisionRerun[];
 };
 
 /**
- * Re-run an owned computed answer from Search, decided or not. The result
- * comes back beside the stored answer, which is never rewritten.
+ * Re-run an owned computed answer from Search, decided or not, with overrides
+ * for the calculation at `calculation`. The results come back beside the
+ * stored answer, which is never rewritten.
  */
 export async function rerunMessageComputation(
   conversationId: string,
   messageId: string,
   inputs: Record<string, unknown>,
+  calculation = 0,
 ): Promise<MessageComputationRerunResponse> {
   return apiFetch<MessageComputationRerunResponse>(
     `/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/computation/rerun`,
-    { method: "POST", body: JSON.stringify({ inputs }) },
+    { method: "POST", body: JSON.stringify({ inputs, calculation }) },
   );
 }

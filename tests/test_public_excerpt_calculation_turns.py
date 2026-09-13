@@ -113,13 +113,17 @@ def test_a_computed_answer_previews_as_a_calculation_with_only_public_inputs(own
     leaf = result.payload.turns[0]
     assert leaf.kind == "calculation"
     assert leaf.question == "Is Apple expensive at this P/E?"
-    assert leaf.title.locale_key == card.presentation.title.locale_key
-    assert leaf.answer.value == card.presentation.answer.value
-    assert [fact.label.locale_key for fact in leaf.inputs] == ["tools.calc.fields.price"]
+    (calculation,) = leaf.calculations
+    assert calculation.title.locale_key == card.presentation.title.locale_key
+    assert calculation.answer.value == card.presentation.answer.value
+    assert [fact.label.locale_key for fact in calculation.inputs] == [
+        "tools.calc.fields.price"
+    ]
     assert (
-        leaf.inputs[0].source.url == "https://www.nasdaq.com/market-activity/stocks/aapl"
+        calculation.inputs[0].source.url
+        == "https://www.nasdaq.com/market-activity/stocks/aapl"
     )
-    assert leaf.inputs[0].source.date == "2026-09-10"
+    assert calculation.inputs[0].source.date == "2026-09-10"
     assert leaf.framing == "calculation_not_advice"
     document = json.dumps(result.payload.model_dump(mode="json"))
     assert "6.25" not in document, "the per-share figure the user typed stays private"
@@ -181,7 +185,10 @@ def test_the_created_receipt_is_frozen_when_the_answer_is_recomputed(owner):
     frozen = snapshot.payload.model_dump(mode="json")
     answer.metadata["tool_result_cards"][0]["presentation"]["answer"]["value"] = 999
     assert snapshot.payload.model_dump(mode="json") == frozen
-    assert snapshot.payload.turns[0].answer.value == card.presentation.answer.value
+    assert (
+        snapshot.payload.turns[0].calculations[0].answer.value
+        == card.presentation.answer.value
+    )
 
 
 def test_a_continued_result_names_its_missing_question_not_an_unfinished_turn(owner):

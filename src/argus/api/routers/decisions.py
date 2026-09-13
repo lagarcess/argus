@@ -86,7 +86,7 @@ def open_decision_route(
     user: User = Depends(current_user),  # noqa: B008
 ) -> DecisionOpenResponse:
     try:
-        decision, computation, rerun = open_decision(user=user, decision_id=decision_id)
+        decision, computation, reruns = open_decision(user=user, decision_id=decision_id)
     except DecisionNotFoundError as exc:
         raise problem(
             request,
@@ -95,7 +95,7 @@ def open_decision_route(
             title="Not Found",
             detail=str(exc),
         ) from exc
-    return DecisionOpenResponse(decision=decision, computation=computation, rerun=rerun)
+    return DecisionOpenResponse(decision=decision, computation=computation, reruns=reruns)
 
 
 @router.post("/decisions/{decision_id}/rerun", response_model=DecisionOpenResponse)
@@ -106,10 +106,11 @@ def rerun_decision_route(
     user: User = Depends(current_user),  # noqa: B008
 ) -> DecisionOpenResponse:
     try:
-        decision, computation, rerun = open_decision(
+        decision, computation, reruns = open_decision(
             user=user,
             decision_id=decision_id,
             overrides=payload.inputs,
+            calculation=payload.calculation,
         )
     except DecisionNotFoundError as exc:
         raise problem(
@@ -128,7 +129,7 @@ def rerun_decision_route(
             detail="Re-run inputs are invalid.",
             context={"errors": exc.errors},
         ) from exc
-    return DecisionOpenResponse(decision=decision, computation=computation, rerun=rerun)
+    return DecisionOpenResponse(decision=decision, computation=computation, reruns=reruns)
 
 
 @router.post(
@@ -143,11 +144,12 @@ def rerun_message_computation_route(
     user: User = Depends(current_user),  # noqa: B008
 ) -> MessageComputationRerunResponse:
     try:
-        computation, rerun = rerun_message_computation(
+        computation, reruns = rerun_message_computation(
             user=user,
             conversation_id=conversation_id,
             message_id=message_id,
             overrides=payload.inputs,
+            calculation=payload.calculation,
         )
     except DecisionMessageNotFoundError as exc:
         raise problem(
@@ -174,4 +176,4 @@ def rerun_message_computation_route(
             detail="Re-run inputs are invalid.",
             context={"errors": exc.errors},
         ) from exc
-    return MessageComputationRerunResponse(computation=computation, rerun=rerun)
+    return MessageComputationRerunResponse(computation=computation, reruns=reruns)

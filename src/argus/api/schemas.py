@@ -650,18 +650,18 @@ class AnswerDecisionAction(BaseModel):
 class AnswerDossier(BaseModel):
     """A computed answer beside the run dossier: asked, used, came out, decided.
 
-    The card carries what Argus used with its sources and what came out;
-    recompute goes through the message computation route and never rewrites
-    the stored answer. The run dossier is unchanged.
+    Its cards, one per calculation in the answer's order, carry what Argus used
+    with its sources and what came out; recompute goes through the message
+    computation route and never rewrites the stored answer. The run dossier is
+    unchanged.
     """
 
     message_id: str
     conversation_id: str
     asked: str | None = Field(default=None, max_length=500)
     computed_at: datetime
-    kind: str = Field(max_length=80)
     symbols: list[str] = Field(default_factory=list, max_length=5)
-    card: dict[str, Any]
+    cards: list[dict[str, Any]] = Field(min_length=1, max_length=4)
     decision: SearchDossierDecision | None = None
     decision_id: str | None = None
     actions: list[AnswerDecisionAction] = Field(default_factory=list, max_length=1)

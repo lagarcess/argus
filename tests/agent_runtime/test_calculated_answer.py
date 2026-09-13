@@ -62,9 +62,11 @@ def _voice(monkeypatch: pytest.MonkeyPatch, answers: list[ca.CalculatedVoicedAns
 def _voiced(lead: str, inputs: list[dict[str, Any]], solve_for: str = "payment"):
     return ca.CalculatedVoicedAnswer(
         lead=lead,
-        calculation=AnswerCalculation.model_validate(
-            {"kind": "time_value", "solve_for": solve_for, "inputs": inputs}
-        ),
+        calculations=[
+            AnswerCalculation.model_validate(
+                {"kind": "time_value", "solve_for": solve_for, "inputs": inputs}
+            )
+        ],
     )
 
 
@@ -114,7 +116,9 @@ def test_a_calculated_answer_computes_its_card_under_the_prose(monkeypatch) -> N
         "Over 48 months at 14%, the payment is **DOP "
         in result.patch["assistant_response"]
     )
-    assert result.patch[ANSWER_TEMPLATE_KEY]["artifact_id"] == card["artifact_id"]
+    assert list(result.patch[ANSWER_TEMPLATE_KEY]["cards"].values()) == [
+        card["artifact_id"]
+    ]
     assert ca.CALCULATED_ANSWER_REASON_CODE in result.decision.reason_codes
 
 
@@ -157,7 +161,7 @@ def test_a_figure_only_the_user_knows_is_one_question_and_the_reply_computes(
     ]
     assert asked.patch["requested_field"] == "periods"
     pending = asked.patch["clarification"]["payload"]
-    assert pending["calculation"]["kind"] == "time_value"
+    assert pending["calculations"][0]["kind"] == "time_value"
 
     class _Interpreter:
         async def ainvoke(self, request):
@@ -182,7 +186,7 @@ def test_a_figure_only_the_user_knows_is_one_question_and_the_reply_computes(
         "With 48 months left, the payment is DOP "
     )
     assert (
-        "Argus asked the user for periods of a time_value calculation"
+        "Argus asked the user for periods of these calculations (time_value)"
         in seen[1][0]["content"]
     )
     assert ca.PENDING_REPLY_REASON_CODE in reply.decision.reason_codes
@@ -246,7 +250,7 @@ def test_an_answer_after_a_failed_lookup_says_so_when_nothing_is_named(
 
 def test_the_no_search_answer_writes_its_calculation_before_its_prose() -> None:
     schema = ca.CalculatedVoicedAnswer.model_json_schema()
-    assert list(schema["properties"])[0] == "calculation"
+    assert list(schema["properties"])[0] == "calculations"
     assert schema["required"] == list(schema["properties"])
 
 
@@ -286,7 +290,9 @@ def test_taking_the_offer_asks_once_for_the_readers_figures(monkeypatch) -> None
     )
     assert asked is not None and asked.outcome == "await_user_reply"
     assert asked.patch["requested_field"] == "periods"
-    assert asked.patch["clarification"]["payload"]["calculation"]["kind"] == "time_value"
+    assert (
+        asked.patch["clarification"]["payload"]["calculations"][0]["kind"] == "time_value"
+    )
     assert (
         "The reader chose to work this out with their own figures"
         in seen[0][0]["content"]
@@ -412,3 +418,54 @@ def test_an_optional_detail_left_blank_is_never_asked_for(monkeypatch) -> None:
     assert [item["name"] for item in asked.patch["clarification"]["missing_inputs"]] == [
         "payment"
     ]
+
+
+def test_options_that_owe_one_figure_ask_once_and_keep_every_calculation(
+    monkeypatch,
+) -> None:
+    owing = [*LOAN, {"name": "periods", "value": None, "source": "user"}]
+    options = [
+        AnswerCalculation.model_validate(
+            {"name": name, "kind": "time_value", "solve_for": "payment", "inputs": inputs}
+        )
+        for name, inputs in (
+            ("first_loan", owing),
+            (
+                "second_loan",
+                [
+                    {**item, "value": 12} if item["name"] == "annual_rate_pct" else item
+                    for item in owing
+                ],
+            ),
+        )
+    ]
+    _voice(
+        monkeypatch,
+        [
+            ca.CalculatedVoicedAnswer(
+                lead="How many months are left?", calculations=options
+            )
+        ],
+    )
+    asked = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="Which of my two loans costs less each month?",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert asked is not None and asked.outcome == "await_user_reply"
+    payload = asked.patch["clarification"]["payload"]
+    assert [item["name"] for item in payload["calculations"]] == [
+        "first_loan",
+        "second_loan",
+    ]
+    assert [item["name"] for item in asked.patch["clarification"]["missing_inputs"]] == [
+        "periods"
+    ]
+    assert ca.pending_requests(payload) == payload["calculations"]
+    one = payload["calculations"][0]
+    assert ca.pending_requests({"calculation": one}) == [one]

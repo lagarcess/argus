@@ -88,12 +88,13 @@ ComputationRefreshStatus = Literal["refreshed", "inputs_not_found"]
 class ComputationRefreshResponse(BaseModel):
     """Freshly retrieved inputs computed beside the stored answer.
 
-    ``refreshed`` carries the recomputed card in ``rerun``; ``inputs_not_found``
-    means the retrieval named no cited input, so nothing was recomputed.
-    ``sources`` lists the pages the retrieval read, dated.
+    ``refreshed`` carries one recomputed card per calculation in ``reruns``, in
+    the computation's order; ``inputs_not_found`` means the retrieval named no
+    cited input, so nothing was recomputed. ``sources`` lists the pages the
+    retrieval read, dated.
     """
 
     computation: DecisionComputation
     status: ComputationRefreshStatus
-    rerun: DecisionRerun | None = None
+    reruns: list[DecisionRerun] = Field(default_factory=list, max_length=4)
     sources: list[dict[str, Any]] = Field(default_factory=list)

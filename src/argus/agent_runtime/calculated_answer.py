@@ -1,30 +1,30 @@
 """The no-search answer that owns its math.
 
 When the user's own figures are enough, or a lookup failed, the answer comes
-from one voicing call that returns prose and at most one typed calculation. Its
-inputs may be the user's words, Argus market data for a current price, or
-assumptions the answer states; a page only when it was retrieved for this
-conversation. The answer step computes the card and fills the prose's figures
-from it. A figure only the user knows becomes one plain question.
+from one voicing call that returns prose and its typed calculations, one per
+option. Their inputs may be the user's words, Argus market data for a current
+price, or assumptions the answer states; a page only when it was retrieved for
+this conversation. The answer step computes each card and fills the prose's
+figures from them. Figures only the user knows become one plain question.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from loguru import logger
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field, field_validator
 
 from argus.agent_runtime.answer_calculation import (
     ANSWER_TEMPLATE_KEY,
     MarketClose,
     PublishedCalculation,
     latest_market_close,
-    publish_calculation,
+    publish_calculations,
 )
 from argus.agent_runtime.calculation_rows import market_counterfactual_rows
 from argus.agent_runtime.knowledge_answer import VoicedAnswer
@@ -38,6 +38,7 @@ from argus.agent_runtime.state.models import RunState, UserState
 from argus.domain.calculations._shared import field_label
 from argus.domain.calculations.answer_request import (
     ANSWER_CALCULATION_INSTRUCTIONS,
+    MAX_ANSWER_CALCULATIONS,
     AnswerCalculation,
     all_properties_required,
     calculation_kinds_clause,
@@ -49,7 +50,9 @@ from argus.llm.openrouter import (
     resolve_openrouter_api_key,
 )
 
-PENDING_PAYLOAD_KEY = "calculation"
+PENDING_PAYLOAD_KEY = "calculations"
+# The one calculation a pending question stored before answers carried several.
+LEGACY_PENDING_PAYLOAD_KEY = "calculation"
 CALCULATED_ANSWER_REASON_CODE = "calculated_answer"
 PENDING_REPLY_REASON_CODE = "calculation_pending_reply"
 INPUT_MISSING_REASON_CODE = "calculation_input_missing"
@@ -69,14 +72,14 @@ NO_SEARCH_ANSWER_GUIDANCE = (
     "Answer the user's money question in their language. Nothing was looked "
     "up for this answer: use the user's own figures, the Argus market data "
     "listed below and assumptions you state plainly. When a figure computed "
-    "from inputs answers or decides the question, always return calculation; "
+    "from inputs answers or decides the question, always return calculations; "
     "never answer such a question with prose alone. A figure a page would "
     "publish that is not listed here, such as a product's price or a bank's "
     "rate, becomes an assumption: choose a typical value, mark it assumption "
     "and say plainly in the answer that you assumed it and that the user can "
     "change it. A figure only the user knows, such as their balance, payment, "
     "term, income or horizon, is never assumed: list each one with source user "
-    "and a null value, still return calculation, and write the answer as one "
+    "and a null value, still return calculations, and write the answer as one "
     "plain question asking for all of them and nothing else: never for a figure "
     "the calculation produces, such as an effective annual rate. Name a currency only when "
     "the user stated one. "
@@ -89,34 +92,41 @@ NO_SEARCH_ANSWER_GUIDANCE = (
 
 
 def _calculation_first(schema: dict[str, Any]) -> None:
-    """Every field is written, the calculation before the prose that references it."""
+    """Every field is written, the calculations before the prose that references them."""
     all_properties_required(schema)
     properties = schema.get("properties") or {}
-    if "calculation" in properties:
+    if "calculations" in properties:
         schema["properties"] = {
-            "calculation": properties["calculation"],
+            "calculations": properties["calculations"],
             **{
-                name: value for name, value in properties.items() if name != "calculation"
+                name: value
+                for name, value in properties.items()
+                if name != "calculations"
             },
         }
         schema["required"] = list(schema["properties"])
 
 
 class CalculatedVoicedAnswer(VoicedAnswer):
-    """A voiced answer with the one calculation Argus computes for it."""
+    """A voiced answer with the calculations Argus computes for it."""
 
     model_config = ConfigDict(json_schema_extra=_calculation_first)
 
-    calculation: AnswerCalculation | None = None
+    calculations: list[AnswerCalculation] = Field(default_factory=list)
+
+    @field_validator("calculations")
+    @classmethod
+    def _bounded(cls, value: list[AnswerCalculation]) -> list[AnswerCalculation]:
+        return value[:MAX_ANSWER_CALCULATIONS]
 
 
 @dataclass(frozen=True)
 class CalculatedAnswer:
-    """An answer whose figures came from its card, or one plain question."""
+    """An answer whose figures came from its cards, or one plain question."""
 
     answer_text: str
     patch: dict[str, Any]
-    template: dict[str, str] | None
+    template: dict[str, Any] | None
     question_field: str | None
     pending: dict[str, Any] | None
     missing_inputs: tuple[str, ...] = ()
@@ -165,12 +175,12 @@ def calculated_answer(
         )
         return None
     prose = voiced.as_markdown()
-    if voiced.calculation is None:
+    if not voiced.calculations:
         return None if "{{" in prose else CalculatedAnswer(prose, {}, None, None, None)
     from argus.domain.capability_registry import get_tool_catalog
 
-    published = publish_calculation(
-        voiced.calculation,
+    published = publish_calculations(
+        voiced.calculations,
         template=prose,
         language=language,
         catalog=get_tool_catalog(),
@@ -182,7 +192,7 @@ def calculated_answer(
         evidence=evidence,
     )
     return answer_from_published(
-        voiced.calculation,
+        voiced.calculations,
         published,
         prose=prose,
         language=language,
@@ -192,7 +202,7 @@ def calculated_answer(
 
 
 def answer_from_published(
-    request: AnswerCalculation,
+    requests: Sequence[AnswerCalculation],
     published: PublishedCalculation | None,
     *,
     prose: str,
@@ -200,8 +210,8 @@ def answer_from_published(
     retrieved: Sequence[ResearchSource],
     evidence: Sequence[RetrievedRow] = (),
 ) -> CalculatedAnswer | None:
-    """The answer a published calculation makes: its card and prose, or the one
-    question for a figure only the user knows; None when inputs were not found."""
+    """The answer published calculations make: their cards and prose, or the one
+    question for the figures only the user knows; None when inputs were not found."""
     if published is None or published.not_looked_up:
         return None
     if published.question_field is not None:
@@ -214,7 +224,9 @@ def answer_from_published(
             question_field=field,
             missing_inputs=tuple(owed),
             pending={
-                PENDING_PAYLOAD_KEY: request.model_dump(mode="json"),
+                PENDING_PAYLOAD_KEY: [
+                    request.model_dump(mode="json") for request in requests
+                ],
                 "requested_field": field,
                 "requested_fields": list(owed),
                 "evidence": [row.model_dump(mode="json") for row in evidence],
@@ -321,9 +333,7 @@ async def calculation_offer_stage_result(
         reason_codes=[CALCULATION_OFFER_TAKEN_REASON_CODE],
     )
     offer = selected_thread_metadata.get(CALCULATION_OFFER_KEY)
-    if not isinstance(offer, dict) or not isinstance(
-        offer.get(PENDING_PAYLOAD_KEY), dict
-    ):
+    if not isinstance(offer, dict) or not pending_requests(offer):
         return StageResult(
             outcome="ready_to_respond",
             decision=research_decision(
@@ -374,22 +384,34 @@ def pending_calculation_reply(
 
 
 def pending_calculation(metadata: dict[str, Any]) -> dict[str, Any] | None:
-    """The calculation a reply completes: the answer asked the user for one
-    figure and is waiting for it."""
+    """The calculations a reply completes: the answer asked the user for their
+    figures and is waiting for them."""
     if metadata.get("last_stage_outcome") != "await_user_reply":
         return None
     clarification = metadata.get("clarification")
     payload = clarification.get("payload") if isinstance(clarification, dict) else None
-    if isinstance(payload, dict) and isinstance(payload.get(PENDING_PAYLOAD_KEY), dict):
+    if isinstance(payload, dict) and pending_requests(payload):
         return payload
     return None
+
+
+def pending_requests(payload: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """The calculations a pending question completes, in the answer's order; a
+    payload stored before answers carried several holds its one calculation."""
+    if not isinstance(payload, Mapping):
+        return []
+    items = payload.get(PENDING_PAYLOAD_KEY)
+    if isinstance(items, list):
+        return [item for item in items if isinstance(item, dict)]
+    single = payload.get(LEGACY_PENDING_PAYLOAD_KEY)
+    return [single] if isinstance(single, dict) else []
 
 
 def question_stage_result(
     answered: CalculatedAnswer, *, decision: InterpretDecision | None
 ) -> StageResult:
-    """One plain question for the figure only the user knows, with the pending
-    calculation the reply completes."""
+    """One plain question for the figures only the user knows, with the pending
+    calculations the reply completes."""
     field = str(answered.question_field)
     owed = list(answered.missing_inputs or (field,))
     return StageResult(
@@ -504,20 +526,24 @@ def _messages(
             "assumptions you state. Never restate the question as the answer.\n"
         )
     if pending:
-        calculation = pending.get(PENDING_PAYLOAD_KEY) or {}
-        payload = json.dumps(calculation, ensure_ascii=False)
+        calculations = pending_requests(pending)
+        payload = json.dumps(calculations, ensure_ascii=False)
+        kinds = ", ".join(str(item.get("kind")) for item in calculations)
         if offered:
             context.append(
                 "The reader chose to work this out with their own figures. Keep "
-                f"this {calculation.get('kind')} calculation and the inputs it "
-                "already holds with their sources, and ask one plain question for "
-                f"every figure only the reader knows: {payload}\n"
+                f"these calculations ({kinds}) and the inputs they already hold with "
+                "their sources, and ask one plain question for every figure only the "
+                f"reader knows: {payload}\n"
             )
         else:
+            asked = ", ".join(
+                pending.get("requested_fields") or [str(pending.get("requested_field"))]
+            )
             context.append(
-                f"Argus asked the user for {', '.join(pending.get('requested_fields') or [str(pending.get('requested_field'))])} of a "
-                f"{calculation.get('kind')} calculation. Keep that kind and its inputs "
-                f"so far, and fill the answered figure: {payload}\n"
+                f"Argus asked the user for {asked} of these calculations ({kinds}). "
+                "Keep their names, kinds and inputs so far, and fill the answered "
+                f"figures: {payload}\n"
             )
     return [
         {"role": "system", "content": "".join(context)},

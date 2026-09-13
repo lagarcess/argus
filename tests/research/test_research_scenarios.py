@@ -112,7 +112,7 @@ def _scenario_card(result) -> dict:
     return cards[0]
 
 
-def _run_scenario(monkeypatch, *, cited: bool):
+def _run_scenario(monkeypatch, *, cited: bool, source_urls: list[str] | None = None):
     from tests.research.conftest import typed_answer_text
 
     set_research_query(
@@ -131,6 +131,7 @@ def _run_scenario(monkeypatch, *, cited: bool):
                     "NVIDIA trades at {{price}}; consensus growth is {{growth_base_pct}} a year.",
                     [],
                     _scenario_calculation(cited=cited),
+                    source_urls=source_urls,
                 ),
                 sources=["https://www.reuters.com/markets/nvidia-outlook/"],
                 tickers=["NVDA"],
@@ -183,7 +184,7 @@ def test_a_scenario_citing_pages_it_never_read_renders_no_blank_card(
     the answer never retrieved feeds nothing, so the calculation is not
     computed and no card with blank inputs renders; without a model to answer
     from market data and assumptions, the honest note says what happened."""
-    result = _run_scenario(monkeypatch, cited=False)
+    result = _run_scenario(monkeypatch, cited=False, source_urls=[OUTLOOK_PAGE])
     assert result is not None
     sidecar = result.stage_patch["research"]
     assert sidecar["degraded"] == {"code": "calculation_inputs_not_found"}
@@ -241,6 +242,7 @@ def test_a_comparison_scenario_runs_balanced_and_a_withheld_cache_hit_stays_with
                     "NVDA ranges written from memory.",
                     [],
                     _scenario_calculation(cited=False),
+                    source_urls=[OUTLOOK_PAGE],
                 ),
                 sources=["https://www.reuters.com/markets/nvidia-outlook/"],
                 tickers=["NVDA", "AMD"],
@@ -308,7 +310,10 @@ def test_a_typed_horizon_alone_selects_the_scenario_contract(monkeypatch) -> Non
         [
             agent_response(
                 text=typed_answer_text(
-                    "A range written from memory.", [], _scenario_calculation(cited=False)
+                    "A range written from memory.",
+                    [],
+                    _scenario_calculation(cited=False),
+                    source_urls=[OUTLOOK_PAGE],
                 ),
                 sources=["https://www.reuters.com/markets/nvidia-outlook/"],
                 tickers=["NVDA"],
@@ -536,7 +541,7 @@ def test_a_scenario_question_sends_the_scenario_contract(monkeypatch) -> None:
     body = __import__("json").loads(transport.requests[0].content.decode())
     assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert "Argus computes the answer from the calculation you return" in body["input"]
-    assert "calculation" in body["response_format"]["json_schema"]["schema"]["required"]
+    assert "calculations" in body["response_format"]["json_schema"]["schema"]["required"]
     assert body["instructions"] != RETRIEVAL_INSTRUCTIONS
 
 
@@ -867,7 +872,7 @@ def test_a_background_answer_that_needs_a_figure_the_kind_requires_offers_the_ca
         answer_markdown=prose,
         sources=(ResearchSource(url=OUTLOOK_PAGE),),
         usage=ResearchUsage(web_search_invocations=1),
-        calculation=calculation,
+        calculations=(calculation,),
     )
     job_request = {
         "capability_class": "thorough_research",
@@ -881,7 +886,10 @@ def test_a_background_answer_that_needs_a_figure_the_kind_requires_offers_the_ca
     assert composed["answer"] == prose
     assert composed["computed"] is None
     assert composed[CALCULATION_OFFER_KEY]["requested_field"] == "per_share"
-    assert composed[CALCULATION_OFFER_KEY]["calculation"]["kind"] == "valuation_scenarios"
+    assert (
+        composed[CALCULATION_OFFER_KEY]["calculations"][0]["kind"]
+        == "valuation_scenarios"
+    )
     assert composed["next_steps"]["items"][0] == {
         "type": "test",
         "kind": "calculation_offer",

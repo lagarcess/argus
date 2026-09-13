@@ -26,8 +26,9 @@ _DECISION_STATES: tuple[DecisionState, ...] = (
 _MAX_ASKED = 500
 
 
-def computed_answer_card(message: Mapping[str, Any]) -> ToolResultCard | None:
-    """The card the answer's declared computation names, or ``None``."""
+def computed_answer_cards(message: Mapping[str, Any]) -> list[ToolResultCard] | None:
+    """The cards the answer's declared computation names, in its order, or
+    ``None`` when a calculation it declares has no card that agrees."""
     metadata = message_metadata(message)
     computation = computation_from_message_metadata(metadata)
     if computation is None or message.get("role") != "assistant":
@@ -35,29 +36,43 @@ def computed_answer_card(message: Mapping[str, Any]) -> ToolResultCard | None:
     raw_cards = metadata.get("tool_result_cards")
     if not isinstance(raw_cards, list):
         return None
+    cards: list[ToolResultCard] = []
     for raw in raw_cards:
         try:
-            card = ToolResultCard.model_validate(raw)
+            cards.append(ToolResultCard.model_validate(raw))
         except ValueError:
             continue
-        if card.tool_name == computation.kind and card.arguments == computation.inputs:
-            return card
-    return None
+    matched: list[int] = []
+    for calculation in computation.calculations:
+        position = next(
+            (
+                index
+                for index, card in enumerate(cards)
+                if index not in matched
+                and card.tool_name == calculation.kind
+                and card.arguments == calculation.inputs
+            ),
+            None,
+        )
+        if position is None:
+            return None
+        matched.append(position)
+    return [cards[index] for index in matched]
 
 
 def latest_computed_answer(
     messages: Sequence[Mapping[str, Any]],
-) -> tuple[Mapping[str, Any], ToolResultCard] | None:
-    """The newest assistant message whose marker and card agree."""
+) -> tuple[Mapping[str, Any], list[ToolResultCard]] | None:
+    """The newest assistant message whose marker and cards agree."""
     ordered = sorted(
         messages,
         key=lambda row: (row_activity(row), text(row.get("id")) or ""),
         reverse=True,
     )
     for message in ordered:
-        card = computed_answer_card(message)
-        if card is not None:
-            return message, card
+        cards = computed_answer_cards(message)
+        if cards is not None:
+            return message, cards
     return None
 
 
@@ -92,7 +107,7 @@ def current_answer_decision(
 def project_answer_dossier(
     *,
     message: Mapping[str, Any],
-    card: ToolResultCard,
+    cards: Sequence[ToolResultCard],
     asked: str | None,
     decision: Mapping[str, Any] | None,
     decision_action_availability: DecisionActionAvailability | None,
@@ -102,7 +117,7 @@ def project_answer_dossier(
     if message_id is None or conversation_id is None:
         raise ValueError("An answer dossier needs its message and conversation ids.")
     computation = computation_from_message_metadata(message_metadata(message))
-    assert computation is not None  # computed_answer_card already required it.
+    assert computation is not None  # computed_answer_cards already required it.
     state = decision.get("decision_state") if decision is not None else None
     typed_state = cast(DecisionState, state) if state in _DECISION_STATES else None
     note = decision.get("note") if decision is not None else None
@@ -124,9 +139,8 @@ def project_answer_dossier(
         conversation_id=conversation_id,
         asked=asked,
         computed_at=row_activity(message),
-        kind=computation.kind,
         symbols=list(computation.symbols),
-        card=card.model_dump(mode="json"),
+        cards=[card.model_dump(mode="json") for card in cards],
         decision=(
             SearchDossierDecision(state=typed_state, note=bounded_note)
             if typed_state is not None

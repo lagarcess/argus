@@ -18,7 +18,7 @@ from argus.api.message_store import (
     update_message_artifact,
 )
 from argus.api.schemas import Message, User
-from argus.domain.computation_marker import computation_from_tool_card
+from argus.domain.computation_marker import computation_from_tool_cards
 from argus.domain.pending_artifacts import (
     DeadPendingArtifactError,
     PendingArtifactLayout,
@@ -144,17 +144,15 @@ async def recompute_tool_result(
         artifact_id=card.artifact_id,
         input_revision=card.input_revision + 1,
     )
-    documents = [
-        (revised if item.artifact_id == artifact else item).model_dump(mode="json")
-        for item in cards
-    ]
-    # The marker is derived from the recomputed card by its one owner, so a
-    # decision saved after this edit stores the recomputed inputs.
-    computation = computation_from_tool_card(revised, catalog=get_tool_catalog())
+    current = [revised if item.artifact_id == artifact else item for item in cards]
+    documents = [item.model_dump(mode="json") for item in current]
+    # The marker is derived from every current card by its one owner, so a
+    # decision saved after this edit stores every option's current inputs.
+    computation = computation_from_tool_cards(current, catalog=get_tool_catalog())
     metadata: dict[str, JsonValue] = {"tool_result_cards": documents}
     if computation is not None:
         metadata["computation"] = computation.model_dump(mode="json")
-    content = _recomputed_answer_text(source, revised)
+    content = _recomputed_answer_text(source, revised, current)
     # The message remains the only durable owner. No checkpoint projection is
     # written here; subsequent turns re-read these current artifact facts.
     try:
@@ -174,25 +172,29 @@ async def recompute_tool_result(
     return ToolResultRecomputeResponse(message=updated)
 
 
-def _recomputed_answer_text(source: Message, revised: Any) -> str:
-    """The prose re-rendered from the recomputed card when the answer stated its
-    figures through references, so every figure it states stays the card's;
-    any other prose stays as stored."""
+def _recomputed_answer_text(source: Message, revised: Any, current: list[Any]) -> str:
+    """The prose re-rendered from the message's current cards when the answer
+    stated its figures through references, so every figure it states stays a
+    card's; any other prose stays as stored."""
     from argus.agent_runtime.answer_calculation import (
         ANSWER_TEMPLATE_KEY,
         fallback_answer_lead,
         render_answer_text,
+        template_cards,
     )
 
     template = (source.metadata or {}).get(ANSWER_TEMPLATE_KEY)
-    if (
-        not isinstance(template, dict)
-        or template.get("artifact_id") != revised.artifact_id
+    names = template_cards(template) if isinstance(template, dict) else {}
+    by_artifact = {card.artifact_id: card for card in current}
+    if revised.artifact_id not in names.values() or any(
+        artifact not in by_artifact for artifact in names.values()
     ):
         return source.content
-    succeeded = revised.outcome.status == "succeeded"
+    assert isinstance(template, dict)
+    cards = {name: by_artifact[artifact] for name, artifact in names.items()}
+    succeeded = all(card.outcome.status == "succeeded" for card in cards.values())
     if succeeded:
-        text, failure = render_answer_text(str(template.get("text") or ""), revised)
+        text, failure = render_answer_text(str(template.get("text") or ""), cards)
         if failure is None:
             return text
     return fallback_answer_lead(

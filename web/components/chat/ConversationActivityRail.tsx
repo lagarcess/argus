@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type {
+  ConversationRailCalculation,
   ConversationRailTick,
   ConversationRailTickKind,
 } from "@/lib/conversation-rail";
@@ -25,7 +26,11 @@ import {
 } from "@/lib/conversation-rail";
 import { recoveryDisplayText } from "@/lib/chat-recovery-display";
 import { toolOutcomeTreatment } from "@/lib/tool-outcome-treatment";
-import { localizedToolText, toolFactValue } from "@/lib/tool-result-card";
+import {
+  localizedToolText,
+  toolFactValue,
+  type ToolTranslator,
+} from "@/lib/tool-result-card";
 import type { Message } from "@/components/chat/types";
 
 type ConversationActivityRailProps = {
@@ -176,9 +181,21 @@ export default function ConversationActivityRail({
     return t("chat.activity_rail.result", "Result");
   };
 
-  // A computed answer's identity is its card title; a run's is its strategy.
+  // A computed answer's identity is its card titles; a run's is its strategy.
   const tickTitle = (tick: ConversationRailTick): string | null =>
-    tick.calculation ? localizedToolText(tick.calculation.title, t) : tick.strategyTitle;
+    tick.calculations
+      ? Array.from(
+          new Set(
+            tick.calculations.map((calculation) =>
+              localizedToolText(calculation.title, t),
+            ),
+          ),
+        ).join(" · ")
+      : tick.strategyTitle;
+
+  // Several calculations each title their own headline, so none leads the preview.
+  const previewTitle = (tick: ConversationRailTick): string | null =>
+    tick.calculations && tick.calculations.length > 1 ? null : tickTitle(tick);
 
   const tickAriaLabel = (tick: ConversationRailTick): string => {
     const label = kindLabel(tick.kind);
@@ -274,9 +291,9 @@ export default function ConversationActivityRail({
             >
               {kindLabel(openTick.kind)}
             </div>
-            {tickTitle(openTick) && (
+            {previewTitle(openTick) && (
               <div className="mt-1 truncate text-[13px] font-medium text-black/80 dark:text-white/80">
-                {tickTitle(openTick)}
+                {previewTitle(openTick)}
               </div>
             )}
             {openTick.symbols.length > 0 && (
@@ -297,18 +314,12 @@ export default function ConversationActivityRail({
                 )}
               </div>
             )}
-            {openTick.kind !== "error_recovery" && openTick.calculation?.headline && (
-              <div
-                data-testid="conversation-activity-rail-headline"
-                className="mt-2 flex items-baseline justify-between gap-3 border-t border-black/8 pt-1.5 text-[12px] dark:border-white/8"
-              >
-                <span className="text-black/50 dark:text-white/50">
-                  {localizedToolText(openTick.calculation.headline.label, t)}
-                </span>
-                <span className="font-medium text-black/80 dark:text-white/80">
-                  {toolFactValue(openTick.calculation.headline, t, locale)}
-                </span>
-              </div>
+            {openTick.kind !== "error_recovery" && openTick.calculations && (
+              <RailCalculationPreview
+                calculations={openTick.calculations}
+                t={t}
+                locale={locale}
+              />
             )}
             {openTick.kind !== "error_recovery" &&
               openTick.metrics.length > 0 && (
@@ -340,5 +351,50 @@ export default function ConversationActivityRail({
         )}
       </nav>
     </div>
+  );
+}
+
+/** Each calculation's headline in marker order; with several, each under its own title. */
+export function RailCalculationPreview({
+  calculations,
+  t,
+  locale,
+}: {
+  calculations: ConversationRailCalculation[];
+  t: ToolTranslator;
+  locale: string;
+}) {
+  const several = calculations.length > 1;
+  return (
+    <>
+      {calculations.map((calculation, index) =>
+        several || calculation.headline ? (
+          <div
+            key={index}
+            data-testid="conversation-activity-rail-calculation"
+            className="mt-2 border-t border-black/8 pt-1.5 text-[12px] dark:border-white/8"
+          >
+            {several && (
+              <div className="truncate font-medium text-black/80 dark:text-white/80">
+                {localizedToolText(calculation.title, t)}
+              </div>
+            )}
+            {calculation.headline && (
+              <div
+                data-testid="conversation-activity-rail-headline"
+                className="flex items-baseline justify-between gap-3"
+              >
+                <span className="text-black/50 dark:text-white/50">
+                  {localizedToolText(calculation.headline.label, t)}
+                </span>
+                <span className="font-medium text-black/80 dark:text-white/80">
+                  {toolFactValue(calculation.headline, t, locale)}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : null,
+      )}
+    </>
   );
 }

@@ -439,11 +439,12 @@ def _packet_from_priced_response(
         rows=tuple(rows),
         typed_answer=typed is not None,
         unsourced_rows=tuple(unsourced),
-        calculation=(
-            typed.calculation.model_dump(mode="json")
-            if typed is not None and typed.calculation is not None
-            else None
+        calculations=(
+            tuple(item.model_dump(mode="json") for item in typed.calculations)
+            if typed is not None
+            else ()
         ),
+        source_urls=_public_urls(typed.source_urls) if typed is not None else (),
         follow_up_questions=(
             tuple(typed.follow_up_questions) if typed is not None else ()
         ),
@@ -874,6 +875,18 @@ def symbols_from_answer_tables(markdown: str) -> list[str]:
 
 def _is_provider_host(host: str) -> bool:
     return any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS)
+
+
+def _public_urls(urls: list[str]) -> tuple[str, ...]:
+    """The pages an answer names, held to the rule every public source meets."""
+    kept = [
+        url
+        for url in urls
+        if url.startswith("https://")
+        and len(url) <= MAX_URL_CHARS
+        and not _is_provider_host(urlparse(url).netloc.lower())
+    ]
+    return tuple(dict.fromkeys(kept))
 
 
 def _append_public_source(parsed: _ParsedToolResults, entry: Any) -> None:

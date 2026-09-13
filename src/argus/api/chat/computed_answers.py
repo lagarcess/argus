@@ -32,10 +32,11 @@ from argus.api.message_store import (
 )
 from argus.api.schemas import Conversation, Message, User
 from argus.api.search_computed import question_for_answer
-from argus.domain.answer_dossiers import computed_answer_card
+from argus.domain.answer_dossiers import computed_answer_cards
 from argus.domain.computation_compare import ComparisonKindMismatch, card_differences
-from argus.domain.computation_marker import computation_from_tool_card
+from argus.domain.computation_marker import computation_from_tool_cards
 from argus.domain.decision_attachment import computation_from_message_metadata
+from argus.domain.research.contracts import ResearchPacket
 from argus.domain.run_dossiers import message_metadata, row_activity
 from argus.domain.tool_contracts import (
     TOOL_INPUT_SOURCES_FIELD,
@@ -83,7 +84,7 @@ class RefreshUnavailableError(RuntimeError):
 @dataclass(frozen=True)
 class OwnedAnswer:
     message: Message
-    card: ToolResultCard
+    cards: list[ToolResultCard]
     computation: DecisionComputation
     asked: str | None
 
@@ -98,12 +99,12 @@ def owned_computed_answer(
         raise ComputedAnswerNotFoundError("Message not found or not owned by user.")
     row = message.model_dump(mode="python")
     computation = computation_from_message_metadata(message.metadata)
-    card = computed_answer_card(row)
-    if computation is None or card is None:
+    cards = computed_answer_cards(row)
+    if computation is None or cards is None:
         raise ComputationUnsupportedError("This answer carries no computation.")
     return OwnedAnswer(
         message=message,
-        card=card,
+        cards=cards,
         computation=computation,
         asked=question_for_answer(user, row),
     )
@@ -122,9 +123,11 @@ def computed_answers_of_kind(
     for row in rows:
         if exclude_message_id is not None and str(row.get("id")) == exclude_message_id:
             continue
-        card = computed_answer_card(row)
+        cards = computed_answer_cards(row)
         computation = computation_from_message_metadata(message_metadata(row))
-        if card is None or computation is None or card.tool_name != kind:
+        # A comparison lines up one calculation with one; an answer that weighs
+        # several options is not a result of one kind.
+        if cards is None or computation is None or computation.kinds != [kind]:
             continue
         items.append(
             ComputedAnswerSummary(
@@ -176,12 +179,16 @@ def compare_computed_answers(
     second = owned_computed_answer(
         user=user, conversation_id=right.conversation_id, message_id=right.message_id
     )
+    if len(first.cards) != 1 or len(second.cards) != 1:
+        raise ComputationSelectionError(
+            "Only answers with one calculation compare side by side."
+        )
     try:
-        differences = card_differences(first.card, second.card)
+        differences = card_differences(first.cards[0], second.cards[0])
     except ComparisonKindMismatch as exc:
         raise ComputationSelectionError(str(exc)) from exc
     return ComputationComparison(
-        kind=first.card.tool_name,
+        kind=first.cards[0].tool_name,
         left=_compared(first),
         right=_compared(second),
         differences=[
@@ -205,7 +212,7 @@ def _compared(answer: OwnedAnswer) -> ComparedAnswer:
         message_id=answer.message.id,
         asked=answer.asked,
         computed_at=answer.message.created_at,
-        card=answer.card.model_dump(mode="json"),
+        card=answer.cards[0].model_dump(mode="json"),
     )
 
 
@@ -214,16 +221,17 @@ def continue_computed_answer(
 ) -> tuple[Conversation, Message]:
     """A new chat whose one message carries only this result, linked to its source.
 
-    The card is copied under a new artifact identity so recomputing it in the
+    Each card is copied under a new artifact identity so recomputing it in the
     new chat never touches the source; the source conversation is unchanged.
     """
     answer = owned_computed_answer(
         user=user, conversation_id=conversation_id, message_id=message_id
     )
-    card = answer.card.model_copy(
-        update={"artifact_id": str(uuid4()), "input_revision": 0}
-    )
-    computation = computation_from_tool_card(card)
+    cards = [
+        card.model_copy(update={"artifact_id": str(uuid4()), "input_revision": 0})
+        for card in answer.cards
+    ]
+    computation = computation_from_tool_cards(cards)
     if computation is None:
         raise ComputationUnsupportedError("This answer carries no computation.")
     conversation = _new_conversation(user)
@@ -233,7 +241,7 @@ def continue_computed_answer(
         role="assistant",
         content=answer.message.content,
         metadata={
-            "tool_result_cards": [card.model_dump(mode="json")],
+            "tool_result_cards": [card.model_dump(mode="json") for card in cards],
             "computation": computation.model_dump(mode="json"),
             CONTINUED_FROM_KEY: {
                 "conversation_id": conversation_id,
@@ -267,14 +275,11 @@ async def refresh_computed_answer(
     message_id: str,
     guest_visitor_key: str | None,
 ) -> ComputationRefreshResponse:
-    """Look up the answer's cited inputs again and compute them beside it. A
+    """Look up the answer's cited inputs again and compute each card beside it. A
     page input is looked up through the research allowance; a market data input
     reads Argus's own latest close for free. The stored answer never moves."""
     from argus.agent_runtime import research_grounded as grounded
-    from argus.agent_runtime.answer_calculation import (
-        cited_page_inputs,
-        latest_market_close,
-    )
+    from argus.agent_runtime.answer_calculation import cited_page_inputs
     from argus.agent_runtime.research_answer import _resolved_subjects
     from argus.agent_runtime.research_calculation import retrieved_pages
     from argus.agent_runtime.research_query import ResearchQueryExtraction
@@ -290,16 +295,10 @@ async def refresh_computed_answer(
     answer = owned_computed_answer(
         user=user, conversation_id=conversation_id, message_id=message_id
     )
-    arguments = dict(answer.card.arguments)
-    stored_sources = arguments.get(TOOL_INPUT_SOURCES_FIELD)
-    stored_sources = stored_sources if isinstance(stored_sources, Mapping) else {}
-    cited = [
-        name
-        for name, source in stored_sources.items()
-        if isinstance(source, Mapping) and source.get("kind") == "page"
-    ]
-    declaration = get_tool_catalog().get(answer.card.tool_name)
-    if declaration is None or not cited:
+    catalog = get_tool_catalog()
+    declarations = [catalog.get(card.tool_name) for card in answer.cards]
+    cited = [_cited_inputs(card) for card in answer.cards]
+    if not any(cited) or any(declaration is None for declaration in declarations):
         raise NothingToRefreshError("This answer cites no page to look up again.")
     if not research_rail_enabled():
         raise RefreshUnavailableError("not_configured")
@@ -312,15 +311,21 @@ async def refresh_computed_answer(
         )
     )
     language = grounded.language_tag(user.language)
+    names = _calculation_names(answer)
+    single = len(answer.cards) == 1
     prompt = grounded._research_prompt(
-        message=answer.asked or declaration.description,
+        message=answer.asked or str(getattr(declarations[0], "description", "")),
         subjects=subjects,
         period=None,
         language=language,
         question_kind=None,
         publisher_sources_required=True,
         scenario=True,
-        lookup_inputs=cited,
+        lookup_inputs=[
+            item if single else f"{name}.{item}"
+            for name, inputs in zip(names, cited, strict=True)
+            for item in inputs
+        ],
     )
     spec = retrieval_spec(
         "balanced",
@@ -367,28 +372,104 @@ async def refresh_computed_answer(
         degraded_code=degraded,
     )
     _record_refresh(user, conversation_id, sidecar)
-    found = (
+    pages = retrieved_pages(packet)
+    found = [
         {}
-        if degraded is not None
-        else cited_page_inputs(packet.calculation, retrieved_pages(packet), cited)
-    )
-    if not found:
+        if degraded is not None or not inputs
+        else cited_page_inputs(
+            _looked_up(packet, name=name, kind=card.tool_name, single=single),
+            pages,
+            inputs,
+        )
+        for name, card, inputs in zip(names, answer.cards, cited, strict=True)
+    ]
+    if not any(found):
         return ComputationRefreshResponse(
             computation=answer.computation,
             status="inputs_not_found",
             sources=list(sidecar["sources"]),
         )
+    symbol = next(iter(answer.computation.symbols), None)
+    return ComputationRefreshResponse(
+        computation=answer.computation,
+        status="refreshed",
+        reruns=[
+            _refreshed_rerun(card, declaration, inputs, symbol=symbol)
+            for card, declaration, inputs in zip(
+                answer.cards, declarations, found, strict=True
+            )
+        ],
+        sources=list(sidecar["sources"]),
+    )
+
+
+def _cited_inputs(card: ToolResultCard) -> list[str]:
+    """The inputs a card read from a page, which a retrieval can look up again."""
+    sources = card.arguments.get(TOOL_INPUT_SOURCES_FIELD)
+    if not isinstance(sources, Mapping):
+        return []
+    return [
+        name
+        for name, source in sources.items()
+        if isinstance(source, Mapping) and source.get("kind") == "page"
+    ]
+
+
+def _calculation_names(answer: OwnedAnswer) -> list[str]:
+    """Each card's calculation name as the answer's template gave it, or its place."""
+    from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY, template_cards
+
+    template = (answer.message.metadata or {}).get(ANSWER_TEMPLATE_KEY)
+    named = template_cards(template) if isinstance(template, Mapping) else {}
+    by_artifact = {artifact: name for name, artifact in named.items()}
+    return [
+        by_artifact.get(card.artifact_id, f"calculation_{index}")
+        for index, card in enumerate(answer.cards, start=1)
+    ]
+
+
+def _looked_up(
+    packet: ResearchPacket, *, name: str, kind: str, single: bool
+) -> dict[str, Any] | None:
+    """The looked-up calculation for a stored card: the one of its kind when the
+    answer holds one calculation, else the one under its name and kind."""
+    from argus.agent_runtime.answer_calculation import folded_name
+
+    return next(
+        (
+            item
+            for item in packet.calculations
+            if item.get("kind") == kind
+            and (single or folded_name(str(item.get("name") or "")) == name)
+        ),
+        None,
+    )
+
+
+def _refreshed_rerun(
+    card: ToolResultCard,
+    declaration: Any,
+    found: Mapping[str, tuple[Any, dict[str, Any]]],
+    *,
+    symbol: str | None,
+) -> DecisionRerun:
+    """A card computed again beside the stored one: each input found again, a
+    cited input no page states today with its stored value and date, and a
+    market data input at Argus's own latest close."""
+    from argus.agent_runtime.answer_calculation import latest_market_close
+
+    arguments = dict(card.arguments)
+    stored_sources = arguments.get(TOOL_INPUT_SOURCES_FIELD)
+    stored_sources = stored_sources if isinstance(stored_sources, Mapping) else {}
     refreshed: dict[str, Any] = {
         name: value
         for name, value in arguments.items()
         if name != TOOL_INPUT_SOURCES_FIELD
     }
-    # A cited input no page states today keeps its stored value and date.
     kept: dict[str, Any] = {name: dict(source) for name, source in stored_sources.items()}
     for name, (value, source) in found.items():
         refreshed[name] = value
         kept[name] = source
-    symbol = next(iter(answer.computation.symbols), None)
     for name, source in stored_sources.items():
         if isinstance(source, Mapping) and source.get("kind") == "market_data" and symbol:
             close = latest_market_close(symbol)
@@ -397,23 +478,18 @@ async def refresh_computed_answer(
                 kept[name] = {"kind": "market_data", "date": close[1]}
     refreshed[TOOL_INPUT_SOURCES_FIELD] = kept
     outcome = declaration.invoke_sync(refreshed)
-    card = declaration.result_card(
+    result = declaration.result_card(
         call=ToolCall(
             tool_name=declaration.name, call_id=RERUN_IDENTITY, arguments=refreshed
         ),
         outcome=outcome,
         artifact_id=RERUN_IDENTITY,
     )
-    return ComputationRefreshResponse(
-        computation=answer.computation,
-        status="refreshed",
-        rerun=DecisionRerun(
-            kind=declaration.name,
-            inputs=card.arguments,
-            status="computed",
-            result=card.model_dump(mode="json"),
-        ),
-        sources=list(sidecar["sources"]),
+    return DecisionRerun(
+        kind=declaration.name,
+        inputs=result.arguments,
+        status="computed",
+        result=result.model_dump(mode="json"),
     )
 
 

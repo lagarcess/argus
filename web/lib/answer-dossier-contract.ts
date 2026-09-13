@@ -10,18 +10,19 @@ export type AnswerDecisionAction = {
 };
 
 /**
- * A computed answer's dossier beside the run dossier: what was asked, the
- * card with what Argus used and what came out, the decision, and recompute
- * through the message computation route. The run dossier is unchanged.
+ * A computed answer's dossier beside the run dossier: what was asked, one
+ * card per calculation with what Argus used and what came out, the decision,
+ * and recompute through the message computation route. The run dossier is
+ * unchanged.
  */
 export type AnswerDossier = {
   message_id: string;
   conversation_id: string;
   asked: string | null;
   computed_at: string;
-  kind: string;
   symbols: string[];
-  card: Record<string, unknown>;
+  /** 1 to 4 tool result cards, one per calculation, in marker order. */
+  cards: Record<string, unknown>[];
   decision: { state: DecisionState; note: string | null; run_label?: string | null } | null;
   decision_id: string | null;
   actions: AnswerDecisionAction[];

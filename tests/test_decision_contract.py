@@ -70,7 +70,7 @@ def test_computed_answer_decision_stores_its_computation_without_a_spine() -> No
     assert decision.idea_id is None
     assert decision.idea_version_id is None
     assert decision.computation is not None
-    assert decision.computation.inputs["months"] == 9
+    assert decision.computation.calculations[0].inputs["months"] == 9
 
 
 @pytest.mark.parametrize(

@@ -100,7 +100,7 @@ def test_a_savings_goal_computes_from_the_price_its_answer_cited(monkeypatch) ->
     assert result is not None
     sent = json.loads(transport.requests[0].content.decode())
     schema = sent["response_format"]["json_schema"]["schema"]
-    assert "calculation" in schema["required"]
+    assert "calculations" in schema["required"]
     card = result.stage_patch["final_response_payload"]["tool_result_cards"][0]
     assert card["tool_name"] == "time_value"
     assert card["outcome"]["status"] == "succeeded"
@@ -113,7 +113,7 @@ def test_a_savings_goal_computes_from_the_price_its_answer_cited(monkeypatch) ->
     assert "**DOP 3,750**" in answer and "DOP 45,000" in answer
     assert "{{" not in answer
     template = result.stage_patch[ac.ANSWER_TEMPLATE_KEY]
-    assert template["artifact_id"] == card["artifact_id"]
+    assert list(template["cards"].values()) == [card["artifact_id"]]
     assert "{{payment}}" in template["text"]
     assert "degraded" not in result.stage_patch["research"]
 
@@ -149,7 +149,7 @@ def test_an_answer_that_needs_a_figure_only_the_user_knows_offers_the_calculatio
     assert "DOP 45,000" in answer and "{{" not in answer
     offer = result.stage_patch[CALCULATION_OFFER_KEY]
     assert offer["requested_field"] == "present_value"
-    assert offer["calculation"]["kind"] == "time_value"
+    assert offer["calculations"][0]["kind"] == "time_value"
     assert offer["retrieved"][0]["url"] == PRICE_PAGE
     assert result.stage_patch["next_steps"]["items"][0] == {
         "type": "test",

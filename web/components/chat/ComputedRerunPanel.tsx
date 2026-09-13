@@ -15,7 +15,7 @@ import ToolOutcomeNotice from "./ToolOutcomeNotice";
  * route, the stored result never moves, and every unsuccessful outcome renders
  * through the treatment owner.
  */
-export default function ComputedRerunPanel({ stored, latest, busy, unavailable, transportError, onRerun, t, locale, labels }: {
+export default function ComputedRerunPanel({ stored, latest, busy, unavailable, transportError, onRerun, t, locale, labels, idPrefix }: {
   stored: ToolResultCard;
   latest: ToolResultCard | null;
   busy: boolean;
@@ -25,6 +25,8 @@ export default function ComputedRerunPanel({ stored, latest, busy, unavailable, 
   t: ToolTranslator;
   locale: string;
   labels: { stored: string; latest: string };
+  /** Keeps input ids unique when several calculations share one artifact identity. */
+  idPrefix?: string;
 }) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -52,7 +54,7 @@ export default function ComputedRerunPanel({ stored, latest, busy, unavailable, 
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">{labels.stored}</p>
         {storedTreatment ? <div className="mb-3"><ToolOutcomeNotice treatment={storedTreatment} repairLabel={storedTreatment.repair ? localizedToolText(storedTreatment.repair.label, t) : null} retryLabel={t("tools.card.retry")} onRepair={applyRepair} onRetry={() => onRerun({})} disabled={busy} /></div> : null}
         <ToolCardPresentation presentation={stored.presentation} t={t} locale={locale} withheld={stored.outcome.status !== "succeeded"}
-          inputs={<ToolInputEditor idPrefix={`rerun-${stored.artifact_id}`} inputs={shownToolInputs(stored.presentation)} drafts={drafts} editable={!unavailable} busy={busy} onChange={change} t={t} locale={locale} />} />
+          inputs={<ToolInputEditor idPrefix={idPrefix ?? `rerun-${stored.artifact_id}`} inputs={shownToolInputs(stored.presentation)} drafts={drafts} editable={!unavailable} busy={busy} onChange={change} t={t} locale={locale} />} />
       </section>
       <section data-computed-rerun="latest" className="min-w-0 rounded-2xl border border-black/10 p-4 dark:border-white/10">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40">{labels.latest}</p>
@@ -65,6 +67,36 @@ export default function ComputedRerunPanel({ stored, latest, busy, unavailable, 
         </> : null}
         {!latest && !unavailable && !upToDate && !transportError ? <p className="text-sm text-black/45 dark:text-white/45">{t("tools.card.saved_result")}</p> : null}
       </section>
+    </div>
+  );
+}
+
+/** One calculation's panel; a calculation with no stored card shows `fallback` instead. */
+export type CalculationRerun = {
+  stored: ToolResultCard | null;
+  latest: ToolResultCard | null;
+  unavailable: ToolOutcomeTreatment | null;
+  transportError: string | null;
+  labels: { stored: string; latest: string };
+  fallback: React.ReactNode;
+};
+
+/** One panel per calculation in marker order; an edit re-runs through its own calculation index. */
+export function ComputedRerunPanels({ calculations, busy, onRerun, t, locale }: {
+  calculations: CalculationRerun[];
+  busy: boolean;
+  onRerun: (calculation: number, changes: Record<string, ToolScalar>) => void;
+  t: ToolTranslator;
+  locale: string;
+}) {
+  const several = calculations.length > 1;
+  return (
+    <div className="flex flex-col gap-4">
+      {calculations.map((calculation, index) => calculation.stored ? (
+        <ComputedRerunPanel key={index} stored={calculation.stored} latest={calculation.latest} busy={busy} unavailable={calculation.unavailable}
+          transportError={calculation.transportError} onRerun={(changes) => onRerun(index, changes)} t={t} locale={locale} labels={calculation.labels}
+          idPrefix={several ? `rerun-${index}-${calculation.stored.artifact_id}` : undefined} />
+      ) : <React.Fragment key={index}>{calculation.fallback}</React.Fragment>)}
     </div>
   );
 }

@@ -20,8 +20,9 @@ export type ComputationDifference = {
 };
 export type ComputationComparison = { kind: string; left: ComparedAnswer; right: ComparedAnswer; differences: ComputationDifference[] };
 export type ContinuedResult = { conversation: { id: string; title: string }; message_id: string };
+/** `reruns` holds one re-run per calculation in marker order, and none when no input was found. */
 export type ComputationRefresh = {
-  computation: DecisionComputation; status: "refreshed" | "inputs_not_found"; rerun: DecisionRerun | null; sources: Record<string, unknown>[];
+  computation: DecisionComputation; status: "refreshed" | "inputs_not_found"; reruns: DecisionRerun[]; sources: Record<string, unknown>[];
 };
 export type ContinuedFrom = { conversationId: string; messageId: string };
 

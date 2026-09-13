@@ -9,6 +9,7 @@ decision whose stored inputs no longer run, and a withheld retrieval with its
 inputs typeable. Their ids are written to GM_SEED_OUT. API on 8620; the web
 dev server runs on 3620.
 """
+
 from __future__ import annotations
 
 import json
@@ -88,12 +89,27 @@ def _seed() -> None:
     seeds: dict[str, dict[str, str]] = {}
 
     def conversation(title: str, language: str) -> str:
-        return memory_conversation(title=title, title_source="user_renamed", language=language, user_id=owner).id
+        return memory_conversation(
+            title=title, title_source="user_renamed", language=language, user_id=owner
+        ).id
 
-    def say(conversation_id: str, role: str, content: str, metadata: dict | None = None) -> str:
-        return create_message(user_id=owner, conversation_id=conversation_id, role=role, content=content, metadata=metadata or {}).id
+    def say(
+        conversation_id: str, role: str, content: str, metadata: dict | None = None
+    ) -> str:
+        return create_message(
+            user_id=owner,
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            metadata=metadata or {},
+        ).id
 
-    def answer(conversation_id: str, card: ToolResultCard, content: str, extra: dict | None = None) -> str:
+    def answer(
+        conversation_id: str,
+        card: ToolResultCard,
+        content: str,
+        extra: dict | None = None,
+    ) -> str:
         card = card.model_copy(update={"artifact_id": str(uuid4())})
         metadata = {
             "tool_result_cards": [card.model_dump(mode="json")],
@@ -103,96 +119,244 @@ def _seed() -> None:
         }
         return say(conversation_id, "assistant", content, metadata)
 
-    loan = {"direction": "borrow", "currency": "USD", "present_value": 30000, "payment": None, "future_value": 0, "annual_rate_pct": 7, "periods": 60}
-    multiple = {"currency": "USD", "symbol": "AAPL", "price": 230, "per_share": 6.5, "multiple": None}
-    growth = {"currency": "USD", "start_value": 10000, "contribution": 200, "end_value": None, "annual_rate_pct": 5, "periods": 120, "inflation_rate_pct": 3}
-    below_interest = {"direction": "borrow", "currency": "USD", "present_value": 180000, "payment": 2000, "future_value": 0, "annual_rate_pct": 14, "periods": None}
+    loan = {
+        "direction": "borrow",
+        "currency": "USD",
+        "present_value": 30000,
+        "payment": None,
+        "future_value": 0,
+        "annual_rate_pct": 7,
+        "periods": 60,
+    }
+    multiple = {
+        "currency": "USD",
+        "symbol": "AAPL",
+        "price": 230,
+        "per_share": 6.5,
+        "multiple": None,
+    }
+    growth = {
+        "currency": "USD",
+        "start_value": 10000,
+        "contribution": 200,
+        "end_value": None,
+        "annual_rate_pct": 5,
+        "periods": 120,
+        "inflation_rate_pct": 3,
+    }
+    below_interest = {
+        "direction": "borrow",
+        "currency": "USD",
+        "present_value": 180000,
+        "payment": 2000,
+        "future_value": 0,
+        "annual_rate_pct": 14,
+        "periods": None,
+    }
 
-    for language, lead in (("en", "Here is that calculation."), ("es-419", "Aquí está ese cálculo.")):
-        rail = conversation("Rail: three computed answers" if language == "en" else "Riel: tres cálculos", language)
+    for language, lead in (
+        ("en", "Here is that calculation."),
+        ("es-419", "Aquí está ese cálculo."),
+    ):
+        rail = conversation(
+            "Rail: three computed answers" if language == "en" else "Riel: tres cálculos",
+            language,
+        )
         turns = [
-            ("What would a 30,000 car loan at 7% for five years cost a month?", run_calculation("time_value", loan)),
-            ("And is Apple expensive at 230 with 6.50 in earnings?", run_calculation("price_multiple", multiple)),
-            ("If I keep 10,000 and add 200 a month at 5% for ten years?", run_calculation("growth_projection", growth)),
-            ("I owe 180,000 at 14% and pay 2,000 a month. When is it paid?", run_calculation("time_value", below_interest)),
+            (
+                "What would a 30,000 car loan at 7% for five years cost a month?",
+                run_calculation("time_value", loan),
+            ),
+            (
+                "And is Apple expensive at 230 with 6.50 in earnings?",
+                run_calculation("price_multiple", multiple),
+            ),
+            (
+                "If I keep 10,000 and add 200 a month at 5% for ten years?",
+                run_calculation("growth_projection", growth),
+            ),
+            (
+                "I owe 180,000 at 14% and pay 2,000 a month. When is it paid?",
+                run_calculation("time_value", below_interest),
+            ),
         ]
         for question, card in turns:
             say(rail, "user", question)
             answer(rail, card, lead)
             say(rail, "user", "Thanks, that helps.")
-            say(rail, "assistant", "Glad it helps. Change any input on the card to recompute it.")
+            say(
+                rail,
+                "assistant",
+                "Glad it helps. Change any input on the card to recompute it.",
+            )
         seeds[f"rail-{language}"] = {"conversation_id": rail}
 
-        unsolved = conversation("Inputs with no solution" if language == "en" else "Datos sin solución", language)
-        say(unsolved, "user", "I owe 180,000 at 14% and pay 2,000 a month. When is it paid?")
+        unsolved = conversation(
+            "Inputs with no solution" if language == "en" else "Datos sin solución",
+            language,
+        )
+        say(
+            unsolved,
+            "user",
+            "I owe 180,000 at 14% and pay 2,000 a month. When is it paid?",
+        )
         seeds[f"no-solution-{language}"] = {
             "conversation_id": unsolved,
-            "message_id": answer(unsolved, run_calculation("time_value", below_interest), lead),
+            "message_id": answer(
+                unsolved, run_calculation("time_value", below_interest), lead
+            ),
         }
 
-        outage = conversation("Outage card" if language == "en" else "Tarjeta con falla del proveedor", language)
-        say(outage, "user", "What would a 30,000 car loan at 7% for five years cost a month?")
+        outage = conversation(
+            "Outage card" if language == "en" else "Tarjeta con falla del proveedor",
+            language,
+        )
+        say(
+            outage,
+            "user",
+            "What would a 30,000 car loan at 7% for five years cost a month?",
+        )
         declaration = catalog.get("time_value")
         card = declaration.result_card(
-            call=ToolCall(tool_name="time_value", call_id=f"seed-{uuid4()}", arguments=loan),
-            outcome=ToolOutcome(status="unavailable", failure=ToolFailure(code="tool_execution_failed")),
+            call=ToolCall(
+                tool_name="time_value", call_id=f"seed-{uuid4()}", arguments=loan
+            ),
+            outcome=ToolOutcome(
+                status="unavailable", failure=ToolFailure(code="tool_execution_failed")
+            ),
             artifact_id=str(uuid4()),
         )
-        seeds[f"outage-{language}"] = {"conversation_id": outage, "message_id": answer(outage, card, lead)}
+        seeds[f"outage-{language}"] = {
+            "conversation_id": outage,
+            "message_id": answer(outage, card, lead),
+        }
 
-        stale = conversation("Decision that cannot re-run" if language == "en" else "Decisión que no se puede recalcular", language)
-        say(stale, "user", "What would a 30,000 car loan at 7% for five years cost a month?")
+        stale = conversation(
+            "Decision that cannot re-run"
+            if language == "en"
+            else "Decisión que no se puede recalcular",
+            language,
+        )
+        say(
+            stale,
+            "user",
+            "What would a 30,000 car loan at 7% for five years cost a month?",
+        )
         stale_message = answer(stale, run_calculation("time_value", loan), lead)
-        decided = httpx.post(f"{base}/conversations/{stale}/messages/{stale_message}/decision", json={"decision_state": "watching"}, timeout=10).json()["decision"]
+        decided = httpx.post(
+            f"{base}/conversations/{stale}/messages/{stale_message}/decision",
+            json={"decision_state": "watching"},
+            timeout=10,
+        ).json()["decision"]
         stored = api_state.store.decision_notes[decided["id"]]
-        broken = stored.computation.model_copy(update={"inputs": {**stored.computation.inputs, "periods": 0}})
-        api_state.store.decision_notes[decided["id"]] = stored.model_copy(update={"computation": broken})
-        seeds[f"stale-decision-{language}"] = {"conversation_id": stale, "message_id": stale_message, "decision_id": decided["id"]}
+        broken = stored.computation.model_copy(
+            update={
+                "calculations": [
+                    calculation.model_copy(
+                        update={"inputs": {**calculation.inputs, "periods": 0}}
+                    )
+                    for calculation in stored.computation.calculations
+                ]
+            }
+        )
+        api_state.store.decision_notes[decided["id"]] = stored.model_copy(
+            update={"computation": broken}
+        )
+        seeds[f"stale-decision-{language}"] = {
+            "conversation_id": stale,
+            "message_id": stale_message,
+            "decision_id": decided["id"],
+        }
 
-        withheld = conversation("Withheld retrieval" if language == "en" else "Recuperación retenida", language)
-        question = "What will $10,000 in NVDA be worth in ten years?" if language == "en" else "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?"
+        withheld = conversation(
+            "Withheld retrieval" if language == "en" else "Recuperación retenida",
+            language,
+        )
+        question = (
+            "What will $10,000 in NVDA be worth in ten years?"
+            if language == "en"
+            else "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?"
+        )
         say(withheld, "user", question)
         interpretation = StructuredInterpretation(
-            intent="conversation_followup", task_relation="new_task", user_goal_summary="scenario",
-            semantic_turn_act="educational_question", candidate_strategy_draft=StrategySummary(),
+            intent="conversation_followup",
+            task_relation="new_task",
+            user_goal_summary="scenario",
+            semantic_turn_act="educational_question",
+            candidate_strategy_draft=StrategySummary(),
         )
         # A failed lookup: nothing was retrieved and the calculation cites pages
         # this answer never read, so the answer step answers without the lookup.
         not_retrieved = "https://example.com/not-retrieved"
-        uncited = {"kind": "valuation_scenarios", "inputs": [
-            {"name": "symbol", "value": "NVDA", "source": "user"},
-            {"name": "price", "value": None, "source": "market_data"},
-            {"name": "per_share", "value": 4.5, "source": "page", "source_url": not_retrieved, "as_of": "2026-09-10"},
-            {"name": "growth_base_pct", "value": 25, "source": "page", "source_url": not_retrieved, "as_of": "2026-09-10"},
-            {"name": "amount", "value": 10000, "source": "user"},
-            {"name": "horizon_years", "value": 10, "source": "user"},
-        ]}
+        uncited = {
+            "kind": "valuation_scenarios",
+            "inputs": [
+                {"name": "symbol", "value": "NVDA", "source": "user"},
+                {"name": "price", "value": None, "source": "market_data"},
+                {
+                    "name": "per_share",
+                    "value": 4.5,
+                    "source": "page",
+                    "source_url": not_retrieved,
+                    "as_of": "2026-09-10",
+                },
+                {
+                    "name": "growth_base_pct",
+                    "value": 25,
+                    "source": "page",
+                    "source_url": not_retrieved,
+                    "as_of": "2026-09-10",
+                },
+                {"name": "amount", "value": 10000, "source": "user"},
+                {"name": "horizon_years", "value": 10, "source": "user"},
+            ],
+        }
         result = grounded._packet_stage_result(
-            packet=ResearchPacket(answer_markdown="NVIDIA in ten years: {{price_at_horizon_base}}.", calculation=uncited),
+            packet=ResearchPacket(
+                answer_markdown="NVIDIA in ten years: {{price_at_horizon_base}}.",
+                calculations=(uncited,),
+            ),
             subjects=[{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
-            shape="balanced", capability_class="balanced_lookup", language=language,
+            shape="balanced",
+            capability_class="balanced_lookup",
+            language=language,
             interpretation=interpretation,
             user=UserState(user_id=owner, language_preference=language, currency="USD"),
-            cache_status="miss", question_kind="company_lookup",
-            scenario=True, message=question,
+            cache_status="miss",
+            question_kind="company_lookup",
+            scenario=True,
+            message=question,
         )
         patch = result.stage_patch
         cards = (patch.get("final_response_payload") or {}).get("tool_result_cards") or []
         metadata = {
             "research": patch["research"],
             "agent_runtime_turn": {"terminal": True, "status": "completed"},
-            **({"next_experiments": patch["next_experiments"]} if patch.get("next_experiments") else {}),
+            **(
+                {"next_experiments": patch["next_experiments"]}
+                if patch.get("next_experiments")
+                else {}
+            ),
         }
         if cards:
-            marker = computation_from_tool_cards([ToolResultCard.model_validate(card) for card in cards])
+            marker = computation_from_tool_cards(
+                [ToolResultCard.model_validate(card) for card in cards]
+            )
             metadata["tool_result_cards"] = cards
             if marker is not None:
                 metadata["computation"] = marker.model_dump(mode="json")
             if patch.get("answer_text_template"):
                 metadata["answer_text_template"] = patch["answer_text_template"]
-        seeds[f"withheld-{language}"] = {"conversation_id": withheld, "message_id": say(withheld, "assistant", patch["assistant_response"], metadata)}
+        seeds[f"withheld-{language}"] = {
+            "conversation_id": withheld,
+            "message_id": say(
+                withheld, "assistant", patch["assistant_response"], metadata
+            ),
+        }
 
-    Path(os.environ.get("GM_SEED_OUT", "seeds.json")).write_text(json.dumps(seeds, indent=2) + "\n")
+    Path(os.environ.get("GM_SEED_OUT", "seeds.json")).write_text(
+        json.dumps(seeds, indent=2) + "\n"
+    )
     print("seeded", json.dumps(seeds), flush=True)
 
 

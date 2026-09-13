@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import ReceiptBody from "../components/receipt/ReceiptBody";
-import type { CalculationReceiptTurn, PublicReceiptDocument } from "../lib/public-receipt-turns";
+import type { CalculationReceiptFigures, CalculationReceiptTurn, PublicReceiptDocument } from "../lib/public-receipt-turns";
 import { receiptDocumentKind, receiptDocumentSupported } from "../lib/public-receipt-turns";
 import { receiptCopy } from "../lib/receipt-copy";
 import { receiptPresentations } from "../lib/receipt-presentation";
@@ -14,7 +14,7 @@ import { receiptRefusalText } from "../lib/receipt-selection";
 // scripts/dump_calculation_fixtures.py; never hand-written.
 const fixture = JSON.parse(
   readFileSync(join(import.meta.dir, "fixtures/calculation-cards.json"), "utf-8"),
-) as { receipt_turn: CalculationReceiptTurn };
+) as { receipt_turn: CalculationReceiptTurn & CalculationReceiptFigures };
 const turn = fixture.receipt_turn;
 const documentOf = (...turns: CalculationReceiptTurn[]): PublicReceiptDocument => ({ schema_version: 2, kind: "turns", turns });
 

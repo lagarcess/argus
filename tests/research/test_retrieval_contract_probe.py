@@ -227,7 +227,7 @@ def test_the_provider_returns_its_calculation_and_argus_computes_the_scenarios()
     input's source, the current price from market data, a figure from a page it
     retrieved and assumptions it states, writes every figure as a reference, and
     the valuation declaration computes a card from exactly those inputs."""
-    from argus.agent_runtime.answer_calculation import publish_calculation
+    from argus.agent_runtime.answer_calculation import publish_calculations
     from argus.agent_runtime.research_calculation import retrieved_pages
     from argus.domain.calculations.answer_request import AnswerCalculation
     from argus.domain.capability_registry import get_tool_catalog
@@ -237,15 +237,15 @@ def test_the_provider_returns_its_calculation_and_argus_computes_the_scenarios()
     packet = _packet_from_response(
         recording["exchanges"][-1]["response"], latency_ms=0, on_unpriced=lambda _: None
     )
-    request = AnswerCalculation.model_validate(packet.calculation)
+    request = AnswerCalculation.model_validate(packet.calculations[0])
     assert request.kind == "valuation_scenarios"
     sources = {item.name: item.source for item in request.inputs}
     assert sources["price"] == "market_data"
     assert "page" in sources.values() and "assumption" in sources.values()
     assert "{{price}}" in packet.answer_markdown
     notes: list[str] = []
-    published = publish_calculation(
-        request,
+    published = publish_calculations(
+        [request],
         template=packet.answer_markdown,
         language="en",
         catalog=get_tool_catalog(),

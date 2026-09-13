@@ -9,10 +9,19 @@ change and the review that comes with it.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    TypeAdapter,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from argus.api.public_excerpt_fact_schemas import PublicExcerptFactBank
 from argus.api.schemas import AssetClass, Language
@@ -292,15 +301,13 @@ class PublicExcerptCalculationFact(BaseModel):
     source: PublicExcerptCalculationSource | None = None
 
 
-class PublicExcerptCalculationTurn(BaseModel):
-    """A computed answer frozen as typed facts; a receipt never recomputes.
+_CALCULATION_FIELDS = ("title", "answer", "rows", "inputs", "notes")
 
-    Inputs publish only when a public page stated them; an input the user
-    typed and the card's arguments stay in the account."""
+
+class PublicExcerptCalculation(BaseModel):
+    """One calculation of a computed answer, frozen as its card's typed facts."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
-    kind: Literal["calculation"] = "calculation"
-    question: str = Field(min_length=1, max_length=500)
     title: PublicExcerptCalculationText
     answer: PublicExcerptCalculationFact
     rows: list[PublicExcerptCalculationFact] = Field(default_factory=list, max_length=24)
@@ -308,11 +315,49 @@ class PublicExcerptCalculationTurn(BaseModel):
         default_factory=list, max_length=24
     )
     notes: list[PublicExcerptCalculationText] = Field(default_factory=list, max_length=8)
+
+
+class PublicExcerptCalculationTurn(BaseModel):
+    """A computed answer frozen as typed facts, one entry per calculation; a
+    receipt never recomputes.
+
+    One calculation serializes flat, exactly as every receipt frozen before
+    answers carried several, and more as ``calculations``; both shapes read
+    back alike. Inputs publish only when a public page stated them; an input
+    the user typed and the cards' arguments stay in the account."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    kind: Literal["calculation"] = "calculation"
+    question: str = Field(min_length=1, max_length=500)
+    calculations: list[PublicExcerptCalculation] = Field(min_length=1, max_length=4)
     computed_at: datetime
     owner_note: str | None = Field(default=None, max_length=280)
     content_language: Language = "en"
     framing: Literal["calculation_not_advice"] = "calculation_not_advice"
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _one_calculation_shape(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "calculations" not in data and "title" in data:
+            single = {key: data[key] for key in _CALCULATION_FIELDS if key in data}
+            rest = {
+                key: value
+                for key, value in data.items()
+                if key not in _CALCULATION_FIELDS
+            }
+            return {**rest, "calculations": [single]}
+        return data
+
+    @model_serializer(mode="wrap")
+    def _frozen_shape(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        calculations = data.pop("calculations")
+        head = {"kind": data.pop("kind"), "question": data.pop("question")}
+        body = (
+            calculations[0] if len(calculations) == 1 else {"calculations": calculations}
+        )
+        return {**head, **body, **data}
 
 
 PublicExcerptTurn = Annotated[

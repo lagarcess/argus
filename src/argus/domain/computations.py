@@ -17,6 +17,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from argus.api.decision_contract import (
+    DecisionCalculation,
     DecisionComputation,
     DecisionRerun,
     DecisionRerunReasonCode,
@@ -133,14 +134,14 @@ def calculation_kernel(declaration: Any) -> ComputationKernel:
 
 
 def unavailable_rerun(
-    computation: DecisionComputation,
+    calculation: DecisionCalculation,
     *,
     inputs: Mapping[str, Any] | None = None,
     reason_code: DecisionRerunReasonCode,
 ) -> DecisionRerun:
     return DecisionRerun(
-        kind=computation.kind,
-        inputs=dict(inputs if inputs is not None else computation.inputs),
+        kind=calculation.kind,
+        inputs=dict(inputs if inputs is not None else calculation.inputs),
         status="unavailable",
         reason_code=reason_code,
     )
@@ -151,31 +152,64 @@ def rerun_computation(
     *,
     overrides: Mapping[str, Any] | None,
     context: RerunContext,
+    index: int = 0,
+) -> list[DecisionRerun]:
+    """Re-run every calculation of ``computation``, in order, with ``overrides``
+    merged over the stored inputs of the one at ``index``.
+
+    Raises :class:`InvalidComputationInputs` when overrides were supplied and
+    the edited calculation's merged inputs fail its kernel's typed model, or no
+    calculation sits at ``index``: that is the client's error. A calculation
+    whose stored inputs drifted re-runs as a typed unavailable state, because
+    the row, not the request, is what drifted.
+    """
+    if overrides and not 0 <= index < len(computation.calculations):
+        raise InvalidComputationInputs(
+            computation.kinds[0],
+            [{"type": "value_error", "msg": "No calculation at that index.", "loc": []}],
+        )
+    reruns: list[DecisionRerun] = []
+    for position, calculation in enumerate(computation.calculations):
+        edited = overrides if position == index else None
+        try:
+            reruns.append(
+                rerun_calculation(calculation, overrides=edited, context=context)
+            )
+        except InvalidComputationInputs:
+            if edited:
+                raise
+            reruns.append(unavailable_rerun(calculation, reason_code="invalid_inputs"))
+    return reruns
+
+
+def rerun_calculation(
+    calculation: DecisionCalculation,
+    *,
+    overrides: Mapping[str, Any] | None,
+    context: RerunContext,
 ) -> DecisionRerun:
-    """Re-run ``computation`` with ``overrides`` merged over its stored inputs.
+    """Re-run one calculation with ``overrides`` merged over its stored inputs.
 
     Raises :class:`InvalidComputationInputs` when the merged inputs fail the
-    kernel's typed model; the caller decides whether that is a client error
-    (overrides were supplied) or a typed unavailable state (stored inputs
-    drifted).
+    kernel's typed model.
     """
-    kernel = kernel_for(computation.kind)
+    kernel = kernel_for(calculation.kind)
     if kernel is None:
-        return unavailable_rerun(computation, reason_code="kernel_unavailable")
-    merged: dict[str, Any] = {**computation.inputs, **dict(overrides or {})}
+        return unavailable_rerun(calculation, reason_code="kernel_unavailable")
+    merged: dict[str, Any] = {**calculation.inputs, **dict(overrides or {})}
     if overrides and not kernel.inputs_editable:
         return unavailable_rerun(
-            computation, inputs=merged, reason_code="inputs_not_editable"
+            calculation, inputs=merged, reason_code="inputs_not_editable"
         )
     try:
         if overrides and kernel.merge is not None:
-            merged = kernel.merge(computation.inputs, overrides)
+            merged = kernel.merge(calculation.inputs, overrides)
         typed_inputs = kernel.inputs_model.model_validate(merged)
     except ValidationError as exc:
-        raise InvalidComputationInputs(computation.kind, exc.errors()) from exc
+        raise InvalidComputationInputs(calculation.kind, exc.errors()) from exc
     except (ValueError, TypeError) as exc:
         raise InvalidComputationInputs(
-            computation.kind, [{"type": "value_error", "msg": str(exc), "loc": []}]
+            calculation.kind, [{"type": "value_error", "msg": str(exc), "loc": []}]
         ) from exc
     return kernel.compute(typed_inputs, context)
 
@@ -192,19 +226,19 @@ def _rerun_backtest(inputs: BaseModel, context: RerunContext) -> DecisionRerun:
     from argus.domain.run_dossiers import project_retest_action
 
     typed = BacktestRerunInputs.model_validate(inputs.model_dump())
-    computation = DecisionComputation(
+    calculation = DecisionCalculation(
         kind=BACKTEST_COMPUTATION_KIND,
         inputs={"source_run_id": typed.source_run_id},
     )
     run = context.load_run(typed.source_run_id)
     if run is None:
-        return unavailable_rerun(computation, reason_code="run_unavailable")
+        return unavailable_rerun(calculation, reason_code="run_unavailable")
     action = project_retest_action(run=run, today=context.today)
     if action is None:
-        return unavailable_rerun(computation, reason_code="retest_unavailable")
+        return unavailable_rerun(calculation, reason_code="retest_unavailable")
     return DecisionRerun(
-        kind=computation.kind,
-        inputs=dict(computation.inputs),
+        kind=calculation.kind,
+        inputs=dict(calculation.inputs),
         status="confirmation_required",
         retest=action,
     )
