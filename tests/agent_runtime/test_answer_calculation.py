@@ -347,3 +347,61 @@ def test_the_prose_audit_skips_day_numbers_and_model_names() -> None:
     assert ac.unsourced_prose_figures(
         prose, cited=[135_500], cards=[], names=["Porsche 911 starting MSRP"]
     ) == ["22%"]
+
+
+def test_a_figure_from_finance_data_is_cited_without_the_provider_url() -> None:
+    from argus.domain.research.contracts import RetrievedRow
+
+    evidence = [
+        RetrievedRow(
+            subject="NVIDIA",
+            symbol="NVDA",
+            label="trailing diluted EPS",
+            value=7.91,
+            kind="currency",
+            unit="USD",
+            as_of="2026-07-26",
+            source_url=None,
+        )
+    ]
+    request = _request(
+        "price_multiple",
+        [
+            {"name": "price", "value": 218.29, "source": "user", "currency": "USD"},
+            {
+                "name": "per_share",
+                "value": 7.91,
+                "source": "page",
+                "source_url": "https://finance.example/provider/NVDA",
+                "as_of": "2026-07-26",
+                "currency": "USD",
+            },
+        ],
+        "multiple",
+    )
+    notes: list[str] = []
+    resolved = ac.resolve_calculation(
+        request,
+        catalog=get_tool_catalog(),
+        retrieved=[],
+        currency="USD",
+        subject_symbol="NVDA",
+        market_close=_close,
+        notes=notes,
+        evidence=evidence,
+    )
+    assert resolved is not None and resolved.computable, notes
+    source = resolved.arguments["sources"]["per_share"]
+    assert source["kind"] == "page" and source.get("url") is None
+    assert source["title"] == "NVIDIA trailing diluted EPS"
+    assert source["date"] == "2026-07-26"
+    unevidenced = ac.resolve_calculation(
+        request,
+        catalog=get_tool_catalog(),
+        retrieved=[],
+        currency="USD",
+        subject_symbol="NVDA",
+        market_close=_close,
+        notes=[],
+    )
+    assert unevidenced is not None and "per_share" in unevidenced.not_looked_up

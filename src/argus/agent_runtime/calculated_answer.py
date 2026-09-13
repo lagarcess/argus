@@ -42,7 +42,7 @@ from argus.domain.calculations.answer_request import (
     all_properties_required,
     calculation_kinds_clause,
 )
-from argus.domain.research.contracts import ResearchSource
+from argus.domain.research.contracts import ResearchSource, RetrievedRow
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema_sync,
     openrouter_structured_model_candidates,
@@ -136,6 +136,7 @@ def calculated_answer(
     market_close: MarketClose = latest_market_close,
     lookup_failed: bool = False,
     offered: bool = False,
+    evidence: Sequence[RetrievedRow] = (),
 ) -> CalculatedAnswer | None:
     """One voicing call and its computed calculation, or None when voicing failed."""
     if not resolve_openrouter_api_key():
@@ -177,6 +178,7 @@ def calculated_answer(
         subject_symbol=subject_symbol,
         market_close=market_close,
         notes=notes,
+        evidence=evidence,
     )
     return answer_from_published(
         voiced.calculation,
@@ -184,6 +186,7 @@ def calculated_answer(
         prose=prose,
         language=language,
         retrieved=retrieved,
+        evidence=evidence,
     )
 
 
@@ -194,6 +197,7 @@ def answer_from_published(
     prose: str,
     language: str,
     retrieved: Sequence[ResearchSource],
+    evidence: Sequence[RetrievedRow] = (),
 ) -> CalculatedAnswer | None:
     """The answer a published calculation makes: its card and prose, or the one
     question for a figure only the user knows; None when inputs were not found."""
@@ -210,6 +214,7 @@ def answer_from_published(
             pending={
                 PENDING_PAYLOAD_KEY: request.model_dump(mode="json"),
                 "requested_field": field,
+                "evidence": [row.model_dump(mode="json") for row in evidence],
                 "retrieved": [source.model_dump(mode="json") for source in retrieved],
             },
         )
@@ -247,6 +252,11 @@ async def calculated_answer_stage_result(
         pending=pending,
         retrieved=retrieved,
         offered=offered,
+        evidence=[
+            RetrievedRow.model_validate(row)
+            for row in ((pending or {}).get("evidence") or [])
+            if isinstance(row, dict)
+        ],
     )
     if answered is None:
         return None

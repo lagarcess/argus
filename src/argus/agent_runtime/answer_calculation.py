@@ -34,7 +34,11 @@ from argus.domain.calculations._shared import (
     UNIT_PERCENT_KEY,
 )
 from argus.domain.calculations.answer_request import RUNTIME_ARGUMENTS, AnswerCalculation
-from argus.domain.research.contracts import CURRENCY_CODES, ResearchSource
+from argus.domain.research.contracts import (
+    CURRENCY_CODES,
+    ResearchSource,
+    RetrievedRow,
+)
 from argus.domain.tool_contracts import (
     TOOL_INPUT_SOURCES_FIELD,
     ToolCall,
@@ -118,6 +122,7 @@ def publish_calculation(
     subject_symbol: str | None,
     market_close: MarketClose,
     notes: list[str],
+    evidence: Sequence[RetrievedRow] = (),
 ) -> PublishedCalculation | None:
     """The card and prose for an answer's request, or None for an unknown kind."""
     resolved = resolve_calculation(
@@ -128,6 +133,7 @@ def publish_calculation(
         subject_symbol=subject_symbol,
         market_close=market_close,
         notes=notes,
+        evidence=evidence,
     )
     if resolved is None:
         return None
@@ -174,6 +180,7 @@ def resolve_calculation(
     subject_symbol: str | None,
     market_close: MarketClose,
     notes: list[str],
+    evidence: Sequence[RetrievedRow] = (),
 ) -> ResolvedCalculation | None:
     declaration = catalog.get(request.kind)
     if declaration is None or not is_free_calculation(declaration):
@@ -217,11 +224,19 @@ def resolve_calculation(
             arguments[name], sources[name] = price
         else:
             page = pages.get(item.source_url or "")
-            if page is None or item.value is None:
+            cited = None if page is not None else _evidenced(item.value, evidence)
+            if item.value is None or (page is None and cited is None):
                 resolved.not_looked_up.append(name)
                 _note(notes, PAGE_UNCITED_REASON_CODE, name=name)
                 continue
-            arguments[name], sources[name] = item.value, page_source(page, item.as_of)
+            arguments[name], sources[name] = (
+                item.value,
+                (
+                    page_source(page, item.as_of)
+                    if page is not None
+                    else evidence_source(cited, item.as_of)
+                ),
+            )
     if request.solve_for in declared:
         arguments[request.solve_for] = None
     if sources:
@@ -547,6 +562,37 @@ def page_source(page: ResearchSource, as_of: str | None) -> ToolFactSource:
     return ToolFactSource(
         kind="page", title=title[:300] or None, url=page.url[:2048], date=dated
     )
+
+
+def _evidenced(value: Any, evidence: Sequence[RetrievedRow]) -> RetrievedRow | None:
+    """The cited row stating this input's figure, when the page it names is the
+    provider's own finance data, whose citation keeps no URL."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return next(
+        (
+            row
+            for row in evidence
+            if abs(float(row.value) - float(value))
+            <= max(abs(float(row.value)) * 1e-6, 1e-9)
+        ),
+        None,
+    )
+
+
+def evidence_source(row: RetrievedRow | None, as_of: str | None) -> ToolFactSource:
+    """A figure cited from finance data names its subject and date, never a URL."""
+    assert row is not None
+    dated = next(
+        (
+            value[:10]
+            for value in (as_of, row.as_of)
+            if value and _ISO_DATE.fullmatch(value[:10])
+        ),
+        None,
+    )
+    title = f"{row.subject} {row.label}".strip()
+    return ToolFactSource(kind="page", title=title[:300] or None, date=dated)
 
 
 def _blank_inputs(

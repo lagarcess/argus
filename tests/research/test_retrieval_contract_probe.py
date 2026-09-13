@@ -254,6 +254,7 @@ def test_the_provider_returns_its_calculation_and_argus_computes_the_scenarios()
         subject_symbol="NVDA",
         market_close=lambda symbol: (218.29, "2026-09-11"),
         notes=notes,
+        evidence=[row for row in packet.rows if row.source_url is None],
     )
     assert published is not None and not published.not_looked_up, notes
     assert published.template is not None, notes
@@ -266,7 +267,10 @@ def test_the_provider_returns_its_calculation_and_argus_computes_the_scenarios()
     }
     assert card["arguments"]["sources"]["growth_base_pct"] == {"kind": "assumption"}
     page = card["arguments"]["sources"]["per_share"]
-    assert page["kind"] == "page" and page["url"].startswith("https://") and page["date"]
+    # A page this answer retrieved names its URL; a figure read from the
+    # provider's finance data names its subject and date instead.
+    assert page["kind"] == "page" and page["date"]
+    assert (page.get("url") or "").startswith("https://") or page.get("title")
     rows = {fact["name"]: fact for fact in card["presentation"]["rows"]}
     assert rows["value_at_horizon_base"]["value"] > 0
     assert "{{" not in published.answer_text

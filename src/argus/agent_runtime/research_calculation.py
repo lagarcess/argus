@@ -33,7 +33,7 @@ from argus.agent_runtime.calculated_answer import (
 )
 from argus.agent_runtime.state.models import UserState
 from argus.domain.calculations.answer_request import AnswerCalculation
-from argus.domain.research.contracts import ResearchPacket, ResearchSource
+from argus.domain.research.contracts import ResearchPacket, ResearchSource, RetrievedRow
 from argus.llm.openrouter import resolve_openrouter_api_key
 
 CALCULATION_NOT_COMPUTED_CODE = "calculation_inputs_not_found"
@@ -80,6 +80,7 @@ def packet_answer(
     from argus.domain.capability_registry import get_tool_catalog
 
     retrieved = retrieved_pages(packet)
+    evidence = cited_evidence(packet)
     published = publish_calculation(
         request,
         template=packet.answer_markdown,
@@ -90,6 +91,7 @@ def packet_answer(
         subject_symbol=_first_symbol(subjects),
         market_close=latest_market_close,
         notes=notes,
+        evidence=evidence,
     )
     if published is None:
         return NotComputed(CALCULATION_NOT_COMPUTED_CODE, ())
@@ -101,6 +103,7 @@ def packet_answer(
         prose=packet.answer_markdown,
         language=language,
         retrieved=retrieved,
+        evidence=evidence,
     )
 
 
@@ -132,6 +135,10 @@ def offered_calculation(
                 subject_symbol=_first_symbol(subjects),
                 market_close=latest_market_close,
                 notes=notes,
+                evidence=[
+                    RetrievedRow.model_validate(row)
+                    for row in offer.get("evidence") or []
+                ],
             )
             if resolved is None:
                 return None
@@ -205,6 +212,12 @@ def retrieved_pages(packet: ResearchPacket) -> list[ResearchSource]:
                 )
             )
     return pages
+
+
+def cited_evidence(packet: ResearchPacket) -> list[RetrievedRow]:
+    """The cited figures read from the provider's own finance data: rows whose
+    evidence is the tool result and whose URL the parser scrubbed."""
+    return [row for row in packet.rows if row.source_url is None]
 
 
 def _first_symbol(subjects: Sequence[dict[str, Any]]) -> str | None:
