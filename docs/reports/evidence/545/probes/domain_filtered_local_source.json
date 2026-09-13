@@ -1,9 +1,9 @@
 {
   "probe": "domain_filtered_local_source",
   "purpose": "domain-filtered call citing a local source, DO location, es",
-  "candidate_sha": "eb5d7daf3efbea17ed0d5414850650497a552111",
-  "captured_at": "2026-09-12T21:46:41.159848+00:00",
-  "elapsed_s": 10.13,
+  "candidate_sha": "bb8fd2d29955adb89e3a4838a46558bd18252e18",
+  "captured_at": "2026-09-12T23:58:44.029411+00:00",
+  "elapsed_s": 66.67,
   "request_overrides": {},
   "exchanges": [
     {
@@ -14,7 +14,7 @@
           "openai/gpt-5.6-sol",
           "anthropic/claude-opus-4-7"
         ],
-        "input": "¿Qué tasa de interés paga hoy el Banco Popular Dominicano por un certificado financiero a un año en pesos?\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nResponde en español latinoamericano (es-419).",
+        "input": "¿Qué tasa de interés paga hoy el Banco Popular Dominicano por un certificado financiero a un año en pesos?\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nLead with the direct answer, then go as deep as the question deserves. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment or product advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nResponde en español latinoamericano (es-419).",
         "tools": [
           {
             "type": "web_search",
@@ -42,17 +42,17 @@
           "effort": "low"
         },
         "language_preference": "es",
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Show options with their math and trade-offs, never which product to choose or what the reader should do, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "response_format": {
           "type": "json_schema",
           "json_schema": {
             "name": "argus_typed_answer",
             "strict": true,
             "schema": {
-              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, and at most one calculation Argus computes.",
+              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, at most one calculation Argus computes, and the questions the reader may ask next.",
               "properties": {
                 "answer_markdown": {
-                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models. Every figure the calculation uses or produces is written as its {{name}} reference.",
+                  "description": "The answer for the reader in markdown: the direct answer first, then sections, a table, the formula, a worked example or steps where they help. No links, no list of sources, no mention of tools, providers or models. Every figure the calculation uses or produces is written as its {{name}} reference.",
                   "type": "string"
                 },
                 "rows": {
@@ -94,7 +94,7 @@
                         "type": "string"
                       },
                       "unit": {
-                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                        "description": "The unit of value: only the ISO 4217 code of a money amount such as USD or DOP, with a per-share or per-unit figure saying so in its label; % for a percentage, x for a multiple, the thing counted for a count.",
                         "type": "string"
                       },
                       "as_of": {
@@ -398,13 +398,26 @@
                       "type": "null"
                     }
                   ],
-                  "description": "The one calculation Argus computes for this answer, with every input and its source, or null when no computed figure is needed."
+                  "description": "The one calculation Argus computes for this answer, with every input and its source, or null when the answer computes nothing."
+                },
+                "follow_up_questions": {
+                  "description": "Two to four short questions, in the reader's language, that this reader is likely to ask next.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "declined": {
+                  "description": "True when the request is not a money question, or asks Argus to place a trade, move money or act on an account; answer_markdown then says so plainly.",
+                  "type": "boolean"
                 }
               },
               "required": [
                 "answer_markdown",
                 "rows",
-                "calculation"
+                "calculation",
+                "follow_up_questions",
+                "declined"
               ],
               "type": "object",
               "additionalProperties": false
@@ -415,13 +428,13 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1789249591,
-        "created_at": 1789249591,
+        "completed_at": 1789257457,
+        "created_at": 1789257457,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_e265d0f1-57ca-4c2b-a83c-ce47d3ea637d",
+        "id": "resp_fa9e6d3e-81ef-494d-bb8c-6d02b2ef721d",
         "incomplete_details": null,
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. When a figure computed from inputs answers or decides the question, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, fill calculation with the one kind listed below that computes it, and never compute it yourself. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. When a figure only the user knows is missing, list it with source user and a null value, and make the answer one plain question asking for it. In the answer, write every figure the calculation uses or produces as {{name}}, with its input or result name, never as digits; Argus fills each one from the computed result. Leave calculation null when no computed figure is needed. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Show options with their math and trade-offs, never which product to choose or what the reader should do, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "max_output_tokens": 2048,
         "max_tool_calls": null,
         "metadata": {},
@@ -434,31 +447,41 @@
           },
           {
             "queries": [
-              "site:popularenlinea.com certificado financiero tasas 1 año pesos",
-              "Banco Popular Dominicano certificado financiero tasa 360 días pesos",
-              "site:popularenlinea.com tasas productos pasivos certificado financiero"
+              "site:popularenlinea.com certificado financiero tasa 1 año pesos",
+              "Banco Popular Dominicano tarifario tasas certificados financieros 360 días"
             ],
             "results": null,
             "type": "search_results"
           },
           {
             "queries": [
-              "Banco Popular Dominicano certificado financiero pesos tasa vigente",
-              "Popularenlinea certificado financiero 1 año",
-              "Banco Popular tasas de interés certificados financieros República Dominicana"
+              "Banco Popular Dominicano tasas pasivas certificado financiero pesos septiembre 2026"
             ],
             "results": null,
             "type": "search_results"
           },
           {
+            "queries": [
+              "Popularenlinea certificados financieros pesos tasa",
+              "Popularenlinea tarifario productos servicios tasas pasivas",
+              "Banco Popular Dominicano certificado financiero pesos dominicanos"
+            ],
+            "results": null,
+            "type": "search_results"
+          },
+          {
+            "contents": null,
+            "type": "fetch_url_results"
+          },
+          {
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"La tasa vigente del certificado financiero en pesos a un año del Banco Popular Dominicano no pudo verificarse en una página pública oficial.\",\"calculation\":null,\"rows\":[]}",
+                "text": "{\"answer_markdown\":\"No pude verificar en una página pública oficial la tasa vigente que paga hoy el Banco Popular Dominicano por un certificado financiero a un año en pesos. Por tanto, no es posible dar una tasa actual sin estimarla.\",\"calculation\":null,\"declined\":false,\"follow_up_questions\":[\"¿Cómo puedo confirmar la tasa directamente con el banco?\",\"¿Quieres comparar las tasas publicadas por otros bancos dominicanos?\",\"¿Quieres calcular cuánto produciría el certificado cuando tengas la tasa?\"],\"rows\":[]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_f5606576-4a4c-4e46-9ef7-9e690b12ffc5",
+            "id": "msg_40fda4ff-5b2c-4bdc-9e7f-6328f5c017ec",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -509,34 +532,39 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.04298,
-            "cache_read_cost": 0.00979,
+            "cache_creation_cost": 0.04651,
+            "cache_read_cost": 0.01407,
             "currency": "USD",
-            "input_cost": 5e-05,
-            "output_cost": 0.0072,
-            "tool_calls_cost": 0.005,
+            "input_cost": 6e-05,
+            "output_cost": 0.01082,
+            "tool_calls_cost": 0.008,
             "tool_calls_cost_details": {
-              "search_web": 0.005
+              "fetch_url": 0.0005,
+              "search_web": 0.0075
             },
-            "total_cost": 0.06502
+            "total_cost": 0.07946
           },
-          "input_tokens": 33073,
+          "input_tokens": 44501,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 8596,
-            "cache_read_input_tokens": 24465,
-            "cached_tokens": 24465
+            "cache_creation_input_tokens": 9301,
+            "cache_read_input_tokens": 35185,
+            "cached_tokens": 35185
           },
-          "output_tokens": 360,
+          "output_tokens": 541,
           "output_tokens_details": {
-            "reasoning_tokens": 127
+            "reasoning_tokens": 116
           },
           "tool_calls_details": {
+            "fetch_url": {
+              "cost_usd": 0.0005,
+              "invocation": 1
+            },
             "search_web": {
-              "cost_usd": 0.005,
-              "invocation": 2
+              "cost_usd": 0.0075,
+              "invocation": 3
             }
           },
-          "total_tokens": 33433
+          "total_tokens": 45042
         },
         "user": null
       }
@@ -549,23 +577,25 @@
     "sources": [],
     "tool_results": [
       "search_results",
-      "search_results"
+      "search_results",
+      "search_results",
+      "fetch_url_results"
     ],
     "tickers": [],
     "usage": {
       "invocations": 0,
       "finance_search_invocations": 0,
-      "web_search_invocations": 2,
-      "fetch_url_invocations": 0,
+      "web_search_invocations": 3,
+      "fetch_url_invocations": 1,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 10129,
-      "cost_usd": 0.06502,
-      "input_tokens": 33073,
-      "output_tokens": 360,
-      "cache_creation_input_tokens": 8596,
-      "cache_read_input_tokens": 24465
+      "latency_ms": 66671,
+      "cost_usd": 0.07946,
+      "input_tokens": 44501,
+      "output_tokens": 541,
+      "cache_creation_input_tokens": 9301,
+      "cache_read_input_tokens": 35185
     },
-    "answer_markdown": "La tasa vigente del certificado financiero en pesos a un año del Banco Popular Dominicano no pudo verificarse en una página pública oficial."
+    "answer_markdown": "No pude verificar en una página pública oficial la tasa vigente que paga hoy el Banco Popular Dominicano por un certificado financiero a un año en pesos. Por tanto, no es posible dar una tasa actual sin estimarla."
   },
   "error": null
 }
