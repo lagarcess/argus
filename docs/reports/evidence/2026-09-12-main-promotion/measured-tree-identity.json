@@ -1,0 +1,19 @@
+{
+  "measured_head": "1623954b1b81e094246729dff539e074f7026fa9",
+  "original_integration_cut": "3d379d3d9020027ccfd1f2a4c617626520af8a44",
+  "main_at_cut": "17a07497abbb2ff9159b9694832a6668421e0e88",
+  "main_is_ancestor": true,
+  "compared_paths": [
+    "src/",
+    "web/app/",
+    "web/components/",
+    "web/lib/",
+    "web/public/",
+    "render.yaml",
+    "supabase/"
+  ],
+  "product_tree_diff": [],
+  "all_non_docs_diff": [],
+  "non_docs_git_tree_sha256": "8f570fe9710c04d74ee66a7d6dc59dfb963a8705ada9521194fa77ac8f15bc7e",
+  "binding": "The evidence-only commit containing this record changes docs only. Recheck git diff against measured_head after any later head change."
+}

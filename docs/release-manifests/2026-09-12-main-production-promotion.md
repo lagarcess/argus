@@ -1,17 +1,17 @@
 # Private Alpha Production Promotion, 2026-09-12
 
-Status: preparation only. No measurement, merge, migration application, live configuration change, or deployment is claimed by this skeleton. Pending fields will be completed with observed evidence.
+Status: stopped in Step 2 at the environment-parity check. Free-gate and readback evidence is recorded below. No live evaluation, browser acceptance, migration application, live configuration change, merge, or deployment has occurred.
 
 ## Candidate
 
-- Candidate SHA: pending; the release-contract commit containing this skeleton defines the measured head.
+- Candidate SHA: `1623954b1b81e094246729dff539e074f7026fa9`
 - Candidate branch: `codex/production-promotion-20260912`
-- Validation status: pending Step 2.
+- Validation status: stopped in Step 2; not ready for merge.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
 - Promotion target: `main`
 - Release captain: Codex in the founder-supervised promotion task.
 - Approver: founder, in this task.
-- Rollback target: pending live three-service readback; do not substitute main HEAD.
+- Rollback target: `ee9c3491fa6219502f1e94abc5d9e661a06839d9`, verified live on API and app; workflow ready version `ee9c349`. The theme column must be restored before deploying this old build after the approved drop, with separate approval.
 - Decision record: founder instructions in this task, 2026-09-12; fixed-cut promotion approved as a one-time exception to full-roadmap completion.
 
 ## Production Migration Gate
@@ -37,7 +37,7 @@ Status: preparation only. No measurement, merge, migration application, live con
 - Migration content drift, including missing statement history:
 - Safety classifications and live requirements for every missing migration:
 - Classification basis and human live-schema review:
-- Gate result: `status=pass` required before service deploy
+- Gate result: not run before the environment-parity stop; `status=pass` remains required before service deploy
 - Gate human-approval state: seven listed migrations approved in principle, including the destructive theme drop with no backup; application awaits the post-merge approval stop in this task.
 - Gate apply result: `not_performed_by_gate`
 - Gate ledger readback:
@@ -171,7 +171,7 @@ Status: preparation only. No measurement, merge, migration application, live con
 - Never merge integration into this branch again. Later integration work is excluded.
 - Founder lands the promotion with a merge commit, never squash or rebase. Codex never merges.
 - The first commit changes the two sharing flags in `render.yaml` and the release profile to `true`. Code defaults remain off. Existing contract tests derive the values; no separate false-valued pin was found.
-- Measured head: the release-contract commit containing this skeleton; full SHA to be recorded after commit creation.
+- Measured head: `1623954b1b81e094246729dff539e074f7026fa9`.
 - Later evidence commits touch only `docs/` unless an approved finding round requires a product fix.
 - Product-tree identity will compare `src/`, `web/app/`, `web/components/`, `web/lib/`, `web/public/`, `render.yaml`, and `supabase/` to the measured head, matching the prior promotion record. Also record all non-doc Git-tree changes, including `workflows/`, tests, lockfiles, and the release profile.
 
@@ -213,3 +213,23 @@ Environment A's pre-existing root `.env` symlink resolves through the integratio
 Environment C has no `.env` or `web/.env.local`. API and web launch from empty environments with only declared Render keys, the approved substitutions, process basics, and the localhost QA captcha token. Key-by-key presence, non-secret values, literal parity and forbidden-production-value checks are pending before either server starts.
 
 Local differences to cover after deployment: in-process backtests instead of `argus-backtests`, no Turnstile widget, no PostHog, no emails, and localhost origins. The API retains production key routing and shadow job rows; only if jobs stay queued may shadow mode be turned off and recorded as another local difference.
+
+## Step 2 Stop Record
+
+Evidence directory: `docs/reports/evidence/2026-09-12-main-promotion/`.
+
+- `production-readback-before.json`: all three live triggers are `off`; API and app are `live` at `ee9c3491fa6219502f1e94abc5d9e661a06839d9`, workflow is `ready` at `ee9c349`. These values were read only.
+- `main-branch-protection-before.json`: required context `ci`, strict checks and admin enforcement on, force pushes and branch deletion off. Nothing changed.
+- `setup.log`: required setup completed with the explicit canonical-root override, Python 3.10.20, Poetry 2.1.3 and Bun 1.3.14.
+- `mocked-eval.log`: 259 passed, exit 0, 41.93 seconds. Provider credentials blanked and synthetic data selected.
+- `release-contract-tests.log`: 87 passed and one failed, exit 1. The new skeleton has no durable live eval scorecard because Step 3 has not run. This is an outstanding evidence requirement, not a product regression. No test was weakened or waived.
+- `modularity.log`: no violations. Main is an ancestor, so the candidate is also the would-be merged product tree.
+- `local-smoke.log`: exit 28 after API health and workflow probe passed. Exact error: `curl: (28) Operation timed out after 20010 milliseconds with 0 bytes received`. Product readiness did not complete. Cause is unclassified; no retry, timeout change or product fix has been made. The smoke processes exited and no listener remains on their ports 8126 or 3126.
+- `environment-parity-before.json`: Render literals, release-profile keys and contract arrays agree for API and web. The template inventory found undocumented settings: `ARGUS_STRUCTURED_REASONING_EFFORT`, `ARGUS_CAPABILITY_REASONING_EFFORT`, `ARGUS_ENV`, `ARGUS_APP_ENV`, `ARGUS_RENDER_WORKFLOW_PROOF_TIMEOUT_SECONDS`, `ARGUS_RENDER_WORKFLOW_PROOF_POLL_SECONDS`, and `ARGUS_WORKFLOW_PROOF_USER_ID`. These are documentation gaps, not an established product regression. Their absence from the live release contract means the production defaults still apply. The initial static inventory is not exhaustive; dynamic task-timeout keys remain to be covered by the resumed full parity pass.
+- `DATABASE_URL` is intentionally derived and documented; `MEM0_TELEMETRY` is forced off internally; `RENDER_TASK_RUN_ID` is platform-supplied. These are not requested configuration changes.
+- `measured-tree-identity.json`: the product paths from the prior promotion and every non-doc Git path are unchanged from the measured head. This stop-record commit contains docs and evidence only.
+- `preflight-status.json`: gate outcomes, zero spend, no live mutations and local cleanup record.
+
+The founder's explicit stop rule for an unexpected environment check applies. The migration gate, promotion PR, Step 3 pair, founder browser walk and historical replay have not started. No production user text was extracted. Spend is $0 of $3.50 for the pair, $0 of $3 for the walk, and $0 of $4 for replay. No fix round has been used.
+
+Requested decision: approve a bounded environment-template correction and resumption of Step 2, or accept the documented template gaps for this promotion. This does not authorize a migration, live setting change, deployment, merge, or production sharing link.
