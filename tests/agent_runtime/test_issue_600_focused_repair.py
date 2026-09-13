@@ -9,7 +9,7 @@ from typing import Any, Callable
 import httpx
 import pytest
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
-from argus.agent_runtime.graph.workflow import _patched_run_state
+from argus.agent_runtime.graph.workflow import _apply_stage_result, _patched_run_state
 from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
 from argus.agent_runtime.stages.clarify import clarify_stage_async
 from argus.agent_runtime.stages.confirm import confirm_stage
@@ -152,6 +152,7 @@ def replay_transport(monkeypatch: pytest.MonkeyPatch) -> Callable[[str, str], No
     monkeypatch.setattr(httpx.AsyncClient, "send", no_network)
 
     def install(language: str, mode: str) -> None:
+        mode, _, relation = mode.partition(":")
         interpretation_calls = 0
         if mode == "audit_budget_exhausted":
             monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", "4")
@@ -167,8 +168,18 @@ def replay_transport(monkeypatch: pytest.MonkeyPatch) -> Callable[[str, str], No
             task, _, _, _, schema, _ = retry_attempt
             if schema == "LLMInterpretationResponse":
                 interpretation_calls += 1
-                if mode == "control":
+                if mode == "control" or mode.startswith("followup_"):
                     result = _primary_payload(language)
+                    if mode.startswith("followup_"):
+                        result.update(
+                            task_relation=relation or "continue",
+                            semantic_turn_act="answer_pending_need",
+                        )
+                        draft = result["candidate_strategy_draft"]
+                        draft["extra_parameters"] = {}
+                        if mode == "followup_no_progress":
+                            draft.pop("initial_capital")
+                            draft["field_provenance"].pop("initial_capital")
                 elif interpretation_calls == 1:
                     raise asyncio.TimeoutError()
                 else:
@@ -209,10 +220,14 @@ def replay_transport(monkeypatch: pytest.MonkeyPatch) -> Callable[[str, str], No
                     "is_recurring_buy_request": True,
                     "recurring_contribution_amount": CONTRIBUTION,
                     "cadence": "monthly",
-                    "total_budget_amount": SEED,
+                    "total_budget_amount": None
+                    if mode == "followup_no_progress"
+                    else SEED,
                     "total_budget_source": "starting_capital",
                     "confidence": 0.9,
                 }
+            elif schema == "StrategyFamilyContinuityAudit":
+                result = {"should_rebind_strategy_family": False, "confidence": 0.9}
             elif schema == "DcaContributionRoleAudit":
                 result = {
                     "recurring_contribution_explicit": True,
@@ -231,6 +246,8 @@ def replay_transport(monkeypatch: pytest.MonkeyPatch) -> Callable[[str, str], No
                     "confidence": 0.9,
                     **_costs(language),
                 }
+                if mode.startswith("followup_"):
+                    result = {"confidence": 0.9}
                 if mode == "audit_omits_seed":
                     result["capital_amount"] = None
                 if mode in {"audit_bad_fee_span", "audit_bad_slippage_span"}:
@@ -283,11 +300,27 @@ async def test_focused_repair_delivers_stated_money_and_costs_or_asks(
             state = _patched_run_state(run_state=state, patch=interpreted.patch)
             if mode.startswith("audit_"):
                 assert interpreted.outcome == "needs_clarification"
+                pending = state.candidate_strategy_draft
+                assert pending.capital_amount == CONTRIBUTION
+                assert pending.extra_parameters["recurring_contribution"] == CONTRIBUTION
+                if mode in {
+                    "audit_unavailable",
+                    "audit_budget_exhausted",
+                    "audit_omits_seed",
+                }:
+                    assert pending.extra_parameters.get("initial_capital") is None
+                    candidates = [
+                        field.candidate_normalized_value
+                        for field in interpreted.decision.ambiguous_fields
+                    ]
+                    assert {"initial_capital": SEED} in candidates
                 clarified = await clarify_stage_async(
                     state=state, contract=contract, language=language
                 )
                 assert clarified.outcome == "await_user_reply"
-                assert "assumption" in clarified.patch["requested_fields"]
+                assert (
+                    "assumption" in clarified.patch["clarification"]["requested_fields"]
+                )
                 assert clarified.patch["clarification"]
                 assert not interpreted.patch.get("confirmation_payload")
                 assert {
@@ -331,3 +364,85 @@ async def test_focused_repair_delivers_stated_money_and_costs_or_asks(
             for r in receipts
         )
     assert not any(r.failure_mode == "AssertionError" for r in receipts)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", MESSAGES)
+@pytest.mark.parametrize("mode", ["followup_no_progress", "followup_confirmed"])
+@pytest.mark.parametrize("relation", ["continue", "ambiguous"])
+async def test_pending_deposit_survives_a_short_followup(
+    replay_transport: Callable[[str, str], None],
+    language: str,
+    mode: str,
+    relation: str,
+) -> None:
+    replay_transport(language, "audit_omits_seed")
+    contract = build_default_capability_contract()
+    interpreter = OpenRouterStructuredInterpreter(contract=contract)
+    user = UserState(user_id=Faker().uuid4(), language_preference=language)
+    state = RunState.new(
+        current_user_message=MESSAGES[language], recent_thread_history=[]
+    )
+    workflow = {"run_state": state, "user": user, "artifact_references": []}
+    with turn_execution_scope(entry_state={}):
+        interpreted = await interpret_stage_async(
+            state=state,
+            user=user,
+            latest_task_snapshot=None,
+            selected_thread_metadata={"ui_language": language},
+            structured_interpreter=interpreter,
+        )
+        workflow = _apply_stage_result(workflow, interpreted)
+        clarified = await clarify_stage_async(
+            state=workflow["run_state"], contract=contract, language=language
+        )
+        workflow = _apply_stage_result(workflow, clarified)
+    metadata = json.loads(json.dumps(workflow["selected_thread_metadata"]))
+    fields = metadata["response_intent"]["facts"]["ambiguous_fields"]
+    assert any(
+        field["candidate_normalized_value"] == {"initial_capital": SEED}
+        for field in fields
+    )
+    pending = workflow["latest_task_snapshot"].pending_strategy_summary
+    assert pending.capital_amount == CONTRIBUTION
+    assert pending.extra_parameters.get("initial_capital") is None
+
+    replay_transport(language, f"{mode}:{relation}")
+    followup = RunState.new(
+        current_user_message="Yes" if language == "en" else "Sí",
+        recent_thread_history=[
+            {"role": "user", "content": MESSAGES[language]},
+            {"role": "assistant", "content": clarified.patch["assistant_prompt"]},
+        ],
+    )
+    with turn_execution_scope(entry_state={}):
+        result = await interpret_stage_async(
+            state=followup,
+            user=user,
+            latest_task_snapshot=workflow["latest_task_snapshot"],
+            selected_thread_metadata=metadata,
+            structured_interpreter=interpreter,
+        )
+        followup = _patched_run_state(run_state=followup, patch=result.patch)
+        assert "dca_capital_role_conflict" not in result.decision.reason_codes
+        assert followup.candidate_strategy_draft.capital_amount == CONTRIBUTION
+        if mode == "followup_no_progress":
+            assert result.outcome == "needs_clarification"
+            repeated = await clarify_stage_async(
+                state=followup, contract=contract, language=language
+            )
+            assert repeated.outcome == "await_user_reply"
+            retained = repeated.patch["response_intent"]["facts"]["ambiguous_fields"]
+            assert any(
+                field["candidate_normalized_value"] == {"initial_capital": SEED}
+                for field in retained
+            )
+        else:
+            assert result.outcome == "ready_for_confirmation"
+            confirmed = await asyncio.to_thread(
+                confirm_stage, state=followup, contract=contract, language=language
+            )
+            assert confirmed.outcome == "await_approval"
+            launch = confirmed.patch["confirmation_payload"]["launch_payload"]
+            assert launch["starting_capital"] == SEED
+            assert launch["recurring_contribution"] == CONTRIBUTION

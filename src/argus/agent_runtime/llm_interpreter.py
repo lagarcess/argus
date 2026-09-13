@@ -165,6 +165,7 @@ from argus.agent_runtime.interpreter.executable_grounding import (  # noqa: F401
 )
 from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
     focused_stated_field_audit_guard,
+    retain_pending_focused_seed,
     response_from_focused_strategy_extraction,
     strategy_extraction_repair_is_allowed,
     _base_response_was_unsupported,
@@ -1129,6 +1130,7 @@ class OpenRouterStructuredInterpreter:
         *,
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
+        response = retain_pending_focused_seed(response, request=request)
         strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)  # fmt: skip
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
@@ -4231,9 +4233,7 @@ async def _audit_stated_run_field_fidelity(
     if capital_recheck is not None:
         candidate_response = capital_recheck
     if required:
-        candidate_response = focused_stated_field_audit_guard(
-            response=candidate_response, audit=valid_audit
-        )
+        candidate_response = focused_stated_field_audit_guard(response=candidate_response, audit=valid_audit)
         return candidate_response
     if capital_recheck is not None:
         return capital_recheck

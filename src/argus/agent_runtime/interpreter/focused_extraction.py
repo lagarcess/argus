@@ -24,9 +24,14 @@ from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
 )
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
-from argus.agent_runtime.interpreter.shared import _llm_value_is_empty, repaired_turn_act
+from argus.agent_runtime.interpreter.shared import (
+    _llm_value_is_empty,
+    is_explicit_fresh_task,
+    repaired_turn_act,
+)
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
+    LLMAmbiguousField,
     LLMInterpretationResponse,
     LLMStrategyDraft,
     LLMUnsupportedConstraint,
@@ -196,40 +201,93 @@ def focused_stated_field_audit_guard(
     """A focused schema cannot establish that omitted money/costs were unstated."""
     draft = response.candidate_strategy_draft
     unresolved = audit is None
+    pending_seed = None
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
         if draft.initial_capital is not None:
-            unresolved |= draft.field_provenance.get("initial_capital") not in {
-                *DCA_SEED_ROLES,
-                "user",
-                "explicit_user",
-                "prior",
-            }
+            seed_unowned = not _has_owned_seed(draft)
+            if seed_unowned:
+                pending_seed = draft.initial_capital
+                draft.initial_capital = None
+                unresolved = True
         if audit is not None and audit.capital_amount is not None:
             unresolved |= draft.initial_capital != audit.capital_amount
+            if unresolved and pending_seed is None:
+                pending_seed = audit.capital_amount
     if unresolved:
-        response = response.model_copy(
-            update={
-                "requires_clarification": True,
-                "assistant_response": None,
-                "missing_required_fields": list(
-                    dict.fromkeys([*response.missing_required_fields, "assumption"])
-                ),
-                "reason_codes": list(
-                    dict.fromkeys(
-                        [
-                            *response.reason_codes,
-                            "focused_repair_stated_fields_unresolved",
-                        ]
-                    )
-                ),
-            }
-        )
+        pending = None
+        if pending_seed is not None:
+            pending = LLMAmbiguousField(
+                field_name="assumption",
+                raw_value=draft.evidence_spans.get("initial_capital", str(pending_seed)),
+                candidate_normalized_value={"initial_capital": pending_seed},
+                reason_code="focused_repair_stated_fields_unresolved",
+            )
+        response = _pending_focused_field_response(response, pending)
     logger.bind(
         guard="focused_strategy_stated_fields",
         audit_available=audit is not None,
         requires_clarification=response.requires_clarification,
         reason_codes=response.reason_codes,
     ).info("Focused strategy stated-field guard evaluated")
+    return response
+
+
+def _has_owned_seed(draft: LLMStrategyDraft) -> bool:
+    return draft.initial_capital is not None and draft.field_provenance.get(
+        "initial_capital"
+    ) in {*DCA_SEED_ROLES, "user", "explicit_user", "prior"}
+
+
+def _pending_focused_field_response(
+    response: LLMInterpretationResponse,
+    pending: LLMAmbiguousField | None,
+) -> LLMInterpretationResponse:
+    fields = list(response.ambiguous_fields)
+    if pending is not None and pending not in fields:
+        fields.append(pending)
+    return response.model_copy(
+        update={
+            "requires_clarification": True,
+            "assistant_response": None,
+            "ambiguous_fields": fields,
+            "missing_required_fields": list(
+                dict.fromkeys([*response.missing_required_fields, "assumption"])
+            ),
+            "reason_codes": list(
+                dict.fromkeys(
+                    [*response.reason_codes, "focused_repair_stated_fields_unresolved"]
+                )
+            ),
+        }
+    )
+
+
+def retain_pending_focused_seed(
+    response: LLMInterpretationResponse,
+    *,
+    request: InterpretationRequest,
+) -> LLMInterpretationResponse:
+    """An answer with no typed seed progress cannot clear a pending money role."""
+    if is_explicit_fresh_task(
+        response.semantic_turn_act, response.task_relation
+    ) or response.intent not in {
+        "strategy_drafting",
+        "backtest_execution",
+    }:
+        return response
+    if _has_owned_seed(response.candidate_strategy_draft):
+        return response
+    intent = request.selected_thread_metadata.get("response_intent")
+    facts = intent.get("facts") if isinstance(intent, dict) else None
+    fields = facts.get("ambiguous_fields") if isinstance(facts, dict) else None
+    for field in fields if isinstance(fields, list) else []:
+        if (
+            isinstance(field, dict)
+            and field.get("reason_code") == "focused_repair_stated_fields_unresolved"
+        ):
+            response = _pending_focused_field_response(
+                response, LLMAmbiguousField.model_validate(field)
+            )
     return response
 
 
@@ -683,6 +741,19 @@ def response_from_focused_strategy_extraction(
         # role. Without that corroboration it cannot become a funded seed.
         draft.initial_capital = extraction.capital_amount
         draft.field_provenance.pop("initial_capital", None)
+        if span := extraction.evidence_spans.get("capital_amount"):
+            draft.evidence_spans["initial_capital"] = span
+    if (
+        canonical_strategy_type(strategy_type) == "dca_accumulation"
+        and extraction.recurring_contribution is not None
+    ):
+        # The executable contribution has one owner even while the seed role
+        # remains a pending assumption awaiting the required audit.
+        draft.capital_amount = draft.recurring_contribution
+        draft.field_provenance["capital_amount"] = "recurring_contribution"
+        draft.evidence_spans.pop("capital_amount", None)
+        if span := extraction.evidence_spans.get("recurring_contribution"):
+            draft.evidence_spans["capital_amount"] = span
     # Missing fields derive from the merged draft so already-grounded context is
     # not re-asked.
     response.missing_required_fields = (
