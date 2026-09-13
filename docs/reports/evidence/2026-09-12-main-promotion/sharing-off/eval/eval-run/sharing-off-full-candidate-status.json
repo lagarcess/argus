@@ -1,0 +1,53 @@
+{
+  "state": "completed",
+  "approval": "Founder approved one fresh full candidate run at the sharing-off product head with a 12.50 USD cumulative combined cap on tracked cost plus reserve; no further run if this guard stops.",
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "baseline_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "combined_limit_usd": 12.5,
+  "environment": {
+    "PATH": "/Users/garces/.codex/worktrees/eca1/private-alpha-next/.venv/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/garces",
+    "VIRTUAL_ENV": "/Users/garces/.codex/worktrees/eca1/private-alpha-next/.venv",
+    "PYTHONPATH": "src:web:/private/tmp/argus-promotion-20260912-eval-control",
+    "PYTEST_PLUGINS": "promotion_observer",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    "NUMBA_CACHE_DIR": "/private/tmp/argus-promotion-20260912-eval-control/numba-cache",
+    "ARGUS_RUN_LIVE_EVALS": "1",
+    "ARGUS_EVAL_ENV_FILE": "/Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/.env",
+    "ARGUS_MARKET_DATA_PROVIDER_MODE": "live_provider",
+    "ARGUS_ASSET_PROVIDER_MODE": "live_provider"
+  },
+  "environment_identical_to_original_pair": true,
+  "environment_source_sha256": "6a428549c310bd43ea51b46f2c106602284618c44bbe41b382b0289728edf45d",
+  "observer_sha256": "10a63f591b691b32996b300db84bb71dae2575092feb68899e4cc021629b63a3",
+  "command": [
+    "poetry",
+    "run",
+    "pytest",
+    "tests/evals/test_measurement_eval_live.py",
+    "-q"
+  ],
+  "preflight": {
+    "argus_import_local": true,
+    "all_imported_argus_modules_local": true,
+    "cases": 71,
+    "user_turns": 84
+  },
+  "initial_event_count": 1541,
+  "prior_ledger_sha256": "45cb30ee2b4fa58a92463511ea27052d3953d12203f488f01a9dc7f6dfc30b9e",
+  "prior_tracked_cost_usd": 6.0129416335,
+  "prior_unpriced_non_skipped_receipts": 53,
+  "reserve_is_not_actual_spend": true,
+  "tracked_cost_usd": 7.964481605684,
+  "fresh_candidate_tracked_cost_usd": 1.951539972184,
+  "unpriced_non_skipped_receipts": 71,
+  "guard_reserve_usd": 1.52,
+  "guarded_total_usd": 9.484481605684,
+  "completed_cases": 71,
+  "pid": 12579,
+  "started_at": 1789329156.448493,
+  "exit_code": 1,
+  "finished_at": 1789331825.878486,
+  "environment_source_unchanged_after_run": true
+}

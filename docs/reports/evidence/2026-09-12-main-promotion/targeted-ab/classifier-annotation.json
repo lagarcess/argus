@@ -1,0 +1,14 @@
+{
+  "scope": "External report annotation only; no native harness, fixture, environment or model-facing text changed",
+  "correction": "Read research from result.typed_outcome.research instead of the absent top-level result.research",
+  "applied_before": "candidate attempt 2",
+  "earlier_candidate_attempts_checked": [
+    1
+  ],
+  "earlier_native_research_codes": [
+    "research_unavailable_http_error"
+  ],
+  "earlier_research_timeouts": 0,
+  "earlier_failed_attempt_counts_unchanged": true,
+  "native_attempt_documents_unchanged": true
+}

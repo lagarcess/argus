@@ -1,0 +1,12 @@
+{
+  "phase": "browser",
+  "limit_usd": 3.0,
+  "tracked_cost_usd": 1.3406330387399998,
+  "unpriced_non_skipped_receipts": 7,
+  "guard_reserve_usd": 0.24000000000000002,
+  "reserve_is_not_actual_spend": true,
+  "api_pid": 10987,
+  "state": "walk_completed",
+  "checked_at_epoch": 1789329093.887736,
+  "guarded_total_usd": 1.5806330387399998
+}

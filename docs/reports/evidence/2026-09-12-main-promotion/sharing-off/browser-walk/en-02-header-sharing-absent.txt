@@ -1,0 +1,25 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "New chat":
+      - generic: New chat
+    - button "Search":
+      - generic: Search
+    - button "Recents":
+      - generic: Recents
+    - button "Settings":
+      - generic: Settings
+  - heading "New chat" [level=1]
+  - button "Chat options":
+  - status: Argus is working on New chat.
+  - region "Conversation":
+    - generic: Let's test Apple with $10,000.
+    - generic: Working...
+  - button "Mention an asset or indicator":
+  - combobox "Add a follow-up" [disabled]
+  - generic: Add a follow-up
+  - generic "Message is empty":
+    - button "Send message" [disabled]:
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.

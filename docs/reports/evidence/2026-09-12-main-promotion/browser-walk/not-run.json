@@ -1,0 +1,184 @@
+[
+  {
+    "language": "en",
+    "step": "Clarifying reply preserves an earlier fact",
+    "status": "not_run",
+    "reason": "The same-chat setup inherited the prior period and did not ask a question. A fresh-chat clarification was still owed when the sharing stop occurred.",
+    "screenshot": null
+  },
+  {
+    "language": "en",
+    "step": "Sharing preview and local link creation",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "en",
+    "step": "Signed-out phone-width shared answer",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "en",
+    "step": "Revoke local link",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "en",
+    "step": "Revoked link stops working",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Signed-in empty greeting",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "New account first profile save",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Home country persistence",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Usage labels",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Backtest confirmation",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "First card edit",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Second edit retains first",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Result and Quick take",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Breakdown with sources",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Conversation after result: one next-step list, gap, dollar costs, worst-drop dates",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Feedback ask once",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Feedback rating and no return",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Clarifying reply preserves an earlier fact",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Forward-looking or valuation research with sources",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Decision saved on result",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Result rail tick",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Pick answers from chat header",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Sharing preview and local link creation",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Signed-out phone-width shared answer",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Revoke local link",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  },
+  {
+    "language": "es-419",
+    "step": "Revoked link stops working",
+    "status": "not_run",
+    "reason": "Stopped at the confirmed English sharing blocker under Step 6.",
+    "screenshot": null
+  }
+]

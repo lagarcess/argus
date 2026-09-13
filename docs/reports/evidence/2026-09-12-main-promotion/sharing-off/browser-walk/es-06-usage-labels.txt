@@ -1,0 +1,48 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Cerrar uso"
+    - dialog "Uso":
+      - heading "Uso" [level=2]
+      - button "Cerrar uso" [active]:
+      - region "Conversación":
+        - heading "Conversación" [level=3]
+        - paragraph: Sin límite
+      - region "Búsquedas con fuentes":
+        - heading "Búsquedas con fuentes" [level=3]
+        - paragraph: Sin límite
+      - region "Simulaciones":
+        - heading "Simulaciones" [level=3]
+        - paragraph: Quedan 50 hoy
+        - progressbar "0 de 50 usados hoy"
+        - paragraph:
+          - text: Se restablece
+          - time: 13 sept 2026, 7:00 p.m. GMT-5
+        - paragraph:
+          - text: 10 disponibles esta hora · se restablece
+          - time: 13 sept 2026, 3:00 p.m. GMT-5
+      - button "¿Qué cuenta?":
+        - text: ¿Qué cuenta?
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading [level=1]
+  - status
+  - paragraph: ¿Qué te gustaría investigar?
+  - status: ¿Qué te gustaría investigar?
+  - button "Menciona un activo o indicador":
+  - combobox "Pregunta sobre cualquier empresa o idea"
+  - generic: Pregunta sobre cualquier empresa o idea
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
+  - button "¿Cómo gana dinero Netflix?"
+  - button "Compara Costco con Walmart y Target"
+  - button "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?"

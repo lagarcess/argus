@@ -1,0 +1,24 @@
+{
+  "measured_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "previous_head": "0b620eb68d046abe61596fa25fda71ec9b7c3922",
+  "non_docs_git_tree_sha256": "6e0940c95470699a7b0dc18272bca0aabf4e74170c3d0b386c0334d84af21614",
+  "all_changed_paths_docs_only": true,
+  "measured_product_tree_identical": true,
+  "acceptance_worktree_clean_detached": true,
+  "acceptance_env_files_absent": true,
+  "screenshots_and_text_present": 21,
+  "jwt_and_real_secret_scan": "pass",
+  "authored_em_dash_scan": "pass",
+  "manifest_local_evidence_links": "pass",
+  "real_env_sha256": "6a428549c310bd43ea51b46f2c106602284618c44bbe41b382b0289728edf45d",
+  "release_docs_tests": {
+    "passed": 24,
+    "seconds": 22.3,
+    "log": "release-docs-tests.log"
+  },
+  "mocked_harness": {
+    "passed": 259,
+    "seconds": 34.93,
+    "log": "mocked-harness.log"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "product_head": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "pre_evidence_head": "f0c4f2f69cd9a2800ba7a22b801ffa8d1e6e2efa",
+  "non_docs_changes_since_product_head": [],
+  "all_changes_in_this_round_under_docs": true,
+  "snapshot_count": 19,
+  "passing_steps": 18,
+  "failing_steps": 1,
+  "screenshot_hashes_verified": true,
+  "every_visible_text_file_present": true,
+  "native_validator_unchanged": true,
+  "new_full_candidate_started": false,
+  "new_ab_started": false
+}

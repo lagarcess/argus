@@ -1,0 +1,10 @@
+{
+  "syntax_valid": true,
+  "native_inputs_identical": true,
+  "native_expectations_preserved": true,
+  "differences": [
+    "expected",
+    "prose_judge"
+  ],
+  "environment_unchanged": true
+}

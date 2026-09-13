@@ -1,0 +1,26 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "New chat":
+      - generic: New chat
+    - button "Search":
+      - generic: Search
+    - button "Recents":
+      - generic: Recents
+    - button "Settings":
+      - generic: Settings
+  - heading [level=1]
+  - status
+  - paragraph: What should we look into?
+  - status: What should we look into?
+  - button "Mention an asset or indicator":
+  - combobox "Ask about any company or idea"
+  - generic: Ask about any company or idea
+  - generic "Message is empty":
+    - button "Send message" [disabled]:
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.
+  - button "How does Netflix make money?"
+  - button "Compare Costco against Walmart and Target"
+  - button "What if I had bought Coca-Cola every month for five years?"

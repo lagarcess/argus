@@ -1,0 +1,12 @@
+{
+  "research_provider_errors": [
+    {
+      "reason": "http_error",
+      "http_status": 429,
+      "no_http_response_status": false,
+      "shape": "balanced"
+    }
+  ],
+  "raw_error_details_not_retained": true,
+  "customer_text_not_retained": true
+}

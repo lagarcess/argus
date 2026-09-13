@@ -1,0 +1,244 @@
+{
+  "status": "ab_completed_founder_merge_disposition_pending",
+  "baseline_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "candidate_native_sha256": "712420b741f6922a29b5e935a6d2a01fe833a40bc33d134d5f97c7617ce4d0cd",
+  "baseline_native_sha256": "ec7e3301fbc796c38265313a61282a882d2564bcd761e7084ffcc05c91c7792a",
+  "baseline_totals": {
+    "expected_failed": 0,
+    "failed": 3,
+    "infrastructure_error": 0,
+    "passed": 59,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "candidate_totals": {
+    "expected_failed": 0,
+    "failed": 1,
+    "infrastructure_error": 0,
+    "passed": 70,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "fixture_relationship": {
+    "common_case_count": 62,
+    "unchanged_common_cases": 59,
+    "changed_common_cases": {
+      "capability_honesty_future_performance_btc_regression": [
+        "expected",
+        "prose_judge"
+      ],
+      "capability_honesty_future_performance_nvda_golden_cross": [
+        "expected",
+        "prose_judge"
+      ],
+      "messy_spanish_future_performance_nvda_cruce_dorado": [
+        "expected",
+        "prose_judge"
+      ]
+    },
+    "candidate_only_case_ids": [
+      "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+      "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+      "ordinary_conversation_capability_indicator_question_en",
+      "ordinary_conversation_capability_indicator_question_es",
+      "ordinary_conversation_concept_compound_interest_en",
+      "ordinary_conversation_concept_etf_es",
+      "ordinary_conversation_concept_inflation_es",
+      "ordinary_conversation_macro_curiosity_en",
+      "ordinary_conversation_price_question_en"
+    ],
+    "baseline_only_case_ids": []
+  },
+  "case_differences": [
+    {
+      "case_id": "action_chip_change_asset_bare_ticker_append_issue_190",
+      "baseline_status": "failed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [
+        "intent: expected 'backtest_execution', got 'conversation_followup'",
+        "assets: expected ['AAPL', 'MSFT', 'NVDA', 'TSLA'], got ['AAPL', 'MSFT', 'NVDA']",
+        "offered.launch_payload.symbols: expected ['AAPL', 'MSFT', 'NVDA', 'TSLA'], got ['AAPL', 'MSFT', 'NVDA']"
+      ],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "asset_discovery_not_result_followup_issue_244",
+      "baseline_status": "failed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [
+        "offered.min_next_experiment_rows: expected at least 1, got []"
+      ],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "baseline_status": "failed",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [
+        "capability_verdict: expected 'executable', got 'unsupported'",
+        "capital_amount: expected 13000, got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'needs_clarification', 'await_user_reply']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "baseline_status": "passed",
+      "candidate_status": "failed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [
+        "research.published: expected True, got False",
+        "prose_judge:scenario_framing"
+      ],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "ordinary_conversation_capability_indicator_question_en",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "ordinary_conversation_capability_indicator_question_es",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "ordinary_conversation_concept_compound_interest_en",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "ordinary_conversation_concept_etf_es",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "ordinary_conversation_concept_inflation_es",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "ordinary_conversation_macro_curiosity_en",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    },
+    {
+      "case_id": "ordinary_conversation_price_question_en",
+      "baseline_status": "not_in_baseline",
+      "candidate_status": "passed",
+      "baseline_failed_checks": [],
+      "candidate_failed_checks": [],
+      "candidate_infrastructure_errors": []
+    }
+  ],
+  "full_environment_identical": true,
+  "prior_partial_candidate_excluded_from_quality_comparison": true,
+  "prior_partial_candidate_cost_included": true,
+  "guarded_total_usd": 7.1729416335,
+  "tracked_cost_usd": 6.0129416335,
+  "guard_reserve_usd": 1.16,
+  "reserve_is_not_actual_spend": true,
+  "combined_cap_usd": 12.5,
+  "fresh_candidate_tracked_cost_usd": 1.8923231143,
+  "fresh_candidate_cost_by_provider": {
+    "openrouter": 1.5380831143,
+    "perplexity_direct": 0.025,
+    "perplexity_agent": 0.32924
+  },
+  "fresh_full_run_event_boundary": {
+    "start": 784,
+    "end_exclusive": 1276
+  },
+  "openrouter_observer_matches_native_scorecard": true,
+  "candidate_user_turns": 84,
+  "baseline_user_turns": 73,
+  "fresh_candidate_tracked_cost_per_user_turn_usd": 0.02252765612261905,
+  "baseline_tracked_cost_per_user_turn_usd": 0.019051849013479453,
+  "candidate_only_failed_case_ids": [
+    "messy_spanish_future_performance_nvda_cruce_dorado"
+  ],
+  "supplemental_disposition": {
+    "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+    "native_failure_retained": true,
+    "native_research_degraded_code": "research_unavailable_timeout",
+    "recorded_judge_replay_pass": false,
+    "permitted_case_rerun_pass": true,
+    "case_rerun_attempts": 1,
+    "case_rerun_research_published": true,
+    "case_rerun_research_rows": 3,
+    "case_rerun_research_sources": 5,
+    "interpretation": "The original timeout did not recur in the one permitted rerun; no sustained product regression is established by this evidence.",
+    "release_gate": "The founder retained the existing ten-pair release rule. Targeted A/B evidence and stop/result are recorded separately."
+  },
+  "targeted_ab": {
+    "state": "completed",
+    "measurements": {
+      "baseline": {
+        "attempts": 10,
+        "failed_count": 0,
+        "failed_rate": 0.0,
+        "passed_count": 10,
+        "passed_rate": 1.0,
+        "research_timeout_count": 0,
+        "research_timeout_rate": 0.0,
+        "criterion": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded.",
+        "fixture_comparison_note": "Inputs are identical. Each build retains its committed typed expectations and prose rubric; production expects a future-performance limitation, candidate expects researched scenarios."
+      },
+      "candidate": {
+        "attempts": 10,
+        "failed_count": 6,
+        "failed_rate": 0.6,
+        "passed_count": 4,
+        "passed_rate": 0.4,
+        "research_timeout_count": 1,
+        "research_timeout_rate": 0.1,
+        "criterion": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded.",
+        "fixture_comparison_note": "Inputs are identical. Each build retains its committed typed expectations and prose rubric; production expects a future-performance limitation, candidate expects researched scenarios."
+      }
+    },
+    "candidate_failure_excess": 6,
+    "failure_gap_stop_applies": false,
+    "baseline_document": "targeted-ab-baseline.json",
+    "candidate_document": "targeted-ab-candidate.json",
+    "founder_disposition_document": "founder-research-disposition.json"
+  }
+}

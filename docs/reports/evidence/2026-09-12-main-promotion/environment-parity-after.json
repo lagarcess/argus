@@ -1,0 +1,1162 @@
+{
+  "measured_head": "df7aee12955f667e31057464d62c72287fb12247",
+  "status": "pass",
+  "scope": "Application and workflow Python, operational Python excluding tests, production web source/build configuration. Literal names, helper/constant indirection and all task-generated timeout names. Standard process variables excluded; DATABASE_URL derivation, forced Mem0 telemetry and Render run identity documented without assignment. Test/benchmark harness inputs are not application settings.",
+  "runtime_and_operator_key_count": 144,
+  "keys": {
+    "ALPACA_API_KEY": {
+      "sites": [
+        "src/argus/context/providers.py:439",
+        "src/argus/domain/market_data/provider.py:185",
+        "src/argus/domain/market_data/provider.py:194",
+        "src/argus/domain/market_data/capabilities.py:91",
+        "src/argus/domain/market_data/capabilities.py:123",
+        "src/argus/domain/market_data/assets.py:218",
+        "src/argus/domain/market_data/assets.py:253"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ALPACA_PAPER_TRADING": {
+      "sites": [
+        "src/argus/domain/market_data/capabilities.py:95",
+        "src/argus/domain/market_data/capabilities.py:127",
+        "src/argus/domain/market_data/assets.py:223",
+        "src/argus/domain/market_data/assets.py:258"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ALPACA_SECRET_KEY": {
+      "sites": [
+        "src/argus/context/providers.py:440",
+        "src/argus/domain/market_data/provider.py:186",
+        "src/argus/domain/market_data/provider.py:195",
+        "src/argus/domain/market_data/capabilities.py:92",
+        "src/argus/domain/market_data/capabilities.py:124",
+        "src/argus/domain/market_data/assets.py:219",
+        "src/argus/domain/market_data/assets.py:254"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "APP_ENV": {
+      "sites": [
+        "src/argus/llm/openrouter_key_policy.py:61",
+        "src/argus/observability/envelope.py:182"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_ALPHA_METRICS_SUPABASE_SERVICE_ROLE_KEY": {
+      "sites": [
+        "scripts/ops/alpha_readiness_metrics.py:280",
+        "scripts/ops/alpha_readiness_metrics.py:39"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_ALPHA_METRICS_SUPABASE_URL": {
+      "sites": [
+        "scripts/ops/alpha_readiness_metrics.py:279",
+        "scripts/ops/alpha_readiness_metrics.py:30"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD": {
+      "sites": [
+        "src/argus/domain/resend_email.py:9"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_APP_ENV": {
+      "sites": [
+        "src/argus/observability/envelope.py:184",
+        "src/argus/api/dependencies.py:382"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_APP_ORIGIN": {
+      "sites": [
+        "src/argus/api/routers/ops.py:176",
+        "web/app/r/[receiptId]/page.tsx:37",
+        "web/app/api/auth/recovery/route.ts:23"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_ASSET_FIXTURE_PATH": {
+      "sites": [
+        "src/argus/domain/market_data/assets.py:368"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_ASSET_PROVIDER_MODE": {
+      "sites": [
+        "src/argus/domain/market_data/assets.py:98"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_ASSET_UNIVERSE_LOADER_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/domain/market_data/assets.py:88"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:96"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:238",
+        "src/argus/domain/backtest_admission.py:73"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:234",
+        "src/argus/domain/backtest_admission.py:70"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:90"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:230",
+        "src/argus/domain/backtest_admission.py:67"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:226",
+        "src/argus/domain/backtest_admission.py:64"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_REAL_WORKFLOW_TASK": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:203"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:103"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_WORKFLOW_TASK": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:206",
+        "workflows/trigger_proof.py:19"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_BACKTEST_WORKFLOW_TIMEOUT_SECONDS": {
+      "sites": [
+        "workflows/main.py:50",
+        "workflows/main.py:67"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": {
+      "sites": [
+        "scripts/ops/alpha_readiness_metrics.py:41",
+        "scripts/ops/stale_backtest_jobs.py:49"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_CANARY_SUPABASE_URL": {
+      "sites": [
+        "scripts/ops/alpha_readiness_metrics.py:32",
+        "scripts/ops/stale_backtest_jobs.py:41"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_CAPABILITY_REASONING_EFFORT": {
+      "sites": [
+        "src/argus/llm/openrouter.py:104"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_CHAT_FALLBACK_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:16"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_CHAT_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:8"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_CHECKPOINTER_MODE": {
+      "sites": [
+        "src/argus/api/state.py:24",
+        "src/argus/api/chat/runtime_worker.py:27"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_CONTEXT_FALLBACK_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:18"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_CONTEXT_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:10"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_CONTEXT_PACKETS_ENABLED": {
+      "sites": [
+        "src/argus/api/chat/context_packets.py:35"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_CONTEXT_PACKET_BUDGET_SECONDS": {
+      "sites": [
+        "src/argus/api/chat/context_packets.py:40"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_CORS_ALLOW_ORIGINS": {
+      "sites": [
+        "src/argus/api/app_setup.py:42"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_DEV_ENDPOINTS_ENABLED": {
+      "sites": [
+        "src/argus/api/routers/dev.py:16"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_DEV_MEMORY_FALLBACK": {
+      "sites": [
+        "src/argus/api/dependencies.py:390",
+        "src/argus/api/state.py:34"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_DISCOVERY_DAILY_LIMIT": {
+      "sites": [
+        "src/argus/domain/research/search/config.py:86"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_DISCOVERY_GLOBAL_DAILY_CEILING": {
+      "sites": [
+        "src/argus/domain/usage_limits.py:86"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_DISCOVERY_HOURLY_LIMIT": {
+      "sites": [
+        "src/argus/domain/research/search/config.py:83"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_DISCOVERY_MAX_CANDIDATES": {
+      "sites": [
+        "src/argus/domain/research/search/config.py:77"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_DISCOVERY_OPENROUTER_SEARCH_MODEL": {
+      "sites": [
+        "src/argus/domain/research/search/selection.py:25"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_DISCOVERY_SEARCH_PROVIDER": {
+      "sites": [
+        "src/argus/domain/research/search/config.py:68"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_DISCOVERY_SEARCH_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/domain/research/search/config.py:72"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_ENABLE_ARTIFACT_NAMING_IN_TESTS": {
+      "sites": [
+        "src/argus/api/chat/title_finalization.py:151"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_ENABLE_EXECUTION_REALISM": {
+      "sites": [
+        "src/argus/domain/backtesting/config.py:111"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL": {
+      "sites": [
+        "src/argus/api/personalization_memory.py:58"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_ENABLE_PERSONALIZATION_MEMORY": {
+      "sites": [
+        "src/argus/memory/service.py:121"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_ENV": {
+      "sites": [
+        "src/argus/observability/envelope.py:183",
+        "src/argus/api/dependencies.py:382"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED": {
+      "sites": [
+        "src/argus/api/public_excerpts.py:74"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_FRED_CONTEXT_SERIES": {
+      "sites": [
+        "src/argus/context/providers.py:30"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_GROUNDED_DISCOVERY_ENABLED": {
+      "sites": [
+        "src/argus/domain/research/search/config.py:66"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_GUEST_ACCESS_ENABLED": {
+      "sites": [
+        "src/argus/api/guest_access.py:27"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY": {
+      "sites": [
+        "src/argus/llm/openrouter_key_policy.py:13"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_IN_PLACE_CARD_EDITS_ENABLED": {
+      "sites": [
+        "src/argus/domain/edit_contract_config.py:21"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_MARKET_DATA_PROVIDER_MODE": {
+      "sites": [
+        "src/argus/domain/backtesting/coverage.py:511",
+        "src/argus/domain/market_data/provider.py:316",
+        "src/argus/domain/market_data/capabilities.py:83",
+        "src/argus/domain/market_data/assets.py:99",
+        "src/argus/domain/market_data/market_session.py:78",
+        "workflows/proof.py:25"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_MEMORY_EMBEDDING_DIMENSIONS": {
+      "sites": [
+        "src/argus/llm/memory_embedding.py:305"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_MEMORY_EMBEDDING_MODEL": {
+      "sites": [
+        "src/argus/llm/memory_embedding.py:299",
+        "src/argus/llm/memory_embedding.py:300"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_MEMORY_EMBEDDING_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/memory_embedding.py:309"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_MEMORY_VECTOR_COLLECTION": {
+      "sites": [
+        "src/argus/api/personalization_memory.py:87"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_MOCK_AUTH": {
+      "sites": [
+        "src/argus/api/dependencies.py:396",
+        "src/argus/api/routers/dev.py:17"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_ASSET_MENTION_PREFLIGHT_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_CAPABILITY_CONFLICT_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_CHAT_COMPOSER_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_CLARIFICATION_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_DISCOVERY_EXTRACTION_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_DISCOVERY_MODEL_KNOWLEDGE_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_DISCOVERY_VOICING_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_FIELD_FIDELITY_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_INTERPRETATION_REPAIR_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_INTERPRETATION_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_KNOWLEDGE_ROUTE_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_KNOWLEDGE_VOICING_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_MEMORY_SENSITIVITY_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_NAME_SUGGESTION_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/llm/openrouter.py:226"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_OPS_TOKEN": {
+      "sites": [
+        "src/argus/api/routers/ops.py:35"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_PERSISTENCE_MODE": {
+      "sites": [
+        "src/argus/api/state.py:22",
+        "src/argus/api/chat/runtime_worker.py:28"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_POSTHOG_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/observability/envelope.py:443"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT": {
+      "sites": [
+        "scripts/ops/production_migration_gate.py:675"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_PRODUCTION_DATABASE_URL": {
+      "sites": [
+        "scripts/ops/production_migration_gate.py:664"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_PROD_OPENROUTER_API_KEY": {
+      "sites": [
+        "src/argus/llm/openrouter_key_policy.py:14"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED": {
+      "sites": [
+        "src/argus/api/guest_access.py:38"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_READINESS_ASSET_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/api/routers/ops.py:63"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_READOUT_FALLBACK_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:19"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_READOUT_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:11"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_RENDER_WORKFLOW_PROOF_POLL_SECONDS": {
+      "sites": [
+        "workflows/trigger_proof.py:115"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_RENDER_WORKFLOW_PROOF_TASK": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:207",
+        "workflows/trigger_proof.py:20"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_RENDER_WORKFLOW_PROOF_TIMEOUT_SECONDS": {
+      "sites": [
+        "workflows/trigger_proof.py:107"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_RESEARCH_BACKGROUND_DEADLINE_SECONDS": {
+      "sites": [
+        "src/argus/domain/research/config.py:262"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_RESEARCH_GLOBAL_DAILY_CEILING": {
+      "sites": [
+        "src/argus/domain/usage_limits.py:105"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_RESEARCH_RAIL_ENABLED": {
+      "sites": [
+        "src/argus/domain/research/config.py:84"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS": {
+      "sites": [
+        "src/argus/api/routers/agent.py:173"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS": {
+      "sites": [
+        "src/argus/api/routers/agent.py:162",
+        "src/argus/agent_runtime/turn_execution.py:503"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_RUNTIME_STREAM_WORKER": {
+      "sites": [
+        "src/argus/api/chat/runtime_worker.py:22"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_RUNTIME_STREAM_WORKERS": {
+      "sites": [
+        "src/argus/api/chat/runtime_worker.py:150"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_STALE_JOBS_SUPABASE_SERVICE_ROLE_KEY": {
+      "sites": [
+        "scripts/ops/alpha_readiness_metrics.py:42",
+        "scripts/ops/stale_backtest_jobs.py:48"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_STALE_JOBS_SUPABASE_URL": {
+      "sites": [
+        "scripts/ops/alpha_readiness_metrics.py:33",
+        "scripts/ops/stale_backtest_jobs.py:40"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_STRUCTURED_FALLBACK_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:17"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_STRUCTURED_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:9"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_STRUCTURED_REASONING_EFFORT": {
+      "sites": [
+        "src/argus/llm/openrouter.py:103"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_TURN_CALL_ALLOWANCE": {
+      "sites": [
+        "src/argus/agent_runtime/turn_execution.py:514"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_TURN_DEADLINE_SECONDS": {
+      "sites": [
+        "src/argus/agent_runtime/turn_execution.py:501"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_UTILITY_FALLBACK_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:15"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_UTILITY_MODEL": {
+      "sites": [
+        "src/argus/llm/openrouter_model_env.py:7"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_VISITOR_KEY_SECRET": {
+      "sites": [
+        "src/argus/domain/visitor_usage.py:27"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_WORKFLOW_DATABASE_URL": {
+      "sites": [
+        "workflows/proof.py:23",
+        "scripts/ops/backfill_backtest_evidence.py:110",
+        "scripts/ops/stale_backtest_jobs.py:36"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ARGUS_WORKFLOW_PROOF_PLAN": {
+      "sites": [
+        "workflows/main.py:51"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ARGUS_WORKFLOW_PROOF_USER_ID": {
+      "sites": [
+        "workflows/proof.py:28"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "DATABASE_URL": {
+      "sites": [
+        "src/argus/api/state.py:23",
+        "src/argus/domain/supabase_gateway.py:164",
+        "scripts/ops/backfill_backtest_evidence.py:287"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "ENABLE_MARKET_DATA_CACHE": {
+      "sites": [
+        "src/argus/domain/market_data/provider.py:32"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "ENVIRONMENT": {
+      "sites": [
+        "src/argus/observability/envelope.py:185"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "FRED_API_KEY": {
+      "sites": [
+        "src/argus/context/providers.py:48"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "MARKET_DATA_CACHE_TTL": {
+      "sites": [
+        "src/argus/domain/market_data/provider.py:42",
+        "src/argus/domain/market_data/assets.py:79"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "MEM0_TELEMETRY": {
+      "sites": [
+        "src/argus/api/personalization_memory_index.py:57"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "MOCK_USER_EMAIL": {
+      "sites": [
+        "src/argus/domain/supabase_gateway.py:155"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "MOCK_USER_PASSWORD": {
+      "sites": [
+        "src/argus/domain/supabase_gateway.py:156"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_DEV_ALLOWED_ORIGINS": {
+      "sites": [
+        "web/next.config.ts:7"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "NEXT_DIST_DIR": {
+      "sites": [
+        "web/next.config.ts:13"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "NEXT_PUBLIC_ARGUS_API_URL": {
+      "sites": [
+        "web/lib/argus-api-transport.ts:4",
+        "web/lib/argus-api-transport.ts:5",
+        "web/lib/guest-captcha.ts:99"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN": {
+      "sites": [
+        "web/lib/guest-captcha.ts:100"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL": {
+      "sites": [
+        "web/app/privacy/page.tsx:4",
+        "web/app/terms/page.tsx:4",
+        "web/components/sidebar/ProfileMenu.tsx:117"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY": {
+      "sites": [
+        "web/lib/guest-captcha.ts:101"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_ENABLE_SPANISH": {
+      "sites": [
+        "web/lib/language-features.ts:16"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED": {
+      "sites": [
+        "web/lib/private-alpha-flags.ts:24"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_GUEST_ACCESS_ENABLED": {
+      "sites": [
+        "src/argus/api/guest_access.py:28",
+        "web/lib/private-alpha-flags.ts:18"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_MOCK_AUTH": {
+      "sites": [
+        "src/argus/api/dependencies.py:395",
+        "src/argus/api/routers/dev.py:18",
+        "web/app/page.tsx:51",
+        "web/app/chat/page.tsx:13",
+        "web/components/ui/DevModeBadge.tsx:7",
+        "web/lib/argus-api-transport.ts:37",
+        "web/lib/argus-api.ts:995",
+        "web/lib/supabase-client.ts:13"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_OMNISEARCH_ENABLED": {
+      "sites": [
+        "web/lib/private-alpha-flags.ts:2"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_RESEARCH_RAIL_ENABLED": {
+      "sites": [
+        "web/lib/private-alpha-flags.ts:8"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+      "sites": [
+        "web/lib/supabase-server.ts:8",
+        "web/lib/supabase-client.ts:12"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NEXT_PUBLIC_SUPABASE_URL": {
+      "sites": [
+        "web/lib/supabase-server.ts:7",
+        "web/lib/supabase-client.ts:11"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "NODE_ENV": {
+      "sites": [
+        "web/proxy.ts:4",
+        "web/app/api/auth/recovery/route.ts:24",
+        "web/app/dev/result-card/page.tsx:11",
+        "web/app/dev/bottom-sheet/page.tsx:11",
+        "web/lib/guest-captcha.ts:98"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "OPENROUTER_API_KEY": {
+      "sites": [
+        "src/argus/llm/openrouter_key_policy.py:35"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "PERPLEXITY_API_KEY": {
+      "sites": [
+        "src/argus/llm/memory_embedding.py:294",
+        "src/argus/domain/research/credentials.py:15"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "POSTHOG_HOST": {
+      "sites": [
+        "src/argus/observability/envelope.py:418"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "POSTHOG_PROJECT_TOKEN": {
+      "sites": [
+        "src/argus/observability/envelope.py:407"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "POSTHOG_REGION": {
+      "sites": [
+        "src/argus/observability/envelope.py:426"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "RENDER_API_KEY": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:332",
+        "src/argus/api/chat/backtest_jobs.py:365"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "RENDER_LOCAL_DEV_URL": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:116"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "RENDER_TASK_RUN_ID": {
+      "sites": [
+        "workflows/main.py:61",
+        "workflows/main.py:77"
+      ],
+      "canonical_file_present": false,
+      "documented": true
+    },
+    "RENDER_USE_LOCAL_DEV": {
+      "sites": [
+        "src/argus/api/chat/backtest_jobs.py:109"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "SUPABASE_ANON_KEY": {
+      "sites": [
+        "src/argus/domain/supabase_gateway.py:171"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "SUPABASE_ANON_PUBLIC_KEY": {
+      "sites": [
+        "src/argus/domain/supabase_gateway.py:171"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "SUPABASE_PROJECT_URL": {
+      "sites": [
+        "src/argus/domain/supabase_gateway.py:162",
+        "scripts/ops/alpha_readiness_metrics.py:35",
+        "scripts/ops/destructive_database_target.py:88",
+        "scripts/ops/stale_backtest_jobs.py:42"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "sites": [
+        "src/argus/domain/supabase_gateway.py:163",
+        "scripts/ops/alpha_readiness_metrics.py:43",
+        "scripts/ops/destructive_database_target.py:101",
+        "scripts/ops/stale_backtest_jobs.py:46"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    },
+    "SUPABASE_URL": {
+      "sites": [
+        "src/argus/domain/supabase_gateway.py:162",
+        "scripts/ops/alpha_readiness_metrics.py:34",
+        "scripts/ops/destructive_database_target.py:117",
+        "scripts/ops/destructive_database_target.py:97",
+        "scripts/ops/destructive_database_target.py:88",
+        "scripts/ops/stale_backtest_jobs.py:38"
+      ],
+      "canonical_file_present": true,
+      "documented": true
+    }
+  },
+  "dynamic_task_timeout_key_count": 15,
+  "missing_example_keys": {},
+  "hosted_contract_checks": [
+    {
+      "service": "argus-api",
+      "profile_keys_missing_from_array": [],
+      "profile_keys_missing_template": [],
+      "profile_literals_differ_from_render": [],
+      "profile_keys_missing_render": [],
+      "render_keys_missing_array": []
+    },
+    {
+      "service": "argus-app",
+      "profile_keys_missing_from_array": [],
+      "profile_keys_missing_template": [],
+      "profile_literals_differ_from_render": [],
+      "profile_keys_missing_render": [],
+      "render_keys_missing_array": []
+    },
+    {
+      "service": "argus-backtests",
+      "profile_keys_missing_from_array": [],
+      "profile_keys_missing_template": []
+    }
+  ],
+  "hosted_required_change": "none; optional keys omitted from the release contract retain code defaults",
+  "template_additions": {
+    "added_keys": [
+      "ARGUS_STRUCTURED_REASONING_EFFORT",
+      "ARGUS_CAPABILITY_REASONING_EFFORT",
+      "ARGUS_ENV",
+      "ARGUS_APP_ENV",
+      "ENVIRONMENT",
+      "ARGUS_RENDER_WORKFLOW_PROOF_TIMEOUT_SECONDS",
+      "ARGUS_RENDER_WORKFLOW_PROOF_POLL_SECONDS",
+      "ARGUS_WORKFLOW_PROOF_USER_ID",
+      "NEXT_DEV_ALLOWED_ORIGINS",
+      "NEXT_DIST_DIR",
+      "NEXT_PUBLIC_POSTHOG_KEY",
+      "ARGUS_CANARY_SUPABASE_URL",
+      "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY",
+      "ARGUS_PRODUCTION_DATABASE_URL",
+      "ARGUS_PRODUCTION_DATABASE_SSL_ROOT_CERT",
+      "RENDER_TASK_RUN_ID",
+      "MEM0_TELEMETRY",
+      "ARGUS_OPENROUTER_INTERPRETATION_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_INTERPRETATION_REPAIR_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_ASSET_MENTION_PREFLIGHT_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_FIELD_FIDELITY_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_CAPABILITY_CONFLICT_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_CLARIFICATION_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_CHAT_COMPOSER_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_NAME_SUGGESTION_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_DISCOVERY_EXTRACTION_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_DISCOVERY_VOICING_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_DISCOVERY_MODEL_KNOWLEDGE_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_KNOWLEDGE_ROUTE_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_KNOWLEDGE_VOICING_TIMEOUT_SECONDS",
+      "ARGUS_OPENROUTER_MEMORY_SENSITIVITY_TIMEOUT_SECONDS"
+    ],
+    "count": 31,
+    "effective_template_values_unchanged": true
+  },
+  "canonical_file_changed": false,
+  "prior_gaps": "Founder confirmed original seven predate this bundle."
+}

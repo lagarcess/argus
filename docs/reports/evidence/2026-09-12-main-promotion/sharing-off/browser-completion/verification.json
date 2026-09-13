@@ -1,0 +1,14 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "capture_count": 10,
+  "pass_count": 9,
+  "failed_provider_attempt_count": 1,
+  "retry_succeeded": true,
+  "sharing_rows_not_applicable": 12,
+  "all_hashes_and_visible_text_files_verified": true,
+  "remaining_applicable_walk_steps": [],
+  "new_p0_p1": false,
+  "known_p2_606_deferred_by_founder": true,
+  "product_change_made": false,
+  "checked_at": "2026-09-13T19:51:34.602889+00:00"
+}

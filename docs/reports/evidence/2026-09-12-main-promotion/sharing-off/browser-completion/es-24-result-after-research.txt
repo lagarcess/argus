@@ -1,0 +1,172 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading "Inversión en Apple con $10,000" [level=1]
+  - button "Opciones de chat":
+  - status
+  - region "Conversación":
+    - generic: Probemos Apple con $10,000.
+    - button "Copiar texto":
+    - paragraph: ¿Qué periodo quieres usar para AAPL?
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: De enero a diciembre de 2024.
+    - button "Copiar texto":
+    - paragraph: Cambiando la ventana de fechas a enero-diciembre de 2024.
+    - generic: AAPL
+    - heading "Comprar y mantener" [level=3]
+    - text: Ejecución completa
+    - term: Capital inicial
+    - definition: $10,000
+    - term: Periodo
+    - definition:
+      - generic: 2 ene 2024 → 31 dic 2024
+    - generic: Acciones
+    - generic: Datos diarios
+    - generic: Sin comisiones
+    - generic: Sin deslizamiento
+    - generic: "Referencia: SPY"
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - button "Copiar texto":
+    - region "Hero + Delta Evidence Card":
+      - generic: AAPL
+      - heading "Comprar y mantener" [level=3]
+      - paragraph: 2 ene 2024 → 31 dic 2024 · Datos diarios
+      - generic: Simulación completa
+      - table:
+        - row:
+          - cell
+          - cell:
+            - link "Charting by TradingView":
+              - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/chat
+          - cell
+        - row:
+          - cell
+          - cell
+          - cell
+      - link "TradingView Lightweight Charts":
+        - /url: https://www.tradingview.com/
+      - group "Rango del gráfico":
+        - button "1M":
+          - generic: 1M
+        - button "3M":
+          - generic: 3M
+        - button "Todo" [pressed]:
+          - generic: Todo
+        - button "Detalles del rango":
+          - text: Detalles del rango
+      - status: "Período visible: 2 ene 2024 al 31 dic 2024."
+      - paragraph: Valor final
+      - paragraph: $13,503
+      - paragraph: +$3,503 ganancia · +35.0% rendimiento total
+      - term: Comparado con SPY
+      - definition: Superó por 11.0 puntos porcentuales
+      - term: Peor caída
+      - definition: "-15.5%"
+      - generic "Contexto de confianza del resultado":
+        - paragraph: Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría
+      - generic "Ver detalles":
+        - text: Ver detalles
+      - button "Explicar resultado":
+        - text: Explicar resultado
+      - button "Ajustar idea":
+        - text: Ajustar idea
+      - text: "Decisión: Observando"
+    - region "Lectura rápida":
+      - generic: Lectura rápida
+      - paragraph: "Comprar AAPL una vez y mantenerla durante 2024 terminó por encima de SPY: el resultado fue 35.0%, frente a 24.0% para el benchmark. La ventaja fue de 11.0 pp, aunque el recorrido tuvo una caída máxima de 15.5%, equivalente a una pérdida temporal de $1,626 desde un máximo anterior. En esta prueba, superar a SPY significó aceptar más variación en el camino."
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: ¿Qué riesgos podrían afectar los ingresos de Apple el próximo año? Responde con fuentes.
+    - button "Copiar texto":
+    - paragraph: No pude completar la búsqueda de datos en este momento, así que no voy a citar cifras en vivo. Probar una idea con datos históricos sigue disponible.
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: ¿Qué riesgos podrían afectar los ingresos de Apple el próximo año? Responde con fuentes.
+    - button "Copiar texto":
+    - paragraph:
+      - text: Los riesgos más claros para los ingresos de Apple durante los próximos doce meses son
+      - strong: menor demanda, problemas de suministro, barreras comerciales, presión competitiva y restricciones regulatorias sobre Servicios
+      - text: . No significan que los ingresos necesariamente caerán, pero sí podrían frenar su crecimiento.
+    - table:
+      - rowgroup:
+        - row "Riesgo Cómo podría afectar los ingresos":
+          - columnheader "Riesgo"
+          - columnheader "Cómo podría afectar los ingresos"
+      - rowgroup:
+        - row "Aranceles y disputas comerciales Nuevos aranceles, controles de exportación o represalias comerciales podrían encarecer componentes, limitar la disponibilidad de productos o exigir cambios costosos en proveedores y operaciones. Si Apple traslada esos costos a precios, también podría debilitar la demanda.":
+          - cell "Aranceles y disputas comerciales":
+            - strong: Aranceles y disputas comerciales
+          - cell "Nuevos aranceles, controles de exportación o represalias comerciales podrían encarecer componentes, limitar la disponibilidad de productos o exigir cambios costosos en proveedores y operaciones. Si Apple traslada esos costos a precios, también podría debilitar la demanda."
+        - row "Escasez de componentes y concentración de proveedores Apple depende de proveedores únicos o limitados para ciertos componentes y de socios asiáticos para gran parte de la fabricación y el ensamblaje. Una escasez de semiconductores, materias primas o capacidad productiva podría impedirle fabricar suficientes dispositivos para satisfacer la demanda.":
+          - cell "Escasez de componentes y concentración de proveedores":
+            - strong: Escasez de componentes y concentración de proveedores
+          - cell "Apple depende de proveedores únicos o limitados para ciertos componentes y de socios asiáticos para gran parte de la fabricación y el ensamblaje. Una escasez de semiconductores, materias primas o capacidad productiva podría impedirle fabricar suficientes dispositivos para satisfacer la demanda."
+        - row "Debilidad económica y menor gasto del consumidor Una desaceleración, inflación persistente, crédito más caro, desempleo o menor confianza del consumidor podrían retrasar las renovaciones de iPhone, Mac y otros dispositivos, además de moderar el gasto en servicios.":
+          - cell "Debilidad económica y menor gasto del consumidor":
+            - strong: Debilidad económica y menor gasto del consumidor
+          - cell "Una desaceleración, inflación persistente, crédito más caro, desempleo o menor confianza del consumidor podrían retrasar las renovaciones de iPhone, Mac y otros dispositivos, además de moderar el gasto en servicios."
+        - row "Competencia y ejecución de nuevos productos Apple compite en mercados con reducciones agresivas de precios y cambios tecnológicos rápidos. Retrasos, problemas de calidad, una recepción débil de nuevos productos o avances superiores de competidores podrían reducir ventas y participación de mercado. Apple también advierte que nuevas ofertas pueden reemplazar productos existentes y generar menos ingresos.":
+          - cell "Competencia y ejecución de nuevos productos":
+            - strong: Competencia y ejecución de nuevos productos
+          - cell "Apple compite en mercados con reducciones agresivas de precios y cambios tecnológicos rápidos. Retrasos, problemas de calidad, una recepción débil de nuevos productos o avances superiores de competidores podrían reducir ventas y participación de mercado. Apple también advierte que nuevas ofertas pueden reemplazar productos existentes y generar menos ingresos."
+        - row "Regulación de App Store y otras plataformas Investigaciones, litigios y normas que obliguen a modificar las condiciones de App Store, permitir sistemas alternativos de distribución o limitar ciertas prácticas comerciales podrían reducir comisiones y otros ingresos de Servicios. También podrían retrasar o restringir productos y funciones en determinados mercados.":
+          - cell "Regulación de App Store y otras plataformas":
+            - strong: Regulación de App Store y otras plataformas
+          - cell "Investigaciones, litigios y normas que obliguen a modificar las condiciones de App Store, permitir sistemas alternativos de distribución o limitar ciertas prácticas comerciales podrían reducir comisiones y otros ingresos de Servicios. También podrían retrasar o restringir productos y funciones en determinados mercados."
+        - row "Tipos de cambio Como Apple vende globalmente y reporta en dólares, un dólar más fuerte puede reducir el valor contable de las ventas realizadas en otras monedas. Sus coberturas cambiarias solo compensan parcialmente esa exposición.":
+          - cell "Tipos de cambio":
+            - strong: Tipos de cambio
+          - cell "Como Apple vende globalmente y reporta en dólares, un dólar más fuerte puede reducir el valor contable de las ventas realizadas en otras monedas. Sus coberturas cambiarias solo compensan parcialmente esa exposición."
+        - row "Geopolítica y otras interrupciones Conflictos, tensiones regionales, desastres naturales, incidentes cibernéticos, problemas logísticos o crisis sanitarias podrían interrumpir producción, distribución, tiendas o servicios digitales y provocar ventas perdidas.":
+          - cell "Geopolítica y otras interrupciones":
+            - strong: Geopolítica y otras interrupciones
+          - cell "Conflictos, tensiones regionales, desastres naturales, incidentes cibernéticos, problemas logísticos o crisis sanitarias podrían interrumpir producción, distribución, tiendas o servicios digitales y provocar ventas perdidas."
+    - paragraph:
+      - strong: "Qué vigilar:"
+      - text: disponibilidad de componentes críticos, cambios arancelarios, condiciones de consumo en los principales mercados, decisiones regulatorias sobre App Store y la aceptación de las próximas generaciones de productos. La combinación más peligrosa sería una interrupción de oferta junto con precios más altos y demanda más débil.
+    - paragraph: Esto es un análisis de riesgos empresariales, no asesoría de inversión.
+    - button "5 fuentes ›"
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: "Volviendo a la prueba de AAPL de 2024: ¿entre qué fechas ocurrió su peor caída?"
+    - button "Copiar texto":
+    - paragraph: La peor caída de AAPL en la prueba de 2024 comenzó el 23 de enero de 2024 y terminó el 19 de abril de 2024. Durante ese período, el valor de la cartera cayó de $10,516 a $8,890, una pérdida temporal de $1,626. Esa caída del 15.5% fue el tramo más duro del año para la acción, aunque después se recuperó y terminó con un rendimiento del 35.0%, superando a SPY por 11.0 puntos porcentuales.
+    - region "Qué probar después":
+      - generic: Qué probar después
+      - button "Probar otro rango de fechas":
+        - generic: ↳
+        - generic: Probar otro rango de fechas
+      - button "Probar compras mensuales recurrentes":
+        - generic: ↳
+        - generic: Probar compras mensuales recurrentes
+      - button "Probar un cruce de medias móviles":
+        - generic: ↳
+        - generic: Probar un cruce de medias móviles
+      - button "¿Qué pasó con AAPL entre esas fechas que explique la caída?":
+        - generic: ↳
+        - generic: ¿Qué pasó con AAPL entre esas fechas que explique la caída?
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+  - button "Menciona un activo o indicador":
+  - combobox "Haz una pregunta de seguimiento..."
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

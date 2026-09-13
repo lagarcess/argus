@@ -1,0 +1,17 @@
+{
+  "reason": "Step 3 budget guard stop",
+  "project_id": "argus-promotion-20260912",
+  "supabase_stop_exit_code": 0,
+  "supabase_stop_command": "supabase stop --no-backup --workdir <owned scratch>",
+  "owned_ports_closed": {
+    "8136": true,
+    "3136": true,
+    "56531": true,
+    "56532": true
+  },
+  "owned_containers_remaining": [],
+  "unrelated_stack_preserved": true,
+  "customer_transcripts_pulled": false,
+  "private_replay_input_present": false,
+  "cleanup_verification_note": "The first verification launcher omitted /usr/local/bin from PATH and could not find docker after Supabase stop succeeded. Verified with the installed absolute Docker CLI path; no Supabase access failure occurred."
+}

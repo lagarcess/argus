@@ -1,0 +1,10 @@
+{
+  "project_id": "argus-promotion-20260912",
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "env_files_absent": true,
+  "migration_copy_identical": true,
+  "start_exit_code": 0,
+  "reset_exit_code": 0,
+  "reset_local_only": true,
+  "checked_at": "2026-09-13T19:35:01.893361+00:00"
+}
