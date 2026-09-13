@@ -366,6 +366,10 @@ def _seed() -> None:
                 else {}
             ),
         }
+        if patch.get("clarification"):
+            # A figure only the reader knows is asked for, as the chat stores it.
+            metadata["clarification"] = patch["clarification"]
+            metadata["requested_field"] = patch.get("requested_field")
         if cards:
             marker = computation_from_tool_cards(
                 [ToolResultCard.model_validate(card) for card in cards]
@@ -380,7 +384,10 @@ def _seed() -> None:
         seeds[f"withheld-{language}"] = {
             "conversation_id": withheld,
             "message_id": say(
-                withheld, "assistant", patch["assistant_response"], metadata
+                withheld,
+                "assistant",
+                patch.get("assistant_response") or patch["assistant_prompt"],
+                metadata,
             ),
         }
 

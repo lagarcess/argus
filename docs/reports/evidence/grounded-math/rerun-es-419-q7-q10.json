@@ -1,0 +1,37 @@
+{
+  "head": "b2f619a33126a91d411bd8e39312334ce6dc805d",
+  "attempts": [
+    {
+      "question": "q7",
+      "attempt": 1,
+      "started_at": "2026-09-13T12:26:00.130717+00:00",
+      "conversation_id": "dbc27ef5-e0be-4720-a75f-8ec8824c608c",
+      "message_id": "52df4594-6e0b-4cde-9c99-0a6cbb953e1f",
+      "provider_errors": [],
+      "research_degraded": null,
+      "research_usd": 0.21286,
+      "openrouter_usd": 0.01715,
+      "reason_codes": null,
+      "routes": [
+        "research_answers_concept_question"
+      ],
+      "rail_declined": false
+    },
+    {
+      "question": "q10",
+      "attempt": 1,
+      "started_at": "2026-09-13T12:27:48.691691+00:00",
+      "conversation_id": "81eb5a64-61b8-4840-87c3-e260fe2a395d",
+      "message_id": "091767df-dbe1-4ba3-ae5f-3c2d95c71e67",
+      "provider_errors": [],
+      "research_degraded": null,
+      "research_usd": 0.17994,
+      "openrouter_usd": 0.01702,
+      "reason_codes": null,
+      "routes": [
+        "research_answers_concept_question"
+      ],
+      "rail_declined": false
+    }
+  ]
+}

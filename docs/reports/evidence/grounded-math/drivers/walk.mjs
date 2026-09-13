@@ -33,7 +33,7 @@ const EXPECT = {
   decision: "A watching decision saves on a computed answer; after an input change, reopening it shows the stored and current reruns, and restoring the stored input shows it up to date.",
   "decision-cannot-rerun": "A decision whose stored inputs no longer run opens and says it cannot rerun, with no error.",
   outage: "A provider outage card shows the retryable tone.",
-  "failed-lookup": "A failed lookup answers from market data and stated assumptions, and no card with blank inputs renders.",
+  "failed-lookup": "A failed lookup never becomes the answer and no card with blank inputs renders; a figure only the reader knows is asked for in one plain question.",
   "no-solution": "A calculation with no solution shows its repair, and taking the repair recomputes the card.",
   rail: "At 1280 the activity rail shows a result tick with its label; below tablet width the rail is hidden.",
   "search-dossier": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
