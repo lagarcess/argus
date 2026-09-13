@@ -653,6 +653,8 @@ def test_company_name_basket_context_survives_underfilled_repair_to_confirmation
 
     async def schema_stub(*, schema_name: str, **kwargs):
         del kwargs
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit()
         if schema_name == "FocusedStrategyExtraction":
             return FocusedStrategyExtraction(
                 is_testable_strategy=True,
@@ -4029,6 +4031,8 @@ async def test_failed_capital_recheck_uses_focused_strategy_repair_before_baseli
     async def audit_stub(**kwargs):
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit()
         if schema_name == "StatedStartingCapitalAudit":
             return interpreter_module.StatedStartingCapitalAudit(
                 starting_capital=None,
@@ -4118,7 +4122,7 @@ async def test_failed_capital_recheck_uses_focused_strategy_repair_before_baseli
         request=request,
     )
 
-    assert calls == ["StatedStartingCapitalAudit", "FocusedStrategyExtraction"]
+    assert calls == ["StatedStartingCapitalAudit", "FocusedStrategyExtraction", "StatedRunFieldFidelityAudit"]
     assert ready_response.candidate_strategy_draft.capital_amount == 10000
     assert (
         ready_response.candidate_strategy_draft.field_provenance["capital_amount"]
@@ -4147,6 +4151,8 @@ async def test_focused_strategy_repair_canonicalizes_interpreter_identified_asse
     async def audit_stub(**kwargs):
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit()
         if schema_name == "FocusedStrategyExtraction":
             return interpreter_module.FocusedStrategyExtraction(
                 is_testable_strategy=True,
@@ -4205,7 +4211,7 @@ async def test_focused_strategy_repair_canonicalizes_interpreter_identified_asse
         request=request,
     )
 
-    assert calls == ["FocusedStrategyExtraction"]
+    assert calls == ["FocusedStrategyExtraction", "StatedRunFieldFidelityAudit"]
     assert repaired is not None
     assert repaired.candidate_strategy_draft.asset_universe == ["AAPL", "MSFT"]
     assert repaired.candidate_strategy_draft.asset_class == "equity"
@@ -4438,6 +4444,8 @@ async def test_dca_repair_uses_focused_date_audit_from_bounded_evidence_span(
     async def audit_stub(**kwargs):
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit()
         if schema_name == "FocusedStrategyExtraction":
             return interpreter_module.FocusedStrategyExtraction(
                 is_testable_strategy=True,
@@ -4585,6 +4593,8 @@ async def test_counterfactual_bitcoin_ytd_starter_gets_focused_repair(
     async def audit_stub(**kwargs):
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit()
         if schema_name == "FocusedStrategyExtraction":
             return interpreter_module.FocusedStrategyExtraction(
                 is_testable_strategy=True,
@@ -4708,6 +4718,8 @@ async def test_weekly_nvidia_dca_starter_gets_focused_repair(
     async def audit_stub(**kwargs):
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit()
         if schema_name == "FocusedStrategyExtraction":
             return interpreter_module.FocusedStrategyExtraction(
                 is_testable_strategy=True,
@@ -4848,6 +4860,8 @@ async def test_dca_capability_conflict_repair_does_not_stop_underfilled(
     async def audit_stub(**kwargs):
         schema_name = kwargs["schema_name"]
         calls.append(schema_name)
+        if schema_name == "StatedRunFieldFidelityAudit":
+            return interpreter_module.StatedRunFieldFidelityAudit()
         if schema_name == "DcaContractAudit":
             return interpreter_module.DcaContractAudit(
                 is_recurring_buy_request=False,

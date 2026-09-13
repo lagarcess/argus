@@ -164,6 +164,7 @@ from argus.agent_runtime.interpreter.executable_grounding import (  # noqa: F401
     _response_needs_launch_field_fidelity_repair,
 )
 from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
+    focused_stated_field_audit_guard,
     response_from_focused_strategy_extraction,
     strategy_extraction_repair_is_allowed,
     _base_response_was_unsupported,
@@ -3198,11 +3199,13 @@ async def _audit_stated_run_fields(
     response: LLMInterpretationResponse,
     preferred_model: str,
     request: InterpretationRequest,
+    required: bool = False,
 ) -> LLMInterpretationResponse | None:
     audited_response = await _audit_stated_run_field_fidelity(
         response=response,
         preferred_model=preferred_model,
         request=request,
+        required=required,
     )
     if audited_response is not None:
         return _response_with_resolved_runtime_date_range(
@@ -3321,39 +3324,31 @@ async def _repair_incomplete_strategy_extraction(
             response=response,
             request=request,
         )
-        if _response_can_skip_optional_runtime_readiness_audits(
-            response=response,
-            request=request,
-        ):
-            _log_runtime_readiness_step(
-                "ready_after_focused_strategy_repair",
+        if not _response_can_skip_optional_runtime_readiness_audits(response=response, request=request):
+            response = await _signal_rule_checked_response(
                 response=response,
+                preferred_model=model_name,
+                request=request,
             )
-            annotate_repair(after=response, repair_applied=True)
-            return response
-        response = await _signal_rule_checked_response(
-            response=response,
-            preferred_model=model_name,
-            request=request,
-        )
-        conflict_response = await _audit_supported_strategy_capability_conflict(
-            response=response,
-            preferred_model=model_name,
-            request=request,
-        )
-        if conflict_response is not None:
-            response = conflict_response
-        date_window_response = await _focused_date_window_audited_response(
-            response=response,
-            preferred_model=model_name,
-            request=request,
-        )
-        if date_window_response is not None:
-            response = date_window_response
+            conflict_response = await _audit_supported_strategy_capability_conflict(
+                response=response,
+                preferred_model=model_name,
+                request=request,
+            )
+            if conflict_response is not None:
+                response = conflict_response
+            date_window_response = await _focused_date_window_audited_response(
+                response=response,
+                preferred_model=model_name,
+                request=request,
+            )
+            if date_window_response is not None:
+                response = date_window_response
         audited_response = await _audit_stated_run_fields(
             response=response,
             preferred_model=model_name,
             request=request,
+            required=_llm_strategy_draft_has_concrete_execution_target(response.candidate_strategy_draft),
         )
         if audited_response is not None:
             response = audited_response
@@ -4185,9 +4180,10 @@ async def _audit_stated_run_field_fidelity(
     response: LLMInterpretationResponse,
     preferred_model: str,
     request: InterpretationRequest,
+    required: bool = False,
 ) -> LLMInterpretationResponse | None:
     del preferred_model
-    if not _response_needs_stated_run_field_fidelity_audit(
+    if not required and not _response_needs_stated_run_field_fidelity_audit(
         response=response,
         request=request,
     ):
@@ -4198,7 +4194,7 @@ async def _audit_stated_run_field_fidelity(
     )
     if deterministic_repair is not None:
         response = deterministic_repair
-        if not _response_needs_stated_run_field_fidelity_audit(
+        if not required and not _response_needs_stated_run_field_fidelity_audit(
             response=response,
             request=request,
         ):
@@ -4217,6 +4213,7 @@ async def _audit_stated_run_field_fidelity(
         )
     except Exception:
         audit = None
+    valid_audit = audit if isinstance(audit, StatedRunFieldFidelityAudit) else None
     if not isinstance(audit, StatedRunFieldFidelityAudit):
         audit = StatedRunFieldFidelityAudit()
         audit_response = deterministic_repair or response
@@ -4231,6 +4228,13 @@ async def _audit_stated_run_field_fidelity(
         response=candidate_response,
         request=request,
     )
+    if capital_recheck is not None:
+        candidate_response = capital_recheck
+    if required:
+        candidate_response = focused_stated_field_audit_guard(
+            response=candidate_response, audit=valid_audit
+        )
+        return candidate_response
     if capital_recheck is not None:
         return capital_recheck
     if repaired is None:
