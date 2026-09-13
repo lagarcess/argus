@@ -535,3 +535,77 @@ def test_a_refused_request_ends_on_the_quiet_recovery_with_nothing_to_retry(
     assert "retry_last_turn" not in failure["metadata"]
     assert failure["metadata"]["recovery"] == live["recovery"]
     assert asked == [QUESTION]
+
+
+# --- A registered call: its recovery speaks for its turn only when it is alone -
+
+
+TRANSIENT_RECOVERY = {"code": "research_lookup_failed", "retryable": True}
+
+
+@pytest.mark.asyncio()
+@pytest.mark.parametrize("tool_name", ["thorough_research", "balanced_lookup"])
+@pytest.mark.parametrize(
+    ("calls", "turn_recovery"),
+    [(1, TRANSIENT_RECOVERY), (2, None)],
+    ids=["one_call", "two_calls"],
+)
+async def test_a_registered_lookup_failure_settles_a_turn_only_when_alone(
+    monkeypatch: pytest.MonkeyPatch,
+    tool_name: str,
+    calls: int,
+    turn_recovery: dict[str, Any] | None,
+) -> None:
+    """A registered research call whose lookup fails ends on the lookup recovery,
+    published through the same projection its answer would take: a thorough
+    call when its background submission fails at publication, a balanced call
+    when its inline lookup fails at execution. One call's recovery settles its
+    turn; a turn with several calls keeps each failure on its own card instead
+    of settling as one failure."""
+    from argus.api.chat import research_jobs
+    from argus.api.chat.tool_results import prepare_runtime_tool_publication
+    from argus.domain.tool_contracts import ToolResultCard
+
+    from tests.research.test_registry_discarded_spend import _call, _execute
+    from tests.research.test_research_jobs import _JobGateway
+
+    class _SubmissionDown:
+        def submit_background(self, prompt: str, spec: Any) -> str:
+            raise ResearchUnavailableError("http_error", "http 503", status=503)
+
+    gateway = _JobGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    monkeypatch.setattr(research_jobs, "_client", lambda: _SubmissionDown())
+    clock = ScriptedClock()
+    inline, _provider = scripted_client(clock, [status(503)] * ATTEMPTS * calls)
+    monkeypatch.setattr(grounded, "_client", lambda: inline)
+    result = await _execute(*[_call(tool_name) for _ in range(calls)])
+    runtime_result = result.stage_patch
+
+    publication = prepare_runtime_tool_publication(
+        runtime_result,
+        runtime_result["tool_effects"],
+        assistant_text=None,
+        user_id="u1",
+        conversation_id="c1",
+        request_message_id="m1",
+        request_id="r1",
+    )
+
+    assert gateway.rows == {}
+    cards = [ToolResultCard.model_validate(card) for card in publication.cards]
+    assert [card.outcome.status for card in cards] == ["unavailable"] * calls
+    assert all(
+        effect.stage_patch["recovery"] == TRANSIENT_RECOVERY
+        for effect in publication.effects
+    )
+    assert runtime_result.get("recovery") == turn_recovery
+    if turn_recovery is not None:
+        assert runtime_result["research"]["degraded"] == {
+            "code": "research_unavailable_http_error",
+            "status": 503,
+        }
+        assert (
+            publication.assistant_text
+            == RECOVERY_FALLBACK_MESSAGES["research_lookup_failed"]
+        )
