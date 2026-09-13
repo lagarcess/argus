@@ -1,0 +1,84 @@
+{
+  "scope": "exact 11 retained command logs",
+  "checks": [
+    {
+      "file": "argus-api-deploy.log",
+      "bytes": 597,
+      "sha256": "c605d943b585197adf267e246c5f034d88387a9e01824a74f88d0dc8b324681b",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "argus-app-deploy.log",
+      "bytes": 597,
+      "sha256": "b0eda6201c733633a6a8bc1e55edd4039919b51f86162028ecb6d3ad7095b477",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "argus-backtests-deploy.log",
+      "bytes": 259,
+      "sha256": "c3293e478ce345ee1e843ef24834b6f7e95ea9f629e44a84f5f79bc0af781369",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "deployment-controller.log",
+      "bytes": 2386,
+      "sha256": "df571233f6110b16cb139452714fd3907b431cddb0a9241de73ebf10a952cad0",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "docs-and-mocked-tests.log",
+      "bytes": 1977,
+      "sha256": "47aa59229723e1f1d0649f76968824b1dc271933c434f581372424f5b23bfeb3",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "landed-direct-readiness-api.log",
+      "bytes": 505,
+      "sha256": "53ff041169dfcfac56f7a73c15a371112f09860f329092f01cbacff14256c286",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "landed-local-smoke-api.log",
+      "bytes": 407,
+      "sha256": "f537806c6413c735f2369b108030d0f36f8c79eaf18f5ef972e97c4d636b1a9e",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "landed-local-smoke-rerun-api.log",
+      "bytes": 584,
+      "sha256": "6d6866b1b0695cf66f5db1e1344d687dd2299392090a80a2f8a1bbf1e843a466",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "landed-local-smoke-rerun.log",
+      "bytes": 1239,
+      "sha256": "45a8b1d942cb1495fa20eb74d176baec4a4658dab61329121829ab0c6c6138ec",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "landed-local-smoke.log",
+      "bytes": 1587,
+      "sha256": "2a2a990c86dff27473a7a8a1d2198e7716a088bd796d900cec8e4654a2e2939f",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    },
+    {
+      "file": "postdeploy-warmup.log",
+      "bytes": 8938,
+      "sha256": "75abaec04cc17e69ca5e2dcf43f17ac8caf2eeddd5a69c28d147708717776136",
+      "known_secret_matches": [],
+      "sensitive_pattern_matches": []
+    }
+  ],
+  "allowed_email": "public support@get-argus.com only",
+  "customer_rows": "none; smoke uses synthetic fixtures; migration controller logs versions and deploy status only"
+}
