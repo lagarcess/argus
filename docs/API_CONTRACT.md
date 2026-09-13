@@ -5265,7 +5265,11 @@ from a page retrieved for this answer, with its URL and date), `market_data` (a
 current price Argus fills from its own market data), `user` (the user's words)
 or `assumption` (a figure the answer states plainly as an assumption). The
 interpreter maps no calculation and its response schema carries none; no
-phrase, pattern or language check runs before either answering model.
+phrase, pattern or language check runs before either answering model. When a
+choice turns on a future figure nobody can cite, such as an exchange rate or a
+price, the research instructions ask for no projection: the answer shows what the
+recent past did, with cited and dated figures in a calculation Argus computes,
+labeled as history rather than a forecast.
 
 Routing uses the primary read's existing research query. A question whose
 figure a page must supply (a product's price, a lender's or bank's rate or
