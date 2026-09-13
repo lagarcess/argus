@@ -1,0 +1,389 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /private/tmp/argus-promotion-20260912-baseline-eval
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+. .                                                                      [100%]
+
+================================ tests coverage ================================
+______________ coverage: platform darwin, python 3.10.20-final-0 _______________
+
+Name                                                                                      Stmts   Miss  Cover   Missing
+-----------------------------------------------------------------------------------------------------------------------
+src/argus/__init__.py                                                                         0      0   100%
+src/argus/agent_runtime/__init__.py                                                           4      0   100%
+src/argus/agent_runtime/artifact_action_recovery.py                                          27     27     0%   1-43
+src/argus/agent_runtime/artifact_edit_planner.py                                            457    368    19%   93-133, 149-159, 174-229, 240-252, 375-406, 416-427, 441-472, 481-505, 521-544, 552-560, 564-572, 615-620, 628-640, 656-658, 667-681, 712, 729-867, 873-896, 902-920, 935-943, 956-978, 982-989
+src/argus/agent_runtime/artifacts/__init__.py                                                 5      0   100%
+src/argus/agent_runtime/artifacts/asset_edits.py                                             33     18    45%   14-17, 21-23, 27-29, 37, 39, 44, 48, 52-55
+src/argus/agent_runtime/artifacts/continuity.py                                             214    167    22%   63-139, 153, 170, 178-183, 195-232, 239-241, 250-282, 291-315, 323, 329-349, 353-369, 373-376, 380, 386, 393-398, 405-407, 414, 427, 444-449, 453-455, 464-465, 474-476, 485-491, 500-502, 506-510, 514-517, 521, 525
+src/argus/agent_runtime/artifacts/drafts.py                                                 149    127    15%   11-13, 17-70, 74-76, 80-91, 95-117, 124-127, 135-143, 150-167, 176-196, 200-206, 210-216, 220-223, 227-233, 237-244, 248-254, 258-261, 265, 269
+src/argus/agent_runtime/artifacts/lifecycle.py                                               21     11    48%   12, 31-36, 40-43
+src/argus/agent_runtime/artifacts/patch_policy.py                                            43     27    37%   43, 53-56, 71-78, 86-97, 101-107
+src/argus/agent_runtime/artifacts/strategy_edits.py                                          79     43    46%   48-88, 92-95, 103, 107-112, 116-123, 127
+src/argus/agent_runtime/asset_identity.py                                                    60     48    20%   73-91, 98-104, 109-123, 132-141, 149-155
+src/argus/agent_runtime/asset_text_grounding.py                                             223     63    72%   41, 44-45, 47, 54, 64, 93, 98-99, 101, 110, 120, 131-162, 168, 175-189, 215-216, 235, 261, 274-280, 290, 293, 300, 307, 309, 314, 316, 366-371
+src/argus/agent_runtime/benchmark_evidence.py                                                34     24    29%   21-50, 70, 76, 80-83
+src/argus/agent_runtime/capabilities/__init__.py                                              2      0   100%
+src/argus/agent_runtime/capabilities/answers.py                                              48     32    33%   29-37, 44-54, 66-68, 77-78, 87, 97-99, 106-109, 113-118
+src/argus/agent_runtime/capabilities/contract.py                                            141     31    78%   22, 24, 26, 28, 39, 41, 93-103, 140, 150-153, 158, 165-170, 194, 205-206, 217-218, 229-230, 258-261, 270, 275
+src/argus/agent_runtime/clarification_contract.py                                           293    202    31%   42-48, 62, 65-67, 84, 91, 103-108, 124-133, 154-195, 203-245, 252-264, 270, 275, 288, 306, 309, 312, 315, 319, 323-335, 341-349, 353-356, 363-378, 382, 388, 391, 394, 398, 404, 411, 420-437, 446-453, 466, 472-482, 486-490, 494-505, 509
+src/argus/agent_runtime/confirmation_artifacts.py                                           148    118    20%   30, 36-61, 74-77, 86-105, 117-121, 125-128, 132-135, 142-192, 196-204, 208-214, 218-222, 229, 233-241, 245-264
+src/argus/agent_runtime/confirmation_direct_edit.py                                         122    122     0%   11-244
+src/argus/agent_runtime/confirmation_facts.py                                               116    101    13%   21-65, 75-78, 90-96, 100-101, 110-113, 117-136, 145-157, 166-199, 203-208, 212-213
+src/argus/agent_runtime/confirmation_revalidation.py                                         38     38     0%   11-82
+src/argus/agent_runtime/coverage_recovery.py                                                 89     59    34%   34, 49-62, 73, 77-80, 103-109, 117-143, 156, 164-178, 182-186, 190-196, 200-202, 206-209
+src/argus/agent_runtime/discovery/__init__.py                                                 2      0   100%
+src/argus/agent_runtime/discovery/composer.py                                               224    186    17%   48, 74-79, 104-353, 383-475, 492-494, 498, 509-515, 520-539, 553-580, 596-611, 615, 629-645, 717-761, 776-847, 858-869
+src/argus/agent_runtime/discovery/contracts.py                                               28      4    86%   31-34
+src/argus/agent_runtime/discovery/extraction.py                                              25     17    32%   18-69, 73-83
+src/argus/agent_runtime/discovery/model_knowledge.py                                         21     14    33%   20-54, 58-68
+src/argus/agent_runtime/discovery/prompt_guidance.py                                          2      0   100%
+src/argus/agent_runtime/discovery/validation.py                                             108     88    19%   25-26, 49-66, 99-127, 155-271, 280-282
+src/argus/agent_runtime/extraction/__init__.py                                                2      0   100%
+src/argus/agent_runtime/extraction/structured.py                                             23      8    65%   24, 28-33, 42
+src/argus/agent_runtime/interpreter/__init__.py                                               0      0   100%
+src/argus/agent_runtime/interpreter/artifact_assumption_edit.py                             548    482    12%   81-84, 97, 103-115, 135-137, 161, 165-170, 174-185, 189-207, 213-222, 228-235, 243-246, 256-258, 277-283, 303-323, 331-335, 348-371, 381-394, 414-568, 597-612, 618-632, 644-734, 738-751, 774-777, 791-809, 819-832, 845-1023, 1041-1272, 1281, 1300-1315, 1329-1342, 1356-1376, 1391-1439, 1449-1538
+src/argus/agent_runtime/interpreter/asset_grounding.py                                       63     36    43%   22-26, 34-38, 43, 51-53, 71-72, 88, 91-98, 102-114, 126-135
+src/argus/agent_runtime/interpreter/asset_resolution_context.py                             115     33    71%   31, 42-47, 49, 54, 97, 115, 117-120, 146-152, 154-155, 160-161, 184, 186, 229, 232, 238, 240, 266-285
+src/argus/agent_runtime/interpreter/asset_role_constraints.py                                23     19    17%   27-36, 63-111
+src/argus/agent_runtime/interpreter/audits.py                                                74      0   100%
+src/argus/agent_runtime/interpreter/benchmark_prompt_guidance.py                              2      0   100%
+src/argus/agent_runtime/interpreter/capability_context_audits.py                             30     16    47%   21, 36-39, 76, 83, 89, 94-108, 119-122
+src/argus/agent_runtime/interpreter/contract_recovery.py                                     60     42    30%   60-77, 81, 106-151, 161-172, 190-221
+src/argus/agent_runtime/interpreter/date_window_repair.py                                   353    272    23%   61-118, 124-133, 139-150, 156-176, 180, 199-208, 227-257, 273-280, 288-315, 321-329, 346-380, 400-434, 450-459, 479, 481, 488, 491, 493, 495, 500-508, 520-541, 555, 558, 562-570, 578-589, 599-604, 689, 699-707, 716-733, 735, 751-765, 784-792, 801-803, 823-842
+src/argus/agent_runtime/interpreter/dca_audits.py                                           168    138    18%   36, 38, 48-60, 80-113, 139-162, 170-188, 192-196, 203-206, 246, 265, 296-301, 339-351, 369-472, 483
+src/argus/agent_runtime/interpreter/discovery_act_guard.py                                   41     25    39%   41-46, 58-67, 74-83, 107-124, 139
+src/argus/agent_runtime/interpreter/discovery_focused_read.py                                59     34    42%   98-130, 146-158, 162-174
+src/argus/agent_runtime/interpreter/draft_shape.py                                          205    153    25%   48, 57-80, 86-89, 100-115, 125-139, 147-169, 187-207, 219-230, 240-242, 271, 285-294, 302, 309, 315-317, 325-366, 379-421, 425-429, 433-448, 460, 509, 511
+src/argus/agent_runtime/interpreter/edit_completion.py                                       47     36    23%   41-66, 70-76, 82-99
+src/argus/agent_runtime/interpreter/executable_grounding.py                                  70     53    24%   27-48, 58, 61-84, 90-92, 96-101, 109, 145-170
+src/argus/agent_runtime/interpreter/execution_cost_capability.py                             11      2    82%   19, 39
+src/argus/agent_runtime/interpreter/execution_cost_fidelity.py                              222    196    12%   40-147, 157-168, 183-194, 202-207, 215, 224-232, 248-279, 298-307, 311-317, 321-329, 333-337, 341-351, 355-360, 369-378, 386-401
+src/argus/agent_runtime/interpreter/focused_extraction.py                                   199    153    23%   50-185, 193-194, 203-224, 249-307, 323-346, 350, 360-371, 403, 409-419, 437-468, 478-643, 655-703
+src/argus/agent_runtime/interpreter/pending_option.py                                       262    225    14%   41, 45-62, 68-87, 96-104, 147-172, 202-208, 212-220, 268-323, 332-361, 368-375, 382-411, 422-434, 440, 451-453, 457, 461-481, 485-498, 502-503, 507-529, 538-568
+src/argus/agent_runtime/interpreter/provider_context_assets.py                              276    129    53%   49-56, 72-80, 94, 110-112, 121-122, 170-175, 184-185, 197, 215, 218, 235-240, 260, 269, 276, 294-297, 325-338, 361, 364, 376, 385-390, 396-409, 439, 476-543, 548, 551-552, 555, 563, 566-567, 585, 597, 600, 618, 625-630, 644-649, 660-668
+src/argus/agent_runtime/interpreter/readiness_helpers.py                                     92     67    27%   41-76, 84-88, 120-134, 161-232, 255-256
+src/argus/agent_runtime/interpreter/repair_observability.py                                  45      4    91%   41, 84, 91-92
+src/argus/agent_runtime/interpreter/requested_asset_answer.py                               126     88    30%   68, 75-107, 117-126, 143-152, 171-186, 195, 213-227, 243-260, 270-295, 322-328, 337-348, 357-369
+src/argus/agent_runtime/interpreter/research_routing.py                                      12      1    92%   42
+src/argus/agent_runtime/interpreter/run_field_audits.py                                     422    351    17%   80-131, 142, 150, 153-168, 176-183, 211-256, 260-268, 307, 332-408, 416-458, 466-484, 495-506, 514-527, 535-542, 553-555, 566-572, 578-604, 613-623, 632-633, 645-666, 673, 683-686, 697-722, 728-734, 738-741, 752-764, 768, 790-796, 804-807, 811-819, 827-832, 836-839, 847-856, 866-874, 896, 958-963, 991, 1062-1131, 1140-1151
+src/argus/agent_runtime/interpreter/shared.py                                               215    163    24%   90-92, 104, 112-126, 141-145, 163-171, 175-178, 185-186, 193-204, 230-239, 243-245, 253-281, 285-287, 291-301, 311, 352-356, 364-382, 391-410, 414-422, 428-430, 446-455, 466-511
+src/argus/agent_runtime/interpreter/signal_rule.py                                          193    116    40%   58-68, 75-80, 92-107, 111-115, 125, 147-156, 162-176, 191-199, 211, 219-241, 247, 249, 256-277, 285-305, 311-320, 333, 343, 345, 347, 397-417, 437-440
+src/argus/agent_runtime/interpreter/simplification_options.py                                 6      2    67%   9, 26
+src/argus/agent_runtime/interpreter/starting_capital.py                                      53     29    45%   39, 44, 47, 50-52, 60, 63-69, 80, 137-138, 153-175, 181-183
+src/argus/agent_runtime/interpreter/strategy_builder.py                                     485    288    41%   84, 117-124, 131-145, 172, 186, 188, 212, 215, 218-225, 240-242, 254-255, 259-262, 273-283, 293, 327, 330-334, 343-345, 355-359, 369-373, 383-390, 419-438, 447, 458-483, 491-510, 518, 529-542, 550-571, 575-587, 597, 600-602, 610, 625-664, 668-679, 683, 693-698, 702-735, 739-749, 759-760, 775, 784-807, 815-844, 855-874, 886-898, 906, 921, 934-942, 989
+src/argus/agent_runtime/interpreter/strategy_repair_predicates.py                            52     40    23%   25-32, 41, 64-66, 84, 88-97, 104-130, 136
+src/argus/agent_runtime/interpreter/strategy_routing.py                                      14      1    93%   33
+src/argus/agent_runtime/interpreter/unsupported_admission.py                                157     70    55%   167-168, 180, 185, 192, 200, 229-234, 238-247, 254-255, 269-318, 340-380, 398-433, 449, 462, 488, 506, 566, 575, 583-592
+src/argus/agent_runtime/interpreter/unsupported_request_context.py                           46     17    63%   32, 34, 45, 73-95, 110, 125-129
+src/argus/agent_runtime/knowledge_answer.py                                                 238    185    22%   77-92, 108-124, 143-155, 168-175, 188, 190, 203-262, 279, 284-287, 301-326, 337-406, 423-439, 454, 468-499, 510-560, 569-594, 606-640
+src/argus/agent_runtime/llm_clarifier.py                                                    310    106    66%   91, 120-173, 178-184, 314, 316-318, 327, 350, 377, 388, 393, 405, 410-412, 414-420, 432-454, 461, 468, 477, 487, 491-493, 495, 510-524, 535, 542, 552, 554, 557, 561, 564, 582, 584, 593-599, 603-604, 611, 615-619, 630, 632, 634, 636, 640-643, 645, 661
+src/argus/agent_runtime/llm_interpreter.py                                                 1678   1198    29%   443, 456, 473, 487, 514, 524-709, 722-737, 752-758, 1168, 1188-1223, 1238, 1245, 1267-1281, 1304-1305, 1321-1335, 1345-1372, 1380-1391, 1403-1431, 1452-1473, 1493-1537, 1580, 1593, 1617, 1627, 1643-1655, 1705-1737, 1770, 1772, 1778, 1783-1803, 1811-1815, 1854-1880, 1915-1928, 1942-1991, 2020, 2031-2038, 2041, 2051, 2059, 2065, 2067, 2070, 2080, 2082, 2089, 2103, 2105, 2108-2110, 2124-2187, 2205-2216, 2230-2264, 2281, 2293, 2300, 2332, 2337-2341, 2347-2356, 2364-2373, 2388, 2395, 2405-2412, 2421-2428, 2443, 2469-2470, 2478-2497, 2508-2513, 2533-2781, 2791-2797, 2799-2806, 2815-2866, 2892, 2917-2985, 2991-3013, 3019-3022, 3028-3036, 3040-3067, 3076-3081, 3095-3112, 3131-3133, 3140, 3147-3154, 3161, 3184-3191, 3206, 3215, 3227-3250, 3260-3353, 3386-3394, 3396-3397, 3401-3402, 3417-3418, 3429, 3436-3547, 3557-3600, 3611-3656, 3704-3719, 3732-3733, 3741-3742, 3753-3754, 3774-3797, 3812, 3820, 3854-3909, 3917-3947, 3957-4016, 4024-4059, 4072-4076, 4092, 4095-4102, 4112-4130, 4145-4169, 4184-4227, 4238-4273, 4287, 4290-4396, 4421-4457, 4469-4491, 4510-4519, 4532, 4557-4563, 4576-4604, 4614-4615, 4626-4661, 4691-4729, 4746-4760, 4779-4797, 4817-4847, 4855, 4875-4900, 4914, 4927-5023, 5045, 5055, 5070-5106, 5139, 5175-5176, 5189-5206, 5208-5209, 5221, 5227-5233, 5247, 5261-5264, 5266-5267, 5269-5270, 5276-5277, 5283-5285, 5291, 5315, 5317-5329
+src/argus/agent_runtime/llm_interpreter_types.py                                            149      3    98%   28-30
+src/argus/agent_runtime/next_experiments.py                                                 181    152    16%   180, 184, 198-249, 255-269, 281-293, 301-307, 311-316, 326-334, 340-342, 351-377, 383-429, 448-470, 488-523
+src/argus/agent_runtime/presentation_i18n.py                                                 92     66    28%   87-88, 97-109, 113-119, 132-156, 165-182, 197-213, 226, 230-235
+src/argus/agent_runtime/profile/__init__.py                                                   3      0   100%
+src/argus/agent_runtime/profile/response_profile.py                                           5      0   100%
+src/argus/agent_runtime/recovery/__init__.py                                                  2      2     0%   3-5
+src/argus/agent_runtime/recovery/policy.py                                                   20     20     0%   1-51
+src/argus/agent_runtime/recovery_messages.py                                                 46     17    63%   265-275, 285, 298, 306-309, 318-319, 324-326
+src/argus/agent_runtime/research_answer.py                                                   86     67    22%   61-66, 93, 98-118, 161-217, 230-254, 267-294
+src/argus/agent_runtime/research_basket.py                                                  119    119     0%   13-295
+src/argus/agent_runtime/research_find.py                                                     43     43     0%   13-156
+src/argus/agent_runtime/research_grounded.py                                                374    314    16%   106, 126-287, 323-382, 416-464, 505-536, 569-597, 627-639, 660-664, 674, 680-683, 687-711, 718-724, 787-800, 804-817, 821-822, 836, 847, 863-898, 902, 906-911, 921-941, 956-970, 979-990, 1002-1039, 1055-1061, 1068-1073, 1081-1090, 1107-1117, 1136-1177, 1210-1216, 1230-1236, 1280-1282, 1294, 1327-1351, 1355-1362, 1380-1386, 1416-1436, 1458-1490
+src/argus/agent_runtime/research_query.py                                                    16      0   100%
+src/argus/agent_runtime/research_rows.py                                                    165    130    21%   58-75, 84-121, 144, 155-168, 182-212, 216, 227-274, 285-298, 333-344, 348-349, 356-367, 373, 383-388
+src/argus/agent_runtime/resolution.py                                                       288    185    36%   34-35, 92, 102, 113-123, 148-154, 166-180, 228-256, 268, 277, 285-289, 306-325, 342-361, 365-370, 379-400, 404-416, 420-425, 429-436, 440-442, 453-454, 458-461, 465-475, 479-483, 487-494, 498-501, 510-554, 566, 573-592, 600-615, 631-648, 690, 719-720, 727-737
+src/argus/agent_runtime/response_language.py                                                 10      7    30%   7-16
+src/argus/agent_runtime/response_style.py                                                    11      5    55%   16, 28-29, 33-34
+src/argus/agent_runtime/result_fact_enrichment.py                                           161    133    17%   24-34, 38-48, 52-53, 57-61, 65, 75-80, 95-133, 156, 195-200, 204-215, 219-235, 239-241, 245-247, 251-263, 267-271, 275-286, 290-295, 299
+src/argus/agent_runtime/result_followups.py                                                 494    416    16%   160-250, 261-298, 312-313, 343-348, 357-373, 377, 388-390, 398, 410, 430-432, 506-521, 525, 533-541, 545-550, 559-568, 574-584, 595-642, 649-661, 665-670, 689-690, 700-729, 741-755, 759-783, 791-794, 802-922, 926-952, 956, 960-963, 967, 977-1034, 1038-1041, 1045-1052, 1056, 1060, 1070-1096, 1100-1101, 1105-1106, 1110-1117, 1121-1130, 1134-1145, 1149-1155, 1159-1167
+src/argus/agent_runtime/result_readout.py                                                   132    132     0%   1-377
+src/argus/agent_runtime/retest_confirmation.py                                              170    170     0%   3-415
+src/argus/agent_runtime/rule_specs.py                                                       128     67    48%   34, 37, 40, 50, 53, 56, 65-73, 81-88, 95-110, 124, 134, 139, 146-150, 154-163, 172, 185-186, 189-191, 193-195, 203, 208-211
+src/argus/agent_runtime/run_field_contract.py                                                51     38    25%   14-40, 44, 52-59, 63-69
+src/argus/agent_runtime/runtime.py                                                          260    260     0%   1-555
+src/argus/agent_runtime/semantic_integrity.py                                               257    132    49%   98-102, 104-106, 108-109, 112-114, 120-122, 145-166, 193-213, 252, 271-272, 281, 292, 305, 322-328, 332-336, 344, 357-362, 366-367, 376, 380, 400, 409-427, 444, 452-456, 485-494, 500-535, 560-564, 573-577, 582
+src/argus/agent_runtime/signal_rule_repair.py                                                73     25    66%   56-57, 59, 61-64, 66, 70, 72, 74, 76, 86-107, 192
+src/argus/agent_runtime/simplification_option_contract.py                                    47     17    64%   23, 27, 29, 39, 43, 47, 49, 75-86, 96
+src/argus/agent_runtime/stages/approval_guard.py                                             84     71    15%   48-89, 103-135, 149, 170-221, 234-245, 249-271
+src/argus/agent_runtime/stages/artifact_context.py                                          284    229    19%   44-48, 55-57, 66-82, 95, 107-119, 125-131, 145-159, 179-180, 188-196, 200-207, 222-249, 264-286, 294-319, 327-328, 339-344, 355-365, 369-373, 380-395, 405-407, 415-434, 438-439, 447-453, 460-464, 472-477, 482-485, 489, 493-498, 504-512, 516-521, 528-556, 563-565, 569-572
+src/argus/agent_runtime/stages/clarify.py                                                   213     89    58%   101-153, 219-366, 386-396, 411, 437-438, 444, 457-460, 478, 482, 538, 552, 562, 568, 582-598, 606-620, 626-646, 654, 664, 677, 698, 701-719, 729-734, 745, 748, 769, 773, 785
+src/argus/agent_runtime/stages/confirm.py                                                   362    308    15%   56-177, 195-231, 245-254, 263-281, 287-317, 321, 329-330, 334-341, 345, 349-351, 355-382, 390-395, 399-416, 422-433, 437-438, 444-482, 498-505, 509, 513-527, 535-540, 551-646, 650-653, 657-658, 662-665, 674-704, 711-728, 739-800, 806-813, 831, 843-848, 852, 856-872, 880-884, 891-894
+src/argus/agent_runtime/stages/interpret.py                                                 948    566    40%   388, 392, 403, 415-417, 428, 437, 464-468, 533-535, 558, 585, 606-620, 650-655, 679-684, 702, 722-724, 735, 834, 865, 867, 873, 917, 929-932, 962, 980-984, 1081, 1085, 1098-1101, 1120, 1126, 1131, 1139, 1147-1157, 1159, 1165, 1173, 1181, 1193, 1206, 1222, 1235, 1245, 1259, 1273, 1283, 1298, 1337-1338, 1351-1354, 1367-1371, 1379-1380, 1384-1428, 1440-1460, 1464-1469, 1481-1499, 1511-1535, 1544-1553, 1579, 1584, 1586-1591, 1593, 1595-1600, 1618-1643, 1647-1658, 1662-1669, 1676-1690, 1701, 1707-1709, 1730-1781, 1815-1825, 1846-1854, 1867-1903, 1920-1926, 1938-2023, 2029-2046, 2053-2071, 2089-2096, 2105-2135, 2154-2160, 2168-2192, 2209-2232, 2243-2263, 2305, 2311-2375, 2385-2393, 2406-2500, 2519-2528, 2549-2559, 2580-2612, 2637-2663, 2684-2746, 2759-2802, 2836-2890, 2923-2934, 2974-2975, 2982-2983, 3001-3003, 3014-3015, 3018-3019, 3021, 3045-3098, 3106, 3115-3121, 3133-3134, 3142-3144, 3148-3167, 3185-3197, 3211-3213
+src/argus/agent_runtime/stages/interpret_actions.py                                         286    230    20%   103-141, 156-159, 185-321, 329-334, 349-389, 428-494, 515-544, 559-606, 633-784, 801, 805, 818-824, 834, 838, 866-941, 971-989, 1000-1004, 1014-1025, 1053, 1056-1089, 1119-1136
+src/argus/agent_runtime/stages/interpret_internal/__init__.py                                 0      0   100%
+src/argus/agent_runtime/stages/interpret_internal/answer_composition.py                     233    187    20%   57-65, 69-80, 84-95, 99-105, 109-121, 125-138, 142-150, 157-165, 169-184, 188-225, 229-258, 268-277, 285-287, 301-307, 315-327, 347-354, 358-362, 366-375, 383-387, 391, 402-409, 423-430, 439-478
+src/argus/agent_runtime/stages/interpret_internal/asset_resolution.py                       566    381    33%   115-120, 122-125, 127-130, 133-147, 157-181, 207, 210-228, 236-254, 262-268, 284-308, 316-319, 332, 350-352, 360-363, 371-399, 411, 416-505, 512, 515, 518-520, 529, 533, 542, 548, 557-564, 572-575, 579-584, 594, 605-607, 616-625, 635-648, 661-676, 684-686, 700-703, 716-730, 734-738, 747-759, 768-770, 789-822, 831-858, 865-880, 888, 890, 893-898, 916, 929, 952-959, 983-996, 1001, 1003, 1011, 1019-1025, 1029, 1036-1045, 1075-1079, 1089-1111, 1115-1117, 1123-1125, 1131-1134, 1156-1173, 1200, 1209, 1221, 1234, 1248, 1268-1277, 1293-1295, 1306, 1339, 1349-1353
+src/argus/agent_runtime/stages/interpret_internal/benchmark_coverage.py                      55     37    33%   36, 39, 48-82, 94-116
+src/argus/agent_runtime/stages/interpret_internal/benchmark_repairs.py                       70     31    56%   33, 41-52, 67-71, 83, 95-105, 115, 121, 128, 131-136, 144, 162
+src/argus/agent_runtime/stages/interpret_internal/confirmation_artifact_edits.py             67     54    19%   26-40, 51-112, 116-126
+src/argus/agent_runtime/stages/interpret_internal/contextual_merge.py                       418    363    13%   80-290, 298-305, 316-326, 337-344, 355-366, 377-387, 395-416, 422-464, 470-480, 486-497, 504-507, 513-527, 537-540, 547-548, 556-574, 590-616, 625-629, 648, 651-653, 663-669, 680, 684-686, 694, 709-751, 755-766, 770-782, 786, 797-811, 821, 835-888, 896-904, 910-923, 929-943, 952-956
+src/argus/agent_runtime/stages/interpret_internal/date_contract.py                          168    128    24%   44-93, 124-197, 205-224, 255-273, 291-302, 306-310, 323-327
+src/argus/agent_runtime/stages/interpret_internal/draft_only_indicator_evidence.py           40     21    48%   25, 30, 32-36, 39-47, 51-55
+src/argus/agent_runtime/stages/interpret_internal/interpreter_unavailable_continuity.py     275    222    19%   77-86, 114-144, 169-223, 248-275, 286-297, 328-335, 365-372, 398-408, 433-530, 551-556, 564-574, 582-584, 590-602, 625-644, 657, 666, 680-702, 710-723, 731-749, 757-772, 778-786
+src/argus/agent_runtime/stages/interpret_internal/latest_result_answer.py                    93     70    25%   37, 106-117, 132-242, 271, 279-288, 294-300, 307-311, 319-341, 345-346
+src/argus/agent_runtime/stages/interpret_internal/offline_recovery.py                        71     52    27%   51-100, 113-157, 185-220, 229-238, 246-249
+src/argus/agent_runtime/stages/interpret_internal/pending_date_answer.py                    113     95    16%   51-177, 198-211, 223-232, 247-290
+src/argus/agent_runtime/stages/interpret_internal/recommendation_continuity.py               30     22    27%   27-68, 85-154
+src/argus/agent_runtime/stages/interpret_internal/result_action_routing.py                   19     12    37%   22-60
+src/argus/agent_runtime/stages/interpret_internal/result_artifact_patch.py                  112     87    22%   49-75, 93-130, 148-167, 175-179, 195-207, 213, 221-235, 243, 255-279, 294-334
+src/argus/agent_runtime/stages/interpret_internal/route_repair.py                            41     28    32%   29-39, 62-102
+src/argus/agent_runtime/stages/interpret_internal/shared.py                                  63     25    60%   24-25, 43, 46-48, 51, 60, 63-65, 93-99, 112-123
+src/argus/agent_runtime/stages/interpret_types.py                                            94      1    99%   199
+src/argus/agent_runtime/stages/launch_validation_recovery.py                                 54     46    15%   22-27, 40-62, 78-85, 95-341
+src/argus/agent_runtime/stages/recovery_composer.py                                          18     14    22%   23-61
+src/argus/agent_runtime/state/__init__.py                                                     2      0   100%
+src/argus/agent_runtime/state/models.py                                                     244     19    92%   79, 86, 88, 90, 92, 102, 106, 108, 215-218, 281-287
+src/argus/agent_runtime/strategy_contract.py                                                364    245    33%   35, 39-47, 66, 68, 76, 78, 80, 82, 96-125, 134-145, 152-171, 179-195, 199-247, 251, 255-299, 313-334, 340-350, 361, 374-376, 380-394, 408-422, 430-434, 438, 464-468, 473, 475, 493-500, 508, 511, 515, 520-531, 540-550, 554-568, 572-577, 581-594, 603-615, 619-633, 641-645, 649-652, 656
+src/argus/agent_runtime/strategy_requirements.py                                             50     23    54%   23-34, 38-46, 48, 50, 58, 60, 66, 71
+src/argus/agent_runtime/substage_events.py                                                   18      9    50%   28, 33, 38-44
+src/argus/agent_runtime/turn_execution.py                                                   266    192    28%   53-54, 84, 87, 91, 115-119, 127-131, 136-152, 171-217, 221-232, 236-238, 245-250, 257-280, 284-287, 296-330, 339-357, 378, 387-459, 465-467, 476-477, 490-497, 501-510, 514-523
+src/argus/agent_runtime/turn_execution_evidence.py                                           19      7    63%   19, 23-27, 31-32, 39
+src/argus/agent_runtime/turn_progress.py                                                    325    268    18%   124-205, 209-218, 226-239, 243-247, 251-256, 260-269, 273-277, 281-284, 288-291, 295-297, 301, 305-314, 324-341, 345-371, 375-381, 385-394, 401-405, 409, 413-418, 422-428, 432-444, 448-457, 461-473, 482-499, 503-510, 518-539, 547-569, 577-587, 595-599, 612-627, 631-635
+src/argus/agent_runtime/workflow_contract.py                                                 11     11     0%   1-22
+src/argus/api/__init__.py                                                                     0      0   100%
+src/argus/api/app_setup.py                                                                   74     74     0%   1-142
+src/argus/api/artifact_message_reads.py                                                      44     44     0%   3-96
+src/argus/api/artifact_naming.py                                                            133    133     0%   1-279
+src/argus/api/artifact_presentation.py                                                       46     30    35%   30-38, 43-64, 69-71, 77-80, 91, 96-110
+src/argus/api/auth_sessions.py                                                               53     53     0%   1-99
+src/argus/api/backtest_service.py                                                            77     77     0%   1-327
+src/argus/api/browser_cookies.py                                                             12     12     0%   13-57
+src/argus/api/chat/__init__.py                                                                0      0   100%
+src/argus/api/chat/actions.py                                                               279    279     0%   1-611
+src/argus/api/chat/allowance.py                                                              33     33     0%   8-91
+src/argus/api/chat/artifacts.py                                                              91     91     0%   1-182
+src/argus/api/chat/backtest_admission_flow.py                                                83     83     0%   8-298
+src/argus/api/chat/backtest_job_envelopes.py                                                 35     23    34%   17-43, 52-61, 76-95, 99
+src/argus/api/chat/backtest_jobs.py                                                         483    382    21%   89, 95, 102, 109, 113-118, 125-129, 133, 139, 145, 149-150, 158-168, 172, 176, 180-184, 192-199, 203, 229-253, 264-300, 311-313, 316-334, 344-345, 348-360, 370-426, 438-560, 564-565, 569-571, 583-632, 636, 644-654, 663, 678-685, 689-700, 704-712, 723-757, 761, 773-776, 781-791, 796-889, 900-902, 913-938, 951-1007, 1015-1025
+src/argus/api/chat/backtest_task_runs.py                                                     40     35    12%   14-25, 29-42, 46-66
+src/argus/api/chat/breakdown.py                                                             482    482     0%   1-1024
+src/argus/api/chat/cancellation.py                                                           26     26     0%   1-91
+src/argus/api/chat/confirmation.py                                                          514    459    11%   45-53, 64-299, 314-351, 366-388, 402-411, 420-434, 445-459, 492-545, 562-603, 625-679, 695-719, 768-840, 850-868, 904-1000, 1021-1046, 1062-1090, 1101-1112, 1129-1146, 1152-1163, 1171-1177, 1181-1187, 1193-1227, 1241-1251, 1255-1258, 1262, 1271-1273, 1278-1283, 1291-1295, 1309-1314, 1321-1328, 1332-1341, 1351, 1360-1361, 1365-1368, 1372, 1376, 1380, 1384
+src/argus/api/chat/context_packets.py                                                       118    118     0%   1-322
+src/argus/api/chat/discovery_evidence.py                                                    122    122     0%   1-384
+src/argus/api/chat/evidence.py                                                              152    152     0%   1-448
+src/argus/api/chat/legacy_onboarding_markers.py                                               8      3    62%   18, 23-26
+src/argus/api/chat/measurement_events.py                                                     69     69     0%   1-166
+src/argus/api/chat/memory_recall.py                                                          34     34     0%   9-95
+src/argus/api/chat/persistence.py                                                            55     55     0%   1-178
+src/argus/api/chat/previews.py                                                               54     41    24%   17-23, 32-36, 46-51, 55-57, 61-67, 71, 77-91
+src/argus/api/chat/recovery.py                                                              383    383     0%   1-943
+src/argus/api/chat/request_admission.py                                                     143    143     0%   1-409
+src/argus/api/chat/research_evidence.py                                                      79     79     0%   21-288
+src/argus/api/chat/research_job_reconciliation.py                                            22     15    32%   31-36, 48-74
+src/argus/api/chat/research_jobs.py                                                         187    187     0%   15-493
+src/argus/api/chat/research_pricing_evidence.py                                              41     41     0%   3-70
+src/argus/api/chat/result_actions.py                                                         48     48     0%   1-154
+src/argus/api/chat/result_link.py                                                           130    130     0%   10-405
+src/argus/api/chat/retest.py                                                                141    141     0%   8-401
+src/argus/api/chat/retry.py                                                                  38     38     0%   1-82
+src/argus/api/chat/route_receipts.py                                                         19     19     0%   1-51
+src/argus/api/chat/run_action_identity.py                                                    19     19     0%   1-56
+src/argus/api/chat/runtime_worker.py                                                        111    111     0%   1-155
+src/argus/api/chat/streaming.py                                                              41     41     0%   1-61
+src/argus/api/chat/title_finalization.py                                                     44     44     0%   1-149
+src/argus/api/chat/turn_lifecycle_hooks.py                                                   45     45     0%   3-134
+src/argus/api/chat/turn_lifecycle_projection.py                                              47     47     0%   3-131
+src/argus/api/chat/turn_metering.py                                                           7      7     0%   8-36
+src/argus/api/client_capabilities.py                                                         18     18     0%   1-47
+src/argus/api/confirmation_schemas.py                                                        39     16    59%   30-32, 48-55, 84-102
+src/argus/api/conversation_activity.py                                                      183    183     0%   3-450
+src/argus/api/conversation_preview_contract.py                                               13      3    77%   28-30
+src/argus/api/conversation_previews.py                                                       34     34     0%   3-64
+src/argus/api/dependencies.py                                                               222    222     0%   1-533
+src/argus/api/feedback_context.py                                                            88     68    23%   47-71, 75-88, 92-104, 108-125, 129-135
+src/argus/api/guest_access.py                                                                71     71     0%   1-168
+src/argus/api/guest_observability.py                                                         80     80     0%   1-302
+src/argus/api/main.py                                                                        27     27     0%   1-86
+src/argus/api/memory_ledger_index.py                                                         79     79     0%   1-225
+src/argus/api/memory_ownership.py                                                             5      5     0%   1-13
+src/argus/api/memory_run_dossiers.py                                                        115    115     0%   1-240
+src/argus/api/memory_search_candidates.py                                                   465    465     0%   1-1477
+src/argus/api/memory_search_postings.py                                                     163    163     0%   1-329
+src/argus/api/message_store.py                                                              395    395     0%   1-1058
+src/argus/api/naming.py                                                                      35     35     0%   1-111
+src/argus/api/openapi_compat.py                                                             229    229     0%   22-515
+src/argus/api/ops_contract.py                                                                 2      2     0%   3-4
+src/argus/api/pagination.py                                                                  21     21     0%   1-38
+src/argus/api/personalization_memory.py                                                     104    104     0%   11-244
+src/argus/api/personalization_memory_assessor.py                                             25     25     0%   9-77
+src/argus/api/personalization_memory_index.py                                               143    143     0%   9-348
+src/argus/api/personalization_memory_schemas.py                                             164    164     0%   11-370
+src/argus/api/public_excerpt_schemas.py                                                     103      0   100%
+src/argus/api/public_excerpts.py                                                            163    163     0%   8-432
+src/argus/api/rate_limits.py                                                                 40     40     0%   1-63
+src/argus/api/routers/__init__.py                                                             2      2     0%   1-3
+src/argus/api/routers/agent.py                                                              531    531     0%   1-1462
+src/argus/api/routers/analytics.py                                                           26     26     0%   1-70
+src/argus/api/routers/auth.py                                                               345    345     0%   1-987
+src/argus/api/routers/backtest.py                                                           326    326     0%   1-985
+src/argus/api/routers/conversation_activity.py                                               52     52     0%   1-151
+src/argus/api/routers/conversations.py                                                      427    427     0%   1-1199
+src/argus/api/routers/dev.py                                                                 24     24     0%   1-37
+src/argus/api/routers/discovery.py                                                           44     44     0%   1-119
+src/argus/api/routers/evidence.py                                                            16     16     0%   1-54
+src/argus/api/routers/evidence_receipts.py                                                   85     85     0%   8-285
+src/argus/api/routers/feedback.py                                                            34     34     0%   1-113
+src/argus/api/routers/history.py                                                            132    132     0%   1-384
+src/argus/api/routers/market.py                                                              18     18     0%   1-30
+src/argus/api/routers/ops.py                                                                142    142     0%   1-290
+src/argus/api/routers/personalization_memory.py                                             108    108     0%   9-385
+src/argus/api/routers/profile.py                                                            110    110     0%   1-330
+src/argus/api/routers/public_receipts.py                                                     33     33     0%   14-118
+src/argus/api/routers/search.py                                                             125    125     0%   1-387
+src/argus/api/schemas.py                                                                    762    135    82%   93-95, 142-144, 216, 230-232, 392-394, 446, 483, 548-551, 591-607, 669-681, 744-746, 750-753, 840-849, 881-896, 917-921, 940-960, 1015-1022, 1026-1034, 1048-1051, 1069-1077, 1094-1102, 1140-1144, 1158-1166, 1170-1175, 1201-1209, 1214-1217, 1232-1247
+src/argus/api/search_assembly.py                                                             79     79     0%   1-238
+src/argus/api/search_utils.py                                                                34     34     0%   1-79
+src/argus/api/state.py                                                                       67     39    42%   26, 34, 38-44, 52-60, 74, 98, 102-115, 120-132, 136-138
+src/argus/context/__init__.py                                                                 4      0   100%
+src/argus/context/freshness.py                                                               32     15    53%   62, 70-83
+src/argus/context/packets.py                                                                 40      2    95%   49, 70
+src/argus/context/providers.py                                                              174    144    17%   29-37, 47-66, 81-105, 130-148, 158-164, 188-203, 218-225, 248-256, 269-280, 288-312, 333-354, 375-379, 389-393, 408-419, 438-442, 449-454, 458-460, 464-466, 470-479, 483-491, 495-502
+src/argus/context/rendering.py                                                               95     86     9%   11-44, 48-51, 60-97, 101-103, 107-109, 113-121, 125-137
+src/argus/domain/__init__.py                                                                  0      0   100%
+src/argus/domain/access_approval_email.py                                                    89     89     0%   1-199
+src/argus/domain/artifact_presentation_kind.py                                               21     17    19%   12-40
+src/argus/domain/backtest_admission.py                                                      228    177    22%   44-50, 62, 83-95, 101, 111-112, 121-131, 140, 155, 185-226, 248, 252, 256-265, 278-303, 307-323, 346-448, 461-473
+src/argus/domain/backtest_admission_gateway.py                                               78     78     0%   4-321
+src/argus/domain/backtest_finalization.py                                                   208    154    26%   45, 71-75, 88-96, 109-122, 127, 134-178, 184-212, 222-259, 268-308, 328-372, 378-399, 411-438, 444-447, 451-475
+src/argus/domain/backtest_job_lifecycle.py                                                   33     33     0%   14-106
+src/argus/domain/backtest_job_scopes.py                                                      10      2    80%   42-43
+src/argus/domain/backtest_message_projection.py                                             154    132    14%   28-33, 59-110, 116-123, 133-145, 157-181, 185, 199-211, 215-225, 232, 241-248, 252-253, 260-266, 275, 284, 288-295, 299-309
+src/argus/domain/backtest_run_builder.py                                                     83     83     0%   1-178
+src/argus/domain/backtesting/__init__.py                                                      0      0   100%
+src/argus/domain/backtesting/cards.py                                                        94     94     0%   1-300
+src/argus/domain/backtesting/charts.py                                                       78     78     0%   1-186
+src/argus/domain/backtesting/config.py                                                      157    117    25%   52-53, 59-61, 65-84, 88-92, 96-104, 119-123, 127-135, 139-147, 160-170, 179-244, 248-302
+src/argus/domain/backtesting/confirmation_preflight.py                                       76     62    18%   22-34, 45-120, 127, 134, 141-143
+src/argus/domain/backtesting/coverage.py                                                    351    140    60%   49-80, 98-99, 114-118, 121, 130, 138-148, 187, 204-207, 217, 227, 256, 289, 302, 309-316, 326, 339, 345, 351, 354, 372, 390, 399, 404, 417, 427-450, 466, 468, 473, 496, 498, 501, 503-504, 509-527, 538, 540, 558-560, 578, 590, 596, 598-599, 601, 610, 621, 626-629, 638-667, 698-740
+src/argus/domain/backtesting/date_window.py                                                   7      4    43%   14-17
+src/argus/domain/backtesting/execution.py                                                   159    159     0%   1-386
+src/argus/domain/backtesting/metrics.py                                                     138    138     0%   1-346
+src/argus/domain/backtesting/rules/__init__.py                                               13      4    69%   30-32, 36-38
+src/argus/domain/backtesting/rules/compiler.py                                               45     45     0%   1-98
+src/argus/domain/backtesting/rules/describe.py                                               91     80    12%   11-31, 35-60, 70-80, 84-97, 101-122, 126-129, 133-136
+src/argus/domain/backtesting/rules/models.py                                                  8      0   100%
+src/argus/domain/backtesting/rules/normalization.py                                          43     35    19%   10-24, 28-39, 43-49, 53-58
+src/argus/domain/backtesting/rules/series.py                                                 29     29     0%   1-65
+src/argus/domain/backtesting/rules/signals.py                                                52     40    23%   16-24, 28-33, 39-48, 52-63, 79-110, 114-119
+src/argus/domain/backtesting/rules/validation.py                                             98     85    13%   20-27, 31-47, 51-65, 69-72, 76-104, 108-120, 124-129, 133-142
+src/argus/domain/backtesting/runner.py                                                      199    199     0%   1-564
+src/argus/domain/backtesting/signals.py                                                      70     70     0%   1-169
+src/argus/domain/backtesting/types.py                                                         2      0   100%
+src/argus/domain/benchmark_comparison.py                                                     25     13    48%   26-48, 56-57, 61
+src/argus/domain/cadences.py                                                                  3      0   100%
+src/argus/domain/capability_registry.py                                                      16      2    88%   31, 88
+src/argus/domain/capability_status.py                                                         3      0   100%
+src/argus/domain/chat_turn_lifecycle.py                                                     287    237    17%   54-62, 73-110, 119-123, 127-130, 145, 155-207, 222-272, 283-361, 376-460, 472-528, 536-595, 604-615, 618-641, 644-648, 657-666, 675-690, 700-703, 710, 727, 744-759, 769-770, 776-790
+src/argus/domain/chat_turn_lifecycle_gateway.py                                              80     60    25%   18-25, 41-65, 80-128, 146-185, 197-218, 229-236, 245-285, 296-299
+src/argus/domain/conversation_activity.py                                                   135    135     0%   3-263
+src/argus/domain/conversation_previews.py                                                    33     25    24%   14, 20-57
+src/argus/domain/conversation_recall.py                                                     366    366     0%   1-800
+src/argus/domain/credential_shapes.py                                                        44     19    57%   160-167, 172-182
+src/argus/domain/dca_capital.py                                                             105     67    36%   44-45, 58, 62, 66-67, 75, 89-102, 110-119, 123-124, 134-139, 148, 161-162, 187-196, 200-204, 208-210, 215, 220-225, 230-237, 246-251
+src/argus/domain/edit_contract_config.py                                                      5      5     0%   11-20
+src/argus/domain/engine.py                                                                   83     83     0%   1-303
+src/argus/domain/engine_launch/__init__.py                                                    8      5    38%   12-20
+src/argus/domain/engine_launch/adapter.py                                                   341    341     0%   1-1196
+src/argus/domain/engine_launch/cadence.py                                                     8      8     0%   1-11
+src/argus/domain/engine_launch/display.py                                                   221    174    21%   72, 76-81, 85-88, 102-108, 116-119, 127-133, 142-166, 177-196, 204-207, 215-224, 232-246, 250-265, 276-290, 294-299, 303-306, 310-320, 331-339, 343-349, 353-359, 363-369, 373-381, 385, 389, 393-400, 404, 408, 412-414
+src/argus/domain/engine_launch/models.py                                                    134     71    47%   81-150, 160-173, 184-194, 198-205
+src/argus/domain/engine_launch/result_facts.py                                              181    155    14%   14-19, 23-42, 47-56, 66-130, 144, 155-166, 174-199, 208-226, 230-239, 246-256, 260, 264-272, 276-286, 290-291, 295-299, 303-307, 311-312, 316, 320-323, 327-332, 336-345, 349-354
+src/argus/domain/engine_launch/results.py                                                    50     37    26%   131-142, 146-147, 151-152, 173, 191-214, 228, 258-262, 284-290
+src/argus/domain/engine_launch/sizing.py                                                     10     10     0%   1-19
+src/argus/domain/engine_launch/strategies.py                                                 91     76    16%   27-30, 34-44, 48-51, 55-69, 77-81, 85-106, 112-182
+src/argus/domain/evidence.py                                                                170    136    20%   39-78, 93, 112, 121-138, 142, 159-170, 175-178, 187-215, 223-231, 235, 245-276, 301-322, 326-329, 338-341, 345-352, 356-363, 367-383, 387-406
+src/argus/domain/guest_cleanup.py                                                            54     54     0%   1-127
+src/argus/domain/guest_funnel_milestones.py                                                  29     19    34%   26, 37-46, 55-60, 75-81, 89-93
+src/argus/domain/guest_workspaces.py                                                         14      0   100%
+src/argus/domain/indicator_execution.py                                                      99     99     0%   1-156
+src/argus/domain/indicators.py                                                              237    162    32%   55-67, 347-349, 353-378, 382-406, 421, 425, 438-444, 451-481, 494-534, 541-549, 553-560, 574-581, 585-594, 598-599, 603-608, 612-614, 618-639
+src/argus/domain/job_settlement.py                                                           57     57     0%   19-162
+src/argus/domain/market_data/__init__.py                                                     12      4    67%   18-20, 30-32
+src/argus/domain/market_data/assets.py                                                      476    106    78%   82-83, 91-92, 108, 128, 156, 189, 192, 207, 221, 235, 245, 256, 262, 273, 281, 289, 306, 321, 352-364, 368-390, 394-426, 432, 434, 444-445, 448, 554, 558-561, 565-567, 577, 584, 608, 611, 622-636, 660, 666-676, 690, 723, 743
+src/argus/domain/market_data/capabilities.py                                                138     72    48%   49, 86, 94, 103, 113-114, 116, 121-129, 141-143, 154-165, 185-193, 202-219, 223-226, 230-242, 250-254, 264-294, 304-311
+src/argus/domain/market_data/market_session.py                                               48     48     0%   9-113
+src/argus/domain/market_data/provider.py                                                    185     87    53%   34, 45-46, 58-60, 66, 68-72, 87, 92-96, 100-101, 107, 115-124, 128, 132, 144-180, 188, 194-198, 203, 207, 218, 224, 239, 264-274, 319, 341-366, 385-392, 396-399
+src/argus/domain/market_data/tradability.py                                                  73     48    34%   47, 52, 56-57, 62-74, 78-93, 97-134
+src/argus/domain/postgres_history_reader.py                                                 119     92    23%   92-96, 109-110, 135-198, 219-361, 427-532, 537-553
+src/argus/domain/postgres_keyset_reader.py                                                  100     73    27%   54-57, 67-72, 84-85, 107-115, 125-155, 169-224, 235-265
+src/argus/domain/postgres_run_dossier_reader.py                                              59     33    44%   190-263
+src/argus/domain/postgres_search_reader.py                                                  374    281    25%   62, 66, 74-85, 91, 111-119, 599-604, 617-817, 826-835, 858-861, 920, 933-949, 1013-1015, 1064-1066, 1226, 1234, 1257-1900, 1961, 1965-1967, 2012-2030, 2172, 2200, 2219-2309, 2345-2456, 2929-2935, 2998-3187, 3202-3253, 3261-3271, 3280-3303, 3312-3328
+src/argus/domain/public_excerpts.py                                                         386    307    20%   169, 173, 178-184, 195-221, 233-269, 284-293, 312-315, 325, 340-342, 352, 362-382, 391-395, 407-430, 436-448, 452, 456-461, 465-474, 478, 482, 492-497, 502-509, 528-548, 560-575, 580-581, 600-632, 644-646, 652-659, 672-691, 696-704, 719-728, 733-744, 749, 767-815, 844-882, 902-919, 929-935, 948-989, 994-1006, 1010-1017, 1026-1036, 1043-1048
+src/argus/domain/research/__init__.py                                                         0      0   100%
+src/argus/domain/research/admission.py                                                       34     13    62%   30-31, 53-57, 63-69
+src/argus/domain/research/billing.py                                                         38     38     0%   3-93
+src/argus/domain/research/cache.py                                                           69     39    43%   100-104, 114-123, 132, 164-174, 179-190, 194-200, 206-207, 213-216
+src/argus/domain/research/config.py                                                          40     16    60%   79-86, 97-103, 113
+src/argus/domain/research/contracts.py                                                       67     10    85%   45-47, 62-67, 138
+src/argus/domain/research/credentials.py                                                      4      1    75%   15
+src/argus/domain/research/perplexity_agent.py                                               353    353     0%   9-654
+src/argus/domain/research/pricing.py                                                         98     98     0%   9-355
+src/argus/domain/research/search/__init__.py                                                  3      0   100%
+src/argus/domain/research/search/config.py                                                   47     25    47%   31-34, 38-45, 49-60, 65
+src/argus/domain/research/search/contracts.py                                                58     27    53%   36-40, 62-65, 78, 82-90, 101-108
+src/argus/domain/research/search/http_post.py                                                19     14    26%   19-38
+src/argus/domain/research/search/openrouter_web_search.py                                   132    111    16%   53-56, 61-76, 86-87, 91-97, 101-153, 157-160, 164-176, 180-196, 200-205, 224-268, 272-281
+src/argus/domain/research/search/perplexity_direct.py                                        38     23    39%   39-41, 46-57, 67-68, 72-86, 90-91
+src/argus/domain/research/search/selection.py                                                16      8    50%   19-32
+src/argus/domain/research/source_selection.py                                                47     38    19%   35-59, 68-78, 82-95
+src/argus/domain/retest_setup.py                                                            226    226     0%   7-476
+src/argus/domain/run_dossiers.py                                                            179    179     0%   1-465
+src/argus/domain/search_sql_text.py                                                          28     16    43%   75-88, 93-104, 109, 113-117
+src/argus/domain/search_symbol_casefold_data.py                                               5      0   100%
+src/argus/domain/search_text.py                                                              32     21    34%   11, 15, 23-26, 30-33, 42-45, 49-55
+src/argus/domain/slot_normalizer.py                                                          46     30    35%   16, 23-32, 43-80, 86
+src/argus/domain/store.py                                                                   129     60    53%   39-40, 43-44, 47-48, 51-55, 58-60, 63-67, 70-71, 74, 78, 171, 174-203, 206-221, 224
+src/argus/domain/strategy_capabilities.py                                                    69     30    57%   64, 69, 221-232, 244-270
+src/argus/domain/supabase_backtest_finalization.py                                           32     19    41%   30-45, 58-74, 78-83, 87
+src/argus/domain/supabase_conversation_activity.py                                           35     25    29%   11-18, 22-25, 39-49, 57-67, 78-89
+src/argus/domain/supabase_conversation_messages.py                                           83     64    23%   27-32, 42-47, 51-63, 78-88, 96-107, 136-159, 172-186, 199-216, 230-280
+src/argus/domain/supabase_gateway.py                                                        738    592    20%   103, 107-112, 116, 120-123, 127, 156-168, 182, 188, 191-209, 212-289, 301-324, 327-330, 333-334, 343-354, 357, 365, 376-388, 394-404, 414-423, 435-446, 449-453, 461-474, 477-482, 485-489, 494-506, 518-603, 608-617, 622-626, 629-637, 640-648, 651-662, 669, 677-681, 692-704, 715-757, 762-769, 774-786, 789-801, 806-822, 827-859, 868-922, 935-945, 952-961, 966-975, 980-996, 1001-1029, 1034-1049, 1063-1074, 1089-1129, 1141-1167, 1170-1172, 1175-1177, 1180-1182, 1185-1187, 1190-1192, 1202-1212, 1215-1224, 1233-1261, 1266-1270, 1280-1289, 1298-1310, 1321-1371, 1381-1422, 1437-1463, 1471-1475, 1483-1501, 1509-1513, 1521-1525, 1528-1530, 1535-1537, 1540-1552, 1557-1569, 1574-1586, 1589-1597, 1609-1630, 1633-1636, 1639-1641, 1647-1656, 1665-1697, 1708-1712, 1717-1728, 1731-1738, 1749, 1770-1772, 1786-1788, 1806-1821, 1834-1838, 1847-1856, 1861, 1874-1909, 1922-1957, 1962-2013, 2017, 2027
+src/argus/domain/supabase_guest_accounts.py                                                 150    119    21%   16-21, 32-35, 38-46, 54-68, 71, 83-118, 137-160, 184-228, 236-246, 255-265, 273-284, 292-302, 312-324, 334-346, 354-364, 367, 374, 383-403, 414-437
+src/argus/domain/supabase_message_reads.py                                                  170    140    18%   75-76, 80, 90-97, 107-127, 165-174, 188-297, 312-404, 421-500
+src/argus/domain/supabase_public_excerpts.py                                                 88     61    31%   58-65, 69, 86-110, 115-127, 142-161, 166-175, 190-201, 212-220, 223-230, 234-244, 248, 252-272
+src/argus/domain/supabase_query_helpers.py                                                   14     10    29%   12-21
+src/argus/domain/usage_counter_reader.py                                                     23     16    30%   8-17, 32-47
+src/argus/domain/usage_limits.py                                                            159    109    31%   76-83, 95-102, 121-142, 156-164, 182-193, 202-242, 254-267, 279-286, 294-305, 316-336
+src/argus/domain/username_signup.py                                                          57     57     0%   1-120
+src/argus/domain/visitor_usage.py                                                            59     41    31%   27-28, 34-35, 46-58, 69-79, 90-102, 118-123, 135-149, 160-165, 176-186
+src/argus/env.py                                                                             20      3    85%   20, 26, 32
+src/argus/llm/__init__.py                                                                     0      0   100%
+src/argus/llm/memory_embedding.py                                                           162    162     0%   7-335
+src/argus/llm/memory_sensitivity.py                                                          17     17     0%   7-83
+src/argus/llm/openrouter.py                                                                 469    236    50%   127, 178, 186, 200-211, 222, 231, 242-258, 267-270, 333, 348, 354-355, 359-360, 364-365, 390-408, 433-444, 448-459, 466, 485, 490, 496-516, 529-531, 541-654, 666-765, 771-776, 780-785, 791-794, 822, 898-907, 933-944, 955-972, 981-983, 989, 992, 995, 999-1009, 1018, 1022-1027, 1033-1041, 1051-1059
+src/argus/llm/openrouter_key_policy.py                                                       36     18    50%   24-28, 37-44, 48-53
+src/argus/llm/openrouter_model_env.py                                                         3      0   100%
+src/argus/llm/openrouter_tasks.py                                                            16      0   100%
+src/argus/llm/openrouter_usage.py                                                            68     35    49%   21, 26-42, 49-56, 63, 72, 75-76, 81, 87, 90-96, 98
+src/argus/memory/__init__.py                                                                 11     11     0%   3-79
+src/argus/memory/contracts.py                                                               256    256     0%   3-425
+src/argus/memory/conversion.py                                                               46     46     0%   3-79
+src/argus/memory/index_policy.py                                                             36     36     0%   8-79
+src/argus/memory/policy.py                                                                   74     74     0%   3-213
+src/argus/memory/postgres_store.py                                                          829    829     0%   3-2990
+src/argus/memory/provider.py                                                                 53     53     0%   3-134
+src/argus/memory/service.py                                                                 587    587     0%   3-1647
+src/argus/memory/store.py                                                                   488    488     0%   3-1307
+src/argus/memory/subject.py                                                                  18     18     0%   3-39
+src/argus/memory/telemetry.py                                                               104    104     0%   3-293
+src/argus/nlp/__init__.py                                                                     0      0   100%
+src/argus/nlp/natural_time.py                                                               581    412    29%   25, 40-43, 68, 70, 74, 78, 89-115, 137-170, 193-215, 237, 240, 250-336, 347, 356-368, 409-458, 475, 485, 487, 491, 517, 527-544, 555-592, 601, 604-608, 614, 617-618, 627-633, 642-650, 654-657, 661-671, 675-685, 696-714, 721, 723, 729, 733-737, 741-747, 751-755, 771-787, 805, 830, 837, 840, 855-875, 888-901, 914, 916, 919-922, 931-947, 964-978, 987, 992-993, 997-1007, 1011-1015, 1019-1023, 1027-1038, 1042-1061, 1065-1075
+src/argus/observability/__init__.py                                                           2      0   100%
+src/argus/observability/cost_ledger.py                                                       61     47    23%   42-55, 106-138, 157, 191-197, 201-205, 218-231, 239-253
+src/argus/observability/envelope.py                                                         173     99    43%   173-177, 181, 238, 248, 255-300, 313, 323-324, 328-350, 354-355, 361-398, 402-403, 407, 411-414, 418-439, 443-449
+src/argus/observability/guest_funnel.py                                                      28     28     0%   1-176
+src/argus/observability/product_events.py                                                    18     18     0%   1-116
+src/argus/observability/research_events.py                                                   23     23     0%   8-58
+-----------------------------------------------------------------------------------------------------------------------
+TOTAL                                                                                     45804  35748    22%
+Coverage HTML written to dir temp/coverage/html
+Coverage XML written to file temp/coverage/coverage.xml
+======================== 1 passed in 117.90s (0:01:57) =========================
