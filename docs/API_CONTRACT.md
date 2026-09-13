@@ -4097,8 +4097,10 @@ Contract rules:
   background submission or discovery search) and no earlier provider call in
   the turn was served, the backend returns the guest's own claim through
   `release_research_usage` for the day it charged. The shared ceiling keeps
-  counting the attempt, and a later provider path in the same turn claims
-  again.
+  counting the attempt. Only a confirmed release lets a later provider path in
+  the same turn claim again; a release that fails or matches no charge, like a
+  cancelled provider call, leaves the charge standing for the rest of the turn,
+  so one turn never costs a guest more than one question.
 - Pricing reconciliation does not gate a usable provider answer. Research
   `usage.cost_usd` is null when the invoice cannot be reconciled; it is never
   replaced with zero or an estimated charge. Provider billing evidence stays

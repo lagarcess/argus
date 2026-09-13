@@ -220,10 +220,12 @@ def test_the_api_gives_a_guest_question_back_through_postgrest(
         assert admission.period_start
         assert _used_count(guest) == 1
 
-        release_research_provider_claim(admission, guest_visitor_key=guest)
+        assert release_research_provider_claim(admission, guest_visitor_key=guest) is True
 
         assert _used_count(guest) == 0
         assert _used_count(GLOBAL_CEILING_KEY) == ceiling_before + 1
+        assert release_research_provider_claim(admission, guest_visitor_key=guest) is False
+        assert _used_count(guest) == 0
     finally:
         _delete_counts(guest)
 

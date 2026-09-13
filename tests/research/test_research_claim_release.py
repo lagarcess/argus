@@ -41,8 +41,11 @@ ADMITTED = ResearchAttemptAdmission(
 class _Turn:
     """The API's claim and release for one turn, recorded."""
 
-    def __init__(self, admission: ResearchAttemptAdmission = ADMITTED) -> None:
+    def __init__(
+        self, admission: ResearchAttemptAdmission = ADMITTED, *, confirmed: bool = True
+    ) -> None:
         self.admission = admission
+        self.confirmed = confirmed
         self.claims = 0
         self.released: list[ResearchAttemptAdmission] = []
 
@@ -50,8 +53,9 @@ class _Turn:
         self.claims += 1
         return self.admission
 
-    def release(self, admission: ResearchAttemptAdmission) -> None:
+    def release(self, admission: ResearchAttemptAdmission) -> bool:
         self.released.append(admission)
+        return self.confirmed
 
     def scope(self):
         return research_attempt_admission_context(self.claim, release=self.release)
@@ -85,6 +89,32 @@ def test_a_served_call_keeps_the_claim_when_a_later_call_fails() -> None:
             raise _ProviderDown
     assert turn.released == []
     assert turn.claims == 1
+
+
+def test_an_unconfirmed_release_keeps_the_charge_for_the_rest_of_the_turn() -> None:
+    turn = _Turn(confirmed=False)
+    with turn.scope():
+        claim_current_research_attempt()
+        with pytest.raises(_ProviderDown), admitted_provider_work():
+            raise _ProviderDown
+        claim_current_research_attempt()
+        with pytest.raises(_ProviderDown), admitted_provider_work():
+            raise _ProviderDown
+    assert turn.claims == 1
+    assert turn.released == [ADMITTED]
+
+
+def test_a_cancelled_call_keeps_the_charge_while_its_work_may_still_bill() -> None:
+    turn = _Turn()
+    with turn.scope():
+        claim_current_research_attempt()
+        with pytest.raises(asyncio.CancelledError), admitted_provider_work():
+            raise asyncio.CancelledError
+        with pytest.raises(_ProviderDown), admitted_provider_work():
+            raise _ProviderDown
+        claim_current_research_attempt()
+    assert turn.claims == 1
+    assert turn.released == []
 
 
 def test_a_refused_claim_has_nothing_to_give_back() -> None:
@@ -145,10 +175,12 @@ def test_a_release_gives_the_guest_question_back_and_keeps_the_ceiling(
     assert admission.period_start
     assert (_guest_used(), _ceiling_used()) == (1, 1)
 
-    evidence.release_research_provider_claim(admission, guest_visitor_key=GUEST)
+    assert evidence.release_research_provider_claim(admission, guest_visitor_key=GUEST)
     assert (_guest_used(), _ceiling_used()) == (0, 1)
 
-    evidence.release_research_provider_claim(admission, guest_visitor_key=GUEST)
+    assert not evidence.release_research_provider_claim(
+        admission, guest_visitor_key=GUEST
+    )
     assert _guest_used() == 0
 
 
@@ -171,7 +203,7 @@ def test_a_release_returns_only_the_day_the_claim_charged(guest_store) -> None:
     admission = evidence.claim_research_provider_attempt(guest_visitor_key=GUEST)
     day_before = datetime.fromisoformat(admission.period_start) - timedelta(days=1)
 
-    evidence.release_research_provider_claim(
+    assert not evidence.release_research_provider_claim(
         ResearchAttemptAdmission(available=True, period_start=day_before.isoformat()),
         guest_visitor_key=GUEST,
     )
@@ -182,32 +214,63 @@ def test_a_release_returns_only_the_day_the_claim_charged(guest_store) -> None:
 def test_a_signed_in_claim_has_no_guest_question_to_return(guest_store) -> None:
     admission = evidence.claim_research_provider_attempt(guest_visitor_key=None)
 
-    evidence.release_research_provider_claim(admission, guest_visitor_key=None)
+    assert not evidence.release_research_provider_claim(
+        admission, guest_visitor_key=None
+    )
 
     assert _ceiling_used() == 1
+
+
+class _GuestRows:
+    """The guest's and the shared ceiling's daily counts behind both functions."""
+
+    def __init__(self, *, release: dict | Exception | None = None) -> None:
+        self.release = release
+        self.calls: list[tuple[str, dict]] = []
+        self.guest = 0
+        self.ceiling = 0
+
+    def rpc(self, name: str, params: dict):
+        self.calls.append((name, params))
+
+        def execute():
+            if name == "claim_research_usage":
+                self.guest += 1
+                self.ceiling += 1
+                return SimpleNamespace(
+                    data={
+                        "available": True,
+                        "guest_exhausted": False,
+                        "period_start": ADMITTED.period_start,
+                    }
+                )
+            if isinstance(self.release, Exception):
+                raise self.release
+            if self.release is None:
+                self.guest -= 1
+                return SimpleNamespace(data={"released": True})
+            return SimpleNamespace(data=self.release)
+
+        return SimpleNamespace(execute=execute)
+
+    def install(self, monkeypatch: pytest.MonkeyPatch) -> _GuestRows:
+        monkeypatch.setattr(api_state, "supabase_gateway", SimpleNamespace(client=self))
+        return self
 
 
 def test_the_database_claim_and_release_carry_the_charged_day(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[tuple[str, dict]] = []
-
-    class _Client:
-        def rpc(self, name: str, params: dict):
-            calls.append((name, params))
-            data = (
-                {"available": True, "guest_exhausted": False, "period_start": ADMITTED.period_start}
-                if name == "claim_research_usage"
-                else {"released": True}
-            )
-            return SimpleNamespace(execute=lambda: SimpleNamespace(data=data))
-
-    monkeypatch.setattr(api_state, "supabase_gateway", SimpleNamespace(client=_Client()))
+    rows = _GuestRows().install(monkeypatch)
+    calls = rows.calls
 
     admission = evidence.claim_research_provider_attempt(guest_visitor_key=GUEST)
-    evidence.release_research_provider_claim(admission, guest_visitor_key=GUEST)
+    released = evidence.release_research_provider_claim(
+        admission, guest_visitor_key=GUEST
+    )
 
     assert admission == ADMITTED
+    assert released is True
     assert calls[-1] == (
         "release_research_usage",
         {
@@ -219,16 +282,59 @@ def test_the_database_claim_and_release_carry_the_charged_day(
     )
 
 
-def test_a_release_that_cannot_be_written_leaves_the_charge_and_never_raises(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    "answer",
+    [{"released": False}, {}, {"released": "true"}, RuntimeError("database unavailable")],
+    ids=["matched_no_charge", "no_flag", "not_a_boolean", "unavailable"],
+)
+def test_a_release_the_database_does_not_confirm_leaves_the_charge_and_never_raises(
+    monkeypatch: pytest.MonkeyPatch, answer: dict | Exception
 ) -> None:
-    class _Down:
-        def rpc(self, *_args, **_kwargs):
-            raise RuntimeError("database unavailable")
+    _GuestRows(release=answer).install(monkeypatch)
 
-    monkeypatch.setattr(api_state, "supabase_gateway", SimpleNamespace(client=_Down()))
+    assert (
+        evidence.release_research_provider_claim(ADMITTED, guest_visitor_key=GUEST)
+        is False
+    )
 
-    evidence.release_research_provider_claim(ADMITTED, guest_visitor_key=GUEST)
+
+@pytest.mark.parametrize(
+    "release",
+    [None, RuntimeError("database unavailable")],
+    ids=["released", "release_down"],
+)
+@pytest.mark.parametrize(
+    "calls",
+    [("fail", "serve"), ("fail", "fail"), ("serve", "fail"), ("fail", "cancel", "fail")],
+    ids="-".join,
+)
+def test_one_turn_never_costs_a_guest_more_than_one_question(
+    monkeypatch: pytest.MonkeyPatch,
+    release: Exception | None,
+    calls: tuple[str, ...],
+) -> None:
+    rows = _GuestRows(release=release).install(monkeypatch)
+
+    with research_attempt_admission_context(
+        lambda: evidence.claim_research_provider_attempt(guest_visitor_key=GUEST),
+        release=lambda admission: evidence.release_research_provider_claim(
+            admission, guest_visitor_key=GUEST
+        ),
+    ):
+        for call in calls:
+            assert claim_current_research_attempt().available
+            try:
+                with admitted_provider_work():
+                    if call == "fail":
+                        raise _ProviderDown
+                    if call == "cancel":
+                        raise asyncio.CancelledError
+            except (_ProviderDown, asyncio.CancelledError):
+                pass
+
+    charge_stands = release is not None or "serve" in calls or "cancel" in calls
+    assert rows.guest == (1 if charge_stands else 0)
+    assert rows.ceiling == len([c for c in rows.calls if c[0] == "claim_research_usage"])
 
 
 # --- Every provider path that claims gives the claim back when it fails ------

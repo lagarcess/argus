@@ -4,8 +4,10 @@ The API owns durable allowance state. Runtime research operations own the
 precise point where a cache miss becomes provider work. This context is the
 small bridge between them: the first provider path claims capacity, while
 later defensive checks in the same turn reuse that result. Provider work that
-fails with no usable response gives the claim back, unless provider work
-earlier in the turn was served, and the next provider path claims again.
+fails with no usable response gives the claim back, and only a confirmed
+release lets the next provider path claim again. The charge stands for the rest
+of the turn once provider work was served, was cancelled while it may still be
+billing, or could not be released.
 """
 
 from __future__ import annotations
@@ -40,9 +42,9 @@ class ResearchCapacityExhausted(RuntimeError):
 @dataclass
 class _AdmissionScope:
     claim: Callable[[], ResearchAttemptAdmission]
-    release: Callable[[ResearchAttemptAdmission], None] | None = None
+    release: Callable[[ResearchAttemptAdmission], bool] | None = None
     result: ResearchAttemptAdmission | None = None
-    served: bool = False
+    charge_stands: bool = False
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -55,11 +57,12 @@ _CURRENT_SCOPE: ContextVar[_AdmissionScope | None] = ContextVar(
 @contextmanager
 def research_attempt_admission_context(
     claim: Callable[[], ResearchAttemptAdmission],
-    release: Callable[[ResearchAttemptAdmission], None] | None = None,
+    release: Callable[[ResearchAttemptAdmission], bool] | None = None,
 ) -> Iterator[None]:
     """Install the API's atomic claim for the duration of one chat turn.
 
-    ``release`` gives an admitted claim back; it must never raise."""
+    ``release`` gives an admitted claim back and returns whether the charge went
+    back; it must never raise."""
 
     token = _CURRENT_SCOPE.set(_AdmissionScope(claim=claim, release=release))
     try:
@@ -84,18 +87,26 @@ def claim_current_research_attempt() -> ResearchAttemptAdmission:
 def admitted_provider_work() -> Iterator[None]:
     """One provider call under this turn's claim.
 
-    A call that returns was served, so the claim stands. A call that raises was
-    not, so the claim goes back, unless a call earlier in the turn was served."""
+    A call that returns was served, and a cancelled call may still be billing,
+    so either keeps the charge. A call that fails with an error gives the claim
+    back, unless the charge already stands."""
 
     try:
         yield
-    except BaseException:
+    except Exception:
         _release_unserved_claim()
         raise
+    except BaseException:
+        _keep_the_charge()
+        raise
+    _keep_the_charge()
+
+
+def _keep_the_charge() -> None:
     scope = _CURRENT_SCOPE.get()
     if scope is not None:
         with scope.lock:
-            scope.served = True
+            scope.charge_stands = True
 
 
 def _release_unserved_claim() -> None:
@@ -104,8 +115,11 @@ def _release_unserved_claim() -> None:
         return
     with scope.lock:
         admission = scope.result
-        if scope.served or admission is None or not admission.available:
+        if scope.charge_stands or admission is None or not admission.available:
             return
-        # A later provider path in this turn claims again.
-        scope.result = None
-    scope.release(admission)
+        # Held across the release, so no path claims while the charge is in doubt.
+        if scope.release(admission) is True:
+            # A later provider path in this turn claims again.
+            scope.result = None
+        else:
+            scope.charge_stands = True

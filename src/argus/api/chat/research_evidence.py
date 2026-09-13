@@ -143,25 +143,25 @@ def release_research_provider_claim(
     admission: ResearchAttemptAdmission,
     *,
     guest_visitor_key: str | None,
-) -> None:
+) -> bool:
     """Give a guest back the research question a failed provider call cost.
 
     Only the guest's own row for the period the claim charged is returned. The
     shared ceiling keeps the attempt: it bounds provider work, and the work was
-    attempted. A signed-in account has no allowance of its own to return. A
-    release that cannot be written leaves the charge standing; this never
-    raises."""
+    attempted. A signed-in account has no allowance of its own to return.
+    Returns whether the charge went back; anything short of a confirmed release
+    leaves the charge standing. This never raises."""
     if (
         guest_visitor_key is None
         or not admission.available
         or admission.period_start is None
         or not research_rail_enabled()
     ):
-        return
+        return False
     guest_meter = research_meter(is_guest=True)
     try:
         if api_state.supabase_gateway is not None:
-            api_state.supabase_gateway.client.rpc(
+            result = api_state.supabase_gateway.client.rpc(
                 "release_research_usage",
                 {
                     "p_guest_visitor_key": guest_visitor_key,
@@ -170,17 +170,25 @@ def release_research_provider_claim(
                     "p_period_start": admission.period_start,
                 },
             ).execute()
-            return
-        _release_memory_research_usage(
-            guest_visitor_key=guest_visitor_key,
-            resource=guest_meter.resource,
-            period_start=datetime.fromisoformat(admission.period_start),
-        )
+            payload = getattr(result, "data", None)
+            released = isinstance(payload, dict) and payload.get("released") is True
+        else:
+            released = _release_memory_research_usage(
+                guest_visitor_key=guest_visitor_key,
+                resource=guest_meter.resource,
+                period_start=datetime.fromisoformat(admission.period_start),
+            )
     except Exception as exc:  # noqa: BLE001
         # The deployed log sink drops structured extras; the error rides the text.
         logger.warning(
             f"Research guest claim release failed; the charge stands error={exc}"
         )
+        return False
+    if not released:
+        logger.warning(
+            "Research guest claim release matched no charge; the charge stands"
+        )
+    return released
 
 
 def _release_memory_research_usage(
@@ -188,7 +196,7 @@ def _release_memory_research_usage(
     guest_visitor_key: str,
     resource: str,
     period_start: datetime,
-) -> None:
+) -> bool:
     """Process-local twin of the release_research_usage function."""
 
     with _MEMORY_CLAIM_LOCK:
@@ -196,11 +204,13 @@ def _release_memory_research_usage(
             (guest_visitor_key, resource, "day")
         )
         if (
-            row is not None
-            and row.get("period_start") == period_start
-            and int(row.get("used_count", 0)) > 0
+            row is None
+            or row.get("period_start") != period_start
+            or int(row.get("used_count", 0)) <= 0
         ):
-            row["used_count"] = int(row["used_count"]) - 1
+            return False
+        row["used_count"] = int(row["used_count"]) - 1
+        return True
 
 
 def _claim_memory_research_usage(
