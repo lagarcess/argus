@@ -2702,6 +2702,8 @@ async def _audited_response_ready_for_runtime(
         )
         if context_response is not None:
             return context_response
+    if (pending := retain_pending_focused_seed(response, request=request)) is not response:
+        return pending
     if _response_replays_prior_strategy_without_current_turn_update(
         response=response,
         request=request,

@@ -29,6 +29,7 @@ from argus.agent_runtime.interpreter.shared import (
     is_explicit_fresh_task,
     repaired_turn_act,
 )
+from argus.agent_runtime.interpreter.strategy_routing import strategy_route_expected
 from argus.agent_runtime.llm_interpreter_types import (
     FocusedStrategyExtraction,
     LLMAmbiguousField,
@@ -270,10 +271,13 @@ def retain_pending_focused_seed(
     """An answer with no typed seed progress cannot clear a pending money role."""
     if is_explicit_fresh_task(
         response.semantic_turn_act, response.task_relation
-    ) or response.intent not in {
-        "strategy_drafting",
-        "backtest_execution",
-    }:
+    ) or not strategy_route_expected(
+        intent=response.intent,
+        semantic_turn_act=response.semantic_turn_act,
+        has_execution_evidence=strategy_has_execution_evidence(
+            response.candidate_strategy_draft
+        ),
+    ):
         return response
     if _has_owned_seed(response.candidate_strategy_draft):
         return response

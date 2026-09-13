@@ -152,7 +152,9 @@ def replay_transport(monkeypatch: pytest.MonkeyPatch) -> Callable[[str, str], No
     monkeypatch.setattr(httpx.AsyncClient, "send", no_network)
 
     def install(language: str, mode: str) -> None:
-        mode, _, relation = mode.partition(":")
+        mode, _, continuation = mode.partition(":")
+        relation, _, route = continuation.partition(":")
+        followup_intent, _, followup_act = route.partition("/")
         interpretation_calls = 0
         if mode == "audit_budget_exhausted":
             monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", "4")
@@ -173,7 +175,8 @@ def replay_transport(monkeypatch: pytest.MonkeyPatch) -> Callable[[str, str], No
                     if mode.startswith("followup_"):
                         result.update(
                             task_relation=relation or "continue",
-                            semantic_turn_act="answer_pending_need",
+                            intent=followup_intent or "backtest_execution",
+                            semantic_turn_act=followup_act or "answer_pending_need",
                         )
                         draft = result["candidate_strategy_draft"]
                         draft["extra_parameters"] = {}
@@ -228,6 +231,8 @@ def replay_transport(monkeypatch: pytest.MonkeyPatch) -> Callable[[str, str], No
                 }
             elif schema == "StrategyFamilyContinuityAudit":
                 result = {"should_rebind_strategy_family": False, "confidence": 0.9}
+            elif schema == "ArtifactAssumptionEditPlan":
+                result = {"outcome": "ready_to_confirm", "confidence": 0.9}
             elif schema == "DcaContributionRoleAudit":
                 result = {
                     "recurring_contribution_explicit": True,
@@ -370,11 +375,20 @@ async def test_focused_repair_delivers_stated_money_and_costs_or_asks(
 @pytest.mark.parametrize("language", MESSAGES)
 @pytest.mark.parametrize("mode", ["followup_no_progress", "followup_confirmed"])
 @pytest.mark.parametrize("relation", ["continue", "ambiguous"])
+@pytest.mark.parametrize(
+    "route",
+    [
+        "backtest_execution/answer_pending_need",
+        "conversation_followup/answer_pending_need",
+        "conversation_followup/approval",
+    ],
+)
 async def test_pending_deposit_survives_a_short_followup(
     replay_transport: Callable[[str, str], None],
     language: str,
     mode: str,
     relation: str,
+    route: str,
 ) -> None:
     replay_transport(language, "audit_omits_seed")
     contract = build_default_capability_contract()
@@ -407,7 +421,7 @@ async def test_pending_deposit_survives_a_short_followup(
     assert pending.capital_amount == CONTRIBUTION
     assert pending.extra_parameters.get("initial_capital") is None
 
-    replay_transport(language, f"{mode}:{relation}")
+    replay_transport(language, f"{mode}:{relation}:{route}")
     followup = RunState.new(
         current_user_message="Yes" if language == "en" else "Sí",
         recent_thread_history=[
@@ -427,12 +441,22 @@ async def test_pending_deposit_survives_a_short_followup(
         assert "dca_capital_role_conflict" not in result.decision.reason_codes
         assert followup.candidate_strategy_draft.capital_amount == CONTRIBUTION
         if mode == "followup_no_progress":
-            assert result.outcome == "needs_clarification"
-            repeated = await clarify_stage_async(
-                state=followup, contract=contract, language=language
-            )
-            assert repeated.outcome == "await_user_reply"
-            retained = repeated.patch["response_intent"]["facts"]["ambiguous_fields"]
+            if result.outcome == "needs_clarification":
+                repeated = await clarify_stage_async(
+                    state=followup, contract=contract, language=language
+                )
+                assert repeated.outcome == "await_user_reply"
+                response_intent = repeated.patch["response_intent"]
+            else:
+                # The existing no-progress owner can ask within interpret.
+                assert result.outcome == "ready_to_respond"
+                response_intent = result.patch["response_intent"]
+                assert response_intent["facts"]["progress_outcome"] == "no_progress"
+                assert result.decision.requires_clarification
+                assert "confirmation_payload" not in result.patch
+            assert response_intent["kind"] == "clarification"
+            assert "assumption" in response_intent["requested_fields"]
+            retained = response_intent["facts"]["ambiguous_fields"]
             assert any(
                 field["candidate_normalized_value"] == {"initial_capital": SEED}
                 for field in retained

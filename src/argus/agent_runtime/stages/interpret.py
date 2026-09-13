@@ -518,11 +518,7 @@ async def _stage_result_from_interpretation(
     expects_strategy_route = _strategy_route_expected(
         intent=interpretation.intent,
         semantic_turn_act=interpretation.semantic_turn_act,
-    ) or (
-        # A resolved asset or date alone names what the user is talking about;
-        # only execution evidence may pull a non-strategy turn onto this route.
-        interpretation.semantic_turn_act != "result_followup"
-        and strategy_has_execution_evidence(interpretation.candidate_strategy_draft)
+        has_execution_evidence=strategy_has_execution_evidence(interpretation.candidate_strategy_draft),
     )
     (
         expects_strategy_route,
