@@ -1,0 +1,14 @@
+{
+  "side": "candidate",
+  "attempt": 9,
+  "http_errors": [
+    {
+      "kind": "research_http_error",
+      "attempt": 9,
+      "http_status": 500,
+      "method": "POST",
+      "time": 1789284822.287584
+    }
+  ],
+  "capture": "Read-only profile observer; no headers, URLs, bodies or native function changes."
+}

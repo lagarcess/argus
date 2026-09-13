@@ -1,0 +1,13 @@
+{
+  "pr": 603,
+  "head_sha": "fc2eaa99fddf6480b9b7e7c37869a444e2b9a4fe",
+  "job_url": "https://github.com/lagarcess/argus/actions/runs/34743980167/job/103688349272",
+  "backend_passed": 7861,
+  "backend_failed": 1,
+  "backend_skipped": 585,
+  "failed_test": "tests/test_private_alpha_release_docs.py::test_main_promotion_manifests_require_live_eval_scorecard_evidence",
+  "failure_reason": "Baseline A/B document has four attempts; minimum ten required.",
+  "current_local_validator_result": "24 passed after completion of ten pairs; validator unchanged",
+  "fresh_codex_review_required_at_final_acceptance_head": true,
+  "prior_codex_summary_head": "2d99bcb4edc6c9e817a524fa295c8d67776ff549"
+}

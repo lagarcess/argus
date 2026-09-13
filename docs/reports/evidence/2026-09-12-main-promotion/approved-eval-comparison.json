@@ -1,5 +1,5 @@
 {
-  "status": "candidate_regression_stop",
+  "status": "ab_completed_founder_merge_disposition_pending",
   "baseline_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
   "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
   "candidate_native_sha256": "712420b741f6922a29b5e935a6d2a01fe833a40bc33d134d5f97c7617ce4d0cd",
@@ -173,9 +173,9 @@
   "full_environment_identical": true,
   "prior_partial_candidate_excluded_from_quality_comparison": true,
   "prior_partial_candidate_cost_included": true,
-  "guarded_total_usd": 6.2585125893,
-  "tracked_cost_usd": 5.1785125893,
-  "guard_reserve_usd": 1.08,
+  "guarded_total_usd": 7.1729416335,
+  "tracked_cost_usd": 6.0129416335,
+  "guard_reserve_usd": 1.16,
   "reserve_is_not_actual_spend": true,
   "combined_cap_usd": 12.5,
   "fresh_candidate_tracked_cost_usd": 1.8923231143,
@@ -210,13 +210,13 @@
     "release_gate": "The founder retained the existing ten-pair release rule. Targeted A/B evidence and stop/result are recorded separately."
   },
   "targeted_ab": {
-    "state": "candidate_regression_stop",
+    "state": "completed",
     "measurements": {
       "baseline": {
-        "attempts": 4,
+        "attempts": 10,
         "failed_count": 0,
         "failed_rate": 0.0,
-        "passed_count": 4,
+        "passed_count": 10,
         "passed_rate": 1.0,
         "research_timeout_count": 0,
         "research_timeout_rate": 0.0,
@@ -224,19 +224,21 @@
         "fixture_comparison_note": "Inputs are identical. Each build retains its committed typed expectations and prose rubric; production expects a future-performance limitation, candidate expects researched scenarios."
       },
       "candidate": {
-        "attempts": 4,
-        "failed_count": 3,
-        "failed_rate": 0.75,
-        "passed_count": 1,
-        "passed_rate": 0.25,
-        "research_timeout_count": 0,
-        "research_timeout_rate": 0.0,
+        "attempts": 10,
+        "failed_count": 6,
+        "failed_rate": 0.6,
+        "passed_count": 4,
+        "passed_rate": 0.4,
+        "research_timeout_count": 1,
+        "research_timeout_rate": 0.1,
         "criterion": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded.",
         "fixture_comparison_note": "Inputs are identical. Each build retains its committed typed expectations and prose rubric; production expects a future-performance limitation, candidate expects researched scenarios."
       }
     },
-    "candidate_failure_excess": 3,
+    "candidate_failure_excess": 6,
+    "failure_gap_stop_applies": false,
     "baseline_document": "targeted-ab-baseline.json",
-    "candidate_document": "targeted-ab-candidate.json"
+    "candidate_document": "targeted-ab-candidate.json",
+    "founder_disposition_document": "founder-research-disposition.json"
   }
 }

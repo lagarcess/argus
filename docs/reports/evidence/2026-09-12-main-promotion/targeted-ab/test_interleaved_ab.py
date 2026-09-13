@@ -15,6 +15,7 @@ from tests.evals.measurement_eval_scorecard import build_scorecard_provenance, v
 from argus.domain.market_data.assets import clear_asset_cache  # noqa: E402
 import pytest  # noqa: E402
 import promotion_observer  # noqa: E402
+import promotion_http_observer  # noqa: E402
 
 CASE_ID = 'messy_spanish_future_performance_nvda_cruce_dorado'
 SIDE = promotion_observer.SIDE
@@ -31,7 +32,15 @@ def test_targeted_case(attempt):
                if name.startswith('argus') and getattr(module, '__file__', None))
     started = time.time()
     promotion_observer.emit({'kind': 'targeted_ab_start', 'attempt': attempt, 'case_id': CASE_ID})
-    result = run_eval_case(case)
+    finish_http_capture = promotion_http_observer.install(attempt)
+    try:
+        result = run_eval_case(case)
+    finally:
+        http_errors = finish_http_capture()
+        http_path = CONTROL / 'targeted-ab' / f'http-attempt-{attempt:02d}-{SIDE}.json'
+        with http_path.open('x') as output:
+            output.write(json.dumps({'side': SIDE, 'attempt': attempt, 'http_errors': http_errors,
+                'capture': 'Read-only profile observer; no headers, URLs, bodies or native function changes.'}, indent=2) + '\n')
     assert_provenance_matches_current_run(provenance)
     research = (result.get('typed_outcome') or {}).get('research') or {}
     timeout = research.get('degraded_code') == 'research_unavailable_timeout'
@@ -40,7 +49,8 @@ def test_targeted_case(attempt):
               'side': SIDE, 'attempt': attempt, 'started_at_epoch': started,
               'finished_at_epoch': time.time(), 'provenance': validated_provenance_payload(provenance),
               'targeted_case_sha256': targeted_hash, 'native_case': case.raw,
-              'argus_imports_local': True, 'result': result,
+              'argus_imports_local': True, 'result': result, 'research_http_errors': http_errors,
+              'research_delivery_failed': bool(research and research.get('published') is False),
               'measurement': {'failed': failed, 'research_timeout': timeout,
                   'classification': 'Any native non-pass or research timeout is a failed attempt. No attempt is discarded.'}}
     path = CONTROL / 'targeted-ab' / f'attempt-{attempt:02d}-{SIDE}.json'

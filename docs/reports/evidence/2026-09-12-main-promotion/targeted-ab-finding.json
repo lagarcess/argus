@@ -1,5 +1,5 @@
 {
-  "status": "blocking_finding",
+  "status": "classified_pending_founder_merge_decision",
   "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
   "measurement_stop": "candidate_regression_stop",
   "paired_rounds_completed": 4,
@@ -51,7 +51,7 @@
     "baseline": 0,
     "candidate": 0
   },
-  "root_cause": "Not established. The native evidence proves the failed outcomes and the founder stop threshold, not a specific implementation defect.",
+  "root_cause": "Forward-looking questions now depend on research. The native research path returns a disclosed search-unavailable answer immediately on a provider error, without retrying that provider error. A provider error window therefore becomes visible as delivery failures.",
   "native_rubrics_differ": true,
   "native_inputs_identical": true,
   "validator_unchanged": true,
@@ -61,5 +61,13 @@
   "browser_stack_remains_stopped": true,
   "customer_text_pulled": false,
   "production_mutations": [],
-  "required_next_decision": "Founder direction on the blocking research-delivery and unsupported-recovery finding before continuing promotion. Routing or model-facing fixes require the separate stop specified in this task."
+  "required_next_decision": "Founder decides at merge stop whether to promote with the research retry still pending.",
+  "historical_status": "blocking_finding",
+  "founder_disposition_document": "founder-research-disposition.json",
+  "completion_document": "targeted-ab-completion-verification.json",
+  "completed_native_failure_rates": {
+    "baseline": 0.0,
+    "candidate": 0.6
+  },
+  "continued_attempt_details": "founder-research-disposition.json"
 }

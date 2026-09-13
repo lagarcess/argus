@@ -130,7 +130,7 @@
   },
   "environment_identical_to_completed_pair": true,
   "environment_source_sha256": "6a428549c310bd43ea51b46f2c106602284618c44bbe41b382b0289728edf45d",
-  "generated_at": "2026-09-13T06:50:20.177010+00:00",
+  "generated_at": "2026-09-13T07:39:10.215512+00:00",
   "paired_execution": {
     "order": "baseline_then_candidate_per_round",
     "planned_rounds": 10,
@@ -138,21 +138,28 @@
       1,
       2,
       3,
-      4
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
     ],
-    "state": "candidate_regression_stop"
+    "state": "completed"
   },
   "measurement": {
-    "attempts": 4,
+    "attempts": 10,
     "failed_count": 0,
     "failed_rate": 0.0,
-    "passed_count": 4,
+    "passed_count": 10,
     "passed_rate": 1.0,
     "research_timeout_count": 0,
     "research_timeout_rate": 0.0,
     "criterion": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded.",
     "fixture_comparison_note": "Inputs are identical. Each build retains its committed typed expectations and prose rubric; production expects a future-performance limitation, candidate expects researched scenarios."
   },
+  "founder_disposition_document": "founder-research-disposition.json",
   "attempts": [
     {
       "scorecard_kind": "live_targeted_interleaved_ab_attempt",
@@ -3141,6 +3148,3874 @@
           }
         ]
       },
+      "measurement": {
+        "failed": false,
+        "research_timeout": false,
+        "classification": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded."
+      }
+    },
+    {
+      "scorecard_kind": "live_targeted_interleaved_ab_attempt",
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "side": "baseline",
+      "attempt": 5,
+      "started_at_epoch": 1789283476.6985369,
+      "finished_at_epoch": 1789283554.4784179,
+      "provenance": {
+        "evaluation_mode": "live",
+        "market_data_provider_mode": "live_provider",
+        "asset_provider_mode": "live_provider",
+        "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+        "python_version": "3.10.20",
+        "fixture_sha256": "1680a195886c2461e5f8bbbe87f7c3b545a45da189dee8a1f25109409e90ece9",
+        "fixture_case_ids": [
+          "action_chip_run_visible_confirmation_aapl",
+          "action_chip_change_asset_remove_aapl_issue_188",
+          "action_chip_change_asset_bare_ticker_append_issue_190",
+          "action_chip_change_asset_compound_replace_issue_188",
+          "action_chip_change_asset_changed_mind_capital_issue_188",
+          "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+          "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+          "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+          "natural_language_establishes_modeled_costs_issue_271",
+          "action_chip_add_asset_preserves_modeled_costs_issue_271",
+          "compound_benchmark_start_date_preserves_confirmation_issue_339",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+          "asset_discovery_category_english_issue_244",
+          "asset_discovery_peer_anchor_english_issue_244",
+          "asset_discovery_comparison_anchor_english_issue_244",
+          "asset_discovery_category_spanish_issue_244",
+          "asset_discovery_recent_ipo_exact_issue_344",
+          "asset_discovery_trending_crypto_exact_issue_344",
+          "asset_discovery_old_pharma_escalation_exact_issue_344",
+          "asset_discovery_semantic_pharma_escalation_issue_344",
+          "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+          "asset_discovery_not_direct_backtest_issue_244",
+          "asset_discovery_not_result_followup_issue_244",
+          "asset_discovery_not_capability_question_issue_244",
+          "metric_correctness_eth_default_crypto_benchmark",
+          "capability_honesty_options_straddle_tsla",
+          "capability_honesty_golden_cross_control_aapl",
+          "capability_honesty_momentum_breakout_aapl",
+          "capability_honesty_news_sentiment_rule_aapl",
+          "capability_honesty_future_performance_nvda_golden_cross",
+          "capability_honesty_future_performance_btc_regression",
+          "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+          "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+          "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+          "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+          "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+          "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+          "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+          "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+          "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+          "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+          "dca_capital_semantics_crypto_weekly_btc_issue_455",
+          "dca_capital_semantics_truncated_window_measures_served_issue_455",
+          "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+          "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+          "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+          "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+          "graceful_recovery_weekly_options_aapl",
+          "graceful_recovery_spanish_weekly_options_aapl",
+          "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+          "messy_english_opening_apple_capital_missing_period_issue_336",
+          "messy_english_aapl_simple_hold_2024",
+          "messy_english_company_name_multi_asset_issue_142",
+          "messy_english_complete_sma_crossover_benchmark_issue_270",
+          "messy_english_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_btc_hold_q1_2024",
+          "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_future_performance_nvda_cruce_dorado",
+          "spanish_ui_english_user_msft_hold_h1_2024"
+        ],
+        "worktree_clean": true,
+        "live_market_data_probe": {
+          "symbol": "SPY",
+          "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-10"
+          },
+          "effective_date_range": {
+            "start": "2024-01-02",
+            "end": "2024-01-10"
+          },
+          "adjustment_reason": "calendar_alignment"
+        }
+      },
+      "targeted_case_sha256": "a80599bba759d9e433593b9f1b69a838e87ba3f20a66479eb90f1944504b495b",
+      "native_case": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "prompt": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+        "user_language": "es-419",
+        "ui_language": "es-419",
+        "expected": {
+          "offered": {
+            "response": true,
+            "clarification_matches_expected": true
+          },
+          "intent": [
+            "unsupported_or_out_of_scope",
+            "backtest_execution",
+            "strategy_drafting"
+          ],
+          "capability_verdict": "unsupported",
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "capital_amount": 10000,
+          "benchmark_symbol": "SPY",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance"
+          }
+        },
+        "prose_judge": {
+          "criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ]
+        }
+      },
+      "argus_imports_local": true,
+      "result": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "category": "messy_spanish",
+        "status": "passed",
+        "failed_checks": [],
+        "expected_fail": null,
+        "typed_outcome": {
+          "intent": "unsupported_or_out_of_scope",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "requested_strategy_template": "moving_average_crossover",
+          "strategy_type": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "date_range": null,
+          "requested_date_range": null,
+          "effective_date_range": null,
+          "adjustment_reason": null,
+          "benchmark_symbol": "SPY",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "launch_validation_code": null,
+          "missing_required_fields": [
+            "entry_logic",
+            "exit_logic",
+            "date_range"
+          ],
+          "fee_rate": null,
+          "slippage": null,
+          "cost_provenance": {},
+          "launch_execution_realism": null,
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+            "prompt_source": "llm_generated",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                "requested_strategy_template": "moving_average_crossover",
+                "strategy_type": null,
+                "strategy_thesis": "Golden cross moving average crossover strategy",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "$10,000",
+                    "asset_universe": "NVDA",
+                    "strategy_type": "cruce dorado"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "strategy_type": "explicit_user"
+                  },
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.8,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "raw_value": "dentro de diez años"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Test this idea over a historical period"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Compare with buy and hold historically"
+              },
+              {
+                "id": "rsi_threshold",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "compatibility_label": "Use a supported RSI threshold rule"
+              }
+            ]
+          },
+          "semantic_turn_act": "unsupported_request",
+          "asset_discovery": null,
+          "offered": {
+            "response": true,
+            "launch_payload": {},
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "reason_code": "future_performance",
+              "prompt_source": "llm_generated",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                  "requested_strategy_template": "moving_average_crossover",
+                  "strategy_type": null,
+                  "strategy_thesis": "Golden cross moving average crossover strategy",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 10000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "NVDA",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA",
+                        "asset_class": "equity",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "raw_symbol": "NVDA",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "capital_amount": "$10,000",
+                      "asset_universe": "NVDA",
+                      "strategy_type": "cruce dorado"
+                    },
+                    "field_provenance": {
+                      "capital_amount": "explicit_user",
+                      "asset_universe": "explicit_user",
+                      "strategy_type": "explicit_user"
+                    },
+                    "future_horizon_intent": {
+                      "kind": "future_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 10.0,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.8,
+                      "evidence": "dentro de diez años"
+                    }
+                  }
+                },
+                "raw_value": "dentro de diez años"
+              },
+              "options": [
+                {
+                  "id": "option_0",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Test this idea over a historical period"
+                },
+                {
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold",
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Compare with buy and hold historically"
+                },
+                {
+                  "id": "rsi_threshold",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  },
+                  "compatibility_label": "Use a supported RSI threshold rule"
+                }
+              ]
+            },
+            "discovery_symbols": [],
+            "next_experiment_kinds": [],
+            "recovery_option_ids": [
+              "option_0",
+              "buy_and_hold",
+              "rsi_threshold"
+            ],
+            "recovery_code": null,
+            "named_unavailable": [],
+            "dropped_not_named": [],
+            "actionable": true
+          }
+        },
+        "prose_judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "notes": "No violations. The prose avoids promising future predictions (honesty), is entirely in Spanish without English fallback, and exposes no raw runtime error details. The recovery options rendered beside it align with the offered alternatives.",
+          "rubric_version": "argus-prose-quality-v2",
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "judged_assistant_text": {
+            "text": "Argus no puede predecir valores futuros, pero sí puede probar cómo le habría ido a esa idea en el pasado. ¿Quieres revisar el cruce dorado en datos históricos, compararlo con comprar y mantener, o usar un RSI como alternativa?",
+            "sha256": "48245766df4a9e2b55aea3e86b775b2064907b1aa9ca6b1caba5e59a3a452f36",
+            "character_count": 226,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          },
+          "judged_rendered_context": {
+            "text": "{\"recovery_options\": [{\"id\": \"option_0\", \"label\": \"Test this idea over a historical period\"}, {\"id\": \"buy_and_hold\", \"label\": \"Compare with buy and hold historically\"}, {\"id\": \"rsi_threshold\", \"label\": \"Use a supported RSI threshold rule\"}]}",
+            "sha256": "57ae2392d06fd5da0574c300cfab84d950f981dae60c29f0f87afb247439ed71",
+            "character_count": 241,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          }
+        },
+        "infrastructure_errors": [],
+        "route_receipts": [
+          {
+            "task": "asset_mention_preflight",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMAssetMentionExtraction",
+            "latency_ms": 1037,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 805,
+              "completion_tokens": 46,
+              "total_tokens": 851,
+              "cached_tokens": 768,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00031485,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:11:17.738303+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMInterpretationResponse",
+            "latency_ms": 16597,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 10541,
+              "completion_tokens": 1918,
+              "total_tokens": 12459,
+              "cached_tokens": 10496,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00695045,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:11:34.501804+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 8267,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1134,
+              "completion_tokens": 790,
+              "total_tokens": 1924,
+              "cached_tokens": 640,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0027205,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:12:04.513702+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "anthropic/claude-haiku-4.5",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 6706,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": true,
+            "token_usage": {
+              "prompt_tokens": 1292,
+              "completion_tokens": 594,
+              "total_tokens": 1886,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.004262,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:12:11.221071+00:00"
+          },
+          {
+            "task": "interpretation_repair",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "FocusedDateWindowExtraction",
+            "latency_ms": 936,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2052,
+              "completion_tokens": 58,
+              "total_tokens": 2110,
+              "cached_tokens": 128,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0025756,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:12:12.158729+00:00",
+            "repair_effect": {
+              "schema_version": "argus_repair_effect/v1",
+              "trigger_reason": "date_window_intent_uncertain",
+              "repair_applied": true,
+              "changed_fields": [
+                "candidate_strategy_draft.date_range_intent"
+              ],
+              "before_fingerprint": "4fe0b9f4a12eb99c02fa339345ed50af7112755bf384b1aef6929231f7f97937",
+              "after_fingerprint": "87888f996d92ef3109d6057179fee4f1ba26286de08ab06a8e08aa88293ebb72",
+              "no_op_reason": null
+            }
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "SignalRulePlan",
+            "latency_ms": 15280,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1675,
+              "completion_tokens": 1870,
+              "total_tokens": 3545,
+              "cached_tokens": 1152,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00555915,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:12:27.442998+00:00"
+          },
+          {
+            "task": "clarification",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ClarificationResponse",
+            "latency_ms": 4453,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2112,
+              "completion_tokens": 97,
+              "total_tokens": 2209,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00020754,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:12:32.364777+00:00"
+          },
+          {
+            "task": "chat_composer",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ArgusProseJudgeResponse",
+            "latency_ms": 1438,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 753,
+              "completion_tokens": 59,
+              "total_tokens": 812,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 9.005e-05,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:12:33.809519+00:00"
+          }
+        ]
+      },
+      "research_http_errors": [],
+      "research_delivery_failed": false,
+      "measurement": {
+        "failed": false,
+        "research_timeout": false,
+        "classification": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded."
+      }
+    },
+    {
+      "scorecard_kind": "live_targeted_interleaved_ab_attempt",
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "side": "baseline",
+      "attempt": 6,
+      "started_at_epoch": 1789283702.750732,
+      "finished_at_epoch": 1789283776.518216,
+      "provenance": {
+        "evaluation_mode": "live",
+        "market_data_provider_mode": "live_provider",
+        "asset_provider_mode": "live_provider",
+        "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+        "python_version": "3.10.20",
+        "fixture_sha256": "1680a195886c2461e5f8bbbe87f7c3b545a45da189dee8a1f25109409e90ece9",
+        "fixture_case_ids": [
+          "action_chip_run_visible_confirmation_aapl",
+          "action_chip_change_asset_remove_aapl_issue_188",
+          "action_chip_change_asset_bare_ticker_append_issue_190",
+          "action_chip_change_asset_compound_replace_issue_188",
+          "action_chip_change_asset_changed_mind_capital_issue_188",
+          "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+          "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+          "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+          "natural_language_establishes_modeled_costs_issue_271",
+          "action_chip_add_asset_preserves_modeled_costs_issue_271",
+          "compound_benchmark_start_date_preserves_confirmation_issue_339",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+          "asset_discovery_category_english_issue_244",
+          "asset_discovery_peer_anchor_english_issue_244",
+          "asset_discovery_comparison_anchor_english_issue_244",
+          "asset_discovery_category_spanish_issue_244",
+          "asset_discovery_recent_ipo_exact_issue_344",
+          "asset_discovery_trending_crypto_exact_issue_344",
+          "asset_discovery_old_pharma_escalation_exact_issue_344",
+          "asset_discovery_semantic_pharma_escalation_issue_344",
+          "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+          "asset_discovery_not_direct_backtest_issue_244",
+          "asset_discovery_not_result_followup_issue_244",
+          "asset_discovery_not_capability_question_issue_244",
+          "metric_correctness_eth_default_crypto_benchmark",
+          "capability_honesty_options_straddle_tsla",
+          "capability_honesty_golden_cross_control_aapl",
+          "capability_honesty_momentum_breakout_aapl",
+          "capability_honesty_news_sentiment_rule_aapl",
+          "capability_honesty_future_performance_nvda_golden_cross",
+          "capability_honesty_future_performance_btc_regression",
+          "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+          "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+          "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+          "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+          "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+          "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+          "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+          "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+          "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+          "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+          "dca_capital_semantics_crypto_weekly_btc_issue_455",
+          "dca_capital_semantics_truncated_window_measures_served_issue_455",
+          "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+          "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+          "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+          "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+          "graceful_recovery_weekly_options_aapl",
+          "graceful_recovery_spanish_weekly_options_aapl",
+          "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+          "messy_english_opening_apple_capital_missing_period_issue_336",
+          "messy_english_aapl_simple_hold_2024",
+          "messy_english_company_name_multi_asset_issue_142",
+          "messy_english_complete_sma_crossover_benchmark_issue_270",
+          "messy_english_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_btc_hold_q1_2024",
+          "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_future_performance_nvda_cruce_dorado",
+          "spanish_ui_english_user_msft_hold_h1_2024"
+        ],
+        "worktree_clean": true,
+        "live_market_data_probe": {
+          "symbol": "SPY",
+          "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-10"
+          },
+          "effective_date_range": {
+            "start": "2024-01-02",
+            "end": "2024-01-10"
+          },
+          "adjustment_reason": "calendar_alignment"
+        }
+      },
+      "targeted_case_sha256": "a80599bba759d9e433593b9f1b69a838e87ba3f20a66479eb90f1944504b495b",
+      "native_case": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "prompt": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+        "user_language": "es-419",
+        "ui_language": "es-419",
+        "expected": {
+          "offered": {
+            "response": true,
+            "clarification_matches_expected": true
+          },
+          "intent": [
+            "unsupported_or_out_of_scope",
+            "backtest_execution",
+            "strategy_drafting"
+          ],
+          "capability_verdict": "unsupported",
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "capital_amount": 10000,
+          "benchmark_symbol": "SPY",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance"
+          }
+        },
+        "prose_judge": {
+          "criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ]
+        }
+      },
+      "argus_imports_local": true,
+      "result": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "category": "messy_spanish",
+        "status": "passed",
+        "failed_checks": [],
+        "expected_fail": null,
+        "typed_outcome": {
+          "intent": "unsupported_or_out_of_scope",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "requested_strategy_template": null,
+          "strategy_type": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "date_range": null,
+          "requested_date_range": null,
+          "effective_date_range": null,
+          "adjustment_reason": null,
+          "benchmark_symbol": "SPY",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "launch_validation_code": null,
+          "missing_required_fields": [
+            "entry_logic",
+            "exit_logic",
+            "date_range"
+          ],
+          "fee_rate": null,
+          "slippage": null,
+          "cost_provenance": {},
+          "launch_execution_realism": null,
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+            "prompt_source": "llm_generated",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                "requested_strategy_template": null,
+                "strategy_type": null,
+                "strategy_thesis": "Cruce dorado en NVDA",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "asset_universe": "NVDA",
+                    "capital_amount": "$10,000",
+                    "date_range_raw_text": "dentro de diez años"
+                  },
+                  "field_provenance": {
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "explicit_user"
+                  },
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.8,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "raw_value": "dentro de diez años"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Test this idea over a historical period"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Compare with buy and hold historically"
+              },
+              {
+                "id": "rsi_threshold",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "compatibility_label": "Use a supported RSI threshold rule"
+              }
+            ]
+          },
+          "semantic_turn_act": "unsupported_request",
+          "asset_discovery": null,
+          "offered": {
+            "response": true,
+            "launch_payload": {},
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "reason_code": "future_performance",
+              "prompt_source": "llm_generated",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                  "requested_strategy_template": null,
+                  "strategy_type": null,
+                  "strategy_thesis": "Cruce dorado en NVDA",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 10000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "NVDA",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA",
+                        "asset_class": "equity",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "raw_symbol": "NVDA",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "asset_universe": "NVDA",
+                      "capital_amount": "$10,000",
+                      "date_range_raw_text": "dentro de diez años"
+                    },
+                    "field_provenance": {
+                      "asset_universe": "explicit_user",
+                      "capital_amount": "explicit_user"
+                    },
+                    "future_horizon_intent": {
+                      "kind": "future_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 10.0,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.8,
+                      "evidence": "dentro de diez años"
+                    }
+                  }
+                },
+                "raw_value": "dentro de diez años"
+              },
+              "options": [
+                {
+                  "id": "option_0",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Test this idea over a historical period"
+                },
+                {
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold",
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Compare with buy and hold historically"
+                },
+                {
+                  "id": "rsi_threshold",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  },
+                  "compatibility_label": "Use a supported RSI threshold rule"
+                }
+              ]
+            },
+            "discovery_symbols": [],
+            "next_experiment_kinds": [],
+            "recovery_option_ids": [
+              "option_0",
+              "buy_and_hold",
+              "rsi_threshold"
+            ],
+            "recovery_code": null,
+            "named_unavailable": [],
+            "dropped_not_named": [],
+            "actionable": true
+          }
+        },
+        "prose_judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "notes": "The assistant honestly states it cannot predict future values or execute the golden cross exactly as asked, and redirects to historical simulation or alternative strategies. The recovery options rendered beside the reply support the offered alternatives (historical test, buy-and-hold comparison, RSI rule). No raw runtime errors, English fallback, or blame of the user appear. The Spanish is natural and fluent for the session.",
+          "rubric_version": "argus-prose-quality-v2",
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "judged_assistant_text": {
+            "text": "Entiendo tu idea, pero Argus no puede predecir valores futuros ni ejecutar un cruce dorado exactamente como lo planteas. Lo que sí podemos hacer es probar una estrategia similar con datos históricos. ¿Te gustaría simular un cruce de medias móviles (como 50/200) en un período pasado, compararlo con comprar y mantener, o usar un RSI como alternativa?",
+            "sha256": "6ce16d3626c743bc3598343a610a91dc19c72dc6cbfdd5258e8555f60b53b615",
+            "character_count": 350,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          },
+          "judged_rendered_context": {
+            "text": "{\"recovery_options\": [{\"id\": \"option_0\", \"label\": \"Test this idea over a historical period\"}, {\"id\": \"buy_and_hold\", \"label\": \"Compare with buy and hold historically\"}, {\"id\": \"rsi_threshold\", \"label\": \"Use a supported RSI threshold rule\"}]}",
+            "sha256": "57ae2392d06fd5da0574c300cfab84d950f981dae60c29f0f87afb247439ed71",
+            "character_count": 241,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          }
+        },
+        "infrastructure_errors": [],
+        "route_receipts": [
+          {
+            "task": "asset_mention_preflight",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMAssetMentionExtraction",
+            "latency_ms": 950,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 805,
+              "completion_tokens": 46,
+              "total_tokens": 851,
+              "cached_tokens": 768,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00031485,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:15:03.703469+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMInterpretationResponse",
+            "latency_ms": 19578,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 10541,
+              "completion_tokens": 2085,
+              "total_tokens": 12626,
+              "cached_tokens": 10496,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00736795,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:15:23.411795+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 6414,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1062,
+              "completion_tokens": 590,
+              "total_tokens": 1652,
+              "cached_tokens": 192,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0026009,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:15:52.161982+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "anthropic/claude-haiku-4.5",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 3620,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": true,
+            "token_usage": {
+              "prompt_tokens": 1188,
+              "completion_tokens": 411,
+              "total_tokens": 1599,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.003243,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:15:55.783439+00:00"
+          },
+          {
+            "task": "interpretation_repair",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "FocusedDateWindowExtraction",
+            "latency_ms": 1258,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2045,
+              "completion_tokens": 58,
+              "total_tokens": 2103,
+              "cached_tokens": 128,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00256685,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:15:57.044026+00:00",
+            "repair_effect": {
+              "schema_version": "argus_repair_effect/v1",
+              "trigger_reason": "date_window_intent_uncertain",
+              "repair_applied": true,
+              "changed_fields": [
+                "candidate_strategy_draft.date_range_intent"
+              ],
+              "before_fingerprint": "d1d3a5e9b325b71a00b0b8aceaa0da8177608050c11fe6e8d73235c787bbf7ab",
+              "after_fingerprint": "9f01d680cd44d34da6d9404c8adb1bb089ee4299bdd88fca968d378fef2dd3d2",
+              "no_op_reason": null
+            }
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "SignalRulePlan",
+            "latency_ms": 13980,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1668,
+              "completion_tokens": 1330,
+              "total_tokens": 2998,
+              "cached_tokens": 1152,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0042004,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:16:11.028156+00:00"
+          },
+          {
+            "task": "clarification",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ClarificationResponse",
+            "latency_ms": 2818,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2084,
+              "completion_tokens": 128,
+              "total_tokens": 2212,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0002106,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:16:14.317240+00:00"
+          },
+          {
+            "task": "chat_composer",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ArgusProseJudgeResponse",
+            "latency_ms": 1526,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 787,
+              "completion_tokens": 96,
+              "total_tokens": 883,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0001027,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:16:15.848591+00:00"
+          }
+        ]
+      },
+      "research_http_errors": [],
+      "research_delivery_failed": false,
+      "measurement": {
+        "failed": false,
+        "research_timeout": false,
+        "classification": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded."
+      }
+    },
+    {
+      "scorecard_kind": "live_targeted_interleaved_ab_attempt",
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "side": "baseline",
+      "attempt": 7,
+      "started_at_epoch": 1789284052.401671,
+      "finished_at_epoch": 1789284120.140993,
+      "provenance": {
+        "evaluation_mode": "live",
+        "market_data_provider_mode": "live_provider",
+        "asset_provider_mode": "live_provider",
+        "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+        "python_version": "3.10.20",
+        "fixture_sha256": "1680a195886c2461e5f8bbbe87f7c3b545a45da189dee8a1f25109409e90ece9",
+        "fixture_case_ids": [
+          "action_chip_run_visible_confirmation_aapl",
+          "action_chip_change_asset_remove_aapl_issue_188",
+          "action_chip_change_asset_bare_ticker_append_issue_190",
+          "action_chip_change_asset_compound_replace_issue_188",
+          "action_chip_change_asset_changed_mind_capital_issue_188",
+          "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+          "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+          "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+          "natural_language_establishes_modeled_costs_issue_271",
+          "action_chip_add_asset_preserves_modeled_costs_issue_271",
+          "compound_benchmark_start_date_preserves_confirmation_issue_339",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+          "asset_discovery_category_english_issue_244",
+          "asset_discovery_peer_anchor_english_issue_244",
+          "asset_discovery_comparison_anchor_english_issue_244",
+          "asset_discovery_category_spanish_issue_244",
+          "asset_discovery_recent_ipo_exact_issue_344",
+          "asset_discovery_trending_crypto_exact_issue_344",
+          "asset_discovery_old_pharma_escalation_exact_issue_344",
+          "asset_discovery_semantic_pharma_escalation_issue_344",
+          "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+          "asset_discovery_not_direct_backtest_issue_244",
+          "asset_discovery_not_result_followup_issue_244",
+          "asset_discovery_not_capability_question_issue_244",
+          "metric_correctness_eth_default_crypto_benchmark",
+          "capability_honesty_options_straddle_tsla",
+          "capability_honesty_golden_cross_control_aapl",
+          "capability_honesty_momentum_breakout_aapl",
+          "capability_honesty_news_sentiment_rule_aapl",
+          "capability_honesty_future_performance_nvda_golden_cross",
+          "capability_honesty_future_performance_btc_regression",
+          "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+          "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+          "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+          "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+          "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+          "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+          "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+          "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+          "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+          "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+          "dca_capital_semantics_crypto_weekly_btc_issue_455",
+          "dca_capital_semantics_truncated_window_measures_served_issue_455",
+          "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+          "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+          "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+          "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+          "graceful_recovery_weekly_options_aapl",
+          "graceful_recovery_spanish_weekly_options_aapl",
+          "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+          "messy_english_opening_apple_capital_missing_period_issue_336",
+          "messy_english_aapl_simple_hold_2024",
+          "messy_english_company_name_multi_asset_issue_142",
+          "messy_english_complete_sma_crossover_benchmark_issue_270",
+          "messy_english_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_btc_hold_q1_2024",
+          "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_future_performance_nvda_cruce_dorado",
+          "spanish_ui_english_user_msft_hold_h1_2024"
+        ],
+        "worktree_clean": true,
+        "live_market_data_probe": {
+          "symbol": "SPY",
+          "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-10"
+          },
+          "effective_date_range": {
+            "start": "2024-01-02",
+            "end": "2024-01-10"
+          },
+          "adjustment_reason": "calendar_alignment"
+        }
+      },
+      "targeted_case_sha256": "a80599bba759d9e433593b9f1b69a838e87ba3f20a66479eb90f1944504b495b",
+      "native_case": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "prompt": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+        "user_language": "es-419",
+        "ui_language": "es-419",
+        "expected": {
+          "offered": {
+            "response": true,
+            "clarification_matches_expected": true
+          },
+          "intent": [
+            "unsupported_or_out_of_scope",
+            "backtest_execution",
+            "strategy_drafting"
+          ],
+          "capability_verdict": "unsupported",
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "capital_amount": 10000,
+          "benchmark_symbol": "SPY",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance"
+          }
+        },
+        "prose_judge": {
+          "criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ]
+        }
+      },
+      "argus_imports_local": true,
+      "result": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "category": "messy_spanish",
+        "status": "passed",
+        "failed_checks": [],
+        "expected_fail": null,
+        "typed_outcome": {
+          "intent": "unsupported_or_out_of_scope",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "requested_strategy_template": "moving_average_crossover",
+          "strategy_type": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "date_range": null,
+          "requested_date_range": null,
+          "effective_date_range": null,
+          "adjustment_reason": null,
+          "benchmark_symbol": "SPY",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "launch_validation_code": null,
+          "missing_required_fields": [
+            "entry_logic",
+            "exit_logic",
+            "date_range"
+          ],
+          "fee_rate": null,
+          "slippage": null,
+          "cost_provenance": {},
+          "launch_execution_realism": null,
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+            "prompt_source": "llm_generated",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                "requested_strategy_template": "moving_average_crossover",
+                "strategy_type": null,
+                "strategy_thesis": "estrategia de cruce dorado",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "$10,000",
+                    "asset_universe": "NVDA"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "strategy_type": "explicit_user"
+                  },
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.8,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "raw_value": "dentro de diez años"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Test this idea over a historical period"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Compare with buy and hold historically"
+              },
+              {
+                "id": "rsi_threshold",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "compatibility_label": "Use a supported RSI threshold rule"
+              }
+            ]
+          },
+          "semantic_turn_act": "unsupported_request",
+          "asset_discovery": null,
+          "offered": {
+            "response": true,
+            "launch_payload": {},
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "reason_code": "future_performance",
+              "prompt_source": "llm_generated",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                  "requested_strategy_template": "moving_average_crossover",
+                  "strategy_type": null,
+                  "strategy_thesis": "estrategia de cruce dorado",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 10000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "NVDA",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA",
+                        "asset_class": "equity",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "raw_symbol": "NVDA",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "capital_amount": "$10,000",
+                      "asset_universe": "NVDA"
+                    },
+                    "field_provenance": {
+                      "capital_amount": "explicit_user",
+                      "asset_universe": "explicit_user",
+                      "strategy_type": "explicit_user"
+                    },
+                    "future_horizon_intent": {
+                      "kind": "future_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 10.0,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.8,
+                      "evidence": "dentro de diez años"
+                    }
+                  }
+                },
+                "raw_value": "dentro de diez años"
+              },
+              "options": [
+                {
+                  "id": "option_0",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Test this idea over a historical period"
+                },
+                {
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold",
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Compare with buy and hold historically"
+                },
+                {
+                  "id": "rsi_threshold",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  },
+                  "compatibility_label": "Use a supported RSI threshold rule"
+                }
+              ]
+            },
+            "discovery_symbols": [],
+            "next_experiment_kinds": [],
+            "recovery_option_ids": [
+              "option_0",
+              "buy_and_hold",
+              "rsi_threshold"
+            ],
+            "recovery_code": null,
+            "named_unavailable": [],
+            "dropped_not_named": [],
+            "actionable": true
+          }
+        },
+        "prose_judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "notes": "The response correctly avoids predicting future values, does not leak English fallback copy, and does not expose raw runtime errors.",
+          "rubric_version": "argus-prose-quality-v2",
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "judged_assistant_text": {
+            "text": "Argus no puede predecir valores futuros, pero sí puede probar esta idea con datos históricos. El cruce dorado (50/200) es una estrategia soportada. ¿Qué prefieres?",
+            "sha256": "85f11cb974f6ac9b88208d0377bba82ff24beeb061278f97b6c0efa769c806d2",
+            "character_count": 163,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          },
+          "judged_rendered_context": {
+            "text": "{\"recovery_options\": [{\"id\": \"option_0\", \"label\": \"Test this idea over a historical period\"}, {\"id\": \"buy_and_hold\", \"label\": \"Compare with buy and hold historically\"}, {\"id\": \"rsi_threshold\", \"label\": \"Use a supported RSI threshold rule\"}]}",
+            "sha256": "57ae2392d06fd5da0574c300cfab84d950f981dae60c29f0f87afb247439ed71",
+            "character_count": 241,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          }
+        },
+        "infrastructure_errors": [],
+        "route_receipts": [
+          {
+            "task": "asset_mention_preflight",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMAssetMentionExtraction",
+            "latency_ms": 976,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 805,
+              "completion_tokens": 46,
+              "total_tokens": 851,
+              "cached_tokens": 768,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00031485,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:20:53.380547+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMInterpretationResponse",
+            "latency_ms": 16486,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 10541,
+              "completion_tokens": 2009,
+              "total_tokens": 12550,
+              "cached_tokens": 10496,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00717795,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:21:10.008747+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 6723,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1102,
+              "completion_tokens": 834,
+              "total_tokens": 1936,
+              "cached_tokens": 192,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0032609,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:21:37.926379+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "anthropic/claude-haiku-4.5",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 4093,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": true,
+            "token_usage": {
+              "prompt_tokens": 1239,
+              "completion_tokens": 436,
+              "total_tokens": 1675,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.003419,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:21:42.020992+00:00"
+          },
+          {
+            "task": "interpretation_repair",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "FocusedDateWindowExtraction",
+            "latency_ms": 1124,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2069,
+              "completion_tokens": 58,
+              "total_tokens": 2127,
+              "cached_tokens": 128,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00259685,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:21:43.147785+00:00",
+            "repair_effect": {
+              "schema_version": "argus_repair_effect/v1",
+              "trigger_reason": "date_window_intent_uncertain",
+              "repair_applied": true,
+              "changed_fields": [
+                "candidate_strategy_draft.date_range_intent"
+              ],
+              "before_fingerprint": "4132fe7748a540ad4c775d867a0b3102becf4f05feed6f99e7a283567cf9de78",
+              "after_fingerprint": "b74a8e00be95b24cdbfdccf025653f8c77076bbe3b1e1e589da6118f3823048a",
+              "no_op_reason": null
+            }
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "SignalRulePlan",
+            "latency_ms": 13470,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1681,
+              "completion_tokens": 1578,
+              "total_tokens": 3259,
+              "cached_tokens": 1152,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00483665,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:21:56.622559+00:00"
+          },
+          {
+            "task": "clarification",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ClarificationResponse",
+            "latency_ms": 1487,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2112,
+              "completion_tokens": 83,
+              "total_tokens": 2195,
+              "cached_tokens": 1024,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.000131292,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:21:58.578900+00:00"
+          },
+          {
+            "task": "chat_composer",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ArgusProseJudgeResponse",
+            "latency_ms": 889,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 820,
+              "completion_tokens": 41,
+              "total_tokens": 861,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 4.48294e-05,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:21:59.473021+00:00"
+          }
+        ]
+      },
+      "research_http_errors": [],
+      "research_delivery_failed": false,
+      "measurement": {
+        "failed": false,
+        "research_timeout": false,
+        "classification": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded."
+      }
+    },
+    {
+      "scorecard_kind": "live_targeted_interleaved_ab_attempt",
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "side": "baseline",
+      "attempt": 8,
+      "started_at_epoch": 1789284301.175207,
+      "finished_at_epoch": 1789284373.37644,
+      "provenance": {
+        "evaluation_mode": "live",
+        "market_data_provider_mode": "live_provider",
+        "asset_provider_mode": "live_provider",
+        "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+        "python_version": "3.10.20",
+        "fixture_sha256": "1680a195886c2461e5f8bbbe87f7c3b545a45da189dee8a1f25109409e90ece9",
+        "fixture_case_ids": [
+          "action_chip_run_visible_confirmation_aapl",
+          "action_chip_change_asset_remove_aapl_issue_188",
+          "action_chip_change_asset_bare_ticker_append_issue_190",
+          "action_chip_change_asset_compound_replace_issue_188",
+          "action_chip_change_asset_changed_mind_capital_issue_188",
+          "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+          "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+          "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+          "natural_language_establishes_modeled_costs_issue_271",
+          "action_chip_add_asset_preserves_modeled_costs_issue_271",
+          "compound_benchmark_start_date_preserves_confirmation_issue_339",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+          "asset_discovery_category_english_issue_244",
+          "asset_discovery_peer_anchor_english_issue_244",
+          "asset_discovery_comparison_anchor_english_issue_244",
+          "asset_discovery_category_spanish_issue_244",
+          "asset_discovery_recent_ipo_exact_issue_344",
+          "asset_discovery_trending_crypto_exact_issue_344",
+          "asset_discovery_old_pharma_escalation_exact_issue_344",
+          "asset_discovery_semantic_pharma_escalation_issue_344",
+          "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+          "asset_discovery_not_direct_backtest_issue_244",
+          "asset_discovery_not_result_followup_issue_244",
+          "asset_discovery_not_capability_question_issue_244",
+          "metric_correctness_eth_default_crypto_benchmark",
+          "capability_honesty_options_straddle_tsla",
+          "capability_honesty_golden_cross_control_aapl",
+          "capability_honesty_momentum_breakout_aapl",
+          "capability_honesty_news_sentiment_rule_aapl",
+          "capability_honesty_future_performance_nvda_golden_cross",
+          "capability_honesty_future_performance_btc_regression",
+          "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+          "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+          "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+          "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+          "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+          "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+          "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+          "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+          "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+          "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+          "dca_capital_semantics_crypto_weekly_btc_issue_455",
+          "dca_capital_semantics_truncated_window_measures_served_issue_455",
+          "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+          "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+          "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+          "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+          "graceful_recovery_weekly_options_aapl",
+          "graceful_recovery_spanish_weekly_options_aapl",
+          "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+          "messy_english_opening_apple_capital_missing_period_issue_336",
+          "messy_english_aapl_simple_hold_2024",
+          "messy_english_company_name_multi_asset_issue_142",
+          "messy_english_complete_sma_crossover_benchmark_issue_270",
+          "messy_english_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_btc_hold_q1_2024",
+          "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_future_performance_nvda_cruce_dorado",
+          "spanish_ui_english_user_msft_hold_h1_2024"
+        ],
+        "worktree_clean": true,
+        "live_market_data_probe": {
+          "symbol": "SPY",
+          "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-10"
+          },
+          "effective_date_range": {
+            "start": "2024-01-02",
+            "end": "2024-01-10"
+          },
+          "adjustment_reason": "calendar_alignment"
+        }
+      },
+      "targeted_case_sha256": "a80599bba759d9e433593b9f1b69a838e87ba3f20a66479eb90f1944504b495b",
+      "native_case": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "prompt": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+        "user_language": "es-419",
+        "ui_language": "es-419",
+        "expected": {
+          "offered": {
+            "response": true,
+            "clarification_matches_expected": true
+          },
+          "intent": [
+            "unsupported_or_out_of_scope",
+            "backtest_execution",
+            "strategy_drafting"
+          ],
+          "capability_verdict": "unsupported",
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "capital_amount": 10000,
+          "benchmark_symbol": "SPY",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance"
+          }
+        },
+        "prose_judge": {
+          "criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ]
+        }
+      },
+      "argus_imports_local": true,
+      "result": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "category": "messy_spanish",
+        "status": "passed",
+        "failed_checks": [],
+        "expected_fail": null,
+        "typed_outcome": {
+          "intent": "unsupported_or_out_of_scope",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "requested_strategy_template": null,
+          "strategy_type": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "date_range": null,
+          "requested_date_range": null,
+          "effective_date_range": null,
+          "adjustment_reason": null,
+          "benchmark_symbol": "SPY",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "launch_validation_code": null,
+          "missing_required_fields": [
+            "entry_logic",
+            "exit_logic",
+            "date_range"
+          ],
+          "fee_rate": null,
+          "slippage": null,
+          "cost_provenance": {},
+          "launch_execution_realism": null,
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+            "prompt_source": "llm_generated",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                "requested_strategy_template": null,
+                "strategy_type": null,
+                "strategy_thesis": "estrategia de cruce dorado",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "strategy_type": "estrategia de cruce dorado",
+                    "asset_universe": "NVDA",
+                    "capital_amount": "$10,000"
+                  },
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.8,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "raw_value": "dentro de diez años"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Test this idea over a historical period"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Compare with buy and hold historically"
+              },
+              {
+                "id": "rsi_threshold",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "compatibility_label": "Use a supported RSI threshold rule"
+              }
+            ]
+          },
+          "semantic_turn_act": "unsupported_request",
+          "asset_discovery": null,
+          "offered": {
+            "response": true,
+            "launch_payload": {},
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "reason_code": "future_performance",
+              "prompt_source": "llm_generated",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                  "requested_strategy_template": null,
+                  "strategy_type": null,
+                  "strategy_thesis": "estrategia de cruce dorado",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 10000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "NVDA",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA",
+                        "asset_class": "equity",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "raw_symbol": "NVDA",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "strategy_type": "estrategia de cruce dorado",
+                      "asset_universe": "NVDA",
+                      "capital_amount": "$10,000"
+                    },
+                    "future_horizon_intent": {
+                      "kind": "future_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 10.0,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.8,
+                      "evidence": "dentro de diez años"
+                    }
+                  }
+                },
+                "raw_value": "dentro de diez años"
+              },
+              "options": [
+                {
+                  "id": "option_0",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Test this idea over a historical period"
+                },
+                {
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold",
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Compare with buy and hold historically"
+                },
+                {
+                  "id": "rsi_threshold",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  },
+                  "compatibility_label": "Use a supported RSI threshold rule"
+                }
+              ]
+            },
+            "discovery_symbols": [],
+            "next_experiment_kinds": [],
+            "recovery_option_ids": [
+              "option_0",
+              "buy_and_hold",
+              "rsi_threshold"
+            ],
+            "recovery_code": null,
+            "named_unavailable": [],
+            "dropped_not_named": [],
+            "actionable": true
+          }
+        },
+        "prose_judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "notes": "The reply honestly states that Argus cannot predict the future but can test the idea historically, which is supported by the recovery options rendered beside it. The Spanish is natural and consistent with the UI language, with no English fallback. No raw runtime errors are exposed.",
+          "rubric_version": "argus-prose-quality-v2",
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "judged_assistant_text": {
+            "text": "Argus no puede predecir el futuro, pero sí puede probar cómo le habría ido a esa idea en el pasado. ¿Qué prefieres?",
+            "sha256": "9789c0fd36870a20c4b3d3ac98cf8b0d04699fde36b4730d8fa785832035aa81",
+            "character_count": 115,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          },
+          "judged_rendered_context": {
+            "text": "{\"recovery_options\": [{\"id\": \"option_0\", \"label\": \"Test this idea over a historical period\"}, {\"id\": \"buy_and_hold\", \"label\": \"Compare with buy and hold historically\"}, {\"id\": \"rsi_threshold\", \"label\": \"Use a supported RSI threshold rule\"}]}",
+            "sha256": "57ae2392d06fd5da0574c300cfab84d950f981dae60c29f0f87afb247439ed71",
+            "character_count": 241,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          }
+        },
+        "infrastructure_errors": [],
+        "route_receipts": [
+          {
+            "task": "asset_mention_preflight",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMAssetMentionExtraction",
+            "latency_ms": 1629,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 805,
+              "completion_tokens": 37,
+              "total_tokens": 842,
+              "cached_tokens": 768,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00029235,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:25:02.806545+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMInterpretationResponse",
+            "latency_ms": 19628,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 10541,
+              "completion_tokens": 2095,
+              "total_tokens": 12636,
+              "cached_tokens": 192,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.01821215,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:25:22.558316+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 7570,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1114,
+              "completion_tokens": 935,
+              "total_tokens": 2049,
+              "cached_tokens": 640,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.003058,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:25:50.850376+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "anthropic/claude-haiku-4.5",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 3980,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": true,
+            "token_usage": {
+              "prompt_tokens": 1248,
+              "completion_tokens": 374,
+              "total_tokens": 1622,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.003118,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:25:54.832396+00:00"
+          },
+          {
+            "task": "interpretation_repair",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "FocusedDateWindowExtraction",
+            "latency_ms": 981,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2041,
+              "completion_tokens": 58,
+              "total_tokens": 2099,
+              "cached_tokens": 128,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00256185,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:25:55.816704+00:00",
+            "repair_effect": {
+              "schema_version": "argus_repair_effect/v1",
+              "trigger_reason": "date_window_intent_uncertain",
+              "repair_applied": true,
+              "changed_fields": [
+                "candidate_strategy_draft.date_range_intent"
+              ],
+              "before_fingerprint": "145dd5adaa579f0c0dea185b34220746eb2f2b9fefed86a33386ca1cb38ac8f9",
+              "after_fingerprint": "9642c689107dd6bf9943de9bdab5939e4d44603ed9e7d43baa57ae751096c689",
+              "no_op_reason": null
+            }
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "SignalRulePlan",
+            "latency_ms": 13178,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1653,
+              "completion_tokens": 1343,
+              "total_tokens": 2996,
+              "cached_tokens": 128,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00528935,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:26:08.999311+00:00"
+          },
+          {
+            "task": "clarification",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ClarificationResponse",
+            "latency_ms": 1428,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2120,
+              "completion_tokens": 70,
+              "total_tokens": 2190,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0002034,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:26:10.898165+00:00"
+          },
+          {
+            "task": "chat_composer",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ArgusProseJudgeResponse",
+            "latency_ms": 1823,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 811,
+              "completion_tokens": 70,
+              "total_tokens": 881,
+              "cached_tokens": 512,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 2.690758e-05,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:26:12.725069+00:00"
+          }
+        ]
+      },
+      "research_http_errors": [],
+      "research_delivery_failed": false,
+      "measurement": {
+        "failed": false,
+        "research_timeout": false,
+        "classification": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded."
+      }
+    },
+    {
+      "scorecard_kind": "live_targeted_interleaved_ab_attempt",
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "side": "baseline",
+      "attempt": 9,
+      "started_at_epoch": 1789284579.4143171,
+      "finished_at_epoch": 1789284646.566635,
+      "provenance": {
+        "evaluation_mode": "live",
+        "market_data_provider_mode": "live_provider",
+        "asset_provider_mode": "live_provider",
+        "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+        "python_version": "3.10.20",
+        "fixture_sha256": "1680a195886c2461e5f8bbbe87f7c3b545a45da189dee8a1f25109409e90ece9",
+        "fixture_case_ids": [
+          "action_chip_run_visible_confirmation_aapl",
+          "action_chip_change_asset_remove_aapl_issue_188",
+          "action_chip_change_asset_bare_ticker_append_issue_190",
+          "action_chip_change_asset_compound_replace_issue_188",
+          "action_chip_change_asset_changed_mind_capital_issue_188",
+          "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+          "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+          "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+          "natural_language_establishes_modeled_costs_issue_271",
+          "action_chip_add_asset_preserves_modeled_costs_issue_271",
+          "compound_benchmark_start_date_preserves_confirmation_issue_339",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+          "asset_discovery_category_english_issue_244",
+          "asset_discovery_peer_anchor_english_issue_244",
+          "asset_discovery_comparison_anchor_english_issue_244",
+          "asset_discovery_category_spanish_issue_244",
+          "asset_discovery_recent_ipo_exact_issue_344",
+          "asset_discovery_trending_crypto_exact_issue_344",
+          "asset_discovery_old_pharma_escalation_exact_issue_344",
+          "asset_discovery_semantic_pharma_escalation_issue_344",
+          "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+          "asset_discovery_not_direct_backtest_issue_244",
+          "asset_discovery_not_result_followup_issue_244",
+          "asset_discovery_not_capability_question_issue_244",
+          "metric_correctness_eth_default_crypto_benchmark",
+          "capability_honesty_options_straddle_tsla",
+          "capability_honesty_golden_cross_control_aapl",
+          "capability_honesty_momentum_breakout_aapl",
+          "capability_honesty_news_sentiment_rule_aapl",
+          "capability_honesty_future_performance_nvda_golden_cross",
+          "capability_honesty_future_performance_btc_regression",
+          "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+          "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+          "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+          "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+          "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+          "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+          "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+          "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+          "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+          "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+          "dca_capital_semantics_crypto_weekly_btc_issue_455",
+          "dca_capital_semantics_truncated_window_measures_served_issue_455",
+          "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+          "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+          "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+          "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+          "graceful_recovery_weekly_options_aapl",
+          "graceful_recovery_spanish_weekly_options_aapl",
+          "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+          "messy_english_opening_apple_capital_missing_period_issue_336",
+          "messy_english_aapl_simple_hold_2024",
+          "messy_english_company_name_multi_asset_issue_142",
+          "messy_english_complete_sma_crossover_benchmark_issue_270",
+          "messy_english_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_btc_hold_q1_2024",
+          "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_future_performance_nvda_cruce_dorado",
+          "spanish_ui_english_user_msft_hold_h1_2024"
+        ],
+        "worktree_clean": true,
+        "live_market_data_probe": {
+          "symbol": "SPY",
+          "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-10"
+          },
+          "effective_date_range": {
+            "start": "2024-01-02",
+            "end": "2024-01-10"
+          },
+          "adjustment_reason": "calendar_alignment"
+        }
+      },
+      "targeted_case_sha256": "a80599bba759d9e433593b9f1b69a838e87ba3f20a66479eb90f1944504b495b",
+      "native_case": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "prompt": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+        "user_language": "es-419",
+        "ui_language": "es-419",
+        "expected": {
+          "offered": {
+            "response": true,
+            "clarification_matches_expected": true
+          },
+          "intent": [
+            "unsupported_or_out_of_scope",
+            "backtest_execution",
+            "strategy_drafting"
+          ],
+          "capability_verdict": "unsupported",
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "capital_amount": 10000,
+          "benchmark_symbol": "SPY",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance"
+          }
+        },
+        "prose_judge": {
+          "criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ]
+        }
+      },
+      "argus_imports_local": true,
+      "result": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "category": "messy_spanish",
+        "status": "passed",
+        "failed_checks": [],
+        "expected_fail": null,
+        "typed_outcome": {
+          "intent": "unsupported_or_out_of_scope",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "requested_strategy_template": "moving_average_crossover",
+          "strategy_type": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "date_range": null,
+          "requested_date_range": null,
+          "effective_date_range": null,
+          "adjustment_reason": null,
+          "benchmark_symbol": "SPY",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "launch_validation_code": null,
+          "missing_required_fields": [
+            "entry_logic",
+            "exit_logic",
+            "date_range"
+          ],
+          "fee_rate": null,
+          "slippage": null,
+          "cost_provenance": {},
+          "launch_execution_realism": null,
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+            "prompt_source": "llm_generated",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                "requested_strategy_template": "moving_average_crossover",
+                "strategy_type": null,
+                "strategy_thesis": "Cruce dorado (50/200 SMA) en NVDA",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "$10,000",
+                    "asset_universe": "NVDA",
+                    "requested_strategy_template": "cruce dorado"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "requested_strategy_template": "explicit_user"
+                  },
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.8,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "raw_value": "dentro de diez años"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Test this idea over a historical period"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Compare with buy and hold historically"
+              },
+              {
+                "id": "rsi_threshold",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "compatibility_label": "Use a supported RSI threshold rule"
+              }
+            ]
+          },
+          "semantic_turn_act": "unsupported_request",
+          "asset_discovery": null,
+          "offered": {
+            "response": true,
+            "launch_payload": {},
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "reason_code": "future_performance",
+              "prompt_source": "llm_generated",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                  "requested_strategy_template": "moving_average_crossover",
+                  "strategy_type": null,
+                  "strategy_thesis": "Cruce dorado (50/200 SMA) en NVDA",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 10000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "NVDA",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA",
+                        "asset_class": "equity",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "raw_symbol": "NVDA",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "capital_amount": "$10,000",
+                      "asset_universe": "NVDA",
+                      "requested_strategy_template": "cruce dorado"
+                    },
+                    "field_provenance": {
+                      "capital_amount": "explicit_user",
+                      "asset_universe": "explicit_user",
+                      "requested_strategy_template": "explicit_user"
+                    },
+                    "future_horizon_intent": {
+                      "kind": "future_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 10.0,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.8,
+                      "evidence": "dentro de diez años"
+                    }
+                  }
+                },
+                "raw_value": "dentro de diez años"
+              },
+              "options": [
+                {
+                  "id": "option_0",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Test this idea over a historical period"
+                },
+                {
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold",
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Compare with buy and hold historically"
+                },
+                {
+                  "id": "rsi_threshold",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  },
+                  "compatibility_label": "Use a supported RSI threshold rule"
+                }
+              ]
+            },
+            "discovery_symbols": [],
+            "next_experiment_kinds": [],
+            "recovery_option_ids": [
+              "option_0",
+              "buy_and_hold",
+              "rsi_threshold"
+            ],
+            "recovery_code": null,
+            "named_unavailable": [],
+            "dropped_not_named": [],
+            "actionable": true
+          }
+        },
+        "prose_judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "notes": "The assistant text honestly states that Argus cannot predict future values but can test the idea historically, which is supported by the recovery options rendered beside it. No English fallback appears in the Spanish session, and no raw runtime error is exposed.",
+          "rubric_version": "argus-prose-quality-v2",
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "judged_assistant_text": {
+            "text": "Argus no puede predecir valores futuros, pero sí puede probar cómo le habría ido a esa idea en datos históricos. ¿Qué prefieres hacer?",
+            "sha256": "9c2e3fa09d4c10b68636e208cd8c826f89c6607362919cfd90ee16cbf6c136f7",
+            "character_count": 134,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          },
+          "judged_rendered_context": {
+            "text": "{\"recovery_options\": [{\"id\": \"option_0\", \"label\": \"Test this idea over a historical period\"}, {\"id\": \"buy_and_hold\", \"label\": \"Compare with buy and hold historically\"}, {\"id\": \"rsi_threshold\", \"label\": \"Use a supported RSI threshold rule\"}]}",
+            "sha256": "57ae2392d06fd5da0574c300cfab84d950f981dae60c29f0f87afb247439ed71",
+            "character_count": 241,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          }
+        },
+        "infrastructure_errors": [],
+        "route_receipts": [
+          {
+            "task": "asset_mention_preflight",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMAssetMentionExtraction",
+            "latency_ms": 1269,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 805,
+              "completion_tokens": 46,
+              "total_tokens": 851,
+              "cached_tokens": 768,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00031485,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:29:40.685391+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMInterpretationResponse",
+            "latency_ms": 11414,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 10541,
+              "completion_tokens": 1520,
+              "total_tokens": 12061,
+              "cached_tokens": 1792,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.01509465,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:29:52.228234+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 6750,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1145,
+              "completion_tokens": 796,
+              "total_tokens": 1941,
+              "cached_tokens": 192,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00321965,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:30:20.333602+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "anthropic/claude-haiku-4.5",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 5942,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": true,
+            "token_usage": {
+              "prompt_tokens": 1296,
+              "completion_tokens": 586,
+              "total_tokens": 1882,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.004226,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:30:26.276957+00:00"
+          },
+          {
+            "task": "interpretation_repair",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "FocusedDateWindowExtraction",
+            "latency_ms": 1261,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2063,
+              "completion_tokens": 62,
+              "total_tokens": 2125,
+              "cached_tokens": 1664,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00098655,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:30:27.539748+00:00",
+            "repair_effect": {
+              "schema_version": "argus_repair_effect/v1",
+              "trigger_reason": "date_window_intent_uncertain",
+              "repair_applied": true,
+              "changed_fields": [
+                "candidate_strategy_draft.date_range_intent"
+              ],
+              "before_fingerprint": "c6a3caeb290dcb329f5915ada61b8dd7175173557a9a21abc21e6d8e6b99ed09",
+              "after_fingerprint": "9b9f6fa5870ba74eb36de508aa4dad9bab0350b143345a2e1704fd39756f1597",
+              "no_op_reason": null
+            }
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "SignalRulePlan",
+            "latency_ms": 12704,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1686,
+              "completion_tokens": 1380,
+              "total_tokens": 3066,
+              "cached_tokens": 1216,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0042807,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:30:40.246315+00:00"
+          },
+          {
+            "task": "clarification",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ClarificationResponse",
+            "latency_ms": 3835,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2148,
+              "completion_tokens": 73,
+              "total_tokens": 2221,
+              "cached_tokens": 1024,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.000132732,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:30:44.563336+00:00"
+          },
+          {
+            "task": "chat_composer",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ArgusProseJudgeResponse",
+            "latency_ms": 1348,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 600,
+              "completion_tokens": 69,
+              "total_tokens": 669,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 7.12425e-05,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:30:45.914791+00:00"
+          }
+        ]
+      },
+      "research_http_errors": [],
+      "research_delivery_failed": false,
+      "measurement": {
+        "failed": false,
+        "research_timeout": false,
+        "classification": "Any native non-pass or research timeout is a failed attempt. No attempt is discarded."
+      }
+    },
+    {
+      "scorecard_kind": "live_targeted_interleaved_ab_attempt",
+      "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "side": "baseline",
+      "attempt": 10,
+      "started_at_epoch": 1789284869.6748748,
+      "finished_at_epoch": 1789284946.882004,
+      "provenance": {
+        "evaluation_mode": "live",
+        "market_data_provider_mode": "live_provider",
+        "asset_provider_mode": "live_provider",
+        "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+        "python_version": "3.10.20",
+        "fixture_sha256": "1680a195886c2461e5f8bbbe87f7c3b545a45da189dee8a1f25109409e90ece9",
+        "fixture_case_ids": [
+          "action_chip_run_visible_confirmation_aapl",
+          "action_chip_change_asset_remove_aapl_issue_188",
+          "action_chip_change_asset_bare_ticker_append_issue_190",
+          "action_chip_change_asset_compound_replace_issue_188",
+          "action_chip_change_asset_changed_mind_capital_issue_188",
+          "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+          "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+          "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+          "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+          "natural_language_establishes_modeled_costs_issue_271",
+          "action_chip_add_asset_preserves_modeled_costs_issue_271",
+          "compound_benchmark_start_date_preserves_confirmation_issue_339",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+          "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+          "asset_discovery_category_english_issue_244",
+          "asset_discovery_peer_anchor_english_issue_244",
+          "asset_discovery_comparison_anchor_english_issue_244",
+          "asset_discovery_category_spanish_issue_244",
+          "asset_discovery_recent_ipo_exact_issue_344",
+          "asset_discovery_trending_crypto_exact_issue_344",
+          "asset_discovery_old_pharma_escalation_exact_issue_344",
+          "asset_discovery_semantic_pharma_escalation_issue_344",
+          "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+          "asset_discovery_not_direct_backtest_issue_244",
+          "asset_discovery_not_result_followup_issue_244",
+          "asset_discovery_not_capability_question_issue_244",
+          "metric_correctness_eth_default_crypto_benchmark",
+          "capability_honesty_options_straddle_tsla",
+          "capability_honesty_golden_cross_control_aapl",
+          "capability_honesty_momentum_breakout_aapl",
+          "capability_honesty_news_sentiment_rule_aapl",
+          "capability_honesty_future_performance_nvda_golden_cross",
+          "capability_honesty_future_performance_btc_regression",
+          "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+          "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+          "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+          "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+          "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+          "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+          "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+          "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+          "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+          "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+          "dca_capital_semantics_crypto_weekly_btc_issue_455",
+          "dca_capital_semantics_truncated_window_measures_served_issue_455",
+          "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+          "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+          "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+          "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+          "graceful_recovery_weekly_options_aapl",
+          "graceful_recovery_spanish_weekly_options_aapl",
+          "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+          "messy_english_opening_apple_capital_missing_period_issue_336",
+          "messy_english_aapl_simple_hold_2024",
+          "messy_english_company_name_multi_asset_issue_142",
+          "messy_english_complete_sma_crossover_benchmark_issue_270",
+          "messy_english_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_btc_hold_q1_2024",
+          "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+          "messy_spanish_future_performance_nvda_cruce_dorado",
+          "spanish_ui_english_user_msft_hold_h1_2024"
+        ],
+        "worktree_clean": true,
+        "live_market_data_probe": {
+          "symbol": "SPY",
+          "requested_date_range": {
+            "start": "2024-01-01",
+            "end": "2024-01-10"
+          },
+          "effective_date_range": {
+            "start": "2024-01-02",
+            "end": "2024-01-10"
+          },
+          "adjustment_reason": "calendar_alignment"
+        }
+      },
+      "targeted_case_sha256": "a80599bba759d9e433593b9f1b69a838e87ba3f20a66479eb90f1944504b495b",
+      "native_case": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "prompt": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+        "user_language": "es-419",
+        "ui_language": "es-419",
+        "expected": {
+          "offered": {
+            "response": true,
+            "clarification_matches_expected": true
+          },
+          "intent": [
+            "unsupported_or_out_of_scope",
+            "backtest_execution",
+            "strategy_drafting"
+          ],
+          "capability_verdict": "unsupported",
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "capital_amount": 10000,
+          "benchmark_symbol": "SPY",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance"
+          }
+        },
+        "prose_judge": {
+          "criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ]
+        }
+      },
+      "argus_imports_local": true,
+      "result": {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "category": "messy_spanish",
+        "status": "passed",
+        "failed_checks": [],
+        "expected_fail": null,
+        "typed_outcome": {
+          "intent": "unsupported_or_out_of_scope",
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "assets": [
+            "NVDA"
+          ],
+          "asset_class": "equity",
+          "requested_strategy_template": null,
+          "strategy_type": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "date_range": null,
+          "requested_date_range": null,
+          "effective_date_range": null,
+          "adjustment_reason": null,
+          "benchmark_symbol": "SPY",
+          "capital_amount": 10000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "contribution_period": null,
+          "launch_validation_code": null,
+          "missing_required_fields": [
+            "entry_logic",
+            "exit_logic",
+            "date_range"
+          ],
+          "fee_rate": null,
+          "slippage": null,
+          "cost_provenance": {},
+          "launch_execution_realism": null,
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+            "prompt_source": "llm_generated",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                "requested_strategy_template": null,
+                "strategy_type": null,
+                "strategy_thesis": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "entry_logic": "cruce dorado",
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "$10,000",
+                    "asset_universe": "NVDA"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "date_range": "explicit_user"
+                  },
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.8,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "raw_value": "dentro de diez años"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Test this idea over a historical period"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Compare with buy and hold historically"
+              },
+              {
+                "id": "rsi_threshold",
+                "replacement_values": {
+                  "simplify_logic": "rsi_only"
+                },
+                "compatibility_label": "Use a supported RSI threshold rule"
+              }
+            ]
+          },
+          "semantic_turn_act": "unsupported_request",
+          "asset_discovery": null,
+          "offered": {
+            "response": true,
+            "launch_payload": {},
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "reason_code": "future_performance",
+              "prompt_source": "llm_generated",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                  "requested_strategy_template": null,
+                  "strategy_type": null,
+                  "strategy_thesis": "Si invierto $10,000 en NVDA con una estrategia de cruce dorado, ¿cuánto tendré dentro de diez años?",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 10000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "NVDA",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "entry_logic": "cruce dorado",
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA",
+                        "asset_class": "equity",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "raw_symbol": "NVDA",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "capital_amount": "$10,000",
+                      "asset_universe": "NVDA"
+                    },
+                    "field_provenance": {
+                      "capital_amount": "explicit_user",
+                      "asset_universe": "explicit_user",
+                      "date_range": "explicit_user"
+                    },
+                    "future_horizon_intent": {
+                      "kind": "future_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 10.0,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.8,
+                      "evidence": "dentro de diez años"
+                    }
+                  }
+                },
+                "raw_value": "dentro de diez años"
+              },
+              "options": [
+                {
+                  "id": "option_0",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Test this idea over a historical period"
+                },
+                {
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold",
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Compare with buy and hold historically"
+                },
+                {
+                  "id": "rsi_threshold",
+                  "replacement_values": {
+                    "simplify_logic": "rsi_only"
+                  },
+                  "compatibility_label": "Use a supported RSI threshold rule"
+                }
+              ]
+            },
+            "discovery_symbols": [],
+            "next_experiment_kinds": [],
+            "recovery_option_ids": [
+              "option_0",
+              "buy_and_hold",
+              "rsi_threshold"
+            ],
+            "recovery_code": null,
+            "named_unavailable": [],
+            "dropped_not_named": [],
+            "actionable": true
+          }
+        },
+        "prose_judge": {
+          "pass": true,
+          "failed_criteria": [],
+          "notes": "",
+          "rubric_version": "argus-prose-quality-v2",
+          "requested_criteria": [
+            "honesty",
+            "spanish_language_integrity",
+            "no_raw_runtime_error"
+          ],
+          "judged_assistant_text": {
+            "text": "Argus no puede predecir valores futuros, pero sí puede probar cómo le habría ido a esa idea en el pasado. ¿Qué prefieres?",
+            "sha256": "e85cc33074a2245173ba0b68e6ca9863e036b0dd384916560bba37d0998db535",
+            "character_count": 121,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          },
+          "judged_rendered_context": {
+            "text": "{\"recovery_options\": [{\"id\": \"option_0\", \"label\": \"Test this idea over a historical period\"}, {\"id\": \"buy_and_hold\", \"label\": \"Compare with buy and hold historically\"}, {\"id\": \"rsi_threshold\", \"label\": \"Use a supported RSI threshold rule\"}]}",
+            "sha256": "57ae2392d06fd5da0574c300cfab84d950f981dae60c29f0f87afb247439ed71",
+            "character_count": 241,
+            "truncated": false,
+            "omitted_character_count": 0,
+            "redactions": []
+          }
+        },
+        "infrastructure_errors": [],
+        "route_receipts": [
+          {
+            "task": "asset_mention_preflight",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMAssetMentionExtraction",
+            "latency_ms": 1036,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 805,
+              "completion_tokens": 46,
+              "total_tokens": 851,
+              "cached_tokens": 768,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00031485,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:34:30.713970+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "LLMInterpretationResponse",
+            "latency_ms": 16988,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 10541,
+              "completion_tokens": 1703,
+              "total_tokens": 12244,
+              "cached_tokens": 10496,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00641295,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:34:47.839135+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 9960,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1074,
+              "completion_tokens": 947,
+              "total_tokens": 2021,
+              "cached_tokens": 640,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.003038,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:35:19.147960+00:00"
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "anthropic/claude-haiku-4.5",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "DcaContractAudit",
+            "latency_ms": 3819,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": true,
+            "token_usage": {
+              "prompt_tokens": 1201,
+              "completion_tokens": 361,
+              "total_tokens": 1562,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.003006,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:35:22.968943+00:00"
+          },
+          {
+            "task": "interpretation_repair",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "FocusedDateWindowExtraction",
+            "latency_ms": 1327,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2056,
+              "completion_tokens": 58,
+              "total_tokens": 2114,
+              "cached_tokens": 128,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0025806,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:35:24.299138+00:00",
+            "repair_effect": {
+              "schema_version": "argus_repair_effect/v1",
+              "trigger_reason": "date_window_intent_uncertain",
+              "repair_applied": true,
+              "changed_fields": [
+                "candidate_strategy_draft.date_range_intent"
+              ],
+              "before_fingerprint": "a82f987bed219a555de30445c6ba0ebfc98939a034ace4ca6cca656a5587ba7f",
+              "after_fingerprint": "c6300b56b71f37ce740994cc5c608ffd2676daad6a525d2451fb9980f1d7ae5c",
+              "no_op_reason": null
+            }
+          },
+          {
+            "task": "interpretation",
+            "tier": "structured",
+            "model": "x-ai/grok-4.3",
+            "fallback_model": "anthropic/claude-haiku-4.5",
+            "mode": "json_schema",
+            "schema_name": "SignalRulePlan",
+            "latency_ms": 18987,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 1668,
+              "completion_tokens": 1760,
+              "total_tokens": 3428,
+              "cached_tokens": 192,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.0062834,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:35:43.291627+00:00"
+          },
+          {
+            "task": "clarification",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ClarificationResponse",
+            "latency_ms": 1248,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 2084,
+              "completion_tokens": 71,
+              "total_tokens": 2155,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 0.00020034,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:35:45.013289+00:00"
+          },
+          {
+            "task": "chat_composer",
+            "tier": "chat",
+            "model": "deepseek/deepseek-v4-flash",
+            "fallback_model": "qwen/qwen3.5-9b",
+            "mode": "json_schema",
+            "schema_name": "ArgusProseJudgeResponse",
+            "latency_ms": 1210,
+            "outcome": "succeeded",
+            "failure_mode": null,
+            "fallback_used": false,
+            "token_usage": {
+              "prompt_tokens": 596,
+              "completion_tokens": 16,
+              "total_tokens": 612,
+              "cached_tokens": 0,
+              "cache_write_tokens": 0
+            },
+            "usage_cost_usd": 8.792e-05,
+            "context_packet_ids": [],
+            "created_at": "2026-09-13T07:35:46.229538+00:00"
+          }
+        ]
+      },
+      "research_http_errors": [],
+      "research_delivery_failed": false,
       "measurement": {
         "failed": false,
         "research_timeout": false,

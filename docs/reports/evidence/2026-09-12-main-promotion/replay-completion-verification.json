@@ -1,0 +1,27 @@
+{
+  "status": "pass",
+  "checked_at": "2026-09-13T08:28:25.582081+00:00",
+  "measured_head": "df7aee12955f667e31057464d62c72287fb12247",
+  "docs_only_changes": true,
+  "release_evidence_tests": {
+    "passed": 24,
+    "seconds": 27.68,
+    "log": "release-docs-replay-complete.log"
+  },
+  "mocked_harness_tests": {
+    "passed": 259,
+    "seconds": 34.45,
+    "log": "mocked-completed-ab.log"
+  },
+  "secret_and_jwt_scan": "pass",
+  "authored_manifest_and_pr_body_em_dash_check": "pass",
+  "replay_cost_ledger_matches_budget": true,
+  "replay_unpriced_non_skipped_receipts": 4,
+  "acceptance_worktree_clean": true,
+  "acceptance_env_files_absent": true,
+  "private_replay_data_deleted": true,
+  "native_full_scorecards_unchanged": true,
+  "non_docs_git_tree_sha256": "6e0940c95470699a7b0dc18272bca0aabf4e74170c3d0b386c0334d84af21614",
+  "fresh_codex_review_pending_at_final_acceptance_head": true,
+  "browser_walk_pending_founder_approval": true
+}
