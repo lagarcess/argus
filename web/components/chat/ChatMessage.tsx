@@ -36,7 +36,10 @@ import { chatMessageCopyText } from "@/lib/chat-message-copy-text";
 import { resultMessageReadoutText } from "@/lib/result-readout-display";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
-import { recoveryDisplayText } from "@/lib/chat-recovery-display";
+import {
+  recoveryDisplayText,
+  wearsQuietFailureNotice,
+} from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import FailureNotice from "./FailureNotice";
@@ -431,13 +434,17 @@ export default function ChatMessage({
                 </button>
               ) : null}
             </div>
-          ) : !isUser &&
-            message.recoveryDisplay?.kind === "artifact_action_recovery" ? (
-            // A rejected/inactive action is still a failure statement; it
-            // must not read as an ordinary answer, only quieter than amber.
+          ) : !isUser && wearsQuietFailureNotice(message.recoveryDisplay) ? (
+            // A rejected action or a lookup that cannot be retried is still a
+            // failure statement; it must not read as an ordinary answer, only
+            // quieter than amber.
             <FailureNotice
               className="max-w-[min(100%,660px)]"
-              testId="artifact-action-failure-notice"
+              testId={
+                message.recoveryDisplay?.kind === "artifact_action_recovery"
+                  ? "artifact-action-failure-notice"
+                  : "recovery-failure-notice"
+              }
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {displayContent}

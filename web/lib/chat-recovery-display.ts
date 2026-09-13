@@ -129,6 +129,23 @@ export function retryableAssistantRecoveryCode(value: unknown): string | null {
   return recovery?.retryable === true ? code : null;
 }
 
+/**
+ * Codes whose recovery replaced the answer and cannot be retried: the reply is
+ * a failure statement, so it wears the quiet notice. Every other non-retryable
+ * code keeps its treatment; the amber notice stays gated on retryable alone.
+ */
+const QUIET_NOTICE_RECOVERY_CODES = new Set(["research_lookup_unavailable"]);
+
+/** Whether a reply renders as the quiet failure notice (failure-treatment.ts). */
+export function wearsQuietFailureNotice(
+  display: RecoveryDisplay | null | undefined,
+): boolean {
+  if (display?.kind === "artifact_action_recovery") return true;
+  return (
+    display?.kind === "recovery_code" && QUIET_NOTICE_RECOVERY_CODES.has(display.code)
+  );
+}
+
 
 export function recoveryDisplayFromRecoveryState(
   value: unknown,
