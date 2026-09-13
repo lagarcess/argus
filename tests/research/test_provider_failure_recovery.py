@@ -9,6 +9,8 @@ Retry-After, a timeout, a 400 and a missing key.
 from __future__ import annotations
 
 import json
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -28,6 +30,7 @@ from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.supabase_gateway import SupabaseGateway
+from loguru import logger
 
 from tests.research.conftest import (
     agent_response,
@@ -274,6 +277,88 @@ def test_a_poll_is_left_to_the_poller_and_not_retried_by_the_client() -> None:
 
     assert len(provider.requests) == 1
     assert clock.waits == []
+
+
+def lost_answer(error: type[httpx.TransportError]) -> Step:
+    def step(request: httpx.Request) -> httpx.Response:
+        raise error("scripted", request=request)
+
+    return step
+
+
+def submitted() -> Step:
+    return lambda _request: httpx.Response(200, json={"id": "resp_bg1", "status": "queued"})
+
+
+@pytest.mark.parametrize(
+    ("first", "sent"),
+    [
+        (status(500), 1),
+        (lost_answer(httpx.ReadTimeout), 1),
+        (lost_answer(httpx.RemoteProtocolError), 1),
+        (status(429, {"Retry-After": "1"}), 2),
+    ],
+    ids=["http_500", "timeout", "lost_connection", "http_429"],
+)
+def test_a_background_submission_that_may_have_started_a_run_is_not_sent_again(
+    first: Step, sent: int
+) -> None:
+    clock = ScriptedClock()
+    client, provider = scripted_client(clock, [first, submitted()])
+
+    if sent == 2:
+        assert client.submit_background(QUESTION, FAST) == "resp_bg1"
+    else:
+        with pytest.raises(ResearchUnavailableError) as raised:
+            client.submit_background(QUESTION, FAST)
+        assert raised.value.transient
+
+    assert len(provider.requests) == sent
+
+
+def held(release: threading.Event) -> Step:
+    def step(_request: httpx.Request) -> httpx.Response:
+        # A provider that stalls where no single connect, write or read timeout fires.
+        release.wait(10)
+        return httpx.Response(200, json=agent_response())
+
+    return step
+
+
+@pytest.mark.parametrize(
+    "before",
+    [[], [status(503, {"Retry-After": "0"})]],
+    ids=["first_attempt", "retried_attempt"],
+)
+def test_a_stalled_provider_cannot_hold_the_call_past_its_deadline(
+    before: list[Step],
+) -> None:
+    ceiling = 0.5
+    release = threading.Event()
+    provider = ScriptedProvider([*before, held(release)])
+    client = PerplexityAgentClient("k", transport=provider)
+    lines: list[str] = []
+    sink = logger.add(lines.append, format="{message}")
+    try:
+        started = time.monotonic()
+        with pytest.raises(ResearchUnavailableError) as raised:
+            client.run_research(
+                QUESTION, FAST.model_copy(update={"timeout_seconds": ceiling})
+            )
+        elapsed = time.monotonic() - started
+        release.set()
+        for _ in range(200):
+            if any("answered after the deadline" in line for line in lines):
+                break
+            time.sleep(0.01)
+    finally:
+        release.set()
+        logger.remove(sink)
+
+    assert raised.value.reason == "timeout"
+    assert elapsed < ceiling + 2.0, "the held attempt would have taken ten seconds"
+    assert len(provider.requests) == len(before) + 1
+    assert any("answered after the deadline" in line for line in lines)
 
 
 @pytest.mark.parametrize(

@@ -4147,11 +4147,15 @@ Contract rules:
   log line. After a transient failure the client asks again, at most three
   attempts in all, waiting what the response's `Retry-After` asks (seconds or
   an HTTP date) or else a backoff that doubles from one second. Every attempt
-  shares the call's own timeout as one deadline, and a retry starts only while
-  at least half of it is left, so a retried call ends no later than one that
-  was never retried. A background poll is not retried by the client; the
-  poller already asks again until its own deadline. A call claims research
-  capacity once, however many attempts it takes.
+  shares the call's own timeout as one deadline, held on the wall clock: the
+  call returns by it however slowly the provider answers, and an answer that
+  arrives after it is logged as discarded. A retry starts only while at least
+  half of the deadline is left. A background submission is sent again only
+  after an HTTP 429, because after any other failure the provider may already
+  have started a run that nothing would poll or record. A background poll is
+  not retried by the client; the poller already asks again until its own
+  deadline. A call claims research capacity once, however many attempts it
+  takes.
 - When no attempt answers, the turn publishes no answer, no rows and no
   `next_experiments`. A transient failure carries
   `recovery = {"code": "research_lookup_failed", "retryable": true}` and

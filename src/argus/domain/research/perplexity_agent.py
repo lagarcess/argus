@@ -1,8 +1,10 @@
 """Perplexity Agent API client for finance_search research.
 
-One HTTP boundary with an injectable transport so tests stay hermetic. A
-transient failure (5xx, 429, a timeout, a lost connection) is asked again at
-that boundary, a bounded number of times inside the call's own deadline. The
+One HTTP boundary with an injectable transport so tests stay hermetic. Every
+request returns by its deadline on the wall clock. A transient failure (5xx,
+429, a timeout, a lost connection) is asked again at that boundary, a bounded
+number of times inside the call's own deadline; a background submission only
+after a 429, because any other failure may already have started a run. The
 parser is deterministic: it walks the typed ``output`` items the Agent API
 documents, never user language. Provider identity is scrubbed at parse time
 because route receipts and the cost ledger own provenance, not prose.
@@ -21,10 +23,13 @@ import json
 import re
 import time
 from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
+from functools import partial
 from typing import Any
 from urllib.parse import urlparse
 
@@ -315,10 +320,12 @@ class PerplexityAgentClient:
     def _post(self, payload: dict[str, Any], *, timeout_seconds: float) -> dict[str, Any]:
         """One request, asked again after a transient failure.
 
-        Every attempt shares the call's ceiling as one deadline, so a retried
-        call returns no later than one that was never retried."""
+        Every attempt shares the call's ceiling as one wall-clock deadline, so a
+        retried call returns by the same deadline as one that was never retried."""
         deadline = self._clock() + timeout_seconds
         remaining = timeout_seconds
+        # A submission whose answer was lost may already have started a run.
+        starts_run = payload.get("background") is True
         attempt = 1
         while True:
             try:
@@ -329,6 +336,7 @@ class PerplexityAgentClient:
                     attempt=attempt,
                     remaining=deadline - self._clock(),
                     ceiling=timeout_seconds,
+                    starts_run=starts_run,
                 )
                 if delay is None:
                     raise
@@ -354,8 +362,32 @@ class PerplexityAgentClient:
         payload: dict[str, Any] | None,
         timeout_seconds: float,
     ) -> dict[str, Any]:
+        """One request that returns within its timeout on the wall clock.
+
+        httpx times each connect, write and read on its own, so a provider that
+        answers slowly can hold a request past every one of them. The request
+        runs on a worker, still capped by those timeouts, that the caller stops
+        waiting for once the timeout has passed."""
         if not self._api_key:
             raise ResearchUnavailableError("not_configured")
+        worker = ThreadPoolExecutor(max_workers=1)
+        pending = worker.submit(self._request, method, url, payload, timeout_seconds)
+        worker.shutdown(wait=False)
+        try:
+            return pending.result(timeout=max(timeout_seconds, 0.0))
+        except FutureTimeoutError:
+            pending.add_done_callback(partial(_log_late_answer, method))
+            raise ResearchUnavailableError(
+                "timeout", "no answer inside the timeout"
+            ) from None
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        payload: dict[str, Any] | None,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
@@ -405,12 +437,18 @@ def _retry_delay(
     attempt: int,
     remaining: float,
     ceiling: float,
+    starts_run: bool,
 ) -> float | None:
     """How long to wait before asking again, or None when not to ask again.
 
     A failure that is not transient fails the same way again, and a retry
-    starts only while at least half the call's ceiling is left to answer in."""
+    starts only while at least half the call's ceiling is left to answer in. A
+    request that starts a background run is sent again only after a 429, the
+    one transient answer that says the provider did not take it: after any
+    other, a run that nothing would poll or record may already be going."""
     if not failure.transient or attempt >= _MAX_ATTEMPTS:
+        return None
+    if starts_run and failure.status != 429:
         return None
     delay = (
         failure.retry_after_seconds
@@ -418,6 +456,23 @@ def _retry_delay(
         else _FIRST_BACKOFF_SECONDS * 2 ** (attempt - 1)
     )
     return delay if remaining - delay >= ceiling / 2 else None
+
+
+def _log_late_answer(method: str, pending: Future[dict[str, Any]]) -> None:
+    """An answer the caller stopped waiting for may still have been billed, or
+    have started a run, so it is recorded rather than dropped unseen."""
+    if pending.cancelled() or pending.exception() is not None:
+        return
+    document = pending.result()
+    usage = document.get("usage")
+    cost = usage.get("cost") if isinstance(usage, dict) else None
+    total_cost = cost.get("total_cost") if isinstance(cost, dict) else None
+    # The deployed log sink drops structured extras; the facts ride the text.
+    logger.warning(
+        "Research provider answered after the deadline; the answer was discarded"
+        f" method={method} id={document.get('id')} status={document.get('status')}"
+        f" model={document.get('model')} total_cost={total_cost}"
+    )
 
 
 def _retry_after_seconds(value: str | None) -> float | None:
