@@ -57,9 +57,8 @@ const copy = {
     answer: "Apple cerró en $312.41 el 2026-08-06.",
     retry: "Reintentar",
     recovery: {
-      transient:
-        "No pude terminar de buscar eso en este momento, así que no voy a responder de memoria. Intenta de nuevo en un momento.",
-      refused: "No puedo buscar eso ahora, así que no voy a responder de memoria.",
+      transient: "No pude terminar de buscar eso en este momento. Intenta de nuevo en un momento.",
+      refused: "No puedo buscar eso ahora.",
     },
   },
 } as const;
