@@ -56,7 +56,10 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.substage_events import emit_substage
 from argus.domain.market_data.new_york_clock import new_york_today
-from argus.domain.research.admission import claim_current_research_attempt
+from argus.domain.research.admission import (
+    admitted_provider_work,
+    claim_current_research_attempt,
+)
 from argus.domain.research.cache import (
     cache_get,
     cache_put,
@@ -185,7 +188,8 @@ class _TurnSpend:
         self, client: Any, prompt: str, spec: ResearchConfigSpec
     ) -> ResearchPacket:
         try:
-            packet = await asyncio.to_thread(client.run_research, prompt, spec)
+            with admitted_provider_work():
+                packet = await asyncio.to_thread(client.run_research, prompt, spec)
         except ResearchUnavailableError as exc:
             if exc.usage is not None:
                 self._usages.append(exc.usage)

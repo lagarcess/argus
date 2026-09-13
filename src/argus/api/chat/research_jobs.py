@@ -36,6 +36,7 @@ from argus.api.chat.research_tool_results import (
 from argus.domain.job_settlement import RESEARCH_OPERATION_SCOPE
 from argus.domain.research.admission import (
     ResearchCapacityExhausted,
+    admitted_provider_work,
     claim_current_research_attempt,
 )
 from argus.domain.research.config import (
@@ -197,7 +198,8 @@ def start_research_job(
             raise ResearchCapacityExhausted(admission)
         try:
             sync_spec = spec.model_copy(update={"timeout_seconds": 110.0})
-            packet = client.run_research(prompt, sync_spec)
+            with admitted_provider_work():
+                packet = client.run_research(prompt, sync_spec)
         except ResearchUnavailableError as exc:
             logger.warning(
                 "Synchronous thorough research failed"
@@ -221,7 +223,8 @@ def start_research_job(
     if not admission.available:
         raise ResearchCapacityExhausted(admission)
     try:
-        background_id = client.submit_background(prompt, spec)
+        with admitted_provider_work():
+            background_id = client.submit_background(prompt, spec)
     except ResearchUnavailableError as exc:
         logger.warning(
             "Research background submission failed"

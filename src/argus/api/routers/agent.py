@@ -85,6 +85,7 @@ from argus.api.chat.request_admission import (
 from argus.api.chat.research_evidence import (
     claim_research_provider_attempt,
     guest_research_visitor_key,
+    release_research_provider_claim,
 )
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.result_link import apply_result_link_outcome
@@ -1413,7 +1414,10 @@ async def chat_stream(
             research_attempt_admission_context(
                 lambda: claim_research_provider_attempt(
                     guest_visitor_key=turn_guest_research_key
-                )
+                ),
+                release=lambda admission: release_research_provider_claim(
+                    admission, guest_visitor_key=turn_guest_research_key
+                ),
             ),
         ):
             workflow_input_error: Exception | None = None

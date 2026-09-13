@@ -4091,6 +4091,14 @@ Contract rules:
   persisted thorough-job replays do not claim capacity. An unreadable or
   unwritable
   claim fails closed into the existing honest capacity-exhausted response.
+  A failed provider attempt does not cost a guest a question: when the
+  provider work a claim admitted fails with no usable response (an outage that
+  outlasts the retries, a refused request, an unreadable answer, a failed
+  background submission or discovery search) and no earlier provider call in
+  the turn was served, the backend returns the guest's own claim through
+  `release_research_usage` for the day it charged. The shared ceiling keeps
+  counting the attempt, and a later provider path in the same turn claims
+  again.
 - Pricing reconciliation does not gate a usable provider answer. Research
   `usage.cost_usd` is null when the invoice cannot be reconciled; it is never
   replaced with zero or an estimated charge. Provider billing evidence stays

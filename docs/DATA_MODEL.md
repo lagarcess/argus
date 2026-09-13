@@ -1961,7 +1961,17 @@ projected by `GET /me/usage`.
 - `claim_research_usage` locks the shared row and optional guest row in one
   transaction, checks both limits, and increments both or neither before
   provider work starts. This is the concurrency boundary: simultaneous turns
-  from one visitor cannot both consume one remaining slot.
+  from one visitor cannot both consume one remaining slot. An admitted claim
+  returns the `period_start` it charged.
+- When the provider work a claim admitted fails with no usable response, and
+  no earlier provider call in the same turn was served, the backend calls
+  `release_research_usage` (service-role only, like the claim) with that
+  `period_start`. It decrements only the guest's own row for that day, never
+  below zero, and never touches the shared row, which keeps the attempt. A
+  release that cannot be written leaves the charge standing, and a later
+  provider path in the same turn claims again. Migration
+  `20260913230000_release_research_guest_claim.sql` adds the release and the
+  claim's `period_start`.
 - Cache hits, ordinary chat turns, unconfigured-provider paths, and persisted
   thorough-job replays never call the claim. Claim failures degrade to the honest
   research-capacity response and do not enter the provider path.
