@@ -1,0 +1,41 @@
+{
+  "evidence_kind": "recorded_text_judge_replay",
+  "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "source_scorecard_sha256": "712420b741f6922a29b5e935a6d2a01fe833a40bc33d134d5f97c7617ce4d0cd",
+  "judged_assistant_text_sha256": "7a3133f46bee92083d0e66e8ddc01be97278c7087ad90280e0509aa8e26dffa2",
+  "judged_rendered_context_sha256": "e241a990446f6a78d2f2135b140fde1cf6010b4ebe34359c5398ff7164bf50a9",
+  "recorded_input_unchanged": true,
+  "result": {
+    "pass": false,
+    "failed_criteria": [
+      "scenario_framing"
+    ],
+    "notes": "The user asks for a forward-looking valuation (future value of $10,000 in NVDA over ten years). The assistant does not provide any labeled scenarios or ranges with arithmetic from cited inputs; instead it declines to give live data and redirects to a historical test. This fails scenario_framing, which requires labeled scenarios or ranges built from cited inputs with arithmetic shown.",
+    "rubric_version": "argus-prose-quality-v3"
+  },
+  "route_receipts": [
+    {
+      "task": "chat_composer",
+      "tier": "chat",
+      "model": "deepseek/deepseek-v4-flash",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "ArgusProseJudgeResponse",
+      "latency_ms": 2691,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "prompt_tokens": 622,
+        "completion_tokens": 104,
+        "total_tokens": 726,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      "usage_cost_usd": 4.13672e-05,
+      "context_packet_ids": [],
+      "created_at": "2026-09-13T05:51:33.065504+00:00"
+    }
+  ]
+}

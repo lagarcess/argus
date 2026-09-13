@@ -1,0 +1,53 @@
+{
+  "state": "completed",
+  "approval": "Founder approved one fresh full candidate run with a 7.50 USD combined cap on tracked cost plus reserve; no further run if this guard stops.",
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "baseline_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "combined_limit_usd": 7.5,
+  "environment": {
+    "PATH": "/Users/garces/.codex/worktrees/eca1/private-alpha-next/.venv/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/garces",
+    "VIRTUAL_ENV": "/Users/garces/.codex/worktrees/eca1/private-alpha-next/.venv",
+    "PYTHONPATH": "src:web:/private/tmp/argus-promotion-20260912-eval-control",
+    "PYTEST_PLUGINS": "promotion_observer",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    "NUMBA_CACHE_DIR": "/private/tmp/argus-promotion-20260912-eval-control/numba-cache",
+    "ARGUS_RUN_LIVE_EVALS": "1",
+    "ARGUS_EVAL_ENV_FILE": "/Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/.env",
+    "ARGUS_MARKET_DATA_PROVIDER_MODE": "live_provider",
+    "ARGUS_ASSET_PROVIDER_MODE": "live_provider"
+  },
+  "environment_identical_to_original_pair": true,
+  "environment_source_sha256": "6a428549c310bd43ea51b46f2c106602284618c44bbe41b382b0289728edf45d",
+  "observer_sha256": "10a63f591b691b32996b300db84bb71dae2575092feb68899e4cc021629b63a3",
+  "command": [
+    "poetry",
+    "run",
+    "pytest",
+    "tests/evals/test_measurement_eval_live.py",
+    "-q"
+  ],
+  "preflight": {
+    "argus_import_local": true,
+    "all_imported_argus_modules_local": true,
+    "cases": 71,
+    "user_turns": 84
+  },
+  "initial_event_count": 784,
+  "prior_ledger_sha256": "e084ee07b3d42eb9fd62894ab5e16ac884e60710fffb11fa28e65d18f79ed934",
+  "prior_tracked_cost_usd": 2.7352358294,
+  "prior_unpriced_non_skipped_receipts": 34,
+  "reserve_is_not_actual_spend": true,
+  "tracked_cost_usd": 4.6275589437,
+  "fresh_candidate_tracked_cost_usd": 1.8923231143,
+  "unpriced_non_skipped_receipts": 46,
+  "guard_reserve_usd": 1.02,
+  "guarded_total_usd": 5.6475589437,
+  "completed_cases": 71,
+  "pid": 92040,
+  "started_at": 1789275557.1828852,
+  "exit_code": 1,
+  "finished_at": 1789278373.5296068,
+  "environment_source_unchanged_after_run": true
+}

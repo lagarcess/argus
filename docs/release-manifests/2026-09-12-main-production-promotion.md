@@ -1,12 +1,12 @@
 # Private Alpha Production Promotion, 2026-09-12
 
-Status: blocked at Step 3's budget guard. The baseline finished; the candidate stopped after 47 of 71 cases, all 47 passing, without a native final scorecard. The paired comparison is incomplete. Environment parity and the single unchanged smoke rerun passed, and the migration gate is blocked only by the seven expected pending migrations. Free local browser checks passed. Paid browser acceptance, historical replay, and terminal review remain pending. The disposable local services were stopped without backup. No migration application, live configuration change, merge, or deployment has occurred.
+Status: the approved full candidate eval completed with 70 passed and one research-timeout failure. The recorded-text judge replay still failed; the one permitted case rerun passed with research and sources. Release-doc validation is blocked by its pre-existing ten-pair prose A/B requirement, which differs from the founder-approved procedure. The native failure is retained. Paid browser acceptance, historical replay, and final CI/review remain pending. Owned local services are stopped. No migration application, live configuration change, merge, or deployment has occurred.
 
 ## Candidate
 
 - Candidate SHA: `df7aee12955f667e31057464d62c72287fb12247`
 - Candidate branch: `codex/production-promotion-20260912`
-- Validation status: free gates completed with one unfulfilled Step 3 scorecard requirement; the live pair stopped incomplete at its budget guard. Not ready for merge.
+- Validation status: blocked at the release-doc policy conflict after the full eval and permitted followups completed. Not ready for merge.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
 - Promotion target: `main`
 - Release captain: Codex in the founder-supervised promotion task.
@@ -206,10 +206,10 @@ The founder explicitly approved no backup, overriding PR #595's backup step. Bet
 
 | Job | Environment | Stop | Spent | Result |
 | --- | --- | --- | --- | --- |
-| Free gates | A: development setup with the explicit canonical-root override | Free | $0 | Smoke, mocked harness, modularity and parity passed; release-doc scorecard check awaits Step 3 |
-| Candidate and production baseline eval | B: identical explicit eval env file and both provider modes live | $3.50 combined | $2.7352358294 tracked; $0.78 guard reserve is not actual spend | Stopped by guard after 47 of 71 candidate cases; comparison incomplete |
+| Free gates | A: development setup with the explicit canonical-root override | Free | $0 | Smoke, mocked harness, modularity and parity passed; release-doc validator requires an unapproved ten-pair procedure |
+| Candidate and production baseline eval | B: identical explicit eval env file and both provider modes live | $7.50 combined, tracked cost plus reserve | $4.88888657926 tracked + $1.02 reserve = $5.90888657926 guarded | Full candidate and permitted followups completed; baseline retained; release policy decision pending |
 | Founder browser walk | C: clean detached worktree, disposable Supabase, production build | $3.00 | $0 | Free greeting, signup, profile, country and English Usage checks passed; paid steps pending |
-| Historical guest replay | C: fresh guest per conversation, ordered user turns | $4.00 | $0 | UTC cohort: 14 conversations, 35 user turns across their complete histories; price estimate pending Step 3 |
+| Historical guest replay | C: fresh guest per conversation, ordered user turns | $4.00 | $0 | New York: 12 conversations / 25 turns, estimated $0.57 tracked; UTC: 14 / 35, estimated $0.79; execution pending |
 
 Environment A's pre-existing root `.env` symlink resolves through the integration worktree to the exact founder-named real file. `web/.env.local` is absent. No environment file is written through or replaced.
 
@@ -217,7 +217,7 @@ Environment C has no `.env` or `web/.env.local`. API and web launched from empty
 
 Local differences to cover after deployment: in-process backtests instead of `argus-backtests`, no Turnstile widget, no PostHog, no emails, and localhost origins. The API retains production key routing and shadow job rows; only if jobs stay queued may shadow mode be turned off and recorded as another local difference.
 
-## Step 3 Budget Stop
+## Historical Step 3 Budget Stop
 
 - Promotion PR: https://github.com/lagarcess/argus/pull/603, targeting `main` with the fixed integration cut. This is a blocked promotion, not a terminal release audit.
 - Baseline eval scorecard: `docs/reports/evidence/2026-09-12-main-promotion/baseline-eval-scorecard-ee9c3491.json`. Original bytes retained, SHA-256 `ec7e3301fbc796c38265313a61282a882d2564bcd761e7084ffcc05c91c7792a`.
@@ -234,7 +234,30 @@ Local differences to cover after deployment: in-process backtests instead of `ar
 - Review: the initial Codex summary completed at PR head `2d99bcb4edc6c9e817a524fa295c8d67776ff549`, with no formal review or inline thread and no explicit `Reviewed commit` receipt. It does not satisfy the founder's exact-head review requirement. No terminal audit or clean-review claim is made.
 - Local free acceptance: six screenshots, profile persistence readback, startup readiness, scratch migration reset, and all 85 environment keys are retained under `local-acceptance/`. Paid browser and replay spend are both `$0`. Customer message content was never pulled; the replay inventory selected aggregate counts only.
 - Cleanup: owned API/web processes stopped, owned ports closed, and `supabase stop --no-backup --workdir <owned scratch>` succeeded. The unrelated running stack remained intact. Evidence: `local-acceptance/cleanup.json`.
-- Required founder decision: approve or decline a revised `$6.50` combined eval cap for one fresh full candidate run, retaining the completed baseline and the same environment. The partial run cannot be resumed into its missing native scorecard. This is a request, not authorization. Browser and replay caps remain `$3` and `$4`.
+- Superseded proposal: the stop report requested a `$6.50` combined eval cap. The founder instead approved `$7.50` on tracked cost plus reserve for exactly one fresh full candidate run, retaining the baseline and environment. Browser and replay caps remain `$3` and `$4`.
+
+## Step 3 Approved Fresh Candidate Run
+
+The founder approved one fresh full candidate run after the stop record at `0e6227386ab76813fd55d0c838f896abe7e70e41`. The combined cap is `$7.50` on tracked cost plus reserve, including the original baseline and interrupted candidate costs. The reserve is not spend. If this guard stops the fresh run, stop and report; no further full run is authorized.
+
+- Live eval scorecard: `docs/reports/evidence/2026-09-12-main-promotion/candidate-eval-scorecard-df7aee12.json`
+- Full candidate result: 70 passed, one failed, zero infrastructure errors as classified by the native harness. The native scorecard is retained unchanged.
+- Candidate-only failed case: `messy_spanish_future_performance_nvda_cruce_dorado`. Research recorded `research_unavailable_timeout`, no publication and no sources. The assistant disclosed the unavailable data search. The native checks failed `research.published` and `prose_judge:scenario_framing`.
+- Recorded-text judge replay: the exact retained answer and rendered context were passed to the candidate's `judge_prose_quality`; `scenario_framing` failed again. No user message was regenerated in that replay.
+- One permitted case rerun: passed with no failed checks or infrastructure errors, published research, three rows and five sources, and a passing prose judge. No second full candidate run or further case rerun was started.
+- The full scorecard's failure remains visible. Supplemental evidence is `docs/reports/evidence/2026-09-12-main-promotion/eval-run/recorded-judge-replay.json` and `docs/reports/evidence/2026-09-12-main-promotion/eval-run/single-case-rerun.json`.
+- Release-doc validation: 23 passed, one failed in 11.11 seconds. The failing test is `test_main_promotion_manifests_require_live_eval_scorecard_evidence`, now because `tests/release_promotion_evidence_support.py:236` requires both sides of a targeted interleaved A/B, with at least ten attempts per side. This rule entered at `5d408acf` before main at the cut. It has not been changed or bypassed. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/release-docs-completed-scorecard.log` and `docs/reports/evidence/2026-09-12-main-promotion/release-policy-stop.json`.
+- Classification: release-policy conflict, not an established product regression. The research timeout did not recur in the one allowed case rerun. No ten-pair measurement, further full run, or extra case rerun was started. Fix rounds used: zero.
+- Final cost including the original baseline, partial candidate, fresh full candidate, recorded judge and permitted case rerun: tracked `$4.88888657926`, reserve `$1.02`, guarded total `$5.90888657926` of `$7.50`. Fresh full candidate cost alone is `$1.8923231143`. The reserve is not spend. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/approved-eval-comparison.json` and `eval-run/all-attempt-events.jsonl` in the same directory.
+- Requested decision: approve a bounded release-validator change recognizing this promotion's founder-approved judge-then-one-retry procedure, while retaining the native failure and verifying the supplemental evidence.
+
+Preflight confirmed the measured head, all 71 fixtures and 84 user turns, a clean detached worktree, local module imports, unchanged observer bytes, and the identical process environment and env-file content hash. The completed baseline is retained byte-for-byte. The new guardian appends to the original cost ledger, records the starting event boundary to separate this attempt, and uses an exclusive launch marker to prevent a second launch.
+
+The replay cohort was counted read-only before pricing using both date boundaries. The New York product day is `2026-08-12T04:00:00Z` through `2026-08-13T04:00:00Z`: 12 guest conversations from 12 people, with 25 user turns across their complete histories. The UTC day is midnight to midnight: 14 guest conversations from 14 people, with 35 full-history user turns. Canary and internal accounts are excluded. The New York cohort will be replayed; both counts were reported to the founder before any replay price estimate. Customer message text has not been selected. After reporting both counts, the higher completed-eval tracked cost per user turn (`$0.0225276561`) gives a rounded-up New York estimate of `$0.57`, or `$0.79` for the UTC comparison. These are tracked-cost estimates, excluding unknown receipt costs and the separate guard reserve; the replay stop remains `$4`. No replay has run. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/replay-price-estimate.json`.
+
+At head `0e622738`, PR #603's red CI is the single release-doc test waiting on the complete candidate scorecard. With that scorecard now present locally, the same test reaches the ten-pair policy requirement and fails there. The completed Codex review summary belongs to `2d99bcb4edc6c9e817a524fa295c8d67776ff549`. A fresh Codex review will be requested at the final head; the earlier summary does not satisfy that requirement.
+
+The owned local stack restarted and reset from the measured migrations. Its initial port check encountered the old browser connection in `FIN_WAIT_2`, with no active listener. The scratch launcher now uses normal reusable-address bind semantics for this availability check; no product code, port, or other stack changed. The production web rebuild and empty-environment assertions passed, followed by API health, web health, and readiness. Paid browser turns remain pending the release-policy decision. After the stop, owned API/web/guard processes were stopped and `supabase stop --no-backup --workdir <owned scratch>` succeeded. All owned ports closed, no owned containers remain, and the unrelated stack remained intact. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/local-acceptance/cleanup-release-gate.json`; restart and environment proofs are adjacent. No customer text was pulled.
 
 ## Historical Step 2 Stop Record (Superseded by Approved Resumption)
 
