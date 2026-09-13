@@ -1,6 +1,8 @@
 """A choice that turns on a future figure nobody can cite is answered with the
 recent past: the research instructions ask for it, and an answer that follows
-them publishes Argus's computation over cited, dated figures as history."""
+them publishes Argus's computation over cited, dated figures as history. A
+forward-valuation question never carries that line and keeps its computed
+scenarios (decision 10)."""
 
 from __future__ import annotations
 
@@ -10,6 +12,7 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime import research_answer as ra
+from argus.agent_runtime import research_calculation
 from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.calculation_rows import MARKET_COUNTERFACTUAL_KIND
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
@@ -84,11 +87,9 @@ def _interpretation() -> StructuredInterpretation:
     )
 
 
-def test_the_research_instructions_ask_for_the_recent_past_instead_of_a_projection() -> (
-    None
-):
+def test_only_answers_that_are_not_scenarios_ask_for_the_recent_past() -> None:
     assert RETRIEVAL_INSTRUCTIONS.count(HISTORY_LINE) == 1
-    assert SCENARIO_RETRIEVAL_INSTRUCTIONS.count(HISTORY_LINE) == 1
+    assert SCENARIO_RETRIEVAL_INSTRUCTIONS.count(HISTORY_LINE) == 0
 
 
 def test_a_choice_on_a_rate_nobody_can_cite_publishes_the_past_year_argus_computed(
@@ -120,7 +121,7 @@ def test_a_choice_on_a_rate_nobody_can_cite_publishes_the_past_year_argus_comput
 
     assert result is not None
     sent = json.loads(transport.requests[0].content.decode())
-    assert HISTORY_LINE in sent["instructions"]
+    assert sent["instructions"] == RETRIEVAL_INSTRUCTIONS
     card = result.stage_patch["final_response_payload"]["tool_result_cards"][0]
     assert card["tool_name"] == "growth_projection"
     assert card["outcome"]["status"] == "succeeded"
@@ -142,3 +143,92 @@ def test_a_choice_on_a_rate_nobody_can_cite_publishes_the_past_year_argus_comput
     assert "degraded" not in result.stage_patch["research"]
     rows = (result.stage_patch.get("next_experiments") or {}).get("rows") or []
     assert MARKET_COUNTERFACTUAL_KIND not in [row["kind"] for row in rows]
+
+
+OUTLOOK_PAGE = "https://www.reuters.com/markets/nvidia-outlook/"
+
+
+def _valuation() -> dict[str, Any]:
+    """A forward valuation: today's price from market data, the per-share figure
+    and growth forecast from the page the answer read, the user's amount and
+    horizon."""
+    return {
+        "kind": "valuation_scenarios",
+        "solve_for": None,
+        "inputs": [
+            {"name": "symbol", "value": "NVDA", "source": "user"},
+            {"name": "price", "value": None, "source": "market_data"},
+            {
+                "name": "per_share",
+                "value": 4.5,
+                "source": "page",
+                "source_url": OUTLOOK_PAGE,
+                "as_of": "2026-09-03",
+                "currency": "USD",
+            },
+            {
+                "name": "growth_base_pct",
+                "value": 25.0,
+                "source": "page",
+                "source_url": OUTLOOK_PAGE,
+                "as_of": "2026-09-03",
+            },
+            {"name": "amount", "value": 10000, "source": "user", "currency": "USD"},
+            {"name": "horizon_years", "value": 10, "source": "user"},
+        ],
+    }
+
+
+def test_a_forward_valuation_keeps_its_scenarios_without_the_history_line(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        research_calculation, "latest_market_close", lambda symbol: (218.36, "2026-09-10")
+    )
+    set_research_query(
+        monkeypatch,
+        globals(),
+        question_kind="company_lookup",
+        symbols=["NVDA"],
+        period_of_interest="ten years",
+        scenario_question=True,
+    )
+    transport = RecordingTransport(
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "NVIDIA trades at {{price}}; consensus growth is {{growth_base_pct}} a year.",
+                    [],
+                    _valuation(),
+                ),
+                sources=[OUTLOOK_PAGE],
+                tickers=["NVDA"],
+            )
+        ]
+    )
+    monkeypatch.setattr(
+        grounded, "_client", lambda: PerplexityAgentClient("k", transport=transport)
+    )
+
+    result = asyncio.run(
+        ra.research_answer_stage_result(
+            interpretation=_interpretation(),
+            state=RunState.new(
+                current_user_message="what will $10,000 in NVDA be worth in ten years?",
+                recent_thread_history=[],
+            ),
+            user=UserState(user_id="research-user", language_preference="en"),
+        )
+    )
+
+    assert result is not None
+    sent = json.loads(transport.requests[0].content.decode())
+    assert sent["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert HISTORY_LINE not in sent["instructions"]
+    card = result.stage_patch["final_response_payload"]["tool_result_cards"][0]
+    assert card["tool_name"] == "valuation_scenarios"
+    assert card["outcome"]["status"] == "succeeded"
+    rows = {fact["name"]: fact for fact in card["presentation"]["rows"]}
+    assert rows["price_at_horizon_base"]["value"] > 218.36
+    assert rows["price_at_horizon_base"]["source"] == {"kind": "computed"}
+    assert "degraded" not in result.stage_patch["research"]

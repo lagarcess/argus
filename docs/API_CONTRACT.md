@@ -5269,7 +5269,9 @@ phrase, pattern or language check runs before either answering model. When a
 choice turns on a future figure nobody can cite, such as an exchange rate or a
 price, the research instructions ask for no projection: the answer shows what the
 recent past did, with cited and dated figures in a calculation Argus computes,
-labeled as history rather than a forecast.
+labeled as history rather than a forecast. A scenario answer's instructions do
+not carry this rule, so a forward-valuation question keeps its computed
+scenarios (decision 10).
 
 Routing uses the primary read's existing research query. A question whose
 figure a page must supply (a product's price, a lender's or bank's rate or

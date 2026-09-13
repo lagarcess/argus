@@ -51,7 +51,7 @@ THOROUGH_MODEL = "anthropic/claude-opus-4-7"
 # System-level contract for every typed retrieval call. This text steers
 # Perplexity, not the interpreter; it is frozen by the recorded probe in
 # tests/research, not by the interpreter fingerprint.
-RETRIEVAL_INSTRUCTIONS = (
+_ANSWER_OPENING = (
     "Answer the reader's money question the way a trusted expert would, as fully "
     "as the best search answer. Open answer_markdown with the direct answer in one "
     "or two sentences. Then, where it helps the reader, add short sections under "
@@ -71,10 +71,18 @@ RETRIEVAL_INSTRUCTIONS = (
     "typical examples and say which. Lay out the options with their math and "
     "trade-offs and let the reader decide: never say which product to choose, what "
     "to do or prefer, or a rule of thumb such as rebalancing once a year, and never "
-    "state a forecast as fact. When a choice turns on a future figure nobody can "
-    "cite, such as an exchange rate or a price, do not project it; show what the "
-    "recent past did with cited figures, computed by Argus and labeled as history, "
-    "not a forecast. Write dates as dates, not in words. follow_up_questions "
+    "state a forecast as fact. "
+)
+# A choice that turns on a future figure nobody can cite is answered with the
+# recent past. Scenario answers never carry it: a forward-valuation question
+# keeps decision 10's computed scenarios.
+HISTORY_NOT_FORECAST_INSTRUCTION = (
+    "When a choice turns on a future figure nobody can cite, such as an exchange "
+    "rate or a price, do not project it; show what the recent past did with cited "
+    "figures, computed by Argus and labeled as history, not a forecast. "
+)
+_ANSWER_REST = (
+    "Write dates as dates, not in words. follow_up_questions "
     "holds two to four short questions, in the reader's language, that this reader "
     "is likely to ask next and Argus can answer. When the question asks for a "
     "figure that arithmetic on specific figures answers, such as what a fund's fees cost "
@@ -98,17 +106,22 @@ RETRIEVAL_INSTRUCTIONS = (
     + ANSWER_CALCULATION_INSTRUCTIONS
     + calculation_kinds_clause()
 )
+RETRIEVAL_INSTRUCTIONS = _ANSWER_OPENING + HISTORY_NOT_FORECAST_INSTRUCTION + _ANSWER_REST
 
-# The same contract for a question whose answer is computed (decision 10):
-# the answer returns its calculation with every input's source, and Argus
-# computes the scenario figures itself. Frozen by its own recording under
+# The same contract, without the history line, for a question whose answer is
+# computed (decision 10): the answer returns its calculation with every input's
+# source, and Argus computes the scenario figures itself. Frozen by its own recording under
 # docs/reports/evidence/grounded-math/probes.
-SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
-    "This question is answered by a calculation: fill calculations with "
-    "valuation_scenarios unless another listed kind fits the question better, "
-    "with the current price from market_data and every other input from a page "
-    "or a stated assumption. Never compute the answer, scenario values, ranges "
-    "or future figures yourself, and never present one number as the future."
+SCENARIO_RETRIEVAL_INSTRUCTIONS = (
+    _ANSWER_OPENING
+    + _ANSWER_REST
+    + (
+        "This question is answered by a calculation: fill calculations with "
+        "valuation_scenarios unless another listed kind fits the question better, "
+        "with the current price from market_data and every other input from a page "
+        "or a stated assumption. Never compute the answer, scenario values, ranges "
+        "or future figures yourself, and never present one number as the future."
+    )
 )
 
 

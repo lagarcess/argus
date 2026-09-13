@@ -313,9 +313,15 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     )
     assert scenario_spec.instructions == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert plain_spec.instructions == RETRIEVAL_INSTRUCTIONS
-    assert SCENARIO_RETRIEVAL_INSTRUCTIONS.startswith(RETRIEVAL_INSTRUCTIONS)
+    # Scenario answers carry the retrieval contract without the history line.
+    from argus.domain.research.config import HISTORY_NOT_FORECAST_INSTRUCTION
+
+    shared = RETRIEVAL_INSTRUCTIONS.replace(HISTORY_NOT_FORECAST_INSTRUCTION, "")
+    assert HISTORY_NOT_FORECAST_INSTRUCTION in RETRIEVAL_INSTRUCTIONS
+    assert HISTORY_NOT_FORECAST_INSTRUCTION not in SCENARIO_RETRIEVAL_INSTRUCTIONS
+    assert SCENARIO_RETRIEVAL_INSTRUCTIONS.startswith(shared)
     assert ANSWER_CALCULATION_INSTRUCTIONS in RETRIEVAL_INSTRUCTIONS
-    scenario_ask = SCENARIO_RETRIEVAL_INSTRUCTIONS[len(RETRIEVAL_INSTRUCTIONS) :]
+    scenario_ask = SCENARIO_RETRIEVAL_INSTRUCTIONS[len(shared) :]
     assert "fill calculation" in scenario_ask
     assert "the current price from market_data" in scenario_ask
     assert "Never compute the answer, scenario values" in scenario_ask
