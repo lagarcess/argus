@@ -1,12 +1,12 @@
 # Private Alpha Production Promotion, 2026-09-12
 
-Status: Sharing remains off at product head 4fd587bf. The resumed browser walk stopped before measurement after reproducing known P2 issue #606 in Spanish, as required by the latest founder instruction. Eighteen checks passed and one failed. The newly approved full candidate run and ten-pair A/B have not started; the old scorecard does not satisfy the new exact-SHA gate. No fix, merge or Step 8 occurred.
+Status: The sharing-off browser walk, fresh full candidate run and ten-pair A/B are complete at product head 4fd587bf, within every spend cap. Native failures and nonblocking findings are retained below; no new blocking P0 or P1 was identified. The founder owns the Step 7 merge decision after final-head CI, Codex review and zero unresolved threads are confirmed in the PR terminal audit. No merge or Step 8 operation was performed.
 
 ## Candidate
 
 - Candidate SHA: `4fd587bf24ce39b794c2228d61f94693826d0da2`
 - Candidate branch: `codex/production-promotion-20260912`
-- Validation status: Sharing remains off at product head 4fd587bf. The resumed browser walk stopped before measurement after reproducing known P2 issue #606 in Spanish, as required by the latest founder instruction. Eighteen checks passed and one failed. The newly approved full candidate run and ten-pair A/B have not started; the old scorecard does not satisfy the new exact-SHA gate. No fix, merge or Step 8 occurred.
+- Validation status: The sharing-off browser walk, fresh full candidate run and ten-pair A/B are complete at product head 4fd587bf, within every spend cap. Native failures and nonblocking findings are retained below; no new blocking P0 or P1 was identified. The founder owns the Step 7 merge decision after final-head CI, Codex review and zero unresolved threads are confirmed in the PR terminal audit. No merge or Step 8 operation was performed.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
 - Promotion target: `main`
 - Release captain: Codex in the founder-supervised promotion task.
@@ -20,134 +20,134 @@ Status: Sharing remains off at product head 4fd587bf. The resumed browser walk s
 - Gate report durable attachment or committed path: `docs/reports/evidence/2026-09-12-main-promotion/production-migration-gate-before.json`
 - Gate checked at: `2026-09-13T02:38:15.471757Z`
 - Gate candidate SHA: `df7aee12955f667e31057464d62c72287fb12247`
-- Gated candidate parents and intended landing method:
-- Landed `origin/main` SHA:
-- Gate-to-landed-SHA identity: exact / invalidated and rerun
-- Landed-ref verification: `--verify-landed-ref origin/main`, status and SHA
-- Sanitized production project and database host:
+- Gated candidate parents and intended landing method: pre-landing candidate `df7aee12`; founder-owned merge commit to main. All seven migration files remain unchanged at `4fd587bf`.
+- Landed `origin/main` SHA: pending founder merge; no landing claimed.
+- Gate-to-landed-SHA identity: pending the Step 8 gate rerun at the actual merge commit.
+- Landed-ref verification: pending Step 8 using `--verify-landed-ref origin/main`.
+- Sanitized production project and database host: recorded in the gate report under `production_target`; no candidate server used that target.
 - Database transport: `sslmode=verify-full`, production CA, GSS disabled
 - Candidate migrations, with version, name, file SHA-256, statement count, and
-  statement-array SHA-256:
+  statement-array SHA-256: complete per-file records in the gate report under `candidate_migrations` and `applied_migrations`, respectively.
 - Applied production migrations, with version, name, statement count, and
-  statement-array SHA-256:
-- Latest applied production migration:
-- Missing migrations:
-- Unexpected applied migrations:
-- Migration name drift:
-- Migration content drift, including missing statement history:
-- Safety classifications and live requirements for every missing migration:
-- Classification basis and human live-schema review:
+  statement-array SHA-256: complete per-file records in the gate report under `candidate_migrations` and `applied_migrations`, respectively.
+- Latest applied production migration: `20260905000000` at the recorded readback.
+- Missing migrations: exactly the seven founder-approved migrations listed under the migration approval section below.
+- Unexpected applied migrations: seven historical identities covered by the committed gate reconciliation; advisory, no new unexpected identity. See `historical_ledger_variance` in the gate report.
+- Migration name drift: none.
+- Migration content drift, including missing statement history: none outside the recorded historical reconciliation.
+- Safety classifications and live requirements for every missing migration: per-migration `classification`, `classification_basis` and `live_requirement` records in the gate report; theme drop is destructive and requires coordinated application immediately before deploy.
+- Classification basis and human live-schema review: gate classifications plus the founder approval of all seven, including theme drop without backup. Fresh live review remains part of Step 8.
 - Gate result: expected `status=blocked`, sole stop reason `missing_candidate_migrations`, with exactly the seven listed versions in repository order. The theme drop is destructive. No new name or content drift; the historical ledger variance matches the gate's committed reconciliation and is advisory. `status=pass` remains required before deploy.
 - Gate human-approval state: seven listed migrations approved in principle, including the destructive theme drop with no backup; application awaits the post-merge approval stop in this task.
 - Gate apply result: `not_performed_by_gate`
-- Gate ledger readback:
+- Gate ledger readback: read-only pre-application report linked above; no ledger row was written.
 - Human apply performed: no.
-- If applied, repository order and ledger before/after:
-- If applied, affected-object readback:
+- If applied, repository order and ledger before/after: not applied; pending Step 8.
+- If applied, affected-object readback: not applied; pending Step 8.
 - Confirm the gate never applies migrations: `database_access=read_only`, `migration_apply=never`, `apply_result=not_performed_by_gate`.
 
 ## Deploy Proof
 
 - API service: `argus-api`
-- API deploy status:
-- API deployed SHA:
+- API deploy status: candidate not deployed; baseline was live at the Step 2 readback.
+- API deployed SHA: baseline `ee9c3491fa6219502f1e94abc5d9e661a06839d9`; candidate proof pending Step 8.
 - Web service: `argus-app`
-- Web deploy status:
-- Web deployed SHA:
+- Web deploy status: candidate not deployed; baseline was live at the Step 2 readback.
+- Web deployed SHA: baseline `ee9c3491fa6219502f1e94abc5d9e661a06839d9`; candidate proof pending Step 8.
 - Workflow service: `argus-backtests`
-- Workflow version status:
-- Workflow released SHA:
-- Workflow version id:
-- Checked at:
+- Workflow version status: baseline ready; candidate not released.
+- Workflow released SHA: baseline abbreviated `ee9c349`; candidate proof pending Step 8.
+- Workflow version id: retained in `production-readback-before.json`; no candidate version exists from this task.
+- Checked at: `2026-09-13T02:13:29.901315+00:00` for baseline readback; no post-deploy readback.
 
 ## Environment Proof
 
 - Expected mode: Environment C uses the measured Render literals, production API mode, live providers, disposable local Supabase, and the production web build. The complete key record appears below.
-- Release profile hash:
-- Effective locales and capabilities:
-- api_web_env_fingerprint:
-- workflow_env_fingerprint:
-- workflow_env_status:
-- autodeploy_fingerprint:
-- autodeploy_status:
+- Release profile hash: `5e654e07047f40df2e28b9cc83291698bd9bf3b211e32edf2c80d2dbf493c2cc` for sharing off.
+- Effective locales and capabilities: English and Spanish, guest and signed-in chat, historical backtests, research and decision notes; sharing disabled.
+- api_web_env_fingerprint: Local key-by-key proof: `sharing-off/browser-completion/environment-proof.json`; hosted fingerprint pending Step 8.
+- workflow_env_fingerprint: Pending Step 8 hosted proof; no workflow environment changed.
+- workflow_env_status: Production baseline read back; candidate workflow not deployed.
+- autodeploy_fingerprint: Read-only service values retained in `production-readback-before.json`.
+- autodeploy_status: All three services were `off`; no Blueprint sync or trigger change.
 - all three services use `checksPass`: not requested; founder requires manual mode on all three, verified `off` in `production-readback-before.json`.
-- workflow_runtime_provider_mode:
-- workflow_runtime_proof:
-- env_fingerprint script output:
-- workflow_task:
-- real_workflow_task:
-- Backtest service mode:
+- workflow_runtime_provider_mode: Baseline readback `live_provider`; candidate proof pending Step 8.
+- workflow_runtime_proof: Pending Step 8 at the founder merge commit.
+- env_fingerprint script output: No candidate hosted audit run; local literal and secret-presence records are linked in Current Browser Acceptance.
+- workflow_task: Pending Step 8; local backtests ran in process.
+- real_workflow_task: Pending Step 8; no production workflow task created.
+- Backtest service mode: local in-process acceptance with production shadow rows enabled; production dispatch proof pending Step 8.
 - Workflow service proof:
-  - `argus-backtests` latest deploy/status:
+  - `argus-backtests` latest deploy/status: Baseline `ee9c349`, ready; recorded in the Step 2 readback.
   - workflow autodeploy verified: `off`.
   - workflow provider mode verified: `live_provider`
   - effective runtime provider mode verified: `live_provider`
-  - effective runtime proof status:
-  - required workflow secrets present with redacted proof:
-  - active workflow task verified:
-  - real workflow task verified:
-- Feature flags:
+  - effective runtime proof status: Candidate hosted proof pending Step 8.
+  - required workflow secrets present with redacted proof: Candidate hosted secret-presence proof pending Step 8; no secret values changed.
+  - active workflow task verified: Candidate hosted task pending Step 8.
+  - real workflow task verified: Candidate hosted task pending Step 8.
+- Feature flags: both receipt-sharing values are false. The complete service key records are in `sharing-off/browser-completion/environment-proof.json`.
 - Guest staged mode:
-  - `ARGUS_GUEST_ACCESS_ENABLED`:
-  - `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED`:
-  - `NEXT_PUBLIC_GUEST_ACCESS_ENABLED`:
-  - permanent account allowlist verified:
+  - `ARGUS_GUEST_ACCESS_ENABLED`: Not declared in the service key record; production code default applies.
+  - `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED`: `true`, from the release literal key record.
+  - `NEXT_PUBLIC_GUEST_ACCESS_ENABLED`: Not declared in the service key record; production code default applies.
+  - permanent account allowlist verified: No allowlist change; local new-account signup and profile save verified.
 - Anonymous Auth / abuse controls:
-  - anonymous Auth enabled:
-  - CAPTCHA posture:
-  - provider anonymous-user rate limit:
-  - Argus per-IP guest-attempt limit:
+  - anonymous Auth enabled: Local disposable Auth used for the guest walk; hosted post-deploy check pending.
+  - CAPTCHA posture: Local QA token with a localhost API; hosted Turnstile proof pending Step 8.
+  - provider anonymous-user rate limit: Not changed or load-tested; local defaults retained.
+  - Argus per-IP guest-attempt limit: Release contract and code defaults retained; no load-test claim.
 - Guest cleanup:
-  - operator-run command:
-  - explicit target:
-  - dry-run selected:
-  - real selected/deleted/preserved/failed:
-  - cleanup lag:
-- Render config audit command:
-- Secret rotation / least-privilege owner:
+  - operator-run command: Owned local stack stopped with `supabase stop --no-backup --workdir <scratch>`; no production cleanup.
+  - explicit target: Only the disposable `argus-promotion-20260912` stack.
+  - dry-run selected: Not applicable to disposable stack teardown; no production guest-cleanup selection.
+  - real selected/deleted/preserved/failed: Owned stack removed; unrelated stacks preserved. See `sharing-off/browser-completion/cleanup-browser.json`.
+  - cleanup lag: Not measured; no production cleanup claim.
+- Render config audit command: Hosted audit pending Step 8. Local launchers proved literal parity, substitutions and absent undeclared keys.
+- Secret rotation / least-privilege owner: Founder; no rotation or secret change authorized or performed.
 
 ## Gate Evidence
 
 - Local smoke command: `.github/local-smoke.sh --expected-sha df7aee12955f667e31057464d62c72287fb12247`, in Environment A after one direct timed readiness request.
 - Local smoke result: the one unchanged rerun passed. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/local-smoke-rerun-status.json` and `local-smoke-rerun.log` in the same directory.
-- Warmup command:
-- Warmup result:
-- Canary evidence artifact: `private-alpha-canary-evidence`
+- Warmup command: No separate hosted warmup; unchanged Environment A smoke command recorded above.
+- Warmup result: Local smoke `verification_status=ready`, `workflow_probe=ready`; hosted candidate proof pending Step 8.
+- Canary evidence artifact: the local acceptance records below; no hosted candidate canary is claimed before Step 8.
 - Authoritative Spanish release canary:
-  - JSON evidence:
-  - Exact candidate SHA verified:
-  - Finalized evidence/result labels:
-  - Decision-note label and reload hydration:
-  - Omnisearch source identity:
+  - JSON evidence: Current Spanish acceptance: `sharing-off/browser-completion/verification.json` and both sharing-off `steps.json` files.
+  - Exact candidate SHA verified: `4fd587bf24ce39b794c2228d61f94693826d0da2`; clean detached local worktree, no env files.
+  - Finalized evidence/result labels: Spanish result and result-rail labels passed in the Current Browser Acceptance table.
+  - Decision-note label and reload hydration: `Decisión: Observando` saved and survived reload; feedback stayed dismissed.
+  - Omnisearch source identity: Not exercised by the founder-specified remaining walk; no additional claim.
 - Browser signup/login proof: local synthetic signup, first profile save, reload persistence, home country and English Usage passed at the measured head. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/local-acceptance/browser-free-checks.json`, `profile-readback.json`, and screenshots `browser/01-en-guest-greeting.png` through `browser/06-en-usage-labels.png` under that same directory. No paid chat turn is claimed by this free evidence.
 - Guest exact-head browser evidence:
-  - local candidate SHA:
-  - 20-check matrix result:
-  - same-UUID new-account conversion:
-  - atomic existing-account claim:
-  - zero cross-owner results:
-  - usage/API/database agreement:
-  - chart-interaction zero-write ledger:
-  - console status:
+  - local candidate SHA: `4fd587bf24ce39b794c2228d61f94693826d0da2` for the sharing-off walk.
+  - 20-check matrix result: No separate 20-check matrix run here; the founder-specified walk is recorded step by step below.
+  - same-UUID new-account conversion: Not measured by this walk; no conversion-identity claim.
+  - atomic existing-account claim: Not measured by this walk; no concurrency claim.
+  - zero cross-owner results: No cross-owner matrix run in this walk; no new isolation claim.
+  - usage/API/database agreement: Local saved result, decision and feedback counts verified; approved Usage labels checked in both languages.
+  - chart-interaction zero-write ledger: Not measured by this walk.
+  - console status: Known #605 receipt warning and expected local email warning recorded in `sharing-off/browser-completion/known-warning-summary.json`.
 - Guest load calibration:
-  - synthetic p50/p95 and sample size:
-  - error rate:
-  - queue/backpressure result:
-  - anonymous-session creation volume:
-  - cleanup lag:
-  - provider-reported cost per completed result:
-  - unsupported production projections:
-  - Failed-capture replay, if failed:
-  - Exit status:
+  - synthetic p50/p95 and sample size: Not run in this promotion; no load projection.
+  - error rate: No load sample collected.
+  - queue/backpressure result: No load sample collected.
+  - anonymous-session creation volume: No load sample collected.
+  - cleanup lag: Not measured; no production cleanup claim.
+  - provider-reported cost per completed result: Not estimated from the browser sample; cumulative actual tracked cost and reserve are reported separately.
+  - unsupported production projections: None made.
+  - Failed-capture replay, if failed: Not applicable to load calibration. The separately approved historical acceptance replay is recorded below.
+  - Exit status: Not applicable; no load job run.
 
 ## Release Decision
 
 - Public tester exposure approved: no new exposure approval claimed; founder owns each stop.
-- Known caveats:
-- Rollback trigger:
-- Rollback command or owner:
-- Guest rollback order verified:
-- Follow-up owner:
+- Known caveats: #604 excluded by sharing off; #605 and #606 are deferred P2 findings; #611 records a P2 Bitcoin follow-up identity mismatch; research delivery and source-grounding failures are retained below, with #599 tracking BTC delivery. No additional product fix was made.
+- Rollback trigger: founder-directed response to a failed production gate or post-deploy check; no automatic rollback authorized.
+- Rollback command or owner: founder. Restore the dropped theme column with separate approval before deploying the old baseline.
+- Guest rollback order verified: not executed; schema compatibility must precede any baseline deploy.
+- Follow-up owner: founder prioritizes #599, #604, #605, #606, #608 and #611; research retry on provider errors is the first research follow-up.
 
 ## Privacy Notes
 
@@ -165,6 +165,8 @@ Status: Sharing remains off at product head 4fd587bf. The resumed browser walk s
   case and turn numbers, outcomes, refusal codes and named capabilities, with
   allowance counts recorded separately.
 
+
+
 ## Fixed Cut and Measurement Identity
 
 - Integration cut: `3d379d3d9020027ccfd1f2a4c617626520af8a44`.
@@ -178,7 +180,7 @@ Status: Sharing remains off at product head 4fd587bf. The resumed browser walk s
 - Later evidence commits touch only `docs/` unless an approved finding round requires a product fix.
 - Product-tree identity will compare `src/`, `web/app/`, `web/components/`, `web/lib/`, `web/public/`, `render.yaml`, and `supabase/` to the measured head, matching the prior promotion record. Also record all non-doc Git-tree changes, including `workflows/`, tests, lockfiles, and the release profile.
 
-## Sharing-Off Decision, 2026-09-13
+## Sharing-Off Decision and Initial Preflight, 2026-09-13 (Historical)
 
 The founder chose to promote with sharing off after the live findings in [#604](https://github.com/lagarcess/argus/issues/604#issuecomment-5655111583). Only `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED` change from `true` to `false` in `render.yaml` and the release profile. Their existing contract tests derive and compare the profile and Blueprint values; no separate true-valued test pin exists. Code defaults, runtime code, eval fixtures and all seven migrations remain unchanged. The earlier sharing-on records below are historical evidence, not the intended release configuration.
 
@@ -198,7 +200,7 @@ The requested issue is [#608](https://github.com/lagarcess/argus/issues/608), wi
 
 No new browser or eval spend occurred under this decision. Cumulative browser cost remains $0.67845263918 tracked plus $0.16 reserve, below $3. Eval cost remains $6.0129416335 tracked plus $1.16 reserve, below $12.50. `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/browser-budget-at-stop.json` records the browser total. Fresh CI/review and Step 7 are not complete. No merge, live environment change, migration application or Step 8 action occurred.
 
-## Sharing-Off Browser Stop Before Measurement, 2026-09-13
+## Sharing-Off Browser Stop Before Measurement, 2026-09-13 (Historical)
 
 The founder subsequently approved one fresh full candidate run to satisfy the unchanged validator, followed by a fresh ten-pair interleaved A/B, with one live job at a time and the same cumulative $12.50 cap. The remaining browser walk had to finish first at the sharing-off product head, with an explicit instruction to stop before measuring if it found anything needing a product change. That later instruction governs this stop; the earlier provenance approval request above is historical.
 
@@ -240,13 +242,112 @@ The current evidence directory is `docs/reports/evidence/2026-09-12-main-promoti
 | es-14-breakdown-gap-sources | The lower Breakdown shows the numeric gap and sources. | KO quedó 34.7 puntos porcentuales por debajo; 5 fuentes | PASS: The Breakdown reports the 34.7-point gap and shows five sources. | [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-14-breakdown-gap-sources.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-14-breakdown-gap-sources.txt) |
 | es-15-follow-up-duplicate-next-steps | The follow-up gives the gap, dollar costs, worst-drop dates and one next-steps list. | 34.7 puntos porcentuales; $16.58 comisiones; $8.29 deslizamiento; $24.87 total; 21 de abril de 2022 al 5 de octubre de 2023; four prose steps plus Qué probar después | FAIL: The facts match the run, but four prose next steps are repeated as four action buttons; this reproduces known P2 issue #606. | [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-15-follow-up-duplicate-next-steps.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-15-follow-up-duplicate-next-steps.txt) |
 
+## Current Browser Acceptance: Sharing Off
+
+The founder explicitly kept #606 as a deferred P2 and limited the pre-measurement product stop to **new P0 or P1 findings requiring a product change**. The remaining Spanish walk completed at `4fd587bf24ce39b794c2228d61f94693826d0da2`, with no new P0 or P1. Both sharing flags remain false, all seven migrations remain included, and no product fix was made.
+
+The fresh Spanish clarification retained AAPL and $10,000 after a date-only reply. A new result accepted a decision, retained `Decisión: Observando` after reload, and kept the rated feedback ask dismissed. The forward-looking research attempt failed with HTTP 500; its only retry began after the required two-minute wait and published an answer with five sources, including SEC and Apple investor filings. A subsequent question returned to the saved worst-drop dates. Once the conversation reached the rail's normal transcript threshold, `Decisión guardada: AAPL · Comprar y Mantener` navigated to and focused the correct result. A read-only local query counted one saved feedback row and one decision.
+
+All sharing rows below are **not applicable** with sharing off. No answer selection, preview, local link, signed-out phone viewing or revocation was attempted. The earlier sharing-on failures remain recorded as history in #604. #606 remains a deferred P2 in both languages. The already recorded #605 receipt-persistence warning appeared again; the process observer retained cost. Expected local feedback-email warnings are the documented no-email environment difference. The first follow-up remains research retry on provider errors. No research failure was relabeled as a candidate request defect.
+
+**Walk spend, cumulative across every walk and founder demo:** $1.34063303874 tracked plus $0.24 reserve = $1.58063303874 of $3. The reserve is not spend. Startup and environment assertions passed; no environment files or production database values were present in the detached worktree. The owned API, web and budget guard stopped, and the owned Supabase stack was stopped with `--no-backup`; owned ports, containers and volumes were removed while unrelated stacks were preserved. Historical customer replay inputs remain deleted. The mocked harness passed all 259 checks in 11.54 seconds.
+
+Evidence is under `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/`: `verification.json`, `persistence-proof.json`, `research-attempt-1.json`, `research-retry-timing.json`, `not-applicable.json`, `budget-final.json`, `cost-events.json`, `cleanup-browser.json`, and `evidence-applicability.json`. Every current capture has its screenshot and visible text. Earlier non-sharing English captures remain applicable because runtime, frontend, migrations, tests and workflows are byte-identical; the two release sharing values do not affect those surfaces. Original artifact bytes and recorded heads remain unchanged.
+
+The table below combines the applicable retained English evidence and both sharing-off capture sessions. Failed attempts remain failures with their disposition, even where a later approved retry passed. NA rows have no fabricated screenshot.
+
+| Step | Expected | Visible text that matters | Result and disposition | Capture / evidence |
+| --- | --- | --- | --- | --- |
+| en-02-signed-in-greeting | A new local account reaches the empty signed-in English chat. | What should we look into?; Search; Settings | PASS: Signup reached the English chat with signed-in sidebar controls. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-02-signed-in-greeting.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-02-signed-in-greeting.txt) |
+| en-03-first-profile-save-country | First home-country save succeeds and derives USD. | Country United States; Currency USD | PASS: United States and USD are shown after the first country save. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-03-first-profile-save-country.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-03-first-profile-save-country.txt) |
+| en-04-profile-reload | Saved country and derived currency survive a reload. | Country United States; Currency USD | PASS: United States and USD persisted after reload. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-04-profile-reload.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-04-profile-reload.txt) |
+| en-05-usage | Usage labels read Usage, Conversation, Searches with sources, Simulations. | Usage; Conversation; Searches with sources; Simulations | PASS: All four approved English labels are visible. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-05-usage.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-05-usage.txt) |
+| en-06-confirmation | The DCA draft preserves starting capital and monthly contribution and discloses any date adjustment. | $200 monthly; $5,000; Jul 27, 2020 → Dec 31, 2024 | PASS: Card shows $5,000, $200 monthly and the disclosed available-data start. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-06-confirmation.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-06-confirmation.txt) |
+| en-07-first-card-edit | Changing starting capital preserves the recurring contribution. | $200 monthly; $6,000 | PASS: $6,000 starting capital is saved with $200 monthly unchanged. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-07-first-card-edit.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-07-first-card-edit.txt) |
+| en-08-second-card-edit | A costs edit preserves the earlier capital edit and monthly contribution. | $6,000; $200 monthly; 10 bps fee + 5 bps slippage | PASS: 10 bps fee and 5 bps slippage are saved with $6,000 and $200 monthly intact. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-08-second-card-edit.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-08-second-card-edit.txt) |
+| en-09-result-quick-take-feedback | A result, Quick take and one feedback ask appear after the backtest. | Simulation Complete; Quick take; How is Argus doing? | PASS: Result and Quick take are present with one How is Argus doing prompt. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-09-result-quick-take-feedback.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-09-result-quick-take-feedback.txt) |
+| en-10-feedback-rated | Rating the feedback ask saves and acknowledges it. | Thanks for telling us. | PASS: The prompt changed to Thanks for telling us after Good. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-10-feedback-rated.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-10-feedback-rated.txt) |
+| en-11-result-details | Expanded result details preserve contributions, assumptions and net costs. | $16,800; Starting capital $6,000; Contribution $200 monthly | PASS: Details show $16,800 contributed, $6,000 starting capital, $200 monthly and modeled costs. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-11-result-details.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-11-result-details.txt) |
+| en-12-breakdown | Breakdown gives a sourced holding experience grounded in the result. | Breakdown; 54 purchases and no sales; 3 sources | PASS: Breakdown preserved DCA amounts, 38.1-point gap and April 21, 2022 to October 5, 2023 worst-drop dates with three sources. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-12-breakdown.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-12-breakdown.txt) |
+| en-13-breakdown-dates | The lower Breakdown shows exact worst-drop dates and benchmark gap. | April 21, 2022; October 5, 2023; 38.1 percentage points | PASS: Dates and the 38.1-percentage-point gap are visible in the Breakdown. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-13-breakdown-dates.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-13-breakdown-dates.txt) |
+| en-14-result-follow-up | The follow-up states gap, dollar costs and worst-drop dates with one next-steps list. | $25.17 in total: $16.78 in fees and $8.39 in slippage; four prose steps plus Try next | FAIL: Facts are correct, but next steps appear twice: a prose list and the matching Try next controls. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-14-result-follow-up.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-14-result-follow-up.txt) |
+| en-15-decision-saved | A decision saves on the result. | Decision: Watching | PASS: The result now reads Decision: Watching. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-15-decision-saved.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-15-decision-saved.txt) |
+| en-16-feedback-and-decision-reload | After another reply and reload, feedback stays dismissed and decision and Breakdown persist. | Decision: Watching; Breakdown; feedback ask absent | PASS: No feedback ask returned; Decision: Watching and the finished Breakdown survived reload. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-16-feedback-and-decision-reload.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-16-feedback-and-decision-reload.txt) |
+| en-17-research-attempt-1 | The valuation and outlook question publishes research with sources. | I couldn't complete the data lookup just now, so I won't quote live figures. | FAIL: The turn disclosed that data lookup could not complete and published no live figures. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-17-research-attempt-1.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-17-research-attempt-1.txt) |
+| en-18-research-attempt-2 | One retry after two minutes publishes the requested research. | I couldn't complete the data lookup just now, so I won't quote live figures. | FAIL: The single retry timed out and again disclosed lookup unavailability. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-18-research-attempt-2.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-18-research-attempt-2.txt) |
+| en-19-result-rail | A long conversation shows a tick that navigates to its saved result. | Decision saved: KO · DCA Accumulation | PASS: The KO result appears as Decision saved after its decision was added, and the tick navigates to it. | df7aee12; retained non-sharing code; [image](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-19-result-rail.png) / [text](../reports/evidence/2026-09-12-main-promotion/browser-walk/en-19-result-rail.txt) |
+| en-01-sharing-off-guest-greeting | The rebuilt guest chat opens in English with sharing off. | What should we look into? | PASS: English greeting and enabled composer are visible. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/en-01-sharing-off-guest-greeting.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/en-01-sharing-off-guest-greeting.txt) |
+| en-02-header-sharing-absent | A signed-in conversation header has no sharing control. | New chat; Chat options; no Share conversation button | PASS: The header shows Chat options and no Share conversation button. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/en-02-header-sharing-absent.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/en-02-header-sharing-absent.txt) |
+| en-03-fresh-clarification | A fresh Apple test with $10,000 asks for its missing date window. | What date window should I use for AAPL? | PASS: Argus asks only for the missing date window and names AAPL. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/en-03-fresh-clarification.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/en-03-fresh-clarification.txt) |
+| en-04-clarification-keeps-facts | A date-only reply retains AAPL and the earlier $10,000 capital. | AAPL; Starting capital $10,000; Jan 2, 2024 → Dec 31, 2024 | PASS: The confirmation keeps AAPL and $10,000 with the supplied 2024 period. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/en-04-clarification-keeps-facts.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/en-04-clarification-keeps-facts.txt) |
+| es-01-guest-greeting | The empty guest chat greets the user in Spanish. | ¿Qué te gustaría investigar?; Pregunta sobre cualquier empresa o idea | PASS: The greeting and composer are Spanish. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-01-guest-greeting.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-01-guest-greeting.txt) |
+| es-02-signed-in-greeting | The new signed-in account sees an empty Spanish greeting. | ¿Qué te gustaría investigar?; Ajustes | PASS: Signup succeeds and the empty signed-in chat remains Spanish. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-02-signed-in-greeting.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-02-signed-in-greeting.txt) |
+| es-03-first-profile-save | The first profile change on a new account saves successfully in Spanish. | ¿Cómo quieres que Argus te llame? Lucía; Idioma de la app es | PASS: The saved preferred name appears as Lucía without an error. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-03-first-profile-save.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-03-first-profile-save.txt) |
+| es-04-home-country-save | Home country saves and remains visible in Spanish. | País Colombia; Moneda COP | PASS: The country selection updates to Colombia and the derived currency to COP. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-04-home-country-save.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-04-home-country-save.txt) |
+| es-05-home-country-persistence | The saved home country survives a reload. | País Colombia; Moneda COP | PASS: Colombia and COP remain selected after reload. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-05-home-country-persistence.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-05-home-country-persistence.txt) |
+| es-06-usage-labels | Usage uses all four founder-approved Spanish labels. | Uso; Conversación; Búsquedas con fuentes; Simulaciones | PASS: All four approved labels are present. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-06-usage-labels.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-06-usage-labels.txt) |
+| es-07-sharing-header-absent | The populated Spanish chat header has no sharing link or action. | Compra recurrente de Coca-Cola; Opciones de chat; no Compartir control | PASS: The header exposes chat options and no sharing button. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-07-sharing-header-absent.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-07-sharing-header-absent.txt) |
+| es-08-dca-confirmation | Spanish confirmation retains KO, the monthly $200 contribution, $5,000 initial capital and date range. | KO; Compras recurrentes; Aporte $200 cada mes; 3 ago 2020 → 31 dic 2024; Capital inicial $5,000 | PASS: All requested DCA facts appear in the confirmation card. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-08-dca-confirmation.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-08-dca-confirmation.txt) |
+| es-09-first-card-edit | The first edit changes starting capital to $6,000 while preserving monthly contributions. | Capital inicial $6,000; Aporte $200 cada mes | PASS: The card now shows $6,000 and still shows $200 each month. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-09-first-card-edit.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-09-first-card-edit.txt) |
+| es-10-second-edit-retains-first | Editing costs preserves the first capital edit and recurring contribution. | Capital inicial $6,000; Aporte $200 cada mes; comisión de 10 bps + deslizamiento de 5 bps | PASS: The card keeps $6,000 and $200 monthly while adding 10 bps fee and 5 bps slippage. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-10-second-edit-retains-first.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-10-second-edit-retains-first.txt) |
+| es-11-result-quick-take-feedback | A Spanish result, Quick take and one feedback ask appear after the backtest. | Simulación completa; Valor final $19,361; 34.7 puntos porcentuales; Lectura rápida; ¿Qué tal lo está haciendo Argus? | PASS: The completed result and Lectura rápida are visible, followed by one feedback ask. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-11-result-quick-take-feedback.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-11-result-quick-take-feedback.txt) |
+| es-12-feedback-rated | Answering the feedback ask saves once and shows an acknowledgment. | Gracias por contarnos.; Cuéntanos más | PASS: Bien changes the prompt to Gracias por contarnos. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-12-feedback-rated.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-12-feedback-rated.txt) |
+| es-13-breakdown | Breakdown explains the holding experience in Spanish with grounded DCA facts and sources. | 53 compras y ninguna venta; $16,600 aportados; $19,361; 21 de abril de 2022 y 5 de octubre de 2023; 5 fuentes | PASS: The Breakdown preserves contributions, ending value and worst-drop dates and includes publisher links. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-13-breakdown.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-13-breakdown.txt) |
+| es-14-breakdown-gap-sources | The lower Breakdown shows the numeric gap and sources. | KO quedó 34.7 puntos porcentuales por debajo; 5 fuentes | PASS: The Breakdown reports the 34.7-point gap and shows five sources. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-14-breakdown-gap-sources.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-14-breakdown-gap-sources.txt) |
+| es-15-follow-up-duplicate-next-steps | The follow-up gives the gap, dollar costs, worst-drop dates and one next-steps list. | 34.7 puntos porcentuales; $16.58 comisiones; $8.29 deslizamiento; $24.87 total; 21 de abril de 2022 al 5 de octubre de 2023; four prose steps plus Qué probar después | FAIL: The facts match the run, but four prose next steps are repeated as four action buttons; this reproduces known P2 issue #606. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-15-follow-up-duplicate-next-steps.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-walk/es-15-follow-up-duplicate-next-steps.txt) |
+| es-16-fresh-clarification | A fresh Apple test asks for the missing period in Spanish. | ¿Qué periodo quieres usar para AAPL? | PASS: The reply asks for the period and keeps the earlier AAPL fact. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-16-fresh-clarification.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-16-fresh-clarification.txt) |
+| es-17-clarification-keeps-facts | A date-only Spanish reply keeps AAPL and the original $10,000. | AAPL; Capital inicial $10,000; 2 ene 2024 → 31 dic 2024 | PASS: The confirmation retains AAPL and $10,000 and adds the requested 2024 dates. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-17-clarification-keeps-facts.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-17-clarification-keeps-facts.txt) |
+| es-18-result-for-remaining-controls | The clarified test completes and exposes decision and feedback controls. | Simulación completa; Valor final $13,503; Agregar decisión; ¿Qué tal lo está haciendo Argus? | PASS: The AAPL result completes with one feedback ask and Agregar decisión. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-18-result-for-remaining-controls.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-18-result-for-remaining-controls.txt) |
+| es-19-decision-saved | A Spanish decision saves on the completed result. | Decisión: Observando | PASS: The result now displays Decisión: Observando. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-19-decision-saved.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-19-decision-saved.txt) |
+| es-20-feedback-decision-reload | The decision survives reload and the rated feedback ask does not return. | Decisión: Observando; no ¿Qué tal lo está haciendo Argus? prompt | PASS: Decisión: Observando persists and the feedback question and rating buttons are absent. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-20-feedback-decision-reload.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-20-feedback-decision-reload.txt) |
+| es-21-research-attempt-1 | A forward-looking question about Apple publishes a Spanish research answer with sources. | No pude completar la búsqueda de datos en este momento, así que no voy a citar cifras en vivo. | FAIL: The reply discloses that the lookup could not complete and cites no live figures. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-21-research-attempt-1.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-21-research-attempt-1.txt) |
+| es-22-research-attempt-2 | The single retry after two minutes publishes Spanish research with sources. | Los riesgos más claros para los ingresos de Apple durante los próximos doce meses; No significan que los ingresos necesariamente caerán; 5 fuentes | PASS: The retry explains revenue risks as possibilities and publishes five sources. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-22-research-attempt-2.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-22-research-attempt-2.txt) |
+| es-23-research-sources | The Spanish research answer exposes its source list. | Fuentes que Argus consultó; www.sec.gov; investor.apple.com; five source links | PASS: The source panel lists five sources, including SEC and Apple investor filings. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-23-research-sources.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-23-research-sources.txt) |
+| es-24-result-after-research | Returning from research to the saved result keeps its exact historical dates. | La peor caída de AAPL en la prueba de 2024 comenzó el 23 de enero de 2024 y terminó el 19 de abril de 2024. | PASS: The reply uses the saved January 23 to April 19 worst-drop window. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-24-result-after-research.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-24-result-after-research.txt) |
+| es-25-result-rail | The Spanish rail exposes the saved result and its tick navigates back to that card. | Actividad de la conversación; Decisión guardada: AAPL · Comprar y Mantener; Decisión: Observando | PASS: The Decisión guardada tick scrolls to the AAPL card and focuses the result, which still shows Observando. | 4fd587bf; [image](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-25-result-rail.png) / [text](../reports/evidence/2026-09-12-main-promotion/sharing-off/browser-completion/es-25-result-rail.txt) |
+| en / Pick answers | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| en / Preview selected answers | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| en / Create a local share link | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| en / Open signed out at phone width | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| en / Revoke the link | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| en / Confirm a revoked link stops working | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| es-419 / Pick answers | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| es-419 / Preview selected answers | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| es-419 / Create a local share link | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| es-419 / Open signed out at phone width | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| es-419 / Revoke the link | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+| es-419 / Confirm a revoked link stops working | Sharing off | Header sharing control absent | NOT APPLICABLE: founder release decision | No sharing capture required |
+
+## Current Full Candidate Comparison: Sharing Off
+
+- Live eval scorecard: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/candidate-eval-scorecard-4fd587bf.json`
+- Baseline eval scorecard: `docs/reports/evidence/2026-09-12-main-promotion/baseline-eval-scorecard-ee9c3491.json`
+- Native candidate: 67 passed, four failed, zero infrastructure errors, all 71 cases and 84 user turns measured. The completed deployed baseline remains 59 passed, three failed, all 62 cases and 73 user turns measured.
+- Provenance: clean detached worktree at `4fd587bf24ce39b794c2228d61f94693826d0da2`, both provider modes `live_provider`, Python 3.10.20, identical Environment B and unchanged real-env source hash. The native scorecards are preserved byte for byte. No product file or validator changed during the run.
+- Fresh tracked cost: $1.951539972184. Cumulative eval subtotal at full-run completion: $7.964481605684 tracked plus $1.52 reserve, or $9.484481605684 guarded. The reserve is not spend. The sequential A/B uses the same cumulative ledger and $12.50 stop.
+- Comparison: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/approved-eval-comparison.json`.
+- Per-case dispositions: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/full-eval-case-dispositions.json`.
+- Free unchanged-validator checks: 24 passed in 7.43 seconds after the new full scorecard and dispositions were recorded. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/release-docs-full-scorecard.log`. Modularity also passed with no violations; its adjacent `modularity-budget.log` applies to the would-be merged product tree because the read-back main SHA remains an ancestor of this candidate.
+- Run, environment and cost evidence: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/eval-run/sharing-off-full-candidate-status.json`, its adjacent log and controller, and `all-attempt-events.jsonl`. This ledger retains every previous paid attempt as well as the new full run.
+
+| Failed native case | Deployed baseline | Sharing-off candidate | Classification and disposition |
+| --- | --- | --- | --- |
+| `action_chip_change_asset_changed_mind_capital_issue_188` | Passed | Failed coverage check | P2 availability-recovery observation. Assets, requested dates and edited $5,000 capital are preserved; `market_data_unavailable` prevents a launch and offers recovery. The underlying catalog, data-shape or transport cause was not retained, so it is not claimed as a confirmed provider fault or new edit defect. The fixture uses a legacy action which neither build emits on new cards. |
+| `capability_honesty_future_performance_btc_regression` | Passed its future-limitation expectation | Failed research publication; prose judge passed | Provider-side research delivery failure, HTTP 500 in the captured case window. The answer disclosed lookup unavailability and quoted no live figure. This is the already known research-delivery caveat. Research retry on provider errors remains the first follow-up. |
+| `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run` | Failed | Failed with identical checks | Shared failure, not new: both return `unsupported_dca_contribution_ceiling`, null capital and no launch. |
+| `messy_spanish_future_performance_nvda_cruce_dorado` | Passed its future-limitation expectation | Failed stronger research expectations; prose judge passed | Both answers disclose the future-performance limitation and offer historical alternatives. The candidate response is no worse than the deployed response, but the native failure is retained. No research sidecar exists on this attempt, so it is not labeled a provider delivery failure. The authorized A/B measures the rate. |
+
+All three candidate-only failures are named above. None has a failing prose judge in this new full run. No recorded-text judge replay, individual case retry or second full run was added. The founder's explicit ten-pair A/B is complete and is recorded in the final section below. Counts do not offset failed cases: the two baseline-only failures are `action_chip_change_asset_bare_ticker_append_issue_190` and `asset_discovery_not_result_followup_issue_244`; all nine candidate-only fixture cases passed.
+
+Read-only source proof confirms identical `prepare_confirmation_launch` ASTs on the deployed and candidate builds and identical new-card secondary actions. Historical cards retain legacy action support; no production reachability count is asserted. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/legacy-change-asset-reachability.json` and the per-case disposition document. No fix round was started.
+
 ## Founder Scope and Approval Stops
 
 - Promote only the fixed cut. Do not add unfinished board items.
 - Acceptance replay is approved. User words stay in private scratch outside the repository and are deleted afterward. Reports contain only case and turn numbers, outcomes, refusal codes and named capabilities, plus separate allowance counts.
 - Usage labels approved: Usage, Conversation, Searches with sources, Simulations; Uso, Conversación, Búsquedas con fuentes, Simulaciones.
-- Founder decision superseded: promote with sharing off. Both release-contract flags are false. No live environment change or Blueprint sync is permitted without separate approval.
-- Each post-merge operation needs founder approval here: migrations, live sharing values, three explicit deployments, and post-deploy checks. Ask before creating a production shared link.
+- Current founder decision: promote with sharing off. Both release-contract flags are false. No live environment change or Blueprint sync is permitted without separate approval.
+- Each post-merge operation needs founder approval here: migrations, live sharing values, three explicit deployments, and post-deploy checks. Production shared-link creation and revocation checks are not applicable while sharing stays off; no production link is authorized.
 - Stop for any Supabase or Render access failure, unexpected production readback, migration or environment mismatch, spending stop, or blocking finding. Report the exact access error without a workaround.
 - At most two small blocking fix rounds. Stop before model-facing text or routing changes and on any real blocking sharing finding.
 
@@ -269,8 +370,8 @@ The founder explicitly approved no backup, overriding PR #595's backup step. Bet
 | Job | Environment | Stop | Spent | Result |
 | --- | --- | --- | --- | --- |
 | Free gates | A: development setup with the explicit canonical-root override | Free | $0 | Smoke, mocked harness, modularity and parity passed; mocked harness passed 259 checks; unchanged release validator checked after A/B evidence |
-| Candidate and production baseline eval | B: identical explicit eval env file and both provider modes live | $12.50 combined, tracked cost plus reserve | $6.0129416335 tracked + $1.16 reserve = $7.1729416335 guarded | Ten pairs complete; native failures deployed 0/10, candidate 6/10; founder merge disposition pending |
-| Browser walk and local sharing demo, cumulative | C: clean detached worktrees, disposable Supabase, production builds | $3.00 | $0.81513723918 tracked + $0.20 reserve = $1.01513723918 guarded | Sharing-off walk: 18 pass, one known P2 failure; stopped before the new measurements under the latest founder instruction |
+| Candidate and production baseline eval | B: identical explicit eval env file and both provider modes live | $12.50 combined, tracked cost plus reserve | $9.556433710664 tracked + $1.64 reserve = $11.196433710664 guarded | Fresh full run and new ten-pair A/B complete; native A/B failures deployed 0/10 and candidate 5/10; founder merge disposition pending |
+| Browser walk and local sharing demo, cumulative | C: clean detached worktrees, disposable Supabase, production builds | $3.00 | $1.34063303874 tracked + $0.24 reserve = $1.58063303874 guarded | Applicable walk complete; #606 deferred P2, Spanish research retry passed, sharing NA; no new P0/P1 |
 | Historical guest replay | C: fresh guest per conversation, ordered user turns | $4.00 | $1.7073169653 tracked + $0.18 reserve = $1.8873169653 guarded | 38/38 assessed; 38 pass, 0 fail, 0 allowance |
 
 Environment A's pre-existing root `.env` symlink resolves through the integration worktree to the exact founder-named real file. `web/.env.local` is absent. No environment file is written through or replaced.
@@ -302,7 +403,7 @@ Local differences to cover after deployment: in-process backtests instead of `ar
 
 The founder approved one fresh full candidate run after the stop record at `0e6227386ab76813fd55d0c838f896abe7e70e41`. The combined cap is `$7.50` on tracked cost plus reserve, including the original baseline and interrupted candidate costs. The reserve is not spend. If this guard stops the fresh run, stop and report; no further full run is authorized.
 
-- Live eval scorecard: `docs/reports/evidence/2026-09-12-main-promotion/candidate-eval-scorecard-df7aee12.json`
+- Historical full candidate scorecard: `docs/reports/evidence/2026-09-12-main-promotion/candidate-eval-scorecard-df7aee12.json`
 - Full candidate result: 70 passed, one failed, zero infrastructure errors as classified by the native harness. The native scorecard is retained unchanged.
 - Candidate-only failed case: `messy_spanish_future_performance_nvda_cruce_dorado`. Research recorded `research_unavailable_timeout`, no publication and no sources. The assistant disclosed the unavailable data search. The native checks failed `research.published` and `prose_judge:scenario_framing`.
 - Recorded-text judge replay: the exact retained answer and rendered context were passed to the candidate's `judge_prose_quality`; `scenario_framing` failed again. No user message was regenerated in that replay.
@@ -321,7 +422,7 @@ At head `0e622738`, PR #603's red CI is the single release-doc test waiting on t
 
 The owned local stack restarted and reset from the measured migrations. Its initial port check encountered the old browser connection in `FIN_WAIT_2`, with no active listener. The scratch launcher now uses normal reusable-address bind semantics for this availability check; no product code, port, or other stack changed. The production web rebuild and empty-environment assertions passed, followed by API health, web health, and readiness. Paid browser turns remain pending the release-policy decision. After the stop, owned API/web/guard processes were stopped and `supabase stop --no-backup --workdir <owned scratch>` succeeded. All owned ports closed, no owned containers remain, and the unrelated stack remained intact. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/local-acceptance/cleanup-release-gate.json`; restart and environment proofs are adjacent. No customer text was pulled.
 
-## Step 3 Targeted Interleaved A/B
+## Step 3 Targeted Interleaved A/B (Historical Sharing-On Result)
 
 Completed ten paired rounds in the identical Environment B, retaining the first four pairs and every native result. The founder superseded the earlier failure-gap stop and required completion under the unchanged `$12.50` cumulative cost-plus-reserve cap. The validator remains unchanged. No additional full eval run or single-case retry was started.
 
@@ -623,3 +724,52 @@ Captured before startup at the measured head. Secret-bearing keys record only pr
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `present` |
 | `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:56531` |
 | `PATH` | `/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin` |
+
+## Current Targeted A/B and Step 7 Gate: Sharing Off
+
+All ten paired rounds of `messy_spanish_future_performance_nvda_cruce_dorado` completed at deployed `ee9c3491fa6219502f1e94abc5d9e661a06839d9` and candidate `4fd587bf24ce39b794c2228d61f94693826d0da2`. Each round ran deployed first, then candidate, with exactly one live attempt at a time. Both sides used the unchanged Environment B. Every native attempt names the case and carries clean-worktree provenance. No native result or judge output was rewritten.
+
+| Side | Native passes | Native failures | Research timeouts |
+| --- | --- | --- | --- |
+| Deployed | 10/10 (100%) | 0/10 (0%) | 0 |
+| Candidate | 5/10 (50%) | 5/10 (50%) | 3 |
+
+These are each build's native full-case expectations: deployed expects the future-performance limitation, while candidate expects sourced scenarios. Inputs are identical; expectations and prose rubrics remain those committed on each build. Neither the differing expectations nor safe refusals erase a native failure.
+
+| Pair | Deployed | Candidate | Candidate prose judge | Research HTTP error status |
+| --- | --- | --- | --- | --- |
+| 1 | PASS | FAIL: research timeout; no HTTP response | FAIL | No response |
+| 2 | PASS | FAIL: cited scenario inputs absent; answer withheld | PASS | None captured |
+| 3 | PASS | FAIL: research timeout; no HTTP response | PASS | No response |
+| 4 | PASS | PASS: research published | PASS | None captured |
+| 5 | PASS | FAIL: research timeout; no HTTP response | PASS | No response |
+| 6 | PASS | PASS: research published | PASS | None captured |
+| 7 | PASS | FAIL: future-performance limitation instead of research | FAIL | None captured |
+| 8 | PASS | PASS: research published | PASS | None captured |
+| 9 | PASS | PASS: research published | PASS | None captured |
+| 10 | PASS | PASS: research published | PASS | None captured |
+
+- Attempts 1, 3 and 5 timed out without an HTTP response. They count as failures; no HTTP status is invented.
+- Attempt 2 retrieved five sources but no cited scenario-input row. The intended `scenario_inputs_uncited` guard withheld the calculation and explained why; its prose judge passed. This is a source-grounding refusal, not an HTTP error or a fabricated numerical answer.
+- Attempt 7 took the production-style future-performance limitation path. It remains failed, including its failed candidate scenario-framing judge. No research sidecar was produced, so it is not counted as a provider delivery error.
+- Attempts 4, 6, 8, 9 and 10 published research and passed their native checks. No HTTP error response was observed during this new A/B. The separate full BTC run and Spanish browser walk retain their actual HTTP 500 evidence.
+- After candidate attempts 1 through 3 failed to publish research, the controller waited 900.11 seconds before pair 4, from `2026-09-13T20:52:28.579468Z` to `2026-09-13T21:07:28.690135Z`. No paid attempt ran during that wait. The next candidate attempt published successfully and reset the streak.
+- The first pair projected a cumulative guarded total of $10.093789333684, below $12.50, before attempt three. Its timed-out research made that an optimistic projection. The hard cumulative guard remained active; final tracked cost is $9.556433710664 with $1.64 reserve, or $11.196433710664 guarded. The reserve is not spend. This new A/B added $1.59195210498 tracked and $0.12 reserve after the fresh full run.
+- The founder removed the earlier failure-gap stop. No attempt was discarded, no result was relabeled as passing, and no extra live job or paid judge replay was added. Research retry on provider errors remains the first follow-up, with the founder deciding whether to merge with that caveat pending.
+
+The source of the new native records is `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/targeted-ab/`. It contains all 20 native attempts, all 20 HTTP-observer documents, logs, the controller, the case driver, the final status, the first-pair projection and the exact event ledger. Verification: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/sharing-off-completion-verification.json`. It checks native hashes and provenance, sequential order, identical inputs, the full cooldown, the unchanged environment source, cumulative cost, secret absence and all non-doc product paths.
+
+### Additional nonblocking finding
+
+[#611](https://github.com/lagarcess/argus/issues/611) records the full BTC case's follow-up label naming the Grayscale Bitcoin Mini Trust ETF although the authored question names Bitcoin. It is a P2 rendered-identity observation. No follow-up was clicked and no wrong-instrument execution or production frequency is claimed. `_resolved_subjects` passes the bare symbol to the resolver without using the available asset-class hint; its AST is identical on the deployed and candidate builds. The capture does not retain the query hint, so that value on this turn is not asserted. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/bitcoin-followup-identity.json`. No product fix was made and this issue is separate from #599's research-delivery failure.
+
+### Product identity and terminal gate
+
+The final unchanged-validator release-document and evidence checks passed: 24 tests in 7.57 seconds after all new A/B documents and final manifest references were present. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/release-docs-final.log`. The offline native-provenance, cost, product-identity and secret checks also passed after the final evidence files were added.
+
+All non-doc Git paths remain byte-identical to the measured sharing-off product head. Main is still the original ancestor `17a07497abbb2ff9159b9694832a6668421e0e88`, so this is also the would-be merged product tree. The verification record binds the pre-evidence-commit head; the terminal PR audit must confirm the actual evidence commit, CI results, Codex's matching Reviewed commit and zero unresolved threads after review returns. No prior review or green check is substituted for that final-head proof. Codex does not merge. Step 8 remains unstarted and requires separate founder approval.
+
+Authoritative new-head A/B documents, after all historical references above:
+
+- Deployed A/B document: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/targeted-ab-baseline.json`.
+- Candidate A/B document: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/targeted-ab-candidate.json`.

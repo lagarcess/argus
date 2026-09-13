@@ -1,0 +1,110 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading "Inversión en Apple con $10,000" [level=1]
+  - button "Opciones de chat":
+  - status
+  - region "Conversación":
+    - generic: Probemos Apple con $10,000.
+    - button "Copiar texto":
+    - paragraph: ¿Qué periodo quieres usar para AAPL?
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - generic: De enero a diciembre de 2024.
+    - button "Copiar texto":
+    - paragraph: Cambiando la ventana de fechas a enero-diciembre de 2024.
+    - generic: AAPL
+    - heading "Comprar y mantener" [level=3]
+    - text: Ejecución completa
+    - term: Capital inicial
+    - definition: $10,000
+    - term: Periodo
+    - definition:
+      - generic: 2 ene 2024 → 31 dic 2024
+    - generic: Acciones
+    - generic: Datos diarios
+    - generic: Sin comisiones
+    - generic: Sin deslizamiento
+    - generic: "Referencia: SPY"
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+    - button "Copiar texto":
+    - region "Hero + Delta Evidence Card":
+      - generic: AAPL
+      - heading "Comprar y mantener" [level=3]
+      - paragraph: 2 ene 2024 → 31 dic 2024 · Datos diarios
+      - generic: Simulación completa
+      - table:
+        - row:
+          - cell
+          - cell:
+            - link "Charting by TradingView":
+              - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/chat
+          - cell
+        - row:
+          - cell
+          - cell
+          - cell
+      - link "TradingView Lightweight Charts":
+        - /url: https://www.tradingview.com/
+      - group "Rango del gráfico":
+        - button "1M":
+          - generic: 1M
+        - button "3M":
+          - generic: 3M
+        - button "Todo" [pressed]:
+          - generic: Todo
+        - button "Detalles del rango":
+          - text: Detalles del rango
+      - status: "Período visible: 2 ene 2024 al 31 dic 2024."
+      - paragraph: Valor final
+      - paragraph: $13,503
+      - paragraph: +$3,503 ganancia · +35.0% rendimiento total
+      - term: Comparado con SPY
+      - definition: Superó por 11.0 puntos porcentuales
+      - term: Peor caída
+      - definition: "-15.5%"
+      - generic "Contexto de confianza del resultado":
+        - paragraph: Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría
+      - generic "Ver detalles":
+        - text: Ver detalles
+      - button "Explicar resultado":
+        - text: Explicar resultado
+      - button "Ajustar idea":
+        - text: Ajustar idea
+      - text: "Decisión: Observando"
+    - region "Lectura rápida":
+      - generic: Lectura rápida
+      - paragraph: "Comprar AAPL una vez y mantenerla durante 2024 terminó por encima de SPY: el resultado fue 35.0%, frente a 24.0% para el benchmark. La ventaja fue de 11.0 pp, aunque el recorrido tuvo una caída máxima de 15.5%, equivalente a una pérdida temporal de $1,626 desde un máximo anterior. En esta prueba, superar a SPY significó aceptar más variación en el camino."
+    - region "Qué probar después":
+      - generic: Qué probar después
+      - button "Probar otro rango de fechas":
+        - generic: ↳
+        - generic: Probar otro rango de fechas·Superó la referencia por 11.0 puntos
+      - button "Probar el mismo enfoque en un activo similar":
+        - generic: ↳
+        - generic: Probar el mismo enfoque en un activo similar·MSFT
+      - button "Probar compras mensuales recurrentes":
+        - generic: ↳
+        - generic: Probar compras mensuales recurrentes
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+  - button "Menciona un activo o indicador":
+  - combobox "Haz una pregunta de seguimiento..."
+  - generic: Haz una pregunta de seguimiento...
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

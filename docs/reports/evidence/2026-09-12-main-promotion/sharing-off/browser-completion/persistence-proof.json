@@ -1,0 +1,26 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "database": "owned disposable Supabase only",
+  "transaction": "begin read only; aggregate counts and facts; rollback",
+  "feedback_count": 1,
+  "decision_count": 1,
+  "run_status": "completed",
+  "worst_drop_peak_date": "2024-01-23",
+  "worst_drop_trough_date": "2024-04-19",
+  "research_attempts": [
+    {
+      "attempt": 1,
+      "degraded_code": "research_unavailable_http_error",
+      "http_status": 500,
+      "source_count": 0
+    },
+    {
+      "attempt": 2,
+      "degraded_code": null,
+      "source_count": 5,
+      "http_error": null
+    }
+  ],
+  "feedback_absent_after_reload_and_followups": true,
+  "identifiers_and_raw_user_text_retained": false
+}
