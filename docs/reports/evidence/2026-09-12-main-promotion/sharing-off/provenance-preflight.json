@@ -1,0 +1,23 @@
+{
+  "old_measured_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "sharing_off_product_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "eval_imported_code_unchanged": true,
+  "touched_eval_imports": [],
+  "same_product_tree": false,
+  "runtime_and_migrations_unchanged": true,
+  "release_contract_tests": {
+    "passed": 16,
+    "seconds": 23.34
+  },
+  "paid_provider_calls": 0,
+  "full_scorecard_check": "failed",
+  "assertion": "",
+  "trace": [
+    {
+      "path": "tests/test_private_alpha_release_docs.py",
+      "line": 546,
+      "function": "_assert_main_promotion_live_eval_evidence",
+      "source": "assert provenance.get(\"candidate_sha\") == candidate_match.group(1)"
+    }
+  ]
+}

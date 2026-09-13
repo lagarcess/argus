@@ -4,7 +4,7 @@ Status: Founder approved promotion with sharing off. The two release-contract fl
 
 ## Candidate
 
-- Candidate SHA: `df7aee12955f667e31057464d62c72287fb12247`
+- Candidate SHA: `4fd587bf24ce39b794c2228d61f94693826d0da2`
 - Candidate branch: `codex/production-promotion-20260912`
 - Validation status: Founder approved promotion with sharing off. The two release-contract flags are false; all seven migrations remain included. Remaining browser acceptance and a fresh ten-pair A/B are authorized within the existing caps. Preflight found a separate exact-SHA requirement for the full scorecard, in addition to the A/B product-tree requirement; that provenance conflict remains unresolved. No validator change, paid rerun, merge or Step 8 is claimed.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
@@ -186,7 +186,17 @@ The full native candidate scorecard remains measurement evidence for the unchang
 
 The founder authorized a fresh ten-pair interleaved A/B at the sharing-off product head, both sides, retaining HTTP statuses and waiting 15 minutes after three consecutive research delivery failures. The combined $12.50 tracked-cost-plus-reserve cap remains cumulative. The unchanged A/B validator includes `render.yaml` in its product-tree comparison. No paid attempt has started under this decision. An exact-SHA preflight for the full scorecard is required before that spend.
 
-The original measured head and scorecard references stay truthful above until the new-head provenance conflict is resolved. The sharing-off commit is the new product head for the remaining browser walk and authorized A/B; its SHA will be recorded in the next evidence commit. CI green, exact-head Codex review and zero unresolved threads are still required before Step 7. No Step 8 action is authorized.
+The original measured head and scorecard bytes remain unchanged in their historical records. Sharing-off commit `4fd587bf24ce39b794c2228d61f94693826d0da2` is the new product head named above and is the intended head for the remaining browser walk and authorized A/B. The retained full scorecard still records its real measured head `df7aee12955f667e31057464d62c72287fb12247`; its provenance has not been rewritten. CI green, exact-head Codex review and zero unresolved threads are still required before Step 7. No Step 8 action is authorized.
+
+### Sharing-Off Preflight Stop
+
+The approved sharing-off product commit is `4fd587bf24ce39b794c2228d61f94693826d0da2`. All 16 existing release-profile and Render-profile contract tests passed in 23.34 seconds. The native import-derived comparison reports no changed eval imports; runtime, frontend, workflows, tests and all seven migrations are byte-identical to the original measured head. The full scorecard remains measurement evidence for that unchanged runtime, but the unchanged release validator does not accept it at the new candidate SHA.
+
+A temporary manifest naming the new product head reproduced `AssertionError` at `tests/test_private_alpha_release_docs.py:546`: `assert provenance.get("candidate_sha") == candidate_match.group(1)`. The same preflight reports `eval_imported_code_unchanged=true` and `same_product_tree=false`. No provider calls were made. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/provenance-preflight.json`.
+
+The requested issue is [#608](https://github.com/lagarcess/argus/issues/608), with the hand-listed A/B paths, import-derived baseline comparison and separate full-scorecard exact-SHA assertion recorded together. No validator fix was attempted. A fresh A/B alone cannot resolve the full-scorecard assertion. The remaining browser walk and paid A/B were not started after this blocking preflight. The old sharing-on demo was stopped as part of the rebuild preparation; its owned API/web processes, containers, volumes and ports were removed while unrelated stacks were preserved. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/demo-cleanup.json`.
+
+No new browser or eval spend occurred under this decision. Cumulative browser cost remains $0.67845263918 tracked plus $0.16 reserve, below $3. Eval cost remains $6.0129416335 tracked plus $1.16 reserve, below $12.50. `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/browser-budget-at-stop.json` records the browser total. Fresh CI/review and Step 7 are not complete. No merge, live environment change, migration application or Step 8 action occurred.
 
 ## Founder Scope and Approval Stops
 
