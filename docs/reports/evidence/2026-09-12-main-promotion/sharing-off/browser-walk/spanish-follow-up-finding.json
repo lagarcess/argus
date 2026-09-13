@@ -1,0 +1,29 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "finding": "Spanish result follow-up repeats four next steps in prose and action buttons",
+  "classification": "P2 known issue #606, newly reproduced in Spanish; the latest founder instruction requires a stop before measurement for any finding needing a product change",
+  "issue": "https://github.com/lagarcess/argus/issues/606",
+  "reproduced": true,
+  "prior_english_evidence": "browser-walk/duplicate-next-steps-finding.json",
+  "source_owner": "src/argus/agent_runtime/result_conversation.py",
+  "baseline_visible_occurrence_replayed": false,
+  "product_files_changed_since_original_walk": false,
+  "model_facing_text_changed": false,
+  "fix_round_started": false,
+  "facts_verified": {
+    "display_gap_percentage_points": 34.7,
+    "fee_usd": 16.58,
+    "slippage_usd": 8.29,
+    "total_cost_usd": 24.87,
+    "worst_drop_peak_date": "2022-04-21",
+    "worst_drop_trough_date": "2023-10-05"
+  },
+  "prose_step_count": 4,
+  "structured_step_count": 4,
+  "feedback_ask_absent_after_next_reply": true,
+  "related_known_readout_receipt_error_count": 0,
+  "related_known_readout_issue": "https://github.com/lagarcess/argus/issues/605",
+  "new_full_candidate_started": false,
+  "new_ab_started": false,
+  "checked_at": "2026-09-13T19:16:13.392296+00:00"
+}
