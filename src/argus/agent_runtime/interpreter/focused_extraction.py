@@ -22,8 +22,12 @@ from argus.agent_runtime.interpreter import simplification_options as _options
 from argus.agent_runtime.interpreter.audits import StatedRunFieldFidelityAudit
 from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
+    dca_recurring_amount,
 )
 from argus.agent_runtime.interpreter.draft_shape import strategy_has_execution_evidence
+from argus.agent_runtime.interpreter.repair_observability import (
+    CONTRIBUTION_ROLE_PRESERVED,
+)
 from argus.agent_runtime.interpreter.shared import (
     _llm_value_is_empty,
     is_explicit_fresh_task,
@@ -203,6 +207,7 @@ def focused_stated_field_audit_guard(
     draft = response.candidate_strategy_draft
     unresolved = audit is None
     pending_seed = None
+    contribution_role_preserved = False
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
         if draft.initial_capital is not None:
             seed_unowned = not _has_owned_seed(draft)
@@ -211,9 +216,24 @@ def focused_stated_field_audit_guard(
                 draft.initial_capital = None
                 unresolved = True
         if audit is not None and audit.capital_amount is not None:
-            unresolved |= draft.initial_capital != audit.capital_amount
-            if unresolved and pending_seed is None:
+            # A broad audit cannot make a second role from a contribution
+            # already owned by the draft. Two separately audited amounts,
+            # including an equal pair, still require the seed to survive.
+            contribution_role_preserved = (
+                audit.recurring_contribution_amount is None
+                and audit.capital_amount == dca_recurring_amount(draft)
+            )
+            seed_missing = (
+                not contribution_role_preserved
+                and draft.initial_capital != audit.capital_amount
+            )
+            unresolved |= seed_missing
+            if seed_missing and pending_seed is None:
                 pending_seed = audit.capital_amount
+    if contribution_role_preserved:
+        response.reason_codes = list(
+            dict.fromkeys([*response.reason_codes, CONTRIBUTION_ROLE_PRESERVED])
+        )
     if unresolved:
         pending = None
         if pending_seed is not None:
@@ -228,6 +248,7 @@ def focused_stated_field_audit_guard(
         guard="focused_strategy_stated_fields",
         audit_available=audit is not None,
         requires_clarification=response.requires_clarification,
+        contribution_role_preserved=contribution_role_preserved,
         reason_codes=response.reason_codes,
     ).info("Focused strategy stated-field guard evaluated")
     return response

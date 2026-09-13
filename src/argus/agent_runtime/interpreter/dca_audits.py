@@ -293,14 +293,19 @@ def _capability_required_missing_fields_for_canonical_strategy(
 
 
 def _dca_draft_has_recurring_amount(draft: LLMStrategyDraft) -> bool:
+    return dca_recurring_amount(draft) is not None
+
+
+def dca_recurring_amount(draft: LLMStrategyDraft) -> float | None:
+    """Read the contribution from its typed slot or its owned legacy slot."""
     if draft.recurring_contribution is not None:
-        return True
-    if draft.capital_amount is None:
-        return False
-    return _capital_source(draft.field_provenance, "capital_amount") in {
+        return draft.recurring_contribution
+    if _capital_source(draft.field_provenance, "capital_amount") in {
         "recurring_contribution",
         "explicit_recurring_contribution",
-    }
+    }:
+        return draft.capital_amount
+    return None
 
 
 def _dca_total_budget_source(value: Any) -> str:
