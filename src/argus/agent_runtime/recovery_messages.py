@@ -210,12 +210,9 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "company to find peers of, and I can bring back verified candidates."
     ),
     "research_lookup_failed": (
-        "I couldn't finish looking that up just now, so I won't answer from "
-        "memory. Try again in a moment."
+        "I couldn't finish looking that up just now. Try again in a moment."
     ),
-    "research_lookup_unavailable": (
-        "I can't look that up right now, so I won't answer from memory."
-    ),
+    "research_lookup_unavailable": "I can't look that up right now.",
 }
 
 # The retryable recoveries whose turn settles recoverable_failed with a durable

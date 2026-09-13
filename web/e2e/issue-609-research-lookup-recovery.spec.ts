@@ -37,9 +37,8 @@ const PROVIDER_STATUS: Record<Outcome, number> = { transient: 500, refused: 400 
 
 // What the backend persists: English compatibility text beside the typed code.
 const PERSISTED_TEXT: Record<Outcome, string> = {
-  transient:
-    "I couldn't finish looking that up just now, so I won't answer from memory. Try again in a moment.",
-  refused: "I can't look that up right now, so I won't answer from memory.",
+  transient: "I couldn't finish looking that up just now. Try again in a moment.",
+  refused: "I can't look that up right now.",
 };
 
 const copy = {
