@@ -152,7 +152,9 @@ async def recompute_tool_result(
     metadata: dict[str, JsonValue] = {"tool_result_cards": documents}
     if computation is not None:
         metadata["computation"] = computation.model_dump(mode="json")
-    content = _recomputed_answer_text(source, revised, current)
+    content, assumptions = _recomputed_answer(source, revised, current)
+    if assumptions is not None:
+        metadata["answer_assumptions"] = assumptions
     # The message remains the only durable owner. No checkpoint projection is
     # written here; subsequent turns re-read these current artifact facts.
     try:
@@ -172,15 +174,19 @@ async def recompute_tool_result(
     return ToolResultRecomputeResponse(message=updated)
 
 
-def _recomputed_answer_text(source: Message, revised: Any, current: list[Any]) -> str:
+def _recomputed_answer(
+    source: Message, revised: Any, current: list[Any]
+) -> tuple[str, list[dict[str, str]] | None]:
     """The prose re-rendered from the message's current cards when the answer
     stated its figures through references, so every figure it states stays a
-    card's; any other prose stays as stored."""
+    card's, with the assumed inputs it never names; any other prose stays as
+    stored, with nothing to list."""
     from argus.agent_runtime.answer_calculation import (
         ANSWER_TEMPLATE_KEY,
         fallback_answer_lead,
         render_answer_text,
         template_cards,
+        unstated_assumptions,
     )
 
     template = (source.metadata or {}).get(ANSWER_TEMPLATE_KEY)
@@ -189,17 +195,19 @@ def _recomputed_answer_text(source: Message, revised: Any, current: list[Any]) -
     if revised.artifact_id not in names.values() or any(
         artifact not in by_artifact for artifact in names.values()
     ):
-        return source.content
+        return source.content, None
     assert isinstance(template, dict)
+    text_template = str(template.get("text") or "")
     cards = {name: by_artifact[artifact] for name, artifact in names.items()}
     succeeded = all(card.outcome.status == "succeeded" for card in cards.values())
     if succeeded:
-        text, failure = render_answer_text(str(template.get("text") or ""), cards)
+        text, failure = render_answer_text(text_template, cards)
         if failure is None:
-            return text
-    return fallback_answer_lead(
+            return text, unstated_assumptions(text_template, cards)
+    lead = fallback_answer_lead(
         str(template.get("language") or "en"), succeeded=succeeded
     )
+    return lead, []
 
 
 def _changed(request: Request) -> Exception:

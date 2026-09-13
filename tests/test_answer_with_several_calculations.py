@@ -9,7 +9,12 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
-from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY, figure_text
+from argus.agent_runtime.answer_calculation import (
+    ANSWER_ASSUMPTIONS_KEY,
+    ANSWER_TEMPLATE_KEY,
+    figure_text,
+    unstated_assumptions,
+)
 from argus.api import guest_access
 from argus.api import public_excerpts as receipts
 from argus.api import state as api_state
@@ -399,3 +404,52 @@ def test_a_receipt_freezes_each_calculation_and_one_private_card_refuses_it(
             owner_note=None,
         )
     assert refused.value.reason == "private_inputs"
+
+
+def test_recomputing_an_assumed_input_the_prose_never_names_drops_it_from_the_line() -> (
+    None
+):
+    client = TestClient(app)
+    client.post("/api/v1/dev/reset")
+    owner = client.get("/api/v1/me").json()["user"]["id"]
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    card = _card("time_value", {**LOAN, "sources": {"periods": {"kind": "assumption"}}})
+    template = "The loan costs {{payment}} a month."
+    listed = unstated_assumptions(template, {"loan": card})
+    assert listed == [{"artifact_id": card.artifact_id, "name": "periods"}]
+    computation = computation_from_tool_cards([card])
+    assert computation is not None
+    message = create_message(
+        user_id=owner,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content=f"The loan costs {figure_text(card.presentation.answer)} a month.",
+        metadata={
+            "tool_result_cards": [card.model_dump(mode="json")],
+            "computation": computation.model_dump(mode="json"),
+            ANSWER_TEMPLATE_KEY: {
+                "cards": {"loan": card.artifact_id},
+                "text": template,
+                "language": "en",
+            },
+            ANSWER_ASSUMPTIONS_KEY: listed,
+        },
+    )
+    response = client.post(
+        f"/api/v1/conversations/{conversation['id']}/tool-results/{card.artifact_id}/recompute",
+        json={
+            "message_id": message.id,
+            "input_revision": 0,
+            "arguments": {"periods": 240},
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()["message"]
+    assert (
+        body["metadata"][ANSWER_ASSUMPTIONS_KEY] == []
+    ), "an edited input is the reader's own"
+    revised = ToolResultCard.model_validate(body["metadata"]["tool_result_cards"][0])
+    assert (
+        body["content"]
+        == f"The loan costs {figure_text(revised.presentation.answer)} a month."
+    )

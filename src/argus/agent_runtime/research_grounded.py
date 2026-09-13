@@ -549,7 +549,10 @@ def _packet_stage_result(
             peers = [p for p in peers if p["symbol"] in named_symbols]
         else:
             degraded_code = "survey_synthesis_incomplete"
-    from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
     from argus.agent_runtime.calculated_answer import (
         CALCULATION_OFFER_KEY,
         INPUT_MISSING_REASON_CODE,
@@ -665,6 +668,8 @@ def _packet_stage_result(
                 **answered.template,
                 "text": answered.template["text"] + suffix,
             }
+        if answered.assumptions:
+            computed[ANSWER_ASSUMPTIONS_KEY] = list(answered.assumptions)
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
         )
@@ -987,7 +992,10 @@ def unavailable_result(
     is no packet to compose from, so the note's own carries it instead: a turn
     that reached the provider is a miss that cost what it cost, and only a
     turn that never called one bypasses the meter."""
-    from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
     from argus.agent_runtime.calculated_answer import (
         INPUT_MISSING_REASON_CODE,
         question_stage_result,
@@ -1048,6 +1056,8 @@ def unavailable_result(
                 **answered.template,
                 "text": answered.template["text"] + suffix,
             }
+        if answered.assumptions:
+            computed[ANSWER_ASSUMPTIONS_KEY] = list(answered.assumptions)
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
         )
@@ -1809,7 +1819,10 @@ def compose_completed_research(
         )
         or _scenario_inputs_code(packet, scenario=scenario)
     )
-    from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
     from argus.agent_runtime.calculated_answer import (
         CALCULATION_OFFER_KEY,
         question_stage_result,
@@ -1916,6 +1929,8 @@ def compose_completed_research(
                 **answered.template,
                 "text": answered.template["text"] + suffix,
             }
+        if answered.assumptions:
+            computed[ANSWER_ASSUMPTIONS_KEY] = list(answered.assumptions)
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
         )

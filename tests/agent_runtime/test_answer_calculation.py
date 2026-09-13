@@ -221,14 +221,23 @@ def test_an_unknown_reference_hands_over_to_argus_lead_and_cited_digits_stand() 
     )
 
 
-def test_an_assumption_the_prose_does_not_state_fails_the_check() -> None:
+def test_an_assumption_the_prose_does_not_name_is_listed_and_the_prose_stands() -> None:
     inputs = [*LOAN[:4], {"name": "future_value", "value": 0, "source": "assumption"}]
-    assert _published("It costs {{payment}} a month.", inputs=inputs).template is None
-    stated = _published(
+    notes: list[str] = []
+    unnamed = _published("It costs {{payment}} a month.", inputs=inputs, notes=notes)
+    card = ac.card_in(unnamed.patch)
+    assert unnamed.template is not None
+    assert unnamed.answer_text == (
+        f"It costs {ac.figure_text(card.presentation.answer)} a month."
+    )
+    assert unnamed.assumptions == (
+        {"artifact_id": card.artifact_id, "name": "future_value"},
+    )
+    named = _published(
         "Assuming the loan ends at {{future_value}}, it costs {{payment}} a month.",
         inputs=inputs,
     )
-    assert stated.template is not None
+    assert named.template is not None and named.assumptions == ()
 
 
 def test_a_plan_that_does_not_solve_keeps_its_card_under_argus_lead() -> None:
@@ -290,19 +299,27 @@ def test_a_currency_written_before_a_money_reference_is_not_stated_twice() -> No
     )
 
 
-def test_only_an_assumption_that_drives_the_result_must_be_stated() -> None:
+def test_every_unnamed_assumption_is_listed_and_only_a_driving_one_is_recorded() -> None:
     stated = (
         "Paying {{present_value}} at {{annual_rate_pct}} over {{periods}} months "
         "costs {{payment}} a month."
     )
     detail = {"name": "periods_per_year", "value": 12, "source": "assumption"}
-    assert _published(stated, inputs=[*LOAN, detail]).template is not None
+    quiet: list[str] = []
+    listed = _published(stated, inputs=[*LOAN, detail], notes=quiet)
+    assert listed.template is not None
+    assert [item["name"] for item in listed.assumptions] == ["periods_per_year"]
+    assert ac.FIGURE_CHECK_REASON_CODE not in quiet
     rate = {"name": "annual_rate_pct", "value": 14, "source": "assumption"}
     unstated = (
         "Paying {{present_value}} over {{periods}} months costs {{payment}} a month."
     )
     loan = [item for item in LOAN if item["name"] != "annual_rate_pct"]
-    assert _published(unstated, inputs=[*loan, rate]).template is None
+    recorded: list[str] = []
+    driving = _published(unstated, inputs=[*loan, rate], notes=recorded)
+    assert driving.template is not None, "the prose stands"
+    assert [item["name"] for item in driving.assumptions] == ["annual_rate_pct"]
+    assert ac.FIGURE_CHECK_REASON_CODE in recorded
 
 
 def test_the_prose_audit_counts_only_figures_with_no_row_or_calculation_value() -> None:

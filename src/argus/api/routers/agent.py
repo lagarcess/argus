@@ -1068,6 +1068,7 @@ async def chat_stream(
                     "next_experiments",
                     "next_steps",
                     "answer_text_template",
+                    "answer_assumptions",
                     "calculation_offer",
                     "research",
                 ):

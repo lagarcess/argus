@@ -53,6 +53,24 @@ os.environ.update(
 import httpx  # noqa: E402
 import uvicorn  # noqa: E402
 from argus.api.main import app  # noqa: E402
+from argus.domain.research import perplexity_agent as _agent  # noqa: E402
+
+_parse_packet = _agent._packet_from_response
+
+
+def _recorded_packet(*args, **kwargs):
+    """Every parsed research packet, kept under GM_PACKETS_OUT so a typed answer
+    can be replayed through the publisher without paying for it again."""
+    packet = _parse_packet(*args, **kwargs)
+    folder = os.environ.get("GM_PACKETS_OUT")
+    if folder:
+        Path(folder).mkdir(parents=True, exist_ok=True)
+        name = f"{time.strftime('%Y%m%dT%H%M%S')}-{uuid4().hex[:6]}.json"
+        (Path(folder) / name).write_text(packet.model_dump_json(indent=2))
+    return packet
+
+
+_agent._packet_from_response = _recorded_packet
 
 
 def _seed() -> None:
@@ -347,6 +365,8 @@ def _seed() -> None:
                 metadata["computation"] = marker.model_dump(mode="json")
             if patch.get("answer_text_template"):
                 metadata["answer_text_template"] = patch["answer_text_template"]
+            if patch.get("answer_assumptions"):
+                metadata["answer_assumptions"] = patch["answer_assumptions"]
         seeds[f"withheld-{language}"] = {
             "conversation_id": withheld,
             "message_id": say(

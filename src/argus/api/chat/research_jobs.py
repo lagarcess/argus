@@ -160,7 +160,10 @@ def _attach_completed_tool_card(
 def _attach_computed_answer(patch: dict[str, Any], computed: Any) -> None:
     """A thorough answer's computed calculation joins its research card, with
     the prose template a recompute re-renders."""
-    from argus.agent_runtime.answer_calculation import ANSWER_TEMPLATE_KEY
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
     from argus.api.chat.tool_results import computation_marker
 
     if not isinstance(computed, dict):
@@ -175,6 +178,8 @@ def _attach_computed_answer(patch: dict[str, Any], computed: Any) -> None:
         patch["computation"] = marker
     if computed.get(ANSWER_TEMPLATE_KEY) is not None:
         patch[ANSWER_TEMPLATE_KEY] = computed[ANSWER_TEMPLATE_KEY]
+    if computed.get(ANSWER_ASSUMPTIONS_KEY):
+        patch[ANSWER_ASSUMPTIONS_KEY] = computed[ANSWER_ASSUMPTIONS_KEY]
 
 
 def _attach_pending_question(patch: dict[str, Any], question: Any) -> None:

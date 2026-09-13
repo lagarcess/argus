@@ -526,7 +526,10 @@ Represents individual messages within a conversation.
   `metadata.answer_text_template` (`{cards: {<calculation name>: <artifact_id>},
   text, language}`; one stored as `{artifact_id, text, language}` reads as its
   one card), the prose with its figure references, which the recompute route
-  re-renders into `content` from the current cards. A pending calculation
+  re-renders into `content` from the current cards. `metadata.answer_assumptions`
+  (`[{artifact_id, name}]`) names each assumed input that prose never names; the
+  app lists them under the answer, and the recompute route derives the list
+  again. A pending calculation
   question keeps `{calculations, requested_field, requested_fields, evidence,
   retrieved}` in its clarification payload until the reply completes it; a
   payload stored with one `calculation` reads as a list of one. A research

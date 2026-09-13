@@ -190,3 +190,57 @@ def test_a_money_unit_with_a_qualifier_keeps_its_code() -> None:
     assert RetrievedRow.model_validate({**row, "unit": "USD/share"}).unit == "USD"
     with pytest.raises(ValueError):
         RetrievedRow.model_validate({**row, "unit": "dollars"})
+
+
+def test_the_savings_answer_shape_keeps_its_prose_and_lists_the_defaults_it_never_named(
+    monkeypatch,
+) -> None:
+    """The savings account answer recorded at ec74c399: a real return on a cited
+    savings rate and cited inflation, an assumed balance it names, and two
+    assumed defaults it never names. Publishing kept none of its prose; it now
+    stands, the two defaults are listed under it, and the figure check still
+    records them."""
+    calculation = {
+        "name": "national_average",
+        "kind": "growth_projection",
+        "solve_for": "end_value",
+        "inputs": [
+            {"name": "start_value", "value": 100, "source": "assumption"},
+            {"name": "contribution", "value": 0, "source": "assumption"},
+            {
+                "name": "annual_rate_pct",
+                "value": 0.38,
+                "source": "page",
+                "source_url": PRICE_PAGE,
+                "as_of": "2026-08-17",
+            },
+            {"name": "periods", "value": 1, "source": "assumption"},
+            {"name": "periods_per_year", "value": 1, "source": "assumption"},
+            {
+                "name": "inflation_rate_pct",
+                "value": 3.4,
+                "source": "page",
+                "source_url": PRICE_PAGE,
+                "as_of": "2026-08-31",
+            },
+        ],
+    }
+    prose = (
+        "Con una tasa de {{national_average.annual_rate_pct}} frente a una inflación de "
+        "{{national_average.inflation_rate_pct}}, {{national_average.start_value}} llega a "
+        "{{national_average.end_value}} en {{national_average.periods}} año, que compra "
+        "lo que hoy compran {{national_average.real_end_value}}: un rendimiento real de "
+        "{{national_average.real_annual_rate_pct}}."
+    )
+    result, _, interpretation = _turn(monkeypatch, calculation, prose=prose)
+    assert result is not None and result.outcome == "ready_to_respond"
+    answer = result.stage_patch["assistant_response"]
+    assert answer.startswith("Con una tasa de 0.38%") and "{{" not in answer
+    card = result.stage_patch["final_response_payload"]["tool_result_cards"][0]
+    assert card["tool_name"] == "growth_projection"
+    assert card["outcome"]["status"] == "succeeded"
+    assert result.stage_patch[ac.ANSWER_ASSUMPTIONS_KEY] == [
+        {"artifact_id": card["artifact_id"], "name": "contribution"},
+        {"artifact_id": card["artifact_id"], "name": "periods_per_year"},
+    ]
+    assert ac.FIGURE_CHECK_REASON_CODE in interpretation.reason_codes

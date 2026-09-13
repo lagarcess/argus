@@ -5302,10 +5302,14 @@ answer, rows and inputs, `{{name}}` with one calculation or
 more than one card could fill is never guessed, and nothing publishes until
 every calculation computes. A cited figure a page published may stand in digits
 beside them, held to its row. A reference
-that does not resolve, or an assumption that drives the result and that the
-prose never references, replaces the prose with Argus's own lead
+that does not resolve replaces the prose with Argus's own lead
 (`answer_figures_replaced`); a plan that does not solve keeps its card under
-that lead. Separately, every research or no-search answer's prose is audited:
+that lead. An assumed input the prose never names leaves the prose standing:
+`metadata.answer_assumptions = [{artifact_id, name}]` names each one, the app
+lists them in one plain line under the answer from each card's own label and
+value in the reader's language, the recompute route derives the list again,
+and `answer_figures_replaced` is still recorded when one of them drives the
+result. Separately, every research or no-search answer's prose is audited:
 each figure written in digits that is neither a cited row nor a value of its
 calculation is recorded with `answer_figures_unsourced` and a log line with the
 count and the figures, and nothing is replaced. Dates, years, a day number beside its year,

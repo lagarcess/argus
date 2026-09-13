@@ -7,8 +7,9 @@ Argus's own market data for a current price, the user's words, or an assumption
 the answer states. Each declaration computes its own card. The prose states
 figures only as references filled from those cards, ``{{name}}`` or, with more
 than one calculation, ``{{calculation.name}}``; a reference that does not
-resolve, a money or percent figure written outside a reference, or an
-assumption the prose never states hands the answer to Argus's own lead. Every guard that changes what the
+resolve, or a money or percent figure written outside a reference, hands the
+answer to Argus's own lead, and an assumed input the prose never names is listed
+under the answer. Every guard that changes what the
 model wrote records a reason code.
 """
 
@@ -55,6 +56,9 @@ CURRENCY_FIELD = "currency"
 PRICE_FIELD = "price"
 # Message metadata that lets a recompute re-render the prose from its new card.
 ANSWER_TEMPLATE_KEY = "answer_text_template"
+# Message metadata naming each assumed input the prose never names; the app lists
+# them under the answer from each card's own label and value.
+ANSWER_ASSUMPTIONS_KEY = "answer_assumptions"
 
 KIND_UNKNOWN_REASON_CODE = "answer_calculation_kind_unknown"
 INPUT_UNDECLARED_REASON_CODE = "answer_input_undeclared"
@@ -114,6 +118,7 @@ class PublishedCalculation:
     question_field: str | None
     not_looked_up: tuple[str, ...]
     owed: tuple[str, ...] = ()
+    assumptions: tuple[dict[str, str], ...] = ()
 
 
 def publish_calculations(
@@ -161,24 +166,28 @@ def publish_calculations(
     patches = [computed_answer_patch(one) for one in resolved]
     cards = dict(zip(calculation_names(requests), map(card_in, patches), strict=True))
     succeeded = all(card.outcome.status == "succeeded" for card in cards.values())
-    assumed = {
-        name: [
-            input_name
-            for input_name in one.assumed
-            if input_name
-            in {fact.name for fact in card.presentation.inputs if fact.driving}
-        ]
-        for (name, card), one in zip(cards.items(), resolved, strict=True)
-    }
-    text, failure = render_answer_text(template, cards, assumed=assumed)
+    text, failure = render_answer_text(template, cards)
     patch = combined_patch(patches)
     if succeeded and failure is None:
+        assumptions = unstated_assumptions(template, cards)
+        driving = _driving(cards, assumptions)
+        if driving:
+            # The prose stands; the check still records what it never named.
+            _note(
+                notes,
+                FIGURE_CHECK_REASON_CODE,
+                failure="assumption_not_stated",
+                prose="kept",
+                unstated=driving,
+            )
         stored = {
             "cards": {name: card.artifact_id for name, card in cards.items()},
             "text": template,
             "language": language,
         }
-        return PublishedCalculation(patch, text, stored, None, ())
+        return PublishedCalculation(
+            patch, text, stored, None, (), assumptions=tuple(assumptions)
+        )
     _note(
         notes,
         FIGURE_CHECK_REASON_CODE,
@@ -296,12 +305,7 @@ def card_in(patch: dict[str, Any]) -> ToolResultCard:
     )
 
 
-def render_answer_text(
-    template: str,
-    cards: AnswerCards,
-    *,
-    assumed: Mapping[str, Sequence[str]] | None = None,
-) -> tuple[str, str | None]:
+def render_answer_text(template: str, cards: AnswerCards) -> tuple[str, str | None]:
     """The prose with each reference filled from its card, and the check's
     failure code when a figure did not come from a card."""
     unresolved: list[str] = []
@@ -316,14 +320,34 @@ def render_answer_text(
     text = _REFERENCE.sub(fill, _without_written_currency(template, cards))
     if unresolved or "{{" in text:
         return text, "invalid_figure_reference"
-    referenced = _referenced_inputs(template, cards)
-    if any(
-        (name, input_name) not in referenced
-        for name, inputs in (assumed or {}).items()
-        for input_name in inputs
-    ):
-        return text, "assumption_not_stated"
     return text, None
+
+
+def unstated_assumptions(template: str, cards: AnswerCards) -> list[dict[str, str]]:
+    """Every input a card holds as an assumption that the prose never names, in
+    the answer's order; the app lists them under the answer from each card's
+    own label and value."""
+    referenced = _referenced_inputs(template, cards)
+    return [
+        {"artifact_id": card.artifact_id, "name": fact.name}
+        for owner, card in cards.items()
+        for fact in card.presentation.inputs
+        if fact.value is not None
+        and fact.source is not None
+        and fact.source.kind == "assumption"
+        and (owner, fact.name) not in referenced
+    ]
+
+
+def _driving(cards: AnswerCards, assumptions: Sequence[Mapping[str, str]]) -> list[str]:
+    """The listed assumptions that drive a result, for the figure check's record."""
+    listed = {(item["artifact_id"], item["name"]) for item in assumptions}
+    return [
+        f"{owner}.{fact.name}"
+        for owner, card in cards.items()
+        for fact in card.presentation.inputs
+        if fact.driving and (card.artifact_id, fact.name) in listed
+    ]
 
 
 def unresolved_references(template: str, cards: AnswerCards) -> list[str]:

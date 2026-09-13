@@ -20,6 +20,7 @@ from loguru import logger
 from pydantic import ConfigDict, Field, field_validator
 
 from argus.agent_runtime.answer_calculation import (
+    ANSWER_ASSUMPTIONS_KEY,
     ANSWER_TEMPLATE_KEY,
     MarketClose,
     PublishedCalculation,
@@ -130,6 +131,7 @@ class CalculatedAnswer:
     question_field: str | None
     pending: dict[str, Any] | None
     missing_inputs: tuple[str, ...] = ()
+    assumptions: tuple[dict[str, str], ...] = ()
 
 
 def calculated_answer(
@@ -239,6 +241,7 @@ def answer_from_published(
         template=published.template,
         question_field=None,
         pending=None,
+        assumptions=published.assumptions,
     )
 
 
@@ -295,6 +298,8 @@ async def calculated_answer_stage_result(
     )
     if answered.template is not None:
         patch[ANSWER_TEMPLATE_KEY] = answered.template
+    if answered.assumptions:
+        patch[ANSWER_ASSUMPTIONS_KEY] = list(answered.assumptions)
     cards = (answered.patch.get("final_response_payload") or {}).get("tool_result_cards")
     if cards and cards[0].get("outcome", {}).get("status") == "succeeded":
         rows = market_counterfactual_rows(
