@@ -1,6 +1,6 @@
 # Issue #609 browser proof: research lookup recovery
 
-Captured on 2026-09-13 at code head `15b671d4` on branch
+Captured on 2026-09-13 at code head `d819b09d` on branch
 `claude/research-provider-retry-0a2c38`, lane base `codex/private-alpha-next`
 at `3d379d3d`.
 
@@ -11,12 +11,14 @@ is scripted in the browser, so no provider or model was called.
 cd web && PLAYWRIGHT_PORT=3609 ARGUS_EVIDENCE_DIR="$PWD/../docs/reports/evidence/609" bunx playwright test e2e/issue-609-research-lookup-recovery.spec.ts
 ```
 
-Result: 4 passed (5.0s).
+Result: 4 passed (5.5s).
 
-Re-validated at `af271c47`, after the Codex review fix `c2819235` and the merge
-of integration `6eb93d84`: 4 passed (5.5s). No file under `web/` changed after
-`15b671d4`, and the spec scripts every API response, so the screenshots still
-show that head's behavior.
+The screenshots show the founder's copy from 2026-09-13, which holds whether or
+not an answer appears above the notice: "I couldn't finish looking that up just
+now. Try again in a moment." and "I can't look that up right now.", with the
+Spanish "No pude terminar de buscar eso en este momento. Intenta de nuevo en un
+momento." and "No puedo buscar eso ahora.". The first capture, at `15b671d4`,
+showed the earlier copy.
 
 | Case | Screenshots |
 | --- | --- |
