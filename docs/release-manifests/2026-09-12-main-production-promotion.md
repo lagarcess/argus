@@ -1,12 +1,12 @@
 # Private Alpha Production Promotion, 2026-09-12
 
-Status: Blocked by sharing during the approved unattended browser walk. The sharing dialog offered zero eligible answers, and the native text audit rejected a public publisher link as unsafe_text. The full walk is incomplete; no link was created. A/B and the 38/38 refusal replay remain complete. Browser cost was $0.1330577 tracked plus $0.10 reserve, below $3. The founder must choose whether to prepare a sharing-off promotion or hold for a sharing fix. No fix round, merge, production change or Step 8 was started.
+Status: Founder approved promotion with sharing off. The two release-contract flags are false; all seven migrations remain included. Remaining browser acceptance and a fresh ten-pair A/B are authorized within the existing caps. Preflight found a separate exact-SHA requirement for the full scorecard, in addition to the A/B product-tree requirement; that provenance conflict remains unresolved. No validator change, paid rerun, merge or Step 8 is claimed.
 
 ## Candidate
 
 - Candidate SHA: `df7aee12955f667e31057464d62c72287fb12247`
 - Candidate branch: `codex/production-promotion-20260912`
-- Validation status: Blocked by sharing during the approved unattended browser walk. The sharing dialog offered zero eligible answers, and the native text audit rejected a public publisher link as unsafe_text. The full walk is incomplete; no link was created. A/B and the 38/38 refusal replay remain complete. Browser cost was $0.1330577 tracked plus $0.10 reserve, below $3. The founder must choose whether to prepare a sharing-off promotion or hold for a sharing fix. No fix round, merge, production change or Step 8 was started.
+- Validation status: Founder approved promotion with sharing off. The two release-contract flags are false; all seven migrations remain included. Remaining browser acceptance and a fresh ten-pair A/B are authorized within the existing caps. Preflight found a separate exact-SHA requirement for the full scorecard, in addition to the A/B product-tree requirement; that provenance conflict remains unresolved. No validator change, paid rerun, merge or Step 8 is claimed.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
 - Promotion target: `main`
 - Release captain: Codex in the founder-supervised promotion task.
@@ -178,12 +178,22 @@ Status: Blocked by sharing during the approved unattended browser walk. The shar
 - Later evidence commits touch only `docs/` unless an approved finding round requires a product fix.
 - Product-tree identity will compare `src/`, `web/app/`, `web/components/`, `web/lib/`, `web/public/`, `render.yaml`, and `supabase/` to the measured head, matching the prior promotion record. Also record all non-doc Git-tree changes, including `workflows/`, tests, lockfiles, and the release profile.
 
+## Sharing-Off Decision, 2026-09-13
+
+The founder chose to promote with sharing off after the live findings in [#604](https://github.com/lagarcess/argus/issues/604#issuecomment-5655111583). Only `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED` change from `true` to `false` in `render.yaml` and the release profile. Their existing contract tests derive and compare the profile and Blueprint values; no separate true-valued test pin exists. Code defaults, runtime code, eval fixtures and all seven migrations remain unchanged. The earlier sharing-on records below are historical evidence, not the intended release configuration.
+
+The full native candidate scorecard remains measurement evidence for the unchanged code exercised in Environment B: that job uses its explicit env file and does not read `render.yaml` or exercise sharing. Its original bytes and recorded measured SHA remain unchanged. This does **not** yet establish that the release validator accepts the scorecard for the new product head. `tests/test_private_alpha_release_docs.py:546` requires the scorecard's `provenance.candidate_sha` to equal the manifest candidate SHA. `eval_measured_code_unchanged` at `tests/release_promotion_evidence_support.py:94` is used for the baseline comparison at lines 160-164; it is not an alternative to the earlier exact-SHA assertion.
+
+The founder authorized a fresh ten-pair interleaved A/B at the sharing-off product head, both sides, retaining HTTP statuses and waiting 15 minutes after three consecutive research delivery failures. The combined $12.50 tracked-cost-plus-reserve cap remains cumulative. The unchanged A/B validator includes `render.yaml` in its product-tree comparison. No paid attempt has started under this decision. An exact-SHA preflight for the full scorecard is required before that spend.
+
+The original measured head and scorecard references stay truthful above until the new-head provenance conflict is resolved. The sharing-off commit is the new product head for the remaining browser walk and authorized A/B; its SHA will be recorded in the next evidence commit. CI green, exact-head Codex review and zero unresolved threads are still required before Step 7. No Step 8 action is authorized.
+
 ## Founder Scope and Approval Stops
 
 - Promote only the fixed cut. Do not add unfinished board items.
 - Acceptance replay is approved. User words stay in private scratch outside the repository and are deleted afterward. Reports contain only case and turn numbers, outcomes, refusal codes and named capabilities, plus separate allowance counts.
 - Usage labels approved: Usage, Conversation, Searches with sources, Simulations; Uso, Conversación, Búsquedas con fuentes, Simulaciones.
-- Sharing is intended on in production. The live two-flag change awaits its post-merge approval stop. No Blueprint sync is permitted.
+- Founder decision superseded: promote with sharing off. Both release-contract flags are false. No live environment change or Blueprint sync is permitted without separate approval.
 - Each post-merge operation needs founder approval here: migrations, live sharing values, three explicit deployments, and post-deploy checks. Ask before creating a production shared link.
 - Stop for any Supabase or Render access failure, unexpected production readback, migration or environment mismatch, spending stop, or blocking finding. Report the exact access error without a workaround.
 - At most two small blocking fix rounds. Stop before model-facing text or routing changes and on any real blocking sharing finding.
