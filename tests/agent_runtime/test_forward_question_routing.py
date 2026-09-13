@@ -319,9 +319,7 @@ def test_a_scenario_question_carries_the_scenario_contract() -> None:
     assert "fill calculation" in scenario_ask
     assert "the current price from market_data" in scenario_ask
     assert "Never compute the answer, scenario values" in scenario_ask
-    assert "never which product to choose or what the reader should do" in (
-        RETRIEVAL_INSTRUCTIONS
-    )
+    assert "never say which product to choose, what" in (RETRIEVAL_INSTRUCTIONS)
     assert "arithmetic" not in scenario_ask
 
 

@@ -311,3 +311,39 @@ def test_the_prose_audit_counts_only_figures_with_no_row_or_calculation_value() 
         prose, cited=[3.1, 33_720_000_000], cards=[card]
     ) == ["22%"]
     assert ac.unsourced_prose_figures("Nothing to count here.", cited=[], cards=[]) == []
+
+
+def test_a_unit_written_after_a_reference_is_not_stated_twice() -> None:
+    published = _published(
+        "Paying {{present_value}} DOP at {{annual_rate_pct}}% over {{periods}} months "
+        "costs {{payment}} DOP a month."
+    )
+    assert published.template is not None
+    assert published.answer_text.count("DOP") == 2
+    assert "%%" not in published.answer_text and "14%" in published.answer_text
+
+
+def test_an_offer_keeps_its_prose_and_leaves_out_what_leans_on_a_result() -> None:
+    card = ac.card_in(
+        _published(
+            "Paying {{present_value}} over {{periods}} months costs {{payment}}."
+        ).patch
+    )
+    template = (
+        "You owe {{present_value}}. At that balance the payment is {{nowhere}}.\n\n"
+        "| Input | Value |\n|---|---|\n| Payment | {{nowhere}} |\n| Rate | {{annual_rate_pct}} |"
+    )
+    text, dropped = ac.render_offer_prose(template, card)
+    assert text.startswith("You owe DOP 180,000.")
+    assert "{{" not in text and "| Rate | 14% |" in text
+    assert dropped == 2
+
+
+def test_the_prose_audit_skips_day_numbers_and_model_names() -> None:
+    prose = (
+        "A Porsche 911 cost $135,500 on September 12, 2025, an iPhone 16 costs less, "
+        "and a 911 needs 22% of income."
+    )
+    assert ac.unsourced_prose_figures(
+        prose, cited=[135_500], cards=[], names=["Porsche 911 starting MSRP"]
+    ) == ["22%"]

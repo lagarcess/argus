@@ -672,6 +672,7 @@ def _packet_stage_result(
     record_unsourced_figures(
         answer,
         cited=[row.value for row in packet.rows],
+        names=[f"{row.subject} {row.label}" for row in packet.rows],
         cards=cards_in(computed),
         notes=interpretation.reason_codes,
         message=message,
@@ -1923,6 +1924,7 @@ def compose_completed_research(
     record_unsourced_figures(
         answer,
         cited=[row.value for row in packet.rows],
+        names=[f"{row.subject} {row.label}" for row in packet.rows],
         cards=cards_in(computed),
         notes=notes,
         message=str(job_request.get("question") or ""),

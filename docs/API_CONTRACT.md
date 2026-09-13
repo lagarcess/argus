@@ -5280,8 +5280,9 @@ prose never references, replaces the prose with Argus's own lead
 that lead. Separately, every research or no-search answer's prose is audited:
 each figure written in digits that is neither a cited row nor a value of its
 calculation is recorded with `answer_figures_unsourced` and a log line with the
-count and the figures, and nothing is replaced. Dates, years and numbers inside
-words are not counted. A computed answer answers `ready_to_respond`:
+count and the figures, and nothing is replaced. Dates, years, a day number beside its year,
+numbers inside words and a number that names a cited product or a model are not
+counted. A computed answer answers `ready_to_respond`:
 `final_response_payload.tool_result_cards` holds the card, the stored message
 carries `tool_result_cards`, the `metadata.computation` derived from it and
 `metadata.answer_text_template = {artifact_id, text, language}`, the prose with
@@ -5304,8 +5305,9 @@ message with `last_stage_outcome = "await_user_reply"`.
 
 A research answer never turns into a question. When its calculation needs a
 figure only the reader knows, the answer keeps its prose, with any reference to
-an input it already holds filled (prose that leans on a result the offer cannot
-show is not published: `calculation_inputs_not_found`), stores
+an input it already holds filled (a sentence or table row that leans on a result the offer cannot show is left
+out, `offer_prose_results_dropped`; only prose with nothing left is not
+published: `calculation_inputs_not_found`), stores
 `metadata.calculation_offer = {calculation, requested_field, retrieved}` with the
 cited inputs and the pages it read, records `calculation_offered`, and leads its
 `next_steps` with a `calculation_offer` row. Tapping the row sends the typed chat
@@ -5322,7 +5324,8 @@ returns a scenario without a calculation (`scenario_inputs_uncited`) or a
 calculation whose inputs were not found (`calculation_inputs_not_found`), the
 no-search answer replies from Argus market data for the named subjects and
 stated assumptions and says what could not be looked up; the degraded code stays
-on the `research` sidecar. Only when that answer cannot run does the honest
+on the `research` sidecar. An answer that only restates the question is never published
+(`answer_restated_question`). Only when that answer cannot run does the honest
 note stand in, and no card with blank inputs ever renders. Thorough runs compute
 and attach the same card. The research contract is frozen by the recordings
 under `docs/reports/evidence/545/probes` and

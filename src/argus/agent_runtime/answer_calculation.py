@@ -67,6 +67,11 @@ _REFERENCE = re.compile(r"\{\{\s*([a-z][a-z0-9_]*)\s*\}\}")
 _WRITTEN_CURRENCY = re.compile(
     r"(?:\b([A-Z]{3})|[A-Z]{0,3}\$|€|£)\s?(\{\{\s*([a-z][a-z0-9_]*)\s*\}\})"
 )
+_WRITTEN_UNIT_AFTER = re.compile(
+    r"(\{\{\s*([a-z][a-z0-9_]*)\s*\}\})\s?([A-Z]{3}\b|%|x\b)"
+)
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+")
+_YEAR = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
 _PERCENT_FIGURE = re.compile(r"\d\s?%")
 _SYMBOL_MONEY = re.compile(r"(?:[A-Z]{0,3}\$|€|£)\s?\d")
 _CODE_MONEY = re.compile(r"\b([A-Z]{3})\s?\d|\d\s?([A-Z]{3})\b")
@@ -400,8 +405,9 @@ def _money_code(fact: ToolFact | None) -> str | None:
 
 
 def _without_written_currency(template: str, facts: dict[str, ToolFact]) -> str:
-    """A money reference renders with its own code, so a currency the prose wrote
-    just before it, the same code or a symbol, is not stated twice."""
+    """A reference renders with its own unit, so a currency the prose wrote just
+    before or after a money reference, or a % or x written after a percent or
+    multiple reference, is not stated twice."""
 
     def drop(match: re.Match[str]) -> str:
         code = _money_code(facts.get(match.group(3)))
@@ -409,7 +415,50 @@ def _without_written_currency(template: str, facts: dict[str, ToolFact]) -> str:
             return match.group(0)
         return match.group(2)
 
-    return _WRITTEN_CURRENCY.sub(drop, template)
+    def drop_after(match: re.Match[str]) -> str:
+        fact = facts.get(match.group(2))
+        unit = match.group(3)
+        key = fact.unit.locale_key if fact is not None and fact.unit is not None else None
+        if (
+            (fact is not None and unit == _money_code(fact))
+            or (unit == "%" and key == UNIT_PERCENT_KEY)
+            or (unit == "x" and key == UNIT_MULTIPLE_KEY)
+        ):
+            return match.group(1)
+        return match.group(0)
+
+    return _WRITTEN_UNIT_AFTER.sub(drop_after, _WRITTEN_CURRENCY.sub(drop, template))
+
+
+def render_offer_prose(template: str, card: ToolResultCard) -> tuple[str, int]:
+    """The prose of an offered calculation: references to figures the card holds
+    filled, and each sentence or table row that leans on a result the offer
+    cannot show left out. Returns the text and how many were left out."""
+    facts = _reference_facts(card)
+
+    def fill(match: re.Match[str]) -> str:
+        fact = facts.get(match.group(1))
+        if fact is not None:
+            return figure_text(fact)
+        stated = _stated_argument(card, match.group(1))
+        return stated if stated is not None else match.group(0)
+
+    filled = _REFERENCE.sub(fill, _without_written_currency(template, facts))
+    kept: list[str] = []
+    dropped = 0
+    for line in filled.split("\n"):
+        if "{{" not in line:
+            kept.append(line)
+            continue
+        if line.lstrip().startswith("|"):
+            dropped += 1
+            continue
+        sentences = _SENTENCE_BREAK.split(line)
+        remaining = [sentence for sentence in sentences if "{{" not in sentence]
+        dropped += len(sentences) - len(remaining)
+        if remaining:
+            kept.append(" ".join(remaining))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(kept)).strip(), dropped
 
 
 def _stated_argument(card: ToolResultCard, name: str) -> str | None:
@@ -583,11 +632,21 @@ def _figure_value(token: str) -> tuple[float, int]:
 
 
 def unsourced_prose_figures(
-    prose: str, *, cited: Sequence[float], cards: Sequence[ToolResultCard]
+    prose: str,
+    *,
+    cited: Sequence[float],
+    cards: Sequence[ToolResultCard],
+    names: Sequence[str] = (),
 ) -> list[str]:
     """The digit figures an answer's prose states that match neither a cited row
-    nor a value of its calculation; dates, years and numbers inside words are
-    not figures."""
+    nor a value of its calculation. Dates, years, a day number beside its year,
+    numbers inside words and a number that names a cited product or a named
+    model are not figures."""
+    named = {
+        token
+        for text in names
+        for token in re.findall(r"(?<![\d.,])\d+(?![\d.,])", str(text))
+    }
     known = [float(value) for value in cited]
     for card in cards:
         presentation = card.presentation
@@ -603,7 +662,16 @@ def unsourced_prose_figures(
     unsourced: list[str] = []
     for match in _PROSE_FIGURE.finditer(text):
         token, suffix, scale = match.group(1), match.group(2), match.group(3)
-        if not suffix and not scale and re.fullmatch(r"(19|20)\d{2}", token):
+        plain = not suffix and not scale and token.isdigit()
+        if plain and re.fullmatch(r"(19|20)\d{2}", token):
+            continue
+        if plain and (token in named or _names_a_model(text, match.start())):
+            continue
+        if (
+            plain
+            and len(token) <= 2
+            and _YEAR.search(text, match.end(), match.end() + 25)
+        ):
             continue
         value, decimals = _figure_value(token)
         candidates = [value, value * _SCALES.get(str(scale or "").lower(), 1.0)]
@@ -617,6 +685,19 @@ def unsourced_prose_figures(
     return unsourced
 
 
+def _names_a_model(text: str, start: int) -> bool:
+    """A bare number right after a mid-sentence word that mixes capitals and
+    lowercase, such as Porsche 911 or iPhone 16, names a model."""
+    word = re.search(r"([^\W\d_]+) $", text[:start])
+    if word is None:
+        return False
+    letters = word.group(1)
+    if not (any(ch.isupper() for ch in letters) and any(ch.islower() for ch in letters)):
+        return False
+    before = text[: word.start(1)].rstrip()
+    return bool(before) and before[-1] not in ".!?:\n"
+
+
 def record_unsourced_figures(
     prose: str,
     *,
@@ -624,9 +705,10 @@ def record_unsourced_figures(
     cards: Sequence[ToolResultCard],
     notes: list[str],
     message: str,
+    names: Sequence[str] = (),
 ) -> int:
     """Records, and never replaces, the figures an answer states with no source."""
-    figures = unsourced_prose_figures(prose, cited=cited, cards=cards)
+    figures = unsourced_prose_figures(prose, cited=cited, cards=cards, names=names)
     if figures:
         if UNSOURCED_FIGURE_REASON_CODE not in notes:
             notes.append(UNSOURCED_FIGURE_REASON_CODE)

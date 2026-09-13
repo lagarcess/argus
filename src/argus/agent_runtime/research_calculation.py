@@ -21,7 +21,7 @@ from argus.agent_runtime.answer_calculation import (
     computed_answer_patch,
     latest_market_close,
     publish_calculation,
-    render_answer_text,
+    render_offer_prose,
     resolve_calculation,
 )
 from argus.agent_runtime.calculated_answer import (
@@ -37,6 +37,9 @@ from argus.domain.research.contracts import ResearchPacket, ResearchSource
 from argus.llm.openrouter import resolve_openrouter_api_key
 
 CALCULATION_NOT_COMPUTED_CODE = "calculation_inputs_not_found"
+# Recorded when an offered calculation's prose left out a sentence or table row
+# that leaned on a result the offer cannot show.
+OFFER_PROSE_TRIMMED_REASON_CODE = "offer_prose_results_dropped"
 MALFORMED_CALCULATION_REASON_CODE = "answer_calculation_malformed"
 # Degraded research an answer without a lookup may replace; a survey or a claim
 # withheld for want of a publisher keeps its own honest note.
@@ -111,7 +114,8 @@ def offered_calculation(
 ) -> tuple[str, dict[str, Any]] | None:
     """A research answer never turns into a question: its calculation is offered
     on the reader's own figures, and the prose stands with any input it already
-    holds filled. None when the prose leans on a result the offer cannot show."""
+    holds filled and each sentence that leans on a result the offer cannot show
+    left out. None only when nothing of the prose is left."""
     if "{{" in prose:
         from argus.domain.capability_registry import get_tool_catalog
 
@@ -131,13 +135,15 @@ def offered_calculation(
             )
             if resolved is None:
                 return None
-            prose, failure = render_answer_text(
+            prose, dropped = render_offer_prose(
                 prose, card_in(computed_answer_patch(resolved))
             )
         except (ValidationError, KeyError, ValueError):
             return None
-        if failure is not None:
+        if not prose.strip():
             return None
+        if dropped:
+            _note(notes, OFFER_PROSE_TRIMMED_REASON_CODE)
     if CALCULATION_OFFERED_REASON_CODE not in notes:
         notes.append(CALCULATION_OFFERED_REASON_CODE)
     logger.info(

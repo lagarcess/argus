@@ -232,7 +232,7 @@ def test_an_answer_after_a_failed_lookup_says_so_when_nothing_is_named(
         notes=[],
     )
     assert answered is not None and answered.question_field == "periods"
-    assert "The lookup for this answer found nothing" in seen[0][0]["content"]
+    assert "The lookup for this answer failed" in seen[0][0]["content"]
 
 
 def test_the_no_search_answer_writes_its_calculation_before_its_prose() -> None:
@@ -314,3 +314,16 @@ def test_a_stale_offer_tap_says_so_and_other_turns_are_not_offers(monkeypatch) -
         )
         is None
     )
+
+
+def test_a_voiced_answer_that_only_restates_the_question_is_never_published(
+    monkeypatch,
+) -> None:
+    question = "Which credit card should I get?"
+    _voice(monkeypatch, [ca.CalculatedVoicedAnswer(lead=question, note="Nothing found.")])
+    notes: list[str] = []
+    assert (
+        ca.calculated_answer(message=question, language="en", user=USER, notes=notes)
+        is None
+    )
+    assert ca.ANSWER_RESTATED_QUESTION_REASON_CODE in notes

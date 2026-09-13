@@ -53,6 +53,9 @@ PENDING_PAYLOAD_KEY = "calculation"
 CALCULATED_ANSWER_REASON_CODE = "calculated_answer"
 PENDING_REPLY_REASON_CODE = "calculation_pending_reply"
 INPUT_MISSING_REASON_CODE = "calculation_input_missing"
+# Recorded when a voiced answer only restated the user's question; it is never
+# published, and the caller's honest note stands in.
+ANSWER_RESTATED_QUESTION_REASON_CODE = "answer_restated_question"
 # A research answer's calculation that needs figures only the reader knows is
 # offered under the answer, and taken through a typed action.
 CALCULATION_OFFER_KEY = "calculation_offer"
@@ -74,7 +77,9 @@ NO_SEARCH_ANSWER_GUIDANCE = (
     "change it. A figure only the user knows, such as their balance, payment, "
     "term, income or horizon, is never assumed: list each one with source user "
     "and a null value, still return calculation, and write the answer as one "
-    "plain question asking for all of them. "
+    "plain question asking for all of them and nothing else: never for a figure "
+    "the calculation produces, such as total interest. Name a currency only when "
+    "the user stated one. "
     "No advice, no forecast stated as fact, no em dashes, no headings, no "
     "tables. Compose lead (required), one short sentence that answers the "
     "question or asks the one question; bullets (optional, up to 4), short "
@@ -148,6 +153,14 @@ def calculated_answer(
         )
     )
     if voiced is None:
+        return None
+    if _restates(message, voiced.lead):
+        if ANSWER_RESTATED_QUESTION_REASON_CODE not in notes:
+            notes.append(ANSWER_RESTATED_QUESTION_REASON_CODE)
+        logger.info(
+            "Voiced answer only restated the question",
+            failure_classification=ANSWER_RESTATED_QUESTION_REASON_CODE,
+        )
         return None
     prose = voiced.as_markdown()
     if voiced.calculation is None:
@@ -393,6 +406,15 @@ def question_text(field: str, language: str) -> str:
     return f"To compute this I need one more value: {label}. What should I use?"
 
 
+def _restates(message: str, lead: str) -> bool:
+    """Whether a lead is the user's own question and nothing more."""
+
+    def plain(text: str) -> str:
+        return "".join(ch for ch in str(text).casefold() if ch.isalnum())
+
+    return bool(plain(lead)) and plain(lead) == plain(message)
+
+
 def _voice(messages: list[dict[str, str]]) -> CalculatedVoicedAnswer | None:
     for model_name in openrouter_structured_model_candidates():
         try:
@@ -456,8 +478,9 @@ def _messages(
         )
     elif lookup_failed:
         context.append(
-            "The lookup for this answer found nothing, so say plainly that "
-            "published figures could not be looked up.\n"
+            "The lookup for this answer failed: say so plainly in one short sentence, "
+            "then answer what you can from the user's figures, Argus market data and "
+            "assumptions you state. Never restate the question as the answer.\n"
         )
     if pending:
         calculation = pending.get(PENDING_PAYLOAD_KEY) or {}
