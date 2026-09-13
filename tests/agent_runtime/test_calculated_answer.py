@@ -378,3 +378,37 @@ def test_a_question_names_only_the_missing_inputs_whatever_the_model_wrote(
         clarification["missing_inputs"][0]["label"]["locale_key"]
         == "tools.calc.fields.periods"
     )
+
+
+def test_an_optional_detail_left_blank_is_never_asked_for(monkeypatch) -> None:
+    _voice(
+        monkeypatch,
+        [
+            _voiced(
+                "What is your payment and when did the loan start?",
+                [
+                    {"name": "direction", "value": "borrow", "source": "user"},
+                    {"name": "present_value", "value": 180000, "source": "user"},
+                    {"name": "annual_rate_pct", "value": 14, "source": "user"},
+                    {"name": "future_value", "value": 0, "source": "user"},
+                    {"name": "payment", "value": None, "source": "user"},
+                    {"name": "start_date", "value": None, "source": "user"},
+                ],
+                solve_for="periods",
+            )
+        ],
+    )
+    asked = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="I owe money on a boat loan at 9 percent, should I refinance?",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert asked is not None and asked.outcome == "await_user_reply"
+    assert [item["name"] for item in asked.patch["clarification"]["missing_inputs"]] == [
+        "payment"
+    ]

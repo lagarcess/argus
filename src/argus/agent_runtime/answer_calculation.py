@@ -210,6 +210,8 @@ def resolve_calculation(
             continue
         if item.source == "user":
             if item.value is None:
+                if not _blank_is_owed(declaration, name):
+                    continue
                 resolved.user_owed.append(name)
                 continue
             arguments[name], sources[name] = item.value, ToolFactSource(kind="user")
@@ -595,6 +597,14 @@ def evidence_source(row: RetrievedRow | None, as_of: str | None) -> ToolFactSour
     )
     title = f"{row.subject} {row.label}".strip()
     return ToolFactSource(kind="page", title=title[:300] or None, date=dated)
+
+
+def _blank_is_owed(declaration: ToolDeclaration, name: str) -> bool:
+    """A blank is owed by the user when the kind needs it: a required input or
+    one of a rule's blanks. An optional detail left blank keeps its default."""
+    field = declaration.arguments_type.model_fields.get(name)
+    in_rule = any(name in rule.fields for rule in declaration.rules)
+    return field is None or field.is_required() or in_rule
 
 
 def _blank_inputs(
