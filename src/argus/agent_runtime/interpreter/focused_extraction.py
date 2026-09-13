@@ -209,7 +209,9 @@ def focused_stated_field_audit_guard(
     pending_seed = None
     contribution_role_preserved = False
     if canonical_strategy_type(draft.strategy_type) == "dca_accumulation":
-        if draft.initial_capital is not None:
+        # Zero already means the canonical DCA no-seed default. Only a funded
+        # deposit needs an owner before it can survive focused repair.
+        if draft.initial_capital not in (None, 0):
             seed_unowned = not _has_owned_seed(draft)
             if seed_unowned:
                 pending_seed = draft.initial_capital

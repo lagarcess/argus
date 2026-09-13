@@ -11,11 +11,12 @@ import asyncio
 import copy
 import json
 import socket
+from datetime import date, datetime, time
 from typing import Any, Literal
 
 import httpx
 import pytest
-from argus.domain.market_data import assets
+from argus.domain.market_data import assets, capabilities, provider
 from argus.llm import openrouter
 from loguru import logger
 
@@ -23,6 +24,7 @@ from tests.evals.measurement_eval_harness import EvalCase, load_eval_cases, run_
 
 PESOS = "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run"
 NVDA = "messy_spanish_future_performance_nvda_cruce_dorado"
+ZERO_SEED = "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455"
 REPLAY_ENV = dict(
     OPENROUTER_API_KEY="hermetic-test-key",
     ARGUS_RUN_LIVE_EVALS="0",
@@ -45,18 +47,24 @@ def replay_case(
         "starting", "recurring", "equal_seed", "distinct_seed"
     ] = "starting",
     unowned_contribution: bool = False,
+    audit_zero_seed: bool = False,
+    initial_capital: float | None = None,
 ) -> dict[str, Any]:
     case_id = case.id
-    dca = case.snapshot is not None
+    zero_seed = case_id == ZERO_SEED
+    dca = case.snapshot is not None or zero_seed
     amount = case.expected.capital_amount if dca else 10000.0
     pending = (
-        case.snapshot.pending_strategy_summary.model_dump(mode="json") if dca else {}
+        case.snapshot.pending_strategy_summary.model_dump(mode="json")
+        if case.snapshot is not None
+        else {"date_range": case.expected.date_range}
     )
     draft = {
         "strategy_type": "dca_accumulation" if dca else "signal_strategy",
         "asset_universe": list(case.expected.assets) if dca else ["NVDA"],
         "asset_class": "equity",
         "capital_amount": amount,
+        "initial_capital": initial_capital,
         "cadence": case.expected.contribution_period if dca else None,
         "date_range": pending.get("date_range"),
     }
@@ -69,6 +77,17 @@ def replay_case(
         "confidence": 0.9,
         "comparison_baseline": "SPY",
     }
+    if zero_seed:
+        draft.update(initial_capital=case.expected.starting_capital, date_range=None)
+        focused.update(
+            recurring_contribution=amount,
+            comparison_baseline=None,
+            date_range_intent={
+                "kind": "explicit_range",
+                **case.expected.date_range,
+                "confidence": 0.9,
+            },
+        )
     if unowned_contribution:
         # An underfilled primary can carry a typed amount with no owner, while
         # the focused read supplies only the missing non-money fields.
@@ -147,9 +166,16 @@ def replay_case(
                 else case.prompt,
                 "candidate_strategy_draft": copy.deepcopy(draft),
             }
-            if primary_count == 1:
+            if zero_seed:
+                result.update(
+                    task_relation="new_task",
+                    semantic_turn_act="new_idea",
+                    requires_clarification=False,
+                    missing_required_fields=[],
+                )
+            elif primary_count == 1:
                 raise asyncio.TimeoutError()
-            if not dca:
+            elif not dca:
                 result["response_profile_overrides"] = None
             elif not current_followup:
                 result["candidate_strategy_draft"]["capital_amount"] = None
@@ -165,7 +191,7 @@ def replay_case(
                 "is_recurring_buy_request": True,
                 "cadence": draft["cadence"],
                 "recurring_contribution_amount": amount
-                if current_followup and not unowned_contribution
+                if (current_followup or zero_seed) and not unowned_contribution
                 else None,
                 "confidence": 0.9,
             }
@@ -178,8 +204,10 @@ def replay_case(
                 "confidence": 0.9,
             }
         elif schema == "FocusedDateWindowExtraction":
-            result = {"has_date_window": not dca, "confidence": 0.9}
-            if not dca:
+            result = {"has_date_window": not dca or zero_seed, "confidence": 0.9}
+            if zero_seed:
+                result["date_range_intent"] = focused["date_range_intent"]
+            elif not dca:
                 result.update(
                     date_range_intent=focused["date_range_intent"],
                     date_range_raw_text=focused["date_range_intent"]["evidence"],
@@ -199,6 +227,14 @@ def replay_case(
                     capital_amount=amount * (2 if audit_role == "distinct_seed" else 1),
                     recurring_contribution_amount=amount,
                 )
+            if zero_seed:
+                result = {
+                    "recurring_contribution_amount": amount,
+                    "capital_amount": case.expected.starting_capital
+                    if audit_zero_seed
+                    else None,
+                    "confidence": 0.9,
+                }
         elif schema == "SignalRuleGroundingAudit":
             result = {"outcome": "grounded", "confidence": 0.9}
         elif schema == "ClarificationResponse":
@@ -244,6 +280,34 @@ def replay_case(
         )
         mp.setitem(assets.SYNTHETIC_UNIT_ASSETS, "KO", ("equity", "Coca-Cola", "KO"))
         mp.setattr(assets, "_ASSET_ALIAS_MAP", None)
+        if zero_seed:
+            synthetic_bars = provider._synthetic_ohlcv
+            window = case.expected.effective_date_range
+
+            def fixture_bars(**kwargs):
+                # The synthetic catalog includes holidays. Use this fixture's
+                # observed coverage at the provider boundary, keeping the real
+                # calendar alignment and confirmation stages in the replay.
+                kwargs.pop("asset_class", None)
+                frame = synthetic_bars(**kwargs)
+                return frame.loc[window["start"] : window["end"]]
+
+            def fixture_calendar(**kwargs):
+                # Only endpoint sessions are needed for this coverage replay.
+                return tuple(
+                    capabilities.EquityMarketSession(
+                        provider="fixture",
+                        session_date=day,
+                        opens_at=datetime.combine(day, time(9, 30), capabilities.EASTERN),
+                        closes_at=datetime.combine(day, time(16), capabilities.EASTERN),
+                    )
+                    for day in (date.fromisoformat(value) for value in window.values())
+                    if kwargs["start_date"] <= day <= kwargs["end_date"]
+                )
+
+            mp.setenv("ARGUS_MARKET_DATA_PROVIDER_MODE", "live_provider")
+            mp.setattr(provider, "_fetch_bars_with_ttl", fixture_bars)
+            mp.setattr(capabilities, "fetch_alpaca_market_calendar", fixture_calendar)
         result = run_eval_case(case, run_prose_judge=False)
     logger.remove(handler)
     t = result["typed_outcome"]
@@ -341,11 +405,15 @@ def test_a_separately_audited_deposit_still_requires_an_owned_seed(
     )
 
 
+@pytest.mark.parametrize("initial_capital", [None, 0])
 def test_unowned_typed_contribution_does_not_suppress_a_deposit_clarification(
     monkeypatch: pytest.MonkeyPatch,
+    initial_capital: float | None,
 ) -> None:
     case = next(case for case in load_eval_cases() if case.id == PESOS)
-    result = replay_case(case, monkeypatch, unowned_contribution=True)
+    result = replay_case(
+        case, monkeypatch, unowned_contribution=True, initial_capital=initial_capital
+    )
     assert not result["unexpected"]
     assert result["guards"]
     assert "assumption" in result["typed"]["missing_required_fields"]
@@ -361,3 +429,16 @@ def test_unowned_typed_contribution_does_not_suppress_a_deposit_clarification(
         and receipt["outcome"] == "succeeded"
     ]
     assert repairs and all(not r["contribution_role_preserved"] for r in repairs)
+
+
+@pytest.mark.parametrize("audit_zero_seed", [False, True])
+def test_focused_repair_does_not_reask_a_zero_starting_deposit(
+    monkeypatch: pytest.MonkeyPatch, audit_zero_seed: bool
+) -> None:
+    case = next(case for case in load_eval_cases() if case.id == ZERO_SEED)
+    result = replay_case(case, monkeypatch, audit_zero_seed=audit_zero_seed)
+    assert not result["unexpected"]
+    assert result["failed_check_codes"] == []
+    assert result["typed"]["stage_outcomes"] == list(case.expected.stage_outcomes)
+    assert result["typed"]["starting_capital"] == case.expected.starting_capital
+    assert result["typed"]["recurring_contribution"] == case.expected.capital_amount
