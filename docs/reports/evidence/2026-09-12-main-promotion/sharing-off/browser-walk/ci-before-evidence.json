@@ -1,0 +1,13 @@
+{
+  "head": "f0c4f2f69cd9a2800ba7a22b801ffa8d1e6e2efa",
+  "run_id": 34775716433,
+  "backend_conclusion": "FAILURE",
+  "selected_failure_lines": [
+    "backend-checks\tRun backend regression suite\t2026-09-13T18:51:55.9396272Z >       assert provenance.get(\"candidate_sha\") == candidate_match.group(1)",
+    "backend-checks\tRun backend regression suite\t2026-09-13T18:51:55.9397309Z tests/test_private_alpha_release_docs.py:546: AssertionError",
+    "backend-checks\tRun backend regression suite\t2026-09-13T18:51:55.9404647Z FAILED tests/test_private_alpha_release_docs.py::test_main_promotion_manifests_require_live_eval_scorecard_evidence - AssertionError: assert 'df7aee12955f...c72287fb12247' == '4fd587bf24ce...94693826d0da2'",
+    "backend-checks\tRun backend regression suite\t2026-09-13T18:51:55.9405618Z ===== 1 failed, 7861 passed, 585 skipped, 6 warnings in 200.61s (0:03:20) ======"
+  ],
+  "new_full_candidate_not_started": true,
+  "new_evidence_head_ci": "Not yet run"
+}

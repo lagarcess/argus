@@ -1,0 +1,52 @@
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/eca1/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 88 items
+
+tests/test_private_alpha_release_docs.py .....F................          [ 25%]
+tests/test_release_promotion_evidence_support.py ..                      [ 27%]
+tests/test_private_alpha_release_profile.py ........                     [ 36%]
+tests/test_render_release_profile_contract.py ........                   [ 45%]
+tests/test_environment_scripts.py ...................................... [ 88%]
+..........                                                               [100%]
+
+=================================== FAILURES ===================================
+______ test_main_promotion_manifests_require_live_eval_scorecard_evidence ______
+
+    def test_main_promotion_manifests_require_live_eval_scorecard_evidence() -> None:
+        manifest_dir = ROOT / "docs" / "release-manifests"
+        manifests = []
+        for manifest_path in sorted(manifest_dir.glob("*.md")):
+            if manifest_path.name == "TEMPLATE.md":
+                continue
+            manifest = manifest_path.read_text(encoding="utf-8")
+            if (
+                "main-production-promotion" in manifest_path.name
+                or re.search(r"^- Promotion target: `?main`?$", manifest, re.M)
+            ):
+                manifests.append(manifest_path)
+        missing_evidence: set[str] = set()
+        for manifest_path in manifests:
+            try:
+                _assert_main_promotion_live_eval_evidence(manifest_path)
+            except AssertionError as exc:
+                if "missing durable live eval scorecard" not in str(exc):
+                    raise
+                missing_evidence.add(manifest_path.name)
+    
+>       assert missing_evidence == KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL
+E       AssertionError: assert {'2026-06-18-...tion.md', ...} == frozenset({'2...ion.md', ...})
+E         
+E         Extra items in the left set:
+E         '2026-09-12-main-production-promotion.md'
+E         Use -v to get more diff
+
+tests/test_private_alpha_release_docs.py:805: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_private_alpha_release_docs.py::test_main_promotion_manifests_require_live_eval_scorecard_evidence
+======================== 1 failed, 87 passed in 27.45s =========================

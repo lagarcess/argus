@@ -1,0 +1,14 @@
+{
+  "phase": "browser",
+  "limit_usd": 3.0,
+  "tracked_cost_usd": 0.8151372391800001,
+  "unpriced_non_skipped_receipts": 5,
+  "guard_reserve_usd": 0.2,
+  "reserve_is_not_actual_spend": true,
+  "api_pid": 8524,
+  "state": "founder_product_finding_stop",
+  "checked_at_epoch": 1789326972.50495,
+  "guarded_total_usd": 1.0151372391800002,
+  "new_full_candidate_started": false,
+  "new_ab_started": false
+}

@@ -9,10 +9,10 @@ from typing import Any
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_from_text
 from argus.agent_runtime.interpreter.shared import (
-    _RECURRING_CAPITAL_SOURCES,
     _TOTAL_CAPITAL_SOURCES,
     _capital_source,
     _field_path_base,
+    _grounded_recurring_contribution,
     _has_complete_date_range_payload,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
@@ -369,23 +369,6 @@ def _grounded_total_capital(
     if _capital_source(field_provenance, "total_capital") in _TOTAL_CAPITAL_SOURCES:
         return value
     if _capital_source(field_provenance, "capital_amount") in _TOTAL_CAPITAL_SOURCES:
-        return value
-    return None
-
-
-def _grounded_recurring_contribution(
-    value: Any,
-    *,
-    field_provenance: dict[str, str],
-) -> Any:
-    if value is None:
-        return None
-    if (
-        _capital_source(field_provenance, "recurring_contribution")
-        in _RECURRING_CAPITAL_SOURCES
-    ):
-        return value
-    if _capital_source(field_provenance, "capital_amount") in _RECURRING_CAPITAL_SOURCES:
         return value
     return None
 

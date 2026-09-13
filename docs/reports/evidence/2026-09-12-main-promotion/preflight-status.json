@@ -1,0 +1,62 @@
+{
+  "checked_at": "2026-09-13T02:19:34.839383+00:00",
+  "status": "stopped_at_environment_parity",
+  "measured_head": "1623954b1b81e094246729dff539e074f7026fa9",
+  "free_gates": {
+    "setup": {
+      "exit": 0
+    },
+    "local_smoke": {
+      "exit": 28,
+      "result": "timeout_after_api_health",
+      "error": "curl: (28) Operation timed out after 20010 milliseconds with 0 bytes received",
+      "root_cause": "not established; no product finding asserted"
+    },
+    "mocked_eval": {
+      "exit": 0,
+      "passed": 259
+    },
+    "release_contract_tests": {
+      "exit": 1,
+      "passed": 87,
+      "failed": 1,
+      "failure": "test_main_promotion_manifests_require_live_eval_scorecard_evidence",
+      "classification": "pending Step 3 scorecard, not a product regression"
+    },
+    "modularity": {
+      "exit": 0,
+      "violations": 0
+    },
+    "environment_parity": {
+      "result": "stop",
+      "classification": "template documentation gap; hosted API/web contract checks agree"
+    }
+  },
+  "production_migration_gate": "not run before stop",
+  "promotion_pr": "not opened before stop",
+  "live_evaluation": {
+    "spent_usd": 0,
+    "limit_usd": 3.5,
+    "status": "not started"
+  },
+  "browser_walk": {
+    "spent_usd": 0,
+    "limit_usd": 3,
+    "status": "not started"
+  },
+  "historical_replay": {
+    "spent_usd": 0,
+    "limit_usd": 4,
+    "status": "not started; no production conversations extracted"
+  },
+  "local_cleanup": "smoke exited; no listeners on 8126 or 3126; no Supabase stack created",
+  "log_redactions": {
+    "setup.log": 0,
+    "local-smoke.log": 0,
+    "mocked-eval.log": 0,
+    "release-contract-tests.log": 0,
+    "modularity.log": 0
+  },
+  "live_mutations": [],
+  "fix_rounds": 0
+}

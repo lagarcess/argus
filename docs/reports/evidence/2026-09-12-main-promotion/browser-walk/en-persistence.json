@@ -1,0 +1,54 @@
+{
+  "country_saved": true,
+  "feedback_rows": 1,
+  "profile_count": 1,
+  "completed_runs": 1,
+  "decisions_saved": 1,
+  "aggregate_metrics": {
+    "risk": {
+      "volatility_pct": 16.29,
+      "max_drawdown_pct": -20.95,
+      "max_drawdown_peak_date": "2022-04-21",
+      "max_drawdown_trough_date": "2023-10-05"
+    },
+    "efficiency": {
+      "win_rate": null,
+      "buy_fills": 54,
+      "sell_fills": 0,
+      "sharpe_ratio": 0.43,
+      "total_trades": 54,
+      "profit_factor": null
+    },
+    "performance": {
+      "profit": 2454.78,
+      "return_basis": "contributions",
+      "total_return_pct": 14.61,
+      "execution_realism": {
+        "enabled": true,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+        "return_drag_pct": 0.17,
+        "modeled_fee_cost": 16.78,
+        "modeled_cost_total": 25.17,
+        "net_total_return_pct": 14.61,
+        "modeled_slippage_cost": 8.39,
+        "gross_total_return_pct": 14.78
+      },
+      "benchmark_coverage": {
+        "target_points": 1114,
+        "observed_ratio": 1.0,
+        "observed_points": 1114,
+        "deferred_fill_count": 0
+      },
+      "benchmark_return_pct": 52.71,
+      "annualized_return_pct": 4.5,
+      "portfolio_value_range": {
+        "source": "strategy_portfolio_equity_close",
+        "currency": "USD",
+        "peak_value": 21914.86,
+        "lowest_value": 6025.36
+      },
+      "delta_vs_benchmark_pct": -38.1
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "web_build_exit_code": 0,
+  "api_health_status": 200,
+  "web_chat_status": 200,
+  "api_pid": 42755,
+  "web_pid": 42756,
+  "guard_pid": 42769,
+  "shadow_jobs_enabled": true,
+  "production_build": true,
+  "research_retry_delay_seconds": 132.374,
+  "approval": "Full unattended EN and ES browser walk; no fix round; docs evidence only; $3 cap",
+  "screenshots_and_visible_text": "steps.json and adjacent PNG/TXT files",
+  "no_production_link": true,
+  "no_step_8": true
+}

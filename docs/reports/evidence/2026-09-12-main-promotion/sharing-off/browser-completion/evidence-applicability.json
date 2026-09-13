@@ -1,0 +1,12 @@
+{
+  "release_product_head": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "original_measured_head": "df7aee12955f667e31057464d62c72287fb12247",
+  "runtime_frontend_migrations_tests_workflows_unchanged": true,
+  "only_product_differences": "Two sharing flags in render.yaml and the release profile changed from true to false",
+  "retained_evidence_scope": "Earlier non-sharing English walk and historical replay; no enabled-sharing acceptance retained for release",
+  "applicable_steps_completed": true,
+  "known_p2_606_deferred_by_founder": true,
+  "new_p0_p1": false,
+  "sharing_not_applicable_rows": 12,
+  "capture_count": 47
+}

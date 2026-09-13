@@ -38,7 +38,9 @@ def strategy_route_expected(
     *,
     intent: IntentName,
     semantic_turn_act: SemanticTurnAct | None,
+    has_execution_evidence: bool = False,
 ) -> bool:
     return (
         route_owner(intent=intent, semantic_turn_act=semantic_turn_act) == "strategy"
+        or (semantic_turn_act != "result_followup" and has_execution_evidence)
     )

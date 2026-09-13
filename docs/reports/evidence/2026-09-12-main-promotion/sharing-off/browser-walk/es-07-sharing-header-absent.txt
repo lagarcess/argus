@@ -1,0 +1,55 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading "Compra recurrente de Coca-Cola" [level=1]
+  - button "Opciones de chat":
+  - status
+  - region "Conversación":
+    - generic: Prueba comprar Coca-Cola (KO) cada mes desde agosto de 2020 hasta diciembre de 2024, empezando con $5,000 USD y añadiendo $200 USD mensuales.
+    - button "Copiar texto":
+    - generic: KO
+    - heading "Compras recurrentes" [level=3]
+    - text: Listo para ejecutar
+    - term: Aporte
+    - definition: $200 cada mes
+    - term: Periodo
+    - definition:
+      - generic: 3 ago 2020 → 31 dic 2024
+    - term: Capital inicial
+    - definition: $5,000
+    - generic: Acciones
+    - generic: Datos diarios
+    - generic: Sin comisiones
+    - generic: Sin deslizamiento
+    - generic: "Referencia: SPY"
+    - button "Editar montos":
+      - text: Editar montos
+    - button "Editar fechas":
+      - text: Editar fechas
+    - button "Editar costos":
+      - text: Editar costos
+    - button "Ejecutar backtest":
+      - text: Ejecutar backtest
+    - button "Cambiar supuestos":
+      - text: Cambiar supuestos
+    - button "Cancelar":
+      - text: Cancelar
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+  - button "Menciona un activo o indicador":
+  - combobox "Haz una pregunta de seguimiento..."
+  - generic: Haz una pregunta de seguimiento...
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

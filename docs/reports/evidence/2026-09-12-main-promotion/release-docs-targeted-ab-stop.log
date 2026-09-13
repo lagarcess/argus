@@ -1,0 +1,117 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/eca1/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 24 items
+
+tests/test_private_alpha_release_docs.py .....F................          [ 91%]
+tests/test_release_promotion_evidence_support.py ..                      [100%]
+
+=================================== FAILURES ===================================
+______ test_main_promotion_manifests_require_live_eval_scorecard_evidence ______
+
+    def test_main_promotion_manifests_require_live_eval_scorecard_evidence() -> None:
+        manifest_dir = ROOT / "docs" / "release-manifests"
+        manifests = []
+        for manifest_path in sorted(manifest_dir.glob("*.md")):
+            if manifest_path.name == "TEMPLATE.md":
+                continue
+            manifest = manifest_path.read_text(encoding="utf-8")
+            if (
+                "main-production-promotion" in manifest_path.name
+                or re.search(r"^- Promotion target: `?main`?$", manifest, re.M)
+            ):
+                manifests.append(manifest_path)
+        missing_evidence: set[str] = set()
+        for manifest_path in manifests:
+            try:
+>               _assert_main_promotion_live_eval_evidence(manifest_path)
+
+tests/test_private_alpha_release_docs.py:799:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests/test_private_alpha_release_docs.py:603: in _assert_main_promotion_live_eval_evidence
+    assert_main_promotion_baseline_comparison(
+tests/release_promotion_evidence_support.py:188: in assert_main_promotion_baseline_comparison
+    assert_prose_failure_measured_on_both_sides(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+manifest = '# Private Alpha Production Promotion, 2026-09-12\n\nStatus: The targeted A/B stopped with `candidate_regression_stop`...XT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:56531` |\n| `PATH` | `/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin` |\n'
+manifest_path = PosixPath('/Users/garces/.codex/worktrees/eca1/private-alpha-next/docs/release-manifests/2026-09-12-main-production-promotion.md')
+
+    def assert_prose_failure_measured_on_both_sides(
+        manifest: str,
+        manifest_path: Path,
+        *,
+        case_id: str,
+        deployed_sha: str,
+        candidate_sha: str,
+        repository_root: Path,
+    ) -> None:
+        """A prose regression is a rate on two sides, never one run's verdict.
+
+        Voiced prose is stochastic, so a single suite run can hand back a
+        candidate-only prose failure that no user would ever meet twice. Prose
+        cannot be dispositioned by argument here: the manifest must carry a
+        targeted interleaved A/B that measured the same case on the deployed build
+        and on the candidate. Ten paired rounds cost about $0.20 against $1.33 and
+        half an hour for a suite that still could not answer the question.
+
+        Evidence is matched by content, never by filename: a side-labelled document
+        naming this case, whose provenance measured the right tree.
+        """
+
+        sides: dict[str, dict[str, object]] = {}
+        for relative in re.findall(r"`([^`]+\.json)`", manifest):
+            path = (repository_root / relative).resolve()
+            if not path.is_file():
+                continue
+            try:
+                document = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(document, dict) or document.get("case_id") != case_id:
+                continue
+            side = document.get("side")
+            if side in {"baseline", "candidate"}:
+                sides[str(side)] = document
+
+        missing = {"baseline", "candidate"} - sides.keys()
+        assert not missing, (
+            f"{manifest_path.name}: {case_id} is a candidate-only PROSE failure, so "
+            f"naming it is not a disposition. Missing the {', '.join(sorted(missing))} "
+            "side of a targeted interleaved A/B. Measure the same case on both the "
+            "deployed build and the candidate, reference both documents here, and "
+            "record the two rates. Roughly ten minutes and $0.20."
+        )
+
+        expected_sha = {"baseline": deployed_sha, "candidate": candidate_sha}
+        for side, document in sorted(sides.items()):
+            measured_sha = str((document.get("provenance") or {}).get("candidate_sha") or "")
+            assert measured_sha == expected_sha[side] or _same_product_tree(
+                measured_sha, expected_sha[side], repository_root=repository_root
+            ), (
+                f"{manifest_path.name}: the {side} A/B for {case_id} measured "
+                f"{measured_sha or '<unrecorded>'}, which is not the "
+                f"{'deployed build' if side == 'baseline' else 'candidate'}."
+            )
+
+            measurement = document.get("measurement")
+            assert isinstance(measurement, dict), (
+                f"{manifest_path.name}: the {side} A/B for {case_id} records no "
+                "measurement."
+            )
+            attempts = measurement.get("attempts")
+>           assert isinstance(attempts, int) and attempts >= _PROSE_AB_MINIMUM_ATTEMPTS, (
+                f"{manifest_path.name}: the {side} A/B for {case_id} ran "
+                f"{attempts!r} attempts. Fewer than {_PROSE_AB_MINIMUM_ATTEMPTS} "
+                "cannot separate a regression from voicing noise."
+            )
+E           AssertionError: 2026-09-12-main-production-promotion.md: the baseline A/B for messy_spanish_future_performance_nvda_cruce_dorado ran 4 attempts. Fewer than 10 cannot separate a regression from voicing noise.
+
+tests/release_promotion_evidence_support.py:261: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_private_alpha_release_docs.py::test_main_promotion_manifests_require_live_eval_scorecard_evidence
+======================== 1 failed, 23 passed in 11.39s =========================

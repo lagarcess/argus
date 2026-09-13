@@ -1,0 +1,28 @@
+{
+  "phase": "recorded_judge",
+  "state": "completed",
+  "combined_limit_usd": 7.5,
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "environment_identical_to_full_run": true,
+  "initial_event_count": 1276,
+  "tracked_cost_usd": 4.6276003109,
+  "guard_reserve_usd": 1.02,
+  "guarded_total_usd": 5.6476003109,
+  "unpriced_non_skipped_receipts": 46,
+  "pid": 94216,
+  "command": [
+    "poetry",
+    "run",
+    "pytest",
+    "-c",
+    "/private/tmp/argus-promotion-20260912-candidate-eval/pyproject.toml",
+    "/private/tmp/argus-promotion-20260912-eval-control/test_approved_followup.py",
+    "-q",
+    "-k",
+    "recorded_judge"
+  ],
+  "started_at": 1789278684.412354,
+  "exit_code": 0,
+  "finished_at": 1789278743.221366,
+  "environment_source_unchanged_after_run": true
+}

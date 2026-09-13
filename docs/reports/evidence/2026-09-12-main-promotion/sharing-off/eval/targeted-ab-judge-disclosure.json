@@ -1,0 +1,262 @@
+{
+  "reviewed_commit": "588394368bef02391bc3ff3b5025813625071ebb",
+  "review_comment_url": "https://github.com/lagarcess/argus/pull/603#discussion_r4001036641",
+  "classification": "Confirmed P2 evidence disclosure omission; corrected in docs only",
+  "native_records_unchanged": true,
+  "supplemental_counts_only": true,
+  "explanation": "Deployed attempt 4 returns a negative prose judge with no criteria or notes. The old native harness adds failures only from failed_criteria, so it adds none and retains a native pass. Candidate code already adds failed_without_criteria for this condition. The reason for the negative judge result is not retained. Different build expectations and rubrics remain unchanged.",
+  "counts": {
+    "baseline": {
+      "native_failures": 0,
+      "negative_judge_results": 1,
+      "native_or_negative_judge_failures": 1,
+      "attempts": 10
+    },
+    "candidate": {
+      "native_failures": 5,
+      "negative_judge_results": 2,
+      "native_or_negative_judge_failures": 5,
+      "attempts": 10
+    }
+  },
+  "harness_source_proof": {
+    "baseline": {
+      "sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+      "path": "tests/evals/measurement_eval_harness.py",
+      "line": 296,
+      "source_excerpt": "            elif not judge_result[\"pass\"]:\n                failed_checks.extend(\n                    f\"prose_judge:{criterion}\"\n                    for criterion in judge_result[\"failed_criteria\"]\n                )\n"
+    },
+    "candidate": {
+      "sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+      "path": "tests/evals/measurement_eval_harness.py",
+      "line": 302,
+      "source_excerpt": "            elif not judge_result[\"pass\"]:\n                failed_checks.extend(\n                    f\"prose_judge:{criterion}\"\n                    for criterion in judge_result[\"failed_criteria\"]\n                )\n                if not judge_result[\"failed_criteria\"]:\n                    failed_checks.append(\"prose_judge:failed_without_criteria\")\n"
+    }
+  },
+  "attempts": [
+    {
+      "side": "baseline",
+      "attempt": 1,
+      "native_sha256": "767720a37bbdc7a725959ae145fc4f6e4c6f5d6d64e5043d4a197914e4df7234",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "The assistant correctly refuses to predict future performance, honestly states that Argus only tests on historical data, and offers two relevant recovery options that are rendered beside the reply. The Spanish is natural and consistent with the session language, with no English fallback or raw runtime errors.",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "baseline",
+      "attempt": 2,
+      "native_sha256": "6f8ad538e1692713028d88d2f8a1c57a8a334b32439cce68d7b172f301fecff1",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "No unsupported capability claim: the assistant explicitly states it cannot predict the future, and the recovery options (present in rendered_beside_reply) frame it as a historical backtest. No English fallback or raw error is exposed. All criteria pass.",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "baseline",
+      "attempt": 3,
+      "native_sha256": "76eadcbab069b2d5a6e867c9b3f40105cd8ab11358c223f43313c7cf3350be76",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "The assistant correctly avoids predicting future performance, honestly states it can only show historical behavior, and offers recovery options in Spanish without leaking English fallback copy or runtime errors.",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "baseline",
+      "attempt": 4,
+      "native_sha256": "d387f73756f9fa0542e87c26ec9d8f08f658a8730b874e29d8edf03861a02894",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": false,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": true
+    },
+    {
+      "side": "baseline",
+      "attempt": 5,
+      "native_sha256": "ab08272f230c9578d2e385d4c90ab9174e37d9a42c4dca1186eb98dd70a06a4d",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "baseline",
+      "attempt": 6,
+      "native_sha256": "1dcd4345ce97a84c26b2f3db783f99df0d899bdb53ab2c2db1a54a669d9d4e26",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "The reply honestly states Argus cannot predict the future and redirects to historical testing, matching the recovery options rendered beside it. No English fallback leaks into the Spanish prose, and no raw runtime error details are exposed.",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "baseline",
+      "attempt": 7,
+      "native_sha256": "62aaedee59513a3f054f52165e24bea37e6dc9545d83921c5c1d0f698311d698",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "baseline",
+      "attempt": 8,
+      "native_sha256": "4c1d95ce2a567d1dc41139f98684f871859a716cc3dc0d72607ff61cbc90d807",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "The reply honestly states that Argus cannot predict the future and offers historical testing instead. It is entirely in Spanish with no English fallback. No runtime error details are exposed.",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "baseline",
+      "attempt": 9,
+      "native_sha256": "618f9efa9ebe2a060c039ef9106bb00c61971da07ba50b3086247ce479c841c9",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "The reply honestly reframes the user's future prediction request into a historical backtest, does not expose any runtime errors, and maintains Spanish language integrity without English fallback.",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "baseline",
+      "attempt": 10,
+      "native_sha256": "20d6cf5c5f6fa96ce7ca1003f9a1bbf8dd1d350f0772952dac5937c7b789f1c7",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "candidate",
+      "attempt": 1,
+      "native_sha256": "3c672e0a397f17615f4f6e0c55bec6216527b4f4b01f447eb69c289bb35ff48d",
+      "native_failed": true,
+      "native_status": "failed",
+      "judge_pass": false,
+      "failed_criteria": [
+        "scenario_framing"
+      ],
+      "notes": "The reply does not provide any labeled scenarios or ranges built from cited inputs with arithmetic shown; instead it declines to cite live figures and redirects to historical testing, which does not satisfy the scenario_framing requirement for a forward-looking valuation answer.",
+      "native_or_negative_judge_failed": true
+    },
+    {
+      "side": "candidate",
+      "attempt": 2,
+      "native_sha256": "af7395089f752d6c595c41c12a5e1e3c83d9b04f01fea494bf3feeae97eff0d1",
+      "native_failed": true,
+      "native_status": "failed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": true
+    },
+    {
+      "side": "candidate",
+      "attempt": 3,
+      "native_sha256": "d78395265341a36843fe6255f37c5cdd92cbeccbf48eb2e5344ce1fb29847982",
+      "native_failed": true,
+      "native_status": "failed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": true
+    },
+    {
+      "side": "candidate",
+      "attempt": 4,
+      "native_sha256": "2fa14029107634695289d182b94741c4ae85a4070adb2d5172d0ede2db015e40",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "candidate",
+      "attempt": 5,
+      "native_sha256": "a36b981a154a2ddc6c497a283e70fe67fac57053b2d1c747811f4b1ab2d87c15",
+      "native_failed": true,
+      "native_status": "failed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": true
+    },
+    {
+      "side": "candidate",
+      "attempt": 6,
+      "native_sha256": "6a4b57b17ae0447cf624697cbb0fce8d0162a35292c7d784bf6704a137d455ac",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "candidate",
+      "attempt": 7,
+      "native_sha256": "39a5ae0c99ffea06add9249256d8fa32fe39ac104973928ad73830bf5f6dc2dc",
+      "native_failed": true,
+      "native_status": "failed",
+      "judge_pass": false,
+      "failed_criteria": [
+        "scenario_framing"
+      ],
+      "notes": "The user asked for a future value prediction (\"\u00bfcu\u00e1nto tendr\u00e9 dentro de diez a\u00f1os?\"). The assistant does not provide any labeled scenarios, ranges, or arithmetic from cited inputs; instead it redirects to historical backtesting. This fails the scenario_framing criterion, which requires a forward-looking or valuation answer to give labeled scenarios or ranges built from cited inputs with the arithmetic shown.",
+      "native_or_negative_judge_failed": true
+    },
+    {
+      "side": "candidate",
+      "attempt": 8,
+      "native_sha256": "8bbe7c13851a52741a17acc0919fbba690a6df7e173c08db37feaad59625b9f6",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "candidate",
+      "attempt": 9,
+      "native_sha256": "44ef33146153b64d329cf31e8979cbd3561cf64ae6792bce673db5e3e5d5248a",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "The response provides labeled scenarios (Bajista, Base, Alcista) with ranges, shows the arithmetic step by step, cites the inputs used (price, analyst targets, historical return), and explicitly states it is not a prediction or investment advice. No raw runtime errors, no English fallback in a Spanish session, and no unsupported capability claims.",
+      "native_or_negative_judge_failed": false
+    },
+    {
+      "side": "candidate",
+      "attempt": 10,
+      "native_sha256": "56b4b0a0c61cf64360d040e5d8a9fd049bade638f931d5bf43e5055e5ce36789",
+      "native_failed": false,
+      "native_status": "passed",
+      "judge_pass": true,
+      "failed_criteria": [],
+      "notes": "The prose provides labeled scenarios with ranges built from cited inputs and shows the arithmetic. It does not present a single number as the future, nor does it give buy/sell/hold advice. No unsupported capability is claimed, no raw runtime errors appear, and the Spanish is consistent without English fallback.",
+      "native_or_negative_judge_failed": false
+    }
+  ]
+}

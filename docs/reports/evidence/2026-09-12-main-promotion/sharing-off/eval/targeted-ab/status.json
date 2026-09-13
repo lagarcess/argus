@@ -1,0 +1,293 @@
+{
+  "state": "completed",
+  "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+  "combined_cap_usd": 12.5,
+  "shas": {
+    "baseline": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+    "candidate": "4fd587bf24ce39b794c2228d61f94693826d0da2"
+  },
+  "order": "baseline_then_candidate_per_round",
+  "planned_attempts_per_side": 10,
+  "completed_attempts": [
+    {
+      "side": "baseline",
+      "attempt": 1,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2048,
+      "event_end_exclusive": 2062,
+      "artifact": "attempt-01-baseline.json",
+      "artifact_sha256": "767720a37bbdc7a725959ae145fc4f6e4c6f5d6d64e5043d4a197914e4df7234"
+    },
+    {
+      "side": "candidate",
+      "attempt": 1,
+      "failed": true,
+      "research_timeout": true,
+      "native_status": "failed",
+      "event_start": 2062,
+      "event_end_exclusive": 2071,
+      "artifact": "attempt-01-candidate.json",
+      "artifact_sha256": "3c672e0a397f17615f4f6e0c55bec6216527b4f4b01f447eb69c289bb35ff48d"
+    },
+    {
+      "side": "baseline",
+      "attempt": 2,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2071,
+      "event_end_exclusive": 2085,
+      "artifact": "attempt-02-baseline.json",
+      "artifact_sha256": "6f8ad538e1692713028d88d2f8a1c57a8a334b32439cce68d7b172f301fecff1"
+    },
+    {
+      "side": "candidate",
+      "attempt": 2,
+      "failed": true,
+      "research_timeout": false,
+      "native_status": "failed",
+      "event_start": 2085,
+      "event_end_exclusive": 2096,
+      "artifact": "attempt-02-candidate.json",
+      "artifact_sha256": "af7395089f752d6c595c41c12a5e1e3c83d9b04f01fea494bf3feeae97eff0d1"
+    },
+    {
+      "side": "baseline",
+      "attempt": 3,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2096,
+      "event_end_exclusive": 2110,
+      "artifact": "attempt-03-baseline.json",
+      "artifact_sha256": "76eadcbab069b2d5a6e867c9b3f40105cd8ab11358c223f43313c7cf3350be76"
+    },
+    {
+      "side": "candidate",
+      "attempt": 3,
+      "failed": true,
+      "research_timeout": true,
+      "native_status": "failed",
+      "event_start": 2110,
+      "event_end_exclusive": 2119,
+      "artifact": "attempt-03-candidate.json",
+      "artifact_sha256": "d78395265341a36843fe6255f37c5cdd92cbeccbf48eb2e5344ce1fb29847982"
+    },
+    {
+      "side": "baseline",
+      "attempt": 4,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2119,
+      "event_end_exclusive": 2134,
+      "artifact": "attempt-04-baseline.json",
+      "artifact_sha256": "d387f73756f9fa0542e87c26ec9d8f08f658a8730b874e29d8edf03861a02894"
+    },
+    {
+      "side": "candidate",
+      "attempt": 4,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2134,
+      "event_end_exclusive": 2144,
+      "artifact": "attempt-04-candidate.json",
+      "artifact_sha256": "2fa14029107634695289d182b94741c4ae85a4070adb2d5172d0ede2db015e40"
+    },
+    {
+      "side": "baseline",
+      "attempt": 5,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2144,
+      "event_end_exclusive": 2158,
+      "artifact": "attempt-05-baseline.json",
+      "artifact_sha256": "ab08272f230c9578d2e385d4c90ab9174e37d9a42c4dca1186eb98dd70a06a4d"
+    },
+    {
+      "side": "candidate",
+      "attempt": 5,
+      "failed": true,
+      "research_timeout": true,
+      "native_status": "failed",
+      "event_start": 2158,
+      "event_end_exclusive": 2167,
+      "artifact": "attempt-05-candidate.json",
+      "artifact_sha256": "a36b981a154a2ddc6c497a283e70fe67fac57053b2d1c747811f4b1ab2d87c15"
+    },
+    {
+      "side": "baseline",
+      "attempt": 6,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2167,
+      "event_end_exclusive": 2181,
+      "artifact": "attempt-06-baseline.json",
+      "artifact_sha256": "1dcd4345ce97a84c26b2f3db783f99df0d899bdb53ab2c2db1a54a669d9d4e26"
+    },
+    {
+      "side": "candidate",
+      "attempt": 6,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2181,
+      "event_end_exclusive": 2192,
+      "artifact": "attempt-06-candidate.json",
+      "artifact_sha256": "6a4b57b17ae0447cf624697cbb0fce8d0162a35292c7d784bf6704a137d455ac"
+    },
+    {
+      "side": "baseline",
+      "attempt": 7,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2192,
+      "event_end_exclusive": 2206,
+      "artifact": "attempt-07-baseline.json",
+      "artifact_sha256": "62aaedee59513a3f054f52165e24bea37e6dc9545d83921c5c1d0f698311d698"
+    },
+    {
+      "side": "candidate",
+      "attempt": 7,
+      "failed": true,
+      "research_timeout": false,
+      "native_status": "failed",
+      "event_start": 2206,
+      "event_end_exclusive": 2220,
+      "artifact": "attempt-07-candidate.json",
+      "artifact_sha256": "39a5ae0c99ffea06add9249256d8fa32fe39ac104973928ad73830bf5f6dc2dc"
+    },
+    {
+      "side": "baseline",
+      "attempt": 8,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2220,
+      "event_end_exclusive": 2234,
+      "artifact": "attempt-08-baseline.json",
+      "artifact_sha256": "4c1d95ce2a567d1dc41139f98684f871859a716cc3dc0d72607ff61cbc90d807"
+    },
+    {
+      "side": "candidate",
+      "attempt": 8,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2234,
+      "event_end_exclusive": 2244,
+      "artifact": "attempt-08-candidate.json",
+      "artifact_sha256": "8bbe7c13851a52741a17acc0919fbba690a6df7e173c08db37feaad59625b9f6"
+    },
+    {
+      "side": "baseline",
+      "attempt": 9,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2244,
+      "event_end_exclusive": 2259,
+      "artifact": "attempt-09-baseline.json",
+      "artifact_sha256": "618f9efa9ebe2a060c039ef9106bb00c61971da07ba50b3086247ce479c841c9"
+    },
+    {
+      "side": "candidate",
+      "attempt": 9,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2259,
+      "event_end_exclusive": 2269,
+      "artifact": "attempt-09-candidate.json",
+      "artifact_sha256": "44ef33146153b64d329cf31e8979cbd3561cf64ae6792bce673db5e3e5d5248a"
+    },
+    {
+      "side": "baseline",
+      "attempt": 10,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2269,
+      "event_end_exclusive": 2284,
+      "artifact": "attempt-10-baseline.json",
+      "artifact_sha256": "20d6cf5c5f6fa96ce7ca1003f9a1bbf8dd1d350f0772952dac5937c7b789f1c7"
+    },
+    {
+      "side": "candidate",
+      "attempt": 10,
+      "failed": false,
+      "research_timeout": false,
+      "native_status": "passed",
+      "event_start": 2284,
+      "event_end_exclusive": 2294,
+      "artifact": "attempt-10-candidate.json",
+      "artifact_sha256": "56b4b0a0c61cf64360d040e5d8a9fd049bade638f931d5bf43e5055e5ce36789"
+    }
+  ],
+  "failures": {
+    "baseline": 0,
+    "candidate": 5
+  },
+  "research_timeouts": {
+    "baseline": 0,
+    "candidate": 3
+  },
+  "reserve_is_not_spend": true,
+  "environment_identical_to_completed_pair": true,
+  "environment_source_sha256": "6a428549c310bd43ea51b46f2c106602284618c44bbe41b382b0289728edf45d",
+  "started_at_epoch": 1789331925.817939,
+  "failure_gap_stop_applies": false,
+  "http_status_capture_enabled": true,
+  "cooldowns": [
+    {
+      "after_pair": 3,
+      "before_pair": 4,
+      "consecutive_candidate_delivery_failures": 3,
+      "started_at_epoch": 1789332748.579468,
+      "required_seconds": 900,
+      "resume_at_epoch": 1789333648.579468,
+      "finished_at_epoch": 1789333648.690135
+    }
+  ],
+  "candidate_research_delivery_failure_streak": 0,
+  "http_observer_sha256": "d7830736e7de8cd26485c731860e8a88c4086ab406b40cb6c67d1299480749a2",
+  "tracked_cost_usd": 9.556433710664,
+  "guard_reserve_usd": 1.64,
+  "guarded_total_usd": 11.196433710664,
+  "unpriced_non_skipped_receipts": 77,
+  "initial_tracked_cost_usd": 7.964481605684,
+  "initial_guard_reserve_usd": 1.52,
+  "initial_guarded_total_usd": 9.484481605684,
+  "initial_event_count": 2048,
+  "active_side": "candidate",
+  "active_attempt": 10,
+  "active_pid": 19188,
+  "active_command": [
+    "poetry",
+    "run",
+    "pytest",
+    "-c",
+    "/private/tmp/argus-promotion-20260913-sharing-off-candidate-eval/pyproject.toml",
+    "/private/tmp/argus-promotion-20260912-eval-control/test_sharing_off_interleaved_ab.py::test_targeted_case[10]",
+    "-q"
+  ],
+  "first_pair_projection": {
+    "basis": "First two attempts: one deployed and one candidate. Extrapolate their tracked cost and reserve growth over ten pairs.",
+    "initial_guarded_total_usd": 9.484481605684,
+    "first_pair_guarded_delta_usd": 0.0609307728,
+    "projected_combined_guarded_total_usd": 10.093789333684,
+    "combined_cap_usd": 12.5,
+    "projection_within_cap": true,
+    "checked_before_attempt_three": true,
+    "tracked_cost_after_pair_usd": 8.005412378484,
+    "reserve_after_pair_usd": 1.54
+  },
+  "finished_at_epoch": 1789335206.0023081,
+  "environment_source_unchanged_after_run": true
+}

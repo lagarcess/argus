@@ -1,0 +1,29 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading "Inversión en Apple con $10,000" [level=1]
+  - button "Opciones de chat":
+  - status
+  - region "Conversación":
+    - generic: Probemos Apple con $10,000.
+    - button "Copiar texto":
+    - paragraph: ¿Qué periodo quieres usar para AAPL?
+    - button "Buena respuesta":
+    - button "Mala respuesta":
+    - button "Más acciones":
+  - button "Menciona un activo o indicador":
+  - combobox "Haz una pregunta de seguimiento..."
+  - generic: Haz una pregunta de seguimiento...
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

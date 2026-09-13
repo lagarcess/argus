@@ -1,0 +1,13 @@
+{
+  "ab_completed": true,
+  "founder_replay_authorized_after_ab": true,
+  "reported_before_execution": true,
+  "estimated_cost_usd": 0.86,
+  "window": "union_august_12",
+  "browser_walk_pending": true,
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "planned_conversations": 15,
+  "planned_user_turns": 38,
+  "cap_usd": 4,
+  "authorization": "Founder direction in this task: after A/B, run the 15-conversation union, 38 turns, then stop before browser walk."
+}

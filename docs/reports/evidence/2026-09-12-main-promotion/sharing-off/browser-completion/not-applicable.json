@@ -1,0 +1,79 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "api_sharing_enabled": false,
+  "web_sharing_enabled": false,
+  "rows": [
+    {
+      "language": "en",
+      "step": "Pick answers",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "en",
+      "step": "Preview selected answers",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "en",
+      "step": "Create a local share link",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "en",
+      "step": "Open signed out at phone width",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "en",
+      "step": "Revoke the link",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "en",
+      "step": "Confirm a revoked link stops working",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "es-419",
+      "step": "Pick answers",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "es-419",
+      "step": "Preview selected answers",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "es-419",
+      "step": "Create a local share link",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "es-419",
+      "step": "Open signed out at phone width",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "es-419",
+      "step": "Revoke the link",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    },
+    {
+      "language": "es-419",
+      "step": "Confirm a revoked link stops working",
+      "result": "not_applicable",
+      "reason": "Founder approved promotion with sharing off; no sharing surface is enabled."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "case_id": "action_chip_change_asset_changed_mind_capital_issue_188",
+  "kind": "read_only_source_reachability",
+  "source_path": "src/argus/api/chat/confirmation.py",
+  "function": "runtime_confirmation_card",
+  "method": "Read each committed source with git show and compare the Python AST assignment to actions; no provider or database calls.",
+  "builds": {
+    "ee9c3491fa6219502f1e94abc5d9e661a06839d9": {
+      "declared_secondary_action_types": [
+        "adjust_assumptions",
+        "cancel_confirmation"
+      ],
+      "actions_ast_sha256": "0f082bce98edafb5b5915e050a9b35c03c22fa4b68fb55ceaffadaa4696cd876",
+      "scoped_change_asset_not_emitted": true
+    },
+    "4fd587bf24ce39b794c2228d61f94693826d0da2": {
+      "declared_secondary_action_types": [
+        "adjust_assumptions",
+        "cancel_confirmation"
+      ],
+      "actions_ast_sha256": "0f082bce98edafb5b5915e050a9b35c03c22fa4b68fb55ceaffadaa4696cd876",
+      "scoped_change_asset_not_emitted": true
+    }
+  },
+  "limits": "The legacy action remains in the schema, handler and renderer for stored transcripts. No production usage count or full runtime equivalence is asserted. This is not a paid case rerun and does not change its native result.",
+  "checked_at": "2026-09-13T20:18:27.621501+00:00"
+}

@@ -1,0 +1,10 @@
+$ next dev --hostname "127.0.0.1" --port "3126"
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://127.0.0.1:3126
+- Network:       http://127.0.0.1:3126
+- Environments: .env.local
+✓ Ready in 177ms
+
+(node:43074) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ GET / 200 in 1490ms (next.js: 1411ms, application-code: 79ms)

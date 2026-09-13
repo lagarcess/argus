@@ -1,0 +1,93 @@
+{
+  "measured_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "read_only_local_database": true,
+  "job_proof": [
+    {
+      "scope": "chat.run_backtest",
+      "status": "succeeded",
+      "native_result_hydrateable": true
+    },
+    {
+      "scope": "chat.research",
+      "status": "succeeded",
+      "native_result_hydrateable": true
+    }
+  ],
+  "answer_audits": [
+    {
+      "message_number": 3,
+      "answer_audit": "pass",
+      "has_job_id": false,
+      "job_id_matches_saved_job": false,
+      "terminal": true,
+      "terminal_status": "completed",
+      "has_research": false
+    },
+    {
+      "message_number": 5,
+      "answer_audit": "unsafe_text",
+      "has_job_id": true,
+      "job_id_matches_saved_job": true,
+      "terminal": true,
+      "terminal_status": "completed",
+      "has_research": false
+    },
+    {
+      "message_number": 6,
+      "answer_audit": "unsafe_text",
+      "has_job_id": true,
+      "job_id_matches_saved_job": true,
+      "terminal": null,
+      "terminal_status": null,
+      "has_research": true
+    },
+    {
+      "message_number": 8,
+      "answer_audit": "pass",
+      "has_job_id": false,
+      "job_id_matches_saved_job": false,
+      "terminal": true,
+      "terminal_status": "completed",
+      "has_research": true
+    },
+    {
+      "message_number": 9,
+      "answer_audit": "pass",
+      "has_job_id": false,
+      "job_id_matches_saved_job": false,
+      "terminal": null,
+      "terminal_status": null,
+      "has_research": false
+    },
+    {
+      "message_number": 11,
+      "answer_audit": "pass",
+      "has_job_id": false,
+      "job_id_matches_saved_job": false,
+      "terminal": true,
+      "terminal_status": "completed",
+      "has_research": true
+    },
+    {
+      "message_number": 13,
+      "answer_audit": "pass",
+      "has_job_id": false,
+      "job_id_matches_saved_job": false,
+      "terminal": true,
+      "terminal_status": "completed",
+      "has_research": true
+    },
+    {
+      "message_number": 15,
+      "answer_audit": "pass",
+      "has_job_id": false,
+      "job_id_matches_saved_job": false,
+      "terminal": true,
+      "terminal_status": "completed",
+      "has_research": false
+    }
+  ],
+  "public_publisher_link_audit": "unsafe_text",
+  "public_example": "See [Coca-Cola second-quarter results](https://investors.coca-colacompany.com/news-events/press-releases/detail/1112/coca-cola-reports-second-quarter-2024-results-and-raises-full-year-guidance).",
+  "raw_private_identifiers_or_messages_retained": false
+}

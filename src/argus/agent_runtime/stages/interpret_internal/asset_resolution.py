@@ -1234,8 +1234,9 @@ def _missing_fields_for_interpretation(
         required_missing_fields = list(
             dict.fromkeys(["asset_universe", *required_missing_fields])
         )
-    if "execution_cost_evidence_unresolved" in interpretation.reason_codes:
-        # A stated cost the audit could not ground is asked, never defaulted (#271).
+    if ("execution_cost_evidence_unresolved" in interpretation.reason_codes
+        or "focused_repair_stated_fields_unresolved" in interpretation.reason_codes):
+        # Unresolved stated money or costs are asked, never defaulted (#271, #600).
         required_missing_fields = [*required_missing_fields, "assumption"]
     allowed_missing_fields = set(required_missing_fields)
     missing = [

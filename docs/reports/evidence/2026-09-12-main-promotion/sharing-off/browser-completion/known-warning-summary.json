@@ -1,0 +1,8 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "known_p2_route_receipt_persistence_warning_count": 1,
+  "known_issue": "https://github.com/lagarcess/argus/issues/605",
+  "expected_local_feedback_email_failure_count": 1,
+  "research_http_500_count": 1,
+  "new_p0_p1_found": false
+}
