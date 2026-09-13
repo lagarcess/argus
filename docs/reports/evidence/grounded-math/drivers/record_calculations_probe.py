@@ -1,10 +1,10 @@
-"""Record one real scenario retrieval through the repository's own client, so
-the input-retrieval contract is frozen the way the other retrieval recordings
-are (tests/research/test_retrieval_contract_probe.py). The request is byte for
-byte what production sends for a scenario question on the balanced
-configuration: the instructions that ask the answer for its calculation with
-every input's source. Paid.
-Usage: GM_TREE=<repo> [GM_ENV_FILE=<.env>] python record_scenario_probe.py <out.json>"""
+"""Record one real typed research answer under the calculations schema through
+the repository's own client, so the schema that carries one calculation per
+option the reader weighs is frozen by a recording the way the other retrieval
+texts are (tests/research/test_retrieval_contract_probe.py). The request is byte
+for byte what production sends for a concept question on the balanced
+configuration. Paid.
+Usage: GM_TREE=<repo> [GM_ENV_FILE=<.env>] python record_calculations_probe.py <out.json>"""
 from __future__ import annotations
 
 import json
@@ -56,23 +56,20 @@ class RecordingHTTPTransport(httpx.HTTPTransport):
         return response
 
 
-question = os.environ.get("GM_QUESTION", "what will $10,000 in NVDA be worth in ten years?")
-prompt = _research_prompt(
-    message=question,
-    subjects=[{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
-    period="ten years",
-    language="en",
-    question_kind=None,
-    publisher_sources_required=True,
-    scenario=True,
+question = os.environ.get(
+    "GM_QUESTION",
+    "Is 20,000 dollars better kept for a year in a 12-month CD at 4.1% or in a savings account at 3.8%?",
 )
-spec = retrieval_spec("balanced", question_kind="company_lookup", language_tag="en", country=None, scenario=True)
+prompt = _research_prompt(
+    message=question, subjects=[], period=None, language="en", question_kind="concept"
+)
+spec = retrieval_spec("balanced", question_kind="concept", language_tag="en", country=None)
 transport = RecordingHTTPTransport()
 client = PerplexityAgentClient(os.environ["PERPLEXITY_API_KEY"], transport=transport)
 started = time.monotonic()
 record: dict[str, Any] = {
-    "probe": "scenario_inputs_balanced",
-    "purpose": "any grounded math: the answer returns its calculation with every input source, balanced configuration",
+    "probe": "typed_answer_calculations_options",
+    "purpose": "any grounded math: one calculation per option under the calculations schema, balanced configuration",
     "candidate_sha": subprocess.check_output(["git", "-C", str(TREE), "rev-parse", "HEAD"], text=True).strip(),
     "captured_at": datetime.now(timezone.utc).isoformat(),
     "question": question,
@@ -88,5 +85,5 @@ record["elapsed_s"] = round(time.monotonic() - started, 2)
 record["exchanges"] = transport.exchanges
 Path(sys.argv[1]).write_text(json.dumps(record, indent=2, ensure_ascii=False, default=str) + "\n")
 packet = record.get("packet") or {}
-print(json.dumps({"elapsed_s": record["elapsed_s"], "error": record["error"], "calculations": packet.get("calculations"), "usage": packet.get("usage")}, indent=1, default=str))
+print(json.dumps({"elapsed_s": record["elapsed_s"], "error": record["error"], "calculations": packet.get("calculations"), "source_urls": packet.get("source_urls"), "usage": packet.get("usage")}, indent=1, default=str))
 print((packet.get("answer_markdown") or "")[:1500])

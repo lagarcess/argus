@@ -25,6 +25,22 @@ const COPY = {
   "es-419": { addDecision: "Agregar decisión", watching: "Observando", save: "Guardar decisión", run: "Ejecutar backtest", ask: "fondo para un viaje a zanzíbar ahorrando 300 cada mes" },
 };
 const report = [];
+// What each step should show; the report pairs it with the screenshots and the result.
+const EXPECT = {
+  answers: "Each recorded smoke answer renders in the conversation language: its prose, sources, calculation cards closed then opened, the assumptions line where one was stored, and one next-steps list. Q7 shows a card per option; Q10 explains the risk and stays at the boundary.",
+  backtest: "The recorded Q9 buy-and-hold setup still runs when Run backtest is pressed, and the result replaces the button.",
+  recompute: "Editing the first input of a computed answer recomputes its card through the API (HTTP 200) and the card shows the new result.",
+  decision: "A watching decision saves on a computed answer; after an input change, reopening it shows the stored and current reruns, and restoring the stored input shows it up to date.",
+  "decision-cannot-rerun": "A decision whose stored inputs no longer run opens and says it cannot rerun, with no error.",
+  outage: "A provider outage card shows the retryable tone.",
+  "failed-lookup": "A failed lookup answers from market data and stated assumptions, and no card with blank inputs renders.",
+  "no-solution": "A calculation with no solution shows its repair, and taking the repair recomputes the card.",
+  rail: "At 1280 the activity rail shows a result tick with its label; below tablet width the rail is hidden.",
+  "search-dossier": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+  "compare-continue": "Compare offers another computed answer of the same kind and shows the differences; Continue opens a new chat carrying the result.",
+  receipt: "A shared calculation opens signed out as a public receipt showing the card and its sources.",
+  "ask-argus": "Typing a money question into Search offers the Ask Argus row.",
+};
 const receipts = {};
 
 async function api(path, init = {}) {
@@ -114,6 +130,8 @@ async function scene(name, run) {
         try { entry.failure_shot = (await shot(tab, `${name}-failed`, width, language)).screenshot; } catch {}
       }
       entry.page_errors = errors;
+      entry.expected = EXPECT[name];
+      entry.pass = Boolean(entry.ok) && errors.length === 0 && (entry.status === undefined || entry.status === 200) && entry.blank_inputs_shown !== true;
       report.push(entry);
       console.log(JSON.stringify(entry));
       await context.close();
@@ -294,12 +312,28 @@ await scene("ask-argus", async ({ tab, width, language, copy }) => {
   await tab.keyboard.type(copy.ask);
   await tab.waitForSelector("[data-ask-argus-row]", { timeout: 20000 });
   const row = await shot(tab, "ask-argus-row", width, language, {}, false);
-  if (width !== 1280) return row;
+  // Sending is a paid turn, so the row is shown and sent only when asked.
+  if (width !== 1280 || process.env.GM_ASK_SEND !== "1") return row;
   await tab.keyboard.press("Enter");
   await tab.waitForTimeout(60000);
   return { ...row, sent: (await shot(tab, "ask-argus-sent", width, language)).screenshot };
 });
 
 await browser.close();
-writeFileSync(`${OUT}/${process.env.GM_REPORT || "walk-report.json"}`, JSON.stringify(report, null, 2) + "\n");
-console.log(`scenes ${report.length}, failed ${report.filter((entry) => !entry.ok).length}`);
+const reportName = process.env.GM_REPORT || "walk-report.json";
+writeFileSync(`${OUT}/${reportName}`, JSON.stringify(report, null, 2) + "\n");
+const table = [
+  "# Browser walk",
+  "",
+  `Head ${process.env.GM_HEAD || "unknown"}. Each step at 1280 and 390 CSS pixels, in English and Spanish.`,
+  "",
+  "| Step | Language | Width | Screenshots | What it should show | Result | Notes |",
+  "| --- | --- | --- | --- | --- | --- | --- |",
+];
+for (const entry of report) {
+  const files = [entry.screenshot, entry.up_to_date, entry.repaired, entry.continued, entry.sent, entry.failure_shot, ...(entry.shots || [])].filter(Boolean);
+  const notes = [entry.error, ...(entry.page_errors || [])].filter(Boolean).join("; ").replace(/\|/g, "/").replace(/\s+/g, " ").slice(0, 300);
+  table.push(`| ${entry.scene} | ${entry.language} | ${entry.width} | ${files.map((file) => `[${file}](${file})`).join(", ")} | ${entry.expected || ""} | ${entry.pass ? "pass" : "fail"} | ${notes} |`);
+}
+writeFileSync(`${OUT}/${reportName.replace(/\.json$/, ".md")}`, table.join("\n") + "\n");
+console.log(`steps ${report.length}, failed ${report.filter((entry) => !entry.pass).length}`);

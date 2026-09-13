@@ -6,8 +6,10 @@ Provider keys come from GM_ENV_FILE, which is only read. Scenes a live turn
 cannot produce on demand are seeded from real code, never hand-written JSON:
 a long transcript for the conversation rail, a provider outage card, a
 decision whose stored inputs no longer run, and a withheld retrieval with its
-inputs typeable. Their ids are written to GM_SEED_OUT. API on 8620; the web
-dev server runs on 3620.
+inputs typeable. Their ids are written to GM_SEED_OUT. With GM_RESTORE_TURNS,
+the recorded smoke conversations in that folder are restored as they were
+stored (drivers/restore_turns.py), since a restart empties the memory store.
+API on 8620; the web dev server runs on 3620.
 """
 
 from __future__ import annotations
@@ -105,6 +107,14 @@ def _seed() -> None:
     owner = httpx.get(f"{base}/me", timeout=5).json()["user"]["id"]
     catalog = get_tool_catalog()
     seeds: dict[str, dict[str, str]] = {}
+    if os.environ.get("GM_RESTORE_TURNS"):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from restore_turns import restore_recorded_turns
+
+        seeds["restored"] = restore_recorded_turns(
+            Path(os.environ["GM_RESTORE_TURNS"]), owner=owner
+        )
+        print("restored", len(seeds["restored"]), flush=True)
 
     def conversation(title: str, language: str) -> str:
         return memory_conversation(
