@@ -1209,9 +1209,9 @@ async def chat_stream(
                     or typed_artifact_answer
                     or lifecycle_hooks.turn_id is not None
                 ):
-                    retryable_recovery_code = chat_retry.discovery_recovery_code(recovery)
+                    retryable_recovery_code = chat_retry.durable_retry_code(recovery)
                     if retryable_recovery_code is not None:
-                        # Retryable discovery recovery: the lifecycle owns the
+                        # A retryable lookup recovery: the lifecycle owns the
                         # durable retry; completed turns strip it by design.
                         assistant_message = lifecycle_hooks.recoverable_failure(
                             content=persisted_text or "",

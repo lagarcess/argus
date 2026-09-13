@@ -333,8 +333,14 @@ def _append_ledger_row(
                 if key in usage
             },
             **({"tool_call_id": tool_call_id} if tool_call_id is not None else {}),
+            # A provider failure's HTTP status rides beside its degraded code,
+            # so outages can be counted by kind.
             **(
-                {"degraded_code": degraded.get("code")}
+                {
+                    f"degraded_{key}": degraded[key]
+                    for key in ("code", "status")
+                    if degraded.get(key) is not None
+                }
                 if isinstance(degraded, dict) and degraded.get("code")
                 else {}
             ),

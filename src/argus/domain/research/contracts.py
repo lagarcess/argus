@@ -154,6 +154,8 @@ def _strict_schema(node: Any, definitions: dict[str, Any]) -> Any:
 class ResearchUnavailableError(Exception):
     """Raised when the research provider cannot serve a request.
 
+    ``status`` is the HTTP status of a response the provider refused, and
+    ``retry_after_seconds`` the wait that response asked for, when it gave one.
     ``usage`` carries the invoice of a response that was read far enough to
     establish one before being rejected. Argus paid for that response, so the
     turn that discards it still records its spend.
@@ -164,12 +166,26 @@ class ResearchUnavailableError(Exception):
         reason: str,
         detail: str | None = None,
         *,
+        status: int | None = None,
+        retry_after_seconds: float | None = None,
         usage: ResearchUsage | None = None,
     ) -> None:
         super().__init__(reason)
         self.reason = reason
         self.detail = detail
+        self.status = status
+        self.retry_after_seconds = retry_after_seconds
         self.usage = usage
+
+    @property
+    def transient(self) -> bool:
+        """Whether the same request can succeed when asked again: the provider
+        failed on its side (5xx), rate limited it (429), or was too slow or
+        unreachable. A request it refused, a missing key and an answer that
+        could not be read fail the same way every time."""
+        if self.status is not None:
+            return self.status == 429 or self.status >= 500
+        return self.reason in ("timeout", "transport")
 
 
 class ResearchPricingError(Exception):

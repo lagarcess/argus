@@ -632,7 +632,10 @@ def test_a_broken_typed_answer_never_reaches_the_reader(monkeypatch) -> None:
     sidecar = result.stage_patch["research"]
     assert sidecar["degraded"] == {"code": "research_unavailable_malformed_response"}
     answer = result.stage_patch["assistant_response"]
-    assert answer.startswith("I couldn't complete the data lookup")
+    assert result.stage_patch["recovery"] == {
+        "code": "research_lookup_unavailable",
+        "retryable": False,
+    }
     assert "200" not in answer and "answer_markdown" not in answer
     assert sidecar["rows"] == [] and sidecar["sources"] == []
 

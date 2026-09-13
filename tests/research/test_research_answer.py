@@ -512,12 +512,11 @@ def test_provider_failure_degrades_without_fabricating(monkeypatch) -> None:
     result = _run("What is Apple at?")
 
     assert result is not None
-    text = result.stage_patch["assistant_response"]
-    assert "won't quote live figures" in text
-    assert (
-        result.stage_patch["research"]["degraded"]["code"]
-        == "research_unavailable_timeout"
-    )
+    patch = result.stage_patch
+    # A timeout is transient: the turn offers the retry, never figures or rows.
+    assert patch["recovery"] == {"code": "research_lookup_failed", "retryable": True}
+    assert "next_experiments" not in patch
+    assert patch["research"]["degraded"]["code"] == "research_unavailable_timeout"
 
 
 def test_concept_and_none_fall_through(monkeypatch) -> None:

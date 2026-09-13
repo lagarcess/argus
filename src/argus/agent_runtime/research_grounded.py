@@ -34,6 +34,11 @@ from loguru import logger
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
+from argus.agent_runtime.recovery_messages import (
+    RecoveryMessageCode,
+    recovery_message,
+    recovery_state_stage_patch,
+)
 from argus.agent_runtime.research_rows import (
     honest_no_next_line,
     research_next_experiment_rows,
@@ -269,14 +274,13 @@ async def grounded_result(
     else:
         client = _client()
         if client is None:
-            return unavailable_result(
+            return lookup_failure_result(
+                failure=ResearchUnavailableError("not_configured"),
                 query=query,
                 subjects=subjects,
                 interpretation=interpretation,
-                state=state,
                 user=user,
                 decision=decision,
-                reason="not_configured",
                 shape=shape,
                 survey=survey,
             )
@@ -301,16 +305,16 @@ async def grounded_result(
             # detail must live in the message itself to be diagnosable.
             logger.warning(
                 "Research provider unavailable"
-                f" reason={exc.reason} detail={exc.detail or ''} shape={shape}",
+                f" reason={exc.reason} status={exc.status} transient={exc.transient}"
+                f" detail={exc.detail or ''} shape={shape}",
             )
-            return unavailable_result(
+            return lookup_failure_result(
+                failure=exc,
                 query=query,
                 subjects=subjects,
                 interpretation=interpretation,
-                state=state,
                 user=user,
                 decision=decision,
-                reason=exc.reason,
                 usage=spend.total,
                 shape=shape,
                 survey=survey,
@@ -781,51 +785,105 @@ async def exhausted_result(
     )
 
 
-def unavailable_result(
+def lookup_failure_result(
     *,
+    failure: ResearchUnavailableError,
     query: ResearchQueryExtraction,
     subjects: list[dict[str, str]],
     interpretation: StructuredInterpretation,
-    state: RunState,
     user: UserState,
-    reason: str,
     shape: QuestionShape,
     survey: bool,
     decision: InterpretDecision | None = None,
     usage: ResearchUsage | None = None,
-) -> StageResult | None:
-    """The honest note when no packet survived.
+) -> StageResult:
+    """The turn a lookup that produced no packet ends on.
 
-    ``usage`` is the spend of the responses the turn read and rejected. There
-    is no packet to compose from, so the note's own carries it instead: a turn
-    that reached the provider is a miss that cost what it cost, and only a
-    turn that never called one bypasses the meter."""
-    del state
-    language = language_tag(user.language_preference)
-    # No reason reaching here has a note of its own: a claim withheld for want
-    # of a publisher has a real packet and composes through _packet_stage_result.
-    note = _unavailable_note(language)
-    rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
-    if not rows and subjects:
-        note = f"{note}\n\n{honest_no_next_line(language)}"
-    packet = ResearchPacket(
-        answer_markdown=note, usage=usage if usage is not None else ResearchUsage()
+    ``usage`` is the spend of the responses the turn read and rejected."""
+    capability_class = capability_class_for_shape(shape, screening=survey)
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=carried_decision(
+            decision,
+            interpretation=interpretation,
+            user=user,
+            reason_code=f"research_answer_{capability_class}",
+        ),
+        stage_patch=lookup_failure_patch(
+            failure,
+            capability_class=capability_class,
+            shape=shape,
+            subjects=subjects,
+            period_of_interest=query.period_of_interest,
+            usage=usage,
+        ),
     )
-    return research_stage_result(
-        answer=note,
-        interpretation=interpretation,
-        user=user,
-        capability_class=capability_class_for_shape(shape, screening=survey),
-        shape=shape,
-        packet=packet,
-        peers=[],
-        rows=rows,
-        subjects=subjects,
-        cache_status="bypass" if usage is None else "miss",
-        degraded_code=f"research_unavailable_{reason}",
-        period_of_interest=query.period_of_interest,
-        decision=decision,
+
+
+def research_lookup_failure_for_job(
+    job_request: dict[str, Any], *, failure: ResearchUnavailableError
+) -> dict[str, Any]:
+    """The same ending for a thorough request whose run never started."""
+    return lookup_failure_patch(
+        failure,
+        capability_class=str(job_request.get("capability_class") or "thorough_research"),
+        shape="thorough",
+        subjects=[
+            subject
+            for subject in job_request.get("subjects") or []
+            if isinstance(subject, dict) and subject.get("symbol")
+        ],
+        period_of_interest=(
+            str(job_request["period_of_interest"])
+            if job_request.get("period_of_interest")
+            else None
+        ),
+        usage=failure.usage,
     )
+
+
+def lookup_failure_patch(
+    failure: ResearchUnavailableError,
+    *,
+    capability_class: str,
+    shape: str,
+    subjects: list[dict[str, str]],
+    period_of_interest: str | None,
+    usage: ResearchUsage | None,
+) -> dict[str, Any]:
+    """A failed lookup ends on a recovery, never an answer or next experiments.
+
+    A transient failure takes the retryable recovery, which the API settles
+    with a durable retry of the same question as it does for discovery; any
+    other reason takes the quiet one, with nothing to retry. The sidecar keeps
+    the degraded code, the status the provider answered with and what the
+    rejected responses cost: a turn that reached the provider is a miss, and
+    only one that never called it bypasses the meter."""
+    code: RecoveryMessageCode = (
+        "research_lookup_failed" if failure.transient else "research_lookup_unavailable"
+    )
+    spent = usage if usage is not None else ResearchUsage()
+    return {
+        "assistant_response": recovery_message(code, retryable=failure.transient),
+        **recovery_state_stage_patch(code, retryable=failure.transient),
+        "research": build_research_sidecar(
+            capability_class=capability_class,
+            shape=shape,
+            sources=[],
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            subjects=subjects,
+            peers=[],
+            usage={
+                "invocations": spent.invocations,
+                "latency_ms": spent.latency_ms,
+                "cost_usd": spent.cost_usd,
+                "cache_status": "bypass" if usage is None else "miss",
+            },
+            period_of_interest=period_of_interest,
+            degraded_code=f"research_unavailable_{failure.reason}",
+            degraded_status=failure.status,
+        ),
+    }
 
 
 def shape_for_kind(kind: str) -> QuestionShape:
@@ -1353,19 +1411,6 @@ def _survey_recovery_note(
     }.get(kind, "I found sources, but could not extract the requested assets.")
 
 
-def _unavailable_note(language: str) -> str:
-    if language == "es-419":
-        return (
-            "No pude completar la búsqueda de datos en este momento, así que "
-            "no voy a citar cifras en vivo. Probar una idea con datos "
-            "históricos sigue disponible."
-        )
-    return (
-        "I couldn't complete the data lookup just now, so I won't quote live "
-        "figures. Testing an idea against historical data is still available."
-    )
-
-
 def _missing_public_source_note(language: str) -> str:
     if language == "es-419":
         return (
@@ -1829,9 +1874,13 @@ def build_research_sidecar(
     period_of_interest: str | None,
     category: str | None = None,
     degraded_code: str | None = None,
+    degraded_status: int | None = None,
     retrieved_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Build the only supported research sidecar shape."""
+    """Build the only supported research sidecar shape.
+
+    ``degraded_status`` is the HTTP status a failed provider answered with,
+    kept beside the degraded code so outages can be counted by kind."""
     sidecar: dict[str, Any] = {
         "schema_version": RESEARCH_SCHEMA_VERSION,
         "capability_class": capability_class,
@@ -1854,6 +1903,8 @@ def build_research_sidecar(
     }
     if degraded_code:
         sidecar["degraded"] = {"code": degraded_code}
+        if degraded_status is not None:
+            sidecar["degraded"]["status"] = degraded_status
     assert set(sidecar) <= RESEARCH_SIDECAR_KEYS, "undocumented research sidecar key"
     return sidecar
 

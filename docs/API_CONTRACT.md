@@ -4124,10 +4124,43 @@ Contract rules:
   stamps `metadata.research_ledger_contract = "argus_research_ledger/v2"`.
   Unversioned historical rows retain their original values; they are not
   correctly scored successes. `degraded_code`, `cache_status`, and
-  `pricing_status` keep their existing meanings. Legacy discovery rows
+  `pricing_status` keep their existing meanings, and `degraded_status` carries
+  the sidecar's `degraded.status` when there is one. Legacy discovery rows
   (`feature_area = "discovery"`) retain status derived from `fallback_code`;
   other sources retain their existing status contract. This is ledger-only:
   no provider-read channel, sidecar field, reader projection, or backfill.
+- **A research provider failure reuses the retryable recovery** (#609). The
+  research client types every failure: HTTP 5xx, HTTP 429, a timeout and a
+  lost connection are transient; any other 4xx, a missing or rejected key
+  (`not_configured`, including HTTP 401 and 403) and an answer that cannot be
+  read are not. The HTTP status travels as a typed field, never only inside a
+  log line. After a transient failure the client asks again, at most three
+  attempts in all, waiting what the response's `Retry-After` asks (seconds or
+  an HTTP date) or else a backoff that doubles from one second. Every attempt
+  shares the call's own timeout as one deadline, and a retry starts only while
+  at least half of it is left, so a retried call ends no later than one that
+  was never retried. A background poll is not retried by the client; the
+  poller already asks again until its own deadline. A call claims research
+  capacity once, however many attempts it takes.
+- When no attempt answers, the turn publishes no answer, no rows and no
+  `next_experiments`. A transient failure carries
+  `recovery = {"code": "research_lookup_failed", "retryable": true}` and
+  finalizes its chat turn as `recoverable_failed` with a durable
+  `retry_last_turn` anchored to the persisted user request, the same
+  settlement a retryable discovery recovery takes; the live final frame
+  carries the message-shaped retry. Clients render the amber retryable notice,
+  and Retry sends the persisted question again. Any other failure carries
+  `recovery = {"code": "research_lookup_unavailable", "retryable": false}`,
+  completes its turn with nothing to retry, and renders as the quiet failure
+  notice. A thorough request whose background submission fails ends on the
+  same recovery. The persisted `content` is English compatibility text;
+  clients render localized copy from the code.
+- That turn's `research` sidecar keeps `degraded.code =
+  "research_unavailable_<reason>"`, where the reason is `http_error`,
+  `timeout`, `transport`, `not_configured`, `malformed_response` or
+  `empty_answer`, and adds `degraded.status` with the HTTP status whenever the
+  provider answered with an error. Both reach the cost ledger, so research
+  outages can be counted by kind.
 - Retrieval evidence is independent of the invoice. The provider's returned
   output is the retrieval record: finance and web result items and the
   citations they carry. Survey grounding and the single survey retry read

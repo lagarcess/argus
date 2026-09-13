@@ -41,6 +41,8 @@ RecoveryMessageCode = Literal[
     "discovery_limit_reached",
     "discovery_target_missing",
     "discovery_suggestions_unavailable",
+    "research_lookup_failed",
+    "research_lookup_unavailable",
 ]
 
 
@@ -207,7 +209,24 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "Tell me what to look for: a category like cybersecurity stocks, or a "
         "company to find peers of, and I can bring back verified candidates."
     ),
+    "research_lookup_failed": (
+        "I couldn't finish looking that up just now, so I won't answer from "
+        "memory. Try again in a moment."
+    ),
+    "research_lookup_unavailable": (
+        "I can't look that up right now, so I won't answer from memory."
+    ),
 }
+
+# The retryable recoveries whose turn settles recoverable_failed with a durable
+# retry of the request; every other recovery keeps completed-turn settlement.
+DURABLE_RETRY_RECOVERY_CODES: frozenset[RecoveryMessageCode] = frozenset(
+    {
+        "discovery_search_failed",
+        "discovery_suggestions_unavailable",
+        "research_lookup_failed",
+    }
+)
 
 
 class RecoveryText(str):

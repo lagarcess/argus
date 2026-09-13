@@ -1,6 +1,8 @@
 """Perplexity Agent API client for finance_search research.
 
-One HTTP boundary with an injectable transport so tests stay hermetic. The
+One HTTP boundary with an injectable transport so tests stay hermetic. A
+transient failure (5xx, 429, a timeout, a lost connection) is asked again at
+that boundary, a bounded number of times inside the call's own deadline. The
 parser is deterministic: it walks the typed ``output`` items the Agent API
 documents, never user language. Provider identity is scrubbed at parse time
 because route receipts and the cost ledger own provenance, not prose.
@@ -20,7 +22,9 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -113,9 +117,14 @@ class PerplexityAgentClient:
         api_key: str,
         *,
         transport: httpx.BaseTransport | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._api_key = api_key.strip()
         self._transport = transport
+        # A retry's deadline and its wait read these, so a test can script time.
+        self._clock = clock
+        self._sleep = sleep
         self._reported_unpriced_ids: set[str] = set()
 
     def run_structured(
@@ -304,9 +313,38 @@ class PerplexityAgentClient:
         return body
 
     def _post(self, payload: dict[str, Any], *, timeout_seconds: float) -> dict[str, Any]:
-        return self._send("POST", PERPLEXITY_AGENT_URL, payload, timeout_seconds)
+        """One request, asked again after a transient failure.
+
+        Every attempt shares the call's ceiling as one deadline, so a retried
+        call returns no later than one that was never retried."""
+        deadline = self._clock() + timeout_seconds
+        remaining = timeout_seconds
+        attempt = 1
+        while True:
+            try:
+                return self._send("POST", PERPLEXITY_AGENT_URL, payload, remaining)
+            except ResearchUnavailableError as exc:
+                delay = _retry_delay(
+                    exc,
+                    attempt=attempt,
+                    remaining=deadline - self._clock(),
+                    ceiling=timeout_seconds,
+                )
+                if delay is None:
+                    raise
+                # The deployed log sink drops structured extras, so what a count
+                # of retries needs is in the message.
+                logger.warning(
+                    "Research provider retried"
+                    f" reason={exc.reason} status={exc.status} attempt={attempt}"
+                    f" delay_seconds={delay:g}"
+                )
+                self._sleep(delay)
+                remaining = deadline - self._clock()
+                attempt += 1
 
     def _get(self, url: str, *, timeout_seconds: float) -> dict[str, Any]:
+        # Not retried here: the poller asks again until its own deadline.
         return self._send("GET", url, None, timeout_seconds)
 
     def _send(
@@ -331,16 +369,21 @@ class PerplexityAgentClient:
             raise ResearchUnavailableError("timeout", str(exc)) from exc
         except httpx.HTTPError as exc:
             raise ResearchUnavailableError("transport", str(exc)) from exc
-        if response.status_code in (401, 403):
-            raise ResearchUnavailableError(
-                "not_configured", f"http {response.status_code}"
-            )
         if response.status_code >= 400:
+            # The deployed log sink drops structured extras; the status rides
+            # in the message.
             logger.warning(
-                "Research provider returned an error status",
-                status=response.status_code,
+                "Research provider returned an error status"
+                f" status={response.status_code}"
             )
-            raise ResearchUnavailableError("http_error", f"http {response.status_code}")
+            raise ResearchUnavailableError(
+                "not_configured" if response.status_code in (401, 403) else "http_error",
+                f"http {response.status_code}",
+                status=response.status_code,
+                retry_after_seconds=_retry_after_seconds(
+                    response.headers.get("retry-after")
+                ),
+            )
         try:
             document = response.json()
         except ValueError as exc:
@@ -348,6 +391,48 @@ class PerplexityAgentClient:
         if not isinstance(document, dict):
             raise ResearchUnavailableError("malformed_response", "non-object body")
         return document
+
+
+# A transient failure is asked at most this many times in all. Each wait
+# doubles from the first backoff unless the provider names its own.
+_MAX_ATTEMPTS = 3
+_FIRST_BACKOFF_SECONDS = 1.0
+
+
+def _retry_delay(
+    failure: ResearchUnavailableError,
+    *,
+    attempt: int,
+    remaining: float,
+    ceiling: float,
+) -> float | None:
+    """How long to wait before asking again, or None when not to ask again.
+
+    A failure that is not transient fails the same way again, and a retry
+    starts only while at least half the call's ceiling is left to answer in."""
+    if not failure.transient or attempt >= _MAX_ATTEMPTS:
+        return None
+    delay = (
+        failure.retry_after_seconds
+        if failure.retry_after_seconds is not None
+        else _FIRST_BACKOFF_SECONDS * 2 ** (attempt - 1)
+    )
+    return delay if remaining - delay >= ceiling / 2 else None
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    """The wait a response asks for, in either Retry-After form: whole seconds
+    or an HTTP date. Anything else is no instruction, and the backoff applies."""
+    text = (value or "").strip()
+    if text.isascii() and text.isdigit():
+        return float(text)
+    try:
+        when = parsedate_to_datetime(text)
+    except (TypeError, ValueError):
+        return None
+    if when.tzinfo is None:
+        return None
+    return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
 
 
 def _packet_from_response(

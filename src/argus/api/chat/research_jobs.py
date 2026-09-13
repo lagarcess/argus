@@ -87,8 +87,9 @@ def apply_research_job_request(
     """Consume a typed research job request from the runtime result.
 
     Returns the public job payload for the background path. The synchronous
-    dev fallback and the failure note mutate ``runtime_result`` in place so
-    the stream and metadata carry the finalized artifacts, and return None.
+    dev fallback, a lookup that failed and the failure note mutate
+    ``runtime_result`` in place so the stream and metadata carry the finalized
+    artifacts, and return None.
     """
     from argus.agent_runtime.research_answer import (
         compose_completed_research,
@@ -96,6 +97,7 @@ def apply_research_job_request(
         research_failure_note,
         store_research_packet_for_job,
     )
+    from argus.agent_runtime.research_grounded import research_lookup_failure_for_job
 
     job_request = runtime_result.pop("research_job_request", None)
     if not isinstance(job_request, dict):
@@ -123,6 +125,14 @@ def apply_research_job_request(
         runtime_result["assistant_response"] = composed["answer"]
         runtime_result["research"] = composed["research"]
         _attach_completed_tool_card(runtime_result, job_request)
+        return None
+    except ResearchUnavailableError as exc:
+        # No run started: the turn ends on the lookup recovery the inline path
+        # takes, retryable when the failure is.
+        runtime_result.update(research_lookup_failure_for_job(job_request, failure=exc))
+        _attach_completed_tool_card(
+            runtime_result, job_request, failure_code="research_failed"
+        )
         return None
     if job is not None:
         return job
@@ -166,7 +176,8 @@ def start_research_job(
 
     Returns ``(public_job_payload, None)`` on the background path,
     ``(None, packet)`` for the synchronous dev fallback, and ``(None, None)``
-    when the provider is unavailable.
+    when the job row could not be written. A provider that cannot take the run
+    raises ``ResearchUnavailableError``.
     """
     from argus.agent_runtime.research_answer import (
         research_prompt_for_job,
@@ -175,7 +186,7 @@ def start_research_job(
 
     client = _client()
     if client is None:
-        return None, None
+        raise ResearchUnavailableError("not_configured")
     spec = retrieval_spec_for_job(job_request)
     prompt = research_prompt_for_job(job_request)
     if api_state.supabase_gateway is None:
@@ -190,9 +201,9 @@ def start_research_job(
         except ResearchUnavailableError as exc:
             logger.warning(
                 "Synchronous thorough research failed"
-                f" reason={exc.reason} detail={exc.detail or ''}"
+                f" reason={exc.reason} status={exc.status} detail={exc.detail or ''}"
             )
-            return None, None
+            raise
         return None, packet
     idempotency_key = _research_job_identity(job_request, request_message_id)
     replay = _replayed_research_job(
@@ -214,9 +225,9 @@ def start_research_job(
     except ResearchUnavailableError as exc:
         logger.warning(
             "Research background submission failed"
-            f" reason={exc.reason} detail={exc.detail or ''}"
+            f" reason={exc.reason} status={exc.status} detail={exc.detail or ''}"
         )
-        return None, None
+        raise
     launch_payload = {
         "schema_version": "research_job_launch/v1",
         "research_request": job_request,

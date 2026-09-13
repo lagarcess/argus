@@ -162,7 +162,12 @@ class RecordingTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         if not self.documents:
-            return httpx.Response(500, json={"error": "exhausted"})
+            # An exhausted script is an outage that asks for a wait longer than
+            # any call's deadline, so the client fails at once instead of
+            # retrying on a real clock.
+            return httpx.Response(
+                500, headers={"Retry-After": "86400"}, json={"error": "exhausted"}
+            )
         document = self.documents.pop(0)
         return httpx.Response(200, json=document)
 
