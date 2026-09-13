@@ -736,18 +736,24 @@ All ten paired rounds of `messy_spanish_future_performance_nvda_cruce_dorado` co
 
 These are each build's native full-case expectations: deployed expects the future-performance limitation, while candidate expects sourced scenarios. Inputs are identical; expectations and prose rubrics remain those committed on each build. Neither the differing expectations nor safe refusals erase a native failure.
 
-| Pair | Deployed | Candidate | Candidate prose judge | Research HTTP error status |
-| --- | --- | --- | --- | --- |
-| 1 | PASS | FAIL: research timeout; no HTTP response | FAIL | No response |
-| 2 | PASS | FAIL: cited scenario inputs absent; answer withheld | PASS | None captured |
-| 3 | PASS | FAIL: research timeout; no HTTP response | PASS | No response |
-| 4 | PASS | PASS: research published | PASS | None captured |
-| 5 | PASS | FAIL: research timeout; no HTTP response | PASS | No response |
-| 6 | PASS | PASS: research published | PASS | None captured |
-| 7 | PASS | FAIL: future-performance limitation instead of research | FAIL | None captured |
-| 8 | PASS | PASS: research published | PASS | None captured |
-| 9 | PASS | PASS: research published | PASS | None captured |
-| 10 | PASS | PASS: research published | PASS | None captured |
+| Pair | Deployed native result | Deployed prose judge | Candidate native result | Candidate prose judge | Candidate research HTTP error status |
+| --- | --- | --- | --- | --- | --- |
+| 1 | PASS | PASS | FAIL: research timeout; no HTTP response | FAIL | No response |
+| 2 | PASS | PASS | FAIL: cited scenario inputs absent; answer withheld | PASS | None captured |
+| 3 | PASS | PASS | FAIL: research timeout; no HTTP response | PASS | No response |
+| 4 | PASS | FAIL: empty criteria and notes | PASS: research published | PASS | None captured |
+| 5 | PASS | PASS | FAIL: research timeout; no HTTP response | PASS | No response |
+| 6 | PASS | PASS | PASS: research published | PASS | None captured |
+| 7 | PASS | PASS | FAIL: future-performance limitation instead of research | FAIL | None captured |
+| 8 | PASS | PASS | PASS: research published | PASS | None captured |
+| 9 | PASS | PASS | PASS: research published | PASS | None captured |
+| 10 | PASS | PASS | PASS: research published | PASS | None captured |
+
+Deployed attempt 4 has a negative, unexplained judge result: `pass=false`, `failed_criteria=[]`, and empty notes. The deployed harness extends `failed_checks` only from the criteria list; the empty list adds no failure, so `_result_status` returns `passed` and the driver retains `measurement.failed=false`. The candidate harness already adds `prose_judge:failed_without_criteria` for that condition. This source difference explains the native counting inconsistency; it does not establish why the judge returned false or make that judge result pass. The native records and deployed 0/10 versus candidate 5/10 native failure rates remain unchanged.
+
+For the founder's full-path comparison, raw negative judge results are deployed 1/10 and candidate 2/10. Counting an attempt when either its native measurement failed or its recorded judge returned false gives deployed 1/10 and candidate 5/10. These are supplemental counts derived from the existing records, not reruns or replacements for native results; the builds still have different committed expectations and rubrics. The confirmed P2 review finding was an omission in the manifest, corrected here without changing product code, the validator, or any scorecard. Source and all 20 judge results: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/targeted-ab-judge-disclosure.json`.
+
+The disclosure correction passed the unchanged release-document/evidence checks: 24 tests in 7.67 seconds, recorded in `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/release-docs-judge-disclosure.log`. Offline verification again confirmed all 20 native hashes, unchanged product files, cumulative cost and the absence of secrets. No paid measurement was repeated.
 
 - Attempts 1, 3 and 5 timed out without an HTTP response. They count as failures; no HTTP status is invented.
 - Attempt 2 retrieved five sources but no cited scenario-input row. The intended `scenario_inputs_uncited` guard withheld the calculation and explained why; its prose judge passed. This is a source-grounding refusal, not an HTTP error or a fabricated numerical answer.
