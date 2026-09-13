@@ -2,38 +2,38 @@
   "label": "q3",
   "language": "en",
   "country": "US",
-  "asked_at": "2026-09-13T01:14:15.608926+00:00",
+  "asked_at": "2026-09-13T01:41:31.035681+00:00",
   "turns": [
     {
       "message": "I owe 180,000 on the car at 14 percent, is paying extra worth it?",
       "action": null,
-      "message_id": "cc69e1d0-f53a-4e3f-bd65-c3836ef87adb",
-      "first_answer_seconds": 14.61,
-      "final_answer_seconds": 14.61,
+      "message_id": "05189b23-e9d2-48c5-9ebe-03fc1cdb5431",
+      "first_answer_seconds": 17.38,
+      "final_answer_seconds": 17.38,
       "research_job_id": null,
-      "elapsed_seconds": 14.61,
+      "elapsed_seconds": 17.38,
       "timeline": [
         {
-          "at": 0.01,
+          "at": 0.07,
           "type": "stage_start",
           "stage": "interpret"
         },
         {
-          "at": 14.61,
+          "at": 17.38,
           "type": "stage_outcome",
           "outcome": "await_user_reply"
         },
         {
-          "at": 14.61,
+          "at": 17.38,
           "type": "token"
         },
         {
-          "at": 14.61,
+          "at": 17.38,
           "type": "final"
         }
       ],
       "summary": {
-        "content": "What is the monthly payment, number of periods, and total interest for the **180000** USD loan at 14 percent?",
+        "content": "To work this out, I need a few of your own figures.",
         "tool": null,
         "status": null,
         "failure": null,
@@ -41,7 +41,7 @@
         "inputs": [],
         "currency": null,
         "computation": false,
-        "requested_field": "periods",
+        "requested_field": "payment",
         "clarification_reason": "calculation_input_missing",
         "next_steps": null,
         "next_experiments": [],
@@ -55,16 +55,33 @@
         "clarification": {
           "kind": "clarification",
           "reason_code": "calculation_input_missing",
-          "prompt_source": "llm_generated",
-          "requested_field": "periods",
+          "prompt_source": "degraded_fallback",
+          "requested_field": "payment",
           "requested_fields": [
-            "periods"
+            "payment",
+            "start_date"
+          ],
+          "missing_inputs": [
+            {
+              "name": "payment",
+              "label": {
+                "locale_key": "tools.calc.fields.payment",
+                "interpolation_args": {}
+              }
+            },
+            {
+              "name": "start_date",
+              "label": {
+                "locale_key": "tools.calc.fields.start_date",
+                "interpolation_args": {}
+              }
+            }
           ],
           "semantic_needs": [],
           "payload": {
             "calculation": {
               "kind": "time_value",
-              "solve_for": "payment",
+              "solve_for": "periods",
               "inputs": [
                 {
                   "name": "currency",
@@ -101,7 +118,7 @@
                 {
                   "name": "future_value",
                   "value": 0.0,
-                  "source": "user",
+                  "source": "assumption",
                   "source_url": null,
                   "as_of": null,
                   "currency": "USD"
@@ -148,15 +165,19 @@
                 }
               ]
             },
-            "requested_field": "periods",
+            "requested_field": "payment",
+            "requested_fields": [
+              "payment",
+              "start_date"
+            ],
             "evidence": [],
             "retrieved": []
           },
           "options": []
         },
         "agent_runtime_turn": {
-          "turn_id": "52d3ad67-68d8-4987-9d89-a9301a5b18bb",
-          "request_id": "4c8c7d25-ff94-4225-a213-d04e5f2427fe",
+          "turn_id": "ccf2ae21-66ae-4a2c-be56-e4293186c685",
+          "request_id": "80777a09-5278-4e4c-995a-f10b95f5f38f",
           "status": "completed",
           "terminal": true,
           "reconciled_outcome": null,
@@ -167,5 +188,5 @@
       }
     }
   ],
-  "conversation_id": "85f56acd-7baf-4ee5-a662-4fbfbad54938"
+  "conversation_id": "61d8789a-a654-4d4d-803e-c7587d8eb9c1"
 }

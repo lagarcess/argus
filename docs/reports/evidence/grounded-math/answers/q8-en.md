@@ -2,34 +2,48 @@
 
 **Asked:** Is my savings account actually losing money?
 
-**Seconds to first answer:** 38.71. **Seconds to final answer:** 38.71.
+**Seconds to first answer:** 47.59. **Seconds to final answer:** 47.59.
 
-**Possibly.** If your savings account’s APY is below **3.4%**, the latest US year-over-year inflation rate as of **2026-08-31**, your balance may be increasing in dollars while losing purchasing power.
+**Possibly, your balance can rise while its purchasing power falls.** If your savings account’s after-tax APY is below inflation, you are losing money in real terms; I cannot determine whether yours is because you have not provided its APY or your tax situation.
 
-### Two meanings of “losing money”
+### The current benchmark
 
-| Measure | What to check | Interpretation |
-|---|---|---|
-| Account balance | Interest credited minus account fees | A declining balance means a nominal loss. |
-| Purchasing power | APY after fees and taxes versus inflation | A return below inflation means a real loss: the money buys less even if the balance rises. |
+U.S. consumer prices rose **3.4%** over the year ended **2026-08-31**, according to data released **2026-09-11**. That is a broad national measure; your personal cost of living may differ.
 
-### The relevant comparison
+### The test
 
-The national CPI measures changes in prices paid by consumers for goods and services. It increased **3.4%** year over year in the latest release, covering the period through **2026-08-31**.
+Compare your account’s APY after tax with inflation:
 
-Compare that with the APY shown on your latest statement or account page, not merely the advertised interest rate. If your effective return is below inflation, purchasing power declined over that period; if it is above inflation, purchasing power increased. Fees and taxes on interest can lower the return you actually retain.
+**After-tax APY = APY × (one − marginal tax rate)**
 
-### Why this is not a complete diagnosis
+**Real return = (one + after-tax APY) ÷ (one + inflation) − one**
 
-Your account’s APY, balance, fees, and tax situation were not provided, so whether *your* savings is losing purchasing power cannot yet be determined. National CPI is also an average: your personal cost changes may differ because your spending mix and location differ.
+| Result | Meaning |
+|---|---|
+| Real return is positive | Purchasing power increased |
+| Real return is zero | Purchasing power was maintained |
+| Real return is negative | Purchasing power decreased |
+
+For a U.S. taxable account, bank-account interest is generally taxable federal income when it becomes available to you. State taxation depends on where you live. Fees can also reduce the effective return.
+
+### What “losing money” can mean
+
+- **Nominal loss:** Your dollar balance declines because fees exceed interest.
+- **Real loss:** Your balance grows, but prices rise faster, so the money buys less.
+- **Opportunity cost:** Another deposit account may pay more, but that is separate from whether your purchasing power is falling.
+
+Check the APY, not merely the stated interest rate, on your latest statement, then account for taxes and any fees before comparing it with inflation.
 
 ## Sources
 
 - Consumer Price Index Summary - 2026 M08 Results (www.bls.gov, 2026-09-11): https://www.bls.gov/news.release/cpi.nr0.htm
 - FDIC Federal Register Publications and Public Comments | FDIC.gov (www.fdic.gov, 2026-09-08): https://www.fdic.gov/federal-register-publications
+- FDIC Deposit Insurance Limits 2026: How Much Is Protected? (usfinnexus.com, 2026-09-11): https://usfinnexus.com/blog/fdic-deposit-insurance-limits-2026
+- FDIC: Definition, Deposit Insurance and Coverage Rules (honestcredit.org, 2026-09-10): https://honestcredit.org/dictionary/fdic/
+- FDIC Insurance - Brenham National Bank (www.bnbank.bank, 2026-09-09): https://www.bnbank.bank/rates/fdic-insurance
 
 ## Next steps
 
-- Question: What APY does your savings account currently pay?
-- Question: Would you like me to compare your APY with inflation?
-- Question: How do fees and taxes affect the result?
+- Question: Can you calculate it using my APY and tax rate?
+- Question: How do fees change my real return?
+- Question: Should I use national or local inflation for the comparison?
