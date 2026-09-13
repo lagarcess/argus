@@ -843,7 +843,9 @@ def test_a_scenario_with_the_users_amount_offers_that_amount_in_the_asset_first(
     ] == ["valuation_scenarios"]
 
 
-def test_a_background_answer_that_needs_the_users_amount_offers_the_calculation() -> None:
+def test_a_background_answer_that_needs_a_figure_the_kind_requires_offers_the_calculation() -> (
+    None
+):
     from argus.agent_runtime.calculated_answer import CALCULATION_OFFER_KEY
     from argus.domain.research.contracts import (
         ResearchPacket,
@@ -852,7 +854,14 @@ def test_a_background_answer_that_needs_the_users_amount_offers_the_calculation(
     )
 
     calculation = _scenario_calculation(cited=True)
-    calculation["inputs"][4] = {"name": "amount", "value": None, "source": "user"}
+    # Earnings per share is a figure the valuation needs; an optional invested
+    # amount left blank would keep its default and compute instead.
+    calculation["inputs"] = [
+        {"name": "per_share", "value": None, "source": "user"}
+        if item["name"] == "per_share"
+        else item
+        for item in calculation["inputs"]
+    ]
     prose = "What an investment in NVIDIA becomes depends on its earnings growth."
     packet = ResearchPacket(
         answer_markdown=prose,
@@ -871,7 +880,7 @@ def test_a_background_answer_that_needs_the_users_amount_offers_the_calculation(
     composed = grounded.compose_completed_research(job_request=job_request, packet=packet)
     assert composed["answer"] == prose
     assert composed["computed"] is None
-    assert composed[CALCULATION_OFFER_KEY]["requested_field"] == "amount"
+    assert composed[CALCULATION_OFFER_KEY]["requested_field"] == "per_share"
     assert composed[CALCULATION_OFFER_KEY]["calculation"]["kind"] == "valuation_scenarios"
     assert composed["next_steps"]["items"][0] == {
         "type": "test",
