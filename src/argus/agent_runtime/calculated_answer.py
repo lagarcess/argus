@@ -78,7 +78,7 @@ NO_SEARCH_ANSWER_GUIDANCE = (
     "term, income or horizon, is never assumed: list each one with source user "
     "and a null value, still return calculation, and write the answer as one "
     "plain question asking for all of them and nothing else: never for a figure "
-    "the calculation produces, such as total interest. Name a currency only when "
+    "the calculation produces, such as an effective annual rate. Name a currency only when "
     "the user stated one. "
     "No advice, no forecast stated as fact, no em dashes, no headings, no "
     "tables. Compose lead (required), one short sentence that answers the "
