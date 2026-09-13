@@ -1,0 +1,52 @@
+{
+  "candidate_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "scorecard_sha256": "ec7e3301fbc796c38265313a61282a882d2564bcd761e7084ffcc05c91c7792a",
+  "totals": {
+    "expected_failed": 0,
+    "failed": 3,
+    "infrastructure_error": 0,
+    "passed": 59,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "provider_usage": {
+    "reported_cost_receipt_count": 305,
+    "reported_cost_usd": 1.365784977984,
+    "route_receipt_count": 325,
+    "unreported_cost_receipt_count": 20
+  },
+  "additional_search_fees_usd": 0.025,
+  "search_fee_basis": "documented fixed per-request fee in the measured adapter, not a provider-reported invoice",
+  "comparison_status": "awaiting candidate; native failures are not a promotion verdict",
+  "nonpasses": [
+    {
+      "id": "action_chip_change_asset_bare_ticker_append_issue_190",
+      "status": "failed",
+      "failed_checks": [
+        "intent: expected 'backtest_execution', got 'conversation_followup'",
+        "assets: expected ['AAPL', 'MSFT', 'NVDA', 'TSLA'], got ['AAPL', 'MSFT', 'NVDA']",
+        "offered.launch_payload.symbols: expected ['AAPL', 'MSFT', 'NVDA', 'TSLA'], got ['AAPL', 'MSFT', 'NVDA']"
+      ],
+      "infrastructure_errors": []
+    },
+    {
+      "id": "asset_discovery_not_result_followup_issue_244",
+      "status": "failed",
+      "failed_checks": [
+        "offered.min_next_experiment_rows: expected at least 1, got []"
+      ],
+      "infrastructure_errors": []
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "status": "failed",
+      "failed_checks": [
+        "capability_verdict: expected 'executable', got 'unsupported'",
+        "capital_amount: expected 13000, got None",
+        "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply', 'needs_clarification', 'await_user_reply']",
+        "offered.launch_payload: no launch reached the turn"
+      ],
+      "infrastructure_errors": []
+    }
+  ]
+}

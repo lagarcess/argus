@@ -1,12 +1,12 @@
 # Private Alpha Production Promotion, 2026-09-12
 
-Status: Step 2 resumed after founder approval. Environment parity and the single unchanged smoke rerun passed. The migration gate is blocked only by the seven expected pending migrations. Live acceptance and terminal review remain pending. No live evaluation, browser acceptance, migration application, live configuration change, merge, or deployment has occurred.
+Status: blocked at Step 3's budget guard. The baseline finished; the candidate stopped after 47 of 71 cases, all 47 passing, without a native final scorecard. The paired comparison is incomplete. Environment parity and the single unchanged smoke rerun passed, and the migration gate is blocked only by the seven expected pending migrations. Free local browser checks passed. Paid browser acceptance, historical replay, and terminal review remain pending. The disposable local services were stopped without backup. No migration application, live configuration change, merge, or deployment has occurred.
 
 ## Candidate
 
 - Candidate SHA: `df7aee12955f667e31057464d62c72287fb12247`
 - Candidate branch: `codex/production-promotion-20260912`
-- Validation status: free gates completed with one pending Step 3 scorecard requirement; not ready for merge.
+- Validation status: free gates completed with one unfulfilled Step 3 scorecard requirement; the live pair stopped incomplete at its budget guard. Not ready for merge.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
 - Promotion target: `main`
 - Release captain: Codex in the founder-supervised promotion task.
@@ -62,7 +62,7 @@ Status: Step 2 resumed after founder approval. Environment parity and the single
 
 ## Environment Proof
 
-- Expected mode:
+- Expected mode: Environment C uses the measured Render literals, production API mode, live providers, disposable local Supabase, and the production web build. The complete key record appears below.
 - Release profile hash:
 - Effective locales and capabilities:
 - api_web_env_fingerprint:
@@ -108,8 +108,8 @@ Status: Step 2 resumed after founder approval. Environment parity and the single
 
 ## Gate Evidence
 
-- Local smoke command:
-- Local smoke result:
+- Local smoke command: `.github/local-smoke.sh --expected-sha df7aee12955f667e31057464d62c72287fb12247`, in Environment A after one direct timed readiness request.
+- Local smoke result: the one unchanged rerun passed. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/local-smoke-rerun-status.json` and `local-smoke-rerun.log` in the same directory.
 - Warmup command:
 - Warmup result:
 - Canary evidence artifact: `private-alpha-canary-evidence`
@@ -119,7 +119,7 @@ Status: Step 2 resumed after founder approval. Environment parity and the single
   - Finalized evidence/result labels:
   - Decision-note label and reload hydration:
   - Omnisearch source identity:
-- Browser signup/login proof:
+- Browser signup/login proof: local synthetic signup, first profile save, reload persistence, home country and English Usage passed at the measured head. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/local-acceptance/browser-free-checks.json`, `profile-readback.json`, and screenshots `browser/01-en-guest-greeting.png` through `browser/06-en-usage-labels.png` under that same directory. No paid chat turn is claimed by this free evidence.
 - Guest exact-head browser evidence:
   - local candidate SHA:
   - 20-check matrix result:
@@ -159,8 +159,11 @@ Status: Step 2 resumed after founder approval. Environment parity and the single
 - Service-role credentials, cookies, prompts, and route receipt payloads are not
   copied into this manifest.
 - Guest evidence contains no Auth UUID, raw conversation/artifact/job/run ids,
-  email, tokens, cookies, headers, screenshots of credentials, or transcript
-  dumps. Store only privacy-safe hashes and aggregate/count facts.
+  customer email, tokens, cookies, headers, screenshots of credentials, or
+  customer transcript dumps. The local profile screenshots contain a synthetic
+  reserved-domain QA email only. Historical guest replay reports contain only
+  case and turn numbers, outcomes, refusal codes and named capabilities, with
+  allowance counts recorded separately.
 
 ## Fixed Cut and Measurement Identity
 
@@ -204,15 +207,34 @@ The founder explicitly approved no backup, overriding PR #595's backup step. Bet
 | Job | Environment | Stop | Spent | Result |
 | --- | --- | --- | --- | --- |
 | Free gates | A: development setup with the explicit canonical-root override | Free | $0 | Smoke, mocked harness, modularity and parity passed; release-doc scorecard check awaits Step 3 |
-| Candidate and production baseline eval | B: identical explicit eval env file and both provider modes live | $3.50 combined | $0 | Not started |
-| Founder browser walk | C: clean detached worktree, disposable Supabase, production build | $3.00 | $0 | Not started |
-| Historical guest replay | C: fresh guest per conversation, ordered user turns | $4.00 | $0 | Count and estimate pending |
+| Candidate and production baseline eval | B: identical explicit eval env file and both provider modes live | $3.50 combined | $2.7352358294 tracked; $0.78 guard reserve is not actual spend | Stopped by guard after 47 of 71 candidate cases; comparison incomplete |
+| Founder browser walk | C: clean detached worktree, disposable Supabase, production build | $3.00 | $0 | Free greeting, signup, profile, country and English Usage checks passed; paid steps pending |
+| Historical guest replay | C: fresh guest per conversation, ordered user turns | $4.00 | $0 | UTC cohort: 14 conversations, 35 user turns across their complete histories; price estimate pending Step 3 |
 
 Environment A's pre-existing root `.env` symlink resolves through the integration worktree to the exact founder-named real file. `web/.env.local` is absent. No environment file is written through or replaced.
 
-Environment C has no `.env` or `web/.env.local`. API and web launch from empty environments with only declared Render keys, the approved substitutions, process basics, and the localhost QA captcha token. Key-by-key presence, non-secret values, literal parity and forbidden-production-value checks are pending before either server starts.
+Environment C has no `.env` or `web/.env.local`. API and web launched from empty environments with only declared Render keys, the approved substitutions, process basics, and the localhost QA captcha token. Before the production web build and server starts, both services passed the key-by-key literal, declared-key, forbidden-production-value, and absent-env-file checks. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/local-acceptance/environment-proof.json`. The disposable stack was reset from the measured branch migrations; startup readiness passed with the runtime, Supabase, and live asset catalog ready. Evidence: `stack-proof.json` and `startup-health.json` in that directory.
 
 Local differences to cover after deployment: in-process backtests instead of `argus-backtests`, no Turnstile widget, no PostHog, no emails, and localhost origins. The API retains production key routing and shadow job rows; only if jobs stay queued may shadow mode be turned off and recorded as another local difference.
+
+## Step 3 Budget Stop
+
+- Promotion PR: https://github.com/lagarcess/argus/pull/603, targeting `main` with the fixed integration cut. This is a blocked promotion, not a terminal release audit.
+- Baseline eval scorecard: `docs/reports/evidence/2026-09-12-main-promotion/baseline-eval-scorecard-ee9c3491.json`. Original bytes retained, SHA-256 `ec7e3301fbc796c38265313a61282a882d2564bcd761e7084ffcc05c91c7792a`.
+- Baseline: 59 passed, 3 failed, no infrastructure errors, all 62 fixtures and 73 user turns. Both provider modes are `live_provider`; the native provenance confirms the production SHA, Python 3.10.20, clean worktree, and holiday-alignment probe.
+- Candidate: 47 completed cases passed, 24 cases remain unmeasured or incomplete. The process stopped during `dca_capital_semantics_spanish_period_exceeds_window_issue_455` with exit code `-15`. No native candidate scorecard was written, and none was reconstructed or fabricated from partial events.
+- Comparison: not accepted. The complete baseline has three failures: `action_chip_change_asset_bare_ticker_append_issue_190`, `asset_discovery_not_result_followup_issue_244`, and `dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run`. Their checks remain in `baseline-summary.json`. Partial candidate successes cannot establish the complete comparison. No candidate failure triggered a judge replay or case rerun.
+- Fixture relationship: 62 common cases, with 59 unchanged. Three forward-looking cases retain their inputs but change expected outcomes and the prose rubric to research with sources. The candidate adds nine cases and removes none. Evidence: `eval-fixture-comparison.json` in the same directory.
+- Environment identity: each run used a separate clean detached worktree and the identical explicit process environment, real env-file path, and live provider modes. The env-file content hash remained unchanged after both processes stopped. Evidence: `eval-environment-source-provenance.json` and `eval-pair-process-record.json` in the same directory.
+- Cost: baseline `$1.390784977984`; partial candidate `$1.344450851416`; combined tracked `$2.7352358294`. This includes OpenRouter usage receipts, validated Perplexity Agent usage, and `$0.05` of documented Perplexity Search request fees. It is not a complete provider invoice because 34 non-skipped receipts lack prices.
+- Guard: `$0.10` for in-flight work plus `$0.02` per unpriced non-skipped receipt. Its final `$0.78` reserve is a conservative operational allowance, not an asserted provider charge. Tracked cost plus reserve reached `$3.5152358294` and terminated the candidate. The report does not claim that actual spend reached `$3.50`.
+- Evidence: `docs/reports/evidence/2026-09-12-main-promotion/eval-budget-stop.json`, plus `eval-run/events.jsonl`, the unchanged observer and guardian source, and sanitized process logs under that evidence directory.
+- Initial PR CI: frontend, guest-release-gates, ownership, and Supabase Preview checks passed. Backend reported 7,861 passed, 585 skipped, and one failure: the required durable candidate live scorecard is absent. That evidence requirement remains unmet; no validator was weakened. The aggregate `ci` check is not green.
+- Stop-record validation: 23 release evidence checks passed; the one missing-candidate-scorecard requirement failed, as expected for this incomplete run. Evidence: `release-docs-budget-stop.log` in the same directory.
+- Review: the initial Codex summary completed at PR head `2d99bcb4edc6c9e817a524fa295c8d67776ff549`, with no formal review or inline thread and no explicit `Reviewed commit` receipt. It does not satisfy the founder's exact-head review requirement. No terminal audit or clean-review claim is made.
+- Local free acceptance: six screenshots, profile persistence readback, startup readiness, scratch migration reset, and all 85 environment keys are retained under `local-acceptance/`. Paid browser and replay spend are both `$0`. Customer message content was never pulled; the replay inventory selected aggregate counts only.
+- Cleanup: owned API/web processes stopped, owned ports closed, and `supabase stop --no-backup --workdir <owned scratch>` succeeded. The unrelated running stack remained intact. Evidence: `local-acceptance/cleanup.json`.
+- Required founder decision: approve or decline a revised `$6.50` combined eval cap for one fresh full candidate run, retaining the completed baseline and the same environment. The partial run cannot be resumed into its missing native scorecard. This is a request, not authorization. Browser and replay caps remain `$3` and `$4`.
 
 ## Historical Step 2 Stop Record (Superseded by Approved Resumption)
 
@@ -249,3 +271,102 @@ The founder approved the template correction and one unchanged smoke rerun in th
 - `measured-tree-identity.json`: product paths and every non-doc Git path match the new measured head. Later evidence commits touch only docs.
 
 The initial stop record above is retained as history, not an outstanding approval request. Paid spend remains zero for each of the eval pair, browser walk and replay. No production conversation content has been extracted. No fix round has been used.
+
+## Local Production Configuration Key Record
+
+Captured before startup at the measured head. Secret-bearing keys record only presence. Every literal is set, and only the founder-approved substitutions differ. No value contains the production Supabase reference or production app domain. Process basics are PATH and HOME.
+
+### argus-api
+
+| Key | Local value or secret presence |
+| --- | --- |
+| `ALPACA_API_KEY` | `present` |
+| `ALPACA_PAPER_TRADING` | `true` |
+| `ALPACA_SECRET_KEY` | `present` |
+| `APP_ENV` | `production` |
+| `ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD` | `absent` |
+| `ARGUS_APP_ORIGIN` | `http://localhost:3136` |
+| `ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED` | `false` |
+| `ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT` | `10` |
+| `ARGUS_BACKTEST_JOBS_GLOBAL_RUNNING_LIMIT` | `5` |
+| `ARGUS_BACKTEST_JOBS_SHADOW_ENABLED` | `true` |
+| `ARGUS_BACKTEST_JOBS_USER_QUEUED_LIMIT` | `2` |
+| `ARGUS_BACKTEST_JOBS_USER_RUNNING_LIMIT` | `1` |
+| `ARGUS_BACKTEST_REAL_WORKFLOW_TASK` | `argus-backtests/run_backtest_job` |
+| `ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED` | `false` |
+| `ARGUS_BACKTEST_WORKFLOW_TASK` | `argus-backtests/workflow_proof` |
+| `ARGUS_CHAT_FALLBACK_MODEL` | `qwen/qwen3.5-9b` |
+| `ARGUS_CHAT_MODEL` | `deepseek/deepseek-v4-flash` |
+| `ARGUS_CHECKPOINTER_MODE` | `postgres` |
+| `ARGUS_CONTEXT_FALLBACK_MODEL` | `deepseek/deepseek-v4-flash` |
+| `ARGUS_CONTEXT_MODEL` | `openai/gpt-oss-120b` |
+| `ARGUS_CONTEXT_PACKETS_ENABLED` | `true` |
+| `ARGUS_CONTEXT_PACKET_BUDGET_SECONDS` | `4` |
+| `ARGUS_CORS_ALLOW_ORIGINS` | `http://localhost:3136` |
+| `ARGUS_DEV_MEMORY_FALLBACK` | `false` |
+| `ARGUS_DISCOVERY_SEARCH_PROVIDER` | `perplexity_direct` |
+| `ARGUS_ENABLE_EXECUTION_REALISM` | `true` |
+| `ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL` | `false` |
+| `ARGUS_ENABLE_PERSONALIZATION_MEMORY` | `true` |
+| `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` | `true` |
+| `ARGUS_GUEST_ACCESS_OPENROUTER_API_KEY` | `present` |
+| `ARGUS_IN_PLACE_CARD_EDITS_ENABLED` | `true` |
+| `ARGUS_MARKET_DATA_PROVIDER_MODE` | `live_provider` |
+| `ARGUS_MEMORY_EMBEDDING_DIMENSIONS` | `1024` |
+| `ARGUS_MEMORY_EMBEDDING_MODEL` | `pplx-embed-v1-0.6b` |
+| `ARGUS_MEMORY_EMBEDDING_TIMEOUT_SECONDS` | `8.0` |
+| `ARGUS_MEMORY_VECTOR_COLLECTION` | `argus_memory_vectors` |
+| `ARGUS_MOCK_AUTH` | `false` |
+| `ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS` | `30` |
+| `ARGUS_OPS_TOKEN` | `present` |
+| `ARGUS_PERSISTENCE_MODE` | `supabase` |
+| `ARGUS_PROD_OPENROUTER_API_KEY` | `present` |
+| `ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED` | `true` |
+| `ARGUS_READINESS_ASSET_TIMEOUT_SECONDS` | `25` |
+| `ARGUS_READOUT_FALLBACK_MODEL` | `openai/gpt-5.6-luna` |
+| `ARGUS_READOUT_MODEL` | `openai/gpt-5.6-luna` |
+| `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` | `5000` |
+| `ARGUS_RESEARCH_RAIL_ENABLED` | `true` |
+| `ARGUS_RUNTIME_EVENT_KEEPALIVE_SECONDS` | `15` |
+| `ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS` | `180` |
+| `ARGUS_STRUCTURED_FALLBACK_MODEL` | `anthropic/claude-haiku-4.5` |
+| `ARGUS_STRUCTURED_MODEL` | `x-ai/grok-4.3` |
+| `ARGUS_TITLE_AUTOGEN_ENABLED` | `true` |
+| `ARGUS_TITLE_AUTOGEN_TIMEOUT_MS` | `250` |
+| `ARGUS_UTILITY_FALLBACK_MODEL` | `qwen/qwen3.5-9b` |
+| `ARGUS_UTILITY_MODEL` | `google/gemini-2.5-flash-lite` |
+| `ARGUS_VISITOR_KEY_SECRET` | `present` |
+| `DATABASE_URL` | `present` |
+| `HOME` | `/private/tmp/argus-promotion-20260912-supabase/home` |
+| `MARKET_DATA_CACHE_TTL` | `43200` |
+| `PATH` | `/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin` |
+| `PERPLEXITY_API_KEY` | `present` |
+| `POETRY_VERSION` | `2.1.3` |
+| `POSTHOG_PROJECT_TOKEN` | `absent` |
+| `POSTHOG_REGION` | `us` |
+| `RENDER_API_KEY` | `absent` |
+| `SUPABASE_ANON_KEY` | `present` |
+| `SUPABASE_JWT_SECRET` | `present` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `present` |
+| `SUPABASE_URL` | `http://127.0.0.1:56531` |
+
+### argus-app
+
+| Key | Local value or secret presence |
+| --- | --- |
+| `ARGUS_APP_ORIGIN` | `http://localhost:3136` |
+| `HOME` | `/private/tmp/argus-promotion-20260912-supabase/home` |
+| `NEXT_PUBLIC_APP_ENV` | `production` |
+| `NEXT_PUBLIC_ARGUS_API_URL` | `http://localhost:8136/api/v1` |
+| `NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN` | `present` |
+| `NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL` | `support@get-argus.com` |
+| `NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY` | `absent` |
+| `NEXT_PUBLIC_ENABLE_SPANISH` | `true` |
+| `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED` | `true` |
+| `NEXT_PUBLIC_MOCK_AUTH` | `false` |
+| `NEXT_PUBLIC_OMNISEARCH_ENABLED` | `true` |
+| `NEXT_PUBLIC_POSTHOG_KEY` | `absent` |
+| `NEXT_PUBLIC_RESEARCH_RAIL_ENABLED` | `true` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `present` |
+| `NEXT_PUBLIC_SUPABASE_URL` | `http://127.0.0.1:56531` |
+| `PATH` | `/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin` |
