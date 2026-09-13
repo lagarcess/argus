@@ -16,5 +16,5 @@
   "all_non_docs_diff": [],
   "non_docs_git_tree_sha256": "6e0940c95470699a7b0dc18272bca0aabf4e74170c3d0b386c0334d84af21614",
   "binding": "The containing evidence commit changes docs only. Recheck against measured_head after every later head change.",
-  "rechecked_at": "2026-09-13T06:05:17.916991+00:00"
+  "rechecked_at": "2026-09-13T06:51:34.591544+00:00"
 }
