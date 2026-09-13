@@ -117,6 +117,30 @@ export function hasUnavailableToolCards(metadata: Record<string, unknown>): bool
   return value != null && (!Array.isArray(value) || value.length > toolCardsFromMetadata(metadata).length);
 }
 
+/** An input fact of one of the message's cards that the answer's prose never names. */
+export type AnswerAssumption = { artifact_id: string; name: string };
+
+export function answerAssumptionsFromMetadata(metadata: Record<string, unknown>): AnswerAssumption[] | null {
+  const value = metadata.answer_assumptions;
+  if (!Array.isArray(value)) return null;
+  const items = value.flatMap((item): AnswerAssumption[] =>
+    record(item) && text(item.artifact_id) && text(item.name) ? [{ artifact_id: item.artifact_id, name: item.name }] : []);
+  return items.length > 0 ? items : null;
+}
+
+/** One line of the assumed inputs, each by its own card's label and value; empty
+ * when no item resolves to a card input that holds a value. */
+export function answerAssumptionsText(message: Pick<Message, "answerAssumptions" | "toolResultCards">, t: ToolTranslator, locale: string): string {
+  const inputs = (message.answerAssumptions ?? []).flatMap(({ artifact_id, name }) => {
+    const input = message.toolResultCards?.find((card) => card.artifact_id === artifact_id)?.presentation.inputs.find((fact) => fact.name === name);
+    if (!input || input.value === null) return [];
+    const label = localizedToolText(input.label, t);
+    return [`${label.charAt(0).toLocaleLowerCase(locale)}${label.slice(1)} ${toolFactValue(input, t, locale)}`];
+  });
+  if (inputs.length === 0) return "";
+  return t("tools.calc.assumed_inputs.line", { inputs: new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(inputs) });
+}
+
 export function toolCardCopyText(card: ToolResultCard, t: ToolTranslator, locale: string): string {
   const { presentation } = card;
   const facts = [presentation.answer, ...presentation.rows, ...presentation.inputs].filter((value): value is ToolFact => value !== null);
@@ -211,15 +235,28 @@ export function toolInputChanges(card: ToolResultCard, drafts: Record<string, st
   return changes;
 }
 
-/** Per-artifact monotonic revisions also protect sibling cards in a plural message. */
+/** Per-artifact monotonic revisions also protect sibling cards in a plural message;
+ * the assumed inputs follow only a response that advanced one of its cards. */
 export function applyToolResultMessage(messages: Message[], response: ApiMessage): Message[] {
   const updates = toolCardsFromMetadata(response.metadata ?? {});
   return messages.map((message) => {
     if (message.id !== response.id) return message;
-    return { ...message, toolResultCards: (message.toolResultCards ?? []).map((current) => {
+    let advanced = false;
+    const toolResultCards = (message.toolResultCards ?? []).map((current) => {
       const update = updates.find((candidate) => candidate.artifact_id === current.artifact_id &&
         candidate.call_id === current.call_id && candidate.tool_name === current.tool_name);
-      return update && update.input_revision > current.input_revision ? update : current;
-    }) };
+      if (!update || update.input_revision <= current.input_revision) return current;
+      advanced = true;
+      return update;
+    });
+    // A response that moved a card forward owns the prose the backend re-rendered from it.
+    return advanced
+      ? {
+        ...message,
+        toolResultCards,
+        ...(typeof response.content === "string" ? { content: response.content } : {}),
+        answerAssumptions: answerAssumptionsFromMetadata(response.metadata ?? {}),
+      }
+      : { ...message, toolResultCards };
   });
 }

@@ -102,7 +102,7 @@ import {
 } from "@/lib/chat-conversation-view-helpers";
 import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
 import { toolResultRecomputeHandler } from "@/lib/tool-result-recompute";
-import { toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
+import { answerAssumptionsFromMetadata, toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
@@ -1345,6 +1345,7 @@ export default function ChatInterface() {
         const finalNextExperimentsSourceRunId =
           nextExperimentsSourceRunIdFromMetadata(finalPayload);
         const finalNextSteps = nextStepsFromMetadata(finalPayload, finalNextExperiments);
+        const finalAnswerAssumptions = answerAssumptionsFromMetadata(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1472,6 +1473,7 @@ export default function ChatInterface() {
                   resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                   nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
                   nextSteps: finalNextSteps,
+                  answerAssumptions: finalAnswerAssumptions,
                   contentPresentation: finalTextPresentation,
                 }),
               ),
@@ -1496,6 +1498,7 @@ export default function ChatInterface() {
                 resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                 nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
                 nextSteps: finalNextSteps,
+                answerAssumptions: finalAnswerAssumptions,
                 contentPresentation: finalTextPresentation,
               },
             );

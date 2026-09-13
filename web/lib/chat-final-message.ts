@@ -15,6 +15,7 @@ type MergeFinalTextOptions = {
   resultReadoutContent?: Message["resultReadoutContent"];
   resultReadoutFacts?: Message["resultReadoutFacts"];
   toolResultCards?: Message["toolResultCards"];
+  answerAssumptions?: Message["answerAssumptions"];
   finalActions: ChatActionOption[];
   contentPresentation?: Message["contentPresentation"];
   recoveryDisplay?: RecoveryDisplay | null;
@@ -39,6 +40,7 @@ export function mergeFinalTextMessage(
     resultReadoutContent,
     resultReadoutFacts,
     toolResultCards,
+    answerAssumptions,
     finalActions,
     contentPresentation,
     recoveryDisplay,
@@ -61,6 +63,7 @@ export function mergeFinalTextMessage(
     ...message,
     content: finalText || message.content || undefined,
     toolResultCards: toolResultCards ?? message.toolResultCards,
+    answerAssumptions: answerAssumptions ?? message.answerAssumptions,
     actions: finalActions.length > 0 ? finalActions : message.actions,
     contentPresentation: contentPresentation ?? message.contentPresentation,
     resultReadoutContent,

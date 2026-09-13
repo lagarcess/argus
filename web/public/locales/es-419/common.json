@@ -1919,6 +1919,9 @@
       "missing_inputs": {
         "ask": "Para calcularlo, dime {{inputs}}."
       },
+      "assumed_inputs": {
+        "line": "Supuestos de este cálculo: {{inputs}}."
+      },
       "units": {
         "currency": "{{code}}",
         "months": "meses",

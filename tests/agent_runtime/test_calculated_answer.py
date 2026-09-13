@@ -469,3 +469,33 @@ def test_options_that_owe_one_figure_ask_once_and_keep_every_calculation(
     assert ca.pending_requests(payload) == payload["calculations"]
     one = payload["calculations"][0]
     assert ca.pending_requests({"calculation": one}) == [one]
+
+
+def test_the_public_turn_result_carries_the_answers_template_assumptions_and_offer() -> (
+    None
+):
+    """The prose template a recompute re-renders, the assumed inputs the prose never
+    names and a research answer's offer reach the stored message; the runtime's
+    public result dropped all three, so no research answer ever stored them."""
+    from argus.agent_runtime.runtime import _public_result
+
+    template = {
+        "cards": {"loan": "artifact-1"},
+        "text": "It costs {{payment}}.",
+        "language": "en",
+    }
+    assumptions = [{"artifact_id": "artifact-1", "name": "periods"}]
+    offer = {"calculations": [{"kind": "time_value"}], "requested_field": "periods"}
+    public = _public_result(
+        {
+            "assistant_response": "It costs USD 1,199.10.",
+            "answer_text_template": template,
+            "answer_assumptions": assumptions,
+            "calculation_offer": offer,
+            "internal_only": {"kept": False},
+        }
+    )
+    assert public["answer_text_template"] == template
+    assert public["answer_assumptions"] == assumptions
+    assert public["calculation_offer"] == offer
+    assert "internal_only" not in public

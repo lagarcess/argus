@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import ToolResultCard from "./ToolResultCard";
-import type { ToolRecompute } from "@/lib/tool-result-card";
+import { answerAssumptionsText, type ToolRecompute } from "@/lib/tool-result-card";
 import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
@@ -244,6 +244,7 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
+  const assumedInputsLine = answerAssumptionsText(message, t, locale);
   const researchSourcesOpen = researchSourcesDisplay(Boolean(message.researchDegradedCode));
   // Chips carry domains and the drawer owns the list; zero sources is the
   // ungrounded marker (derived, never asserted). Canon: DESIGN.md §11.
@@ -453,6 +454,9 @@ export default function ChatMessage({
               </ReactMarkdown>
             </div>
           )}
+          {assumedInputsLine ? (
+            <p data-answer-assumptions className="mt-3 max-w-[min(100%,660px)] text-sm text-black/60 dark:text-white/60">{assumedInputsLine}</p>
+          ) : null}
 
           {!isUser && message.continuedFrom && onOpenConversation ? (
             <button type="button" data-continued-from={message.continuedFrom.conversationId}

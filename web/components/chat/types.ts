@@ -326,6 +326,8 @@ export type Message = {
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
   toolResultCards?: import("@/lib/tool-result-card").ToolResultCard[];
+  /** Assumed inputs the backend says the prose never names, each on one of these cards. */
+  answerAssumptions?: import("@/lib/tool-result-card").AnswerAssumption[] | null;
   hasUnavailableToolResults?: boolean;
   toolJobs?: ToolJob[];
   resultReadoutFacts?: ResultReadoutFacts | null;
