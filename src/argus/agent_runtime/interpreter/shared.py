@@ -477,6 +477,23 @@ def _capital_source(field_provenance: dict[str, str], key: str) -> str:
     return str(field_provenance.get(key) or "").strip()
 
 
+def _grounded_recurring_contribution(
+    value: Any,
+    *,
+    field_provenance: dict[str, str],
+) -> Any:
+    if value is None:
+        return None
+    if (
+        _capital_source(field_provenance, "recurring_contribution")
+        in _RECURRING_CAPITAL_SOURCES
+    ):
+        return value
+    if _capital_source(field_provenance, "capital_amount") in _RECURRING_CAPITAL_SOURCES:
+        return value
+    return None
+
+
 _BROADER_EDIT_MONEY_SOURCES = frozenset(
     {
         "user",

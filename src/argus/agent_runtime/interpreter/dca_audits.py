@@ -12,6 +12,7 @@ from argus.agent_runtime.interpreter.shared import (
     _capital_source,
     _date_range_from_intent_or_bounded_evidence,
     _field_path_base,
+    _grounded_recurring_contribution,
     _llm_value_is_empty,
     _supported_dca_cadence_value,
     repaired_turn_act,
@@ -293,19 +294,25 @@ def _capability_required_missing_fields_for_canonical_strategy(
 
 
 def _dca_draft_has_recurring_amount(draft: LLMStrategyDraft) -> bool:
-    return dca_recurring_amount(draft) is not None
-
-
-def dca_recurring_amount(draft: LLMStrategyDraft) -> float | None:
-    """Read the contribution from its typed slot or its owned legacy slot."""
+    # Shape presence does not establish ownership; grounding owns that check.
     if draft.recurring_contribution is not None:
-        return draft.recurring_contribution
+        return True
     if _capital_source(draft.field_provenance, "capital_amount") in {
         "recurring_contribution",
         "explicit_recurring_contribution",
     }:
-        return draft.capital_amount
-    return None
+        return draft.capital_amount is not None
+    return False
+
+
+def dca_recurring_amount(draft: LLMStrategyDraft) -> float | None:
+    """Read a contribution only when canonical strategy grounding will keep it."""
+    amount = draft.recurring_contribution
+    if amount is None and _dca_draft_has_recurring_amount(draft):
+        amount = draft.capital_amount
+    return _grounded_recurring_contribution(
+        amount, field_provenance=draft.field_provenance
+    )
 
 
 def _dca_total_budget_source(value: Any) -> str:

@@ -44,6 +44,7 @@ def replay_case(
     audit_role: Literal[
         "starting", "recurring", "equal_seed", "distinct_seed"
     ] = "starting",
+    unowned_contribution: bool = False,
 ) -> dict[str, Any]:
     case_id = case.id
     dca = case.snapshot is not None
@@ -68,6 +69,11 @@ def replay_case(
         "confidence": 0.9,
         "comparison_baseline": "SPY",
     }
+    if unowned_contribution:
+        # An underfilled primary can carry a typed amount with no owner, while
+        # the focused read supplies only the missing non-money fields.
+        draft.update(capital_amount=None, recurring_contribution=amount)
+        focused["capital_amount"] = None
     if not dca:
         focused.update(
             entry_rule={
@@ -116,7 +122,7 @@ def replay_case(
             result = {
                 "all_traded_asset_mentions_included": True,
                 "asset_mentions": []
-                if current_followup
+                if current_followup and not unowned_contribution
                 else [
                     {
                         "raw_text": draft["asset_universe"][0],
@@ -150,20 +156,24 @@ def replay_case(
             else:
                 # Successful but underfilled follow-up, then a focused repair.
                 result["candidate_strategy_draft"]["date_range"] = None
+                if unowned_contribution:
+                    result.update(task_relation="new_task", semantic_turn_act="new_idea")
         elif schema == "FocusedStrategyExtraction":
             result = copy.deepcopy(focused)
         elif schema == "DcaContractAudit":
             result = {
                 "is_recurring_buy_request": True,
                 "cadence": draft["cadence"],
-                "recurring_contribution_amount": amount if current_followup else None,
+                "recurring_contribution_amount": amount
+                if current_followup and not unowned_contribution
+                else None,
                 "confidence": 0.9,
             }
         elif schema == "StrategyFamilyContinuityAudit":
             result = {"should_rebind_strategy_family": False, "confidence": 0.9}
         elif schema == "DcaContributionRoleAudit":
             result = {
-                "recurring_contribution_explicit": True,
+                "recurring_contribution_explicit": not unowned_contribution,
                 "total_budget_not_recurring": False,
                 "confidence": 0.9,
             }
@@ -329,3 +339,25 @@ def test_a_separately_audited_deposit_still_requires_an_owned_seed(
         and not guard["contribution_role_preserved"]
         for guard in result["guards"]
     )
+
+
+def test_unowned_typed_contribution_does_not_suppress_a_deposit_clarification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    case = next(case for case in load_eval_cases() if case.id == PESOS)
+    result = replay_case(case, monkeypatch, unowned_contribution=True)
+    assert not result["unexpected"]
+    assert result["guards"]
+    assert "assumption" in result["typed"]["missing_required_fields"]
+    assert result["typed"]["stage_outcomes"][-2:] == [
+        "needs_clarification",
+        "await_user_reply",
+    ]
+    assert not any(guard["contribution_role_preserved"] for guard in result["guards"])
+    repairs = [
+        receipt["repair_effect"]
+        for receipt in result["receipts"]
+        if receipt["schema_name"] == "FocusedStrategyExtraction"
+        and receipt["outcome"] == "succeeded"
+    ]
+    assert repairs and all(not r["contribution_role_preserved"] for r in repairs)
