@@ -1,0 +1,207 @@
+{
+  "captured_at_utc": "2026-09-10T08:47:33.546880+00:00",
+  "candidate_head": "b17d25775028b7d7e2ea2f30ab35348291c973cc",
+  "candidate_worktree_clean_before_capture": true,
+  "original_integration_base": "9e8b59b23f29d432ec7603c42f7362137b1ee21f",
+  "current_integration": "09b0f6af2107931a9d2540987f6a24eaa3b6d963",
+  "reconciliation_merge": "2fde1698739c74d0d85d829d39e6260a6e997327",
+  "reconciliation": "Normal one-way integration merges, no rebase. Latest integration changes since 542fcfb2 are documentation-only; affected earlier runtime overlap was restored or verified against integration.",
+  "parked_rewrite": "dcde9affb92abd16488310ac44e91ef9d5f7c6dc",
+  "frozen_byte_identical_sha256": {
+    "src/argus/agent_runtime/discovery/prompt_guidance.py": "cd056137696b9d6aee236b3cbef7646b94f071c81beef450d9e2c34a4a9010b5",
+    "src/argus/agent_runtime/interpreter/audits.py": "fd687219bd6f7b17bef6a4bcdf0b05a9f90907c7eec18528922479a2a87cb671",
+    "src/argus/agent_runtime/interpreter/benchmark_prompt_guidance.py": "7e045a3bdeacc6c690a3b0a5f3363edeb3e1487d4898f6ddb02e9a6b7dc5d197",
+    "src/argus/agent_runtime/interpreter/discovery_focused_read.py": "d472af8e6638da690c4be9d6c3fef25451757d87024cd6347208edffa2d48453",
+    "src/argus/agent_runtime/interpreter/execution_cost_capability.py": "b03b8f7062f54cae4fcb14c61a8d0b2a03d97e63b23f2678be223818d1869499",
+    "src/argus/agent_runtime/interpreter/focused_extraction.py": "644e597631ea5b3ea39ca96291e243463d49783a0a1e3c8b6427f1e5bbd9efd3",
+    "src/argus/agent_runtime/interpreter/signal_rule.py": "8f710e451d291a5a1e750d4d15f91b86cf04e6e5205b146b3d82718ccdd4a6f9",
+    "src/argus/agent_runtime/interpreter/unsupported_admission.py": "6d0dbd188c81471a9d522dbb7bf4612cf59c0332c947bfa696bc56e5938874bb",
+    "src/argus/agent_runtime/llm_clarifier.py": "dbb50465c7cb80fa052ae291a50e1c6aaca01a787180ceb74f20be473124e119",
+    "src/argus/agent_runtime/llm_interpreter.py": "07fa17a1e1a41a984ed07828b060477b78a321bdc6f665aa7d076ef44dff2289",
+    "src/argus/agent_runtime/llm_interpreter_types.py": "814a8a0d94378fe8f779765378497fdcffb3fe32b32a0c14f9cde13c477c59e7",
+    "src/argus/agent_runtime/research_grounded.py": "c3a55ecfcd441a7fc39e2fd5b10c2130af5be27e2b595040d69b3c726c65f504",
+    "src/argus/agent_runtime/research_query.py": "5c89fbf38bdf6e242c409ef8cb5293f7696a4b7a26e71de3abfee2ea60ffefaa",
+    "src/argus/agent_runtime/result_followups.py": "00cb8129b75c51013ceaf8da250509cbf604761d61f7c101e95a1d2e3783ec62",
+    "src/argus/agent_runtime/stages/execute.py": "f96fae7eeb4f27432896ae2c9619a59712b8baf73443cf1c9110dcb346240609",
+    "src/argus/agent_runtime/stages/explain.py": "1219874272e4c1fc8c302b225f19b4f6ab7aa21d8490a96df60b1a260cc9bdad",
+    "src/argus/agent_runtime/stages/interpret_types.py": "9515dac36f7e5d77fe0f9a0f36e43bc313988c09b6c71684d399ebf9b83ab411",
+    ".agent/interpreter_prompt_fingerprint.json": "397f5386815ffe8c909709c9904da36b83c9ce25a5919f4cace33270d6fdc072",
+    "src/argus/api/state.py": "264086a85e7d4fe9d1a07fe069709ceec988aeb48114b5bddcc173ed6cb0f0d3"
+  },
+  "complete_model_input_identity": {
+    "baseline_checkout": "542fcfb2432e906663160d8cb874d955faeafd16",
+    "baseline_src_identical_to_current_integration": true,
+    "candidate_and_baseline_equal": true,
+    "research_flag_values": {
+      "false": {
+        "schema_sha256": "2b88363bea00e101843146fd1c601a8ede08254597714b5ab13e141b3dee1270",
+        "schema_bytes": 21874,
+        "prompt_sha256": "ab795bf414607b82b058dc40a36ddda3952d312671141706d51a547602b3351b",
+        "prompt_bytes": 26937
+      },
+      "true": {
+        "schema_sha256": "2b88363bea00e101843146fd1c601a8ede08254597714b5ab13e141b3dee1270",
+        "schema_bytes": 21874,
+        "prompt_sha256": "ab795bf414607b82b058dc40a36ddda3952d312671141706d51a547602b3351b",
+        "prompt_bytes": 26937
+      }
+    },
+    "measurement": "Fresh-process OpenRouterStructuredInterpreter._system_prompt() plus canonical JSON of LLMInterpretationResponse.model_json_schema(); no invocation.",
+    "catalog_construction_preserves_model_inputs": {
+      "false": {
+        "before": {
+          "schema_sha256": "2b88363bea00e101843146fd1c601a8ede08254597714b5ab13e141b3dee1270",
+          "prompt_sha256": "ab795bf414607b82b058dc40a36ddda3952d312671141706d51a547602b3351b"
+        },
+        "after": {
+          "schema_sha256": "2b88363bea00e101843146fd1c601a8ede08254597714b5ab13e141b3dee1270",
+          "prompt_sha256": "ab795bf414607b82b058dc40a36ddda3952d312671141706d51a547602b3351b"
+        },
+        "declarations": 6
+      },
+      "true": {
+        "before": {
+          "schema_sha256": "2b88363bea00e101843146fd1c601a8ede08254597714b5ab13e141b3dee1270",
+          "prompt_sha256": "ab795bf414607b82b058dc40a36ddda3952d312671141706d51a547602b3351b"
+        },
+        "after": {
+          "schema_sha256": "2b88363bea00e101843146fd1c601a8ede08254597714b5ab13e141b3dee1270",
+          "prompt_sha256": "ab795bf414607b82b058dc40a36ddda3952d312671141706d51a547602b3351b"
+        },
+        "declarations": 6
+      }
+    }
+  },
+  "serializer_class_paths_retained": [
+    "AmbiguousField",
+    "ArtifactActionRecoveryFacts",
+    "ArtifactReference",
+    "ConfirmationPayload",
+    "ConversationMessage",
+    "ExtractedFieldValue",
+    "FinalResponsePayload",
+    "ResolutionProvenance",
+    "ResponseIntent",
+    "ResponseProfile",
+    "ResponseProfileOverrides",
+    "RunState",
+    "SimplificationOption",
+    "StrategySummary",
+    "StructuredActionContext",
+    "TaskSnapshot",
+    "ThreadState",
+    "ToolCallRecord",
+    "UnsupportedConstraint",
+    "UserState"
+  ],
+  "public_surface_no_diff_paths": [
+    "docs/reports/evidence/registry/receipt-test-bootstrap.sql",
+    "docs/reports/evidence/registry/tool-receipts.json",
+    "src/argus/api/public_excerpt_schemas.py",
+    "src/argus/api/public_excerpt_selection.py",
+    "src/argus/api/public_excerpts.py",
+    "src/argus/api/routers/evidence_receipts.py",
+    "src/argus/domain/public_excerpt_kinds.py",
+    "src/argus/domain/public_excerpt_tool_turns.py",
+    "src/argus/domain/public_excerpt_turns.py",
+    "src/argus/domain/public_excerpts.py",
+    "src/argus/domain/supabase_public_excerpts.py",
+    "supabase/migrations/20260909183409_add_tool_receipt_sources.sql",
+    "supabase/migrations/20260909183500_bridge_public_excerpt_message_trigger.sql",
+    "supabase/migrations/20260909233706_combine_selected_tool_receipt_sources.sql",
+    "tests/public_excerpt_tool_factories.py",
+    "tests/test_public_excerpt_migration_bridge_postgres.py",
+    "tests/test_public_excerpt_tool_selection.py",
+    "tests/test_tool_receipt_sources_postgres.py",
+    "tests/test_tool_result_receipts.py",
+    "web/__tests__/fixtures/receipt-turns.ts",
+    "web/__tests__/public-receipt.test.ts",
+    "web/__tests__/receipt-selection-api.test.ts",
+    "web/__tests__/receipt-sharing-surfaces.test.tsx",
+    "web/__tests__/receipt-tool-turns.test.tsx",
+    "web/__tests__/tool-backtest-presentation.test.tsx",
+    "web/app/r/[receiptId]/opengraph-image.tsx",
+    "web/app/r/[receiptId]/page.tsx",
+    "web/components/chat/ShareReceiptAction.tsx",
+    "web/components/guest/GuestExperienceSurfaces.tsx",
+    "web/components/receipt/ReceiptBody.tsx",
+    "web/components/receipt/ReceiptChart.tsx",
+    "web/components/settings/SharedReceiptsView.tsx",
+    "web/e2e/receipt-sharing-focus.spec.ts",
+    "web/e2e/registry-receipts.playwright.config.ts",
+    "web/e2e/registry-receipts.spec.ts",
+    "web/e2e/support/registry-receipt-fixture.ts",
+    "web/e2e/support/registry-receipt-server.ts",
+    "web/lib/evidence-receipts.ts",
+    "web/lib/public-receipt-contract.ts",
+    "web/lib/public-receipt-turns.ts",
+    "web/lib/receipt-copy.ts",
+    "web/lib/receipt-plan.ts",
+    "web/lib/receipt-presentation.ts",
+    "web/lib/receipt-preview-facts.ts"
+  ],
+  "migration_diff": [],
+  "protected_unchanged_from_31b20baf_sha256": {
+    "src/argus/agent_runtime/stages/tool_execution.py": "ef2bd6d90ffc869257324e87d79749d5c3d8a02235aa260796f6bc9e4f6aba7c",
+    "web/lib/tool-result-recompute.ts": "a82aec47730d9cc439f4888c439f6aec3f64892f2ed40192f4b029b5b9fbcbc2"
+  },
+  "private_openrouter_attribution_retained": true,
+  "checks": {
+    "backend": {
+      "passed": 6908,
+      "failed": 0,
+      "skipped": 585,
+      "command": "ARGUS_RUN_LIVE_EVALS=0 ARGUS_RESEARCH_RAIL_ENABLED=false ARGUS_ENABLE_PERSONALIZATION_MEMORY=false pytest tests -q --no-cov",
+      "environment": "Python 3.10.20; provider credentials empty; local process and loopback permissions. Live, hosted and disposable-DB acceptance remains opt-in and is not claimed by local skips."
+    },
+    "frontend": {
+      "passed": 1682,
+      "failed": 0,
+      "lint": "passed",
+      "production_build": "passed"
+    },
+    "declaration_and_fingerprint": {
+      "passed": 105,
+      "failed": 0
+    },
+    "runtime_and_legacy_strategy_workflow": {
+      "passed": 152,
+      "failed": 0,
+      "strategy_shapes": [
+        "dca_accumulation",
+        "signal_strategy"
+      ]
+    },
+    "lifecycle_publication_recompute_cost": {
+      "passed": 245,
+      "failed": 0,
+      "skipped": 0
+    },
+    "lane_c": {
+      "passed": 93,
+      "fresh_process_probes": 31
+    },
+    "combined_imports_lane_c_api_generation": {
+      "passed": 140,
+      "failed": 0
+    },
+    "modularity": "passed on the reconciled would-be merged tree; no violations",
+    "ruff": "passed for src/tests/workflows/scripts"
+  },
+  "environment_controls": {
+    "initial_local_run": "17 failed / 6891 passed / 585 skipped. Fourteen were sandbox restrictions; three reproduced on unchanged integration with worktree dotenv flags enabled.",
+    "permission_recheck": "28/28 local stub/process tests passed with normal local permissions.",
+    "flag_controls": "Both flags false:3/3 passed. Research-only true:the two legacy research fixtures failed. Memory-only true:the default-off memory fixture failed. Integration baseline reproduced the same behavior.",
+    "source_changes_for_environment_failures": false
+  },
+  "evaluator_commits": {
+    "false_empty_verdict": "fc759c817ce9229f35fdf221175702ad6df31945",
+    "delivery_source_regression_tests": "db295374ac113c46b1bc757c84a8feb2d558ac2b",
+    "removed_faulty_selection_checker": "30a117d5281a17fcbe6c88d0803ae0c37dd40999",
+    "scope": "The old per-figure checker was removed with the parked evaluator. Separate tests preserve actual drawer evidence and failing judge verdicts; the parked v3 selection policy is not active. Native historical grades and the frozen fingerprint were not changed."
+  },
+  "live_eval_runs": 0,
+  "paid_provider_calls": 0,
+  "additional_provider_cost_usd": 0,
+  "review_state_at_capture": "Prior fingerprint finding addressed; terminal CI and the final Codex review are recorded separately after completion. This file is not a READY declaration."
+}

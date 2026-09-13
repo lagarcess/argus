@@ -250,6 +250,13 @@ exposure and are not needed at current scale.
 
 ### 7.5 What is shareable — DECIDED 2026-08-07
 
+**Superseded in scope, founder 2026-09-09:**
+[conversation-sharing.md sections 4 and 4.5](../../specs/conversation-sharing.md#4-the-research-receipt)
+now permit grounded research answers and up to four independently eligible turns
+from one conversation, through this same receipt pipeline. The research exclusion
+and sequencing below record the original decision, not the active boundary.
+Freeze, privacy, revocation and owner requirements remain in force.
+
 **Completed backtest results only. Comparisons second, once the funnel is
 measured. Research answers not at all.**
 

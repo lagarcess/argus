@@ -1,3 +1,4 @@
+import { resultReadoutContentFromMetadata } from "./result-readout-content";
 import {
   resultCardFromRun,
   type ApiMessage,
@@ -12,7 +13,7 @@ import {
   nextExperimentRowsFromMetadata,
   type NextExperimentRow,
 } from "./chat-next-experiments";
-import type { Message } from "@/components/chat/types";
+import type { Message, ToolJob } from "@/components/chat/types";
 import {
   confirmationStatusFromPayload,
   confirmationStatusLabel,
@@ -63,6 +64,7 @@ export function backtestJobMessage({
     id,
     role: "ai",
     kind: "backtest_job",
+    contentPresentation: metadata.artifact_presentation_kind === "breakdown" ? "result_breakdown" : undefined,
     content,
     backtestJob: job,
     artifactId: job.id,
@@ -84,6 +86,39 @@ export function backtestJobFromMetadata(
   return backtestJobFromUnknown(metadata.backtest_job);
 }
 
+/** Live finals and transcript reloads use the same per-call job contract. */
+export function toolJobsFromMetadata(
+  metadata: Record<string, unknown>,
+): ToolJob[] {
+  const nested = metadata.final_response_payload;
+  const payload = typeof nested === "object" && nested !== null && !Array.isArray(nested)
+    ? nested as Record<string, unknown>
+    : null;
+  const values = metadata.tool_jobs ?? payload?.tool_jobs;
+  if (!Array.isArray(values)) return [];
+  const seen = new Set<string>();
+  const jobs: ToolJob[] = [];
+  for (const value of values) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) continue;
+    const record = value as Record<string, unknown>;
+    const callId = stringOrNull(record.call_id);
+    const toolName = stringOrNull(record.tool_name);
+    const artifactId = stringOrNull(record.artifact_id);
+    const job = backtestJobFromUnknown(record.job);
+    if (!callId || !toolName || !artifactId || !job || seen.has(callId)) continue;
+    seen.add(callId);
+    const resultMessageId = stringOrNull(record.result_message_id);
+    jobs.push({
+      call_id: callId,
+      tool_name: toolName,
+      artifact_id: artifactId,
+      job,
+      ...(resultMessageId ? { resultMessageId } : {}),
+    });
+  }
+  return jobs;
+}
+
 // Whether a job response still owes the view something. A backtest's result
 // is its run; a research job's is the message the response carries, for a
 // success (the answer) and for a failure (the persisted note) alike. One null
@@ -93,11 +128,12 @@ export function backtestJobResponseAwaitsPolling(
   response: Pick<BacktestJobResponse, "job" | "run" | "result_message">,
 ): boolean {
   const job = response.job;
-  if (job.status === "queued" || job.status === "running") return true;
-  if (job.operation_scope === RESEARCH_JOB_SCOPE) {
-    return job.status === "succeeded" && !response.result_message;
-  }
-  return job.status === "succeeded" && !response.run;
+  return jobAwaitsPolling(
+    job,
+    Boolean(job.operation_scope === RESEARCH_JOB_SCOPE
+      ? response.result_message
+      : response.run),
+  );
 }
 
 // The card-side twin: a research card is pending until its message is in
@@ -106,11 +142,15 @@ export function backtestJobResponseAwaitsPolling(
 export function backtestJobCardAwaitsPolling(message: Message): boolean {
   const job = message.backtestJob;
   if (message.kind !== "backtest_job" || !job) return false;
+  return jobAwaitsPolling(
+    job,
+    job.operation_scope === RESEARCH_JOB_SCOPE && Boolean(message.researchResultMessageId),
+  );
+}
+
+function jobAwaitsPolling(job: BacktestJob, resultPresent: boolean): boolean {
   if (job.status === "queued" || job.status === "running") return true;
-  if (job.operation_scope === RESEARCH_JOB_SCOPE) {
-    return job.status === "succeeded" && !message.researchResultMessageId;
-  }
-  return job.status === "succeeded";
+  return job.status === "succeeded" && !resultPresent;
 }
 
 export function pendingBacktestJobIds(messages: Message[]): string[] {
@@ -118,6 +158,11 @@ export function pendingBacktestJobIds(messages: Message[]): string[] {
   for (const message of messages) {
     if (backtestJobCardAwaitsPolling(message) && message.backtestJob) {
       ids.add(message.backtestJob.id);
+    }
+    for (const toolJob of message.toolJobs ?? []) {
+      if (jobAwaitsPolling(toolJob.job, Boolean(toolJob.resultMessageId))) {
+        ids.add(toolJob.job.id);
+      }
     }
   }
   return [...ids];
@@ -135,7 +180,19 @@ export function applyBacktestJobUpdate(
           response.run.id,
         )
       : messages;
-  const updatedMessages = ownerSafeMessages.map((message) => {
+  const updatedMessages = ownerSafeMessages.map((original) => {
+    const message = original.toolJobs?.some(
+      (toolJob) => toolJob.job.id === response.job.id,
+    )
+      ? {
+          ...original,
+          toolJobs: original.toolJobs.map((toolJob) =>
+            toolJob.job.id === response.job.id
+              ? { ...toolJob, job: response.job }
+              : toolJob,
+          ),
+        }
+      : original;
     if (
       message.kind === "backtest_job" &&
       message.backtestJob?.id === response.job.id
@@ -144,7 +201,7 @@ export function applyBacktestJobUpdate(
         return resultMessageFromRun(
           message,
           response.run,
-          response.result_readout,
+          response,
           nextExperimentRowsFromMetadata({
             next_experiments: response.next_experiments,
           }),
@@ -177,7 +234,7 @@ export function applyHydratedBacktestJobTruth(messages: Message[]): Message[] {
 function resultMessageFromRun(
   message: Message,
   run: BacktestRun,
-  resultReadout: string | null | undefined,
+  response: BacktestJobResponse,
   nextExperiments?: NextExperimentRow[] | null,
 ): Message {
   const baseCard = resultCardFromRun(run);
@@ -185,10 +242,11 @@ function resultMessageFromRun(
   return {
     ...message,
     kind: "strategy_result",
-    content: normalizedReadout(resultReadout) ?? "",
+    content: "",
     backtestJob: undefined,
     result: {
       ...baseCard,
+      readoutContent: resultReadoutContentFromMetadata(response, baseCard.readoutContent),
       actions,
     },
     actions,
@@ -197,14 +255,6 @@ function resultMessageFromRun(
     artifactType: "backtest_run",
     artifactStatus: run.status,
   };
-}
-
-function normalizedReadout(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const normalized = value.trim();
-  return normalized || null;
 }
 
 function settleConfirmationLabelsForJob(

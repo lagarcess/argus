@@ -1,3 +1,4 @@
+import { parseToolProgress, type ToolProgress, type ToolResultCard, type ToolScalar } from "./tool-result-card";
 import { getSupabaseClient } from "./supabase-client";
 import i18next from "i18next";
 import { localizeArtifactFinalPayload } from "./artifact-response-transport";
@@ -9,6 +10,7 @@ import type { DecisionState as RunDossierDecisionState } from "./run-dossier-con
 import type {
   ChatActionOption,
   ChatMention,
+  ToolJob,
   ExecutionCostEvidence,
   StrategyConfirmationPayload,
 } from "@/components/chat/types";
@@ -18,9 +20,15 @@ import {
 } from "./language-features";
 import { isConversationMemoryOptOut } from "./memory-privacy";
 import { currentViewportBand } from "./responsive-layout";
-import { runActionIdempotencyKey } from "./usage-allowance";
-import type { UsageAllowanceResponse } from "./usage-allowance";
-import type { MarketSessionPhase } from "@/components/chat/greetingPool";
+import {
+  runActionIdempotencyKey,
+  normalizeUsageAllowances,
+  type RawUsageAllowanceResponse,
+} from "./usage-allowance";
+import type {
+  DemonstratedInterest,
+  MarketSessionPhase,
+} from "@/components/chat/greetingPool";
 import type { AvatarTheme } from "./avatar-theme";
 import type { GuestPendingActionSummary } from "./guest-conversion";
 import {
@@ -29,6 +37,7 @@ import {
   resultMetricDisplayOrder,
 } from "./result-card-display";
 import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
+import { resultReadoutContentFromMetadata, type ResultReadoutContent } from "./result-readout-content";
 import { resultReadoutFacts } from "./result-readout-facts";
 import {
   ARGUS_API_BASE_URL,
@@ -126,6 +135,7 @@ export type ResultChartPayload = {
 };
 
 export type ConversationResultCard = {
+  result_readout_content?: ResultReadoutContent | null;
   title: string;
   symbols?: string[];
   strategy_label?: string;
@@ -171,6 +181,8 @@ export type BacktestRun = {
   chart?: ResultChartPayload | null;
   trades?: Record<string, unknown>[] | null;
   created_at: string;
+  /** One-decimal display figures the backend derives from metrics on read. */
+  figures?: Record<string, unknown> | null;
 };
 
 export type BacktestJob = {
@@ -199,6 +211,7 @@ export type BacktestJobResponse = {
   result_message?: ApiMessage | null;
   /** Private source prose is never transported; retained slot for old clients. */
   result_readout?: null;
+  result_readout_content?: ResultReadoutContent | null;
   result_readout_source?: string | null;
   next_experiments?: Record<string, unknown> | null;
   result_readout_fallback_used?: boolean | null;
@@ -295,17 +308,10 @@ export type EvidenceArtifact = {
   updated_at: string;
 };
 
-export type DecisionNote = {
-  id: string;
-  idea_id: string;
-  idea_version_id: string;
-  evidence_artifact_id: string;
-  source_conversation_id?: string | null;
-  decision_state: DecisionState;
-  note?: string | null;
-  created_at: string;
-  updated_at: string;
-};
+// The decision contract owns this shape; a decision attaches to an evidence
+// artifact or to a computed answer's message.
+export type { DecisionNote } from "./decision-contract";
+import type { DecisionNote } from "./decision-contract";
 
 export type SearchConversationItem = SearchConversationContract;
 
@@ -336,7 +342,7 @@ export type ChatStreamEvent =
   | { event: "token"; data: { text: string } }
   | { event: "title"; data: { conversation_id: string; title: string } }
   | { event: "status"; data: { status: string } }
-  | { event: "stage_start"; data: { stage: string; detail?: string } }
+  | { event: "stage_start"; data: { stage: string; detail?: string; tool_progress?: ToolProgress } }
   | { event: "stage_outcome"; data: { outcome: string } }
   | { event: "final"; data: ChatFinalPayload }
   | {
@@ -357,6 +363,7 @@ export type ChatStreamEvent =
   | { event: "done"; data: { message_id: string | null } };
 
 export type ChatFinalPayload = {
+  result_readout_content?: ResultReadoutContent | null;
   code?: string;
   final_response_payload?: ChatFinalResponsePayload | null;
   stage_outcome?: string;
@@ -366,6 +373,8 @@ export type ChatFinalPayload = {
   confirmation?: StrategyConfirmationPayload | null;
   confirmation_cancelled?: { confirmation_id?: string | null } | null;
   confirmation_payload?: Record<string, unknown> | null;
+  tool_result_cards?: ToolResultCard[];
+  tool_jobs?: ToolJob[];
   pending_strategy?: {
     strategy: Record<string, unknown>;
     requested_field?: string | null;
@@ -472,7 +481,7 @@ export function resultCardFromConversationCard(
   card: ConversationResultCard,
   run?: Pick<BacktestRun, "id" | "strategy_id"> &
     Partial<
-      Pick<BacktestRun, "asset_class" | "benchmark_symbol" | "config_snapshot" | "metrics" | "symbols">
+      Pick<BacktestRun, "asset_class" | "benchmark_symbol" | "config_snapshot" | "figures" | "metrics" | "symbols">
     >,
 ) {
   const rows = [...card.rows].sort(
@@ -491,6 +500,7 @@ export function resultCardFromConversationCard(
       label: displayResultMetricLabel(row, run?.benchmark_symbol),
       value: row.value,
     })),
+    readoutContent: resultReadoutContentFromMetadata(card),
     readoutFacts: resultReadoutFacts({ ...run, symbols: run?.symbols ?? card.symbols, result_card: card }),
     assetClass: run?.asset_class ?? card.asset_class ?? undefined,
     configSnapshot: run?.config_snapshot,
@@ -571,11 +581,14 @@ export async function persistBrowserSession(payload: AuthResponsePayload) {
 export type ProfilePatch = {
   language?: "en" | "es-419";
   locale?: ArgusLocale;
-  theme?: string;
   display_name?: string;
   /** Empty clears it, which is how a user opts out of being addressed by name. */
   preferred_name?: string | null;
   avatar_theme?: AvatarTheme;
+  /** ISO 3166-1 alpha-2; null clears it, and a user with none sends no location. */
+  country?: string | null;
+  /** ISO 4217; null goes back to the currency the country implies. */
+  currency_override?: string | null;
 };
 
 export async function getMe() {
@@ -583,7 +596,9 @@ export async function getMe() {
 }
 
 export async function getUsageAllowances() {
-  return apiFetch<UsageAllowanceResponse>("/me/usage");
+  return normalizeUsageAllowances(
+    await apiFetch<RawUsageAllowanceResponse>("/me/usage"),
+  );
 }
 
 export type MarketSessionResponse = {
@@ -592,12 +607,14 @@ export type MarketSessionResponse = {
     is_market_day: boolean;
     as_of: string;
   } | null;
+  interest: DemonstratedInterest | null;
 };
 
 /**
  * Which session US equities are in, resolved by the backend in Eastern time
- * against the real trading calendar. `session` is null when that calendar is
- * unreachable, and callers say nothing about the market rather than guessing.
+ * against the real trading calendar, and what the caller's own records show
+ * interest in. Either is null when unreadable, and callers say nothing about
+ * the market rather than guessing.
  */
 export async function getMarketSession(signal?: AbortSignal) {
   return apiFetch<MarketSessionResponse>("/market/session", { signal });
@@ -777,6 +794,14 @@ export async function restoreConfirmationAssets(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ restore_previous: true }),
     },
+  );
+  return response.message;
+}
+
+export async function recomputeToolResult(conversationId: string, messageId: string, card: ToolResultCard, changes: Record<string, ToolScalar>): Promise<ApiMessage> {
+  const response = await apiFetch<{ message: ApiMessage }>(
+    `/conversations/${encodeURIComponent(conversationId)}/tool-results/${encodeURIComponent(card.artifact_id)}/recompute`,
+    { method: "POST", body: JSON.stringify({ message_id: messageId, input_revision: card.input_revision, arguments: changes }) },
   );
   return response.message;
 }
@@ -1103,10 +1128,12 @@ export function parseChatStreamFrame(part: string): ChatStreamEvent | null {
 
   const type = payload.type;
   if (type === "stage_start") {
+    const progress = parseToolProgress(payload.tool_progress);
     return {
       event: "stage_start",
       data: {
         stage: String(payload.stage ?? ""),
+        ...(progress ? { tool_progress: progress } : {}),
         ...(typeof payload.detail === "string" && payload.detail
           ? { detail: payload.detail }
           : {}),

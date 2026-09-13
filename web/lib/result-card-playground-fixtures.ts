@@ -632,6 +632,11 @@ export const resultCardPlaygroundFixtures: ResultCardPlaygroundFixture[] = fixtu
       readoutFacts: {
         symbols: result.symbols ?? [],
         benchmarkDeltaPct: fixtureComparisons[fixture.id],
+        // Fixture authoring stands in for the backend claim the reader receives.
+        benchmarkClaim: fixtureComparisons[fixture.id] === 0 ? "matched"
+          : fixtureComparisons[fixture.id] > 0 ? "beat" : "lagged",
+        // The reader boundary would carry these figures; the fixture stands in.
+        costs: result.executionCosts ?? undefined,
       },
     },
   };

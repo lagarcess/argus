@@ -156,6 +156,8 @@ ISSUE_154_MIGRATED_LANGUAGE_SURFACES = [
     ARGUS_SRC / "agent_runtime" / "stages" / "explain.py",
     ARGUS_SRC / "api" / "chat" / "breakdown.py",
     ARGUS_SRC / "api" / "chat" / "confirmation.py",
+    ARGUS_SRC / "api" / "chat" / "confirmation_lifecycle.py",
+    ARGUS_SRC / "api" / "chat" / "confirmation_research_peers.py",
     ARGUS_SRC / "agent_runtime" / "recovery_messages.py",
     ARGUS_SRC / "agent_runtime" / "clarification_contract.py",
     ARGUS_SRC / "agent_runtime" / "artifact_action_recovery.py",

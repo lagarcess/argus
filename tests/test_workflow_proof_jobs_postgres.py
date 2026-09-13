@@ -20,10 +20,8 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from argus.domain.conversation_activity import (
-    ActivitySource,
-    project_conversation_activity,
-)
+from argus.api.conversation_activity import source_from_row
+from argus.domain.conversation_activity import project_conversation_activity
 
 DSN = os.getenv("ARGUS_DISPOSABLE_DATABASE_URL", "").strip()
 pytestmark = pytest.mark.skipif(
@@ -79,21 +77,18 @@ def _job_sources(connection, *, user_id: str, conversation_id: str) -> list[dict
     return [source for source in row[0] if source["source_kind"] == "backtest_job"]
 
 
+def _trimmed_fraction_width(occurred_at: object) -> int:
+    """How many fractional-second digits Postgres actually serialized."""
+
+    fraction = re.search(r"\.(\d+)", str(occurred_at))
+    assert fraction is not None, occurred_at
+    return len(fraction.group(1))
+
+
 def _projected_operation(conversation_id: str, sources: list[dict]) -> str:
     activity = project_conversation_activity(
         conversation_id=conversation_id,
-        sources=[
-            ActivitySource(
-                conversation_id=str(source["conversation_id"]),
-                source_kind=source["source_kind"],
-                source_id=str(source["source_id"]),
-                status=str(source["status"]),
-                occurred_at=datetime.fromisoformat(source["occurred_at"]),
-                stage_outcome=source.get("stage_outcome"),
-                result_hydrateable=source.get("result_hydrateable") is True,
-            )
-            for source in sources
-        ],
+        sources=[source_from_row(source) for source in sources],
         read_state=None,
     )
     return activity.operation.status
@@ -173,16 +168,20 @@ def test_legacy_proof_row_projects_checking_until_reclassified() -> None:
         try:
             conversation_id = _seed_conversation(connection, user_id=user_id)
             job_id = str(uuid4())
-            finished_at = datetime.now(timezone.utc)
+            # A succeeded row the reader cannot hydrate is projected from
+            # updated_at, not finished_at, so that is the column that has to
+            # carry the short fraction. Postgres trims trailing zeros, so
+            # these microseconds serialize as five digits on every run.
+            occurred_at = datetime.now(timezone.utc).replace(microsecond=123_450)
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     insert into public.backtest_jobs
                       (id, user_id, conversation_id, operation_scope, payload_hash,
-                       launch_payload, status, started_at, finished_at,
+                       launch_payload, status, started_at, finished_at, updated_at,
                        execution_metadata)
                     values (%s, %s, %s, 'chat.run_backtest', 'sha256:legacy',
-                            %s::jsonb, 'succeeded', %s, %s, %s::jsonb)
+                            %s::jsonb, 'succeeded', %s, %s, %s, %s::jsonb)
                     """,
                     (
                         job_id,
@@ -195,8 +194,9 @@ def test_legacy_proof_row_projects_checking_until_reclassified() -> None:
                                 "created_by": PROOF_SEED_CREATED_BY,
                             }
                         ),
-                        finished_at,
-                        finished_at,
+                        occurred_at,
+                        occurred_at,
+                        occurred_at,
                         json.dumps({"workflow_proof": {"kind": PROOF_KIND}}),
                     ),
                 )
@@ -207,6 +207,7 @@ def test_legacy_proof_row_projects_checking_until_reclassified() -> None:
             assert [
                 (source["status"], source["result_hydrateable"]) for source in before
             ] == [("succeeded", False)]
+            assert _trimmed_fraction_width(before[0]["occurred_at"]) == 5
             assert _projected_operation(conversation_id, before) == "checking"
 
             with connection.cursor() as cursor:

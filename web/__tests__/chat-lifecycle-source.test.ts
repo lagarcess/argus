@@ -178,7 +178,6 @@ describe("chat archive/delete lifecycle source contract", () => {
     const sidebar = readFileSync(join(root, "components/sidebar/ChatSidebar.tsx"), "utf-8");
     const profileMenu = readFileSync(join(root, "components/sidebar/ProfileMenu.tsx"), "utf-8");
     const profilePanels = readFileSync(join(root, "components/sidebar/ProfileSettingsPanels.tsx"), "utf-8");
-    const settings = readFileSync(join(root, "components/views/SettingsView.tsx"), "utf-8");
     const archived = readFileSync(join(root, "components/settings/ArchivedChatsView.tsx"), "utf-8");
     const deleted = readFileSync(join(root, "components/settings/DeletedItemsView.tsx"), "utf-8");
 
@@ -188,8 +187,6 @@ describe("chat archive/delete lifecycle source contract", () => {
     // The menu threads it to the panel dispatch, which owns the panels.
     expect(profileMenu).toContain("onHistoryMutated={onHistoryMutated}");
     expect(profilePanels).toContain("onRestored={onHistoryMutated}");
-    expect(settings).toContain("onHistoryMutated?: () => void");
-    expect(settings).toContain("onHistoryMutated?.()");
     expect(archived).toContain("onRestored?: () => void");
     expect(archived).toContain("onRestored?.()");
     expect(deleted).toContain("onRestored?: () => void");
@@ -393,11 +390,13 @@ describe("chat archive/delete lifecycle source contract", () => {
       join(root, "lib/chat-transcript-session-cache.ts"),
       "utf-8",
     );
+    // The shared affordance calls onSaved only after the durable write
+    // succeeded, so the card's callback is the success slice.
     const decisionSuccessStart = card.indexOf(
-      "const response = await createEvidenceDecision",
+      "onSaved: async (decision) => {",
     );
     const decisionSuccessEnd = card.indexOf(
-      "} catch",
+      "if (!memoryProposalEnabled) return;",
       decisionSuccessStart,
     );
     const decisionSuccess = card.slice(
@@ -407,10 +406,10 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(decisionSuccessStart).toBeGreaterThan(-1);
     expect(decisionSuccessEnd).toBeGreaterThan(decisionSuccessStart);
     expect(decisionSuccess).toContain(
-      "setSavedDecisionState(response.decision.decision_state)",
+      "setSavedDecisionState(decision.decision_state)",
     );
     expect(decisionSuccess).toContain(
-      "onDecisionSaved?.(response.decision.decision_state)",
+      "onDecisionSaved?.(decision.decision_state)",
     );
     expect(decisionSuccess.indexOf("setSavedDecisionState")).toBeLessThan(
       decisionSuccess.indexOf("onDecisionSaved?.("),

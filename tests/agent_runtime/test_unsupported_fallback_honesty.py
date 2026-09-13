@@ -172,10 +172,10 @@ def test_other_unsupported_reasons_never_claim_rule_is_undefined() -> None:
 
 def test_future_and_granularity_fallbacks_are_unchanged() -> None:
     future_state = _unsupported_state(
-        message="What will BTC be worth in ten years?",
+        message="Backtest BTC over the next ten years.",
         category="future_performance",
-        raw_value="in ten years",
-        explanation="Argus cannot predict future performance.",
+        raw_value="the next ten years",
+        explanation="There is no market data for a future period.",
     )
     future_result = clarify_stage(
         state=future_state,
@@ -184,7 +184,11 @@ def test_future_and_granularity_fallbacks_are_unchanged() -> None:
         language="en",
     )
     future_prompt = future_result.patch["assistant_prompt"]
-    assert "cannot predict future performance" in future_prompt
+    # Decision 10: the surviving boundary is a test over a future window,
+    # named for what it is, never a refusal to look forward.
+    assert "no market data for a period that has not happened yet" in future_prompt
+    assert "historical period" in future_prompt
+    assert "predict" not in future_prompt
 
     granularity_state = _unsupported_state(
         message="Backtest AAPL on 5-minute bars.",

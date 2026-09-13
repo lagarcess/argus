@@ -10,25 +10,42 @@ type UsageWindow = {
 type UsageAllowance = {
   hour: UsageWindow;
   day: UsageWindow;
-  guest_session: null;
+  guest_session: UsageWindow | null;
   available_now: boolean;
-  limiting_window: "hour" | "day";
+  limiting_window: "hour" | "day" | "guest_session";
+};
+
+type UnboundedAllowance = {
+  hour: null;
+  day: null;
+  guest_session: null;
+  available_now: true;
+  limiting_window: null;
+};
+
+const UNBOUNDED: UnboundedAllowance = {
+  hour: null,
+  day: null,
+  guest_session: null,
+  available_now: true,
+  limiting_window: null,
 };
 
 type UsageShellOptions = {
   language?: "en" | "es-419";
   locale?: "en-US" | "es-419";
   allowances?: {
-    messages: UsageAllowance;
-    backtests: UsageAllowance;
+    compute: UnboundedAllowance;
+    grounding: UsageAllowance;
+    execution: UsageAllowance;
   };
 };
 
 type ThresholdCase = {
   tone: "teal" | "warning" | "danger";
   expectedColor: string;
-  messageDay: UsageWindow;
-  backtestDay: UsageWindow;
+  groundingDay: UsageWindow;
+  executionDay: UsageWindow;
 };
 
 const thresholdHourEnd = "2026-08-07T15:00:00Z";
@@ -37,13 +54,13 @@ const thresholdCases: ThresholdCase[] = [
   {
     tone: "teal",
     expectedColor: "rgb(91, 168, 151)",
-    messageDay: {
+    groundingDay: {
       limit: 200,
       used: 140,
       remaining: 60,
       period_end: thresholdDayEnd,
     },
-    backtestDay: {
+    executionDay: {
       limit: 50,
       used: 35,
       remaining: 15,
@@ -53,13 +70,13 @@ const thresholdCases: ThresholdCase[] = [
   {
     tone: "warning",
     expectedColor: "rgb(194, 164, 77)",
-    messageDay: {
+    groundingDay: {
       limit: 200,
       used: 142,
       remaining: 58,
       period_end: thresholdDayEnd,
     },
-    backtestDay: {
+    executionDay: {
       limit: 50,
       used: 36,
       remaining: 14,
@@ -69,13 +86,13 @@ const thresholdCases: ThresholdCase[] = [
   {
     tone: "danger",
     expectedColor: "rgb(214, 109, 117)",
-    messageDay: {
+    groundingDay: {
       limit: 200,
       used: 180,
       remaining: 20,
       period_end: thresholdDayEnd,
     },
-    backtestDay: {
+    executionDay: {
       limit: 50,
       used: 45,
       remaining: 5,
@@ -199,7 +216,7 @@ async function openUsageDialog(
   return settingsTrigger;
 }
 
-test("Usage colors message and backtest gauges independently", async ({
+test("Usage colors grounding and execution gauges independently", async ({
   page,
 }) => {
   const danger = thresholdCases.find(({ tone }) => tone === "danger");
@@ -210,8 +227,9 @@ test("Usage colors message and backtest gauges independently", async ({
 
   await mockUsageShell(page, {
     allowances: {
-      messages: thresholdAllowance(danger.messageDay, 60),
-      backtests: thresholdAllowance(teal.backtestDay, 10),
+      compute: UNBOUNDED,
+      grounding: thresholdAllowance(danger.groundingDay, 60),
+      execution: thresholdAllowance(teal.executionDay, 10),
     },
   });
   await page.goto("/chat", { waitUntil: "networkidle" });
@@ -273,8 +291,9 @@ for (const languageCase of [
         language: languageCase.language,
         locale: languageCase.locale,
         allowances: {
-          messages: thresholdAllowance(thresholdCase.messageDay, 60),
-          backtests: thresholdAllowance(thresholdCase.backtestDay, 10),
+          compute: UNBOUNDED,
+          grounding: thresholdAllowance(thresholdCase.groundingDay, 60),
+          execution: thresholdAllowance(thresholdCase.executionDay, 10),
         },
       });
       await page.goto("/chat", { waitUntil: "networkidle" });
@@ -292,10 +311,10 @@ for (const languageCase of [
         );
       }
       await expect(dialog).toContainText(
-        languageCase.remainingText(thresholdCase.messageDay.remaining),
+        languageCase.remainingText(thresholdCase.groundingDay.remaining),
       );
       await expect(dialog).toContainText(
-        languageCase.remainingText(thresholdCase.backtestDay.remaining),
+        languageCase.remainingText(thresholdCase.executionDay.remaining),
       );
       await expect(
         dialog.locator(`time[datetime="${thresholdDayEnd}"]`),
@@ -364,8 +383,9 @@ test("Usage renders the quiet remaining-first gauge with one disclosure", async 
   });
   await mockUsageShell(page, {
     allowances: {
-      messages: zeroAllowance(60, 200, hourEnd, dayEnd),
-      backtests: zeroAllowance(10, 50, hourEnd, dayEnd),
+      compute: UNBOUNDED,
+      grounding: zeroAllowance(60, 200, hourEnd, dayEnd),
+      execution: zeroAllowance(10, 50, hourEnd, dayEnd),
     },
   });
   await page.goto("/chat", { waitUntil: "networkidle" });
@@ -396,8 +416,12 @@ test("Usage renders the quiet remaining-first gauge with one disclosure", async 
   await disclosure.click();
   await expect(disclosure).toHaveAttribute("aria-expanded", "true");
   await expect(dialog).toContainText(
-    "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
+    "Conversation is free. Asking questions and reading answers never counts.",
   );
+  await expect(dialog).toContainText(
+    "Searches with sources count once per search Argus runs for you. Answers from Argus data don’t count.",
+  );
+  await expect(dialog).toContainText("No limit");
   await expect(dialog).toContainText(
     "New simulations count once. Retrying the same simulation doesn’t count again.",
   );
@@ -419,14 +443,15 @@ test("Usage reveals the hourly window when the backend marks it limiting", async
   const dayEnd = "2026-07-18T00:00:00Z";
   await mockUsageShell(page, {
     allowances: {
-      messages: {
+      compute: UNBOUNDED,
+      grounding: {
         hour: { limit: 60, used: 60, remaining: 0, period_end: hourEnd },
         day: { limit: 200, used: 90, remaining: 110, period_end: dayEnd },
         guest_session: null,
         available_now: false,
         limiting_window: "hour",
       },
-      backtests: zeroAllowance(10, 50, hourEnd, dayEnd),
+      execution: zeroAllowance(10, 50, hourEnd, dayEnd),
     },
   });
   await page.goto("/chat", { waitUntil: "networkidle" });
@@ -453,14 +478,15 @@ test("Usage renders the Spanish daily-exhausted state and backend reset", async 
     language: "es-419",
     locale: "es-419",
     allowances: {
-      messages: {
+      compute: UNBOUNDED,
+      grounding: {
         hour: { limit: 60, used: 0, remaining: 60, period_end: hourEnd },
         day: { limit: 200, used: 200, remaining: 0, period_end: dayEnd },
         guest_session: null,
         available_now: false,
         limiting_window: "day",
       },
-      backtests: zeroAllowance(10, 50, hourEnd, dayEnd),
+      execution: zeroAllowance(10, 50, hourEnd, dayEnd),
     },
   });
   await page.goto("/chat", { waitUntil: "networkidle" });
@@ -478,8 +504,12 @@ test("Usage renders the Spanish daily-exhausted state and backend reset", async 
   const disclosure = dialog.getByRole("button", { name: "¿Qué cuenta?" });
   await disclosure.click();
   await expect(dialog).toContainText(
-    "Los mensajes cuentan cuando Argus completa una respuesta. Las respuestas fallidas o interrumpidas no cuentan.",
+    "La conversación es gratis. Preguntar y leer respuestas nunca cuenta.",
   );
+  await expect(dialog).toContainText(
+    "Las búsquedas con fuentes cuentan una vez por cada búsqueda que Argus hace por ti. Las respuestas con datos de Argus no cuentan.",
+  );
+  await expect(dialog).toContainText("Sin límite");
   await expect(dialog).toContainText(
     "Las simulaciones nuevas cuentan una vez. Reintentar la misma simulación no vuelve a contar.",
   );
@@ -488,3 +518,79 @@ test("Usage renders the Spanish daily-exhausted state and backend reset", async 
     dialog.locator(`time[datetime="${dayEnd}"]`).first(),
   ).not.toBeEmpty();
 });
+
+// Operation classes: an unbounded class shows no gauge. Screenshots land
+// under docs/reports/evidence/561 only when the capture flag is set. The
+// guest workspace line needs a real guest bootstrap and is covered by unit
+// tests instead.
+const OPERATION_CLASS_EVIDENCE_DIR =
+  "../docs/reports/evidence/561/usage-operation-classes";
+
+for (const classCase of [
+  {
+    language: "en" as const,
+    locale: "en-US" as const,
+    theme: "light" as const,
+    labels: { settings: "Settings", data: "Data Controls", usage: "Usage" },
+    noLimit: "No limit",
+    simulationsLeft: "46 left today",
+  },
+  {
+    language: "es-419" as const,
+    locale: "es-419" as const,
+    theme: "dark" as const,
+    labels: { settings: "Ajustes", data: "Controles de datos", usage: "Uso" },
+    noLimit: "Sin límite",
+    simulationsLeft: "Quedan 46 hoy",
+  },
+]) {
+  test(`Usage keys allowances by operation class in ${classCase.language}`, async ({
+    page,
+  }) => {
+    const hourEnd = "2026-07-17T15:00:00Z";
+    const dayEnd = "2026-07-18T00:00:00Z";
+    await page.addInitScript((theme) => {
+      window.localStorage.setItem("argus-theme", theme);
+    }, classCase.theme);
+    await mockUsageShell(page, {
+      language: classCase.language,
+      locale: classCase.locale,
+      allowances: {
+        compute: UNBOUNDED,
+        grounding: UNBOUNDED,
+        execution: {
+          hour: { limit: 10, used: 1, remaining: 9, period_end: hourEnd },
+          day: { limit: 50, used: 4, remaining: 46, period_end: dayEnd },
+          guest_session: null,
+          available_now: true,
+          limiting_window: "hour",
+        },
+      },
+    });
+    await page.goto("/chat", { waitUntil: "networkidle" });
+    await openUsageDialog(page, classCase.labels);
+
+    const dialog = page.getByRole("dialog", { name: classCase.labels.usage });
+    // Rail on: conversation and searches are both unbounded for an account,
+    // so only simulations carries a gauge.
+    await expect(dialog.getByText(classCase.noLimit)).toHaveCount(2);
+    await expect(dialog.getByRole("progressbar")).toHaveCount(1);
+    await expect(dialog).toContainText(classCase.simulationsLeft);
+    await expect(dialog).not.toContainText("temporary chat");
+
+    if (process.env.ARGUS_CAPTURE_USAGE_CLASSES_EVIDENCE === "1") {
+      await page.evaluate(() => {
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
+      await dialog.screenshot({
+        path: `${OPERATION_CLASS_EVIDENCE_DIR}/${classCase.language}-${classCase.theme}-registered.png`,
+        animations: "disabled",
+      });
+    }
+  });
+}

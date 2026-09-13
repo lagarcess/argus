@@ -2,7 +2,7 @@ import type { StrategyConfirmationPeriodAdjustment } from "@/components/chat/typ
 
 type PeriodTranslation = (
   key: string,
-  options: { period: string },
+  options: { period: string; symbol?: string; date?: string },
 ) => string;
 
 export function confirmationPeriodAdjustmentText(
@@ -26,9 +26,19 @@ export function confirmationPeriodAdjustmentText(
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
     return null;
   }
-  const start = formatter.format(startDate);
-  const end = formatter.format(endDate);
-  return translate("chat.confirmation.period_adjustment", {
-    period: `${start} – ${end}`,
-  });
+  const period = `${formatter.format(startDate)} – ${formatter.format(endDate)}`;
+  const limitedBy = adjustment.limited_by;
+  const symbol = limitedBy?.symbol.trim() ?? "";
+  const firstAvailable = limitedBy
+    ? new Date(`${limitedBy.first_available}T00:00:00Z`)
+    : null;
+  // Older cards without a limiting asset keep the shared data window reason.
+  if (symbol && firstAvailable && !Number.isNaN(firstAvailable.getTime())) {
+    return translate("chat.confirmation.period_adjustment_limited_by", {
+      period,
+      symbol,
+      date: formatter.format(firstAvailable),
+    });
+  }
+  return translate("chat.confirmation.period_adjustment", { period });
 }

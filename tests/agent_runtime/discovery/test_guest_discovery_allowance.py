@@ -86,7 +86,13 @@ class TestGlobalCeiling:
         """The bound that still holds when someone rotates identity."""
         seen: list[str] = []
 
-        def _within(*, subject: str, limits: list[tuple[str, int]], now: object) -> bool:
+        def _within(
+            *,
+            subject: str,
+            limits: list[tuple[str, int]],
+            now: object,
+            resource: str = discovery_evidence.DISCOVERY_USAGE_RESOURCE,
+        ) -> bool:
             seen.append(subject)
             return subject != GLOBAL_DISCOVERY_CEILING_SUBJECT
 
@@ -108,7 +114,13 @@ class TestGlobalCeiling:
     ) -> None:
         seen: list[str] = []
 
-        def _within(*, subject: str, limits: list[tuple[str, int]], now: object) -> bool:
+        def _within(
+            *,
+            subject: str,
+            limits: list[tuple[str, int]],
+            now: object,
+            resource: str = discovery_evidence.DISCOVERY_USAGE_RESOURCE,
+        ) -> bool:
             seen.append(subject)
             return True
 

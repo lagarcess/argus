@@ -5,13 +5,12 @@ from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
     Field,
     SerializerFunctionWrapHandler,
-    WithJsonSchema,
+    computed_field,
     field_serializer,
     field_validator,
     model_serializer,
@@ -21,17 +20,47 @@ from typing_extensions import NotRequired, TypedDict
 
 from argus.api.artifact_presentation import ReaderJobResponse, reader_run
 from argus.api.conversation_preview_contract import ConversationPreview
+
+# Re-exported: the decision contract owns these shapes; readers keep
+# importing them from here.
+from argus.api.decision_contract import (  # noqa: F401
+    DECISION_NOTE_WRITE_MAX_LENGTH,
+    DecisionActionAvailability,
+    DecisionComputation,
+    DecisionNote,
+    DecisionNoteCreate,
+    DecisionOpenResponse,
+    DecisionRerun,
+    DecisionRerunRequest,
+    DecisionState,
+    MessageDecisionResponse,
+    RetestDossierState,
+    RetestWindowViolationCode,
+    SearchDecisionAction,
+    SearchDossierDecision,
+    SearchRetestAction,
+    SearchRetestRepair,
+)
 from argus.api.feedback_context import (
     MAX_FEEDBACK_CONTEXT_DEPTH,
     MAX_FEEDBACK_CONTEXT_KEYS,
     MAX_FEEDBACK_CONTEXT_SERIALIZED_LENGTH,
     MAX_FEEDBACK_MESSAGE_LENGTH,
 )
-from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
+from argus.domain.home_country import (
+    AssignedCountryCode,
+    CountryCode,
+    CurrencyCode,
+    TenderCurrencyCode,
+    resolved_currency,
+)
+from argus.domain.result_readout_content import ResultReadoutContent
+from argus.domain.strategy_template_contract import (
+    ExecutableStrategyTemplate as StrategyTemplate,
+)
 
 Language = Literal["en", "es-419"]
 Locale = Literal["en-US", "es-419"]
-Theme = Literal["dark", "light", "system"]
 AvatarTheme = Literal["ocean", "plum", "teal", "ember", "gold", "indigo", "slate"]
 AssetClass = Literal["equity", "crypto", "currency_pair"]
 BacktestStatus = Literal["queued", "running", "completed", "failed"]
@@ -47,11 +76,6 @@ ArtifactLifecycle = Literal[
     "discarded",
 ]
 EvidenceArtifactType = Literal["backtest"]
-DecisionState = Literal["watching", "promising", "rejected", "revisit_later"]
-DecisionActionAvailability = Literal[
-    "available",
-    "account_conversion_required",
-]
 MessageRole = Literal["user", "assistant", "system", "tool"]
 NameSource = Literal["system_default", "ai_generated", "user_renamed"]
 ConversationOperationStatus = Literal["idle", "queued", "running", "checking"]
@@ -63,8 +87,6 @@ ConversationAttentionStatus = Literal[
     "needs_input",
     "needs_attention",
 ]
-
-DECISION_NOTE_WRITE_MAX_LENGTH = 500
 
 CHAT_STREAM_MAX_BODY_BYTES = 65_536
 CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH = 128
@@ -82,30 +104,6 @@ CHAT_STREAM_MAX_ACTION_PAYLOAD_BYTES = 16_384
 CHAT_STREAM_MAX_ACTION_PAYLOAD_DEPTH = 6
 CHAT_STREAM_MAX_ACTION_PAYLOAD_CONTAINER_ITEMS = 50
 CHAT_STREAM_MAX_ACTION_PAYLOAD_STRING_LENGTH = 4_096
-
-
-# Single source of truth: executable templates live only in the capability registry
-# (derived from each StrategyCapability's status). StrategyTemplate validates against that
-# set at runtime and publishes its OpenAPI enum from it, so there is no second hardcoded
-# list to keep in sync. Draft templates are absent from the registry's executable set, so
-# the API rejects them at the request boundary.
-def _ensure_executable_template(value: str) -> str:
-    if value not in EXECUTABLE_TEMPLATES:
-        raise ValueError(f"unsupported strategy template: {value!r}")
-    return value
-
-
-StrategyTemplate = Annotated[
-    str,
-    AfterValidator(_ensure_executable_template),
-    WithJsonSchema(
-        {
-            "type": "string",
-            "enum": sorted(EXECUTABLE_TEMPLATES),
-            "title": "StrategyTemplate",
-        }
-    ),
-]
 
 
 class OnboardingState(BaseModel):
@@ -162,12 +160,22 @@ class User(BaseModel):
     preferred_name: PreferredName = None
     language: Language = "en"
     locale: Locale = "en-US"
-    theme: Theme = "dark"
     avatar_theme: AvatarTheme = "ocean"
+    #: ISO 3166-1 alpha-2, declared in Settings and never inferred. Research
+    #: sends it as the reader's location; null sends none.
+    country: CountryCode = None
+    #: ISO 4217 the user chose over the currency their country implies.
+    currency_override: CurrencyCode = None
     is_admin: bool = False
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    @property
+    def currency(self) -> str | None:
+        """ISO 4217: the override when set, otherwise the country's currency."""
+        return resolved_currency(self.country, self.currency_override)
 
 
 class GuestAccountSummary(BaseModel):
@@ -176,7 +184,6 @@ class GuestAccountSummary(BaseModel):
     expires_at: datetime
     conversation_id: str | None
     conversation_limit: int = Field(ge=1, le=2_147_483_647)
-    message_limit: int = Field(ge=1, le=2_147_483_647)
     simulation_limit: int = Field(ge=1, le=2_147_483_647)
     feedback_limit: int = Field(ge=1, le=2_147_483_647)
 
@@ -203,7 +210,6 @@ class GuestUser(BaseModel):
     display_name: str | None = None
     language: Language = "en"
     locale: Locale = "en-US"
-    theme: Theme = "dark"
     is_admin: bool = False
     onboarding: OnboardingState = Field(default_factory=OnboardingState)
     created_at: datetime
@@ -232,47 +238,14 @@ class UserResponse(BaseModel):
         return self
 
 
-class UsageWindow(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    limit: int = Field(ge=0)
-    used: int = Field(ge=0)
-    remaining: int = Field(ge=0)
-    period_end: datetime
-
-
-class UsageAllowance(BaseModel):
-    """Backend-derived allowance truth for the account's active windows."""
-
-    model_config = ConfigDict(frozen=True)
-
-    hour: UsageWindow | None
-    day: UsageWindow | None
-    guest_session: UsageWindow | None
-    available_now: bool
-    limiting_window: Literal["hour", "day", "guest_session"]
-
-
-class UsageAllowances(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    messages: UsageAllowance
-    backtests: UsageAllowance
-
-
-class UsageAllowanceResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    allowances: UsageAllowances
-
-
 class ProfilePatch(BaseModel):
     display_name: str | None = None
     preferred_name: PreferredName = None
     language: Language | None = None
     locale: Locale | None = None
-    theme: Theme | None = None
     avatar_theme: AvatarTheme = "ocean"
+    country: AssignedCountryCode = None
+    currency_override: TenderCurrencyCode = None
 
 
 class ConversationCreate(BaseModel):
@@ -385,6 +358,8 @@ class Strategy(BaseModel):
     @field_validator("template", mode="before")
     @classmethod
     def _tolerate_retired_template(cls, value: Any) -> Any:
+        from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
+
         # Persisted strategies saved before a template was retired (e.g. the draft
         # momentum_breakout / trend_follow) must still load. Coerce any non-executable
         # template to buy_and_hold on read. BacktestRunRequest intentionally stays
@@ -436,6 +411,7 @@ class BacktestRun(BaseModel):
     created_at: datetime
     chart: dict[str, Any] | None = None
     trades: list[dict[str, Any]] | None = None
+    figures: dict[str, Any] | None = None  # display figures, derived on read
 
 
 class BacktestRunResponse(BaseModel):
@@ -473,6 +449,7 @@ class BacktestJobResponse(ReaderJobResponse):
     # way a backtest's result is ``run``; clients render it in place.
     result_message: Message | None = None
     result_readout: str | None = None
+    result_readout_content: ResultReadoutContent | None = None
     result_readout_source: str | None = None
     result_readout_fallback_used: bool | None = None
     result_readout_failure_mode: str | None = None
@@ -521,34 +498,6 @@ class EvidenceArtifact(BaseModel):
     payload: dict[str, Any]
     created_at: datetime
     updated_at: datetime
-
-
-class DecisionNote(BaseModel):
-    id: str
-    idea_id: str
-    idea_version_id: str
-    evidence_artifact_id: str
-    source_conversation_id: str | None = None
-    decision_state: DecisionState
-    note: str | None = None
-    created_at: datetime
-    updated_at: datetime
-
-
-class DecisionNoteCreate(BaseModel):
-    decision_state: DecisionState
-    note: str | None = Field(
-        default=None,
-        max_length=DECISION_NOTE_WRITE_MAX_LENGTH,
-    )
-
-    @field_validator("note")
-    @classmethod
-    def normalize_note(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        cleaned = value.strip()
-        return cleaned or None
 
 
 class DecisionNoteResponse(BaseModel):
@@ -612,12 +561,6 @@ class PaginatedHistory(BaseModel):
     next_cursor: str | None = None
 
 
-class SearchDossierDecision(BaseModel):
-    state: DecisionState
-    note: str | None = Field(default=None, max_length=2000)
-    run_label: str | None = Field(default=None, max_length=160)
-
-
 class SearchDossierMetric(BaseModel):
     name: str = Field(max_length=80)
     value: str | int | float
@@ -629,65 +572,6 @@ class SearchDossierOutcome(BaseModel):
     benchmark_symbol: str | None = Field(default=None, max_length=24)
     result_fact_bank: dict[str, Any] | None = None
     metrics: list[SearchDossierMetric] = Field(default_factory=list, max_length=4)
-
-
-RetestDossierState = Literal["new_data_available", "no_new_data", "cant_do_it"]
-RetestWindowViolationCode = Literal[
-    "provider_history_start_unavailable",
-    "kraken_ohlc_window_exceeded",
-    "provider_timeframe_unavailable",
-]
-
-
-class SearchRetestRepair(BaseModel):
-    kind: Literal["clamp_start"] = "clamp_start"
-    start_date: date
-    end_date: date
-
-
-class SearchRetestAction(BaseModel):
-    """Bounded typed retest envelope (spec 2.2).
-
-    Carries identity and policy only. The executable setup is reloaded
-    server-side from the owner-scoped source run, so no client value can
-    reach canonical state.
-    """
-
-    type: Literal["retest_run"] = "retest_run"
-    source_run_id: str
-    run_label: str = Field(max_length=160)
-    window_policy: Literal["preserve_start_ending_latest_available"] = (
-        "preserve_start_ending_latest_available"
-    )
-    contract_version: Literal["argus_retest_run/v2"] = "argus_retest_run/v2"
-    state: RetestDossierState
-    reason_code: RetestWindowViolationCode | None = None
-    repair: SearchRetestRepair | None = None
-
-    @model_validator(mode="after")
-    def validate_state_shape(self) -> SearchRetestAction:
-        if self.state != "cant_do_it":
-            if self.reason_code is not None or self.repair is not None:
-                raise ValueError("Only cant_do_it may carry a reason or repair")
-            return self
-        if self.reason_code is None:
-            raise ValueError("cant_do_it requires a reason_code")
-        repairable = self.reason_code in {
-            "provider_history_start_unavailable",
-            "kraken_ohlc_window_exceeded",
-        }
-        if repairable != (self.repair is not None):
-            raise ValueError("Retest repair must match the reason_code")
-        return self
-
-
-class SearchDecisionAction(BaseModel):
-    type: Literal["decision"] = "decision"
-    availability: DecisionActionAvailability
-    evidence_artifact_id: str
-    decision_state: DecisionState | None = None
-    note: str | None = Field(default=None, max_length=2000)
-    run_label: str = Field(max_length=160)
 
 
 SearchDossierAction = Annotated[
@@ -993,6 +877,14 @@ class MarketSession(BaseModel):
     as_of: datetime
 
 
+class DemonstratedInterest(BaseModel):
+    """What a person's own records show interest in."""
+
+    model_config = ConfigDict(frozen=True)
+
+    markets: bool
+
+
 class MarketSessionResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -1000,6 +892,12 @@ class MarketSessionResponse(BaseModel):
         description=(
             "Null when the trading calendar is unreachable. Callers say nothing "
             "about the market rather than guessing an open or a holiday."
+        )
+    )
+    interest: DemonstratedInterest | None = Field(
+        description=(
+            "Null when the caller's records are unreadable. Callers treat it as "
+            "no shown interest."
         )
     )
 
@@ -1116,6 +1014,9 @@ class GuestBootstrapRequest(BaseModel):
 GuestHandoffKind = Literal["existing_account", "new_account_signup"]
 
 
+# message_limit is legacy: no client creates it since conversation became
+# compute, but a handoff persisted by an earlier bundle can still carry it and
+# must claim cleanly until it expires.
 GuestConversionReason = Literal[
     "second_simulation",
     "simulation_limit",
@@ -1124,6 +1025,7 @@ GuestConversionReason = Literal[
     "new_conversation",
     "keep_history",
     "discovery_searches",
+    "share_result",
 ]
 
 
@@ -1135,12 +1037,20 @@ class GuestPendingAction(BaseModel):
     action_id: str = Field(min_length=1, max_length=128)
     artifact_id: str | None = Field(default=None, min_length=1, max_length=128)
 
+    message_id: str | None = Field(default=None, min_length=1, max_length=128)
+
     @model_validator(mode="after")
     def require_reason_specific_identity(self) -> "GuestPendingAction":
-        if self.reason == "save_decision" and self.artifact_id is None:
-            raise ValueError("save_decision_requires_artifact_id")
-        if self.reason != "save_decision" and self.artifact_id is not None:
-            raise ValueError("artifact_id_is_only_valid_for_save_decision")
+        from argus.domain.guest_pending_action_contract import (
+            GUEST_PENDING_ACTION_IDENTITIES,
+        )
+
+        for reason, field in GUEST_PENDING_ACTION_IDENTITIES.items():
+            value = getattr(self, field)
+            if self.reason == reason and value is None:
+                raise ValueError(f"{reason}_requires_{field}")
+            if self.reason != reason and value is not None:
+                raise ValueError(f"{field}_is_only_valid_for_{reason}")
         return self
 
 

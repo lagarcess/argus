@@ -168,6 +168,10 @@ def compute_alpha_metrics(
     symbol_coverages: list[dict[str, Any]] = []
     closed_trades: list[ClosedTrade] = []
     gross_closed_trades: list[ClosedTrade] = []
+    # Cost dollars sum the strategy's own fills only, never the benchmark's or
+    # the zero-cost gross side's.
+    modeled_fee_cost = 0.0
+    modeled_slippage_cost = 0.0
     start = date.fromisoformat(config["start_date"])
     end = date.fromisoformat(config["end_date"])
     realism = _execution_realism_settings(config)
@@ -203,6 +207,8 @@ def compute_alpha_metrics(
             exits=exits,
             allow_accumulation=is_dca,
         )
+        symbol_buy_fills = _execution_fill_count(execution_events, side="buy")
+        symbol_sell_fills = _execution_fill_count(execution_events, side="sell")
         symbol_execution: LongOnlyExecutionResult | None = None
         if not is_dca:
             symbol_execution = _execute_long_only_ledger(
@@ -258,6 +264,8 @@ def compute_alpha_metrics(
                 slippage=float(realism["slippage"]),
             )
             symbol_equity = dca_result.equity_curve
+            modeled_fee_cost += dca_result.modeled_fee_cost
+            modeled_slippage_cost += dca_result.modeled_slippage_cost
             benchmark_result = _dca_equity_curve(
                 close=benchmark_normalized,
                 entries=entries,
@@ -296,12 +304,16 @@ def compute_alpha_metrics(
                 external_flows=dca_result.external_flows,
                 invested_capital=invested_capital,
                 time_basis=symbol_time_basis,
-                trade_count=_execution_fill_count(execution_events, side="buy"),
+                trade_count=symbol_buy_fills,
+                buy_fills=symbol_buy_fills,
+                sell_fills=symbol_sell_fills,
             )
         else:
             if symbol_execution is None:
                 raise ValueError("execution_result_unavailable")
             symbol_equity = symbol_execution.equity_curve
+            modeled_fee_cost += symbol_execution.modeled_fee_cost
+            modeled_slippage_cost += symbol_execution.modeled_slippage_cost
             if has_modeled_costs:
                 if gross_symbol_execution is None:
                     raise ValueError("execution_result_unavailable")
@@ -321,6 +333,8 @@ def compute_alpha_metrics(
                 invested_capital=allocation_capital,
                 time_basis=symbol_time_basis,
                 trade_count=_execution_fill_count(execution_events),
+                buy_fills=symbol_buy_fills,
+                sell_fills=symbol_sell_fills,
                 closed_trade_pnls=[trade.net_pnl for trade in symbol_closed_trades],
             )
 
@@ -336,6 +350,8 @@ def compute_alpha_metrics(
     aggregate_strategy_equity = _sum_without_edge_backfill(symbol_equity_curves)
     aggregate_benchmark_equity = _sum_without_edge_backfill(benchmark_equity_curves)
     trade_count = sum(row["efficiency"]["total_trades"] for row in by_symbol.values())
+    buy_fills = sum(row["efficiency"]["buy_fills"] for row in by_symbol.values())
+    sell_fills = sum(row["efficiency"]["sell_fills"] for row in by_symbol.values())
     aggregate_time_basis = _metric_time_basis_for(
         config=config,
         effective_index=aggregate_strategy_equity.index,
@@ -361,6 +377,8 @@ def compute_alpha_metrics(
             invested_capital=aggregate_invested,
             time_basis=aggregate_time_basis,
             trade_count=trade_count,
+            buy_fills=buy_fills,
+            sell_fills=sell_fills,
         )
     else:
         aggregate_invested = float(config["starting_capital"])
@@ -370,6 +388,8 @@ def compute_alpha_metrics(
             invested_capital=aggregate_invested,
             time_basis=aggregate_time_basis,
             trade_count=trade_count,
+            buy_fills=buy_fills,
+            sell_fills=sell_fills,
             closed_trade_pnls=aggregate_closed_trade_pnls,
         )
     if has_modeled_costs and gross_symbol_equity_curves:
@@ -387,6 +407,8 @@ def compute_alpha_metrics(
                 invested_capital=aggregate_invested,
                 time_basis=aggregate_time_basis,
                 trade_count=trade_count,
+                buy_fills=buy_fills,
+                sell_fills=sell_fills,
             )
         else:
             gross_metrics = _compute_metrics_from_equity(
@@ -395,6 +417,8 @@ def compute_alpha_metrics(
                 invested_capital=aggregate_invested,
                 time_basis=aggregate_time_basis,
                 trade_count=trade_count,
+                buy_fills=buy_fills,
+                sell_fills=sell_fills,
                 closed_trade_pnls=[trade.net_pnl for trade in gross_closed_trades],
             )
         aggregate_metrics.setdefault("performance", {})["execution_realism"] = (
@@ -402,6 +426,8 @@ def compute_alpha_metrics(
                 realism=realism,
                 gross_performance=gross_metrics["performance"],
                 net_performance=aggregate_metrics["performance"],
+                modeled_fee_cost=modeled_fee_cost,
+                modeled_slippage_cost=modeled_slippage_cost,
             )
         )
     aggregate_metrics.setdefault("performance", {})["benchmark_coverage"] = (
@@ -558,9 +584,14 @@ def _execution_realism_performance_summary(
     realism: dict[str, float | bool],
     gross_performance: dict[str, Any],
     net_performance: dict[str, Any],
+    modeled_fee_cost: float,
+    modeled_slippage_cost: float,
 ) -> dict[str, Any]:
     gross_return = float(gross_performance["total_return_pct"])
     net_return = float(net_performance["total_return_pct"])
+    # The total adds the rounded parts, so the dollars shown always sum.
+    fee_cost = round(modeled_fee_cost, 2)
+    slippage_cost = round(modeled_slippage_cost, 2)
     return {
         "enabled": True,
         "fee_bps": round(float(realism["fees"]) * 10000.0, 4),
@@ -568,4 +599,7 @@ def _execution_realism_performance_summary(
         "gross_total_return_pct": gross_return,
         "net_total_return_pct": net_return,
         "return_drag_pct": round(gross_return - net_return, 2),
+        "modeled_fee_cost": fee_cost,
+        "modeled_slippage_cost": slippage_cost,
+        "modeled_cost_total": round(fee_cost + slippage_cost, 2),
     }

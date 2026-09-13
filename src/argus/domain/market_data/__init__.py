@@ -9,7 +9,9 @@ from .assets import (
 )
 from .tradability import (
     TradableHistory,
+    asset_history_start,
     clear_tradable_history_cache,
+    shared_history_start,
     tradable_history,
 )
 
@@ -43,7 +45,9 @@ __all__ = [
     "resolve_asset",
     "search_assets",
     "TradableHistory",
+    "asset_history_start",
     "clear_tradable_history_cache",
+    "shared_history_start",
     "tradable_history",
     "warm_asset_universe",
 ]

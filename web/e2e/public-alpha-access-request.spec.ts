@@ -69,7 +69,6 @@ function guestMe(
       expires_at: EXPIRES_AT,
       conversation_id: CONVERSATION_ID,
       conversation_limit: 1,
-      message_limit: 10,
       simulation_limit: 1,
       feedback_limit: 5,
     },
@@ -204,8 +203,9 @@ async function mockGuestJourney(
   await page.route("**/api/v1/me/usage", (route) =>
     fulfillJson(route, page, {
       allowances: {
-        messages: { available_now: true },
-        backtests: { available_now: true },
+        compute: { available_now: true, limiting_window: null },
+        grounding: { available_now: true },
+        execution: { available_now: true },
       },
     }),
   );

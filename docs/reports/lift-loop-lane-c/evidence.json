@@ -1,0 +1,759 @@
+{
+  "source_base": "6bc3e0ee84fef9911230cec496734edc29f640a9",
+  "python": "3.10.20",
+  "proof_file_sha256": {
+    "card.py": "f99816820c9ed4048b28fadf7a45b129660ef17de21ce20a86dd97db33cea51d",
+    "compute.py": "fb1d87f8074f43152c952b50ab89f242122901f24181927db2f64ef8eb14a524",
+    "declaration.py": "3dca1a51c600e3502b54c41cf2872a5886a61541cf66c7d49291019dffedede2",
+    "test_proof.py": "91bf58511805021669083ce6f2ce9292abd5f73a192f1001b5c2b7f27b276759"
+  },
+  "body_import_guard": [
+    "argus.domain.backtesting",
+    "argus.domain.engine_launch",
+    "argus.agent_runtime.strategy_contract"
+  ],
+  "catalog_import_guard": [
+    "argus.domain.backtesting",
+    "argus.domain.engine_launch",
+    "argus.agent_runtime.strategy_contract",
+    "argus.domain.strategy_capabilities"
+  ],
+  "observations": [
+    {
+      "probe": "calculation",
+      "boundary": "body",
+      "status": "returned",
+      "result": {
+        "answer": 12000.0
+      },
+      "loaded_argus_modules": []
+    },
+    {
+      "probe": "calculation",
+      "boundary": "catalog",
+      "status": "returned",
+      "result": {
+        "answer": 12000.0
+      },
+      "loaded_argus_modules": []
+    },
+    {
+      "probe": "calculation",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "answer": 12000.0
+      },
+      "loaded_argus_modules": []
+    },
+    {
+      "probe": "transport",
+      "boundary": "body",
+      "status": "returned",
+      "result": {
+        "round_trip": true,
+        "cards": [
+          {
+            "kind": "time_value_of_money",
+            "version": 1,
+            "answer": {
+              "field": "payment",
+              "value": -1000.0
+            },
+            "inputs": {
+              "present_value": 0.0,
+              "payment": null,
+              "rate": 0.0,
+              "periods": 12.0,
+              "future_value": 12000.0
+            }
+          },
+          {
+            "kind": "time_value_of_money",
+            "version": 1,
+            "answer": {
+              "field": "present_value",
+              "value": 12000.0
+            },
+            "inputs": {
+              "present_value": null,
+              "payment": -1000.0,
+              "rate": 0.0,
+              "periods": 12.0,
+              "future_value": 0.0
+            }
+          }
+        ]
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.api",
+        "argus.api.artifact_presentation",
+        "argus.api.confirmation_schemas",
+        "argus.api.conversation_preview_contract",
+        "argus.api.feedback_context",
+        "argus.api.schemas",
+        "argus.domain",
+        "argus.domain.artifact_presentation_kind",
+        "argus.domain.benchmark_comparison",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.display_figure",
+        "argus.domain.result_figures",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "transport",
+      "boundary": "catalog",
+      "status": "blocked",
+      "blocked_import": "argus.domain.strategy_capabilities",
+      "loaded_argus_modules": [
+        "argus.domain"
+      ]
+    },
+    {
+      "probe": "transport",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "round_trip": true,
+        "cards": [
+          {
+            "kind": "time_value_of_money",
+            "version": 1,
+            "answer": {
+              "field": "payment",
+              "value": -1000.0
+            },
+            "inputs": {
+              "present_value": 0.0,
+              "payment": null,
+              "rate": 0.0,
+              "periods": 12.0,
+              "future_value": 12000.0
+            }
+          },
+          {
+            "kind": "time_value_of_money",
+            "version": 1,
+            "answer": {
+              "field": "present_value",
+              "value": 12000.0
+            },
+            "inputs": {
+              "present_value": null,
+              "payment": -1000.0,
+              "rate": 0.0,
+              "periods": 12.0,
+              "future_value": 0.0
+            }
+          }
+        ]
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.api",
+        "argus.api.artifact_presentation",
+        "argus.api.confirmation_schemas",
+        "argus.api.conversation_preview_contract",
+        "argus.api.feedback_context",
+        "argus.api.schemas",
+        "argus.domain",
+        "argus.domain.artifact_presentation_kind",
+        "argus.domain.benchmark_comparison",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.display_figure",
+        "argus.domain.result_figures",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "confirmation_payload",
+      "boundary": "body",
+      "status": "returned",
+      "result": {
+        "confirmation_errors": [
+          {
+            "loc": [
+              "strategy"
+            ],
+            "type": "missing"
+          }
+        ],
+        "intent_errors": [
+          "literal_error"
+        ],
+        "facts_preserved": true
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "confirmation_payload",
+      "boundary": "catalog",
+      "status": "blocked",
+      "blocked_import": "argus.domain.strategy_capabilities",
+      "loaded_argus_modules": [
+        "argus.domain"
+      ]
+    },
+    {
+      "probe": "confirmation_payload",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "confirmation_errors": [
+          {
+            "loc": [
+              "strategy"
+            ],
+            "type": "missing"
+          }
+        ],
+        "intent_errors": [
+          "literal_error"
+        ],
+        "facts_preserved": true
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "lifecycle",
+      "boundary": "body",
+      "status": "returned",
+      "result": {
+        "own_kind_unchanged": true,
+        "confirmation_state": "superseded"
+      },
+      "loaded_argus_modules": [
+        "argus.api",
+        "argus.api.chat",
+        "argus.api.chat.confirmation_lifecycle"
+      ]
+    },
+    {
+      "probe": "lifecycle",
+      "boundary": "catalog",
+      "status": "returned",
+      "result": {
+        "own_kind_unchanged": true,
+        "confirmation_state": "superseded"
+      },
+      "loaded_argus_modules": [
+        "argus.api",
+        "argus.api.chat",
+        "argus.api.chat.confirmation_lifecycle"
+      ]
+    },
+    {
+      "probe": "lifecycle",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "own_kind_unchanged": true,
+        "confirmation_state": "superseded"
+      },
+      "loaded_argus_modules": [
+        "argus.api",
+        "argus.api.chat",
+        "argus.api.chat.confirmation_lifecycle"
+      ]
+    },
+    {
+      "probe": "next_rows",
+      "boundary": "body",
+      "status": "returned",
+      "result": {
+        "version": "argus_next_experiments/v1",
+        "label_key": "chat.next_experiments.labels.solve_for_unknown",
+        "offered": [
+          "solve_for_unknown"
+        ],
+        "continuity": null
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.next_experiments_contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "next_rows",
+      "boundary": "catalog",
+      "status": "blocked",
+      "blocked_import": "argus.domain.strategy_capabilities",
+      "loaded_argus_modules": [
+        "argus.domain"
+      ]
+    },
+    {
+      "probe": "next_rows",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "version": "argus_next_experiments/v1",
+        "label_key": "chat.next_experiments.labels.solve_for_unknown",
+        "offered": [
+          "solve_for_unknown"
+        ],
+        "continuity": null
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.next_experiments_contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "presentation",
+      "boundary": "body",
+      "status": "returned",
+      "result": {
+        "own_key": null,
+        "result_key": "result"
+      },
+      "loaded_argus_modules": [
+        "argus.domain",
+        "argus.domain.artifact_presentation_kind"
+      ]
+    },
+    {
+      "probe": "presentation",
+      "boundary": "catalog",
+      "status": "returned",
+      "result": {
+        "own_key": null,
+        "result_key": "result"
+      },
+      "loaded_argus_modules": [
+        "argus.domain",
+        "argus.domain.artifact_presentation_kind"
+      ]
+    },
+    {
+      "probe": "presentation",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "own_key": null,
+        "result_key": "result"
+      },
+      "loaded_argus_modules": [
+        "argus.domain",
+        "argus.domain.artifact_presentation_kind"
+      ]
+    },
+    {
+      "probe": "retry",
+      "boundary": "body",
+      "status": "returned",
+      "result": {
+        "decision": "active"
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.artifacts",
+        "argus.agent_runtime.artifacts.asset_edits",
+        "argus.agent_runtime.artifacts.continuity",
+        "argus.agent_runtime.artifacts.drafts",
+        "argus.agent_runtime.artifacts.lifecycle",
+        "argus.agent_runtime.artifacts.strategy_edits",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.agent_runtime.turn_progress",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "retry",
+      "boundary": "catalog",
+      "status": "blocked",
+      "blocked_import": "argus.domain.strategy_capabilities",
+      "loaded_argus_modules": [
+        "argus.domain"
+      ]
+    },
+    {
+      "probe": "retry",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "decision": "active"
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.artifacts",
+        "argus.agent_runtime.artifacts.asset_edits",
+        "argus.agent_runtime.artifacts.continuity",
+        "argus.agent_runtime.artifacts.drafts",
+        "argus.agent_runtime.artifacts.lifecycle",
+        "argus.agent_runtime.artifacts.strategy_edits",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.agent_runtime.turn_progress",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "registry",
+      "boundary": "body",
+      "status": "returned",
+      "result": {
+        "errors": [
+          [
+            {
+              "loc": [],
+              "type": "value_error"
+            }
+          ],
+          [
+            {
+              "loc": [
+                "execution_strategy_type"
+              ],
+              "type": "literal_error"
+            }
+          ]
+        ]
+      },
+      "loaded_argus_modules": [
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "registry",
+      "boundary": "catalog",
+      "status": "blocked",
+      "blocked_import": "argus.domain.strategy_capabilities",
+      "loaded_argus_modules": [
+        "argus.domain"
+      ]
+    },
+    {
+      "probe": "registry",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "errors": [
+          [
+            {
+              "loc": [],
+              "type": "value_error"
+            }
+          ],
+          [
+            {
+              "loc": [
+                "execution_strategy_type"
+              ],
+              "type": "literal_error"
+            }
+          ]
+        ]
+      },
+      "loaded_argus_modules": [
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "edit_bookkeeping",
+      "boundary": "body",
+      "status": "blocked",
+      "blocked_import": "argus.domain.backtesting",
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.artifacts",
+        "argus.agent_runtime.artifacts.asset_edits",
+        "argus.agent_runtime.artifacts.continuity",
+        "argus.agent_runtime.artifacts.drafts",
+        "argus.agent_runtime.artifacts.lifecycle",
+        "argus.agent_runtime.artifacts.strategy_edits",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.interpreter",
+        "argus.agent_runtime.interpreter.audits",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.recovery_messages",
+        "argus.agent_runtime.research_query",
+        "argus.agent_runtime.stages",
+        "argus.agent_runtime.stages.interpret_types",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.agent_runtime.turn_progress",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "edit_bookkeeping",
+      "boundary": "catalog",
+      "status": "blocked",
+      "blocked_import": "argus.domain.strategy_capabilities",
+      "loaded_argus_modules": [
+        "argus.domain"
+      ]
+    },
+    {
+      "probe": "edit_bookkeeping",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {
+        "accepted": [
+          "payment",
+          "rate"
+        ],
+        "partially_materialized": true,
+        "unapplied": [
+          {
+            "op": "set",
+            "target": "payment",
+            "reason": "unsupported_operation"
+          }
+        ],
+        "edit_target_errors": [
+          "literal_error"
+        ]
+      },
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.artifact_edit_planner",
+        "argus.agent_runtime.artifacts",
+        "argus.agent_runtime.artifacts.asset_edits",
+        "argus.agent_runtime.artifacts.continuity",
+        "argus.agent_runtime.artifacts.drafts",
+        "argus.agent_runtime.artifacts.lifecycle",
+        "argus.agent_runtime.artifacts.strategy_edits",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.interpreter",
+        "argus.agent_runtime.interpreter.audits",
+        "argus.agent_runtime.interpreter.execution_cost_capability",
+        "argus.agent_runtime.interpreter.execution_cost_fidelity",
+        "argus.agent_runtime.interpreter.shared",
+        "argus.agent_runtime.llm_interpreter_types",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.recovery_messages",
+        "argus.agent_runtime.research_query",
+        "argus.agent_runtime.rule_specs",
+        "argus.agent_runtime.stages",
+        "argus.agent_runtime.stages.interpret_types",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.agent_runtime.strategy_contract",
+        "argus.agent_runtime.turn_execution",
+        "argus.agent_runtime.turn_progress",
+        "argus.domain",
+        "argus.domain.backtesting",
+        "argus.domain.backtesting.config",
+        "argus.domain.backtesting.date_window",
+        "argus.domain.backtesting.rules",
+        "argus.domain.backtesting.rules.describe",
+        "argus.domain.backtesting.rules.models",
+        "argus.domain.backtesting.rules.normalization",
+        "argus.domain.backtesting.rules.signals",
+        "argus.domain.backtesting.rules.validation",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.indicators",
+        "argus.domain.market_data",
+        "argus.domain.market_data.assets",
+        "argus.domain.market_data.capabilities",
+        "argus.domain.market_data.tradability",
+        "argus.domain.slot_normalizer",
+        "argus.domain.strategy_capabilities",
+        "argus.env",
+        "argus.llm",
+        "argus.llm.openrouter",
+        "argus.llm.openrouter_key_policy",
+        "argus.llm.openrouter_model_env",
+        "argus.llm.openrouter_tasks",
+        "argus.llm.openrouter_usage",
+        "argus.nlp",
+        "argus.nlp.natural_time"
+      ]
+    },
+    {
+      "probe": "display_facts",
+      "boundary": "body",
+      "status": "blocked",
+      "blocked_import": "argus.agent_runtime.strategy_contract",
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    },
+    {
+      "probe": "display_facts",
+      "boundary": "catalog",
+      "status": "blocked",
+      "blocked_import": "argus.domain.strategy_capabilities",
+      "loaded_argus_modules": [
+        "argus.domain"
+      ]
+    },
+    {
+      "probe": "display_facts",
+      "boundary": "observe",
+      "status": "returned",
+      "result": {},
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.confirmation_facts",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.agent_runtime.strategy_contract",
+        "argus.domain",
+        "argus.domain.backtesting",
+        "argus.domain.backtesting.config",
+        "argus.domain.backtesting.date_window",
+        "argus.domain.backtesting.rules",
+        "argus.domain.backtesting.rules.describe",
+        "argus.domain.backtesting.rules.models",
+        "argus.domain.backtesting.rules.normalization",
+        "argus.domain.backtesting.rules.signals",
+        "argus.domain.backtesting.rules.validation",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.dca_capital",
+        "argus.domain.indicators",
+        "argus.domain.market_data",
+        "argus.domain.market_data.assets",
+        "argus.domain.market_data.capabilities",
+        "argus.domain.market_data.tradability",
+        "argus.domain.slot_normalizer",
+        "argus.domain.strategy_capabilities",
+        "argus.nlp",
+        "argus.nlp.natural_time"
+      ]
+    },
+    {
+      "probe": "lifecycle_write",
+      "boundary": "body",
+      "status": "blocked",
+      "blocked_import": "argus.domain.backtesting",
+      "loaded_argus_modules": [
+        "argus.agent_runtime",
+        "argus.agent_runtime.capabilities",
+        "argus.agent_runtime.capabilities.contract",
+        "argus.agent_runtime.profile",
+        "argus.agent_runtime.profile.response_profile",
+        "argus.agent_runtime.state",
+        "argus.agent_runtime.state.models",
+        "argus.api",
+        "argus.api.chat",
+        "argus.api.chat.confirmation_lifecycle",
+        "argus.domain",
+        "argus.domain.cadences",
+        "argus.domain.capability_registry",
+        "argus.domain.capability_status",
+        "argus.domain.strategy_capabilities"
+      ]
+    }
+  ]
+}

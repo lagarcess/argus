@@ -6,9 +6,13 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
+import ToolResultCard from "./ToolResultCard";
+import type { ToolRecompute } from "@/lib/tool-result-card";
+import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
 import DiscoverySourcesPanel from "./DiscoverySourcesPanel";
+import { researchSourcesDisplay } from "@/lib/research-sources-display";
 import MemoryRecallNote from "./MemoryRecallNote";
 import { RetestReceipt } from "./RetestReceipt";
 import { RETEST_ACTION_TYPE } from "@/lib/chat-retest";
@@ -18,7 +22,8 @@ import NextMoveRow, {
   NextMoveTicker,
   NextMoveTitle,
 } from "./NextMoveRow";
-import { nextExperimentAction } from "@/lib/chat-next-experiments";
+import NextStepsSection from "./NextStepsSection";
+import { messageNextSteps } from "@/lib/chat-next-steps";
 import {
   type ChatActionOption,
   type ChatMention,
@@ -27,19 +32,11 @@ import {
 } from "./types";
 import type { DecisionState } from "@/lib/argus-api";
 import { normalizeAssistantDisplayText } from "@/lib/chat-display-text";
-import {
-  confirmationCardCopyText,
-  resultCardCopyText,
-} from "@/lib/chat-card-copy-text";
-import { confirmationCardViewModel } from "@/lib/confirmation-card-view-model";
-import { resultCardViewModel } from "@/lib/result-card-view-model";
-import { resultBreakdownText, resultQuickTakeText } from "@/lib/result-readout-display";
+import { chatMessageCopyText } from "@/lib/chat-message-copy-text";
+import { resultMessageReadoutText } from "@/lib/result-readout-display";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
-import {
-  recoveryDisplayCopyText,
-  recoveryDisplayText,
-} from "@/lib/chat-recovery-display";
+import { recoveryDisplayText } from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import FailureNotice from "./FailureNotice";
@@ -50,19 +47,23 @@ import {
   retryableNoticeRetryPillClass,
 } from "@/lib/failure-treatment";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
+import { isSettledStrategyResult } from "@/lib/chat-result-message";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import { actionHasCardScopedOwnership } from "@/lib/chat-action-ownership";
 import { confirmationPeriodAdjustmentText } from "@/lib/confirmation-period-adjustment";
 import { confirmationBenchmarkAdjustmentText } from "@/lib/confirmation-benchmark-adjustment";
 import { confirmationEditDisclosureText } from "@/lib/confirmation-edit-disclosure";
+import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import { discoveryEscalationCopyPlan } from "@/lib/chat-discovery-escalation";
 import { EntityToken } from "./entity-token";
+import { toolRecomputeEligible } from "@/lib/tool-result-recompute";
 import { messageMentionPieces } from "./mention-rendering";
 
 
 type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
+  onToolRecompute?: ToolRecompute;
   onDirectEdit?: (
     confirmationId: string,
     edit: ConfirmationDirectEditPayload,
@@ -70,6 +71,7 @@ type ChatMessageProps = {
   onFeedback?: (type: "bug" | "feature" | "general" | "rating", context: Record<string, unknown>, rating?: "positive" | "negative") => void;
   onToast?: (message: string, variant?: "neutral" | "error") => void;
   isLatest?: boolean;
+  latestMessageId?: string | null;
   isStreaming?: boolean;
   conversationId?: string | null;
   nextMovesEnabled?: boolean;
@@ -91,9 +93,11 @@ export default function ChatMessage({
   message,
   onAction,
   onDirectEdit,
+  onToolRecompute,
   onFeedback,
   onToast,
   isLatest,
+  latestMessageId,
   isStreaming,
   conversationId,
   nextMovesEnabled = true,
@@ -111,6 +115,7 @@ export default function ChatMessage({
   const locale = i18n.resolvedLanguage ?? i18n.language ?? "en";
   const { isBelowTablet } = useResponsiveLayout();
   const isUser = message.role === "user";
+  const confirmation = pendingArtifactCardFromPayload(message.confirmation);
   const [rating, setRating] = useState<"positive" | "negative" | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [showSources, setShowSources] = useState(false);
@@ -172,9 +177,6 @@ export default function ChatMessage({
     };
   }, [showOptions]);
 
-  const normalizeCopyText = (text: string) =>
-    isUser ? text : normalizeAssistantDisplayText(text);
-
   const handleRating = (newRating: "positive" | "negative") => {
     if (rating === newRating) {
       setRating(null);
@@ -184,40 +186,7 @@ export default function ChatMessage({
     }
   };
 
-  const getCopyText = () => {
-    if (!isUser && message.contentPresentation === "result_readout") {
-      return resultQuickTakeText(message.resultReadoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
-    }
-    if (!isUser) {
-      const localizedRecovery = recoveryDisplayCopyText(message.recoveryDisplay, t, locale);
-      if (localizedRecovery) {
-        return normalizeCopyText(localizedRecovery);
-      }
-    }
-    // Copy reads the card's own view model. Deriving it from the payload
-    // again is what put backend English on a Spanish workspace (#509).
-    if (message.kind === "strategy_result" && message.result) {
-      return normalizeCopyText(
-        resultCardCopyText(
-          resultCardViewModel(message.result, { t, locale }),
-          t,
-        ),
-      );
-    }
-    if (message.kind === "strategy_confirmation" && message.confirmation) {
-      return normalizeCopyText(
-        confirmationCardCopyText(
-          confirmationCardViewModel(message.confirmation, t, locale),
-          t,
-          locale,
-        ),
-      );
-    }
-    if (message.contentPresentation === "result_breakdown") {
-      return resultBreakdownText(null, t, locale);
-    }
-    return normalizeCopyText(message.content ?? "");
-  };
+  const getCopyText = () => chatMessageCopyText(message, t, locale);
 
   const handleCopy = async (text = getCopyText()) => {
     const copied = await writeClipboardText(text);
@@ -228,21 +197,17 @@ export default function ChatMessage({
   };
 
   const getDisplayContent = () => {
-    if (!isUser && message.contentPresentation === "result_readout") {
-      return resultQuickTakeText(message.resultReadoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
+    if (!isUser && isStreaming && message.contentPresentation === "result_breakdown") {
+      return t("chat.status.working");
     }
-    if (!isUser && message.kind === "strategy_result") {
-      return resultQuickTakeText(message.result?.readoutFacts, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
-    }
+    const readout = resultMessageReadoutText(message, t, locale);
+    if (readout !== null) return readout;
     const content = message.content ?? "";
     if (!isUser && message.recoveryDisplay) {
       const recovered = recoveryDisplayText(message.recoveryDisplay, t, locale);
       if (recovered.trim()) {
         return recovered;
       }
-    }
-    if (!isUser && message.contentPresentation === "result_breakdown") {
-      return resultBreakdownText(null, t, i18n.resolvedLanguage ?? i18n.language ?? "en");
     }
     return isUser ? content : normalizeAssistantDisplayText(content);
   };
@@ -276,6 +241,7 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
+  const researchSourcesOpen = researchSourcesDisplay(Boolean(message.researchDegradedCode));
   // Chips carry domains and the drawer owns the list; zero sources is the
   // ungrounded marker (derived, never asserted). Canon: DESIGN.md §11.
   const discoverySourcesLineText =
@@ -286,22 +252,17 @@ export default function ChatMessage({
       : t("chat.discovery_results.unsourced_line", {
           defaultValue: "From general knowledge, not a current search",
         });
-  // Localized heading chrome for latest-result fact answers, driven by the
-  // typed fact key. Unknown keys render no heading.
-  const factHeadingLabel = message.resultFactHeadingKey
-    ? t(`chat.result_followup.headings.${message.resultFactHeadingKey}`, "")
-    : "";
   const confirmationPeriodLeadIn = confirmationPeriodAdjustmentText(
-    message.confirmation?.period_adjustment,
+    confirmation?.period_adjustment,
     (key, options) => t(key, options),
     i18n.resolvedLanguage ?? i18n.language ?? "en",
   );
   const confirmationBenchmarkLeadIn = confirmationBenchmarkAdjustmentText(
-    message.confirmation?.benchmark_adjustment,
+    confirmation?.benchmark_adjustment,
     (key, options) => t(key, options),
   );
   const confirmationEditDisclosureLeadIn = confirmationEditDisclosureText(
-    message.confirmation?.edit_disclosure,
+    confirmation?.edit_disclosure,
     t,
   );
 
@@ -369,7 +330,7 @@ export default function ChatMessage({
       )}
       <div className="flex flex-col max-w-[85%]">
         <div className="flex flex-col mt-1.5">
-          {message.kind === "strategy_result" && message.result && !message.isLoadingResult ? (
+          {isSettledStrategyResult(message) ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">
               <StrategyResultCard
                 result={message.result}
@@ -389,7 +350,8 @@ export default function ChatMessage({
                 />
               )}
             </div>
-          ) : message.kind === "backtest_job" && message.backtestJob ? (
+          ) : message.kind === "backtest_job" && message.backtestJob &&
+            (message.contentPresentation !== "result_breakdown" || !isStreaming) ? (
             <div className="w-full max-w-[min(100%,660px)]">
               <BacktestJobCard
                 job={message.backtestJob}
@@ -401,7 +363,7 @@ export default function ChatMessage({
                 retryLabel={retryAction ? actionLabel(retryAction) : undefined}
               />
             </div>
-          ) : message.kind === "strategy_confirmation" && message.confirmation ? (
+          ) : message.kind === "strategy_confirmation" && confirmation?.kind === "backtest" ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-3">
               {confirmationPeriodLeadIn ? (
                 <p className="text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75">
@@ -422,13 +384,13 @@ export default function ChatMessage({
                 </p>
               ) : null}
               <StrategyConfirmationCard
-                confirmation={message.confirmation}
+                confirmation={confirmation}
                 disabled={turnInFlight}
                 onAction={onAction}
                 onDirectEdit={
-                  onDirectEdit && message.confirmation.confirmation_id
+                  onDirectEdit && confirmation.confirmation_id
                     ? (edit) =>
-                        onDirectEdit(message.confirmation!.confirmation_id!, edit)
+                        onDirectEdit(confirmation.confirmation_id!, edit)
                     : undefined
                 }
               />
@@ -441,6 +403,7 @@ export default function ChatMessage({
               ariaLabel={t("chat.result_breakdown.aria_label", "Result breakdown")}
               content={displayContent}
               label={t("chat.result_breakdown.label", "Breakdown")}
+              isWorking={Boolean(isStreaming)}
             />
           ) : !isUser && message.assistantRecoveryCode ? (
             // Infrastructure failure is visibly a failure: no result chrome,
@@ -482,17 +445,32 @@ export default function ChatMessage({
             </FailureNotice>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
-              {factHeadingLabel && (
-                <div className="argus-result-section-label">{factHeadingLabel}</div>
-              )}
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {displayContent}
               </ReactMarkdown>
             </div>
           )}
 
+          {!isUser && message.toolJobs?.map((pending) => <div key={pending.call_id} className="mt-3 w-full max-w-[min(100%,660px)]">
+            <BacktestJobCard job={pending.job} canRetry={false} />
+          </div>)}
+          {!isUser && message.hasUnavailableToolResults ? <p role="status" className="mt-3 text-sm text-black/60 dark:text-white/60">{t("tools.card.unavailable")}</p> : null}
+          {!isUser && message.toolResultCards?.filter((card) => !(card.card_type === "backtest" && message.result) && !message.toolJobs?.some((pending) => pending.artifact_id === card.artifact_id && pending.call_id === card.call_id)).map((card) => (
+            <div key={`${card.artifact_id}-${card.input_revision}`} className="mt-3 w-full max-w-[min(100%,660px)]">
+              <ToolResultCard card={card} onRecompute={onToolRecompute} disabled={!toolRecomputeEligible(message.id, latestMessageId, turnInFlight || Boolean(isStreaming))} />
+            </div>
+          ))}
+
           {!isUser && !isStreaming && message.memoryRecalls?.length ? (
             <MemoryRecallNote recalls={message.memoryRecalls} />
+          ) : null}
+          {/* Any computed answer offers a decision; guests resume on cards only. */}
+          {!isUser && !isStreaming && message.computation && canSaveDecision ? (
+            <ComputedAnswerDecision
+              message={message}
+              conversationId={conversationId}
+              onSaved={(decision) => onDecisionSaved?.(decision.decision_state)}
+            />
           ) : null}
           {!isUser && !isStreaming && message.discovery && (
             <div className="mt-3 flex w-full max-w-[min(100%,660px)] flex-col gap-2">
@@ -668,10 +646,10 @@ export default function ChatMessage({
                 data-testid="research-sources-open"
                 className="relative z-10 shrink-0 text-[12px] leading-[1.5] tracking-[0.2px] text-black/50 underline-offset-2 transition-colors after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:min-w-11 after:-translate-y-1/2 after:content-[''] hover:text-black/80 hover:underline dark:text-white/50 dark:hover:text-white/80"
               >
-                {t("chat.discovery_results.sources_panel_open", {
+                {t(researchSourcesOpen.openKey, {
                   count: message.researchSources?.length ?? 0,
-                  defaultValue: "{{count}} sources ›",
-                  defaultValue_one: "{{count}} source ›",
+                  defaultValue: researchSourcesOpen.openFallback,
+                  defaultValue_one: researchSourcesOpen.openFallbackOne,
                 })}
               </button>
             </div>
@@ -689,6 +667,7 @@ export default function ChatMessage({
                 sources: message.researchSources ?? [],
                 retrieved_at: "",
               }}
+              withheld={Boolean(message.researchDegradedCode)}
             />
           ) : null}
 
@@ -703,84 +682,24 @@ export default function ChatMessage({
             />
           ) : null}
 
-          {/* Try next rows are the sanctioned next-move surface for any
-              message that carries them (results, grounded knowledge answers);
-              only mid-turn composition suppresses them. */}
-          {shouldShowAssistantFooter &&
-            Boolean(isLatest) &&
-            !turnInFlight &&
-            (message.nextExperiments?.length ?? 0) > 0 && (
-              <section
-                aria-label={t("chat.next_experiments.section", "Try next")}
-                className="mt-5 flex w-full max-w-[min(100%,660px)] flex-col"
-              >
-                <div className="argus-result-section-label">
-                  {t("chat.next_experiments.section", "Try next")}
-                </div>
-                <div className="flex w-full flex-col divide-y divide-black/8 dark:divide-white/8">
-                  {(message.nextExperiments ?? []).map((row, rowIndex) => {
-                    const rowLabel = t(row.labelKey, row.label);
-                    // Narrow screens read the backend's short form; the clamp
-                    // below is only a safety net, never a single-line ellipsis.
-                    const narrowLabel =
-                      isBelowTablet && row.labelShortKey
-                        ? t(row.labelShortKey, row.labelShort ?? row.label)
-                        : rowLabel;
-                    // One result-level reason; captioning every row repeats it.
-                    const whyText =
-                      row.why && rowIndex === 0
-                        ? t(`chat.next_experiments.why.${row.why.code}`, {
-                            defaultValue: "",
-                            ...row.why.params,
-                          })
-                        : "";
-                    return (
-                      <NextMoveRow
-                        key={row.kind}
-                        ariaLabel={rowLabel}
-                        disabled={turnInFlight}
-                        onClick={() =>
-                          onAction?.(
-                            nextExperimentAction(
-                              row,
-                              rowLabel,
-                              message.result?.runId,
-                            ),
-                          )
-                        }
-                      >
-                        <NextMoveTitle>
-                          {row.labelParts
-                            ? row.labelParts.map((part, partIndex) =>
-                                part.type === "ticker" ? (
-                                  <span key={partIndex}>
-                                    {" "}
-                                    <NextMoveTicker>{part.value}</NextMoveTicker>
-                                  </span>
-                                ) : (
-                                  <span key={partIndex}>{part.value}</span>
-                                ),
-                              )
-                            : narrowLabel}
-                        </NextMoveTitle>
-                        {row.detail ? (
-                          <>
-                            <NextMoveSeparator>·</NextMoveSeparator>
-                            <NextMoveDetail>{row.detail}</NextMoveDetail>
-                          </>
-                        ) : null}
-                        {whyText ? (
-                          <>
-                            <NextMoveSeparator>·</NextMoveSeparator>
-                            <NextMoveDetail>{whyText}</NextMoveDetail>
-                          </>
-                        ) : null}
-                      </NextMoveRow>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
+          {/* One next-move list is the sanctioned surface for any message that
+              carries one (results, answers about them, grounded knowledge
+              answers); only mid-turn composition suppresses it. */}
+          {shouldShowAssistantFooter && Boolean(isLatest) && !turnInFlight && (
+            <NextStepsSection
+              steps={messageNextSteps(message)}
+              disabled={turnInFlight}
+              isBelowTablet={isBelowTablet}
+              locale={locale}
+              onAction={onAction}
+              sourceRunId={
+                message.result?.runId ??
+                message.nextExperimentsSourceRunId ??
+                undefined
+              }
+              t={t}
+            />
+          )}
 
           {showNextMoveRows && (
             <div className="mt-2 flex w-full max-w-[min(100%,660px)] flex-col divide-y divide-black/8 dark:divide-white/8">
@@ -949,13 +868,15 @@ function ResultBreakdown({
   ariaLabel,
   content,
   label,
+  isWorking,
 }: {
   ariaLabel: string;
   content: string;
   label: string;
+  isWorking: boolean;
 }) {
   return (
-    <section aria-label={ariaLabel}>
+    <section aria-label={ariaLabel} aria-busy={isWorking || undefined}>
       <div className="argus-result-section-label">{label}</div>
       <div className="argus-result-breakdown prose dark:prose-invert max-w-none">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>

@@ -38,6 +38,7 @@ from argus.agent_runtime.stages.interpret_internal.shared import (
     _field_base,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
+    _turn_continues_pending_setup,
 )
 from argus.agent_runtime.stages.interpret_types import (
     ArtifactTarget,
@@ -202,6 +203,7 @@ def _strategy_with_hidden_context_guard(
     snapshot: TaskSnapshot | None,
     artifact_target: ArtifactTarget | None,
     current_user_message: str,
+    selected_thread_metadata: dict[str, Any] | None = None,
 ) -> tuple[StrategySummary, list[str], bool]:
     if artifact_target != "none":
         return strategy, [], False
@@ -212,6 +214,17 @@ def _strategy_with_hidden_context_guard(
     if snapshot is None or snapshot.pending_strategy_summary is None:
         return strategy, [], False
     prior = snapshot.pending_strategy_summary
+    if _turn_continues_pending_setup(
+        prior=prior,
+        strategy=interpretation.candidate_strategy_draft,
+        selected_thread_metadata=dict(selected_thread_metadata or {}),
+        semantic_turn_act=interpretation.semantic_turn_act,
+        task_relation=interpretation.task_relation,
+        current_user_message=current_user_message,
+        reason_codes=list(interpretation.reason_codes),
+    ):
+        # The asset came from the setup the runtime is waiting on, by design.
+        return strategy, [], False
     if not prior.asset_universe or strategy.asset_universe != prior.asset_universe:
         return strategy, [], False
     if _strategy_has_fresh_execution_detail(strategy=strategy, prior=prior):
@@ -1221,6 +1234,9 @@ def _missing_fields_for_interpretation(
         required_missing_fields = list(
             dict.fromkeys(["asset_universe", *required_missing_fields])
         )
+    if "execution_cost_evidence_unresolved" in interpretation.reason_codes:
+        # A stated cost the audit could not ground is asked, never defaulted (#271).
+        required_missing_fields = [*required_missing_fields, "assumption"]
     allowed_missing_fields = set(required_missing_fields)
     missing = [
         field

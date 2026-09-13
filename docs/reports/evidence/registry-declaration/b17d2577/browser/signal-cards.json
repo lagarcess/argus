@@ -1,0 +1,1447 @@
+{
+  "cards": {
+    "en": {
+      "kind": "tool_result",
+      "schema_version": 1,
+      "tool_name": "backtest",
+      "call_id": "signal-call",
+      "artifact_id": "signal-artifact",
+      "input_revision": 0,
+      "card_type": "backtest",
+      "card_version": 1,
+      "arguments": {
+        "strategy": {
+          "raw_user_phrasing": null,
+          "requested_strategy_template": null,
+          "strategy_type": "signal_strategy",
+          "strategy_thesis": null,
+          "asset_universe": [
+            "AAPL"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2024-01-02",
+            "end": "2024-03-01"
+          },
+          "sizing_mode": null,
+          "capital_amount": 10000.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": {
+            "type": "macd_crossover",
+            "fast_period": 12,
+            "slow_period": 26,
+            "signal_period": 9,
+            "direction": "bullish"
+          },
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [],
+          "extra_parameters": {}
+        }
+      },
+      "outcome": {
+        "status": "succeeded",
+        "result": {
+          "execution_status": "succeeded",
+          "facts": {
+            "asset_class": "equity",
+            "symbols": [
+              "AAPL"
+            ],
+            "benchmark_symbol": "SPY",
+            "date_range": {
+              "start": "2024-01-02",
+              "end": "2024-03-01"
+            },
+            "metrics": [
+              {
+                "key": "cash_value",
+                "value": "$10,000 -> $11,840"
+              },
+              {
+                "key": "total_return_pct",
+                "value": "+18.4%"
+              },
+              {
+                "key": "max_drawdown_pct",
+                "value": "0.0%"
+              },
+              {
+                "key": "win_rate",
+                "value": "66.0%"
+              },
+              {
+                "key": "benchmark_return_pct",
+                "value": "+9.1%"
+              },
+              {
+                "key": "delta_vs_benchmark_pct",
+                "value": "9.3"
+              }
+            ],
+            "strategy_facts": [
+              {
+                "key": "strategy_type",
+                "value": "macd crossover"
+              },
+              {
+                "key": "fast_period",
+                "value": 12.0
+              },
+              {
+                "key": "slow_period",
+                "value": 26.0
+              },
+              {
+                "key": "signal_period",
+                "value": 9.0
+              }
+            ],
+            "assumptions": [
+              {
+                "key": "long_only",
+                "value": null
+              },
+              {
+                "key": "equal_weight",
+                "value": null
+              },
+              {
+                "key": "modeled_fee_bps",
+                "value": 10.0
+              },
+              {
+                "key": "modeled_slippage_bps",
+                "value": 5.0
+              },
+              {
+                "key": "benchmark_same_modeled_costs",
+                "value": "SPY"
+              }
+            ],
+            "visual": {
+              "kind": "portfolio_equity",
+              "currency": "USD",
+              "base_value": 10000.0,
+              "series": [
+                {
+                  "time": "2024-01-02",
+                  "value": 10000.0
+                },
+                {
+                  "time": "2024-01-03",
+                  "value": 10042.790697674418
+                },
+                {
+                  "time": "2024-01-04",
+                  "value": 10085.581395348838
+                },
+                {
+                  "time": "2024-01-05",
+                  "value": 10128.372093023256
+                },
+                {
+                  "time": "2024-01-08",
+                  "value": 10171.162790697674
+                },
+                {
+                  "time": "2024-01-09",
+                  "value": 10213.953488372093
+                },
+                {
+                  "time": "2024-01-10",
+                  "value": 10256.744186046511
+                },
+                {
+                  "time": "2024-01-11",
+                  "value": 10299.53488372093
+                },
+                {
+                  "time": "2024-01-12",
+                  "value": 10342.32558139535
+                },
+                {
+                  "time": "2024-01-15",
+                  "value": 10385.116279069767
+                },
+                {
+                  "time": "2024-01-16",
+                  "value": 10427.906976744185
+                },
+                {
+                  "time": "2024-01-17",
+                  "value": 10470.697674418605
+                },
+                {
+                  "time": "2024-01-18",
+                  "value": 10513.488372093023
+                },
+                {
+                  "time": "2024-01-19",
+                  "value": 10556.279069767443
+                },
+                {
+                  "time": "2024-01-22",
+                  "value": 10599.06976744186
+                },
+                {
+                  "time": "2024-01-23",
+                  "value": 10641.860465116279
+                },
+                {
+                  "time": "2024-01-24",
+                  "value": 10684.651162790698
+                },
+                {
+                  "time": "2024-01-25",
+                  "value": 10727.441860465116
+                },
+                {
+                  "time": "2024-01-26",
+                  "value": 10770.232558139534
+                },
+                {
+                  "time": "2024-01-29",
+                  "value": 10813.023255813954
+                },
+                {
+                  "time": "2024-01-30",
+                  "value": 10855.813953488372
+                },
+                {
+                  "time": "2024-01-31",
+                  "value": 10898.60465116279
+                },
+                {
+                  "time": "2024-02-01",
+                  "value": 10941.39534883721
+                },
+                {
+                  "time": "2024-02-02",
+                  "value": 10984.186046511628
+                },
+                {
+                  "time": "2024-02-05",
+                  "value": 11026.976744186046
+                },
+                {
+                  "time": "2024-02-06",
+                  "value": 11069.767441860466
+                },
+                {
+                  "time": "2024-02-07",
+                  "value": 11112.558139534884
+                },
+                {
+                  "time": "2024-02-08",
+                  "value": 11155.348837209302
+                },
+                {
+                  "time": "2024-02-09",
+                  "value": 11198.139534883721
+                },
+                {
+                  "time": "2024-02-12",
+                  "value": 11240.93023255814
+                },
+                {
+                  "time": "2024-02-13",
+                  "value": 11283.720930232557
+                },
+                {
+                  "time": "2024-02-14",
+                  "value": 11326.511627906977
+                },
+                {
+                  "time": "2024-02-15",
+                  "value": 11369.302325581395
+                },
+                {
+                  "time": "2024-02-16",
+                  "value": 11412.093023255815
+                },
+                {
+                  "time": "2024-02-19",
+                  "value": 11454.883720930233
+                },
+                {
+                  "time": "2024-02-20",
+                  "value": 11497.67441860465
+                },
+                {
+                  "time": "2024-02-21",
+                  "value": 11540.46511627907
+                },
+                {
+                  "time": "2024-02-22",
+                  "value": 11583.255813953489
+                },
+                {
+                  "time": "2024-02-23",
+                  "value": 11626.046511627907
+                },
+                {
+                  "time": "2024-02-26",
+                  "value": 11668.837209302326
+                },
+                {
+                  "time": "2024-02-27",
+                  "value": 11711.627906976744
+                },
+                {
+                  "time": "2024-02-28",
+                  "value": 11754.418604651162
+                },
+                {
+                  "time": "2024-02-29",
+                  "value": 11797.209302325582
+                },
+                {
+                  "time": "2024-03-01",
+                  "value": 11840.0
+                }
+              ]
+            }
+          },
+          "job_id": null
+        },
+        "failure": null
+      },
+      "presentation": {
+        "title": {
+          "locale_key": "chat.tools.backtest.title",
+          "interpolation_args": {
+            "asset_universe": "AAPL"
+          }
+        },
+        "answer": {
+          "name": "total_return_pct",
+          "label": {
+            "locale_key": "receipt.metric_labels.total_return_pct",
+            "interpolation_args": {}
+          },
+          "value": "+18.4%",
+          "value_text": null,
+          "unit": null
+        },
+        "narrative": null,
+        "sources": [],
+        "visual": {
+          "kind": "portfolio_equity",
+          "currency": "USD",
+          "base_value": 10000.0,
+          "series": [
+            {
+              "time": "2024-01-02",
+              "value": 10000.0
+            },
+            {
+              "time": "2024-01-03",
+              "value": 10042.790697674418
+            },
+            {
+              "time": "2024-01-04",
+              "value": 10085.581395348838
+            },
+            {
+              "time": "2024-01-05",
+              "value": 10128.372093023256
+            },
+            {
+              "time": "2024-01-08",
+              "value": 10171.162790697674
+            },
+            {
+              "time": "2024-01-09",
+              "value": 10213.953488372093
+            },
+            {
+              "time": "2024-01-10",
+              "value": 10256.744186046511
+            },
+            {
+              "time": "2024-01-11",
+              "value": 10299.53488372093
+            },
+            {
+              "time": "2024-01-12",
+              "value": 10342.32558139535
+            },
+            {
+              "time": "2024-01-15",
+              "value": 10385.116279069767
+            },
+            {
+              "time": "2024-01-16",
+              "value": 10427.906976744185
+            },
+            {
+              "time": "2024-01-17",
+              "value": 10470.697674418605
+            },
+            {
+              "time": "2024-01-18",
+              "value": 10513.488372093023
+            },
+            {
+              "time": "2024-01-19",
+              "value": 10556.279069767443
+            },
+            {
+              "time": "2024-01-22",
+              "value": 10599.06976744186
+            },
+            {
+              "time": "2024-01-23",
+              "value": 10641.860465116279
+            },
+            {
+              "time": "2024-01-24",
+              "value": 10684.651162790698
+            },
+            {
+              "time": "2024-01-25",
+              "value": 10727.441860465116
+            },
+            {
+              "time": "2024-01-26",
+              "value": 10770.232558139534
+            },
+            {
+              "time": "2024-01-29",
+              "value": 10813.023255813954
+            },
+            {
+              "time": "2024-01-30",
+              "value": 10855.813953488372
+            },
+            {
+              "time": "2024-01-31",
+              "value": 10898.60465116279
+            },
+            {
+              "time": "2024-02-01",
+              "value": 10941.39534883721
+            },
+            {
+              "time": "2024-02-02",
+              "value": 10984.186046511628
+            },
+            {
+              "time": "2024-02-05",
+              "value": 11026.976744186046
+            },
+            {
+              "time": "2024-02-06",
+              "value": 11069.767441860466
+            },
+            {
+              "time": "2024-02-07",
+              "value": 11112.558139534884
+            },
+            {
+              "time": "2024-02-08",
+              "value": 11155.348837209302
+            },
+            {
+              "time": "2024-02-09",
+              "value": 11198.139534883721
+            },
+            {
+              "time": "2024-02-12",
+              "value": 11240.93023255814
+            },
+            {
+              "time": "2024-02-13",
+              "value": 11283.720930232557
+            },
+            {
+              "time": "2024-02-14",
+              "value": 11326.511627906977
+            },
+            {
+              "time": "2024-02-15",
+              "value": 11369.302325581395
+            },
+            {
+              "time": "2024-02-16",
+              "value": 11412.093023255815
+            },
+            {
+              "time": "2024-02-19",
+              "value": 11454.883720930233
+            },
+            {
+              "time": "2024-02-20",
+              "value": 11497.67441860465
+            },
+            {
+              "time": "2024-02-21",
+              "value": 11540.46511627907
+            },
+            {
+              "time": "2024-02-22",
+              "value": 11583.255813953489
+            },
+            {
+              "time": "2024-02-23",
+              "value": 11626.046511627907
+            },
+            {
+              "time": "2024-02-26",
+              "value": 11668.837209302326
+            },
+            {
+              "time": "2024-02-27",
+              "value": 11711.627906976744
+            },
+            {
+              "time": "2024-02-28",
+              "value": 11754.418604651162
+            },
+            {
+              "time": "2024-02-29",
+              "value": 11797.209302325582
+            },
+            {
+              "time": "2024-03-01",
+              "value": 11840.0
+            }
+          ]
+        },
+        "rows": [
+          {
+            "name": "cash_value",
+            "label": {
+              "locale_key": "receipt.metric_labels.cash_value",
+              "interpolation_args": {}
+            },
+            "value": "$10,000 -> $11,840",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "max_drawdown_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.max_drawdown_pct",
+              "interpolation_args": {}
+            },
+            "value": "0.0%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "win_rate",
+            "label": {
+              "locale_key": "receipt.metric_labels.win_rate",
+              "interpolation_args": {}
+            },
+            "value": "66.0%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "benchmark_return_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.benchmark_return_pct",
+              "interpolation_args": {}
+            },
+            "value": "+9.1%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "delta_vs_benchmark_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.delta_vs_benchmark_pct",
+              "interpolation_args": {}
+            },
+            "value": "9.3",
+            "value_text": null,
+            "unit": {
+              "locale_key": "chat.tools.units.percentage_points",
+              "interpolation_args": {}
+            }
+          },
+          {
+            "name": "strategy.strategy_type",
+            "label": {
+              "locale_key": "receipt.strategy_facts.strategy_type",
+              "interpolation_args": {}
+            },
+            "value": "macd crossover",
+            "value_text": {
+              "locale_key": "receipt.strategy_type_values.macd crossover",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "strategy.fast_period",
+            "label": {
+              "locale_key": "receipt.strategy_facts.fast_period",
+              "interpolation_args": {}
+            },
+            "value": 12.0,
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "strategy.slow_period",
+            "label": {
+              "locale_key": "receipt.strategy_facts.slow_period",
+              "interpolation_args": {}
+            },
+            "value": 26.0,
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "strategy.signal_period",
+            "label": {
+              "locale_key": "receipt.strategy_facts.signal_period",
+              "interpolation_args": {}
+            },
+            "value": 9.0,
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "symbols",
+            "label": {
+              "locale_key": "receipt.fields.asset",
+              "interpolation_args": {}
+            },
+            "value": "AAPL",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "start_date",
+            "label": {
+              "locale_key": "chat.tools.backtest.start_date",
+              "interpolation_args": {}
+            },
+            "value": "2024-01-02",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "end_date",
+            "label": {
+              "locale_key": "chat.tools.backtest.end_date",
+              "interpolation_args": {}
+            },
+            "value": "2024-03-01",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "asset_class",
+            "label": {
+              "locale_key": "receipt.fields.asset_class",
+              "interpolation_args": {}
+            },
+            "value": "equity",
+            "value_text": {
+              "locale_key": "receipt.asset_class_values.equity",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "benchmark_symbol",
+            "label": {
+              "locale_key": "receipt.fields.benchmark",
+              "interpolation_args": {}
+            },
+            "value": "SPY",
+            "value_text": null,
+            "unit": null
+          }
+        ],
+        "inputs": [],
+        "notes": [
+          {
+            "locale_key": "receipt.assumptions.long_only",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.equal_weight",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.modeled_fee_bps",
+            "interpolation_args": {
+              "value": 10.0,
+              "amount": 10.0,
+              "bps": 10.0,
+              "symbol": 10.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.modeled_slippage_bps",
+            "interpolation_args": {
+              "value": 5.0,
+              "amount": 5.0,
+              "bps": 5.0,
+              "symbol": 5.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.benchmark_same_modeled_costs",
+            "interpolation_args": {
+              "value": "SPY",
+              "amount": "SPY",
+              "bps": "SPY",
+              "symbol": "SPY"
+            }
+          }
+        ]
+      },
+      "artifact_state": "active"
+    },
+    "es-419": {
+      "kind": "tool_result",
+      "schema_version": 1,
+      "tool_name": "backtest",
+      "call_id": "signal-call",
+      "artifact_id": "signal-artifact",
+      "input_revision": 0,
+      "card_type": "backtest",
+      "card_version": 1,
+      "arguments": {
+        "strategy": {
+          "raw_user_phrasing": null,
+          "requested_strategy_template": null,
+          "strategy_type": "signal_strategy",
+          "strategy_thesis": null,
+          "asset_universe": [
+            "AAPL"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "cadence": null,
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2024-01-02",
+            "end": "2024-03-01"
+          },
+          "sizing_mode": null,
+          "capital_amount": 10000.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": {
+            "type": "macd_crossover",
+            "fast_period": 12,
+            "slow_period": 26,
+            "signal_period": 9,
+            "direction": "bullish"
+          },
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [],
+          "extra_parameters": {}
+        }
+      },
+      "outcome": {
+        "status": "succeeded",
+        "result": {
+          "execution_status": "succeeded",
+          "facts": {
+            "asset_class": "equity",
+            "symbols": [
+              "AAPL"
+            ],
+            "benchmark_symbol": "SPY",
+            "date_range": {
+              "start": "2024-01-02",
+              "end": "2024-03-01"
+            },
+            "metrics": [
+              {
+                "key": "cash_value",
+                "value": "$10,000 -> $11,840"
+              },
+              {
+                "key": "total_return_pct",
+                "value": "+18.4%"
+              },
+              {
+                "key": "max_drawdown_pct",
+                "value": "0.0%"
+              },
+              {
+                "key": "win_rate",
+                "value": "66.0%"
+              },
+              {
+                "key": "benchmark_return_pct",
+                "value": "+9.1%"
+              },
+              {
+                "key": "delta_vs_benchmark_pct",
+                "value": "9.3"
+              }
+            ],
+            "strategy_facts": [
+              {
+                "key": "strategy_type",
+                "value": "macd crossover"
+              },
+              {
+                "key": "fast_period",
+                "value": 12.0
+              },
+              {
+                "key": "slow_period",
+                "value": 26.0
+              },
+              {
+                "key": "signal_period",
+                "value": 9.0
+              }
+            ],
+            "assumptions": [
+              {
+                "key": "long_only",
+                "value": null
+              },
+              {
+                "key": "equal_weight",
+                "value": null
+              },
+              {
+                "key": "modeled_fee_bps",
+                "value": 10.0
+              },
+              {
+                "key": "modeled_slippage_bps",
+                "value": 5.0
+              },
+              {
+                "key": "benchmark_same_modeled_costs",
+                "value": "SPY"
+              }
+            ],
+            "visual": {
+              "kind": "portfolio_equity",
+              "currency": "USD",
+              "base_value": 10000.0,
+              "series": [
+                {
+                  "time": "2024-01-02",
+                  "value": 10000.0
+                },
+                {
+                  "time": "2024-01-03",
+                  "value": 10042.790697674418
+                },
+                {
+                  "time": "2024-01-04",
+                  "value": 10085.581395348838
+                },
+                {
+                  "time": "2024-01-05",
+                  "value": 10128.372093023256
+                },
+                {
+                  "time": "2024-01-08",
+                  "value": 10171.162790697674
+                },
+                {
+                  "time": "2024-01-09",
+                  "value": 10213.953488372093
+                },
+                {
+                  "time": "2024-01-10",
+                  "value": 10256.744186046511
+                },
+                {
+                  "time": "2024-01-11",
+                  "value": 10299.53488372093
+                },
+                {
+                  "time": "2024-01-12",
+                  "value": 10342.32558139535
+                },
+                {
+                  "time": "2024-01-15",
+                  "value": 10385.116279069767
+                },
+                {
+                  "time": "2024-01-16",
+                  "value": 10427.906976744185
+                },
+                {
+                  "time": "2024-01-17",
+                  "value": 10470.697674418605
+                },
+                {
+                  "time": "2024-01-18",
+                  "value": 10513.488372093023
+                },
+                {
+                  "time": "2024-01-19",
+                  "value": 10556.279069767443
+                },
+                {
+                  "time": "2024-01-22",
+                  "value": 10599.06976744186
+                },
+                {
+                  "time": "2024-01-23",
+                  "value": 10641.860465116279
+                },
+                {
+                  "time": "2024-01-24",
+                  "value": 10684.651162790698
+                },
+                {
+                  "time": "2024-01-25",
+                  "value": 10727.441860465116
+                },
+                {
+                  "time": "2024-01-26",
+                  "value": 10770.232558139534
+                },
+                {
+                  "time": "2024-01-29",
+                  "value": 10813.023255813954
+                },
+                {
+                  "time": "2024-01-30",
+                  "value": 10855.813953488372
+                },
+                {
+                  "time": "2024-01-31",
+                  "value": 10898.60465116279
+                },
+                {
+                  "time": "2024-02-01",
+                  "value": 10941.39534883721
+                },
+                {
+                  "time": "2024-02-02",
+                  "value": 10984.186046511628
+                },
+                {
+                  "time": "2024-02-05",
+                  "value": 11026.976744186046
+                },
+                {
+                  "time": "2024-02-06",
+                  "value": 11069.767441860466
+                },
+                {
+                  "time": "2024-02-07",
+                  "value": 11112.558139534884
+                },
+                {
+                  "time": "2024-02-08",
+                  "value": 11155.348837209302
+                },
+                {
+                  "time": "2024-02-09",
+                  "value": 11198.139534883721
+                },
+                {
+                  "time": "2024-02-12",
+                  "value": 11240.93023255814
+                },
+                {
+                  "time": "2024-02-13",
+                  "value": 11283.720930232557
+                },
+                {
+                  "time": "2024-02-14",
+                  "value": 11326.511627906977
+                },
+                {
+                  "time": "2024-02-15",
+                  "value": 11369.302325581395
+                },
+                {
+                  "time": "2024-02-16",
+                  "value": 11412.093023255815
+                },
+                {
+                  "time": "2024-02-19",
+                  "value": 11454.883720930233
+                },
+                {
+                  "time": "2024-02-20",
+                  "value": 11497.67441860465
+                },
+                {
+                  "time": "2024-02-21",
+                  "value": 11540.46511627907
+                },
+                {
+                  "time": "2024-02-22",
+                  "value": 11583.255813953489
+                },
+                {
+                  "time": "2024-02-23",
+                  "value": 11626.046511627907
+                },
+                {
+                  "time": "2024-02-26",
+                  "value": 11668.837209302326
+                },
+                {
+                  "time": "2024-02-27",
+                  "value": 11711.627906976744
+                },
+                {
+                  "time": "2024-02-28",
+                  "value": 11754.418604651162
+                },
+                {
+                  "time": "2024-02-29",
+                  "value": 11797.209302325582
+                },
+                {
+                  "time": "2024-03-01",
+                  "value": 11840.0
+                }
+              ]
+            }
+          },
+          "job_id": null
+        },
+        "failure": null
+      },
+      "presentation": {
+        "title": {
+          "locale_key": "chat.tools.backtest.title",
+          "interpolation_args": {
+            "asset_universe": "AAPL"
+          }
+        },
+        "answer": {
+          "name": "total_return_pct",
+          "label": {
+            "locale_key": "receipt.metric_labels.total_return_pct",
+            "interpolation_args": {}
+          },
+          "value": "+18.4%",
+          "value_text": null,
+          "unit": null
+        },
+        "narrative": null,
+        "sources": [],
+        "visual": {
+          "kind": "portfolio_equity",
+          "currency": "USD",
+          "base_value": 10000.0,
+          "series": [
+            {
+              "time": "2024-01-02",
+              "value": 10000.0
+            },
+            {
+              "time": "2024-01-03",
+              "value": 10042.790697674418
+            },
+            {
+              "time": "2024-01-04",
+              "value": 10085.581395348838
+            },
+            {
+              "time": "2024-01-05",
+              "value": 10128.372093023256
+            },
+            {
+              "time": "2024-01-08",
+              "value": 10171.162790697674
+            },
+            {
+              "time": "2024-01-09",
+              "value": 10213.953488372093
+            },
+            {
+              "time": "2024-01-10",
+              "value": 10256.744186046511
+            },
+            {
+              "time": "2024-01-11",
+              "value": 10299.53488372093
+            },
+            {
+              "time": "2024-01-12",
+              "value": 10342.32558139535
+            },
+            {
+              "time": "2024-01-15",
+              "value": 10385.116279069767
+            },
+            {
+              "time": "2024-01-16",
+              "value": 10427.906976744185
+            },
+            {
+              "time": "2024-01-17",
+              "value": 10470.697674418605
+            },
+            {
+              "time": "2024-01-18",
+              "value": 10513.488372093023
+            },
+            {
+              "time": "2024-01-19",
+              "value": 10556.279069767443
+            },
+            {
+              "time": "2024-01-22",
+              "value": 10599.06976744186
+            },
+            {
+              "time": "2024-01-23",
+              "value": 10641.860465116279
+            },
+            {
+              "time": "2024-01-24",
+              "value": 10684.651162790698
+            },
+            {
+              "time": "2024-01-25",
+              "value": 10727.441860465116
+            },
+            {
+              "time": "2024-01-26",
+              "value": 10770.232558139534
+            },
+            {
+              "time": "2024-01-29",
+              "value": 10813.023255813954
+            },
+            {
+              "time": "2024-01-30",
+              "value": 10855.813953488372
+            },
+            {
+              "time": "2024-01-31",
+              "value": 10898.60465116279
+            },
+            {
+              "time": "2024-02-01",
+              "value": 10941.39534883721
+            },
+            {
+              "time": "2024-02-02",
+              "value": 10984.186046511628
+            },
+            {
+              "time": "2024-02-05",
+              "value": 11026.976744186046
+            },
+            {
+              "time": "2024-02-06",
+              "value": 11069.767441860466
+            },
+            {
+              "time": "2024-02-07",
+              "value": 11112.558139534884
+            },
+            {
+              "time": "2024-02-08",
+              "value": 11155.348837209302
+            },
+            {
+              "time": "2024-02-09",
+              "value": 11198.139534883721
+            },
+            {
+              "time": "2024-02-12",
+              "value": 11240.93023255814
+            },
+            {
+              "time": "2024-02-13",
+              "value": 11283.720930232557
+            },
+            {
+              "time": "2024-02-14",
+              "value": 11326.511627906977
+            },
+            {
+              "time": "2024-02-15",
+              "value": 11369.302325581395
+            },
+            {
+              "time": "2024-02-16",
+              "value": 11412.093023255815
+            },
+            {
+              "time": "2024-02-19",
+              "value": 11454.883720930233
+            },
+            {
+              "time": "2024-02-20",
+              "value": 11497.67441860465
+            },
+            {
+              "time": "2024-02-21",
+              "value": 11540.46511627907
+            },
+            {
+              "time": "2024-02-22",
+              "value": 11583.255813953489
+            },
+            {
+              "time": "2024-02-23",
+              "value": 11626.046511627907
+            },
+            {
+              "time": "2024-02-26",
+              "value": 11668.837209302326
+            },
+            {
+              "time": "2024-02-27",
+              "value": 11711.627906976744
+            },
+            {
+              "time": "2024-02-28",
+              "value": 11754.418604651162
+            },
+            {
+              "time": "2024-02-29",
+              "value": 11797.209302325582
+            },
+            {
+              "time": "2024-03-01",
+              "value": 11840.0
+            }
+          ]
+        },
+        "rows": [
+          {
+            "name": "cash_value",
+            "label": {
+              "locale_key": "receipt.metric_labels.cash_value",
+              "interpolation_args": {}
+            },
+            "value": "$10,000 -> $11,840",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "max_drawdown_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.max_drawdown_pct",
+              "interpolation_args": {}
+            },
+            "value": "0.0%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "win_rate",
+            "label": {
+              "locale_key": "receipt.metric_labels.win_rate",
+              "interpolation_args": {}
+            },
+            "value": "66.0%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "benchmark_return_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.benchmark_return_pct",
+              "interpolation_args": {}
+            },
+            "value": "+9.1%",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "delta_vs_benchmark_pct",
+            "label": {
+              "locale_key": "receipt.metric_labels.delta_vs_benchmark_pct",
+              "interpolation_args": {}
+            },
+            "value": "9.3",
+            "value_text": null,
+            "unit": {
+              "locale_key": "chat.tools.units.percentage_points",
+              "interpolation_args": {}
+            }
+          },
+          {
+            "name": "strategy.strategy_type",
+            "label": {
+              "locale_key": "receipt.strategy_facts.strategy_type",
+              "interpolation_args": {}
+            },
+            "value": "macd crossover",
+            "value_text": {
+              "locale_key": "receipt.strategy_type_values.macd crossover",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "strategy.fast_period",
+            "label": {
+              "locale_key": "receipt.strategy_facts.fast_period",
+              "interpolation_args": {}
+            },
+            "value": 12.0,
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "strategy.slow_period",
+            "label": {
+              "locale_key": "receipt.strategy_facts.slow_period",
+              "interpolation_args": {}
+            },
+            "value": 26.0,
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "strategy.signal_period",
+            "label": {
+              "locale_key": "receipt.strategy_facts.signal_period",
+              "interpolation_args": {}
+            },
+            "value": 9.0,
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "symbols",
+            "label": {
+              "locale_key": "receipt.fields.asset",
+              "interpolation_args": {}
+            },
+            "value": "AAPL",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "start_date",
+            "label": {
+              "locale_key": "chat.tools.backtest.start_date",
+              "interpolation_args": {}
+            },
+            "value": "2024-01-02",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "end_date",
+            "label": {
+              "locale_key": "chat.tools.backtest.end_date",
+              "interpolation_args": {}
+            },
+            "value": "2024-03-01",
+            "value_text": null,
+            "unit": null
+          },
+          {
+            "name": "asset_class",
+            "label": {
+              "locale_key": "receipt.fields.asset_class",
+              "interpolation_args": {}
+            },
+            "value": "equity",
+            "value_text": {
+              "locale_key": "receipt.asset_class_values.equity",
+              "interpolation_args": {}
+            },
+            "unit": null
+          },
+          {
+            "name": "benchmark_symbol",
+            "label": {
+              "locale_key": "receipt.fields.benchmark",
+              "interpolation_args": {}
+            },
+            "value": "SPY",
+            "value_text": null,
+            "unit": null
+          }
+        ],
+        "inputs": [],
+        "notes": [
+          {
+            "locale_key": "receipt.assumptions.long_only",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.equal_weight",
+            "interpolation_args": {
+              "value": null,
+              "amount": null,
+              "bps": null,
+              "symbol": null
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.modeled_fee_bps",
+            "interpolation_args": {
+              "value": 10.0,
+              "amount": 10.0,
+              "bps": 10.0,
+              "symbol": 10.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.modeled_slippage_bps",
+            "interpolation_args": {
+              "value": 5.0,
+              "amount": 5.0,
+              "bps": 5.0,
+              "symbol": 5.0
+            }
+          },
+          {
+            "locale_key": "receipt.assumptions.benchmark_same_modeled_costs",
+            "interpolation_args": {
+              "value": "SPY",
+              "amount": "SPY",
+              "bps": "SPY",
+              "symbol": "SPY"
+            }
+          }
+        ]
+      },
+      "artifact_state": "active"
+    }
+  },
+  "expected": {
+    "fast_period": 12,
+    "slow_period": 26,
+    "signal_period": 9
+  }
+}

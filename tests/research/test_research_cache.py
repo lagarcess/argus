@@ -8,6 +8,7 @@ import time
 from argus.domain.research import cache as research_cache
 from argus.domain.research.cache import (
     DATA_CLASS_TTL_SECONDS,
+    WITHHELD_TTL_SECONDS,
     cache_get,
     cache_put,
     cache_stats,
@@ -143,3 +144,76 @@ def test_expired_entries_fall_out(monkeypatch) -> None:
         research_cache.time, "monotonic", lambda: real_monotonic() + 121.0
     )
     assert cache_get(key) is None
+
+
+def test_a_withheld_record_serves_for_its_class_capped_at_a_day() -> None:
+    """An absence is bounded twice: by how fast the figure itself changes,
+    and by the day a page can appear. Volatile classes keep their minutes,
+    so a model fault on a quote never outlives a retry; quarterly and closed
+    classes are cut from ninety days to one."""
+    assert WITHHELD_TTL_SECONDS == 86_400.0
+    assert (
+        DATA_CLASS_TTL_SECONDS["movers"]
+        < WITHHELD_TTL_SECONDS
+        < DATA_CLASS_TTL_SECONDS["analyst_estimates"]
+    )
+    for kind in ("live_quote", "market_pulse", "screening"):
+        assert ttl_for_packet(question_kind=kind, withheld=True) == ttl_for_packet(
+            question_kind=kind
+        )
+    for kind in ("cross_company", "company_lookup", "etf_constituents"):
+        assert ttl_for_packet(question_kind=kind, withheld=True) == WITHHELD_TTL_SECONDS
+        assert ttl_for_packet(question_kind=kind) > WITHHELD_TTL_SECONDS
+    assert (
+        ttl_for_packet(question_kind="live_quote", closed_period=True, withheld=True)
+        == WITHHELD_TTL_SECONDS
+    )
+
+
+def test_the_scenario_contract_has_its_own_cache_identity() -> None:
+    """Decision 10: a packet answered under the retrieval contract never
+    serves a scenario question, and the reverse; the contract is part of the
+    public request identity, still with no user parameter."""
+    base = dict(
+        capability_class="balanced_lookup",
+        shape="balanced",
+        symbols=("NVDA",),
+        period_key="ten years",
+        question_fingerprint="what will $10,000 in nvda be worth in ten years?",
+        language="en",
+    )
+    assert research_cache_key(**base) == research_cache_key(**base, contract="retrieval")
+    assert research_cache_key(**base, contract="scenario") != research_cache_key(**base)
+
+
+def test_a_scenario_lives_in_the_analyst_estimates_class() -> None:
+    """Decision 10: a computed scenario is built from forecasts, targets and
+    multiples, so its cache TTL and its recency filter follow the
+    analyst-estimates class whatever kind the question was typed as, and a
+    closed window still wins."""
+    from argus.domain.research.cache import (
+        DATA_CLASS_TTL_SECONDS,
+        data_class_for,
+        ttl_for_packet,
+    )
+    from argus.domain.research.config import retrieval_spec
+
+    assert data_class_for(question_kind="company_lookup") == "fundamentals"
+    assert (
+        data_class_for(question_kind="company_lookup", scenario=True)
+        == "analyst_estimates"
+    )
+    assert data_class_for(
+        question_kind="company_lookup", scenario=True, closed_period=True
+    ) == ("closed_ohlcv")
+    assert (
+        ttl_for_packet(question_kind="company_lookup", scenario=True)
+        == (DATA_CLASS_TTL_SECONDS["analyst_estimates"])
+    )
+    assert retrieval_spec(
+        "balanced", question_kind="company_lookup", country=None, scenario=True
+    ).recency == ("month")
+    assert (
+        retrieval_spec("balanced", question_kind="company_lookup", country=None).recency
+        is None
+    )

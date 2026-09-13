@@ -1,0 +1,77 @@
+{
+  "title": "sending another turn cancels the pending tool edit en",
+  "status": "passed",
+  "requests": [
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations/conversation-alpha/messages?limit=100"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations/conversation-alpha/messages?limit=100"
+    },
+    {
+      "method": "POST",
+      "url": "http://127.0.0.1:8318/api/v1/chat/stream"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=50"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/memory/availability"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/me"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations/conversation-alpha/messages?limit=100"
+    },
+    {
+      "method": "GET",
+      "url": "http://127.0.0.1:8318/api/v1/conversations?limit=30&archived=false&deleted=false"
+    }
+  ],
+  "external": [],
+  "unhandledApi": [],
+  "pageErrors": []
+}

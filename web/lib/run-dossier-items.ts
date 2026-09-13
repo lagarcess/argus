@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 
 import type { RunDossier } from "./run-dossier-contract";
+import { percentText, signedPercentText } from "./result-figures";
 
 const MAX_DOSSIER_SYMBOLS = 5;
 const MAX_DOSSIER_METRICS = 4;
@@ -44,16 +45,6 @@ function localizedNumber(
     maximumFractionDigits,
     minimumFractionDigits: 0,
   }).format(value);
-}
-
-function localizedPercent(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale, {
-    style: "percent",
-    maximumFractionDigits: 1,
-    minimumFractionDigits: 0,
-  })
-    .format(value / 100)
-    .replaceAll("\u00a0", " ");
 }
 
 export function formatRunDossierSetup(
@@ -124,10 +115,12 @@ export function formatRunDossierMetrics(
         return { name, value: metric.value };
       }
       if (metric.name.endsWith("_pct")) {
-        return { name, value: localizedPercent(metric.value, locale) };
+        // A display figure the backend rounded; printed like the Quick Take
+        // beside it, never rounded again here.
+        return { name, value: signedPercentText(metric.value, locale) };
       }
       if (metric.name === "win_rate") {
-        return { name, value: localizedPercent(metric.value * 100, locale) };
+        return { name, value: percentText(metric.value * 100, locale) };
       }
       return {
         name,

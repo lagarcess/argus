@@ -81,13 +81,13 @@ describe("single-run dossier formatting", () => {
 
   test("formats bounded metric values with locale-aware numbers", () => {
     expect(formatRunDossierMetrics(dossier, t, "en-US")).toEqual([
-      { name: "Total return", value: "8.4%" },
+      { name: "Total return", value: "+8.4%" },
       { name: "Worst drop", value: "-6.2%" },
       { name: "Sharpe", value: "1.23" },
     ]);
 
     expect(formatRunDossierMetrics(dossier, t, "es-419")).toEqual([
-      { name: "Total return", value: "8.4%" },
+      { name: "Total return", value: "+8.4%" },
       { name: "Worst drop", value: "-6.2%" },
       { name: "Sharpe", value: "1.23" },
     ]);

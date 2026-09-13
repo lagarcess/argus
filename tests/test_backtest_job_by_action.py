@@ -53,7 +53,6 @@ class _ByActionGateway:
             display_name="Mock Developer",
             language="en",
             locale="en-US",
-            theme="dark",
             is_admin=True,
             created_at=datetime(2026, 7, 24, tzinfo=timezone.utc),
             updated_at=datetime(2026, 7, 24, tzinfo=timezone.utc),

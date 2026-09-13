@@ -1,0 +1,30 @@
+{
+  "status": "blocked_release_policy_conflict",
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "release_docs": {
+    "passed": 23,
+    "failed": 1,
+    "test": "test_main_promotion_manifests_require_live_eval_scorecard_evidence",
+    "assertion": "Missing the baseline, candidate side of a targeted interleaved A/B.",
+    "minimum_attempts_per_side": 10,
+    "policy_source": "tests/release_promotion_evidence_support.py",
+    "policy_origin_commit": "5d408acf6b1ed9608dfe8b757ff41372f9b9daeb",
+    "policy_predates_main_at_cut": true
+  },
+  "founder_procedure_completed": "Recorded-text judge replay, then one complete case rerun after the judge still failed",
+  "validator_changed": false,
+  "further_paid_runs_started": false,
+  "fix_rounds": 0,
+  "tracked_cost_usd": 4.88888657926,
+  "reserve_usd": 1.02,
+  "guarded_total_usd": 5.90888657926,
+  "combined_cap_usd": 7.5,
+  "reserve_is_not_actual_spend": true,
+  "browser_spend_usd": 0,
+  "replay_spend_usd": 0,
+  "production_mutations": [],
+  "customer_text_pulled": false,
+  "review_required_at_final_head": true,
+  "prior_review_summary_commit": "2d99bcb4edc6c9e817a524fa295c8d67776ff549",
+  "decision_requested": "Approve a bounded release-validator change recognizing the founder-approved judge-then-one-retry procedure, while retaining the native failure and verifying the supplemental evidence."
+}

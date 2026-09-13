@@ -1,0 +1,107 @@
+{
+  "label": "savings-500-5pct",
+  "language": "en",
+  "question": "If I save $500 a month at 5%, how much will I have in 20 years?",
+  "asked_at": "2026-09-10T20:06:33.308280+00:00",
+  "tree": "base",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+        "recovery": {
+          "code": "interpreter_unavailable",
+          "retryable": false
+        },
+        "message_id": "2127fd51-ab8f-473a-8116-dec89069aa5b",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "e58890aa-1789-45ac-aa93-e9ddcfdbffab",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "9a171ceb-7c9b-493d-9bf7-4cecdfc0845d",
+        "conversation_id": "e58890aa-1789-45ac-aa93-e9ddcfdbffab",
+        "role": "user",
+        "content": "If I save $500 a month at 5%, how much will I have in 20 years?",
+        "created_at": "2026-09-10T20:06:33.340001Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "e58890aa-1789-45ac-aa93-e9ddcfdbffab",
+            "request_id": "ac7c62dd-ab79-4fcb-9b35-7558e07d2ff0",
+            "started_at": "2026-09-10T20:06:33.339990+00:00"
+          }
+        }
+      },
+      {
+        "id": "2127fd51-ab8f-473a-8116-dec89069aa5b",
+        "conversation_id": "e58890aa-1789-45ac-aa93-e9ddcfdbffab",
+        "role": "assistant",
+        "content": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+        "created_at": "2026-09-10T20:07:13.140851Z",
+        "metadata": {
+          "conversation_mode": "guide",
+          "agent_runtime_stage_outcome": "ready_to_respond",
+          "recovery": {
+            "code": "interpreter_unavailable",
+            "retryable": false
+          },
+          "agent_runtime_turn": {
+            "turn_id": "9a171ceb-7c9b-493d-9bf7-4cecdfc0845d",
+            "request_id": "ac7c62dd-ab79-4fcb-9b35-7558e07d2ff0",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 39.84,
+  "summary": {
+    "label": "savings-500-5pct",
+    "language": "en",
+    "elapsed_seconds": 39.84,
+    "stage_outcomes": [
+      "ready_to_respond"
+    ],
+    "answered": false,
+    "recovery_code": "interpreter_unavailable",
+    "clarification_kind": null,
+    "clarification_reason_code": null,
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "I saved your message, but I could not turn it into a reliable test setup. Please retry in a moment.",
+    "shape": null,
+    "degraded": null,
+    "rows": 0,
+    "sources": [],
+    "research_usage": null,
+    "next_experiments": []
+  }
+}

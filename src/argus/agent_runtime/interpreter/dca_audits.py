@@ -14,6 +14,7 @@ from argus.agent_runtime.interpreter.shared import (
     _field_path_base,
     _llm_value_is_empty,
     _supported_dca_cadence_value,
+    repaired_turn_act,
 )
 from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
@@ -25,6 +26,7 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     has_partial_explicit_date_range,
 )
+from argus.domain.dca_capital import DCA_CEILING_ROLES, DCA_SEED_ROLES
 
 
 def _response_needs_strategy_family_continuity_audit(
@@ -70,6 +72,7 @@ def _response_from_dca_contract_audit(
     *,
     response: LLMInterpretationResponse,
     audit: Any,
+    request: InterpretationRequest,
 ) -> LLMInterpretationResponse | None:
     if (
         not isinstance(audit, DcaContractAudit)
@@ -97,11 +100,52 @@ def _response_from_dca_contract_audit(
     extra_parameters["recurring_contribution"] = float(recurring_amount)
     extra_parameters["recurring_cadence"] = cadence
 
+    audit_reason_codes: list[str] = []
     if audit.total_budget_amount is not None and audit.total_budget_amount > 0:
+        budget = float(audit.total_budget_amount)
         budget_source = _dca_total_budget_source(audit.total_budget_source)
-        draft.total_capital = float(audit.total_budget_amount)
-        field_provenance["total_capital"] = budget_source
-        extra_parameters["total_budget"] = float(audit.total_budget_amount)
+        # Money the user already typed in a role keeps that role; an audit
+        # may only add a role for a distinct amount, and the role it names
+        # decides the field, so a seed never lands under a ceiling key.
+        if _draft_types_amount_as_seed(draft, field_provenance, budget):
+            audit_reason_codes.append("dca_budget_audit_outranked_by_typed_seed")
+        elif budget == draft.initial_capital and budget_source in _DCA_SEED_ROLE_SOURCES:
+            if _capital_source(field_provenance, "initial_capital") in (
+                _DCA_CEILING_ROLE_SOURCES
+            ):
+                # The draft typed this money as a cap; a second reading of the
+                # same money adds no role, and the reader places the cap.
+                audit_reason_codes.append("dca_budget_audit_same_amount_already_typed")
+            else:
+                # Two reads agree on the seed; the audit supplies the
+                # provenance the primary left out.
+                field_provenance["initial_capital"] = budget_source
+                audit_reason_codes.append("dca_budget_audit_seed_corroborated")
+        elif budget_source in _DCA_SEED_ROLE_SOURCES and draft.initial_capital is None:
+            draft.initial_capital = budget
+            field_provenance["initial_capital"] = budget_source
+            audit_reason_codes.append("dca_budget_audit_typed_as_seed")
+        else:
+            # The audit never replaces a role the draft already holds. A seed
+            # beside the user's own seed can only bound the plan; a seed
+            # beside a cap in the seed slot keeps its role, and the reader
+            # places both by role.
+            if budget_source in _DCA_SEED_ROLE_SOURCES:
+                if _capital_source(field_provenance, "initial_capital") in (
+                    _DCA_CEILING_ROLE_SOURCES
+                ):
+                    audit_reason_codes.append(
+                        "dca_budget_audit_seed_role_kept_beside_misplaced_cap"
+                    )
+                else:
+                    budget_source = "total_budget"
+                    audit_reason_codes.append(
+                        "dca_budget_audit_seed_role_occupied_read_as_ceiling"
+                    )
+            draft.total_capital = budget
+            field_provenance["total_capital"] = budget_source
+            if budget_source not in _DCA_SEED_ROLE_SOURCES:
+                extra_parameters["total_budget"] = budget
 
     draft.field_provenance = field_provenance
     draft.extra_parameters = extra_parameters
@@ -110,25 +154,85 @@ def _response_from_dca_contract_audit(
         response.missing_required_fields,
         draft=draft,
     )
+    turn = repaired_turn_act(
+        base_act=response.semantic_turn_act,
+        base_relation=response.task_relation,
+        request=request,
+    )
     return response.model_copy(
         update={
             "intent": "strategy_drafting"
             if missing_required_fields
             else "backtest_execution",
-            "task_relation": "new_task",
+            "task_relation": turn.task_relation,
             "requires_clarification": bool(missing_required_fields),
             "candidate_strategy_draft": draft,
             "missing_required_fields": missing_required_fields,
             "assistant_response": None,
-            "semantic_turn_act": "new_idea",
+            "semantic_turn_act": turn.semantic_turn_act,
             "capability_question_focus": None,
             "artifact_target": "none",
             "unsupported_constraints": [],
             "reason_codes": list(
-                dict.fromkeys([*response.reason_codes, "dca_contract_audit"])
+                dict.fromkeys(
+                    [
+                        *response.reason_codes,
+                        "dca_contract_audit",
+                        *audit_reason_codes,
+                        *turn.reason_codes,
+                    ]
+                )
             ),
         }
     )
+
+
+# A budget audit that names a seed role has read the seed, not a ceiling.
+_DCA_SEED_ROLE_SOURCES = frozenset(DCA_SEED_ROLES)
+_DCA_CEILING_ROLE_SOURCES = frozenset(DCA_CEILING_ROLES)
+# Provenance that makes a seed the user's own: their words, a carried setup,
+# or a seed role. A ceiling role under the seed key is a cap in the wrong slot.
+_USER_SEED_SOURCES = frozenset({"user", "explicit_user", "prior", *DCA_SEED_ROLES})
+
+
+def _draft_types_amount_as_seed(
+    draft: LLMStrategyDraft,
+    field_provenance: dict[str, str],
+    amount: float,
+) -> bool:
+    if draft.initial_capital is None or float(draft.initial_capital) != amount:
+        return False
+    return _capital_source(field_provenance, "initial_capital") in _USER_SEED_SOURCES
+
+
+def _seed_corroborated_by_fidelity_audit(
+    draft: LLMStrategyDraft,
+    *,
+    audit: Any,
+    repaired: LLMInterpretationResponse,
+) -> bool:
+    """A seed the primary typed without provenance keeps its value once the
+    fidelity audit reads the same starting capital beside the contribution.
+    The audit's schema keeps the two roles apart, so an equal pair is two
+    facts, not one restated. The audit corroborates; it never invents a seed.
+    """
+    if canonical_strategy_type(draft.strategy_type) != "dca_accumulation":
+        return False
+    if audit.capital_amount is None or audit.recurring_contribution_amount is None:
+        return False
+    seed = float(audit.capital_amount)
+    if draft.initial_capital is None or float(draft.initial_capital) != seed:
+        return False
+    if (
+        _capital_source(draft.field_provenance, "initial_capital")
+        in _TOTAL_CAPITAL_SOURCES
+    ):
+        return False
+    draft.field_provenance["initial_capital"] = "starting_capital"
+    repaired.reason_codes = list(
+        dict.fromkeys([*repaired.reason_codes, "stated_run_field_seed_corroborated"])
+    )
+    return True
 
 
 def _dca_contract_missing_fields(

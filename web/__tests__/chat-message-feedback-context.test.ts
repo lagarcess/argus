@@ -117,6 +117,56 @@ describe("chat message feedback context", () => {
     });
   });
 
+  test("carries the evidence artifact of a reloaded result beside its run", () => {
+    const message: Message = {
+      id: "assistant-result-2",
+      role: "ai",
+      kind: "strategy_result",
+      content: "**Quick take**",
+      result: {
+        strategyName: "AAPL buy and hold",
+        period: "June 1, 2025 to June 1, 2026",
+        metrics: [],
+        runId: "run-2",
+        evidenceArtifactId: "evidence-2",
+      },
+    };
+
+    expect(feedbackContextForMessage(message, "conversation-1")).toEqual({
+      message_id: "assistant-result-2",
+      conversation_id: "conversation-1",
+      message_kind: "strategy_result",
+      artifact_id: "run-2",
+      result_run_id: "run-2",
+      evidence_artifact_id: "evidence-2",
+    });
+  });
+
+  test("points at the calculation card that succeeded", () => {
+    type Card = NonNullable<Message["toolResultCards"]>[number];
+    const card = (artifactId: string, status: Card["outcome"]["status"]) =>
+      ({
+        kind: "tool_result",
+        artifact_id: artifactId,
+        outcome: { status, result: null, failure: null },
+      }) as unknown as Card;
+    const message: Message = {
+      id: "assistant-calculation-1",
+      role: "ai",
+      kind: "text",
+      content: "",
+      toolResultCards: [card("calculation-1", "succeeded"), card("calculation-2", "invalid")],
+    };
+
+    expect(feedbackContextForMessage(message, "conversation-1")).toEqual({
+      message_id: "assistant-calculation-1",
+      conversation_id: "conversation-1",
+      message_kind: "text",
+      artifact_id: "calculation-1",
+      artifact_type: "tool_result",
+    });
+  });
+
   test("omits empty optional values", () => {
     const message: Message = {
       id: "assistant-text-1",

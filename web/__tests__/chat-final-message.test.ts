@@ -123,7 +123,7 @@ describe("chat final frame visibility", () => {
       "utf-8",
     );
     const finalHandler = chat.slice(
-      chat.indexOf("} else if (finalText) {"),
+      chat.indexOf("} else if (finalText || finalToolCards.length || finalToolCardsUnavailable || finalToolJobs.length) {"),
       chat.indexOf("terminalReadiness.accept(event.data, identityAuthorized)"),
     );
     expect(finalHandler).toContain(
@@ -143,5 +143,33 @@ describe("chat final frame visibility", () => {
     expect(fallback).toContain("settleOpenConfirmationsFromFinalPayload");
     expect(fallback).toContain("recoveryDisplay: options.recoveryDisplay");
     expect(fallback).toContain("researchSourcesForFinalPayload");
+  });
+
+  test("a streamed what-next answer keeps the run its rows belong to (#590)", () => {
+    const message = mergeFinalTextMessage(
+      { id: "assistant-590", role: "ai", kind: "text", content: "" },
+      {
+        assistantId: "assistant-590",
+        finalText: "Here is what you can try next from this result.",
+        finalActions: [],
+        nextExperiments: [
+          {
+            kind: "change_date_range",
+            label: "Test a different date range",
+            labelKey: "chat.next_experiments.labels.change_date_range",
+            labelShort: null,
+            labelShortKey: null,
+            labelParts: null,
+            detail: null,
+            sendText: null,
+            why: null,
+          },
+        ],
+        nextExperimentsSourceRunId: "run-590",
+      },
+    );
+
+    expect(message.nextExperiments?.[0]?.kind).toBe("change_date_range");
+    expect(message.nextExperimentsSourceRunId).toBe("run-590");
   });
 });

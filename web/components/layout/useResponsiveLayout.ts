@@ -1,45 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import {
-  BELOW_DESKTOP_QUERY,
-  BELOW_TABLET_QUERY,
   DESKTOP_LAYOUT,
-  layoutsEqual,
+  responsiveLayoutSnapshot,
+  subscribeResponsiveLayout,
   type ResponsiveLayout,
 } from "@/lib/responsive-layout";
 
-function readLayout(): ResponsiveLayout {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return DESKTOP_LAYOUT;
-  }
-  return {
-    isBelowTablet: window.matchMedia(BELOW_TABLET_QUERY).matches,
-    isBelowDesktop: window.matchMedia(BELOW_DESKTOP_QUERY).matches,
-  };
-}
-
 /**
- * Current layout band by viewport width. Starts at the desktop band so server
- * markup and the first client paint agree, then corrects on mount.
+ * SSR and hydration agree on desktop. Later client mounts read the actual band
+ * immediately, so opening a phone panel never mounts a temporary desktop modal
+ * that would register focus/history and then pop its entry during the swap.
  */
 export function useResponsiveLayout(): ResponsiveLayout {
-  const [layout, setLayout] = useState<ResponsiveLayout>(DESKTOP_LAYOUT);
-
-  useEffect(() => {
-    const sync = () =>
-      setLayout((current) => {
-        const next = readLayout();
-        return layoutsEqual(current, next) ? current : next;
-      });
-    sync();
-    const queries = [BELOW_TABLET_QUERY, BELOW_DESKTOP_QUERY].map((query) =>
-      window.matchMedia(query),
-    );
-    queries.forEach((query) => query.addEventListener("change", sync));
-    return () =>
-      queries.forEach((query) => query.removeEventListener("change", sync));
-  }, []);
-
-  return layout;
+  return useSyncExternalStore(subscribeResponsiveLayout, responsiveLayoutSnapshot, () => DESKTOP_LAYOUT);
 }

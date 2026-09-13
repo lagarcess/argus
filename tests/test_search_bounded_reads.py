@@ -187,9 +187,7 @@ def _hydration_row() -> dict[str, Any]:
             "conversation_id": CONVERSATION_ID,
             "role": "assistant",
             "content": "Latest run result",
-            "metadata": {
-                "result_run_id": "00000000-0000-0000-0000-000000000401"
-            },
+            "metadata": {"result_run_id": "00000000-0000-0000-0000-000000000401"},
             "created_at": ACTIVITY_AT,
         },
     }
@@ -282,9 +280,7 @@ def test_search_hydrates_latest_recall_decision_without_a_run_dossier() -> None:
 
     assert result.rows["runs"] == []
     assert result.rows["evidence"] == []
-    assert result.rows["decisions"] == [
-        hydration["latest_recall_decision_payload"]
-    ]
+    assert result.rows["decisions"] == [hydration["latest_recall_decision_payload"]]
     hydration_sql = pool.cursor.executions[1][0]
     assert "latest_recall_decision_payload" in str(hydration_sql)
 
@@ -309,14 +305,10 @@ def test_search_visible_id_recall_is_one_bounded_hydration_and_one_ledger_read()
         include_ledger_groups=True,
     )
 
-    assert [row["id"] for row in result.rows["conversations"]] == [
-        CONVERSATION_ID
-    ]
+    assert [row["id"] for row in result.rows["conversations"]] == [CONVERSATION_ID]
     assert len(pool.cursor.executions) == 2
     hydration_sql, hydration_params = pool.cursor.executions[0]
-    assert "conversation.id = any(%(conversation_ids)s::uuid[])" in str(
-        hydration_sql
-    )
+    assert "conversation.id = any(%(conversation_ids)s::uuid[])" in str(hydration_sql)
     assert [str(value) for value in hydration_params["conversation_ids"]] == [
         CONVERSATION_ID
     ]
@@ -413,8 +405,7 @@ def test_search_allows_symbol_only_queries_without_text_scans(symbol: str) -> No
     assert "%(text_search_enabled)s::boolean as text_search_enabled" in sql_text
     assert "not input.text_search_enabled" in sql_text
     assert (
-        "btrim(public.argus_search_symbol_casefold("
-        'run.symbols[1])) collate "C"'
+        "btrim(public.argus_search_symbol_casefold(" 'run.symbols[1])) collate "C"'
     ) in sql_text
     assert all(
         execution_params["text_search_enabled"] is False
@@ -716,8 +707,7 @@ def test_conversation_symbol_rank_uses_canonical_expanding_casefold() -> None:
 
     rendered = pool.cursor.executions[0][0].as_string()
     assert (
-        "btrim(public.argus_search_symbol_casefold("
-        'symbol_run.symbols[1])) collate "C"'
+        "btrim(public.argus_search_symbol_casefold(" 'symbol_run.symbols[1])) collate "C"'
     ) in rendered
     assert "input.symbol_query = lower(symbol)" not in rendered
 
@@ -774,9 +764,7 @@ def test_asset_rollup_is_one_bounded_owner_scoped_row_outside_conversation_limit
     assert str(params["user_id"]) == OWNER_ID
 
 
-def test_asset_rollup_bounds_indexed_symbol_candidates_before_lineage_hydration() -> (
-    None
-):
+def test_asset_rollup_bounds_indexed_symbol_candidates_before_lineage_hydration() -> None:
     reader_type, _ = _reader_types()
     pool = _RecordingPool([[]])
 
@@ -820,9 +808,12 @@ def test_asset_rollup_bounds_indexed_symbol_candidates_before_lineage_hydration(
     assert matching_runs < first_decision_read
     assert "conversation.id" not in lineage_sql
     assert lineage_sql.count("run.conversation_id") == 3
-    assert sql_text[symbol_candidates:selected_symbol].count(
-        "limit (select asset_symbol_limit from input)"
-    ) == 5
+    assert (
+        sql_text[symbol_candidates:selected_symbol].count(
+            "limit (select asset_symbol_limit from input)"
+        )
+        == 5
+    )
     assert params["asset_symbol_limit"] == 2
     assert params["symbol_query"] == "gold"
     assert params["symbol_prefix_end"] == "gole"
@@ -881,16 +872,19 @@ def test_search_decision_filter_and_ledger_match_all_conversation_layers() -> No
     assert pool.cursor.executions[1][1]["decision_state"] is None
 
 
-@pytest.mark.parametrize(
-    ("has_anchor", "expected_prefilter_count"),
-    [(False, 6), (True, 7)],
-)
+@pytest.mark.parametrize("has_anchor", [False, True])
 def test_search_decision_filter_precedes_every_source_match_cap(
     has_anchor: bool,
-    expected_prefilter_count: int,
 ) -> None:
-    from argus.domain.postgres_search_reader import _conversation_match_ctes
+    from argus.domain.postgres_search_reader import (
+        _DECISION_ATTACHMENTS,
+        _conversation_match_ctes,
+    )
 
+    # Five non-decision sources, plus one decision branch per discovery index:
+    # the decision's own note and state, and each attachment's text.
+    decision_branches = 1 + len(_DECISION_ATTACHMENTS) if has_anchor else 1
+    expected_prefilter_count = 5 + decision_branches
     sql_text = " ".join(
         _conversation_match_ctes(has_anchor=has_anchor).as_string().split()
     )
@@ -964,9 +958,7 @@ def test_search_hydration_is_one_owner_scoped_full_aggregate_without_child_cap()
         "latest_suggestion_untaken": False,
         "latest_activity": ACTIVITY_AT,
     }
-    assert [row["conversation_id"] for row in result.rows["runs"]] == [
-        CONVERSATION_ID
-    ]
+    assert [row["conversation_id"] for row in result.rows["runs"]] == [CONVERSATION_ID]
     assert len(pool.cursor.executions) == 2
     hydration_sql, params = pool.cursor.executions[1]
     rendered = str(hydration_sql)
@@ -1165,9 +1157,7 @@ def test_conversation_recall_anchor_predicates_match_the_shipped_indexes() -> No
         _normalized,
     )
 
-    rendered = " ".join(
-        _conversation_match_ctes(has_anchor=True).as_string().split()
-    )
+    rendered = " ".join(_conversation_match_ctes(has_anchor=True).as_string().split())
     indexed_haystacks = (
         (
             "conversation.title || ' ' "
@@ -1187,27 +1177,31 @@ def test_conversation_recall_anchor_predicates_match_the_shipped_indexes() -> No
 
 def test_decision_match_combines_owned_evidence_text_with_indexed_prefilters() -> None:
     from argus.domain.postgres_search_reader import (
+        _DECISION_ATTACHMENTS,
         _DECISION_INDEX_HAYSTACK,
-        _EVIDENCE_INDEX_HAYSTACK,
         _conversation_match_ctes,
         _normalized,
     )
 
-    rendered = " ".join(
-        _conversation_match_ctes(has_anchor=True).as_string().split()
-    )
+    rendered = " ".join(_conversation_match_ctes(has_anchor=True).as_string().split())
     decision_branch = rendered[: rendered.index(" matches as (")]
 
-    assert "join public.evidence_artifacts as evidence" in decision_branch
-    assert "evidence.id = decision.evidence_artifact_id" in decision_branch
+    # Every attachment is left-joined so a decision without evidence lineage
+    # still matches; each attachment's index also discovers candidates.
+    assert (
+        "left join public.evidence_artifacts as evidence "
+        "on evidence.id = decision.evidence_artifact_id"
+    ) in decision_branch
     assert "decision.evidence_artifact_id = evidence.id" in decision_branch
+    assert "decision.source_message_id = decision_message.id" in decision_branch
     assert "union all" in decision_branch
     assert "select distinct on (candidate.source_id)" in decision_branch
-    for haystack in (_DECISION_INDEX_HAYSTACK, _EVIDENCE_INDEX_HAYSTACK):
+    indexes = [_DECISION_INDEX_HAYSTACK, *(a.index_text for a in _DECISION_ATTACHMENTS)]
+    for haystack in indexes:
         normalized = " ".join(_normalized(haystack).as_string().split())
         assert f"{normalized} like %(anchor_pattern)s" in decision_branch
-    assert "coalesce(evidence.digest, '')" in decision_branch
-    assert decision_branch.count("unnest(%(token_patterns)s::text[])") == 2
+    assert "nullif(evidence.digest, '')" in decision_branch
+    assert decision_branch.count("unnest(%(token_patterns)s::text[])") == len(indexes)
 
 
 def test_conversation_recall_caps_every_source_before_window_ranking() -> None:
@@ -1229,20 +1223,24 @@ def test_conversation_recall_caps_every_source_before_window_ranking() -> None:
             "winning_matches as ("
         )
     ]
-    assert bounded_matches.count(
-        "limit (select match_limit from input)"
-    ) == 6
-    assert bounded_matches.count(
-        "count(*) over ( partition by source_match.conversation_id )"
-    ) == 6
-    assert bounded_matches.count(
-        "row_number() over ( partition by source_match.conversation_id "
-        'order by source_match.candidate_at desc, source_match.matched_text '
-        'collate "und-x-icu" desc, source_match.source_id desc )'
-    ) == 6
-    for bounded_window in bounded_matches.split(
-        "limit (select match_limit from input)"
-    )[:-1]:
+    assert bounded_matches.count("limit (select match_limit from input)") == 6
+    assert (
+        bounded_matches.count(
+            "count(*) over ( partition by source_match.conversation_id )"
+        )
+        == 6
+    )
+    assert (
+        bounded_matches.count(
+            "row_number() over ( partition by source_match.conversation_id "
+            "order by source_match.candidate_at desc, source_match.matched_text "
+            'collate "und-x-icu" desc, source_match.source_id desc )'
+        )
+        == 6
+    )
+    for bounded_window in bounded_matches.split("limit (select match_limit from input)")[
+        :-1
+    ]:
         assert "count(*) over" in bounded_window
         assert "row_number() over" in bounded_window
     winning_matches = sql_text[
@@ -1273,25 +1271,13 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
     ]
 
     assert base_matches.count("limit (select match_limit from input)") == 6
-    assert (
-        base_matches.count("select max(source_activity.activity_at)") == 6
-    )
-    assert (
-        base_matches.count(
-            "order by conversation.pinned::integer desc"
-        )
-        == 6
-    )
+    assert base_matches.count("select max(source_activity.activity_at)") == 6
+    assert base_matches.count("order by conversation.pinned::integer desc") == 6
     assert base_matches.count("source_winner.layer_rank desc") == 6
     assert base_matches.count("conversation.id desc") >= 6
     assert cursor_matches.count("limit (select match_limit from input)") == 6
     bounded_cursor_windows = cursor_matches
-    assert (
-        bounded_cursor_windows.count(
-            "order by conversation.pinned::integer desc"
-        )
-        == 6
-    )
+    assert bounded_cursor_windows.count("order by conversation.pinned::integer desc") == 6
     assert bounded_cursor_windows.count("input.has_cursor") == 6
     assert bounded_cursor_windows.count("conversation.id = input.cursor_id") == 6
     assert bounded_cursor_windows.count(") <= row(") == 6
@@ -1303,10 +1289,7 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
     assert bounded_cursor_windows.count("input.cursor_text_rank") == 6
     assert bounded_cursor_windows.count("input.cursor_id") == 12
     assert bounded_cursor_windows.count("conversation.id desc") >= 6
-    assert (
-        bounded_cursor_windows.count("select max(source_activity.activity_at)")
-        == 12
-    )
+    assert bounded_cursor_windows.count("select max(source_activity.activity_at)") == 12
     candidate_keys = bounded_cursor_windows.split(") <= row(")[:-1]
     assert len(candidate_keys) == 6
     for candidate_key in candidate_keys:
@@ -1314,9 +1297,7 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
         assert (
             candidate_key.index("conversation.pinned::integer")
             < candidate_key.index("input.normalized_query <> ''")
-            < candidate_key.index(
-                "symbol_run.conversation_id = conversation.id"
-            )
+            < candidate_key.index("symbol_run.conversation_id = conversation.id")
             < candidate_key.index("source_winner.layer_rank")
         )
 
@@ -1338,15 +1319,19 @@ def test_conversation_recall_adds_bounded_cursor_relative_source_windows() -> No
             "winning_matches as ("
         )
     ]
-    assert anchored_decisions.count("like %(anchor_pattern)s") == 2
+    # One anchored discovery per index: the decision's own note and state,
+    # and each attachment's text.
+    from argus.domain.postgres_search_reader import _DECISION_ATTACHMENTS
+
+    assert anchored_decisions.count("like %(anchor_pattern)s") == 1 + len(
+        _DECISION_ATTACHMENTS
+    )
     assert "select distinct on (candidate.source_id)" in anchored_decisions
     assert "limit (select match_limit from input)" not in anchored_decisions
-    assert anchored_cursor_matches.count(
-        "order by conversation.pinned::integer desc"
-    ) == 6
     assert (
-        anchored_cursor_matches.count("limit (select match_limit from input)") == 6
+        anchored_cursor_matches.count("order by conversation.pinned::integer desc") == 6
     )
+    assert anchored_cursor_matches.count("limit (select match_limit from input)") == 6
 
 
 def test_conversation_recall_match_cap_has_an_absolute_ceiling() -> None:

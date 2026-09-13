@@ -1,0 +1,113 @@
+source HEAD: 542fcfb2432e906663160d8cb874d955faeafd16
+app source untouched? (only tests, spec, env example, unimported lib):
+ M web/.env.local.example
+ M web/__tests__/alpha-frontend.test.ts
+ M web/__tests__/chat-lifecycle-source.test.ts
+ M web/__tests__/empty-chat-greeting-aria.test.ts
+ M web/__tests__/guest-shell.test.tsx
+ M web/__tests__/onboarding-removal.test.ts
+ M web/__tests__/profile-propagation.test.ts
+?? web/__tests__/profile-writes.test.ts
+?? web/e2e/profile-language-save.spec.ts
+?? web/lib/profile-writes.ts
+(node:32032) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+Running 5 tests using 2 workers
+
+(node:32035) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:32036) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:32037) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[WebServer] (Use `node --trace-deprecation ...` to show where the warning was created)
+  ✘  1 [chromium] › e2e/profile-language-save.spec.ts:156:7 › a refused save is shown and put back (en account picks es-419) (6.2s)
+  ✘  2 [chromium] › e2e/profile-language-save.spec.ts:156:7 › a refused save is shown and put back (es-419 account picks en) (6.2s)
+(node:32085) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:32086) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  ✓  3 [chromium] › e2e/profile-language-save.spec.ts:206:5 › a save that outlives its panel cannot close the panel that replaced it (931ms)
+  ✓  4 [chromium] › e2e/profile-language-save.spec.ts:184:5 › a saved language reaches the account and survives a reload (1.6s)
+  ✘  5 [chromium] › e2e/profile-language-save.spec.ts:241:5 › the front door keeps a language in this browser and writes no profile (855ms)
+
+
+  1) [chromium] › e2e/profile-language-save.spec.ts:156:7 › a refused save is shown and put back (en account picks es-419) 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByRole('dialog', { name: 'Language' }).getByRole('alert')
+    Expected: "Could not update language yet."
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for getByRole('dialog', { name: 'Language' }).getByRole('alert')
+
+
+      166 |     await activate(page, panel.getByRole("button", { name: languageRow(to) }));
+      167 |
+    > 168 |     await expect(panel.getByRole("alert")).toHaveText(
+          |                                            ^
+      169 |       COPY[from].settings.profile.language_save_error,
+      170 |     );
+      171 |     expect(saves).toEqual([{ language: to, locale: LOCALE[to] }]);
+        at /Users/garces/Documents/projects/repos/argus/.claude/worktrees/argus-retrieval-parameters-1d0d3c/web/e2e/profile-language-save.spec.ts:168:44
+
+    Error Context: temp/playwright-results/1789025635017-32036/profile-language-save-a-re-247b8-ck-en-account-picks-es-419--chromium/error-context.md
+
+  2) [chromium] › e2e/profile-language-save.spec.ts:156:7 › a refused save is shown and put back (es-419 account picks en) 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator: getByRole('dialog', { name: 'Idioma' }).getByRole('alert')
+    Expected: "No pudimos actualizar el idioma todavía."
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toHaveText" with timeout 5000ms
+      - waiting for getByRole('dialog', { name: 'Idioma' }).getByRole('alert')
+
+
+      166 |     await activate(page, panel.getByRole("button", { name: languageRow(to) }));
+      167 |
+    > 168 |     await expect(panel.getByRole("alert")).toHaveText(
+          |                                            ^
+      169 |       COPY[from].settings.profile.language_save_error,
+      170 |     );
+      171 |     expect(saves).toEqual([{ language: to, locale: LOCALE[to] }]);
+        at /Users/garces/Documents/projects/repos/argus/.claude/worktrees/argus-retrieval-parameters-1d0d3c/web/e2e/profile-language-save.spec.ts:168:44
+
+    Error Context: temp/playwright-results/1789025635017-32035/profile-language-save-a-re-1aa7c-ck-es-419-account-picks-en--chromium/error-context.md
+
+  3) [chromium] › e2e/profile-language-save.spec.ts:241:5 › the front door keeps a language in this browser and writes no profile 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "http://localhost:8000/api/v1/me",
+    + ]
+
+      271 |     }, sentinel),
+      272 |   ]);
+    > 273 |   expect(writes).toEqual([]);
+          |                  ^
+      274 |   await expect.poll(() => storedLanguage(page)).toBe("es-419");
+      275 | });
+      276 |
+        at /Users/garces/Documents/projects/repos/argus/.claude/worktrees/argus-retrieval-parameters-1d0d3c/web/e2e/profile-language-save.spec.ts:273:18
+
+    Error Context: temp/playwright-results/1789025641521-32086/profile-language-save-the--2eccc-owser-and-writes-no-profile-chromium/error-context.md
+
+  3 failed
+    [chromium] › e2e/profile-language-save.spec.ts:156:7 › a refused save is shown and put back (en account picks es-419) 
+    [chromium] › e2e/profile-language-save.spec.ts:156:7 › a refused save is shown and put back (es-419 account picks en) 
+    [chromium] › e2e/profile-language-save.spec.ts:241:5 › the front door keeps a language in this browser and writes no profile 
+  2 passed (9.1s)
+exit=1

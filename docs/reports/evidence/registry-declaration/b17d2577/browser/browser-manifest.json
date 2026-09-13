@@ -1,0 +1,660 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "authored_rendered_fixture",
+  "source_sha": "b17d25775028b7d7e2ea2f30ab35348291c973cc",
+  "source_files_unchanged_after_capture": true,
+  "primary_source_and_tests_clean_after_capture": true,
+  "production_web_source": "git archive of the exact source SHA; no production changes in the archive",
+  "locales": [
+    "en",
+    "es-419"
+  ],
+  "behavioral_viewport_widths": [
+    1280,
+    390
+  ],
+  "source_fixture_convention": "The unchanged repository generator runs inside the isolated archive, where its relative docs/reports/evidence/registry output lands. The authored temporary wrapper replaces only DCA/MACD fixture values with coherent inputs before the final browser run.",
+  "test_instrumentation": "Original 14 test bodies unchanged; two evidence-hook statements prepended. Two authored signal controls added only to the isolated archive. Exact wrappers are under harness/.",
+  "unique_browser_cases": 16,
+  "provider_calls": 0,
+  "interpreter_calls": 0,
+  "backtest_handler_calls": 0,
+  "real_api_calls": 0,
+  "paid_spend_usd": 0,
+  "network_guard": "Service workers blocked. HTTP and WebSocket routes outside loopback are denied. Every API request must be fulfilled by an authored route; unmatched API requests abort and fail. Progress additionally uses an authored fetch stream.",
+  "assertions": [
+    "English and es-419 localized card/progress labels",
+    "Typed zero remains known and the declared unknown remains blank",
+    "Two input edits and two revision advances, invalid edit withheld, reload retains result and sibling",
+    "Latest-message eligibility and pending-edit cancellation on send",
+    "Repeated asynchronous calls complete out of order and both survive reload",
+    "Canonical DCA cadence, zero seed, contribution and modeled costs remain visible",
+    "Authored MACD control retains fast/slow/signal windows, chart and modeled costs before and after reload"
+  ],
+  "screenshots": [
+    {
+      "path": "screenshots/signal-card-en.png",
+      "sha256": "7ed9fd37f01354bff038adf11043882341588e455be62b27d311a4a1cc60a74e",
+      "pixel_size": {
+        "width": 281,
+        "height": 1039
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "MACD +18.4%, $10,000 to $11,840, 12/26/9 windows, date window and modeled costs readable; plotted final value and date match the typed snapshot.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/signal-card-en.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 1000
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 44,
+            "cardTop": 60
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 1142.5,
+            "cardHeight": 1038.5
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/signal-card-es-419.png",
+      "sha256": "99ba51c6560f138d47654ee694cd29477ae2708ec4346ded5ed7a6ce5418d0d5",
+      "pixel_size": {
+        "width": 287,
+        "height": 1039
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "MACD +18.4%, $10,000 to $11,840, 12/26/9 windows, date window and modeled costs readable; plotted final value and date match the typed snapshot.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/signal-card-es-419.png",
+        "originalViewport": {
+          "width": 390,
+          "height": 1000
+        },
+        "viewport": {
+          "width": 390,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 44,
+            "cardTop": 60
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 1142.5,
+            "cardHeight": 1038.5
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-backtest-en.png",
+      "sha256": "0e2935c53d16392552f7360093beb2c085775750b09604346945fc4a1c3a7eea",
+      "pixel_size": {
+        "width": 273,
+        "height": 1022
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "DCA +18.4%, $600 to rounded $710 ending value, monthly $200 contribution, zero seed, date window and modeled costs readable; plotted final value is $710.40 in the typed fixture.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-backtest-en.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 27,
+            "cardTop": 77
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 1125.5,
+            "cardHeight": 1021.5
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-backtest-es-419.png",
+      "sha256": "e6b6e0dc42720ab704df58eabbffa6c2c5e02c003e6ec239342e5bb07ac98f42",
+      "pixel_size": {
+        "width": 318,
+        "height": 1022
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "DCA +18.4%, $600 to rounded $710 ending value, monthly $200 contribution, zero seed, date window and modeled costs readable; plotted final value is $710.40 in the typed fixture.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-backtest-es-419.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 27,
+            "cardTop": 77
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 1125.5,
+            "cardHeight": 1021.5
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-card-en-1280.png",
+      "sha256": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+      "pixel_size": {
+        "width": 268,
+        "height": 345
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Localized chrome, answer zero, known zero, other seven and unknown to-solve remain readable; names are declared test-only identifiers.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-card-en-1280.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 188,
+            "cardTop": 0
+          },
+          "after": {
+            "scrollTop": 28,
+            "cardTop": 160,
+            "cardBottom": 505,
+            "cardHeight": 345
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-card-en-390.png",
+      "sha256": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+      "pixel_size": {
+        "width": 268,
+        "height": 345
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Localized chrome, answer zero, known zero, other seven and unknown to-solve remain readable; names are declared test-only identifiers.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-card-en-390.png",
+        "originalViewport": {
+          "width": 390,
+          "height": 900
+        },
+        "viewport": {
+          "width": 390,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 188,
+            "cardTop": 0
+          },
+          "after": {
+            "scrollTop": 28,
+            "cardTop": 160,
+            "cardBottom": 505,
+            "cardHeight": 345
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-card-es-419-1280.png",
+      "sha256": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+      "pixel_size": {
+        "width": 265,
+        "height": 345
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Localized chrome, answer zero, known zero, other seven and unknown to-solve remain readable; names are declared test-only identifiers.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-card-es-419-1280.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 188,
+            "cardTop": 0
+          },
+          "after": {
+            "scrollTop": 28,
+            "cardTop": 160,
+            "cardBottom": 505,
+            "cardHeight": 345
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-card-es-419-390.png",
+      "sha256": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+      "pixel_size": {
+        "width": 265,
+        "height": 345
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Localized chrome, answer zero, known zero, other seven and unknown to-solve remain readable; names are declared test-only identifiers.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-card-es-419-390.png",
+        "originalViewport": {
+          "width": 390,
+          "height": 900
+        },
+        "viewport": {
+          "width": 390,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 188,
+            "cardTop": 0
+          },
+          "after": {
+            "scrollTop": 28,
+            "cardTop": 160,
+            "cardBottom": 505,
+            "cardHeight": 345
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-history-en.png",
+      "sha256": "6fe1075536e0a0a67556370281d305c7511e7017c6441ae08e5ee1575cec50db",
+      "pixel_size": {
+        "width": 1280,
+        "height": 900
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Earlier card is read-only and later saved user message remains visible; all product chrome is retained.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-history-en.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 1000
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 0,
+            "cardTop": 104
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 433,
+            "cardHeight": 329
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-history-es-419.png",
+      "sha256": "2c177d7fc85b5c776f0d08a846e57a248eb6790ea9ac54a8cae477e03ec23d47",
+      "pixel_size": {
+        "width": 1280,
+        "height": 900
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Earlier card is read-only and later saved user message remains visible; all product chrome is retained.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-history-es-419.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 1000
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 0,
+            "cardTop": 104
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 433,
+            "cardHeight": 329
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-jobs-en.png",
+      "sha256": "c7f882aa3fe151d6814dfc95950cb2dd2cabfcc72e9abe37511c23da601dcf11",
+      "pixel_size": {
+        "width": 1280,
+        "height": 1500
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Both completed results remain visible in order, first 40 then zero, with latest card editable; product chrome retained.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-jobs-en.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 192,
+            "cardTop": 340.75
+          },
+          "after": {
+            "scrollTop": 192,
+            "cardTop": 340.75,
+            "cardBottom": 669.75,
+            "cardHeight": 329
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-jobs-es-419.png",
+      "sha256": "0539afeb11d0c6cda85d2bd564ee917b280a5f136d23619a215a8084c92cbc2b",
+      "pixel_size": {
+        "width": 1280,
+        "height": 1500
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Both completed results remain visible in order, first 40 then zero, with latest card editable; product chrome retained.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-b17d2577/screenshots/tool-jobs-es-419.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 192,
+            "cardTop": 340.75
+          },
+          "after": {
+            "scrollTop": 192,
+            "cardTop": 340.75,
+            "cardBottom": 669.75,
+            "cardHeight": 329
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-progress-en.png",
+      "sha256": "ea057c3a2f0a0015504b6062b24e006072f5969ee45816b61ecc7620459a4793",
+      "pixel_size": {
+        "width": 1280,
+        "height": 1000
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Declared Checking 0 or Revisando 0 progress is visible in the normal muted shimmer style; no result card invented."
+    },
+    {
+      "path": "screenshots/tool-progress-es-419.png",
+      "sha256": "f59bd8b77aaf3fa523470de1cd5b177421a73293fc8648fb802ca76bc1b5eb0f",
+      "pixel_size": {
+        "width": 1280,
+        "height": 1000
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Declared Checking 0 or Revisando 0 progress is visible in the normal muted shimmer style; no result card invented."
+    }
+  ],
+  "capture_note": "All 14 selected images come from the final corrected 16-case run. The retained helper uses real transcript scrolling and recorded viewport-height changes only; it does not change styles or hide chrome. Initial inconsistent DCA/MACD captures and inputs are marked superseded and retained separately.",
+  "server_cleanup": {
+    "port": 3195,
+    "playwright_processes_exited": true,
+    "listener_present_after_runs": false,
+    "verification": "lsof -nP -iTCP:3195 -sTCP:LISTEN returned exit 1 with no output"
+  },
+  "limitations": "Authored fixture acceptance only: no live model, real API/recompute backend, provider data or backtest execution claim.",
+  "archived_file_sha256": {
+    "README.md": "7d80002864752ebe1d7cb0fbcf448029f8fab0b17c4926bf31e0ae98e718f021",
+    "backtest-cards.json": "5d0a14d8fabd517bcb64041c2f25037dbaea777319bd252f068f4bab7922eaf3",
+    "browser-collection.log": "24f29eb3c1e1d5926ee352dbb5c08fdff837365471a641abad81e3ab3f28948e",
+    "browser.log": "74142545256a956ff28d828dcad9a3bc7568876d831d4013dc4f5970beb0153f",
+    "capture-network/authored-signal-card-retains-macd-windows-and-chart-across-reload-en.json": "ab7c2ce3df500dcbdf71c33c75cdf79870f92854908c06822fc6a9777178d2ad",
+    "capture-network/authored-signal-card-retains-macd-windows-and-chart-across-reload-es-419.json": "83efd7350683be7f65654580c41800b2de4170c696039a005c0a2b3ad0aa052c",
+    "capture-network/declared-backtest-keeps-dca-assumptions-and-the-receipt-visual-en.json": "6678656e2441e9811d71097fda78f46fd688f928cef4fb1674b72e52e7889989",
+    "capture-network/declared-backtest-keeps-dca-assumptions-and-the-receipt-visual-es-419.json": "2bca169e167d9ee3447703d3355c5c3e96500c3685125ca9407781477dc9e658",
+    "capture-network/repeated-asynchronous-calls-settle-independently-en.json": "fd940938a176816ba0aedb54e74d268e2fe666d8ac2e6a8b7c5cd7f6dd278768",
+    "capture-network/repeated-asynchronous-calls-settle-independently-es-419.json": "379a9cbd527358434caf72523aedaa46e3ab708e9ca7921c1cb97eba451dad58",
+    "capture-network/tool-results-live-recompute-and-reload-en-1280.json": "7c03b61206a3516df93c964ae13a7c3f2ae44b07d75da1670d18a1d817713508",
+    "capture-network/tool-results-live-recompute-and-reload-en-390.json": "4032d562aad2992598bbff3fb1cb4d7f2aa9f263a50778013e82fc26b5b87bb1",
+    "capture-network/tool-results-live-recompute-and-reload-es-419-1280.json": "158c807bbec850f796fb867bc3401e214884e6ec78478130529c591c4e3690e5",
+    "capture-network/tool-results-live-recompute-and-reload-es-419-390.json": "136f683390ea00a53743e4a5eb35d6506d3eede7fc56b9ffe838c251b81cf49c",
+    "capture-results.json": "390385e17178426b794184dd7ae2ec13a94307acf3b745074e86752e7020ff18",
+    "capture.log": "3cb5ff554c410687f375cd4b1629428c634f8962601e79203845d1a60cd8b915",
+    "coherent-browser.log": "ff57bc0f39ed901ff0d06658cdb69a277ed3a69f8e7838579b6bbcdc9a186f49",
+    "coherent-fixture-generation.log": "0b7fd9d96625f494d8f155af379c4eb3b871ba1e0e48acb388d90fa31c360d10",
+    "coherent-matrix-results.json": "166494acb84536d0b19d365bc6108d4c74ebf1c41a3052d7146ca2800be9212a",
+    "coherent-network/a-later-saved-user-message-makes-old-tool-inputs-read-only-en.json": "fc09f0c10e75c6cf1c3b15a374e70149f6e1963126263ade9c89d02aad2f3db5",
+    "coherent-network/a-later-saved-user-message-makes-old-tool-inputs-read-only-es-419.json": "19f8766cb8572bf6dee2830d2e08331b4bb62387f133f31530dc128dd854bae9",
+    "coherent-network/authored-signal-card-retains-macd-windows-and-chart-across-reload-en.json": "ab7c2ce3df500dcbdf71c33c75cdf79870f92854908c06822fc6a9777178d2ad",
+    "coherent-network/authored-signal-card-retains-macd-windows-and-chart-across-reload-es-419.json": "83efd7350683be7f65654580c41800b2de4170c696039a005c0a2b3ad0aa052c",
+    "coherent-network/declared-backtest-keeps-dca-assumptions-and-the-receipt-visual-en.json": "6678656e2441e9811d71097fda78f46fd688f928cef4fb1674b72e52e7889989",
+    "coherent-network/declared-backtest-keeps-dca-assumptions-and-the-receipt-visual-es-419.json": "2bca169e167d9ee3447703d3355c5c3e96500c3685125ca9407781477dc9e658",
+    "coherent-network/executing-call-progress-is-localizable-without-another-turn-en.json": "3eed509669645f672ec6fad079d001f2f31e6289b6342f4e76b4db477bb1daab",
+    "coherent-network/executing-call-progress-is-localizable-without-another-turn-es-419.json": "3aef990f816a766026e7189a58f67a8e20f62ae412829ac4c04444bc4b11e527",
+    "coherent-network/repeated-asynchronous-calls-settle-independently-en.json": "fd940938a176816ba0aedb54e74d268e2fe666d8ac2e6a8b7c5cd7f6dd278768",
+    "coherent-network/repeated-asynchronous-calls-settle-independently-es-419.json": "379a9cbd527358434caf72523aedaa46e3ab708e9ca7921c1cb97eba451dad58",
+    "coherent-network/sending-another-turn-cancels-the-pending-tool-edit-en.json": "a3bca6d28969032690f7163cd64f3d8c19cbfb118f3353ffe8d1f68e368822c9",
+    "coherent-network/sending-another-turn-cancels-the-pending-tool-edit-es-419.json": "42d9bdb55f58986784fcb9a47c0c9fa4ca61def0d3bdffcc4baa69d45f7f4a42",
+    "coherent-network/tool-results-live-recompute-and-reload-en-1280.json": "7c03b61206a3516df93c964ae13a7c3f2ae44b07d75da1670d18a1d817713508",
+    "coherent-network/tool-results-live-recompute-and-reload-en-390.json": "4032d562aad2992598bbff3fb1cb4d7f2aa9f263a50778013e82fc26b5b87bb1",
+    "coherent-network/tool-results-live-recompute-and-reload-es-419-1280.json": "158c807bbec850f796fb867bc3401e214884e6ec78478130529c591c4e3690e5",
+    "coherent-network/tool-results-live-recompute-and-reload-es-419-390.json": "136f683390ea00a53743e4a5eb35d6506d3eede7fc56b9ffe838c251b81cf49c",
+    "command.txt": "adedf4c7bbbf56f46d5ffbf1eb26dd38b317fb6a37b613271363988154b7e420",
+    "fixture-coherence.json": "7f49e8dc63cdb7831b7419acd0cdc1ac569c32e265bd91a1c594969466b44907",
+    "fixture-generation.log": "b6a2e83744b2444975559376e20843a1f4e017fea317498bbb3694ad9b2266c9",
+    "full-matrix-results.json": "774e19f317f71ffd83184b64d02a3094564afd3ba26b2f84d430b77fb45c57b3",
+    "generate-fixtures.py": "841901a423fad40c1ad319de0ed55bc5dfedc14cbb59900112d7e70399784f7e",
+    "harness/mobile-shell-fixture.ts": "2d3e8f43c342980d4d3b2a32594b2f4e853a01049ca3547519f5e966eb131683",
+    "harness/registry-evidence-hooks.ts": "c3e0850a817fb60d6e75f833eb9ea2a85ee70040bc84c5eb90f74a82697caf0b",
+    "harness/registry-fixture.py": "14992c317fe0d18e392d7ed62e38b746340d726e07e3a5bebacf4c36e9824e1f",
+    "harness/registry-signal-control.spec.ts": "1eeb3681cb1fc26d7ba465eafb8c1b55e3d397d68ddf2eefffaac6bc94046ec4",
+    "harness/tool-registry.spec.ts": "0104b0ba789b1873e3852cdb5e0970526b39df43a6d1063dee9023aed12613ac",
+    "network/a-later-saved-user-message-makes-old-tool-inputs-read-only-en.json": "fc09f0c10e75c6cf1c3b15a374e70149f6e1963126263ade9c89d02aad2f3db5",
+    "network/a-later-saved-user-message-makes-old-tool-inputs-read-only-es-419.json": "19f8766cb8572bf6dee2830d2e08331b4bb62387f133f31530dc128dd854bae9",
+    "network/authored-signal-card-retains-macd-windows-and-chart-across-reload-en.json": "ab7c2ce3df500dcbdf71c33c75cdf79870f92854908c06822fc6a9777178d2ad",
+    "network/authored-signal-card-retains-macd-windows-and-chart-across-reload-es-419.json": "83efd7350683be7f65654580c41800b2de4170c696039a005c0a2b3ad0aa052c",
+    "network/declared-backtest-keeps-dca-assumptions-and-the-receipt-visual-en.json": "6678656e2441e9811d71097fda78f46fd688f928cef4fb1674b72e52e7889989",
+    "network/declared-backtest-keeps-dca-assumptions-and-the-receipt-visual-es-419.json": "2bca169e167d9ee3447703d3355c5c3e96500c3685125ca9407781477dc9e658",
+    "network/executing-call-progress-is-localizable-without-another-turn-en.json": "3eed509669645f672ec6fad079d001f2f31e6289b6342f4e76b4db477bb1daab",
+    "network/executing-call-progress-is-localizable-without-another-turn-es-419.json": "3aef990f816a766026e7189a58f67a8e20f62ae412829ac4c04444bc4b11e527",
+    "network/repeated-asynchronous-calls-settle-independently-en.json": "fd940938a176816ba0aedb54e74d268e2fe666d8ac2e6a8b7c5cd7f6dd278768",
+    "network/repeated-asynchronous-calls-settle-independently-es-419.json": "379a9cbd527358434caf72523aedaa46e3ab708e9ca7921c1cb97eba451dad58",
+    "network/sending-another-turn-cancels-the-pending-tool-edit-en.json": "a3bca6d28969032690f7163cd64f3d8c19cbfb118f3353ffe8d1f68e368822c9",
+    "network/sending-another-turn-cancels-the-pending-tool-edit-es-419.json": "42d9bdb55f58986784fcb9a47c0c9fa4ca61def0d3bdffcc4baa69d45f7f4a42",
+    "network/tool-results-live-recompute-and-reload-en-1280.json": "7c03b61206a3516df93c964ae13a7c3f2ae44b07d75da1670d18a1d817713508",
+    "network/tool-results-live-recompute-and-reload-en-390.json": "4032d562aad2992598bbff3fb1cb4d7f2aa9f263a50778013e82fc26b5b87bb1",
+    "network/tool-results-live-recompute-and-reload-es-419-1280.json": "158c807bbec850f796fb867bc3401e214884e6ec78478130529c591c4e3690e5",
+    "network/tool-results-live-recompute-and-reload-es-419-390.json": "136f683390ea00a53743e4a5eb35d6506d3eede7fc56b9ffe838c251b81cf49c",
+    "provenance.json": "2cf767f6e5caa6eb895b578ef4677e84ee35a59e5266a11c15db237c7ca91529",
+    "registry-capture.playwright.config.ts": "3cdefc3269ab2fbb43866753a2638d1e41cdc4358e2e4f8f4620b52e337b2107",
+    "registry.playwright.config.ts": "6aff8c10c8b672a3676e98a0c48a7eb0fb8e46add811e6e016c018e806b1675b",
+    "screenshots/signal-card-en.png": "7ed9fd37f01354bff038adf11043882341588e455be62b27d311a4a1cc60a74e",
+    "screenshots/signal-card-es-419.png": "99ba51c6560f138d47654ee694cd29477ae2708ec4346ded5ed7a6ce5418d0d5",
+    "screenshots/tool-backtest-en.png": "0e2935c53d16392552f7360093beb2c085775750b09604346945fc4a1c3a7eea",
+    "screenshots/tool-backtest-es-419.png": "e6b6e0dc42720ab704df58eabbffa6c2c5e02c003e6ec239342e5bb07ac98f42",
+    "screenshots/tool-card-en-1280.png": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+    "screenshots/tool-card-en-390.png": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+    "screenshots/tool-card-es-419-1280.png": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+    "screenshots/tool-card-es-419-390.png": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+    "screenshots/tool-history-en.png": "6fe1075536e0a0a67556370281d305c7511e7017c6441ae08e5ee1575cec50db",
+    "screenshots/tool-history-es-419.png": "2c177d7fc85b5c776f0d08a846e57a248eb6790ea9ac54a8cae477e03ec23d47",
+    "screenshots/tool-jobs-en.png": "c7f882aa3fe151d6814dfc95950cb2dd2cabfcc72e9abe37511c23da601dcf11",
+    "screenshots/tool-jobs-es-419.png": "0539afeb11d0c6cda85d2bd564ee917b280a5f136d23619a215a8084c92cbc2b",
+    "screenshots/tool-progress-en.png": "ea057c3a2f0a0015504b6062b24e006072f5969ee45816b61ecc7620459a4793",
+    "screenshots/tool-progress-es-419.png": "f59bd8b77aaf3fa523470de1cd5b177421a73293fc8648fb802ca76bc1b5eb0f",
+    "scroll-capture.cjs": "ccead2dea6c4cf39069b33cc2e8b0a82f68129c6e8928f6ecd4824af15a33867",
+    "scroll-captures.jsonl": "e4cf6c826ae392376256816fa20f73559fde7cca16771ec8be3dd2f5b51c1352",
+    "signal-cards.json": "870392fbee52304a7a1f79003d1e33f8ff4051c65e369de5f0ab90af1f2839de",
+    "superseded/README.md": "5f43f64cb685aaef704ccfe9e7d4acd8c65d2f218fd7eb7c0feaf8e7c6ad952b",
+    "superseded/backtest-cards.json": "43c5c0fcfdc29130eda8724f9753928a348a2cac3f662795ebcc2ac87a224a77",
+    "superseded/fixture-generation.log": "b6a2e83744b2444975559376e20843a1f4e017fea317498bbb3694ad9b2266c9",
+    "superseded/generate-fixtures.py": "a95987a42304db054dd930d03a3ad7d49af4361a8435951df710c5104ebbfab4",
+    "superseded/provenance.json": "a5eaad7975cb49c12c73c7fbf57fb50d29b70a75ae66c9554e5655e3522cd515",
+    "superseded/screenshots/signal-card-en.png": "fdb8274880b97616730a469aa9bc52e2ddc9e3b47cadbbcdba53384072eeb219",
+    "superseded/screenshots/signal-card-es-419.png": "749387a900fb072546e47bb58a5a7a252f562e531778aa15ef376251eb2edcac",
+    "superseded/screenshots/tool-backtest-en.png": "2eae33d8f3e3ccca2e9a1d577d0bfb7865465dc0cdef9316b7dded3468c0ff50",
+    "superseded/screenshots/tool-backtest-es-419.png": "02ea65287d966fe4fc7fba20a81b42221e84b2945c4d5a8a1e8185a765685063",
+    "superseded/signal-cards.json": "ce17e08ade920ef1eb7b3ef7c5fc5086d746ba4dc2b000a7cb526580d0ce8ba1",
+    "tool-cards.json": "35f3786eca400c82bebc445ca3dba0df444d9f1edfd919f735592a93529d5fb9",
+    "tool-progress.json": "9062af124011023f543f4fa9d2d540e01ad305e4cea72bfdee6ef1145a946f0b",
+    "verify-bundle.py": "ccd0edaf277565fb23625aadf60318e6702cf6830c1776335a21b80ec75ab176"
+  },
+  "superseded_runs": {
+    "full_matrix": {
+      "report": "full-matrix-results.json",
+      "stats": {
+        "startTime": "2026-09-10T08:46:58.549Z",
+        "duration": 58178.733,
+        "expected": 16,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "playwright_version": "1.59.1",
+      "observed_mocked_api_requests": 208,
+      "external_requests": 0,
+      "unhandled_api_requests": 0,
+      "page_errors": 0,
+      "network_logs": "network",
+      "acceptance": false,
+      "disposition": "Historical execution record; DCA/MACD authored numeric fixtures were rejected by visual review and replaced."
+    },
+    "readable_card_recapture": {
+      "report": "capture-results.json",
+      "stats": {
+        "startTime": "2026-09-10T08:51:22.607Z",
+        "duration": 39925.216,
+        "expected": 10,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "playwright_version": "1.59.1",
+      "observed_mocked_api_requests": 142,
+      "external_requests": 0,
+      "unhandled_api_requests": 0,
+      "page_errors": 0,
+      "network_logs": "capture-network",
+      "acceptance": false,
+      "disposition": "Historical execution record; DCA/MACD authored numeric fixtures were rejected by visual review and replaced."
+    }
+  },
+  "runs": {
+    "coherent_full_matrix": {
+      "report": "coherent-matrix-results.json",
+      "stats": {
+        "startTime": "2026-09-10T09:04:29.596Z",
+        "duration": 54694.994,
+        "expected": 16,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "playwright_version": "1.59.1",
+      "observed_mocked_api_requests": 208,
+      "external_requests": 0,
+      "unhandled_api_requests": 0,
+      "page_errors": 0,
+      "network_logs": "coherent-network",
+      "acceptance": true
+    }
+  },
+  "selected_run": "coherent_full_matrix",
+  "numeric_fixture_ledger": "fixture-coherence.json",
+  "archive_source_verification": "Compared every tracked web file in the archive with git archive of source_sha after final browser exit: only web/e2e/tool-registry.spec.ts differed, by the documented evidence-hook prefix. Added temporary signal/hook files are retained under harness/.",
+  "fixture_correction": "Shared test factories independently authored profit, total return and a generic chart. The temporary generator now derives profit/ending value from existing capital owners and net return, binds chart endpoints/dates to the same snapshot, and authors monotonic path drawdown as zero. No production/shared factory changes."
+}

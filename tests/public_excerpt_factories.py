@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
-from argus.api.schemas import BacktestRun, Conversation, EvidenceArtifact
+from argus.api.schemas import BacktestRun, Conversation, EvidenceArtifact, Message
 from argus.domain.backtesting.cards import (
     build_result_card as generate_result_card,
 )
@@ -184,8 +184,12 @@ def build_run(
         symbols=["AAPL"],
         allocation_method="equal_weight",
         benchmark_symbol="SPY",
-        metrics={"aggregate": {"performance": {"total_return_pct": 18.4}}},
-        config_snapshot={"template": "buy_and_hold"},
+        metrics=build_artifact_payload()["metrics"],
+        config_snapshot={
+            "template": "buy_and_hold",
+            "start_date": WINDOW_START,
+            "end_date": WINDOW_END,
+        },
         conversation_result_card=build_result_card(total_return=total_return),
         created_at=utc(),
         chart=chart if chart is not None else build_chart(),
@@ -653,3 +657,31 @@ def generated_card_snapshot(
         },
         "engine_config": engine_config,
     }
+
+
+def seed_result_messages(
+    store: Any, run: BacktestRun, *, offset: int = 0
+) -> list[Message]:
+    """A persisted user request and typed completed answer for a canonical run."""
+    messages = [
+        Message(
+            id=str(uuid4()),
+            conversation_id=run.conversation_id,
+            role="user",
+            content="Test buying and holding AAPL",
+            created_at=utc(offset * 2),
+        ),
+        Message(
+            id=str(uuid4()),
+            conversation_id=run.conversation_id,
+            role="assistant",
+            content="The historical result is ready.",
+            created_at=utc(offset * 2 + 1),
+            metadata={
+                "agent_runtime_turn": {"terminal": True, "status": "completed"},
+                "result_run_id": run.id,
+            },
+        ),
+    ]
+    store.messages.setdefault(run.conversation_id, []).extend(messages)
+    return messages

@@ -22,6 +22,7 @@ from argus.agent_runtime.strategy_contract import (
     executable_strategy_type,
     strategy_can_be_approved,
 )
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.nlp.natural_time import (
     dateparser_languages_for_user_language,
     parse_date_text,
@@ -63,7 +64,7 @@ def pending_date_answer_interpretation(
         return None
     if not _prior_strategy_allows_pending_date_answer_fallback(prior):
         return None
-    current_date = today or date.today()
+    current_date = today or new_york_today()
     text = current_user_message.strip()
     if not text:
         return None
@@ -271,7 +272,7 @@ def repair_pending_date_answer_route_when_pending_need_is_active(
         language=language,
         snapshot=snapshot,
         selected_thread_metadata=selected_thread_metadata,
-        today=today or date.today(), allow_result_anchor=True,
+        today=today or new_york_today(), allow_result_anchor=True,
         require_explicit_range=(
             "pending_date_answer_unowned_candidate_stripped"
             in interpretation.reason_codes

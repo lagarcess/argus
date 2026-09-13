@@ -1,0 +1,770 @@
+{
+  "label": "after",
+  "tree_head": "72c0bf6a",
+  "argus_module": "src/argus/__init__.py",
+  "cases": [
+    {
+      "name": "nike-fast-1",
+      "recording": "open-the-gates/probes/nike-fast-1.json",
+      "question": "what's the price of nike today",
+      "question_kind": "live_quote",
+      "symbols": [
+        "NKE"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#578's Nike quote: one finance lookup (regression guard)",
+      "asked_at": "2026-09-09T23:50:30.495342+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 1,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results"
+        ],
+        "sources_before_selection": []
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [],
+      "rows": 1,
+      "answer": "Nike (NKE) is trading at **$37.35 per share**, as of September 9, 2026."
+    },
+    {
+      "name": "nike-fast-2",
+      "recording": "open-the-gates/probes/nike-fast-2.json",
+      "question": "what's the price of nike today",
+      "question_kind": "live_quote",
+      "symbols": [
+        "NKE"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#578 probe, same question",
+      "asked_at": "2026-09-09T23:50:39.177447+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 1,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results"
+        ],
+        "sources_before_selection": []
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [],
+      "rows": 1,
+      "answer": "Nike (NKE) is priced at **$37.35 USD** as of **September 9, 2026**."
+    },
+    {
+      "name": "nike-fast-web",
+      "recording": "open-the-gates/probes/nike-fast-web.json",
+      "question": "what's the price of nike today",
+      "question_kind": "live_quote",
+      "symbols": [
+        "NKE"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#578 probe with web search offered",
+      "asked_at": "2026-09-09T23:52:35.627644+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 1,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results"
+        ],
+        "sources_before_selection": []
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [],
+      "rows": 1,
+      "answer": "Nike’s latest share price is **$37.35 USD**, as of September 9, 2026."
+    },
+    {
+      "name": "nike-unresolved-fast-2steps",
+      "recording": "open-the-gates/probes/nike-unresolved-fast-2steps.json",
+      "question": "what's the price of nike today",
+      "question_kind": "live_quote",
+      "symbols": [
+        "NKE"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#578 probe: the only call went to the ticker lookup",
+      "asked_at": "2026-09-10T00:27:18.183139+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 1,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results"
+        ],
+        "sources_before_selection": []
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [],
+      "rows": 0,
+      "answer": "Nike’s current share price could not be retrieved."
+    },
+    {
+      "name": "nike-unresolved-fast-4steps",
+      "recording": "open-the-gates/probes/nike-unresolved-fast-4steps.json",
+      "question": "what's the price of nike today",
+      "question_kind": "live_quote",
+      "symbols": [
+        "NKE"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#578 probe at the four-step budget",
+      "asked_at": "2026-09-10T00:27:29.138474+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 2,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results",
+          "finance_results"
+        ],
+        "sources_before_selection": []
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [],
+      "rows": 1,
+      "answer": "Nike’s latest share price is **$37.35**, as of September 9, 2026."
+    },
+    {
+      "name": "apple-es-fast-4steps",
+      "recording": "open-the-gates/probes/apple-es-fast-4steps.json",
+      "question": "¿A cuánto está la acción de Apple hoy y cuánto subió esta semana?",
+      "question_kind": "live_quote",
+      "symbols": [
+        "AAPL"
+      ],
+      "language": "es-419",
+      "period_of_interest": "esta semana",
+      "path": "inline",
+      "why": "#578 Spanish quote probe, asked 20:17 ET",
+      "asked_at": "2026-09-10T00:17:24.942866+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 1,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results"
+        ],
+        "sources_before_selection": []
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [],
+      "rows": 1,
+      "answer": "Apple (AAPL) está en **US$315.34 por acción**, según la cotización más reciente disponible al **9 de septiembre de 2026**.\n\nEl aumento acumulado de esta semana **no pudo recuperarse**, así que no puedo dar una cifra confiable sin estimarla."
+    },
+    {
+      "name": "perplexity-spx-week",
+      "recording": "open-the-gates/perplexity-spx-week.json",
+      "question": "how much did the S&P 500 move this week?",
+      "question_kind": "market_pulse",
+      "symbols": [
+        "SPY"
+      ],
+      "language": "en",
+      "period_of_interest": "this week",
+      "path": "inline",
+      "why": "#579: the S&P week question, asked 20:13 ET (plain provider call)",
+      "asked_at": "2026-09-10T00:13:58.299222+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 2,
+        "web_search_invocations": 2,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results",
+          "finance_results",
+          "search_results",
+          "search_results"
+        ],
+        "sources_before_selection": [
+          [
+            "https://www.thetelegraph.com/business/article/how-major-us-stock-indexes-fared-friday-9-4-2026-22418278.php",
+            "2026-09-05"
+          ],
+          [
+            "https://tenbrief.com/en/2026/09/05/sp-500-closes-7718-60-september-4/",
+            "2026-09-05"
+          ],
+          [
+            "https://tickerdaily.com/article/stock-market-today-september-4-2026-sandp-500-nasdaq-dow-close-recap",
+            "2026-09-04"
+          ],
+          [
+            "https://finlore.io/news/sp500-slides-september-4-2026-yield-surge-sector-rotation",
+            "2026-09-04"
+          ],
+          [
+            "https://swingfolio.com/daily/us/2026-09-04/afternoon",
+            "2026-09-04"
+          ],
+          [
+            "https://247wallst.com/cards/the-dow-did-the-heavy-lifting-on-the-downside-dropping-310-gspc-market-bell-01m1q0a90s7pe1yzhy4ez4bbdt",
+            "2026-09-04"
+          ],
+          [
+            "https://www.fundsipcalculator.com/market-briefing/4-september-2026-us",
+            "2026-09-04"
+          ],
+          [
+            "https://finance.yahoo.com/markets/stocks/articles/stock-market-news-sep-4-090900700.html",
+            "2026-09-04"
+          ],
+          [
+            "https://tapeboard.com/blog/market-pulse-2026-09-04",
+            "2026-09-04"
+          ],
+          [
+            "https://finance.yahoo.com/markets/stocks/articles/stock-market-today-sept-4-133716564.html",
+            "2026-09-04"
+          ],
+          [
+            "https://finance.yahoo.com/quote/%5EGSPC/history/",
+            "2026-08-04"
+          ],
+          [
+            "https://www.investopedia.com/stock-market-today-dow-jones-s-and-p-500-09042026-12107971",
+            "2026-09-04"
+          ],
+          [
+            "https://www.morningstar.com/news/dow-jones/202609046420/sp-500-rises-009-this-week-to-771860-data-talk",
+            "2026-09-04"
+          ],
+          [
+            "https://www.wsj.com/market-data/quotes/index/SPX/historical-prices",
+            "2026-08-13"
+          ],
+          [
+            "https://www.thestreet.com/stock-market-today/stock-market-today-dow-jones-sp-500-nasdaq-updates-sept-04-2026",
+            "2026-09-05"
+          ],
+          [
+            "https://www.investing.com/indices/us-spx-500-historical-data",
+            "2026-08-10"
+          ],
+          [
+            "https://www.cnbc.com/quotes/.SPX",
+            "2026-09-06"
+          ],
+          [
+            "https://www.spglobal.com/spdji/en/indices/equity/sp-500/",
+            "2026-08-21"
+          ],
+          [
+            "https://www.marketwatch.com/investing/index/spx",
+            "2026-09-08"
+          ],
+          [
+            "https://www.tradingview.com/symbols/SPX/",
+            "2026-09-04"
+          ],
+          [
+            "https://vittarthi.com/markets/us",
+            "2026-09-09"
+          ],
+          [
+            "https://finance.yahoo.com/quote/SPXW260910P07800000/",
+            "2026-08-24"
+          ],
+          [
+            "https://finance.yahoo.com/quote/%5ESPX/history/",
+            "2026-08-04"
+          ],
+          [
+            "https://fred.stlouisfed.org/data/SP500",
+            "2026-09-09"
+          ],
+          [
+            "https://www.wsj.com/market-data/quotes/index/SPX",
+            "2026-08-13"
+          ],
+          [
+            "https://ycharts.com/indicators/sp_500",
+            "2026-02-05"
+          ],
+          [
+            "https://www.reuters.com/markets/quote/.SPX/",
+            "2026-09-08"
+          ],
+          [
+            "https://www.investing.com/indices/us-spx-500-historical-data+",
+            "2026-03-08"
+          ]
+        ]
+      },
+      "published": false,
+      "degraded_code": "survey_synthesis_incomplete",
+      "sources": [
+        [
+          "https://vittarthi.com/markets/us",
+          "2026-09-09"
+        ],
+        [
+          "https://fred.stlouisfed.org/data/SP500",
+          "2026-09-09"
+        ]
+      ],
+      "rows": 0,
+      "answer": "I found sources, but could not extract today's market movers from them."
+    },
+    {
+      "name": "perplexity-nvda-week",
+      "recording": "open-the-gates/perplexity-nvda-week.json",
+      "question": "why is NVIDIA stock moving this week?",
+      "question_kind": "current_external",
+      "symbols": [
+        "NVDA"
+      ],
+      "language": "en",
+      "period_of_interest": "this week",
+      "path": "inline",
+      "why": "#578 claim-shaped question, asked 20:22 ET (plain provider call)",
+      "asked_at": "2026-09-10T00:22:05.546365+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 2,
+        "web_search_invocations": 1,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results",
+          "finance_results",
+          "search_results"
+        ],
+        "sources_before_selection": [
+          [
+            "https://finance.yahoo.com/quote/NVDA/news/",
+            "2026-08-04"
+          ],
+          [
+            "https://finance.yahoo.com/markets/stocks/articles/dear-nvidia-stock-fans-mark-194239279.html",
+            "2026-09-08"
+          ],
+          [
+            "https://finance.yahoo.com/markets/article/nvidia-stock-moves-closer-to-all-time-high-193309793.html",
+            "2026-09-05"
+          ],
+          [
+            "https://finance.yahoo.com/quote/NVDA/latest-news/",
+            "2026-08-04"
+          ],
+          [
+            "https://finance.yahoo.com/quote/NVDA/",
+            "2026-09-09"
+          ],
+          [
+            "https://www.marketwatch.com/investing/stock/nvda",
+            "2026-09-09"
+          ],
+          [
+            "https://www.cnbc.com/quotes/NVDA",
+            "2026-09-05"
+          ],
+          [
+            "https://finance.yahoo.com/markets/article/nvidia-stock-extends-gains-to-hover-near-all-time-highs-193309793.html",
+            "2026-09-04"
+          ],
+          [
+            "https://finance.yahoo.com/markets/article/nvidia-drops-nearly-5-leading-chip-stocks-lower-amid-renewed-worries-of-circular-financing-193309793.html",
+            "2026-09-04"
+          ],
+          [
+            "https://beckmann.ai/en/ai-economy/2026-09/ai-stock-week-nvidia-rate-fears",
+            "2026-09-04"
+          ],
+          [
+            "https://finance.yahoo.com/markets/stocks/articles/jensen-huang-just-sent-signal-091400657.html",
+            "2026-09-05"
+          ],
+          [
+            "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-edges-lower-ahead-goldman-ai-fireside-chat/70075275",
+            "2026-09-09"
+          ],
+          [
+            "https://www.marketbeat.com/stocks/NASDAQ/NVDA/news/",
+            "2026-09-09"
+          ],
+          [
+            "https://www.barchart.com/story/news/4497506/dear-nvidia-stock-fans-mark-your-calendars-for-september-10",
+            "2026-09-09"
+          ],
+          [
+            "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-climbs-after-96-2-billion-quarter-and-70-percent-forecast/70012105",
+            "2026-08-28"
+          ]
+        ]
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [
+        [
+          "https://finance.yahoo.com/quote/NVDA/news/",
+          "2026-08-04"
+        ],
+        [
+          "https://www.marketwatch.com/investing/stock/nvda",
+          "2026-09-09"
+        ],
+        [
+          "https://www.cnbc.com/quotes/NVDA",
+          "2026-09-05"
+        ],
+        [
+          "https://beckmann.ai/en/ai-economy/2026-09/ai-stock-week-nvidia-rate-fears",
+          "2026-09-04"
+        ],
+        [
+          "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-edges-lower-ahead-goldman-ai-fireside-chat/70075275",
+          "2026-09-09"
+        ]
+      ],
+      "rows": 0,
+      "answer": "NVIDIA (NVDA) is **down 2.90% this week through Wednesday’s close**, falling from **$230.36 Friday to $223.67 Wednesday**. The U.S. market was closed Monday for Labor Day.\n\nThe move appears driven by several factors rather than one major ne"
+    },
+    {
+      "name": "perplexity-nike",
+      "recording": "open-the-gates/perplexity-nike.json",
+      "question": "what's the price of nike today",
+      "question_kind": "live_quote",
+      "symbols": [
+        "NKE"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#578 side-by-side recording (plain provider call)",
+      "asked_at": "2026-09-09T23:43:28.633527+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 2,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results",
+          "finance_results"
+        ],
+        "sources_before_selection": []
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [],
+      "rows": 0,
+      "answer": "Nike (NYSE: **NKE**) closed today at **$37.35 USD**, down **$0.75 (1.97%)**. The market is currently in after-hours trading."
+    },
+    {
+      "name": "perplexity-apple-pe",
+      "recording": "open-the-gates/perplexity-apple-pe.json",
+      "question": "what is apple's p/e ratio right now?",
+      "question_kind": "live_quote",
+      "symbols": [
+        "AAPL"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#578 side-by-side recording (plain provider call)",
+      "asked_at": "2026-09-10T00:13:38.613915+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 1,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results"
+        ],
+        "sources_before_selection": []
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [],
+      "rows": 0,
+      "answer": "Apple’s **P/E ratio is 36.12** as of the latest market close on **September 9, 2026**. AAPL closed at **$315.34**."
+    },
+    {
+      "name": "perplexity-apple-es",
+      "recording": "open-the-gates/perplexity-apple-es.json",
+      "question": "¿A cuánto está la acción de Apple hoy y cuánto subió esta semana?",
+      "question_kind": "live_quote",
+      "symbols": [
+        "AAPL"
+      ],
+      "language": "es-419",
+      "period_of_interest": "esta semana",
+      "path": "inline",
+      "why": "#578 side-by-side recording (plain provider call)",
+      "asked_at": "2026-09-10T00:13:32.633936+00:00",
+      "question_date": "2026-09-09",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 2,
+        "web_search_invocations": 1,
+        "fetch_url_invocations": 0,
+        "tool_results": [
+          "finance_results",
+          "finance_results",
+          "search_results"
+        ],
+        "sources_before_selection": [
+          [
+            "https://finance.yahoo.com/quote/AAPL/history/",
+            "2026-08-04"
+          ],
+          [
+            "https://www.marketbeat.com/stocks/NASDAQ/AAPL/chart/",
+            "2026-09-08"
+          ],
+          [
+            "https://www.marketwatch.com/investing/stock/aapl/download-data",
+            "2026-09-09"
+          ],
+          [
+            "https://www.investing.com/equities/apple-computer-inc-historical-data",
+            "2026-08-10"
+          ],
+          [
+            "https://www.wsj.com/market-data/quotes/AAPL/historical-prices",
+            "2025-10-09"
+          ],
+          [
+            "https://seekingalpha.com/symbol/AAPL/historical-price-quotes",
+            "2026-09-09"
+          ],
+          [
+            "https://ycharts.com/companies/AAPL/price",
+            "2026-09-08"
+          ],
+          [
+            "https://twelvedata.com/markets/861640/stock/nasdaq/aapl/historical-data",
+            "2026-09-09"
+          ],
+          [
+            "https://stockscan.io/stocks/AAPL/price-history",
+            "2026-09-08"
+          ],
+          [
+            "https://www.investing.com/equities/aapl-usd-perpetual-futures-historical-data",
+            "2026-08-09"
+          ],
+          [
+            "https://stoculator.com/stock/AAPL/historical",
+            "2016-09-09"
+          ],
+          [
+            "https://finance.yahoo.com/quote/AAPL/history?period1=",
+            "2026-09-04"
+          ],
+          [
+            "https://twelvedata.com/markets/603024/stock/bvc/aapl/historical-data",
+            "2026-09-09"
+          ],
+          [
+            "https://finance.yahoo.com/quote/AAPL.TO/history/",
+            "2026-08-04"
+          ],
+          [
+            "https://www.digrin.com/stocks/detail/AAPL/price",
+            "2026-06-25"
+          ]
+        ]
+      },
+      "published": true,
+      "degraded_code": null,
+      "sources": [
+        [
+          "https://finance.yahoo.com/quote/AAPL/history/",
+          "2026-08-04"
+        ],
+        [
+          "https://www.marketbeat.com/stocks/NASDAQ/AAPL/chart/",
+          "2026-09-08"
+        ],
+        [
+          "https://www.marketwatch.com/investing/stock/aapl/download-data",
+          "2026-09-09"
+        ],
+        [
+          "https://www.investing.com/equities/apple-computer-inc-historical-data",
+          "2026-08-10"
+        ],
+        [
+          "https://www.wsj.com/market-data/quotes/AAPL/historical-prices",
+          "2025-10-09"
+        ]
+      ],
+      "rows": 0,
+      "answer": "Apple (**AAPL**) cotiza a **US$315,34** según la última operación disponible, correspondiente al **9 de septiembre**.\n\nEn lo que va de semana, comparado con el cierre del viernes 4 de septiembre de **US$319,97**, :\n\n- **Variación:** **−US$4"
+    },
+    {
+      "name": "377-equity-control-quote",
+      "recording": "377/probes/equity_control_quote.json",
+      "question": "AAPL latest close (request not recorded)",
+      "question_kind": "live_quote",
+      "symbols": [
+        "AAPL"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#580: a recorded response that called no tool",
+      "asked_at": "2026-08-07T18:00:00+00:00",
+      "question_date": "2026-08-07",
+      "provider_requests": 1,
+      "retrieval_record": {
+        "finance_search_invocations": 0,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [],
+        "sources_before_selection": []
+      },
+      "published": false,
+      "degraded_code": "research_not_grounded",
+      "sources": [],
+      "rows": 0,
+      "answer": "I couldn't retrieve the data to answer this question."
+    },
+    {
+      "name": "377-equity-control-quote-background",
+      "recording": "377/probes/equity_control_quote.json",
+      "question": "AAPL latest close (request not recorded)",
+      "question_kind": "cross_company",
+      "symbols": [
+        "AAPL"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "background",
+      "why": "#580 on the background path",
+      "asked_at": "2026-08-07T18:00:00+00:00",
+      "question_date": "2026-08-07",
+      "provider_requests": 0,
+      "retrieval_record": {
+        "finance_search_invocations": 0,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [],
+        "sources_before_selection": []
+      },
+      "published": false,
+      "degraded_code": "research_not_grounded",
+      "sources": [],
+      "rows": 0,
+      "answer": "I couldn't retrieve the data to answer this question."
+    },
+    {
+      "name": "377-equity-peers-netflix",
+      "recording": "377/probes/equity_peers_netflix.json",
+      "question": "Netflix peers (request not recorded)",
+      "question_kind": "company_lookup",
+      "symbols": [
+        "NFLX"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "#580: prose from memory on a claim-shaped question",
+      "asked_at": "2026-08-07T18:00:00+00:00",
+      "question_date": "2026-08-07",
+      "provider_requests": 2,
+      "retrieval_record": {
+        "finance_search_invocations": 0,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [],
+        "sources_before_selection": []
+      },
+      "published": false,
+      "degraded_code": "research_not_grounded",
+      "sources": [],
+      "rows": 0,
+      "answer": "I couldn't retrieve the data to answer this question."
+    },
+    {
+      "name": "377-equity-peers-netflix-background",
+      "recording": "377/probes/equity_peers_netflix.json",
+      "question": "Netflix peers (request not recorded)",
+      "question_kind": "cross_company",
+      "symbols": [
+        "NFLX"
+      ],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "background",
+      "why": "#580: prose from memory on the background path",
+      "asked_at": "2026-08-07T18:00:00+00:00",
+      "question_date": "2026-08-07",
+      "provider_requests": 0,
+      "retrieval_record": {
+        "finance_search_invocations": 0,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [],
+        "sources_before_selection": []
+      },
+      "published": false,
+      "degraded_code": "research_not_grounded",
+      "sources": [],
+      "rows": 0,
+      "answer": "I couldn't retrieve the data to answer this question."
+    },
+    {
+      "name": "545-market-pulse-no-tool",
+      "recording": "545/probes/market_pulse_retry_finance_only.json",
+      "question": "anything interesting moving today",
+      "question_kind": "market_pulse",
+      "symbols": [],
+      "language": "en",
+      "period_of_interest": null,
+      "path": "inline",
+      "why": "survey gate unchanged: a survey that called no tool",
+      "asked_at": "2026-09-09T01:23:12.431979+00:00",
+      "question_date": "2026-09-08",
+      "provider_requests": 2,
+      "retrieval_record": {
+        "finance_search_invocations": 0,
+        "web_search_invocations": 0,
+        "fetch_url_invocations": 0,
+        "tool_results": [],
+        "sources_before_selection": []
+      },
+      "published": false,
+      "degraded_code": "survey_not_grounded",
+      "sources": [],
+      "rows": 0,
+      "answer": "I couldn't retrieve today's market movers."
+    }
+  ]
+}

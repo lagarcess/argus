@@ -18,7 +18,6 @@ OpenRouterTask = Literal[
     "clarification",
     "chat_composer",
     "result_summary",
-    "result_breakdown",
     "name_suggestion",
     "discovery_extraction",
     "discovery_voicing",
@@ -27,7 +26,7 @@ OpenRouterTask = Literal[
     "knowledge_voicing",
     "memory_sensitivity",
 ]
-OpenRouterModelTier = Literal["utility", "chat", "structured", "context"]
+OpenRouterModelTier = Literal["utility", "chat", "structured", "context", "readout"]
 OpenRouterReasoningEffort = Literal["xhigh", "high", "medium", "low", "minimal", "none"]
 
 
@@ -83,13 +82,6 @@ OPENROUTER_PROFILES: dict[OpenRouterTask, OpenRouterProfile] = {
     "result_summary": OpenRouterProfile(
         "result_summary", temperature=0.2, max_tokens=700, timeout_seconds=30
     ),
-    "result_breakdown": OpenRouterProfile(
-        "result_breakdown",
-        temperature=0.2,
-        max_tokens=2400,
-        timeout_seconds=25,
-        max_retries=0,
-    ),
     "name_suggestion": OpenRouterProfile(
         "name_suggestion", temperature=0, max_tokens=400
     ),
@@ -121,8 +113,7 @@ OPENROUTER_TASK_MODEL_TIERS: dict[OpenRouterTask, OpenRouterModelTier] = {
     "capability_conflict": "context",
     "clarification": "chat",
     "chat_composer": "chat",
-    "result_summary": "chat",
-    "result_breakdown": "context",
+    "result_summary": "readout",
     "name_suggestion": "utility",
     "discovery_extraction": "structured",
     "discovery_voicing": "chat",

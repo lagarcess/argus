@@ -144,7 +144,7 @@ export default function SharedReceiptsView({
           <p className="text-[13px] leading-relaxed text-black/50 dark:text-white/50">
             {t(
               "receipt.list.intro",
-              "Everything you have shared. Each link shows locked numbers and nothing about you.",
+              "Every link you have shared, with its frozen answers or test results.",
             )}
           </p>
 
@@ -196,7 +196,7 @@ export default function SharedReceiptsView({
                       {receipt.title}
                     </p>
                     <p className="mt-0.5 truncate text-[12.5px] text-black/45 dark:text-white/45">
-                      {[receipt.symbols.join(", "), formatWindow(receipt.date_range)]
+                      {[t(`receipt.kinds.${receipt.kind}`), receipt.symbols.join(", "), formatWindow(receipt.date_range)]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>

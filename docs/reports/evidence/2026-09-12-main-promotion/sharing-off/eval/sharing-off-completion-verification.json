@@ -1,0 +1,301 @@
+{
+  "state": "pass",
+  "measured_product_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "baseline_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+  "promotion_head_before_evidence_commit": "7cefbd49dbbe516539e909ad2b28ef64cf374694",
+  "non_docs_product_tree_sha256": "bf51ad411f381a95e84c213f51256f2b77e2a66663abc27b365df9d2bd485eef",
+  "all_non_docs_paths_identical": true,
+  "current_main_base_is_ancestor": true,
+  "native_attempts_verified": 20,
+  "identical_user_inputs_both_sides": true,
+  "all_attempts_sequential": true,
+  "environment_source_unchanged": true,
+  "tracked_cost_usd": 9.556433710664,
+  "reserve_usd": 1.64,
+  "guarded_total_usd": 11.196433710664,
+  "reserve_is_not_spend": true,
+  "cap_usd": 12.5,
+  "cooldowns_verified": [
+    {
+      "after_pair": 3,
+      "before_pair": 4,
+      "consecutive_candidate_delivery_failures": 3,
+      "started_at_epoch": 1789332748.579468,
+      "required_seconds": 900,
+      "resume_at_epoch": 1789333648.579468,
+      "finished_at_epoch": 1789333648.690135
+    }
+  ],
+  "research_categories": {
+    "baseline": {
+      "future_performance_limitation": 10
+    },
+    "candidate": {
+      "provider_timeout": 3,
+      "research_grounding_or_availability_guard": 1,
+      "published_pass": 5,
+      "future_performance_limitation": 1
+    }
+  },
+  "attempt_outcomes": [
+    {
+      "attempt": 1,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 1,
+      "side": "candidate",
+      "native_status": "failed",
+      "failed": true,
+      "category": "provider_timeout",
+      "degraded_code": "research_unavailable_timeout",
+      "http_error_statuses": [],
+      "research_sources": 0,
+      "prose_judge_pass": false,
+      "failed_checks": [
+        "research.published: expected True, got False",
+        "prose_judge:scenario_framing"
+      ]
+    },
+    {
+      "attempt": 2,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 2,
+      "side": "candidate",
+      "native_status": "failed",
+      "failed": true,
+      "category": "research_grounding_or_availability_guard",
+      "degraded_code": "scenario_inputs_uncited",
+      "http_error_statuses": [],
+      "research_sources": 5,
+      "prose_judge_pass": true,
+      "failed_checks": [
+        "research.published: expected True, got False"
+      ]
+    },
+    {
+      "attempt": 3,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 3,
+      "side": "candidate",
+      "native_status": "failed",
+      "failed": true,
+      "category": "provider_timeout",
+      "degraded_code": "research_unavailable_timeout",
+      "http_error_statuses": [],
+      "research_sources": 0,
+      "prose_judge_pass": true,
+      "failed_checks": [
+        "research.published: expected True, got False"
+      ]
+    },
+    {
+      "attempt": 4,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": false,
+      "failed_checks": []
+    },
+    {
+      "attempt": 4,
+      "side": "candidate",
+      "native_status": "passed",
+      "failed": false,
+      "category": "published_pass",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": 5,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 5,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 5,
+      "side": "candidate",
+      "native_status": "failed",
+      "failed": true,
+      "category": "provider_timeout",
+      "degraded_code": "research_unavailable_timeout",
+      "http_error_statuses": [],
+      "research_sources": 0,
+      "prose_judge_pass": true,
+      "failed_checks": [
+        "research.published: expected True, got False"
+      ]
+    },
+    {
+      "attempt": 6,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 6,
+      "side": "candidate",
+      "native_status": "passed",
+      "failed": false,
+      "category": "published_pass",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": 5,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 7,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 7,
+      "side": "candidate",
+      "native_status": "failed",
+      "failed": true,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": false,
+      "failed_checks": [
+        "intent: expected one of ['conversation_followup', 'beginner_guidance'], got 'backtest_execution'",
+        "capability_verdict: expected 'answer_only', got 'unsupported'",
+        "stage_outcomes: expected ['ready_to_respond'], got ['needs_clarification', 'await_user_reply']",
+        "offered.min_next_experiment_rows: expected at least 1, got []",
+        "research: expected a research sidecar, got None",
+        "prose_judge:scenario_framing"
+      ]
+    },
+    {
+      "attempt": 8,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 8,
+      "side": "candidate",
+      "native_status": "passed",
+      "failed": false,
+      "category": "published_pass",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": 5,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 9,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 9,
+      "side": "candidate",
+      "native_status": "passed",
+      "failed": false,
+      "category": "published_pass",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": 5,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 10,
+      "side": "baseline",
+      "native_status": "passed",
+      "failed": false,
+      "category": "future_performance_limitation",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": null,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    },
+    {
+      "attempt": 10,
+      "side": "candidate",
+      "native_status": "passed",
+      "failed": false,
+      "category": "published_pass",
+      "degraded_code": null,
+      "http_error_statuses": [],
+      "research_sources": 5,
+      "prose_judge_pass": true,
+      "failed_checks": []
+    }
+  ],
+  "new_evidence_secret_scan_passed": true,
+  "checked_at": "2026-09-13T21:45:43.767689+00:00",
+  "scope": "Measurement and pre-commit product identity. Final CI and exact-head review must be verified on the eventual evidence commit before the PR terminal audit."
+}

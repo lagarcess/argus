@@ -1,0 +1,83 @@
+argus
+Nuevo chat
+Buscar
+Recientes
+ÚLTIMOS 7 DÍAS
+META Buy and Hold Strategy
+Resultado de simulación · META · Comprar y mantener
+Ajustes
+META Buy and Hold Strategy
+test META buy and hold
+
+¿Qué periodo quieres usar para META?
+
+January 3, 2023 through December 31, 2024, with $10,000 starting capital
+
+Got it — META buy-and-hold with $10,000 starting capital. You mentioned January 3, 2023 through December 31, 2024. What are the exact start and end dates for the test?
+
+Start date: 2023-01-03. End date: 2024-12-31.
+META
+Comprar y mantener
+Ejecución completa
+CAPITAL INICIAL
+$10,000
+PERIODO
+3 ene 2023 → 31 dic 2024
+Acciones
+Datos diarios
+Sin comisiones
+Sin deslizamiento
+Referencia: SPY
+Run backtest
+META
+Comprar y mantener
+
+3 ene 2023 → 31 dic 2024 · Datos diarios
+
+Simulación completa
+	
+	
+
+	
+	
+TradingView Lightweight Charts
+1M
+3M
+Este año
+1A
+Todo
+Detalles del rango
+
+Período visible: 3 ene 2023 al 31 dic 2024.
+
+Valor final
+
+$46,950
+
++$36,950 ganancia · +369.5% rendimiento total
+
+Comparado con SPY
+Superó por 315.6 puntos porcentuales
+Peor caída
+-18.4%
+
+Acciones · Simulación histórica · Sin comisiones/deslizamiento · No es asesoría
+
+Ver detalles
+Explicar resultado
+Ajustar idea
+Agregar decisión
+LECTURA RÁPIDA
+
+Comprar y mantener de META, 3 ene 2023 → 31 dic 2024. El retorno total fue de +369.5%. Terminó 315.6 puntos porcentuales por encima de SPY. La peor caída fue de -18.4%.
+
+QUÉ PROBAR DESPUÉS
+↳
+Probar otro rango de fechas·Superó la referencia por 315.6 puntos
+↳
+Probar el mismo enfoque en un activo similar·GOOGL
+↳
+Probar compras mensuales recurrentes
+Haz una pregunta de seguimiento...
+
+Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.

@@ -226,9 +226,23 @@
         "other": "Other"
       }
     },
+    "ask": {
+      "question": "How is Argus doing?",
+      "answers": {
+        "negative": "Bad",
+        "neutral": "Okay",
+        "positive": "Good"
+      },
+      "thanks": "Thanks for telling us.",
+      "tell_more": "Tell us more",
+      "dismiss": "Don't ask again in this chat"
+    },
     "close": "Close feedback"
   },
   "chat": {
+    "artifact_edit_disclosure": {
+      "no_change_applied": "No requested changes were applied. Please restate what you want to change."
+    },
     "artifact_assumptions": {
       "confirmation": "For the confirmation, these are the assumptions: {{assumptions}}.",
       "current_idea": "For this idea, these are the known assumptions: {{assumptions}}.",
@@ -253,7 +267,6 @@
       "early_c": "Morning. What is on your mind?",
       "early_named_a": "Morning, {{name}}. What should we look at?",
       "day_a": "What should we try today?",
-      "day_b": "What are we testing today?",
       "day_c": "Got a hunch worth checking?",
       "day_d": "What should we look into?",
       "day_e": "Something you have been meaning to test?",
@@ -262,19 +275,14 @@
       "day_named_b": "Where do we start, {{name}}?",
       "evening_a": "What should we look into tonight?",
       "evening_b": "Evening. What are we testing?",
-      "evening_c": "Anything you want to check before the day is done?",
       "evening_d": "What is worth a look tonight?",
       "evening_named_a": "Evening, {{name}}. What should we look into?",
-      "night_a": "Hello, night owl. What are you curious about?",
       "night_b": "Still up. What should we look at?",
       "night_c": "Late one. What are we testing?",
       "night_named_a": "Still up, {{name}}. What are you curious about?",
-      "session_closed_weekend_a": "Stocks are closed for the weekend. Crypto never stops, so there is still plenty to test.",
-      "session_closed_weekend_b": "The stock market is shut for the weekend. Crypto keeps going, and past data is always there to test.",
+      "session_closed_weekend_a": "Stocks are closed for the weekend. Crypto is still trading.",
       "session_closed_holiday_a": "Stocks are closed for the holiday. Crypto is still trading.",
-      "session_closed_holiday_b": "The stock market is shut today. Crypto never closes, and past data is always there to test.",
-      "session_pre_market_a": "Regular trading opens in a few hours. Crypto has been going all night.",
-      "session_after_hours_a": "The regular session is over, and extended hours are still running. Crypto is still going."
+      "session_pre_market_a": "Regular trading opens in a few hours. Crypto has been going all night."
     },
     "view_history": "View history",
     "chat_options": "Chat options",
@@ -421,8 +429,8 @@
         "daily": "Retry with daily bars",
         "hour_1": "Retry with 1-hour bars"
       },
-      "future_performance": "I can't predict future performance. I can test how the same idea performed over a historical period instead. What historical period would you like to examine?",
-      "future_performance_with_options": "I can't predict future performance. I can test how the same idea performed over a historical period instead: {{options}}?"
+      "future_performance": "There's no market data for a period that hasn't happened yet, so I can't run a test over it. I can test how the same idea performed over a historical period, or research what analysts expect. What historical period would you like to examine?",
+      "future_performance_with_options": "There's no market data for a period that hasn't happened yet, so I can't run a test over it. I can test how the same idea performed over a historical period, or research what analysts expect: {{options}}?"
     },
     "coverage_recovery": {
       "no_common_data_window": "Those assets and the benchmark do not share a usable data window for one trustworthy test. Change the dates, an asset, or the benchmark.",
@@ -532,6 +540,9 @@
       "sources_panel_open_other": "{{count}} sources ›",
       "sources_panel_title": "Sources Argus read",
       "sources_panel_note": "Sources used to inform this answer. Links open in a new tab.",
+      "sources_panel_open_withheld": "Where Argus looked ›",
+      "sources_panel_title_withheld": "Where Argus looked",
+      "sources_panel_note_withheld": "Argus read these pages while answering and could not verify the answer with them. Links open in a new tab.",
       "sources_panel_close": "Close sources",
       "sources_panel_external_link_new_tab": "Opens in a new tab",
       "allowance_banner": "Grounded search allowance used",
@@ -789,30 +800,14 @@
       }
     },
     "status": {
-      "understanding": "Thinking...",
-      "interpret": "Understanding your idea...",
-      "clarify": "I have a question...",
-      "confirm": "Here's what I found...",
-      "execute": "Running backtest...",
-      "explain": "Reviewing results...",
-      "next_step": "What's next...",
-      "extracting_strategy": "Extracting strategy",
-      "running_backtest": "Running backtest",
-      "calculating_metrics": "Calculating metrics",
-      "running": "Running simulation",
       "checking": "Checking what was saved...",
-      "preparing": "Preparing results",
-      "intent_run_backtest": "Designing your strategy...",
-      "intent_education": "Thinking...",
-      "intent_unsupported_request": "Thinking...",
-      "discovery_search": "Searching the web...",
-      "discovery_search_detail": "Searching the web: {{detail}}",
-      "discovery_verify": "Verifying candidates against supported markets..."
+      "working": "Working..."
     },
     "confirmation": {
       "asset_count": "{{count}} assets",
       "selected_asset": "Selected asset",
       "period_adjustment": "I adjusted the test period to {{period}} because every asset and the benchmark need a shared data window.",
+      "period_adjustment_limited_by": "I adjusted the test period to {{period}} because Argus has price data for {{symbol}} only from {{date}}.",
       "undo": "Undo",
       "peer_add_failed": "Couldn't change that test. The card is unchanged.",
       "status": {
@@ -919,9 +914,9 @@
         "change_date_range": "Test a different date range",
         "same_setup_peer_asset": "Test the same setup on a similar asset",
         "same_rule_peer_asset": "Test the same rule on a similar asset",
-        "supported_rsi_threshold": "Try a supported RSI threshold rule",
-        "supported_ma_crossover": "Try a supported SMA/EMA crossover",
-        "supported_rsi_or_ma_rule": "Simplify into a supported RSI or SMA/EMA rule",
+        "supported_rsi_threshold": "Try an RSI threshold rule",
+        "supported_ma_crossover": "Try a moving average crossover",
+        "supported_rsi_or_ma_rule": "Simplify into an RSI or moving average rule",
         "adjust_indicator_thresholds": "Test different indicator thresholds",
         "adjust_signal_periods": "Test different signal periods",
         "adjust_contribution_cadence": "Test a different contribution schedule",
@@ -942,9 +937,9 @@
         "recurring_monthly_buys": "Monthly buys",
         "same_rule_peer_asset": "Same rule, similar asset",
         "same_setup_peer_asset": "Similar asset",
-        "supported_ma_crossover": "SMA/EMA crossover",
+        "supported_ma_crossover": "Moving average crossover",
         "supported_rsi_or_ma_rule": "Simplify the rule",
-        "supported_rsi_threshold": "Supported RSI rule"
+        "supported_rsi_threshold": "RSI rule"
       },
       "test_verb": "Test"
     },
@@ -968,6 +963,35 @@
       "period": "Period",
       "assumptions": "Assumptions",
       "assistant_explanation": "Assistant explanation"
+    },
+    "tools": {
+      "backtest": {
+        "title": "Backtest: {{asset_universe}}",
+        "start_date": "Start date",
+        "end_date": "End date",
+        "total_return_pct": "Total return",
+        "contribution_return_pct": "Return on contributions",
+        "max_drawdown_pct": "Largest drop"
+      },
+      "units": { "percent": "%", "percentage_points": "percentage points" },
+      "failed": "Result unavailable",
+      "progress": {
+        "backtest": "Running the {{asset_universe}} backtest",
+        "fast_quote": "Checking the latest figures for {{symbols}}",
+        "balanced_lookup": "Looking up {{request}}",
+        "thorough_research": "Researching {{request}}",
+        "screening": "Comparing candidates for {{request}}",
+        "peer_expansion": "Finding comparable assets for {{request}}"
+      },
+      "research": {
+        "title": "Research result",
+        "figure": "{{subject}}: {{label}}",
+        "unit": "{{unit}}",
+        "subject": "{{name}}",
+        "request": "Requested facts",
+        "pending": "Research is in progress. The result will appear here when ready.",
+        "unavailable": "The requested facts could not be verified."
+      }
     }
   },
   "settings": {
@@ -986,6 +1010,8 @@
       "preferred_name_save_error": "Could not save that name yet.",
       "preferred_name_too_long": "Keep this to {{count}} characters or fewer.",
       "language_save_error": "Could not update language yet.",
+      "country_save_error": "Could not update your country yet.",
+      "currency_save_error": "Could not update your currency yet.",
       "avatar_theme": {
         "label": "Avatar color",
         "change": "Edit avatar",
@@ -1033,7 +1059,20 @@
         "dark": "Dark",
         "system": "System"
       },
-      "close_appearance": "Close appearance"
+      "close_appearance": "Close appearance",
+      "home_country": "Country and currency",
+      "close_home_country": "Close country and currency",
+      "home_country_note": "When Argus looks things up, it uses your country as your location.",
+      "country": "Country",
+      "currency": "Currency",
+      "no_country": "No country",
+      "no_currency": "Not set",
+      "suggested_country": "Suggested",
+      "currency_from_country": "Match my country",
+      "search_country": "Search countries",
+      "search_currency": "Search currencies",
+      "no_countries": "No countries found.",
+      "no_currencies": "No currencies found."
     },
     "sidebar": {
       "title": "Sidebar preference",
@@ -1111,8 +1150,10 @@
       "usage": "Usage",
       "usage_panel": {
         "title": "Usage",
-        "messages": "Messages",
+        "conversation": "Conversation",
+        "searches": "Searches with sources",
         "simulations": "Simulations",
+        "no_limit": "No limit",
         "left_today": "{{count}} left today",
         "left_today_one": "{{count}} left today",
         "left_today_other": "{{count}} left today",
@@ -1121,12 +1162,16 @@
         "hourly_available": "{{count}} available this hour · resets {{time}}",
         "hourly_available_one": "{{count}} available this hour · resets {{time}}",
         "hourly_available_other": "{{count}} available this hour · resets {{time}}",
+        "workspace_available": "{{count}} left in this temporary chat · expires {{time}}",
+        "workspace_available_one": "{{count}} left in this temporary chat · expires {{time}}",
+        "workspace_available_other": "{{count}} left in this temporary chat · expires {{time}}",
         "what_counts": "What counts?",
         "loading": "Loading usage…",
         "load_error": "Usage couldn’t be loaded.",
         "retry": "Try again",
         "close": "Close usage",
-        "message_rule": "Messages count when Argus completes a response. Failed or interrupted responses don’t count.",
+        "conversation_rule": "Conversation is free. Asking questions and reading answers never counts.",
+        "search_rule": "Searches with sources count once per search Argus runs for you. Answers from Argus data don’t count.",
         "simulation_rule": "New simulations count once. Retrying the same simulation doesn’t count again."
       },
       "shared_links": "Shared links",
@@ -1523,12 +1568,12 @@
       "simulation_limit_request_access": "This temporary chat has reached today’s simulation limit. It resets on {{date}}. Request access or sign in to continue.",
       "simulation_workspace_limit_reset": "This temporary chat has reached its simulation limit. It expires on {{date}}. Create an account to continue now.",
       "simulation_workspace_limit_request_access": "This temporary chat has reached its simulation limit. It expires on {{date}}. Request access or sign in to continue.",
-      "message_limit": "Sign in to keep this conversation and continue.",
       "save_decision": "Sign in to save this decision.",
       "new_conversation": "Sign in to keep this conversation and start another.",
       "new_conversation_create": "Create an account to keep this conversation and start another.",
       "keep_history": "Sign in to keep this conversation and start another.",
-      "discovery_searches": "Sign in for more grounded searches with sources."
+      "discovery_searches": "Sign in for more grounded searches with sources.",
+      "share_result": "Create an account or sign in to share this answer and keep control of its link."
     },
     "new_conversation": {
       "title": "Start a new conversation?",
@@ -1676,7 +1721,7 @@
     "cta": {
       "headline": "Got an idea? Try it.",
       "detail": "Tell Argus an idea in your own words and it will show you how it would have gone. Free to try, no account needed.",
-      "action": "Test your own idea"
+      "action": "Continue with Argus"
     },
     "tombstone": {
       "title": "This one is gone",
@@ -1689,7 +1734,7 @@
     },
     "owner": {
       "share": "Share this",
-      "share_hint": "Makes a link anyone can open. It shows these numbers, locked as they are right now. Your chat, your name, and anything Argus remembers all stay out of it.",
+      "share_hint": "Makes a public link to the selected answers and your note. Review the preview before sharing.",
       "note_label": "Add a note if you want",
       "note_placeholder": "Why is this worth a look?",
       "note_public_warning": "Anyone with the link can read this. Keep it free of anything private.",
@@ -1704,14 +1749,16 @@
       "errors": {
         "create": "Argus could not make that link. Try again.",
         "note_rejected": "That note cannot go public. Take out any keys or long codes.",
-        "rate_limited": "You have made a lot of links just now. Try again shortly."
+        "rate_limited": "You have made a lot of links just now. Try again shortly.",
+        "account_conversion_required": "Create an account or sign in to share this answer.",
+        "preview_changed": "The content changed. Preview it again before making the link."
       }
     },
     "list": {
       "menu": "Shared links",
       "title": "Shared links",
       "close": "Close shared links",
-      "intro": "Everything you have shared. Each link shows locked numbers and nothing about you.",
+      "intro": "Every link you have shared, with its frozen answers or test results.",
       "loading": "Loading your links...",
       "load_error": "Your shared links did not load.",
       "load_more": "Show older links",
@@ -1744,6 +1791,89 @@
       "signal_period": "Signal window",
       "entry_threshold": "Buys at",
       "exit_threshold": "Sells at"
+    },
+    "kinds": {
+      "backtest": "Historical test",
+      "research_answer": "Research answer",
+      "mixed": "Answers and tests"
+    },
+    "research": {
+      "stamp": "Argus looked this up on {{date}}",
+      "preview_stamp": "Looked up {{date}} · {{count}} sources",
+      "sources": "Sources",
+      "next_step": "What Argus offered next",
+      "research_test_single": "Argus offered to test buying and holding {{symbols}}.",
+      "research_test_versus": "Argus offered to compare buying and holding {{symbols}}.",
+      "framing": "This records what these sources reported on that date. It is not advice or a prediction. Things may have changed since. Nothing was bought or simulated here.",
+      "short": "A dated research snapshot. Not a tip.",
+      "headline": "Research from that date, not advice."
+    },
+    "selection": {
+      "title": "Share conversation",
+      "close": "Close sharing",
+      "hint": "Choose the answers to include. You will see the exact public page before making a link. Anyone with the link can read the selected content and note.",
+      "all": "Select all eligible",
+      "clear": "Clear selection",
+      "count": "{{selected}} of {{eligible}} selected",
+      "turn": "Turn {{count}}",
+      "loading": "Loading answers...",
+      "empty": "There are no assistant answers in this conversation yet.",
+      "preview": "Preview public page",
+      "previewing": "Preparing preview...",
+      "edit": "Change selection or note",
+      "existing": "This selection already has a live link. The preview shows its saved content and note.",
+      "reuse": "Use this link",
+      "turns": "{{count}} turns",
+      "field_refusal": "{{field}} cannot be shared. {{reason}}",
+      "fields": {
+        "question": "The question",
+        "answer": "The answer",
+        "owner_note": "Your note",
+        "sources": "The sources"
+      },
+      "reasons": {
+        "not_completed": "This answer is not complete yet.",
+        "unsupported_turn": "This type of answer cannot be shared.",
+        "unsupported_shape": "This research format cannot be shared.",
+        "missing_sources": "This answer has no supported publisher sources.",
+        "degraded": "The research did not complete with full supporting evidence.",
+        "memory_used": "This answer uses personal memory.",
+        "missing_question": "The question for this answer is unavailable.",
+        "text_too_long": "The text is too long to publish in full.",
+        "unsafe_text": "The text contains private information or codes.",
+        "unlisted_url": "The answer contains a link outside its listed sources.",
+        "invalid_selection": "Choose eligible answers from this conversation.",
+        "preview_changed": "The content changed. Preview it again before making the link.",
+        "invalid_source": "The source content is unavailable or cannot be verified.",
+        "unsupported_backtest": "This test does not have all the facts needed for sharing."
+      }
+    }
+  },
+  "tools": {
+    "progress": {
+      "call": "Running {{tool_name}}",
+      "value": "Checking {{known}}"
+    },
+    "card": {
+      "title": "Result",
+      "solved_value": "Solved value",
+      "input": "Input",
+      "named_input": "Input {{name}}",
+      "inputs": "Inputs",
+      "unknown": "To solve",
+      "yes": "Yes",
+      "no": "No",
+      "unavailable": "This result is unavailable.",
+      "enter_value": "Enter a value to update this result.",
+      "recompute_failed": "Could not update this result. Try again.",
+      "saved_result": "The saved result is shown while your inputs change.",
+      "updating": "Updating...",
+      "status": {
+        "invalid": "These inputs could not produce a result.",
+        "ambiguous": "These inputs have more than one possible answer.",
+        "bounded": "A reliable answer is outside this tool’s limits.",
+        "unavailable": "This result is unavailable right now."
+      }
     }
   }
 }

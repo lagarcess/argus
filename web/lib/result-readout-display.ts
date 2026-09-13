@@ -1,7 +1,10 @@
 import type { TFunction } from "i18next";
+import type { Message } from "@/components/chat/types";
+import { resultReadoutText } from "./result-readout-content";
 import { contributionPhrase } from "./contribution-period-display";
 import { compactDateRangeDisplay } from "./date-range-display";
 import { formatCurrency } from "./result-card-display";
+import { benchmarkComparisonView, signedPercentText } from "./result-figures";
 import type { ResultReadoutFacts } from "./result-readout-facts";
 import { strategyDisplayLabel } from "./strategy-display";
 import { resultRuleGroupText } from "./result-readout-rules";
@@ -10,49 +13,57 @@ function figure(value: number, locale: string): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
 }
 
-function percent(value: number, locale: string): string {
-  return `${figure(value, locale)}%`;
-}
-
-export function resultQuickTakeText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): string {
+export function resultQuickTakeText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string, readoutContent?: unknown): string {
+  const modelText = resultReadoutText(readoutContent, "quick_take", locale);
+  if (modelText !== null) return modelText;
   if (!facts || facts.totalReturnPct === undefined) return t("chat.result_readout.unavailable");
   const strategy = strategyDisplayLabel(facts.strategyType, t) ?? t("chat.result_readout.strategy");
   const period = compactDateRangeDisplay(facts.dateRange, locale);
   const lines = [t(period ? "chat.result_readout.tested_period" : "chat.result_readout.tested", {
     strategy, symbols: facts.symbols.join(", ") || t("chat.result_readout.assets_unavailable"), period,
   }), t(facts.strategyType === "dca_accumulation" ? "chat.result_readout.contribution_return" : "chat.result_readout.total_return", {
-    value: percent(facts.totalReturnPct, locale),
+    value: signedPercentText(facts.totalReturnPct, locale),
   })];
-  if (facts.benchmarkSymbol && facts.benchmarkDeltaPct !== undefined) {
-    const delta = facts.benchmarkDeltaPct;
-    lines.push(t(delta > 0 ? "chat.result_readout.beat" : delta < 0 ? "chat.result_readout.lagged" : "chat.result_readout.matched", {
-      symbol: facts.benchmarkSymbol, value: figure(Math.abs(delta), locale),
+  if (facts.benchmarkSymbol && facts.benchmarkDeltaPct !== undefined && facts.benchmarkClaim !== undefined) {
+    // The backend's gap and claim, printed the way the card prints them.
+    const comparison = benchmarkComparisonView(facts.benchmarkClaim, facts.benchmarkDeltaPct, locale);
+    lines.push(t(`chat.result_readout.${comparison.claim}`, {
+      symbol: facts.benchmarkSymbol, value: comparison.magnitude,
     }));
   } else {
     lines.push(t("chat.result_readout.comparison_unavailable"));
   }
-  if (facts.maxDrawdownPct !== undefined) lines.push(t("chat.result_readout.drawdown", { value: percent(facts.maxDrawdownPct, locale) }));
+  if (facts.maxDrawdownPct !== undefined) lines.push(t("chat.result_readout.drawdown", { value: signedPercentText(facts.maxDrawdownPct, locale) }));
   return lines.join(" ");
 }
 
-export function resultBreakdownText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): string {
+export function resultBreakdownText(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string, readoutContent?: unknown): string {
+  const modelText = resultReadoutText(readoutContent, "breakdown", locale);
+  if (modelText !== null) return modelText;
   const readout = resultQuickTakeText(facts, t, locale);
   if (!facts) return readout;
-  const details: string[] = resultReadoutRuleDetails(facts, t, locale).map((rule) => `${rule.label}: ${rule.value}`);
-  if (facts.startingCapital !== undefined) details.push(t("chat.result_readout.starting_capital", { value: formatCurrency(facts.startingCapital, locale) }));
-  if (facts.recurringContribution !== undefined) details.push(t("chat.result_readout.contribution", {
-    value: contributionPhrase(formatCurrency(facts.recurringContribution, locale), facts.contributionPeriod, t),
-  }));
+  const details = resultReadoutPlanDetails(facts, t, locale);
   if (facts.benchmarkSymbol && facts.benchmarkReturnPct !== undefined) details.push(t("chat.result_readout.benchmark_return", {
-    symbol: facts.benchmarkSymbol, value: percent(facts.benchmarkReturnPct, locale),
+    symbol: facts.benchmarkSymbol, value: signedPercentText(facts.benchmarkReturnPct, locale),
   }));
   const costs = facts.costs;
   if (costs && costs.fee_bps != null && costs.slippage_bps != null) details.push(t("chat.result_readout.costs", {
     fee: figure(costs.fee_bps, locale), slippage: figure(costs.slippage_bps, locale),
   }));
-  if (costs?.gross_total_return_pct != null) details.push(t("chat.result_readout.gross_return", { value: percent(costs.gross_total_return_pct, locale) }));
-  if (costs?.net_total_return_pct != null) details.push(t("chat.result_readout.net_return", { value: percent(costs.net_total_return_pct, locale) }));
+  if (costs?.gross_total_return_pct != null) details.push(t("chat.result_readout.gross_return", { value: signedPercentText(costs.gross_total_return_pct, locale) }));
+  if (costs?.net_total_return_pct != null) details.push(t("chat.result_readout.net_return", { value: signedPercentText(costs.net_total_return_pct, locale) }));
   return [readout, ...details, t("chat.result_readout.historical")].join("\n\n");
+}
+
+/** The typed plan read is shared by the breakdown and frozen public receipts. */
+export function resultReadoutPlanDetails(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): string[] {
+  if (!facts) return [];
+  const details = resultReadoutRuleDetails(facts, t, locale).map((rule) => `${rule.label}: ${rule.value}`);
+  if (facts.startingCapital !== undefined) details.push(t("chat.result_readout.starting_capital", { value: formatCurrency(facts.startingCapital, locale) }));
+  if (facts.recurringContribution !== undefined) details.push(t("chat.result_readout.contribution", {
+    value: contributionPhrase(formatCurrency(facts.recurringContribution, locale), facts.contributionPeriod, t),
+  }));
+  return details;
 }
 
 export function resultReadoutRuleDetails(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): { label: string; value: string }[] {
@@ -64,4 +75,20 @@ export function resultReadoutRuleDetails(facts: ResultReadoutFacts | null | unde
   if (indicator?.entryThreshold !== undefined) rules.push({ label: t("chat.result_card.details.entry_rule"), value: t("chat.result_readout.rsi_entry", { threshold: figure(indicator.entryThreshold, locale), period: indicator.period ?? t("chat.result_readout.parameter_unavailable") }) });
   if (indicator?.exitThreshold !== undefined) rules.push({ label: t("chat.result_card.details.exit_rule"), value: t("chat.result_readout.rsi_exit", { threshold: figure(indicator.exitThreshold, locale), period: indicator.period ?? t("chat.result_readout.parameter_unavailable") }) });
   return rules;
+}
+
+/** Visible frame text is also the source for its clipboard representation. */
+export function resultMessageReadoutText(message: Message, t: TFunction, locale: string): string | null {
+  if (message.role === "user") return null;
+  if (message.kind === "strategy_result") {
+    return resultQuickTakeText(message.result?.readoutFacts, t, locale, message.result?.readoutContent);
+  }
+  if (message.contentPresentation === "result_readout") {
+    return resultQuickTakeText(message.resultReadoutFacts, t, locale, message.resultReadoutContent);
+  }
+  if (message.contentPresentation === "result_breakdown" || message.recoveryDisplay?.kind === "result_breakdown") {
+    const facts = message.recoveryDisplay?.kind === "result_breakdown" ? message.recoveryDisplay.facts : message.resultReadoutFacts;
+    return resultBreakdownText(facts, t, locale, message.resultReadoutContent);
+  }
+  return null;
 }

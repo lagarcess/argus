@@ -1,0 +1,18 @@
+{
+  "conversation_id_private": true,
+  "counterBefore": [
+    "Choose the answers to include. You will see the exact public page before making a link. Anyone with the link can read the selected content and note.",
+    "0 of 6 selected"
+  ],
+  "counterAfter": [
+    "Choose the answers to include. You will see the exact public page before making a link. Anyone with the link can read the selected content and note.",
+    "6 of 6 selected"
+  ],
+  "checked": 6,
+  "capCopy": false,
+  "previewStatus": 200,
+  "createStatus": 200,
+  "publicStatus": 200,
+  "publicTurns": 6,
+  "errors": []
+}

@@ -108,7 +108,7 @@ const DEGRADED_METADATA_SHAPES: Array<{
         options: [],
       },
     },
-    englishCompatProse: "I cannot predict future performance.",
+    englishCompatProse: "There is no market data for a period that has not happened yet",
   },
   {
     label: "unsupported bar size without options",

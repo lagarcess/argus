@@ -23,6 +23,7 @@ from argus.api.client_capabilities import (
 )
 from argus.api.conversation_activity import conversation_activity_service
 from argus.api.conversation_previews import conversation_previews
+from argus.api.decision_message_reads import owned_message_decisions
 from argus.api.dependencies import (
     current_user,
     dev_memory_fallback_enabled,
@@ -811,6 +812,7 @@ def list_messages(
     items = owned_result_message_facts(
         items, user_id=user.id, conversation_id=conversation_id
     )
+    items = owned_message_decisions(items, user_id=user.id)
     items = _public_message_projection(items)
     if database_page:
         items = [item for item in items if item.id in database_page_ids]

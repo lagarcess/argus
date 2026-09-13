@@ -1123,7 +1123,7 @@ def test_protected_approval_replay_uses_real_gateway_and_sends_once(
             fake.password(),
         )
         monkeypatch.setattr(
-            "argus.domain.access_approval_email.smtplib.SMTP_SSL",
+            "argus.domain.resend_email.smtplib.SMTP_SSL",
             _smtp,
         )
 

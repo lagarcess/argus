@@ -242,7 +242,7 @@ describe("result card playground", () => {
 
     const compactProductionShape = heroDeltaEvidenceView({
       ...resultCardPlaygroundFixtures[0].result,
-      readoutFacts: { symbols: ["AAPL"], benchmarkDeltaPct: 8.4 },
+      readoutFacts: { symbols: ["AAPL"], benchmarkDeltaPct: 8.4, benchmarkClaim: "beat" },
       metrics: [
         { key: "cash_value", label: "Ending value", value: "$1K -> $1.37K" },
         { key: "total_return_pct", label: "Total return", value: "+37.1%" },
@@ -316,7 +316,7 @@ describe("result card playground", () => {
   test("uses structured benchmark facts before stale assumption text", () => {
     const structured = heroDeltaEvidenceView({
       ...resultCardPlaygroundFixtures[0].result,
-      readoutFacts: { symbols: ["AAPL"], benchmarkDeltaPct: 8.1 },
+      readoutFacts: { symbols: ["AAPL"], benchmarkDeltaPct: 8.1, benchmarkClaim: "beat" },
       metrics: [
         { key: "cash_value", label: "Ending value", value: "$1,000 -> $1,350" },
         { key: "total_return_pct", label: "Total return", value: "+35.0%" },

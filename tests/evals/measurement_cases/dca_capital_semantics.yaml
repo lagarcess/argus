@@ -423,3 +423,64 @@ cases:
       contribution_period: monthly
       stage_outcomes:
         ["needs_clarification", "await_user_reply", "ready_for_confirmation", "await_approval"]
+
+  # Recorded live 2026-09-10 (English workspace): "$1,000 is starting capital,
+  # not a total contribution cap" was answered with a question about a cap,
+  # and the reply that restated the money was answered with a question for
+  # the asset and dates the user had already given. A clarification reply
+  # keeps every earlier fact and the card carries both money roles, the
+  # dates, the benchmark and both modeled costs.
+  - id: dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10
+    prompt: "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade."
+    followup_prompt: "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage."
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        launch_matches_expected: true
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["DOCN"]
+      asset_class: equity
+      strategy_type: dca_accumulation
+      date_range:
+        start: "2025-09-10"
+        end: "2026-09-09"
+      benchmark_symbol: SPY
+      capital_amount: 100
+      recurring_contribution: 100
+      starting_capital: 1000
+      contribution_period: monthly
+      fee_rate: 0.001
+      slippage: 0.0005
+      cost_provenance:
+        fee_rate: explicit_user
+        slippage: explicit_user
+
+  # The Spanish twin of the recorded turns.
+  - id: dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10
+    prompt: "Prueba un promedio de costo en dólares mensual en DOCN del 10 de septiembre de 2025 al 9 de septiembre de 2026. Empieza con $1,000 de capital inicial y luego aporta $100 cada mes. Los $1,000 son capital inicial, no un tope total de aportes. Compara con SPY. Modela una comisión de 10 puntos básicos y 5 puntos básicos de slippage por operación."
+    followup_prompt: "Usa los $1,000 solo como capital inicial. No hay tope de aportes. Agrega $100 mensuales después de la inversión inicial. Mantén las fechas, el benchmark SPY, 10 pb de comisión y 5 pb de slippage."
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        launch_matches_expected: true
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["DOCN"]
+      asset_class: equity
+      strategy_type: dca_accumulation
+      date_range:
+        start: "2025-09-10"
+        end: "2026-09-09"
+      benchmark_symbol: SPY
+      capital_amount: 100
+      recurring_contribution: 100
+      starting_capital: 1000
+      contribution_period: monthly
+      fee_rate: 0.001
+      slippage: 0.0005
+      cost_provenance:
+        fee_rate: explicit_user
+        slippage: explicit_user

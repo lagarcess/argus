@@ -1,0 +1,9 @@
+{
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "attempt": "single founder-approved unchanged rerun after direct timed readiness",
+  "exit_code": 0,
+  "elapsed_seconds": 5.394,
+  "app_or_smoke_timeout_changed": false,
+  "api_log_retained": true,
+  "web_log_retained": true
+}

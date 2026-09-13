@@ -60,7 +60,6 @@ function account(
             expires_at: "2026-08-03T18:00:00Z",
             conversation_id: CONVERSATION_ID,
             conversation_limit: 1,
-            message_limit: 10,
             simulation_limit: 1,
             feedback_limit: 5,
           },
@@ -204,8 +203,9 @@ async function mockJourney(page: Page, language: LocaleFixture["language"]) {
   await page.route("**/api/v1/me/usage", (route) =>
     fulfillJson(route, {
       allowances: {
-        messages: { available_now: true },
-        backtests: { available_now: true },
+        compute: { available_now: true, limiting_window: null },
+        grounding: { available_now: true },
+        execution: { available_now: true },
       },
     }),
   );

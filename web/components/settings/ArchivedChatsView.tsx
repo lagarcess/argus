@@ -21,7 +21,6 @@ type ArchivedChatsViewProps = {
 
 /**
  * Centered blur modal showing archived conversations with restore functionality.
- * Extracted from SettingsView for reuse in ProfileMenu > Data submenu.
  */
 export default function ArchivedChatsView({ onClose, onBack, backLabel, onRestored }: ArchivedChatsViewProps) {
   const { t } = useTranslation();

@@ -4,6 +4,13 @@ One HTTP boundary with an injectable transport so tests stay hermetic. The
 parser is deterministic: it walks the typed ``output`` items the Agent API
 documents, never user language. Provider identity is scrubbed at parse time
 because route receipts and the cost ledger own provenance, not prose.
+
+Every request carries the retrieval parameters the spec derived for it: the
+model fallback chain, the strict typed-output schema, the response language,
+and the web search options. The answer is read back in that typed shape with
+every row the model wrote: a row's citation is the model's own, and a row
+written without one is kept apart so the turn can say the figure has no
+source.
 """
 
 from __future__ import annotations
@@ -11,12 +18,15 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 from urllib.parse import urlparse
 
 import httpx
 from loguru import logger
+from pydantic import ValidationError
 
 from argus.domain.research.billing import (
     UnpricedResearchSpend,
@@ -27,6 +37,7 @@ from argus.domain.research.billing import (
 from argus.domain.research.config import ResearchConfigSpec
 from argus.domain.research.contracts import (
     MAX_ANSWER_CHARS,
+    MAX_PACKET_ROWS,
     MAX_PACKET_SOURCES,
     MAX_PACKET_TICKERS,
     MAX_PEER_PAIRS,
@@ -39,12 +50,61 @@ from argus.domain.research.contracts import (
     ResearchSource,
     ResearchUnavailableError,
     ResearchUsage,
+    RetrievedRow,
+    TypedRetrieval,
+    typed_response_format,
 )
 from argus.domain.research.pricing import validated_research_cost_usd
 
 PERPLEXITY_AGENT_URL = "https://api.perplexity.ai/v1/agent"
 
 _TERMINAL_STATUSES = {"completed", "failed", "cancelled", "incomplete"}
+
+
+@dataclass(frozen=True)
+class StructuredAgentLimits:
+    """Optional provider request limits, explicit and caller-owned."""
+
+    max_tool_calls: int | None = None
+    parallel_tool_calls: bool | None = None
+    web_search_max_tokens: int | None = None
+    web_search_max_tokens_per_page: int | None = None
+    web_search_max_results: int | None = None
+    fetch_url_max_urls: int | None = None
+    fetch_url_total_budget_tokens: int | None = None
+
+    def __post_init__(self) -> None:
+        for name, minimum, maximum in (
+            ("max_tool_calls", 0, None),
+            ("web_search_max_tokens", 1, None),
+            ("web_search_max_tokens_per_page", 1, None),
+            ("web_search_max_results", 1, 50),
+            ("fetch_url_max_urls", 1, 10),
+            ("fetch_url_total_budget_tokens", 1, 120000),
+        ):
+            value = getattr(self, name)
+            if value is not None and (
+                not isinstance(value, int)
+                or isinstance(value, bool)
+                or value < minimum
+                or (maximum is not None and value > maximum)
+            ):
+                raise ValueError(f"invalid structured request limit: {name}")
+        if self.parallel_tool_calls is not None and not isinstance(
+            self.parallel_tool_calls, bool
+        ):
+            raise ValueError("parallel_tool_calls must be boolean")
+
+
+@dataclass(frozen=True)
+class StructuredAgentResult:
+    """Complete caller-validated output beside the existing retrieval invoice."""
+
+    draft: dict[str, Any]
+    sources: tuple[ResearchSource, ...]
+    usage: ResearchUsage
+    tool_results: tuple[str, ...]
+    provider_response_id: str | None
 
 
 class PerplexityAgentClient:
@@ -58,6 +118,107 @@ class PerplexityAgentClient:
         self._transport = transport
         self._reported_unpriced_ids: set[str] = set()
 
+    def run_structured(
+        self,
+        prompt: str,
+        spec: ResearchConfigSpec,
+        *,
+        schema_model: Any,
+        schema_name: str,
+        instructions: str,
+        limits: StructuredAgentLimits | None = None,
+    ) -> StructuredAgentResult:
+        """Run the caller's closed contract without research prose processing."""
+        from argus.domain.research.contracts import _strict_schema
+
+        schema = schema_model.model_json_schema()
+        definitions = schema.pop("$defs", {})
+        payload = self._request_body(prompt, spec)
+        if limits is not None:
+            for key in ("max_tool_calls", "parallel_tool_calls"):
+                if (value := getattr(limits, key)) is not None:
+                    payload[key] = value
+            tool_fields = {
+                "web_search": ("max_tokens", "max_tokens_per_page", "max_results"),
+                "fetch_url": ("max_urls", "total_budget_tokens"),
+            }
+            for tool in payload["tools"]:
+                for key in tool_fields.get(tool["type"], ()):
+                    if (value := getattr(limits, f"{tool['type']}_{key}")) is not None:
+                        tool[key] = value
+        payload["instructions"] = instructions
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema_name,
+                "strict": True,
+                "schema": _strict_schema(schema, definitions),
+            },
+        }
+        started = time.monotonic()
+        response = self._post(payload, timeout_seconds=spec.timeout_seconds)
+        usage = _usage_from_response(
+            response,
+            latency_ms=int((time.monotonic() - started) * 1000),
+            on_unpriced=self._record_unpriced,
+        )
+        try:
+            if (
+                response.get("status") not in (None, "completed")
+                or response.get("incomplete_details")
+                or response.get("error")
+            ):
+                raise ValueError("incomplete structured response")
+            output = response.get("output")
+            if not isinstance(output, list):
+                raise ValueError("missing output list")
+            text_blocks: list[str] = []
+            parsed = _ParsedToolResults()
+            for item in output:
+                if not isinstance(item, dict) or not isinstance(item.get("type"), str):
+                    raise ValueError("invalid output item")
+                item_type = item["type"]
+                reader = _TOOL_RESULT_READERS.get(item_type)
+                if reader is not None:
+                    parsed.tool_results.append(item_type)
+                    reader(item, parsed)
+                elif item_type == "message":
+                    if item.get("status") not in (None, "completed"):
+                        raise ValueError("incomplete output message")
+                    content = item.get("content")
+                    if not isinstance(content, list):
+                        raise ValueError("invalid message content")
+                    for chunk in content:
+                        if (
+                            not isinstance(chunk, dict)
+                            or chunk.get("type") != "output_text"
+                            or not isinstance(chunk.get("text"), str)
+                        ):
+                            raise ValueError("invalid structured text chunk")
+                        text_blocks.append(chunk["text"])
+                        for annotation in chunk.get("annotations") or []:
+                            _append_public_source(parsed, annotation)
+            draft = schema_model.model_validate_json(
+                "".join(text_blocks), strict=True, extra="forbid"
+            ).model_dump()
+            if not isinstance(draft, dict):
+                raise ValueError("structured draft is not an object")
+            return StructuredAgentResult(
+                draft=draft,
+                sources=tuple(parsed.sources),
+                usage=usage,
+                tool_results=tuple(parsed.tool_results),
+                provider_response_id=str(response.get("id") or "") or None,
+            )
+        except Exception:  # noqa: BLE001
+            # The response was billed even if its whole draft cannot be read.
+            # Neither partial prose nor schema errors containing it escape.
+            raise ResearchUnavailableError(
+                "malformed_response",
+                "structured output did not match the caller contract",
+                usage=usage,
+            ) from None
+
     def run_research(self, prompt: str, spec: ResearchConfigSpec) -> ResearchPacket:
         payload = self._request_body(prompt, spec)
         started = time.monotonic()
@@ -66,6 +227,7 @@ class PerplexityAgentClient:
         packet = _packet_from_response(
             response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
         )
+        _observe_retrieval(packet, spec)
         return packet
 
     def submit_background(self, prompt: str, spec: ResearchConfigSpec) -> str:
@@ -78,7 +240,11 @@ class PerplexityAgentClient:
         return background_id
 
     def poll_background(
-        self, background_id: str, *, timeout_seconds: float = 30.0
+        self,
+        background_id: str,
+        *,
+        timeout_seconds: float = 30.0,
+        spec: ResearchConfigSpec | None = None,
     ) -> BackgroundPoll:
         started = time.monotonic()
         response = self._get(
@@ -94,9 +260,22 @@ class PerplexityAgentClient:
             detail = json.dumps(error)[:500] if error else None
             return BackgroundPoll(status=status, failure_detail=detail)  # type: ignore[arg-type]
         latency_ms = int((time.monotonic() - started) * 1000)
-        packet = _packet_from_response(
-            response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
-        )
+        try:
+            packet = _packet_from_response(
+                response, latency_ms=latency_ms, on_unpriced=self._record_unpriced
+            )
+        except ResearchUnavailableError as exc:
+            # The run is complete, so polling again cannot change its answer:
+            # an answer that cannot be read is the job's terminal failure. It
+            # was still billed, so the invoice leaves with the failure.
+            return BackgroundPoll(
+                status="failed",
+                failure_detail=f"{exc.reason}: {exc.detail or ''}",
+                failure_reason=exc.reason,
+                usage=exc.usage,
+            )
+        if spec is not None:
+            _observe_retrieval(packet, spec)
         return BackgroundPoll(status="completed", packet=packet)
 
     def _record_unpriced(self, spend: UnpricedResearchSpend) -> None:
@@ -109,14 +288,19 @@ class PerplexityAgentClient:
 
     def _request_body(self, prompt: str, spec: ResearchConfigSpec) -> dict[str, Any]:
         body: dict[str, Any] = {
-            "model": spec.model,
+            "models": list(spec.models),
             "input": prompt,
-            "tools": [{"type": tool} for tool in spec.tools],
+            "tools": [_tool_declaration(tool, spec) for tool in spec.tools],
             "max_steps": spec.max_steps,
             "max_output_tokens": spec.max_output_tokens,
         }
         if spec.reasoning_effort is not None:
             body["reasoning"] = {"effort": spec.reasoning_effort}
+        if spec.language:
+            body["language_preference"] = spec.language
+        if spec.typed_output:
+            body["instructions"] = spec.instructions
+            body["response_format"] = typed_response_format()
         return body
 
     def _post(self, payload: dict[str, Any], *, timeout_seconds: float) -> dict[str, Any]:
@@ -172,44 +356,48 @@ def _packet_from_response(
     latency_ms: int,
     on_unpriced: UnpricedSpendRecorder = record_unpriced_spend,
 ) -> ResearchPacket:
+    # The invoice is read before anything can reject the response, so every
+    # rejection below carries what Argus was billed. A document that got this
+    # far was served; only transport and a non-object body have no invoice.
+    usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
+    try:
+        return _packet_from_priced_response(document, usage=usage)
+    except ResearchUnavailableError as exc:
+        raise ResearchUnavailableError(exc.reason, exc.detail, usage=usage) from exc
+    except Exception as exc:  # noqa: BLE001
+        # However the document defeats the parser, it is a malformed response
+        # Argus was billed for, not a crashed turn. Checking each nested shape
+        # would only name the ones seen so far; the next one is already out
+        # there. The catch is wide enough to cover an Argus-side regression in
+        # the parser too, so the traceback is attached: no sink is configured,
+        # and loguru's default renders it. What leaves with the error stays
+        # generic instead, because a failed job serves its detail to a reader.
+        logger.opt(exception=True).warning("Research response could not be parsed")
+        raise ResearchUnavailableError(
+            "malformed_response", "response shape not parseable", usage=usage
+        ) from exc
+
+
+def _packet_from_priced_response(
+    document: dict[str, Any], *, usage: ResearchUsage
+) -> ResearchPacket:
     output = document.get("output")
     if not isinstance(output, list):
         raise ResearchUnavailableError("malformed_response", "missing output list")
     text_blocks: list[str] = []
-    categories: list[str] = []
-    tickers: list[str] = []
-    sources: list[ResearchSource] = []
-    pairs: list[ResearchNamePair] = []
+    parsed = _ParsedToolResults()
     for item in output:
         if not isinstance(item, dict):
             continue
         item_type = item.get("type")
-        if item_type == "finance_results":
-            for value in item.get("categories") or []:
-                if isinstance(value, str) and value not in categories:
-                    categories.append(value)
-            for value in item.get("tickers") or []:
-                if isinstance(value, str) and value not in tickers:
-                    tickers.append(value)
-            for result in item.get("results") or []:
-                if not isinstance(result, dict):
-                    continue
-                category = result.get("category")
-                if isinstance(category, str) and category not in categories:
-                    categories.append(category)
-                for url in result.get("sources") or []:
-                    _append_public_source(sources, {"url": url})
-                if category == "tickers_lookup":
-                    pairs.extend(_pairs_from_lookup(str(result.get("content") or "")))
-                elif category == "etf_holdings":
-                    pairs.extend(_pairs_from_holdings(str(result.get("content") or "")))
-        elif item_type == "search_results":
-            # Web search citations live in their own output items: title,
-            # url, and the publisher's own date. This is the channel the
-            # sector and comparison shapes fill.
-            for result in item.get("results") or []:
-                if isinstance(result, dict):
-                    _append_public_source(sources, result)
+        if not isinstance(item_type, str):
+            continue
+        reader = _TOOL_RESULT_READERS.get(item_type)
+        if reader is not None:
+            # Reading a tool result is what records it as retrieval evidence;
+            # the two facts share one owner and cannot drift.
+            parsed.tool_results.append(item_type)
+            reader(item, parsed)
         elif item_type == "message":
             for chunk in item.get("content") or []:
                 if not isinstance(chunk, dict) or chunk.get("type") != "output_text":
@@ -221,14 +409,20 @@ def _packet_from_response(
                 # same chunk instead of as search_results items.
                 for annotation in chunk.get("annotations") or []:
                     if isinstance(annotation, dict):
-                        _append_public_source(sources, annotation)
-    usage = _usage_from_response(document, latency_ms=latency_ms, on_unpriced=on_unpriced)
-    answer = _sanitize_answer("\n\n".join(text_blocks))
+                        _append_public_source(parsed, annotation)
+    typed = _typed_retrieval("\n\n".join(text_blocks))
+    rows: list[RetrievedRow] = []
+    unsourced: list[RetrievedRow] = []
+    if typed is not None:
+        rows, unsourced = _sourced_rows(typed.rows)
+        answer = _sanitize_answer(typed.answer_markdown)
+    else:
+        answer = _sanitize_answer("\n\n".join(text_blocks))
     if not answer:
         raise ResearchUnavailableError("empty_answer")
     seen: set[str] = set()
     unique_pairs = []
-    for pair in pairs:
+    for pair in parsed.pairs:
         key = pair.symbol.upper()
         if key in seen:
             continue
@@ -236,13 +430,188 @@ def _packet_from_response(
         unique_pairs.append(pair)
     return ResearchPacket(
         answer_markdown=answer[:MAX_ANSWER_CHARS],
-        categories=tuple(categories[:12]),
-        tickers=tuple(tickers[:MAX_PACKET_TICKERS]),
-        sources=tuple(sources[:MAX_PACKET_SOURCES]),
+        categories=tuple(parsed.categories[:12]),
+        tickers=tuple(parsed.tickers[:MAX_PACKET_TICKERS]),
+        sources=tuple(parsed.sources[:MAX_PACKET_SOURCES]),
         name_pairs=tuple(unique_pairs[:MAX_PEER_PAIRS]),
+        rows=tuple(rows),
+        typed_answer=typed is not None,
+        unsourced_rows=tuple(unsourced),
+        tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
     )
+
+
+@dataclass
+class _ParsedToolResults:
+    """Everything the tool result items of one response contribute."""
+
+    categories: list[str] = field(default_factory=list)
+    tickers: list[str] = field(default_factory=list)
+    sources: list[ResearchSource] = field(default_factory=list)
+    pairs: list[ResearchNamePair] = field(default_factory=list)
+    tool_results: list[str] = field(default_factory=list)
+
+
+def _typed_retrieval(text: str) -> TypedRetrieval | None:
+    """The answer in its requested typed shape, or None when it is prose.
+
+    Machine format only: a JSON object, optionally inside a code fence. A
+    document that is not one is prose and is delivered as such. A document
+    that is JSON-shaped but not the schema, an invalid row or an answer the
+    output budget truncated, is a broken contract, never prose: its figures
+    cannot be verified and its text must never reach a reader, so it fails
+    closed as a malformed response."""
+    body = text.strip()
+    if body.startswith("```"):
+        body = body.split("\n", 1)[1] if "\n" in body else ""
+        body = body.rsplit("```", 1)[0].strip()
+    try:
+        parsed = json.loads(body)
+    except ValueError as exc:
+        if body.startswith(("{", "[")):
+            raise ResearchUnavailableError(
+                "malformed_response", "typed answer is not valid JSON"
+            ) from exc
+        return None
+    if not isinstance(parsed, dict):
+        # Any JSON value that is not the answer object: an array, a string,
+        # a number. The model answered in JSON and not in the schema.
+        raise ResearchUnavailableError(
+            "malformed_response", "typed answer is not the answer object"
+        )
+    try:
+        return TypedRetrieval.model_validate(parsed)
+    except ValidationError as exc:
+        raise ResearchUnavailableError(
+            "malformed_response",
+            f"typed answer did not match the schema: {type(exc).__name__}",
+        ) from exc
+
+
+def _sourced_rows(
+    rows: list[RetrievedRow],
+) -> tuple[list[RetrievedRow], list[RetrievedRow]]:
+    """Rows that carry a citation, and rows the model wrote without one.
+
+    A citation is kept as the model wrote it: the page it names is the
+    figure's source, whether or not this response retrieved that page. A
+    row read from the provider's own finance data keeps its evidence in the
+    tool result and loses the provider URL, the way every provider-host
+    citation does. A row with no citation at all is kept apart so the turn
+    can say, under the answer, that the figure has no source."""
+    if len(rows) > MAX_PACKET_ROWS:
+        # More figures than the packet carries: an answer whose evidence would
+        # be cut cannot be published whole, so it is not the contract.
+        raise ResearchUnavailableError(
+            "malformed_response", f"typed answer carries more than {MAX_PACKET_ROWS} rows"
+        )
+    sourced: list[RetrievedRow] = []
+    unsourced: list[RetrievedRow] = []
+    for row in rows:
+        url = str(row.source_url or "").strip()
+        if not url:
+            unsourced.append(row.model_copy(update={"source_url": None}))
+            continue
+        if _is_provider_host(urlparse(url).netloc.lower()):
+            row = row.model_copy(update={"source_url": None})
+        sourced.append(row)
+    return sourced, unsourced
+
+
+def _observe_retrieval(packet: ResearchPacket, spec: ResearchConfigSpec) -> None:
+    """Record the compensations, so a decaying provider read is visible.
+
+    The deployed log sink drops structured extras, so every fact is in the
+    message itself."""
+    served = packet.usage.model
+    if served and served != spec.models[0]:
+        logger.warning(
+            "Research served by a fallback model"
+            f" shape={spec.shape} primary={spec.models[0]} served={served}"
+        )
+    if spec.typed_output and not packet.typed_answer:
+        logger.warning(
+            "Research answer arrived as prose under a typed request"
+            f" shape={spec.shape} model={served or 'unknown'}"
+        )
+    if packet.unsourced_rows:
+        logger.warning(
+            "Research rows written without a citation"
+            f" shape={spec.shape} unsourced={len(packet.unsourced_rows)}"
+            f" cited={len(packet.rows)}"
+        )
+
+
+def _tool_declaration(tool: str, spec: ResearchConfigSpec) -> dict[str, Any]:
+    """One tool entry in the request. Only web search takes options: context
+    size, the recency and domain filters, and the reader's location."""
+    declaration: dict[str, Any] = {"type": tool}
+    if tool != "web_search":
+        return declaration
+    if spec.search_context_size is not None:
+        declaration["search_context_size"] = spec.search_context_size
+    filters: dict[str, Any] = {}
+    if spec.recency is not None:
+        filters["search_recency_filter"] = spec.recency
+    if spec.source_domains:
+        filters["search_domain_filter"] = list(spec.source_domains)
+    if filters:
+        declaration["filters"] = filters
+    if spec.location is not None:
+        declaration["user_location"] = spec.location.model_dump(exclude_none=True)
+    return declaration
+
+
+def _read_finance_results(item: dict[str, Any], parsed: _ParsedToolResults) -> None:
+    for value in item.get("categories") or []:
+        if isinstance(value, str) and value not in parsed.categories:
+            parsed.categories.append(value)
+    for value in item.get("tickers") or []:
+        if isinstance(value, str) and value not in parsed.tickers:
+            parsed.tickers.append(value)
+    for result in item.get("results") or []:
+        if not isinstance(result, dict):
+            continue
+        category = result.get("category")
+        if isinstance(category, str) and category not in parsed.categories:
+            parsed.categories.append(category)
+        for url in result.get("sources") or []:
+            _append_public_source(parsed, {"url": url})
+        if category == "tickers_lookup":
+            parsed.pairs.extend(_pairs_from_lookup(str(result.get("content") or "")))
+        elif category == "etf_holdings":
+            parsed.pairs.extend(_pairs_from_holdings(str(result.get("content") or "")))
+
+
+def _read_search_results(item: dict[str, Any], parsed: _ParsedToolResults) -> None:
+    # Web search citations live in their own output items: title, url, and
+    # the publisher's own date. This is the channel the sector and
+    # comparison shapes fill.
+    for result in item.get("results") or []:
+        if isinstance(result, dict):
+            _append_public_source(parsed, result)
+
+
+def _read_fetch_url_results(item: dict[str, Any], parsed: _ParsedToolResults) -> None:
+    # A page the model opened is a page it read: title, url and an excerpt,
+    # no publisher date. It is a typed source the way a search hit is.
+    for content in item.get("contents") or []:
+        if isinstance(content, dict):
+            _append_public_source(parsed, content)
+
+
+# The one owner of which output items are tool results. Recorded responses
+# carry exactly one finance_results item per finance_search call, one
+# search_results item per web search and one fetch_url_results item per
+# fetched page batch; a response that ran no tool carries none. A kind read
+# here is retrieval evidence whether or not the invoice arrived.
+_TOOL_RESULT_READERS: dict[str, Callable[[dict[str, Any], _ParsedToolResults], None]] = {
+    "finance_results": _read_finance_results,
+    "search_results": _read_search_results,
+    "fetch_url_results": _read_fetch_url_results,
+}
 
 
 def _usage_from_response(
@@ -257,7 +626,11 @@ def _usage_from_response(
     output_tokens: int | None = None
     cache_creation_input_tokens: int | None = None
     cache_read_input_tokens: int | None = None
-    finance_search_invocations = web_search_invocations = fetch_url_invocations = 0
+    # Unknown until the invoice establishes each count; a lost or malformed
+    # invoice leaves them None, never zero.
+    finance_search_invocations: int | None = None
+    web_search_invocations: int | None = None
+    fetch_url_invocations: int | None = None
     pricing_error: ResearchPricingError | None = None
     try:
         usage = document.get("usage")
@@ -327,10 +700,13 @@ def _usage_from_response(
             provider_output_cost_usd=_required_nonnegative_decimal(
                 cost, "output_cost", path="usage.cost.output_cost"
             ),
-            provider_cache_creation_cost_usd=_required_nonnegative_decimal(
+            # A cache bucket nothing was billed in arrives absent or null, the
+            # way the documented example shows; the component check still
+            # holds a zero against the bucket's token count.
+            provider_cache_creation_cost_usd=_optional_nonnegative_decimal(
                 cost, "cache_creation_cost", path="usage.cost.cache_creation_cost"
             ),
-            provider_cache_read_cost_usd=_required_nonnegative_decimal(
+            provider_cache_read_cost_usd=_optional_nonnegative_decimal(
                 cost, "cache_read_cost", path="usage.cost.cache_read_cost"
             ),
             provider_tool_calls_cost_usd=_optional_nonnegative_decimal(
@@ -408,7 +784,7 @@ def _required_nonnegative_decimal(
 def _optional_nonnegative_decimal(
     values: dict[str, Any], key: str, *, path: str
 ) -> Decimal:
-    if key not in values:
+    if values.get(key) is None:
         return Decimal(0)
     return _nonnegative_decimal(values[key], path=path)
 
@@ -485,12 +861,16 @@ def symbols_from_answer_tables(markdown: str) -> list[str]:
     return symbols
 
 
-def _append_public_source(sources: list[ResearchSource], entry: Any) -> None:
+def _is_provider_host(host: str) -> bool:
+    return any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS)
+
+
+def _append_public_source(parsed: _ParsedToolResults, entry: Any) -> None:
     """One citation, bounded and scrubbed.
 
     Accepts either channel's shape: a search result, an annotation, or a
-    bare finance URL. Provider-identity hosts never survive, so Argus never
-    cites the tool that answered it.
+    bare finance URL. Provider-identity hosts never survive into the public
+    sources, so Argus never cites the tool that answered it.
     """
     if not isinstance(entry, dict):
         return
@@ -500,8 +880,8 @@ def _append_public_source(sources: list[ResearchSource], entry: Any) -> None:
     candidate = raw_url.strip()
     if not candidate.startswith("https://") or len(candidate) > MAX_URL_CHARS:
         return
-    host = urlparse(candidate).netloc.lower()
-    if any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS):
+    sources = parsed.sources
+    if _is_provider_host(urlparse(candidate).netloc.lower()):
         return
     if any(source.url == candidate for source in sources):
         return
@@ -640,8 +1020,7 @@ def _sanitize_answer(text: str) -> str:
     typographic dashes normalize to house style (digit ranges keep a hyphen)."""
 
     def _replace_link(match: re.Match[str]) -> str:
-        host = urlparse(match.group(2)).netloc.lower()
-        if any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS):
+        if _is_provider_host(urlparse(match.group(2)).netloc.lower()):
             return match.group(1)
         return match.group(0)
 

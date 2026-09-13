@@ -13,7 +13,10 @@ from argus.agent_runtime.next_experiments import (
 from argus.agent_runtime.stages.explain import explain_stage
 from argus.agent_runtime.state.models import ResponseProfile, RunState
 
-_BUY_AND_HOLD_FACTS = {"config_snapshot": {"template": "buy_and_hold"}, "symbols": ["AAPL"]}
+_BUY_AND_HOLD_FACTS = {
+    "config_snapshot": {"template": "buy_and_hold"},
+    "symbols": ["AAPL"],
+}
 
 
 def test_sidecar_caps_rows_and_carries_typed_identity() -> None:
@@ -28,11 +31,26 @@ def test_sidecar_caps_rows_and_carries_typed_identity() -> None:
         assert row["label_key"] == f"chat.next_experiments.labels.{row['kind']}"
 
 
+def test_sidecar_names_its_run_only_when_told() -> None:
+    # A card-bearing message owns its run id; a card-less one (a what-next
+    # follow-up, #590) gets it from the sidecar so continuity rows keep their
+    # typed action.
+    assert "source_run_id" not in next_experiments_sidecar(_BUY_AND_HOLD_FACTS)
+    anchored = next_experiments_sidecar(_BUY_AND_HOLD_FACTS, source_run_id="run-1")
+    assert anchored is not None
+    assert anchored["source_run_id"] == "run-1"
+    assert (
+        next_experiments_sidecar(_BUY_AND_HOLD_FACTS, source_run_id="").get(
+            "source_run_id"
+        )
+        is None
+    )
+
+
 def test_losing_run_leads_with_refinement_and_says_why() -> None:
     sidecar = next_experiments_sidecar(
         _BUY_AND_HOLD_FACTS,
-        total_return=5.0,
-        benchmark_return=12.5,
+        benchmark_delta=-7.5,
     )
 
     assert sidecar is not None
@@ -51,8 +69,7 @@ def test_losing_run_leads_with_refinement_and_says_why() -> None:
 def test_winning_run_leads_with_exploration() -> None:
     sidecar = next_experiments_sidecar(
         _BUY_AND_HOLD_FACTS,
-        total_return=20.0,
-        benchmark_return=8.0,
+        benchmark_delta=12.0,
     )
 
     assert sidecar is not None
@@ -61,11 +78,30 @@ def test_winning_run_leads_with_exploration() -> None:
     assert first["why"]["code"] == "beat_benchmark"
 
 
+def test_reason_carries_the_engine_gap_as_a_display_figure() -> None:
+    # Rounded once here, from the engine gap, never rebuilt from two rounded
+    # returns; the client prints the digits it receives.
+    sidecar = next_experiments_sidecar(_BUY_AND_HOLD_FACTS, benchmark_delta=46.35)
+
+    assert sidecar is not None
+    assert sidecar["rows"][0]["why"] == {
+        "code": "beat_benchmark",
+        "params": {"points": 46.4},
+    }
+
+
+def test_a_gap_that_rounds_to_nothing_is_no_reason_and_no_loss() -> None:
+    sidecar = next_experiments_sidecar(_BUY_AND_HOLD_FACTS, benchmark_delta=-0.03)
+
+    assert sidecar is not None
+    assert all("why" not in row for row in sidecar["rows"])
+    assert sidecar["rows"][0]["kind"] in {"change_date_range", "same_setup_peer_asset"}
+
+
 def test_deep_drawdown_outranks_the_benchmark_story() -> None:
     sidecar = next_experiments_sidecar(
         _BUY_AND_HOLD_FACTS,
-        total_return=20.0,
-        benchmark_return=8.0,
+        benchmark_delta=12.0,
         max_drawdown=-22.4,
     )
 
@@ -172,9 +208,7 @@ def test_acceptance_detection_matches_offered_labels_in_both_languages() -> None
     ) == {"kind": "same_setup_peer_asset", "position": 0}
     # A label that was never offered is not an acceptance.
     assert (
-        detect_next_experiment_acceptance(
-            "Compare with buy and hold", thread_metadata
-        )
+        detect_next_experiment_acceptance("Compare with buy and hold", thread_metadata)
         is None
     )
     assert detect_next_experiment_acceptance("Test AAPL", thread_metadata) is None
@@ -224,9 +258,7 @@ def test_deep_drawdown_reads_the_canonical_nested_metrics() -> None:
         "result": {
             "total_return": 0.30,
             "benchmark_return": 0.10,
-            "metrics": {
-                "aggregate": {"performance": {"max_drawdown_pct": -24.5}}
-            },
+            "metrics": {"aggregate": {"performance": {"max_drawdown_pct": -24.5}}},
         }
     }
 

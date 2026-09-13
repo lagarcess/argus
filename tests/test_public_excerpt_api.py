@@ -25,6 +25,7 @@ from tests.public_excerpt_factories import (
     build_artifact,
     build_conversation,
     build_run,
+    seed_result_messages,
     stable_uuid,
 )
 
@@ -66,6 +67,7 @@ def _seed(client: TestClient) -> str:
     api_state.store.evidence_artifact_owners[artifact.id] = user_id
     api_state.store.backtest_runs[run.id] = run
     api_state.store.backtest_run_owners[run.id] = user_id
+    seed_result_messages(api_state.store, run)
     return user_id
 
 
@@ -100,9 +102,12 @@ def test_every_receipt_route_is_absent_while_the_flag_is_off(
     assert client.get("/api/v1/public/receipts/abcdefghijklmnopqrstuvwx").status_code == (
         404
     )
-    assert client.post(
-        "/api/v1/public/receipt-funnel", json={"stage": "try_argus"}
-    ).status_code == 404
+    assert (
+        client.post(
+            "/api/v1/public/receipt-funnel", json={"stage": "try_argus"}
+        ).status_code
+        == 404
+    )
 
 
 def test_flag_off_leaves_no_receipt_state_behind(sharing_off: None) -> None:
@@ -148,8 +153,15 @@ def test_created_receipt_is_readable_anonymously_and_carries_only_the_payload(
     body = view.json()
     assert body["status"] == "available"
     assert body["indexing"] == "noindex, nofollow"
-    assert body["payload"]["owner_note"] == "Surprised by the drawdown."
-    assert set(body) == {"public_id", "status", "indexing", "created_at", "payload"}
+    assert body["payload"]["turns"][0]["owner_note"] == "Surprised by the drawdown."
+    assert set(body) == {
+        "public_id",
+        "status",
+        "kind",
+        "indexing",
+        "created_at",
+        "payload",
+    }
 
 
 def test_public_read_response_contains_no_private_identifier(sharing_on: None) -> None:
@@ -176,6 +188,7 @@ def test_owner_list_shows_the_receipt_without_a_source_reference(
         "title",
         "symbols",
         "date_range",
+        "kind",
         "created_at",
         "revoked_at",
         "revocation_reason",
@@ -386,9 +399,7 @@ def test_reading_a_receipt_never_counts_a_view(
 
     # The rendered page is what reports a view.
     assert (
-        client.post(
-            "/api/v1/public/receipt-funnel", json={"stage": "viewed"}
-        ).status_code
+        client.post("/api/v1/public/receipt-funnel", json={"stage": "viewed"}).status_code
         == 204
     )
     assert events == ["receipt_viewed"]
@@ -510,6 +521,13 @@ def _seed_extra_artifacts(user_id: str, count: int) -> None:
         artifact = build_artifact(artifact_id=stable_uuid(index, prefix=1))
         api_state.store.evidence_artifacts[artifact.id] = artifact
         api_state.store.evidence_artifact_owners[artifact.id] = user_id
+        run = build_run(run_id=stable_uuid(index, prefix=8))
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user_id
+        api_state.store.evidence_artifacts[artifact.id] = artifact.model_copy(
+            update={"source_run_id": run.id}
+        )
+        seed_result_messages(api_state.store, run, offset=index + 1)
 
 
 def test_the_receipt_list_pages_instead_of_hiding_older_live_links(
@@ -596,6 +614,9 @@ def test_an_insert_race_returns_the_existing_receipt_rather_than_failing(
     class _RacingGateway(SupabasePublicExcerptMixin):
         def __init__(self) -> None:
             self.client = None
+
+        def get_live_public_excerpt_for_selection(self, **kwargs):
+            return winner.get("snapshot")
 
         def get_live_public_excerpt_for_artifact(
             self, *, owner_id: str, evidence_artifact_id: str | None
@@ -777,12 +798,10 @@ def test_revoking_twice_reports_one_revocation(
     second = client.delete(f"{LIST_PATH}/{receipt['id']}")
 
     assert first.status_code == second.status_code == 200
-    assert first.json()["receipt"]["revoked_at"] == (
-        second.json()["receipt"]["revoked_at"]
+    assert (
+        first.json()["receipt"]["revoked_at"] == (second.json()["receipt"]["revoked_at"])
     )
-    assert [kind for kind in events if kind == "receipt_revoked"] == [
-        "receipt_revoked"
-    ]
+    assert [kind for kind in events if kind == "receipt_revoked"] == ["receipt_revoked"]
 
 
 # ── Review round 4: frozen means frozen, transient never reads as permanent ────
@@ -808,15 +827,13 @@ def test_changing_your_language_does_not_relabel_an_older_result(
 
     receipt = _create(client)
     view = client.get(f"/api/v1/public/receipts/{receipt['public_id']}").json()
-    assert view["payload"]["content_language"] == "en"
+    assert view["payload"]["turns"][0]["content_language"] == "en"
 
 
 def test_a_spanish_conversation_produces_a_spanish_receipt(sharing_on: None) -> None:
     client = _client()
     user_id = _seed(client)
-    api_state.store.conversations[CONVERSATION_ID] = build_conversation(
-        language="es-419"
-    )
+    api_state.store.conversations[CONVERSATION_ID] = build_conversation(language="es-419")
     api_state.store.conversation_owners[CONVERSATION_ID] = user_id
     owner = api_state.store.get_or_create_dev_user()
     # Owner profile in English, conversation in Spanish: the conversation wins.
@@ -824,7 +841,7 @@ def test_a_spanish_conversation_produces_a_spanish_receipt(sharing_on: None) -> 
 
     receipt = _create(client)
     view = client.get(f"/api/v1/public/receipts/{receipt['public_id']}").json()
-    assert view["payload"]["content_language"] == "es-419"
+    assert view["payload"]["turns"][0]["content_language"] == "es-419"
 
 
 def test_the_snapshot_captures_nothing_mutable_beyond_the_owner_note() -> None:
@@ -899,6 +916,13 @@ def test_a_valid_cursor_still_pages(sharing_on: None) -> None:
         artifact = build_artifact(artifact_id=stable_uuid(index, prefix=7))
         api_state.store.evidence_artifacts[artifact.id] = artifact
         api_state.store.evidence_artifact_owners[artifact.id] = user_id
+        run = build_run(run_id=stable_uuid(index, prefix=9))
+        api_state.store.backtest_runs[run.id] = run
+        api_state.store.backtest_run_owners[run.id] = user_id
+        api_state.store.evidence_artifacts[artifact.id] = artifact.model_copy(
+            update={"source_run_id": run.id}
+        )
+        seed_result_messages(api_state.store, run, offset=index + 1)
         assert (
             client.post(
                 f"/api/v1/evidence-artifacts/{artifact.id}/public-excerpt", json={}

@@ -1,0 +1,1668 @@
+[
+  {
+    "id": "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+    "category": "action_chip_semantics",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "backtest_execution",
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "assets": [
+        "TSLA"
+      ],
+      "asset_class": "equity",
+      "requested_strategy_template": null,
+      "strategy_type": "buy_and_hold",
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": {
+        "start": "2023-01-01",
+        "end": "2023-12-31"
+      },
+      "requested_date_range": {
+        "start": "2023-01-01",
+        "end": "2023-12-31"
+      },
+      "effective_date_range": {
+        "start": "2023-01-03",
+        "end": "2023-12-29"
+      },
+      "adjustment_reason": "calendar_alignment",
+      "benchmark_symbol": "SPY",
+      "capital_amount": 2000.0,
+      "starting_capital": null,
+      "recurring_contribution": null,
+      "contribution_period": null,
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "executable",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "answer_pending_need",
+      "asset_discovery": null,
+      "research": null,
+      "offered": {
+        "response": false,
+        "launch_payload": {
+          "strategy_type": "buy_and_hold",
+          "symbol": "TSLA",
+          "symbols": [
+            "TSLA"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2023-01-03",
+            "end": "2023-12-29"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 2000.0,
+          "starting_capital": null,
+          "recurring_contribution": null,
+          "position_size": null,
+          "cadence": null,
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "en",
+          "requested_date_range": {
+            "start": "2023-01-01",
+            "end": "2023-12-31"
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "adjusted_coverage",
+            "requested_date_range": {
+              "start": "2023-01-01",
+              "end": "2023-12-31"
+            },
+            "effective_date_range": {
+              "start": "2023-01-03",
+              "end": "2023-12-29"
+            },
+            "observations_by_symbol": {
+              "TSLA": 250,
+              "SPY": 250
+            },
+            "adjustment_reason": "calendar_alignment",
+            "preflight_id": "sha256:042148c46d3683bebf6c60f910b864f75d29b560ef6aec339473827a216ec2d7"
+          }
+        },
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": null,
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 3417,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1681,
+          "completion_tokens": 85,
+          "total_tokens": 1766,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00016659,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:24:39.576788+00:00"
+      },
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 3385,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 792,
+          "completion_tokens": 46,
+          "total_tokens": 838,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0009706,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:24:42.964845+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 20013,
+        "outcome": "failed",
+        "failure_mode": "TimeoutError",
+        "fallback_used": false,
+        "token_usage": null,
+        "usage_cost_usd": null,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:25:03.332309+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 13603,
+        "outcome": "failed",
+        "failure_mode": "ValidationError",
+        "fallback_used": true,
+        "token_usage": null,
+        "usage_cost_usd": null,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:25:16.936498+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "ArtifactAssumptionEditPlan",
+        "latency_ms": 14736,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2713,
+          "completion_tokens": 1345,
+          "total_tokens": 4058,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00655215,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:25:31.674332+00:00"
+      }
+    ],
+    "cost_usd": 0.007689
+  },
+  {
+    "id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+    "category": "dca_capital_semantics",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "backtest_execution",
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "assets": [
+        "KO"
+      ],
+      "asset_class": "equity",
+      "requested_strategy_template": null,
+      "strategy_type": "dca_accumulation",
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": {
+        "start": "2021-09-11",
+        "end": "2026-09-11"
+      },
+      "requested_date_range": {
+        "start": "2021-09-11",
+        "end": "2026-09-11"
+      },
+      "effective_date_range": {
+        "start": "2021-09-13",
+        "end": "2026-09-10"
+      },
+      "adjustment_reason": "calendar_alignment",
+      "benchmark_symbol": "SPY",
+      "capital_amount": 200.0,
+      "starting_capital": 0.0,
+      "recurring_contribution": 200.0,
+      "contribution_period": "monthly",
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "executable",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "new_idea",
+      "asset_discovery": null,
+      "research": null,
+      "offered": {
+        "response": false,
+        "launch_payload": {
+          "strategy_type": "dca_accumulation",
+          "symbol": "KO",
+          "symbols": [
+            "KO"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2021-09-13",
+            "end": "2026-09-10"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 200.0,
+          "starting_capital": 0.0,
+          "recurring_contribution": 200.0,
+          "position_size": null,
+          "cadence": "monthly",
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "en",
+          "requested_date_range": {
+            "start": "2021-09-11",
+            "end": "2026-09-11"
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "adjusted_coverage",
+            "requested_date_range": {
+              "start": "2021-09-11",
+              "end": "2026-09-11"
+            },
+            "effective_date_range": {
+              "start": "2021-09-13",
+              "end": "2026-09-10"
+            },
+            "observations_by_symbol": {
+              "KO": 1253,
+              "SPY": 1254
+            },
+            "adjustment_reason": "calendar_alignment",
+            "preflight_id": "sha256:a0168761811a38e266bab9a084fb9d78a216aabe06d3ea01d138cd0f63807f5c"
+          }
+        },
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": null,
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 1470,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 788,
+          "completion_tokens": 48,
+          "total_tokens": 836,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0009706,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:25:35.080682+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 17554,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10903,
+          "completion_tokens": 2032,
+          "total_tokens": 12935,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.01850715,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:25:53.638238+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 11762,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1118,
+          "completion_tokens": 1053,
+          "total_tokens": 2171,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0038284,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:07.120004+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 5745,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": true,
+        "token_usage": {
+          "prompt_tokens": 1257,
+          "completion_tokens": 525,
+          "total_tokens": 1782,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.003882,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:12.866410+00:00"
+      },
+      {
+        "task": "interpretation_repair",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "FocusedDateWindowExtraction",
+        "latency_ms": 4097,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2099,
+          "completion_tokens": 87,
+          "total_tokens": 2186,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00270685,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:17.825483+00:00",
+        "repair_effect": {
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "date_window_intent_uncertain",
+          "repair_applied": true,
+          "changed_fields": [
+            "candidate_strategy_draft.date_range"
+          ],
+          "before_fingerprint": "c55faba345fbfb944c7cbd8d1fee4b01ceffd4f688f930b2f4108aeaacb6dde8",
+          "after_fingerprint": "0ec82a30a269577d4ce1a5ad1fbdbe2afe7ffcb60417ac446dffb8424a7dc77b",
+          "no_op_reason": null
+        }
+      },
+      {
+        "task": "field_fidelity",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "latency_ms": 1583,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2200,
+          "completion_tokens": 69,
+          "total_tokens": 2269,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0027881,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:20.165198+00:00"
+      },
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 3191,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2433,
+          "completion_tokens": 37,
+          "total_tokens": 2470,
+          "cached_tokens": 1024,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00026014,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:23.704478+00:00"
+      },
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 0,
+        "outcome": "failed",
+        "failure_mode": "contract_violation",
+        "fallback_used": false,
+        "token_usage": null,
+        "usage_cost_usd": null,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:23.704844+00:00"
+      },
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "qwen/qwen3.5-9b",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 2642,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": true,
+        "token_usage": {
+          "prompt_tokens": 2348,
+          "completion_tokens": 74,
+          "total_tokens": 2422,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0002459,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:26.347463+00:00"
+      },
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 939,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 777,
+          "completion_tokens": 17,
+          "total_tokens": 794,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00087935,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:27.288222+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 20015,
+        "outcome": "failed",
+        "failure_mode": "TimeoutError",
+        "fallback_used": false,
+        "token_usage": null,
+        "usage_cost_usd": null,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:47.304450+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 7689,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": true,
+        "token_usage": {
+          "prompt_tokens": 14160,
+          "completion_tokens": 806,
+          "total_tokens": 14966,
+          "cached_tokens": 6741,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0121231,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:26:54.994690+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 5219,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": true,
+        "token_usage": {
+          "prompt_tokens": 1174,
+          "completion_tokens": 515,
+          "total_tokens": 1689,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.003749,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:00.215981+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "StrategyFamilyContinuityAudit",
+        "latency_ms": 5078,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": true,
+        "token_usage": {
+          "prompt_tokens": 1173,
+          "completion_tokens": 405,
+          "total_tokens": 1578,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.003198,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:05.294890+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContributionRoleAudit",
+        "latency_ms": 4086,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": true,
+        "token_usage": {
+          "prompt_tokens": 990,
+          "completion_tokens": 392,
+          "total_tokens": 1382,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00295,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:09.382071+00:00"
+      }
+    ],
+    "cost_usd": 0.056089
+  },
+  {
+    "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+    "category": "dca_capital_semantics",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "backtest_execution",
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "assets": [
+        "KO"
+      ],
+      "asset_class": "equity",
+      "requested_strategy_template": null,
+      "strategy_type": "dca_accumulation",
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": {
+        "start": "2021-08-19",
+        "end": "2026-08-19"
+      },
+      "requested_date_range": {
+        "start": "2021-08-19",
+        "end": "2026-08-19"
+      },
+      "effective_date_range": {
+        "start": "2021-08-19",
+        "end": "2026-08-19"
+      },
+      "adjustment_reason": "none",
+      "benchmark_symbol": "SPY",
+      "capital_amount": 13000.0,
+      "starting_capital": 0.0,
+      "recurring_contribution": 13000.0,
+      "contribution_period": "monthly",
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": null,
+      "slippage": null,
+      "cost_provenance": {},
+      "launch_execution_realism": null,
+      "capability_verdict": "executable",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "answer_pending_need",
+      "asset_discovery": null,
+      "research": null,
+      "offered": {
+        "response": false,
+        "launch_payload": {
+          "strategy_type": "dca_accumulation",
+          "symbol": "KO",
+          "symbols": [
+            "KO"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2021-08-19",
+            "end": "2026-08-19"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 13000.0,
+          "starting_capital": 0.0,
+          "recurring_contribution": 13000.0,
+          "position_size": null,
+          "cadence": "monthly",
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "es-419",
+          "requested_date_range": {
+            "start": "2021-08-19",
+            "end": "2026-08-19"
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "full_coverage",
+            "requested_date_range": {
+              "start": "2021-08-19",
+              "end": "2026-08-19"
+            },
+            "effective_date_range": {
+              "start": "2021-08-19",
+              "end": "2026-08-19"
+            },
+            "observations_by_symbol": {
+              "KO": 1254,
+              "SPY": 1255
+            },
+            "adjustment_reason": "none",
+            "preflight_id": "sha256:1767ea6eec5da76ef375ef08d2dcc9f25404d1e3e0b2e3b3e3d51c89d50cb372"
+          }
+        },
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": null,
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 751,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 788,
+          "completion_tokens": 48,
+          "total_tokens": 836,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0009706,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:11.116093+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 9725,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10906,
+          "completion_tokens": 1930,
+          "total_tokens": 12836,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0183231,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:20.855316+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 5190,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1119,
+          "completion_tokens": 1023,
+          "total_tokens": 2142,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00375465,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:29.661362+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 4449,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": true,
+        "token_usage": {
+          "prompt_tokens": 1258,
+          "completion_tokens": 450,
+          "total_tokens": 1708,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.003508,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:34.111410+00:00"
+      },
+      {
+        "task": "field_fidelity",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "latency_ms": 717,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2199,
+          "completion_tokens": 69,
+          "total_tokens": 2268,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00278685,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:35.755054+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 8706,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 5283,
+          "completion_tokens": 1885,
+          "total_tokens": 7168,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.01118185,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:44.462122+00:00"
+      },
+      {
+        "task": "interpretation_repair",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "FocusedStrategyExtraction",
+        "latency_ms": 2060,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 3471,
+          "completion_tokens": 365,
+          "total_tokens": 3836,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00511685,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:46.523995+00:00",
+        "repair_effect": {
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "repair_applied": true,
+          "changed_fields": [
+            "artifact_target",
+            "candidate_strategy_draft.date_range_intent",
+            "candidate_strategy_draft.language",
+            "confidence",
+            "detected_user_language",
+            "missing_required_fields",
+            "requires_clarification"
+          ],
+          "before_fingerprint": "bd6ab5a9a4651746d5d75bfd2bb3cdb096b3ed778200b5850543ba759f035aba",
+          "after_fingerprint": "3487db3da8317e388d874d34b7413e6d88e02c98ce138ae19cbc76f7376c06d1",
+          "no_op_reason": null
+        }
+      },
+      {
+        "task": "field_fidelity",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "latency_ms": 729,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2205,
+          "completion_tokens": 69,
+          "total_tokens": 2274,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00279435,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:48.278410+00:00"
+      },
+      {
+        "task": "field_fidelity",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "latency_ms": 611,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2205,
+          "completion_tokens": 49,
+          "total_tokens": 2254,
+          "cached_tokens": 1664,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00113155,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:49.910753+00:00"
+      },
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 3642,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2545,
+          "completion_tokens": 95,
+          "total_tokens": 2640,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.000377335,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:53.655836+00:00"
+      },
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 825,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 779,
+          "completion_tokens": 17,
+          "total_tokens": 796,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00088185,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:27:54.483225+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 20013,
+        "outcome": "failed",
+        "failure_mode": "TimeoutError",
+        "fallback_used": false,
+        "token_usage": null,
+        "usage_cost_usd": null,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:28:14.496876+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 10198,
+        "outcome": "failed",
+        "failure_mode": "ValidationError",
+        "fallback_used": true,
+        "token_usage": null,
+        "usage_cost_usd": null,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:28:24.695662+00:00"
+      },
+      {
+        "task": "interpretation_repair",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "FocusedStrategyExtraction",
+        "latency_ms": 2371,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 3706,
+          "completion_tokens": 174,
+          "total_tokens": 3880,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0049331,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:28:27.067557+00:00",
+        "repair_effect": {
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "repair_applied": true,
+          "changed_fields": [
+            "candidate_strategy_draft.asset_class",
+            "candidate_strategy_draft.asset_universe",
+            "candidate_strategy_draft.cadence",
+            "candidate_strategy_draft.capital_amount",
+            "candidate_strategy_draft.date_range",
+            "candidate_strategy_draft.field_provenance",
+            "candidate_strategy_draft.recurring_contribution",
+            "candidate_strategy_draft.strategy_type",
+            "intent",
+            "requires_clarification",
+            "semantic_turn_act",
+            "task_relation"
+          ],
+          "before_fingerprint": "b52ff49136c7b51cdc73acf2df57b8dca192353f7577dd437a2cb7d057e376bd",
+          "after_fingerprint": "eddc31d09276c61bd9e190afb15310a05f5a1829cd58760dc78c7b15b972e7b7",
+          "no_op_reason": null
+        }
+      }
+    ],
+    "cost_usd": 0.05576
+  },
+  {
+    "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+    "category": "dca_capital_semantics",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "backtest_execution",
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "assets": [
+        "DOCN"
+      ],
+      "asset_class": "equity",
+      "requested_strategy_template": null,
+      "strategy_type": "dca_accumulation",
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": {
+        "start": "2025-09-10",
+        "end": "2026-09-09"
+      },
+      "requested_date_range": {
+        "start": "2025-09-10",
+        "end": "2026-09-09"
+      },
+      "effective_date_range": {
+        "start": "2025-09-10",
+        "end": "2026-09-09"
+      },
+      "adjustment_reason": "none",
+      "benchmark_symbol": "SPY",
+      "capital_amount": 100.0,
+      "starting_capital": 1000.0,
+      "recurring_contribution": 100.0,
+      "contribution_period": "monthly",
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": 0.001,
+      "slippage": 0.0005,
+      "cost_provenance": {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user"
+      },
+      "launch_execution_realism": {
+        "enabled": true,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0
+      },
+      "capability_verdict": "executable",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "new_idea",
+      "asset_discovery": null,
+      "research": null,
+      "offered": {
+        "response": false,
+        "launch_payload": {
+          "strategy_type": "dca_accumulation",
+          "symbol": "DOCN",
+          "symbols": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "starting_capital": 1000.0,
+          "recurring_contribution": 100.0,
+          "position_size": null,
+          "cadence": "monthly",
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "en",
+          "requested_date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "_execution_realism": {
+            "enabled": true,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "full_coverage",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "observations_by_symbol": {
+              "DOCN": 251,
+              "SPY": 251
+            },
+            "adjustment_reason": "none",
+            "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe"
+          }
+        },
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": null,
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 1133,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 853,
+          "completion_tokens": 75,
+          "total_tokens": 928,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00111935,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:28:29.006940+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 10949,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10880,
+          "completion_tokens": 1333,
+          "total_tokens": 12213,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0167309,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:28:40.114340+00:00"
+      },
+      {
+        "task": "interpretation_repair",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "FocusedStrategyExtraction",
+        "latency_ms": 4573,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 3536,
+          "completion_tokens": 476,
+          "total_tokens": 4012,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0054756,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:28:44.689334+00:00",
+        "repair_effect": {
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "repair_applied": true,
+          "changed_fields": [
+            "artifact_target",
+            "candidate_strategy_draft.date_range_intent",
+            "candidate_strategy_draft.field_provenance",
+            "candidate_strategy_draft.recurring_contribution",
+            "detected_user_language",
+            "uses_latest_result_context"
+          ],
+          "before_fingerprint": "f34e8f6dc917c6c5894825aabda4305515fbcd995a1bef765a1640d83450fbef",
+          "after_fingerprint": "11fb16a80857ba7847e5528d9da0a8bfb828013dc3647aefa2bb54a024114a6c",
+          "no_op_reason": null
+        }
+      },
+      {
+        "task": "field_fidelity",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "latency_ms": 2369,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2464,
+          "completion_tokens": 145,
+          "total_tokens": 2609,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0033081,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:28:47.073973+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 5082,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1507,
+          "completion_tokens": 461,
+          "total_tokens": 1968,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00283465,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:28:55.933815+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContributionRoleAudit",
+        "latency_ms": 13544,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1379,
+          "completion_tokens": 886,
+          "total_tokens": 2265,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00373715,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:29:09.478954+00:00"
+      }
+    ],
+    "cost_usd": 0.033206
+  },
+  {
+    "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+    "category": "dca_capital_semantics",
+    "status": "passed",
+    "failed_checks": [],
+    "expected_fail": null,
+    "typed_outcome": {
+      "intent": "backtest_execution",
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "assets": [
+        "DOCN"
+      ],
+      "asset_class": "equity",
+      "requested_strategy_template": null,
+      "strategy_type": "dca_accumulation",
+      "entry_rule": null,
+      "exit_rule": null,
+      "rule_spec": null,
+      "date_range": {
+        "start": "2025-09-10",
+        "end": "2026-09-09"
+      },
+      "requested_date_range": {
+        "start": "2025-09-10",
+        "end": "2026-09-09"
+      },
+      "effective_date_range": {
+        "start": "2025-09-10",
+        "end": "2026-09-09"
+      },
+      "adjustment_reason": "none",
+      "benchmark_symbol": "SPY",
+      "capital_amount": 100.0,
+      "starting_capital": 1000.0,
+      "recurring_contribution": 100.0,
+      "contribution_period": "monthly",
+      "launch_validation_code": null,
+      "missing_required_fields": [],
+      "fee_rate": 0.001,
+      "slippage": 0.0005,
+      "cost_provenance": {
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user"
+      },
+      "launch_execution_realism": {
+        "enabled": true,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0
+      },
+      "capability_verdict": "executable",
+      "requested_field": null,
+      "clarification": null,
+      "semantic_turn_act": "new_idea",
+      "asset_discovery": null,
+      "research": null,
+      "offered": {
+        "response": false,
+        "launch_payload": {
+          "strategy_type": "dca_accumulation",
+          "symbol": "DOCN",
+          "symbols": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "starting_capital": 1000.0,
+          "recurring_contribution": 100.0,
+          "position_size": null,
+          "cadence": "monthly",
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "es-419",
+          "requested_date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "_execution_realism": {
+            "enabled": true,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "full_coverage",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "observations_by_symbol": {
+              "DOCN": 251,
+              "SPY": 251
+            },
+            "adjustment_reason": "none",
+            "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe"
+          }
+        },
+        "clarification": {},
+        "discovery_symbols": [],
+        "next_experiment_kinds": [],
+        "recovery_option_ids": [],
+        "recovery_code": null,
+        "named_unavailable": [],
+        "dropped_not_named": [],
+        "actionable": true
+      }
+    },
+    "prose_judge": null,
+    "infrastructure_errors": [],
+    "route_receipts": [
+      {
+        "task": "asset_mention_preflight",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMAssetMentionExtraction",
+        "latency_ms": 1140,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 867,
+          "completion_tokens": 75,
+          "total_tokens": 942,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00113685,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:29:11.070940+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "LLMInterpretationResponse",
+        "latency_ms": 12773,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 10896,
+          "completion_tokens": 2168,
+          "total_tokens": 13064,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0188384,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:29:23.845362+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContractAudit",
+        "latency_ms": 6143,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1393,
+          "completion_tokens": 941,
+          "total_tokens": 2334,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00389215,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:29:34.794236+00:00"
+      },
+      {
+        "task": "interpretation",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "DcaContributionRoleAudit",
+        "latency_ms": 7018,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1291,
+          "completion_tokens": 941,
+          "total_tokens": 2232,
+          "cached_tokens": 192,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00376465,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:29:41.813838+00:00"
+      },
+      {
+        "task": "interpretation_repair",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "FocusedDateWindowExtraction",
+        "latency_ms": 2774,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2372,
+          "completion_tokens": 86,
+          "total_tokens": 2458,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0030456,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:29:44.590310+00:00",
+        "repair_effect": {
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "date_window_intent_uncertain",
+          "repair_applied": false,
+          "changed_fields": [],
+          "before_fingerprint": "ea7c3c8e4202fe8c3c7b2157ac6d56ca6afe15d4e96a2a1a80af39f375292d7e",
+          "after_fingerprint": "ea7c3c8e4202fe8c3c7b2157ac6d56ca6afe15d4e96a2a1a80af39f375292d7e",
+          "no_op_reason": "no_typed_change"
+        }
+      },
+      {
+        "task": "field_fidelity",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "mode": "json_schema",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "latency_ms": 1181,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2463,
+          "completion_tokens": 134,
+          "total_tokens": 2597,
+          "cached_tokens": 128,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00327935,
+        "context_packet_ids": [],
+        "created_at": "2026-09-11T07:29:45.799925+00:00"
+      }
+    ],
+    "cost_usd": 0.033957
+  }
+]

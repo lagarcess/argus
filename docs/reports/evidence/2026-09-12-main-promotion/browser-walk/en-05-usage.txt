@@ -1,0 +1,48 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "New chat":
+      - generic: New chat
+    - button "Search":
+      - generic: Search
+    - button "Recents":
+      - generic: Recents
+    - button "Close usage"
+    - dialog "Usage":
+      - heading "Usage" [level=2]
+      - button "Close usage" [active]:
+      - region "Conversation":
+        - heading "Conversation" [level=3]
+        - paragraph: No limit
+      - region "Searches with sources":
+        - heading "Searches with sources" [level=3]
+        - paragraph: No limit
+      - region "Simulations":
+        - heading "Simulations" [level=3]
+        - paragraph: 50 left today
+        - progressbar "0 of 50 used today"
+        - paragraph:
+          - text: Resets
+          - time: Sep 13, 2026, 7:00 PM CDT
+        - paragraph:
+          - text: 10 available this hour · resets
+          - time: Sep 13, 2026, 5:00 AM CDT
+      - button "What counts?":
+        - text: What counts?
+    - button "Settings":
+      - generic: Settings
+  - heading [level=1]
+  - status
+  - paragraph: What should we look into?
+  - status: What should we look into?
+  - button "Mention an asset or indicator":
+  - combobox "Ask about any company or idea"
+  - generic: Ask about any company or idea
+  - generic "Message is empty":
+    - button "Send message" [disabled]:
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.
+  - button "How does Netflix make money?"
+  - button "Compare Costco against Walmart and Target"
+  - button "What if I had bought Coca-Cola every month for five years?"

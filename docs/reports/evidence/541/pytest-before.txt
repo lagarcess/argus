@@ -1,0 +1,771 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/Documents/projects/repos/argus/.claude/worktrees/argus-research-execution-a787ee
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 74 items
+
+tests/research/test_research_shapes.py ..................FFFF            [ 29%]
+tests/research/test_research_client.py .......................FFFFF      [ 67%]
+tests/research/test_research_pricing_delivery.py ..........FFFF......... [ 98%]
+.                                                                        [100%]
+
+=================================== FAILURES ===================================
+_____ test_a_grounded_survey_without_an_invoice_is_delivered_once[missing] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x113f535e0>
+malformation = 'missing'
+
+    @pytest.mark.parametrize(
+        "malformation", ["missing", "not_an_object", "malformed_tool_details"]
+    )
+    def test_a_grounded_survey_without_an_invoice_is_delivered_once(
+        monkeypatch, malformation: str
+    ) -> None:
+        """The finance_results item is the retrieval record; the invoice is
+        billing. Losing the invoice must not read as "no retrieval", which paid
+        for a second request and, when the retry lost its invoice the same way,
+        replaced a usable answer with the survey-unavailable note (#541)."""
+        set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+        # A second identical document is available so that a wrong retry would
+        # succeed with the same omission, exactly the production shape.
+        transport = _wire(
+            monkeypatch,
+            [
+                _without_invoice(_finance_only_survey(), malformation),
+                _without_invoice(_finance_only_survey(), malformation),
+            ],
+        )
+    
+        result = _run("What's moving in the market?")
+    
+        assert result is not None
+>       assert len(transport.requests) == 1, "retrieval evidence must not be re-bought"
+E       AssertionError: retrieval evidence must not be re-bought
+E       assert 2 == 1
+E        +  where 2 = len([<Request('POST', 'https://api.perplexity.ai/v1/agent')>, <Request('POST', 'https://api.perplexity.ai/v1/agent')>])
+E        +    where [<Request('POST', 'https://api.perplexity.ai/v1/agent')>, <Request('POST', 'https://api.perplexity.ai/v1/agent')>] = <tests.research.conftest.RecordingTransport object at 0x110abe710>.requests
+
+tests/research/test_research_shapes.py:633: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.675 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+2026-09-05 10:51:42.675 | ERROR    | argus.domain.research.billing:record_unpriced_spend:87 - research_cost_unrecorded recorder=unconfigured {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+__ test_a_grounded_survey_without_an_invoice_is_delivered_once[not_an_object] __
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x110abd6c0>
+malformation = 'not_an_object'
+
+    @pytest.mark.parametrize(
+        "malformation", ["missing", "not_an_object", "malformed_tool_details"]
+    )
+    def test_a_grounded_survey_without_an_invoice_is_delivered_once(
+        monkeypatch, malformation: str
+    ) -> None:
+        """The finance_results item is the retrieval record; the invoice is
+        billing. Losing the invoice must not read as "no retrieval", which paid
+        for a second request and, when the retry lost its invoice the same way,
+        replaced a usable answer with the survey-unavailable note (#541)."""
+        set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+        # A second identical document is available so that a wrong retry would
+        # succeed with the same omission, exactly the production shape.
+        transport = _wire(
+            monkeypatch,
+            [
+                _without_invoice(_finance_only_survey(), malformation),
+                _without_invoice(_finance_only_survey(), malformation),
+            ],
+        )
+    
+        result = _run("What's moving in the market?")
+    
+        assert result is not None
+>       assert len(transport.requests) == 1, "retrieval evidence must not be re-bought"
+E       AssertionError: retrieval evidence must not be re-bought
+E       assert 2 == 1
+E        +  where 2 = len([<Request('POST', 'https://api.perplexity.ai/v1/agent')>, <Request('POST', 'https://api.perplexity.ai/v1/agent')>])
+E        +    where [<Request('POST', 'https://api.perplexity.ai/v1/agent')>, <Request('POST', 'https://api.perplexity.ai/v1/agent')>] = <tests.research.conftest.RecordingTransport object at 0x110abe200>.requests
+
+tests/research/test_research_shapes.py:633: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.741 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+2026-09-05 10:51:42.741 | ERROR    | argus.domain.research.billing:record_unpriced_spend:87 - research_cost_unrecorded recorder=unconfigured {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+_ test_a_grounded_survey_without_an_invoice_is_delivered_once[malformed_tool_details] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x113f53610>
+malformation = 'malformed_tool_details'
+
+    @pytest.mark.parametrize(
+        "malformation", ["missing", "not_an_object", "malformed_tool_details"]
+    )
+    def test_a_grounded_survey_without_an_invoice_is_delivered_once(
+        monkeypatch, malformation: str
+    ) -> None:
+        """The finance_results item is the retrieval record; the invoice is
+        billing. Losing the invoice must not read as "no retrieval", which paid
+        for a second request and, when the retry lost its invoice the same way,
+        replaced a usable answer with the survey-unavailable note (#541)."""
+        set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+        # A second identical document is available so that a wrong retry would
+        # succeed with the same omission, exactly the production shape.
+        transport = _wire(
+            monkeypatch,
+            [
+                _without_invoice(_finance_only_survey(), malformation),
+                _without_invoice(_finance_only_survey(), malformation),
+            ],
+        )
+    
+        result = _run("What's moving in the market?")
+    
+        assert result is not None
+>       assert len(transport.requests) == 1, "retrieval evidence must not be re-bought"
+E       AssertionError: retrieval evidence must not be re-bought
+E       assert 2 == 1
+E        +  where 2 = len([<Request('POST', 'https://api.perplexity.ai/v1/agent')>, <Request('POST', 'https://api.perplexity.ai/v1/agent')>])
+E        +    where [<Request('POST', 'https://api.perplexity.ai/v1/agent')>, <Request('POST', 'https://api.perplexity.ai/v1/agent')>] = <tests.research.conftest.RecordingTransport object at 0x113f53c40>.requests
+
+tests/research/test_research_shapes.py:633: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.745 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "invalid usage.tool_calls_details", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+2026-09-05 10:51:42.745 | ERROR    | argus.domain.research.billing:record_unpriced_spend:87 - research_cost_unrecorded recorder=unconfigured {"detail": "invalid usage.tool_calls_details", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+____ test_a_survey_with_no_tool_output_and_no_invoice_is_still_not_grounded ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x11411ffa0>
+
+    def test_a_survey_with_no_tool_output_and_no_invoice_is_still_not_grounded(
+        monkeypatch,
+    ) -> None:
+        """Unknown counts are not evidence either way: with no tool output the
+        rail still asks once more, then says it could not retrieve."""
+        set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+        transport = _wire(
+            monkeypatch,
+            [
+                _without_invoice(
+                    agent_response(text="Markets were mixed.", invocations=0), "missing"
+                ),
+                _without_invoice(
+                    agent_response(text="Still mixed.", invocations=0), "missing"
+                ),
+            ],
+        )
+    
+        result = _run("anything interesting moving today")
+    
+        assert result is not None
+        assert len(transport.requests) == 2, "one retry, then honesty"
+        sidecar = result.stage_patch["research"]
+        assert sidecar["degraded"] == {"code": "survey_not_grounded"}
+>       assert sidecar["usage"]["invocations"] is None
+E       assert 0 is None
+
+tests/research/test_research_shapes.py:667: AssertionError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.749 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+2026-09-05 10:51:42.749 | ERROR    | argus.domain.research.billing:record_unpriced_spend:87 - research_cost_unrecorded recorder=unconfigured {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+_ test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost[missing_usage] _
+
+malformation = 'missing_usage'
+
+    @pytest.mark.parametrize(
+        "malformation", ["missing_usage", "usage_not_an_object", "malformed_tool_count"]
+    )
+    def test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost(
+        malformation: str,
+    ) -> None:
+        """Recorded responses carry one finance_results item per finance call.
+        That output survives a lost invoice, and the counts the invoice would
+        have established are unknown, not zero."""
+        response = agent_response()
+        if malformation == "missing_usage":
+            del response["usage"]
+        elif malformation == "usage_not_an_object":
+            response["usage"] = "unavailable"
+        else:
+            response["usage"]["tool_calls_details"] = {
+                "finance_search": {"invocation": "one"}
+            }
+        client, _ = _client([response])
+    
+        packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+    
+>       assert packet.tool_results == ("finance_results",)
+
+tests/research/test_research_client.py:469: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple closed at $312.41 on 2026-08-06.', categories=('quote',), tickers=('AAPL',), sou...etrieved_at=datetime.datetime(2026, 9, 5, 15, 51, 42, 765015, tzinfo=datetime.timezone.utc), background_id='resp_test')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.764 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+2026-09-05 10:51:42.764 | ERROR    | argus.domain.research.billing:record_unpriced_spend:87 - research_cost_unrecorded recorder=unconfigured {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+_ test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost[usage_not_an_object] _
+
+malformation = 'usage_not_an_object'
+
+    @pytest.mark.parametrize(
+        "malformation", ["missing_usage", "usage_not_an_object", "malformed_tool_count"]
+    )
+    def test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost(
+        malformation: str,
+    ) -> None:
+        """Recorded responses carry one finance_results item per finance call.
+        That output survives a lost invoice, and the counts the invoice would
+        have established are unknown, not zero."""
+        response = agent_response()
+        if malformation == "missing_usage":
+            del response["usage"]
+        elif malformation == "usage_not_an_object":
+            response["usage"] = "unavailable"
+        else:
+            response["usage"]["tool_calls_details"] = {
+                "finance_search": {"invocation": "one"}
+            }
+        client, _ = _client([response])
+    
+        packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+    
+>       assert packet.tool_results == ("finance_results",)
+
+tests/research/test_research_client.py:469: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple closed at $312.41 on 2026-08-06.', categories=('quote',), tickers=('AAPL',), sou...etrieved_at=datetime.datetime(2026, 9, 5, 15, 51, 42, 777463, tzinfo=datetime.timezone.utc), background_id='resp_test')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.777 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+2026-09-05 10:51:42.777 | ERROR    | argus.domain.research.billing:record_unpriced_spend:87 - research_cost_unrecorded recorder=unconfigured {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+_ test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost[malformed_tool_count] _
+
+malformation = 'malformed_tool_count'
+
+    @pytest.mark.parametrize(
+        "malformation", ["missing_usage", "usage_not_an_object", "malformed_tool_count"]
+    )
+    def test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost(
+        malformation: str,
+    ) -> None:
+        """Recorded responses carry one finance_results item per finance call.
+        That output survives a lost invoice, and the counts the invoice would
+        have established are unknown, not zero."""
+        response = agent_response()
+        if malformation == "missing_usage":
+            del response["usage"]
+        elif malformation == "usage_not_an_object":
+            response["usage"] = "unavailable"
+        else:
+            response["usage"]["tool_calls_details"] = {
+                "finance_search": {"invocation": "one"}
+            }
+        client, _ = _client([response])
+    
+        packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+    
+>       assert packet.tool_results == ("finance_results",)
+
+tests/research/test_research_client.py:469: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple closed at $312.41 on 2026-08-06.', categories=('quote',), tickers=('AAPL',), sou...etrieved_at=datetime.datetime(2026, 9, 5, 15, 51, 42, 786810, tzinfo=datetime.timezone.utc), background_id='resp_test')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.786 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "invalid usage.tool_calls_details.finance_search.invocation", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+2026-09-05 10:51:42.786 | ERROR    | argus.domain.research.billing:record_unpriced_spend:87 - research_cost_unrecorded recorder=unconfigured {"detail": "invalid usage.tool_calls_details.finance_search.invocation", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_test", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+__________ test_a_response_that_ran_no_tool_reports_a_confirmed_zero ___________
+
+    def test_a_response_that_ran_no_tool_reports_a_confirmed_zero() -> None:
+        """Recorded zero-tool responses omit tool_calls_details and bill no tool;
+        that is an established zero, distinct from an unknown count."""
+        client, _ = _client(
+            [
+                agent_response(
+                    invocations=0,
+                    # Synthetic bill: the recorded invoice minus its finance call.
+                    cost_overrides={
+                        "tool_calls_cost": 0.0,
+                        "tool_calls_cost_details": {},
+                        "total_cost": 0.04895,
+                    },
+                )
+            ]
+        )
+    
+        packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+    
+>       assert packet.tool_results == ()
+
+tests/research/test_research_client.py:496: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple closed at $312.41 on 2026-08-06.', categories=(), tickers=(), sources=(), name_p...etrieved_at=datetime.datetime(2026, 9, 5, 15, 51, 42, 824531, tzinfo=datetime.timezone.utc), background_id='resp_test')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+____________ test_every_tool_result_item_is_kept_in_provider_order _____________
+
+    def test_every_tool_result_item_is_kept_in_provider_order() -> None:
+        response = agent_response(web_search_invocations=1)
+        response["output"].insert(
+            2,
+            {
+                "type": "search_results",
+                "results": [{"url": "https://www.sec.gov/b", "title": "Filing"}],
+            },
+        )
+        client, _ = _client([response])
+    
+        packet = client.run_research("q", RESEARCH_CONFIG_SPECS["balanced"])
+    
+>       assert packet.tool_results == ("finance_results", "search_results")
+
+tests/research/test_research_client.py:517: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple closed at $312.41 on 2026-08-06.', categories=('quote',), tickers=('AAPL',), sou...etrieved_at=datetime.datetime(2026, 9, 5, 15, 51, 42, 833906, tzinfo=datetime.timezone.utc), background_id='resp_test')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.833 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "usage.cost.tool_calls_cost does not match response usage", "expected_max_usd": 0.0075, "expected_min_usd": 0.0075, "provider_response_id": "resp_test", "reason": "cost_mismatch", "reported_component_usd": 0.005, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": 6221, "cache_read_input_tokens": 7864, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 1, "input_tokens": 14166, "invocations": 1, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": 191, "web_search_invocations": 1}}
+2026-09-05 10:51:42.833 | ERROR    | argus.domain.research.billing:record_unpriced_spend:87 - research_cost_unrecorded recorder=unconfigured {"detail": "usage.cost.tool_calls_cost does not match response usage", "expected_max_usd": 0.0075, "expected_min_usd": 0.0075, "provider_response_id": "resp_test", "reason": "cost_mismatch", "reported_component_usd": 0.005, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": 6221, "cache_read_input_tokens": 7864, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 1, "input_tokens": 14166, "invocations": 1, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": 191, "web_search_invocations": 1}}
+_ test_incomplete_billing_metadata_cannot_erase_a_valid_answer[missing_model] __
+
+malformation = 'missing_model'
+ledger = [{'billable_quantity': None, 'billable_unit': 'request', 'correlation_id': 'research:invoice:resp_29270f89-91bc-458c-9253-037b9d008541', 'cost_amount': None, ...}]
+
+    @pytest.mark.parametrize(
+        "malformation",
+        ["missing_model", "missing_usage", "missing_tokens", "cache_disagreement"],
+    )
+    def test_incomplete_billing_metadata_cannot_erase_a_valid_answer(malformation, ledger):
+        response = recorded_agent_response()
+        if malformation == "missing_model":
+            del response["model"]
+        elif malformation == "missing_usage":
+            del response["usage"]
+        elif malformation == "missing_tokens":
+            del response["usage"]["input_tokens"]
+        else:
+            response["usage"]["input_tokens_details"]["cached_tokens"] += 1
+        client = PerplexityAgentClient("test", transport=RecordingTransport([response]))
+        packet = client.run_research("quote", RESEARCH_CONFIG_SPECS["fast"])
+        assert packet.answer_markdown
+        assert packet.usage.cost_usd is None
+        assert ledger[0]["usage_metadata"]["pricing_status"] == "unpriced"
+        # The recorded output keeps its retrieval record; the count is unknown
+        # only when the invoice itself is gone, never a zero.
+>       assert packet.tool_results == ("finance_results",)
+
+tests/research/test_research_pricing_delivery.py:249: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple’s latest closing price was **$312.41 USD** per share on **August 6, 2026**.', ca...26, 9, 5, 15, 51, 42, 867975, tzinfo=datetime.timezone.utc), background_id='resp_29270f89-91bc-458c-9253-037b9d008541')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.867 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "missing model", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_29270f89-91bc-458c-9253-037b9d008541", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 1, "input_tokens": null, "invocations": 1, "latency_ms": 0, "model": "", "output_tokens": null, "web_search_invocations": 0}}
+_ test_incomplete_billing_metadata_cannot_erase_a_valid_answer[missing_usage] __
+
+malformation = 'missing_usage'
+ledger = [{'billable_quantity': None, 'billable_unit': 'request', 'correlation_id': 'research:invoice:resp_29270f89-91bc-458c-9253-037b9d008541', 'cost_amount': None, ...}]
+
+    @pytest.mark.parametrize(
+        "malformation",
+        ["missing_model", "missing_usage", "missing_tokens", "cache_disagreement"],
+    )
+    def test_incomplete_billing_metadata_cannot_erase_a_valid_answer(malformation, ledger):
+        response = recorded_agent_response()
+        if malformation == "missing_model":
+            del response["model"]
+        elif malformation == "missing_usage":
+            del response["usage"]
+        elif malformation == "missing_tokens":
+            del response["usage"]["input_tokens"]
+        else:
+            response["usage"]["input_tokens_details"]["cached_tokens"] += 1
+        client = PerplexityAgentClient("test", transport=RecordingTransport([response]))
+        packet = client.run_research("quote", RESEARCH_CONFIG_SPECS["fast"])
+        assert packet.answer_markdown
+        assert packet.usage.cost_usd is None
+        assert ledger[0]["usage_metadata"]["pricing_status"] == "unpriced"
+        # The recorded output keeps its retrieval record; the count is unknown
+        # only when the invoice itself is gone, never a zero.
+>       assert packet.tool_results == ("finance_results",)
+
+tests/research/test_research_pricing_delivery.py:249: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple’s latest closing price was **$312.41 USD** per share on **August 6, 2026**.', ca...26, 9, 5, 15, 51, 42, 878657, tzinfo=datetime.timezone.utc), background_id='resp_29270f89-91bc-458c-9253-037b9d008541')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.878 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "missing usage", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_29270f89-91bc-458c-9253-037b9d008541", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"currency": null}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 0, "input_tokens": null, "invocations": 0, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+_ test_incomplete_billing_metadata_cannot_erase_a_valid_answer[missing_tokens] _
+
+malformation = 'missing_tokens'
+ledger = [{'billable_quantity': None, 'billable_unit': 'request', 'correlation_id': 'research:invoice:resp_29270f89-91bc-458c-9253-037b9d008541', 'cost_amount': None, ...}]
+
+    @pytest.mark.parametrize(
+        "malformation",
+        ["missing_model", "missing_usage", "missing_tokens", "cache_disagreement"],
+    )
+    def test_incomplete_billing_metadata_cannot_erase_a_valid_answer(malformation, ledger):
+        response = recorded_agent_response()
+        if malformation == "missing_model":
+            del response["model"]
+        elif malformation == "missing_usage":
+            del response["usage"]
+        elif malformation == "missing_tokens":
+            del response["usage"]["input_tokens"]
+        else:
+            response["usage"]["input_tokens_details"]["cached_tokens"] += 1
+        client = PerplexityAgentClient("test", transport=RecordingTransport([response]))
+        packet = client.run_research("quote", RESEARCH_CONFIG_SPECS["fast"])
+        assert packet.answer_markdown
+        assert packet.usage.cost_usd is None
+        assert ledger[0]["usage_metadata"]["pricing_status"] == "unpriced"
+        # The recorded output keeps its retrieval record; the count is unknown
+        # only when the invoice itself is gone, never a zero.
+>       assert packet.tool_results == ("finance_results",)
+
+tests/research/test_research_pricing_delivery.py:249: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple’s latest closing price was **$312.41 USD** per share on **August 6, 2026**.', ca...26, 9, 5, 15, 51, 42, 887959, tzinfo=datetime.timezone.utc), background_id='resp_29270f89-91bc-458c-9253-037b9d008541')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.887 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "invalid usage.input_tokens", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_29270f89-91bc-458c-9253-037b9d008541", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": null, "cache_read_input_tokens": null, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 1, "input_tokens": null, "invocations": 1, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": null, "web_search_invocations": 0}}
+_ test_incomplete_billing_metadata_cannot_erase_a_valid_answer[cache_disagreement] _
+
+malformation = 'cache_disagreement'
+ledger = [{'billable_quantity': None, 'billable_unit': 'request', 'correlation_id': 'research:invoice:resp_29270f89-91bc-458c-9253-037b9d008541', 'cost_amount': None, ...}]
+
+    @pytest.mark.parametrize(
+        "malformation",
+        ["missing_model", "missing_usage", "missing_tokens", "cache_disagreement"],
+    )
+    def test_incomplete_billing_metadata_cannot_erase_a_valid_answer(malformation, ledger):
+        response = recorded_agent_response()
+        if malformation == "missing_model":
+            del response["model"]
+        elif malformation == "missing_usage":
+            del response["usage"]
+        elif malformation == "missing_tokens":
+            del response["usage"]["input_tokens"]
+        else:
+            response["usage"]["input_tokens_details"]["cached_tokens"] += 1
+        client = PerplexityAgentClient("test", transport=RecordingTransport([response]))
+        packet = client.run_research("quote", RESEARCH_CONFIG_SPECS["fast"])
+        assert packet.answer_markdown
+        assert packet.usage.cost_usd is None
+        assert ledger[0]["usage_metadata"]["pricing_status"] == "unpriced"
+        # The recorded output keeps its retrieval record; the count is unknown
+        # only when the invoice itself is gone, never a zero.
+>       assert packet.tool_results == ("finance_results",)
+
+tests/research/test_research_pricing_delivery.py:249: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = ResearchPacket(answer_markdown='Apple’s latest closing price was **$312.41 USD** per share on **August 6, 2026**.', ca...26, 9, 5, 15, 51, 42, 897056, tzinfo=datetime.timezone.utc), background_id='resp_29270f89-91bc-458c-9253-037b9d008541')
+item = 'tool_results'
+
+    def __getattr__(self, item: str) -> Any:
+        private_attributes = object.__getattribute__(self, '__private_attributes__')
+        if item in private_attributes:
+            attribute = private_attributes[item]
+            if hasattr(attribute, '__get__'):
+                return attribute.__get__(self, type(self))  # type: ignore
+    
+            try:
+                # Note: self.__pydantic_private__ cannot be None if self.__private_attributes__ has items
+                return self.__pydantic_private__[item]  # type: ignore
+            except KeyError as exc:
+                raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}') from exc
+        else:
+            # `__pydantic_extra__` can fail to be set if the model is not yet fully initialized.
+            # See `BaseModel.__repr_args__` for more details
+            try:
+                pydantic_extra = object.__getattribute__(self, '__pydantic_extra__')
+            except AttributeError:
+                pydantic_extra = None
+    
+            if pydantic_extra and item in pydantic_extra:
+                return pydantic_extra[item]
+            else:
+                if hasattr(self.__class__, item):
+                    return super().__getattribute__(item)  # Raises AttributeError if appropriate
+                else:
+                    # this is the current error
+>                   raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+E                   AttributeError: 'ResearchPacket' object has no attribute 'tool_results'
+
+.venv/lib/python3.10/site-packages/pydantic/main.py:1026: AttributeError
+----------------------------- Captured stderr call -----------------------------
+2026-09-05 10:51:42.897 | ERROR    | argus.domain.research.billing:record_unpriced_spend:85 - research_cost_unpriced {"detail": "invalid usage.input_tokens_details.cached_tokens", "expected_max_usd": null, "expected_min_usd": null, "provider_response_id": "resp_29270f89-91bc-458c-9253-037b9d008541", "reason": "invalid_usage", "reported_component_usd": null, "reported_cost": {"cache_creation_cost": 0.03888, "cache_read_cost": 0.00393, "currency": "USD", "input_cost": 0.00041, "output_cost": 0.00573, "tool_calls_cost": 0.005, "total_cost": 0.05395}, "usage": {"cache_creation_input_tokens": 6221, "cache_read_input_tokens": 7864, "cost_usd": null, "fetch_url_invocations": 0, "finance_search_invocations": 1, "input_tokens": 14166, "invocations": 1, "latency_ms": 0, "model": "openai/gpt-5.6-sol", "output_tokens": 191, "web_search_invocations": 0}}
+=========================== short test summary info ============================
+FAILED tests/research/test_research_shapes.py::test_a_grounded_survey_without_an_invoice_is_delivered_once[missing]
+FAILED tests/research/test_research_shapes.py::test_a_grounded_survey_without_an_invoice_is_delivered_once[not_an_object]
+FAILED tests/research/test_research_shapes.py::test_a_grounded_survey_without_an_invoice_is_delivered_once[malformed_tool_details]
+FAILED tests/research/test_research_shapes.py::test_a_survey_with_no_tool_output_and_no_invoice_is_still_not_grounded
+FAILED tests/research/test_research_client.py::test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost[missing_usage]
+FAILED tests/research/test_research_client.py::test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost[usage_not_an_object]
+FAILED tests/research/test_research_client.py::test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost[malformed_tool_count]
+FAILED tests/research/test_research_client.py::test_a_response_that_ran_no_tool_reports_a_confirmed_zero
+FAILED tests/research/test_research_client.py::test_every_tool_result_item_is_kept_in_provider_order
+FAILED tests/research/test_research_pricing_delivery.py::test_incomplete_billing_metadata_cannot_erase_a_valid_answer[missing_model]
+FAILED tests/research/test_research_pricing_delivery.py::test_incomplete_billing_metadata_cannot_erase_a_valid_answer[missing_usage]
+FAILED tests/research/test_research_pricing_delivery.py::test_incomplete_billing_metadata_cannot_erase_a_valid_answer[missing_tokens]
+FAILED tests/research/test_research_pricing_delivery.py::test_incomplete_billing_metadata_cannot_erase_a_valid_answer[cache_disagreement]
+======================== 13 failed, 61 passed in 3.25s =========================

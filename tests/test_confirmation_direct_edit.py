@@ -13,6 +13,7 @@ import pytest
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.main import app
 from argus.api.message_store import create_message
+from argus.domain.market_data.new_york_clock import new_york_today
 from fastapi.testclient import TestClient
 
 
@@ -629,7 +630,6 @@ def test_out_of_envelope_values_refuse_with_their_exact_codes() -> None:
 def test_card_advertises_the_engine_envelope() -> None:
     """The card's edit constraints are the engine's bounds by import, so the
     client renders backend truth without owning it."""
-    from datetime import date
 
     from argus.domain.backtesting.config import (
         MAX_FEE_RATE,
@@ -656,7 +656,7 @@ def test_card_advertises_the_engine_envelope() -> None:
     }
     assert constraints["fees"] == {"min": 0.0, "max": MAX_FEE_RATE}
     assert constraints["slippage"] == {"min": 0.0, "max": MAX_SLIPPAGE_RATE}
-    assert constraints["date_window"]["max_end"] == date.today().isoformat()
+    assert constraints["date_window"]["max_end"] == new_york_today().isoformat()
     assert (
         constraints["date_window"]["min_start"] == ALPACA_EQUITY_HISTORY_START.isoformat()
     )

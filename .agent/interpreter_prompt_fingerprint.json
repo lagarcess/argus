@@ -1,10 +1,11 @@
 {
   "_comment": "Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.",
   "last_measured": {
-    "commit": "9fec4bf70c95383f4afa536674ceac4f38104787",
-    "scorecard": "docs/reports/evidence/411/live-measurement.json",
-    "passed": 61,
-    "failed": 1
+    "commit": "36086097c2608f5b51e14d9f7387be7738a75348",
+    "scorecard": "docs/reports/evidence/conversation-after-result/final-measurement/live-measurement.json",
+    "passed": 64,
+    "failed": 7,
+    "infrastructure_error": 0
   },
   "surface": {
     "src/argus/agent_runtime/discovery/prompt_guidance.py": {
@@ -44,18 +45,18 @@
     },
     "src/argus/agent_runtime/interpreter/unsupported_admission.py": {
       "entries": 2,
-      "chars": 2370,
-      "sha256": "b873f42ff8e2d008e67107062139de4c7df3094d5f60e481def990dde264e9a4"
+      "chars": 2864,
+      "sha256": "837e28c3d3191b2f5ccd928d65c4d40caf717e9f466a999aaa506fad7743e33f"
     },
     "src/argus/agent_runtime/llm_clarifier.py": {
       "entries": 6,
-      "chars": 5573,
-      "sha256": "15ec1bdd530ac63e0d1a66bbf5e2c6687535cc89746b5f676b09168ff24b3ff5"
+      "chars": 5676,
+      "sha256": "8b4dddbbca184e84fb8d12206690ed9c1eac9841b7369ac7bd37801071338449"
     },
     "src/argus/agent_runtime/llm_interpreter.py": {
       "entries": 3,
-      "chars": 20900,
-      "sha256": "b6ccc08100f01e427b5d91e482be47efb17cbea1f68f57feccf55b7bf3cfd58c"
+      "chars": 20954,
+      "sha256": "0b208a9a8eaa32ecd116ee391b6b1b9f8826f0edd71659266849e15693001899"
     },
     "src/argus/agent_runtime/llm_interpreter_types.py": {
       "entries": 40,
@@ -64,33 +65,63 @@
     },
     "src/argus/agent_runtime/research_grounded.py": {
       "entries": 3,
-      "chars": 1868,
-      "sha256": "af6520a67ca45ae10f5b746508cd4dedf0e0d292e5b0b997f05a95b899c10e3b"
+      "chars": 2100,
+      "sha256": "cbd90276feb448c8fcb884e017362d344a2eeaece7321d7a01919b8f1a05789d"
     },
     "src/argus/agent_runtime/research_query.py": {
-      "entries": 10,
-      "chars": 2017,
-      "sha256": "c69ebf65f56c13c68d250929a0fc46b29d71251ab0de5d6b60ee5160cafb9300"
+      "entries": 11,
+      "chars": 2508,
+      "sha256": "6272ae2d2caa136cf141ff1092e1569ee2f97bd98b9bfc72496c89ba72758851"
+    },
+    "src/argus/agent_runtime/result_conversation.py": {
+      "entries": 4,
+      "chars": 4344,
+      "sha256": "c4fc0266f18c215452f59fe270a64dd19af85b062f2b35af069a6f9e3189a399"
     },
     "src/argus/agent_runtime/result_followups.py": {
-      "entries": 11,
-      "chars": 1969,
-      "sha256": "d288cf8becc776cebe35f75a503a2992e5e7855fcd95f9f5a231e51924c3b2c4"
+      "entries": 5,
+      "chars": 778,
+      "sha256": "20feb61ab064f85a08c322b2b139e3ead540c9e0ee9220649c71bc0812361b93"
     },
     "src/argus/agent_runtime/stages/execute.py": {
       "entries": 2,
-      "chars": 1584,
-      "sha256": "46c86259f37db7b674728bd358277bd369e96a4f399df32235e0ecd33511d92d"
+      "chars": 1576,
+      "sha256": "0c65b46c21ee1160328bae017f560fa9c14a73f55dae0949d819435a9405af9b"
     },
     "src/argus/agent_runtime/stages/explain.py": {
-      "entries": 10,
-      "chars": 1295,
-      "sha256": "7f817d3989813e4061a9e45099839fc8bc14bff4c87eeb4ee7bca774bc846260"
+      "entries": 2,
+      "chars": 517,
+      "sha256": "4f1b992ced040464f520ab178c7c2e30d4519cc8047df17b67cfb09997040393"
     },
     "src/argus/agent_runtime/stages/interpret_types.py": {
       "entries": 2,
       "chars": 713,
       "sha256": "15f28666f1e0a1b154a8706ca90ebef8e4799ae3198187b052ff8db741d18347"
+    },
+    "src/argus/api/chat/breakdown.py": {
+      "entries": 2,
+      "chars": 284,
+      "sha256": "5e0374f13476e43242d497971640227a4ccd99888fe641ef094c42fef873dea6"
+    },
+    "src/argus/domain/result_readout_fact_definitions.py": {
+      "entries": 276,
+      "chars": 5615,
+      "sha256": "902b493d4ed3ccdea45ed7ee84a30f4626295ffb4085ee7790ea3552e2a41930"
+    },
+    "src/argus/domain/result_readout_fact_sheet.py": {
+      "entries": 478,
+      "chars": 7124,
+      "sha256": "2406d8c7f59925bc5f1ac98f9943cc6242ecd0100b81eace183428d4ed5e6f88"
+    },
+    "src/argus/domain/result_readout_grounding.py": {
+      "entries": 8,
+      "chars": 2027,
+      "sha256": "f859530d37b777307d33937ebd1a956b731348fb9bcbe4b0e856a4bbd87e794a"
+    },
+    "src/argus/domain/result_readout_sources.py": {
+      "entries": 1,
+      "chars": 409,
+      "sha256": "5e0bb9699040b6a9ce3c13bfc9885a2a84235535d35b7affb3c0e361adf8e15b"
     }
   }
 }

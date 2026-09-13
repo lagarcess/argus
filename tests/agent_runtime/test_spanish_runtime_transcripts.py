@@ -526,8 +526,8 @@ def test_spanish_result_followup_anchors_to_latest_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
-    from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as interpret_actions_module
+    from argus.agent_runtime import result_followup_answers as answers_module
+    from argus.agent_runtime.result_conversation import ResultConversationAnswer
 
     monkeypatch.setattr(
         interpreter_module,
@@ -558,7 +558,9 @@ def test_spanish_result_followup_anchors_to_latest_result(
 
     async def compose_followup_stub(**kwargs):
         followup_calls.append(kwargs)
-        return "El resultado usa capital inicial, datos diarios y sin comisiones."
+        return ResultConversationAnswer(
+            text="El resultado usa capital inicial, datos diarios y sin comisiones."
+        )
 
     monkeypatch.setattr(
         interpreter_module,
@@ -566,13 +568,8 @@ def test_spanish_result_followup_anchors_to_latest_result(
         invoke_stub,
     )
     monkeypatch.setattr(
-        interpret_module,
-        "compose_result_followup_response",
-        compose_followup_stub,
-    )
-    monkeypatch.setattr(
-        interpret_actions_module,
-        "compose_result_followup_response",
+        answers_module,
+        "compose_result_conversation_answer",
         compose_followup_stub,
     )
     result_reference = ArtifactReference(
@@ -622,7 +619,7 @@ def test_spanish_result_followup_anchors_to_latest_result(
     assert result.decision.semantic_turn_act == "result_followup"
     assert result.decision.result_followup_focus == "assumptions"
     assert result.decision.artifact_target == "latest_result"
-    assert followup_calls[0]["focus"] == "assumptions"
+    assert followup_calls[0]["language"] == "es-419"
     assert followup_calls[0]["user_message"] == "explícame los supuestos del resultado"
     assert "capital inicial" in result.patch["assistant_response"]
 

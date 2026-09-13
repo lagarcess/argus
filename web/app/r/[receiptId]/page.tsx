@@ -5,15 +5,14 @@ import ReceiptNotice from "@/components/receipt/ReceiptNotice";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import {
   readPublicReceipt,
-  headlineReceiptMetric,
   type PublicReceiptResult,
 } from "@/lib/public-receipt-contract";
 import {
-  formatReceiptDateRange,
   receiptCopy,
   receiptLanguageFromAcceptLanguage,
 } from "@/lib/receipt-copy";
 import { notFound } from "next/navigation";
+import { receiptPreviewFacts } from "@/lib/receipt-preview-facts";
 
 // Revocation has to take effect on the next request, so nothing here is cached
 // and nothing is prerendered.
@@ -75,36 +74,22 @@ export async function generateMetadata({
       metadataBase: metadataBase(),
     };
   }
-  const headline = headlineReceiptMetric(result.payload);
-  // Description is built from the frozen payload only, so the card shows the
-  // same closed set of facts the page does and nothing more. Its labels and dates
-  // come from the copy, not from the payload: a preview card is read by whoever the
-  // link was sent to, in their language.
-  const metricLabels = copy.metric_labels as Record<string, string>;
-  const description = [
-    result.payload.symbols.join(", "),
-    formatReceiptDateRange(result.payload.date_range, copy, language),
-    headline
-      ? `${metricLabels[headline.key] ?? headline.key}: ${headline.value}`
-      : null,
-    copy.framing.short,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const facts = receiptPreviewFacts(result.payload, language);
+  const description = facts.description;
   return {
-    title: `${result.payload.idea_title} · ${copy.provenance}`,
+    title: `${facts.title} · ${copy.provenance}`,
     description,
     robots: RECEIPT_ROBOTS,
     metadataBase: metadataBase(),
     openGraph: {
       type: "article",
-      title: result.payload.idea_title,
+      title: facts.title,
       description,
       siteName: "Argus",
     },
     twitter: {
       card: "summary_large_image",
-      title: result.payload.idea_title,
+      title: facts.title,
       description,
     },
   };

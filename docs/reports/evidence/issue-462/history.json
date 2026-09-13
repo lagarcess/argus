@@ -1,0 +1,918 @@
+{
+  "cutoff": "2026-09-08T20:57:46.773454+00:00",
+  "window_days": 30,
+  "read_at": "2026-09-08T21:33:15.440625+00:00",
+  "read_only": true,
+  "queries": {
+    "coverage": [
+      {
+        "receipt_rows": 1593,
+        "correlated_requests": 228,
+        "uncorrelated_rows": 351,
+        "runtime_clock_rows": 1242
+      }
+    ],
+    "tiers": [
+      {
+        "tier": "structured",
+        "receipt_rows": 1090,
+        "successful_receipts": 988,
+        "successful_requests": 225,
+        "correlated_requests": 225,
+        "uncorrelated_rows": 0
+      },
+      {
+        "tier": "utility",
+        "receipt_rows": 286,
+        "successful_receipts": 133,
+        "successful_requests": 0,
+        "correlated_requests": 0,
+        "uncorrelated_rows": 286
+      },
+      {
+        "tier": "chat",
+        "receipt_rows": 199,
+        "successful_receipts": 105,
+        "successful_requests": 46,
+        "correlated_requests": 67,
+        "uncorrelated_rows": 65
+      },
+      {
+        "tier": "context",
+        "receipt_rows": 18,
+        "successful_receipts": 3,
+        "successful_requests": 3,
+        "correlated_requests": 7,
+        "uncorrelated_rows": 0
+      }
+    ],
+    "tasks": [
+      {
+        "task": "interpretation",
+        "schema_name": "LLMInterpretationResponse",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 214,
+        "call_p50_ms": 11402,
+        "call_p95_ms": 18253
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "LLMAssetMentionExtraction",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 209,
+        "call_p50_ms": 1061,
+        "call_p95_ms": 1863
+      },
+      {
+        "task": "name_suggestion",
+        "schema_name": "name_suggestion",
+        "tier": "utility",
+        "model": "google/gemini-2.5-flash-lite",
+        "outcome": "skipped",
+        "receipt_rows": 152,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "name_suggestion",
+        "schema_name": "name_suggestion",
+        "tier": "utility",
+        "model": "google/gemini-2.5-flash-lite",
+        "outcome": "succeeded",
+        "receipt_rows": 132,
+        "call_p50_ms": 510,
+        "call_p95_ms": 953
+      },
+      {
+        "task": "knowledge_route",
+        "schema_name": "ResearchQueryExtraction",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 75,
+        "call_p50_ms": 1208,
+        "call_p95_ms": 2221
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "FocusedStrategyExtraction",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 59,
+        "call_p50_ms": 2583,
+        "call_p95_ms": 4918
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "FocusedDateWindowExtraction",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 54,
+        "call_p50_ms": 1146,
+        "call_p95_ms": 2331
+      },
+      {
+        "task": "result_summary",
+        "schema_name": "QuickTakeDraft",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "succeeded",
+        "receipt_rows": 53,
+        "call_p50_ms": 5017,
+        "call_p95_ms": 18549
+      },
+      {
+        "task": "field_fidelity",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 49,
+        "call_p50_ms": 1143,
+        "call_p95_ms": 1840
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "DcaContractAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 40,
+        "call_p50_ms": 6378,
+        "call_p95_ms": 10600
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "FocusedStrategyExtraction",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 37,
+        "call_p50_ms": 3660,
+        "call_p95_ms": 8003
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "LLMAssetMentionExtraction",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 37,
+        "call_p50_ms": 1292,
+        "call_p95_ms": 4016
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "DcaContractAudit",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 35,
+        "call_p50_ms": 4781,
+        "call_p95_ms": 7114
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "LLMInterpretationResponse",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "failed",
+        "receipt_rows": 29,
+        "call_p50_ms": 20039,
+        "call_p95_ms": 20085
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "StrategyFamilyContinuityAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 29,
+        "call_p50_ms": 7841,
+        "call_p95_ms": 13354
+      },
+      {
+        "task": "clarification",
+        "schema_name": "ClarificationResponse",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "failed",
+        "receipt_rows": 27,
+        "call_p50_ms": 0,
+        "call_p95_ms": 12059
+      },
+      {
+        "task": "clarification",
+        "schema_name": "ClarificationResponse",
+        "tier": "chat",
+        "model": "qwen/qwen3.5-9b",
+        "outcome": "skipped",
+        "receipt_rows": 20,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "clarification",
+        "schema_name": "ClarificationResponse",
+        "tier": "chat",
+        "model": "qwen/qwen3.5-9b",
+        "outcome": "failed",
+        "receipt_rows": 20,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "LLMInterpretationResponse",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 18,
+        "call_p50_ms": 8834,
+        "call_p95_ms": 12123
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "DcaContributionRoleAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 17,
+        "call_p50_ms": 8070,
+        "call_p95_ms": 16414
+      },
+      {
+        "task": "clarification",
+        "schema_name": "ClarificationResponse",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "succeeded",
+        "receipt_rows": 17,
+        "call_p50_ms": 1738,
+        "call_p95_ms": 4117
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "ContextQuestionAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 17,
+        "call_p50_ms": 6093,
+        "call_p95_ms": 13623
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "AssetGroundingAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 16,
+        "call_p50_ms": 5723,
+        "call_p95_ms": 10256
+      },
+      {
+        "task": "clarification",
+        "schema_name": "ClarificationResponse",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "skipped",
+        "receipt_rows": 16,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "asset_mention_preflight",
+        "schema_name": "LLMAssetMentionExtraction",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 16,
+        "call_p50_ms": 1068,
+        "call_p95_ms": 1417
+      },
+      {
+        "task": "chat_composer",
+        "schema_name": null,
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "succeeded",
+        "receipt_rows": 11,
+        "call_p50_ms": 4946,
+        "call_p95_ms": 14218
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "FocusedAssetDiscoveryRead",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 11,
+        "call_p50_ms": 4773,
+        "call_p95_ms": 9274
+      },
+      {
+        "task": "capability_conflict",
+        "schema_name": "SupportedStrategyCapabilityConflictAudit",
+        "tier": "context",
+        "model": "openai/gpt-oss-120b",
+        "outcome": "skipped",
+        "receipt_rows": 10,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "ArtifactAssumptionEditPlan",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 9,
+        "call_p50_ms": 6742,
+        "call_p95_ms": 7506
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "CapabilitySideQuestionAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 9,
+        "call_p50_ms": 6245,
+        "call_p95_ms": 9002
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "FocusedStrategyExtraction",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "skipped",
+        "receipt_rows": 9,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "FocusedDateWindowExtraction",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "skipped",
+        "receipt_rows": 8,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "FocusedDateWindowExtraction",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 8,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "FocusedStrategyExtraction",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 8,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "SignalRulePlan",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "skipped",
+        "receipt_rows": 7,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "clarification",
+        "schema_name": "ClarificationResponse",
+        "tier": "chat",
+        "model": "qwen/qwen3.5-9b",
+        "outcome": "succeeded",
+        "receipt_rows": 7,
+        "call_p50_ms": 2351,
+        "call_p95_ms": 8377
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "SignalRulePlan",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 7,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "LLMInterpretationResponse",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "skipped",
+        "receipt_rows": 6,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "result_summary",
+        "schema_name": "QuickTakeDraft",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "failed",
+        "receipt_rows": 6,
+        "call_p50_ms": 30194,
+        "call_p95_ms": 30433
+      },
+      {
+        "task": "discovery_voicing",
+        "schema_name": null,
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "succeeded",
+        "receipt_rows": 6,
+        "call_p50_ms": 2420,
+        "call_p95_ms": 5575
+      },
+      {
+        "task": "result_summary",
+        "schema_name": "QuickTakeDraft",
+        "tier": "chat",
+        "model": "qwen/qwen3.5-9b",
+        "outcome": "succeeded",
+        "receipt_rows": 6,
+        "call_p50_ms": 3740,
+        "call_p95_ms": 4265
+      },
+      {
+        "task": "discovery_extraction",
+        "schema_name": "discovery_extraction",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 6,
+        "call_p50_ms": 3953,
+        "call_p95_ms": 4209
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "LatestResultRoutingAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 5,
+        "call_p50_ms": 5130,
+        "call_p95_ms": 6219
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "SignalRulePlan",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 5,
+        "call_p50_ms": 8569,
+        "call_p95_ms": 14962
+      },
+      {
+        "task": "knowledge_voicing",
+        "schema_name": "VoicedAnswer",
+        "tier": "chat",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 5,
+        "call_p50_ms": 1855,
+        "call_p95_ms": 2617
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "LLMInterpretationResponse",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 4,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "field_fidelity",
+        "schema_name": "StatedStartingCapitalAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 4,
+        "call_p50_ms": 861,
+        "call_p95_ms": 1134
+      },
+      {
+        "task": "field_fidelity",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 4,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "discovery_model_knowledge",
+        "schema_name": "discovery_model_knowledge",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 4,
+        "call_p50_ms": 3675,
+        "call_p95_ms": 5200
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "LLMInterpretationResponse",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "failed",
+        "receipt_rows": 4,
+        "call_p50_ms": 9429,
+        "call_p95_ms": 13406
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "ArtifactAssumptionEditPlan",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 3,
+        "call_p50_ms": 4842,
+        "call_p95_ms": 5242
+      },
+      {
+        "task": "capability_conflict",
+        "schema_name": "SupportedStrategyCapabilityConflictAudit",
+        "tier": "context",
+        "model": "openai/gpt-oss-120b",
+        "outcome": "failed",
+        "receipt_rows": 3,
+        "call_p50_ms": 15035,
+        "call_p95_ms": 15038
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "PendingResponseOptionSelectionAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 3,
+        "call_p50_ms": 5014,
+        "call_p95_ms": 6578
+      },
+      {
+        "task": "capability_conflict",
+        "schema_name": "SupportedStrategyCapabilityConflictAudit",
+        "tier": "context",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "failed",
+        "receipt_rows": 2,
+        "call_p50_ms": 6464,
+        "call_p95_ms": 15040
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "StrategyFamilyContinuityAudit",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 2,
+        "call_p50_ms": 7584,
+        "call_p95_ms": 13189
+      },
+      {
+        "task": "capability_conflict",
+        "schema_name": "SupportedStrategyCapabilityConflictAudit",
+        "tier": "context",
+        "model": "openai/gpt-oss-120b",
+        "outcome": "succeeded",
+        "receipt_rows": 2,
+        "call_p50_ms": 1597,
+        "call_p95_ms": 13944
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "DcaContractAudit",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "skipped",
+        "receipt_rows": 2,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "name_suggestion",
+        "schema_name": "name_suggestion",
+        "tier": "utility",
+        "model": "qwen/qwen3.5-9b",
+        "outcome": "succeeded",
+        "receipt_rows": 1,
+        "call_p50_ms": 1279,
+        "call_p95_ms": 1279
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "LatestResultSaveAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "succeeded",
+        "receipt_rows": 1,
+        "call_p50_ms": 3528,
+        "call_p95_ms": 3528
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "LatestResultRoutingAudit",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 1,
+        "call_p50_ms": 5939,
+        "call_p95_ms": 5939
+      },
+      {
+        "task": "chat_composer",
+        "schema_name": null,
+        "tier": "chat",
+        "model": "qwen/qwen3.5-9b",
+        "outcome": "failed",
+        "receipt_rows": 1,
+        "call_p50_ms": 9267,
+        "call_p95_ms": 9267
+      },
+      {
+        "task": "chat_composer",
+        "schema_name": null,
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "knowledge_voicing",
+        "schema_name": "VoicedAnswer",
+        "tier": "chat",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "knowledge_voicing",
+        "schema_name": "VoicedAnswer",
+        "tier": "chat",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "name_suggestion",
+        "schema_name": "name_suggestion",
+        "tier": "utility",
+        "model": "google/gemini-2.5-flash-lite",
+        "outcome": "failed",
+        "receipt_rows": 1,
+        "call_p50_ms": 541,
+        "call_p95_ms": 541
+      },
+      {
+        "task": "chat_composer",
+        "schema_name": null,
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "failed",
+        "receipt_rows": 1,
+        "call_p50_ms": 25027,
+        "call_p95_ms": 25027
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "PendingResponseOptionSelectionAudit",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "PendingResponseOptionSelectionAudit",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 1,
+        "call_p50_ms": 3764,
+        "call_p95_ms": 3764
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "PendingResponseOptionSelectionAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "discovery_model_knowledge",
+        "schema_name": "discovery_model_knowledge",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "DcaContributionRoleAudit",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 1,
+        "call_p50_ms": 5002,
+        "call_p95_ms": 5002
+      },
+      {
+        "task": "capability_conflict",
+        "schema_name": "SupportedStrategyCapabilityConflictAudit",
+        "tier": "context",
+        "model": "deepseek/deepseek-v4-flash",
+        "outcome": "succeeded",
+        "receipt_rows": 1,
+        "call_p50_ms": 4089,
+        "call_p95_ms": 4089
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "DcaContractAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation_repair",
+        "schema_name": "FocusedDateWindowExtraction",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "succeeded",
+        "receipt_rows": 1,
+        "call_p50_ms": 2814,
+        "call_p95_ms": 2814
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "ContextQuestionAudit",
+        "tier": "structured",
+        "model": "x-ai/grok-4.3",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      },
+      {
+        "task": "interpretation",
+        "schema_name": "AssetGroundingAudit",
+        "tier": "structured",
+        "model": "anthropic/claude-haiku-4.5",
+        "outcome": "skipped",
+        "receipt_rows": 1,
+        "call_p50_ms": 0,
+        "call_p95_ms": 0
+      }
+    ],
+    "turn_runtime": [
+      {
+        "requests": 228,
+        "measured_requests": 228,
+        "runtime_p50_ms": "31576.000",
+        "runtime_p95_ms": "73611.000"
+      }
+    ],
+    "research": [
+      {
+        "shape": "balanced",
+        "cache_status": "miss",
+        "degraded": null,
+        "assistant_messages": 13,
+        "provider_p50_ms": "26526",
+        "provider_p95_ms": "48620"
+      },
+      {
+        "shape": "balanced",
+        "cache_status": "bypass",
+        "degraded": "research_unavailable_malformed_response",
+        "assistant_messages": 8,
+        "provider_p50_ms": "0",
+        "provider_p95_ms": "0"
+      },
+      {
+        "shape": "thorough",
+        "cache_status": "miss",
+        "degraded": null,
+        "assistant_messages": 7,
+        "provider_p50_ms": "187",
+        "provider_p95_ms": "271"
+      },
+      {
+        "shape": "find",
+        "cache_status": "miss",
+        "degraded": null,
+        "assistant_messages": 5,
+        "provider_p50_ms": "710",
+        "provider_p95_ms": "1642"
+      },
+      {
+        "shape": "thorough",
+        "cache_status": "hit",
+        "degraded": null,
+        "assistant_messages": 4,
+        "provider_p50_ms": "161",
+        "provider_p95_ms": "164"
+      },
+      {
+        "shape": "find",
+        "cache_status": "bypass",
+        "degraded": null,
+        "assistant_messages": 3,
+        "provider_p50_ms": null,
+        "provider_p95_ms": null
+      },
+      {
+        "shape": "balanced",
+        "cache_status": "miss",
+        "degraded": "survey_synthesis_incomplete",
+        "assistant_messages": 2,
+        "provider_p50_ms": "12565",
+        "provider_p95_ms": "21040"
+      },
+      {
+        "shape": "balanced",
+        "cache_status": "miss",
+        "degraded": "survey_not_grounded",
+        "assistant_messages": 2,
+        "provider_p50_ms": "18155",
+        "provider_p95_ms": "21984"
+      },
+      {
+        "shape": "fast",
+        "cache_status": "miss",
+        "degraded": null,
+        "assistant_messages": 1,
+        "provider_p50_ms": "24377",
+        "provider_p95_ms": "24377"
+      },
+      {
+        "shape": "balanced",
+        "cache_status": "bypass",
+        "degraded": "research_unavailable_missing_public_sources",
+        "assistant_messages": 1,
+        "provider_p50_ms": "0",
+        "provider_p95_ms": "0"
+      },
+      {
+        "shape": "balanced",
+        "cache_status": "bypass",
+        "degraded": "research_capacity_exhausted",
+        "assistant_messages": 1,
+        "provider_p50_ms": "0",
+        "provider_p95_ms": "0"
+      },
+      {
+        "shape": "find",
+        "cache_status": "hit",
+        "degraded": null,
+        "assistant_messages": 1,
+        "provider_p50_ms": "710",
+        "provider_p95_ms": "710"
+      }
+    ]
+  }
+}

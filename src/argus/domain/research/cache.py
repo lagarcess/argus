@@ -27,6 +27,11 @@ was), and from the question's dominant data need otherwise; the most volatile
 ingredient of a genuinely current ask (a live quote) keeps its short
 tolerance because the question kind carries it there.
 
+A withheld packet, one whose prose composition will not publish, is stored
+under the same key for its class TTL capped at ``WITHHELD_TTL_SECONDS`` (one
+day) when it carries a retrieval record; one that never retrieved is not
+stored.
+
 The closed-period rule stands: a question about an entirely closed window is
 ``closed_ohlcv`` regardless of anything else. The cache key includes the
 period of interest, so a specific past close is a different entry from a
@@ -63,6 +68,10 @@ DATA_CLASS_TTL_SECONDS: dict[DataClass, float] = {
     "closed_ohlcv": 7_776_000.0,
     "filings_transcripts": 7_776_000.0,
 }
+
+# The longest a withheld packet is served: an absence is bounded by the day a
+# page can appear, whatever the class of the figure that was not found.
+WITHHELD_TTL_SECONDS = 86_400.0
 
 # Ordered: the first family a category matches decides it, so
 # "earnings_transcript" is a filing before it is fundamentals and
@@ -109,10 +118,18 @@ def data_class_for(
     question_kind: str | None,
     categories: Sequence[str] = (),
     closed_period: bool = False,
+    scenario: bool = False,
 ) -> DataClass:
-    """The section 7 data class governing one cache entry."""
+    """The section 7 data class governing one cache entry.
+
+    A computed scenario (decision 10) is built from forecasts, targets and
+    multiples whatever kind the question was typed as, so it lives in the
+    analyst-estimates class: its recency filter and its TTL follow those
+    inputs, not the company read it may have been typed as."""
     if closed_period:
         return "closed_ohlcv"
+    if scenario:
+        return "analyst_estimates"
     families = {
         family
         for family in (_family_for_category(category) for category in categories)
@@ -128,14 +145,19 @@ def ttl_for_packet(
     question_kind: str | None,
     categories: Sequence[str] = (),
     closed_period: bool = False,
+    withheld: bool = False,
+    scenario: bool = False,
 ) -> float:
-    return DATA_CLASS_TTL_SECONDS[
+    """The class TTL of one entry; a withheld packet's is capped at one day."""
+    ttl = DATA_CLASS_TTL_SECONDS[
         data_class_for(
             question_kind=question_kind,
             categories=categories,
             closed_period=closed_period,
+            scenario=scenario,
         )
     ]
+    return min(ttl, WITHHELD_TTL_SECONDS) if withheld else ttl
 
 
 @dataclass
@@ -159,8 +181,16 @@ def research_cache_key(
     period_key: str,
     question_fingerprint: str,
     language: str,
+    contract: str = "retrieval",
+    country: str | None = None,
 ) -> str:
-    """Public-market request identity only. No user identity may enter here."""
+    """Public-market request identity only. No user identity may enter here.
+
+    ``contract`` names the provider-facing instructions the packet was
+    produced under (``retrieval`` or ``scenario``): a packet answered under
+    one contract never serves a question asked under the other. ``country``
+    is the location the request carried, so a search made for one country's
+    readers never answers another's."""
     material = "|".join(
         (
             capability_class,
@@ -169,6 +199,8 @@ def research_cache_key(
             period_key,
             question_fingerprint,
             language,
+            contract,
+            country or "",
         )
     )
     return hashlib.sha256(material.encode()).hexdigest()

@@ -23,6 +23,7 @@ EXPECTED_LOCKED_CATEGORIES = {
     "graceful_recovery",
     "asset_discovery_routing",
     "dca_capital_semantics",
+    "ordinary_conversation",
 }
 
 PHRASE_ASSERTION_KEYS = {
@@ -85,7 +86,7 @@ def test_measurement_fixtures_do_not_assert_expected_prose() -> None:
     assert offending_keys == []
     # v2 hands the judge the surface rendered beside the reply (issue #516);
     # the discrimination evidence lives in docs/reports/evidence/issue-516/.
-    assert PROSE_JUDGE_RUBRIC_VERSION == "argus-prose-quality-v2"
+    assert PROSE_JUDGE_RUBRIC_VERSION == "argus-prose-quality-v3"
 
 
 def test_expected_fail_baselines_are_issue_tagged() -> None:
@@ -1310,3 +1311,35 @@ def test_blocking_eval_results_include_failures_and_unexpected_passes() -> None:
     ]
     assert blocking[1]["status"] == "unexpected_pass"
     assert harness.expected_fail_issue_for_result(blocking[1]) == "#251"
+
+
+def test_research_expectation_reads_the_typed_sidecar_not_the_stage_outcome() -> None:
+    """A withheld research answer still ends ready_to_respond, so the refusal
+    the price question pins is visible only on the typed sidecar."""
+    published = harness._research_outcome(
+        {"research": {"shape": "fast", "rows": [{"value": 37.35}], "sources": []}}
+    )
+    withheld = harness._research_outcome(
+        {"research": {"shape": "fast", "rows": [], "degraded": {"code": "x"}}}
+    )
+    assert published == {
+        "published": True,
+        "degraded_code": None,
+        "shape": "fast",
+        "rows": 1,
+        "sources": 0,
+    }
+    assert withheld["published"] is False and withheld["degraded_code"] == "x"
+    assert harness._research_outcome({"assistant_response": "no rail"}) is None
+
+    expectation = {"published": True, "rows": 1}
+    failures: list[str] = []
+    harness._compare_research(expectation, published, failures)
+    assert failures == []
+    harness._compare_research(expectation, withheld, failures)
+    assert failures == [
+        "research.published: expected True, got False",
+        "research.rows: expected at least 1, got 0",
+    ]
+    harness._compare_research(expectation, None, failures[:0] or failures)
+    assert failures[-1].startswith("research: expected a research sidecar")

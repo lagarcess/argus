@@ -1,0 +1,38 @@
+[
+  {
+    "attempt": 1,
+    "status": "passed",
+    "failed_checks": [],
+    "capability_verdict": "unsupported",
+    "starting_capital": null,
+    "clarification": "unsupported_dca_contribution_ceiling",
+    "interpretation_models": [
+      "anthropic/claude-haiku-4.5"
+    ],
+    "cost_usd": 0.036664
+  },
+  {
+    "attempt": 2,
+    "status": "passed",
+    "failed_checks": [],
+    "capability_verdict": "unsupported",
+    "starting_capital": null,
+    "clarification": "unsupported_dca_contribution_ceiling",
+    "interpretation_models": [
+      "anthropic/claude-haiku-4.5"
+    ],
+    "cost_usd": 0.027738
+  },
+  {
+    "attempt": 3,
+    "status": "passed",
+    "failed_checks": [],
+    "capability_verdict": "unsupported",
+    "starting_capital": null,
+    "clarification": "unsupported_dca_contribution_ceiling",
+    "interpretation_models": [
+      "anthropic/claude-haiku-4.5"
+    ],
+    "cost_usd": 0.024268
+  }
+]

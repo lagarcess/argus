@@ -12,6 +12,7 @@ from argus.api.routers import (
     backtest,
     conversation_activity,
     conversations,
+    decisions,
     dev,
     discovery,
     evidence,
@@ -24,6 +25,7 @@ from argus.api.routers import (
     profile,
     public_receipts,
     search,
+    tool_results,
 )
 
 cors_allow_origins = app_setup.cors_allow_origins
@@ -45,9 +47,11 @@ for api_router in (
     analytics.router,
     profile.router,
     conversations.router,
+    tool_results.router,
     conversation_activity.router,
     backtest.router,
     evidence.router,
+    decisions.router,
     evidence_receipts.router,
     public_receipts.router,
     agent.router,

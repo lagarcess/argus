@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from datetime import date
 from typing import Any
 
 from argus.agent_runtime.interpreter.audits import StatedRunFieldFidelityAudit
 from argus.agent_runtime.interpreter.dca_audits import (
     _capability_required_missing_fields_for_canonical_strategy,
+    _seed_corroborated_by_fidelity_audit,
 )
 from argus.agent_runtime.interpreter.draft_shape import (
     _llm_strategy_draft_has_executable_shape,
@@ -24,6 +24,7 @@ from argus.agent_runtime.interpreter.execution_cost_fidelity import (
     EXECUTION_COST_FIDELITY_INSTRUCTIONS,
     apply_cost_fidelity,
 )
+from argus.agent_runtime.interpreter.latest_result_context import latest_result_facts
 from argus.agent_runtime.interpreter.shared import (
     _bounded_date_evidence_candidates,
     _date_range_from_bounded_evidence,
@@ -55,7 +56,6 @@ from argus.agent_runtime.llm_interpreter_types import (
     LLMInterpretationResponse,
     LLMStrategyDraft,
 )
-from argus.agent_runtime.result_followups import result_followup_fact_bank
 from argus.agent_runtime.rule_specs import executable_rule_spec_from_strategy
 from argus.agent_runtime.run_field_contract import (
     field_fidelity_tokens as _field_fidelity_tokens,
@@ -71,6 +71,7 @@ from argus.agent_runtime.strategy_contract import (
     resolve_date_range,
 )
 from argus.domain.capability_registry import EXECUTABLE_TEMPLATES
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.nlp.natural_time import resolve_date_range_intent
 
 
@@ -309,7 +310,8 @@ def _response_with_executable_fields_preferred_over_clarification_prose(
             "intent": "backtest_execution",
             "requires_clarification": False,
             "assistant_response": None,
-            "semantic_turn_act": "new_idea",
+            # The executable fields win over prose; the act stays the read's.
+            "semantic_turn_act": response.semantic_turn_act or "new_idea",
             "reason_codes": list(
                 dict.fromkeys(
                     [
@@ -744,7 +746,7 @@ def _date_endpoint_is_runtime_current(value: Any) -> bool:
         "present",
         "current",
         "current_date",
-        date.today().isoformat(),
+        new_york_today().isoformat(),
     }
 
 
@@ -958,29 +960,7 @@ def _latest_result_fact_bank_for_routing(
     snapshot = request.latest_task_snapshot
     if snapshot is None or snapshot.latest_backtest_result_reference is None:
         return {}
-    metadata = dict(snapshot.latest_backtest_result_reference.metadata)
-    fact_bank = result_followup_fact_bank(metadata)
-    return {
-        key: fact_bank[key]
-        for key in (
-            "symbols",
-            "strategy",
-            "date_range",
-            "total_return",
-            "benchmark_symbol",
-            "benchmark_return",
-            "benchmark_delta",
-            "max_drawdown",
-            "fee_bps",
-            "slippage_bps",
-            "gross_total_return",
-            "net_total_return",
-            "return_drag",
-            "benchmark_cost_treatment",
-            "runnable_next_tests",
-        )
-        if key in fact_bank
-    }
+    return latest_result_facts(snapshot.latest_backtest_result_reference)
 
 
 def _stated_run_field_fidelity_messages(
@@ -1018,7 +998,7 @@ def _stated_run_field_fidelity_messages(
                 "leave recurring_contribution_amount null. Normalize one-hour/hourly "
                 "bars to 1h, four-hour bars to "
                 "4h, and daily bars to 1D. Preserve today/current as today or the "
-                f"runtime date {date.today().isoformat()} only when the user stated "
+                f"runtime date {new_york_today().isoformat()} only when the user stated "
                 "today/current. If the user stated only a start or only an end date, "
                 "return only that endpoint; do not infer the missing endpoint or "
                 "rewrite the unstated endpoint. For pending date answers such as "
@@ -1068,6 +1048,9 @@ def _response_from_stated_run_field_fidelity_audit(
         changed = True
     if audit.recurring_contribution_amount is not None:
         recurring_amount = float(audit.recurring_contribution_amount)
+        changed |= _seed_corroborated_by_fidelity_audit(
+            draft, audit=audit, repaired=repaired
+        )
         if draft.capital_amount != recurring_amount:
             draft.capital_amount = recurring_amount
             changed = True
@@ -1121,12 +1104,7 @@ def _response_from_stated_run_field_fidelity_audit(
     if not changed:
         return None
     repaired.reason_codes = list(
-        dict.fromkeys(
-            [
-                *repaired.reason_codes,
-                "stated_run_field_fidelity_audit",
-            ]
-        )
+        dict.fromkeys([*repaired.reason_codes, "stated_run_field_fidelity_audit"])
     )
     return repaired
 

@@ -25,7 +25,6 @@ def _user() -> User:
         display_name=None,
         language="en",
         locale="en-US",
-        theme="dark",
         is_admin=False,
         created_at=utcnow(),
         updated_at=utcnow(),

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 import pytest
 
@@ -7,6 +8,7 @@ PROVIDER_CREDENTIAL_ENV_VARS = (
     "ALPACA_API_KEY",
     "ALPACA_SECRET_KEY",
     "PERPLEXITY_API_KEY",
+    "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD",
 )
 
 
@@ -30,6 +32,24 @@ def reset_guest_funnel_milestones():
     api_state.store.guest_funnel_milestones.clear()
     yield
     api_state.store.guest_funnel_milestones.clear()
+
+
+@pytest.fixture
+def freeze_new_york_clock(monkeypatch):
+    """Freeze the one clock every "today" reads at an aware instant."""
+    from argus.domain.market_data import new_york_clock
+
+    def freeze(at: datetime) -> None:
+        assert at.tzinfo is not None, "freeze the clock at an aware instant"
+
+        class _Frozen(datetime):
+            @classmethod
+            def now(cls, tz=None):  # type: ignore[override]
+                return at.astimezone(tz) if tz is not None else at.replace(tzinfo=None)
+
+        monkeypatch.setattr(new_york_clock, "datetime", _Frozen)
+
+    return freeze
 
 
 @pytest.fixture(autouse=True)

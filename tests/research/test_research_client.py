@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from argus.agent_runtime.research_grounded import _retrieval_happened
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import (
+    _TOOL_RESULT_READERS,
     PerplexityAgentClient,
     _sanitize_answer,
 )
@@ -42,7 +44,8 @@ def test_run_research_builds_documented_request_and_parses_packet() -> None:
     packet = client.run_research("What is Apple at?", RESEARCH_CONFIG_SPECS["fast"])
 
     body = request_body(transport.requests[0])
-    assert body["model"] == "openai/gpt-5.6-sol"
+    assert body["models"] == ["openai/gpt-5.6-sol", "anthropic/claude-opus-4-7"]
+    assert "model" not in body, "the fallback chain replaces the single model"
     assert body["tools"] == [{"type": "finance_search"}]
     assert body["max_steps"] == RESEARCH_CONFIG_SPECS["fast"].max_steps
     assert body["max_output_tokens"] == 1024
@@ -50,10 +53,10 @@ def test_run_research_builds_documented_request_and_parses_packet() -> None:
     assert packet.usage.finance_search_invocations == 1
     assert packet.usage.web_search_invocations == 0
     assert packet.usage.fetch_url_invocations == 0
-    assert packet.usage.input_tokens == 14_166
-    assert packet.usage.output_tokens == 191
+    assert packet.usage.input_tokens == 15_950
+    assert packet.usage.output_tokens == 298
     assert packet.usage.model == "openai/gpt-5.6-sol"
-    assert packet.usage.cost_usd == pytest.approx(0.05395)
+    assert packet.usage.cost_usd == pytest.approx(0.0487)
     # Provider hosts are scrubbed; public sources survive as typed citations.
     assert [source.url for source in packet.sources] == ["https://www.sec.gov/a"]
     # NOT_FOUND and header rows never become candidates.
@@ -92,7 +95,8 @@ def test_usage_cost_uses_served_model_tokens_and_every_tool_count() -> None:
 
     packet = client.run_research("compare", RESEARCH_CONFIG_SPECS["fast"])
 
-    assert request_body(transport.requests[0])["model"] == "openai/gpt-5.6-sol"
+    assert request_body(transport.requests[0])["models"][0] == "openai/gpt-5.6-sol"
+    # The invoice names the model that served; a fallback is priced as itself.
     assert packet.usage.model == "anthropic/claude-opus-4-7"
     assert packet.usage.input_tokens == 20_000
     assert packet.usage.output_tokens == 4_000
@@ -109,9 +113,9 @@ def test_usage_cost_matches_the_committed_live_cached_response() -> None:
 
     packet = client.run_research("quote Apple", RESEARCH_CONFIG_SPECS["fast"])
 
-    assert packet.usage.cost_usd == pytest.approx(0.05395)
-    assert packet.usage.cache_creation_input_tokens == 6_221
-    assert packet.usage.cache_read_input_tokens == 7_864
+    assert packet.usage.cost_usd == pytest.approx(0.0487)
+    assert packet.usage.cache_creation_input_tokens == 6_754
+    assert packet.usage.cache_read_input_tokens == 9_115
 
 
 def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> None:
@@ -124,13 +128,13 @@ def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> No
                 output_tokens=1_000,
                 invocations=0,
                 cost_overrides={
-                    "input_cost": 1.5,
-                    "output_cost": 0.03,
+                    "input_cost": 1.2,
+                    "output_cost": 0.02,
                     "cache_creation_cost": 0.0,
                     "cache_read_cost": 0.0,
                     "tool_calls_cost": 0.0,
                     "tool_calls_cost_details": {},
-                    "total_cost": 1.53,
+                    "total_cost": 1.22,
                 },
             )
         ]
@@ -138,7 +142,7 @@ def test_aggregated_multistep_tokens_do_not_invent_a_long_context_charge() -> No
 
     packet = client.run_research("multi-step", RESEARCH_CONFIG_SPECS["fast"])
 
-    assert packet.usage.cost_usd == pytest.approx(1.53)
+    assert packet.usage.cost_usd == pytest.approx(1.22)
 
 
 @pytest.mark.parametrize(
@@ -241,8 +245,8 @@ def test_aggregated_multistep_tokens_accept_a_feasible_tier_blend() -> None:
 @pytest.mark.parametrize(
     ("input_cost", "output_cost", "total_cost"),
     [
-        pytest.param(1.5, 0.045, 1.545, id="short-input-long-output"),
-        pytest.param(3.0, 0.03, 3.03, id="long-input-short-output"),
+        pytest.param(1.2, 0.045, 1.245, id="short-input-long-output"),
+        pytest.param(3.0, 0.02, 3.02, id="long-input-short-output"),
     ],
 )
 def test_aggregated_multistep_tokens_reject_inconsistent_tiers(
@@ -322,7 +326,7 @@ def test_missing_required_token_usage_is_unpriced() -> None:
 @pytest.mark.parametrize(
     ("input_tokens", "input_cost", "output_cost", "expected_cost_usd"),
     [
-        (272_000, 1.36, 0.03, 1.39),
+        (272_000, 1.088, 0.02, 1.108),
         (272_001, 2.72001, 0.045, 2.76501),
     ],
 )
@@ -361,7 +365,7 @@ def test_balanced_spec_sends_reasoning_and_all_three_tools() -> None:
     body = request_body(transport.requests[0])
     assert body["reasoning"] == {"effort": "low"}
     assert body["tools"] == [
-        {"type": "web_search"},
+        {"type": "web_search", "search_context_size": "medium"},
         {"type": "finance_search"},
         {"type": "fetch_url"},
     ]
@@ -442,3 +446,96 @@ def test_sanitizer_strips_provider_links_and_typographic_dashes() -> None:
     # A lone dash cell stays an empty-value marker, not punctuation.
     assert "| - |" in cleaned
     assert "[SEC filing](https://www.sec.gov/f)" in cleaned
+
+
+@pytest.mark.parametrize(
+    "malformation", ["missing_usage", "usage_not_an_object", "malformed_tool_count"]
+)
+def test_tool_output_is_the_retrieval_record_when_the_invoice_is_lost(
+    malformation: str,
+) -> None:
+    """Recorded responses carry one finance_results item per finance call.
+    That output survives a lost invoice, and the counts the invoice would
+    have established are unknown, not zero."""
+    response = agent_response()
+    if malformation == "missing_usage":
+        del response["usage"]
+    elif malformation == "usage_not_an_object":
+        response["usage"] = "unavailable"
+    else:
+        response["usage"]["tool_calls_details"] = {
+            "finance_search": {"invocation": "one"}
+        }
+    client, _ = _client([response])
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.tool_results == ("finance_results",)
+    assert packet.usage.invocations is None
+    assert packet.usage.finance_search_invocations is None
+    assert packet.usage.web_search_invocations is None
+    assert packet.usage.fetch_url_invocations is None
+    assert packet.usage.cost_usd is None
+
+
+def test_a_response_that_ran_no_tool_reports_a_confirmed_zero() -> None:
+    """Recorded zero-tool responses omit tool_calls_details and bill no tool;
+    that is an established zero, distinct from an unknown count."""
+    client, _ = _client(
+        [
+            agent_response(
+                invocations=0,
+                # Synthetic bill: the recorded invoice minus its finance call.
+                cost_overrides={
+                    "tool_calls_cost": 0.0,
+                    "tool_calls_cost_details": {},
+                    "total_cost": 0.0437,
+                },
+            )
+        ]
+    )
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.tool_results == ()
+    assert packet.usage.invocations == 0
+    assert packet.usage.finance_search_invocations == 0
+    assert packet.usage.web_search_invocations == 0
+    assert packet.usage.fetch_url_invocations == 0
+    assert packet.usage.cost_usd == pytest.approx(0.0437)
+
+
+def test_every_tool_result_item_is_kept_in_provider_order() -> None:
+    response = agent_response(web_search_invocations=1)
+    response["output"].insert(
+        2,
+        {
+            "type": "search_results",
+            "results": [{"url": "https://www.sec.gov/b", "title": "Filing"}],
+        },
+    )
+    client, _ = _client([response])
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["balanced"])
+
+    assert packet.tool_results == ("finance_results", "search_results")
+
+
+@pytest.mark.parametrize("kind", sorted(_TOOL_RESULT_READERS))
+def test_every_kind_the_parser_reads_is_retrieval_evidence_without_an_invoice(
+    kind: str,
+) -> None:
+    """The invariant behind #541: reading a tool result is what records it,
+    so a kind the parser learns to read can never be missing from the
+    retrieval record. Parametrized over the parser's own table so a new
+    reader is covered the moment it is registered."""
+    response = agent_response(invocations=0)
+    del response["usage"]
+    response["output"].insert(1, {"type": kind})
+    client, _ = _client([response])
+
+    packet = client.run_research("q", RESEARCH_CONFIG_SPECS["fast"])
+
+    assert packet.tool_results == (kind,)
+    assert not packet.sources, "the bare item must prove retrieval on its own"
+    assert _retrieval_happened(packet)

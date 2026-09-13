@@ -1,0 +1,36 @@
+[
+  {
+    "layout": "phone-390",
+    "rows": {
+      "appearance": {
+        "height": 44,
+        "minHeight": "44px"
+      },
+      "language": {
+        "height": 44,
+        "minHeight": "44px"
+      },
+      "country": {
+        "height": 44,
+        "minHeight": "44px"
+      }
+    }
+  },
+  {
+    "layout": "desktop-1280",
+    "rows": {
+      "appearance": {
+        "height": 38,
+        "minHeight": "38px"
+      },
+      "language": {
+        "height": 38,
+        "minHeight": "38px"
+      },
+      "country": {
+        "height": 38,
+        "minHeight": "38px"
+      }
+    }
+  }
+]

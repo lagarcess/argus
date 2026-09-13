@@ -13,23 +13,36 @@
 
 # 1. Product Truth
 
-**Argus is the easiest place to speak an investing or trading idea and instantly see how it would have played out.**
+**Argus is the easiest place to bring a money question and get an answer you can check.**
 
-**Argus is AI-powered investing and trading idea validation for everyone.**
+Every answer is computed by Argus or cited to a source, never asserted. The questions that can be tested against real history end in a backtest.
+
+**Argus is AI-powered, grounded money answers for everyone.**
 
 Argus is a **chat-first, AI-first investing sandbox** where users interact through natural conversation instead of dashboards, technical forms, or intimidating trading tools.
 
-Users describe ideas in plain language.
+Users describe questions and ideas in plain language.
 
 Argus helps them:
 
 - understand concepts
+- compute what they are actually asking, from the numbers they gave
 - refine ideas
 - simulate strategies
 - inspect outcomes
 - learn without risking capital
 
-The backtesting engine is critical infrastructure.
+A money question is any question a person asks about their own money or about
+an asset: what to save, what something costs over time, what a rate really
+means, what an instrument would return, what a company is trading at, what an
+idea would have done. Argus answers them the same way, by computing or citing.
+
+**Compute what the user gave you. Never prescribe what they should do.**
+Arithmetic on someone's own numbers is a grounded calculator. Telling them what
+they ought to do is advice, and Argus does not give it.
+
+The backtesting engine is critical infrastructure, and the first calculation
+Argus learned.
 
 The conversation is the product.
 
@@ -310,15 +323,31 @@ The AI assistant should:
 
 - welcome first-time users into ordinary conversation
 - explain financial terms simply
+- **answer money questions by computing them or citing a source**
+- **teach the method: when a question is too broad, offer specific questions
+  derived from what the user actually said**
 - gather requirements for supported backtests
 - recommend **localized generic starter prompts**
 - guide users toward successful flows
 - explain results
-- suggest next experiments
+- suggest next experiments, including **what the same money would have done in
+  the market over the same period**
 - remember thread context appropriately
-- adapt to preferred language
+- adapt to preferred language, **and to the currency of the user's locale**
 
-The AI assistant should **not** pretend unsupported capabilities exist.
+The AI assistant should **not** pretend unsupported capabilities exist, **and
+should not refuse a question it can compute or ground.** A refusal that names a
+capability the user did not ask about is a defect.
+
+Forward-looking and valuation questions are answered, as grounded scenarios
+(decision 10, 2026-09-10). "What will $10,000 in NVDA be worth in ten years"
+and "what price does NVDA need to grow into" get cited forecasts, analyst
+targets and valuation multiples, the arithmetic written out, and the result as
+labeled scenario ranges. Argus never presents one number as the future and
+never says what the user should do. A projection on the user's own numbers is
+arithmetic, not a prediction. The one thing that stays impossible is a backtest
+over a future window, because that data does not exist: Argus says so, offers
+the historical test, and can research what analysts expect instead.
 
 ---
 
@@ -527,15 +556,20 @@ either way, because opening the gate grants access without granting a role.
 Two clocks govern a guest, and they are deliberately distinct. The
 **workspace** lives seven fixed days with one conversation: that is how long
 the temporary chat survives and the window to claim it to an account.
-Activity never extends the expiry. **Allowances** follow the visitor as an
-abuse boundary (decision 2026-07-28): ten useful assistant terminals and two
-unique simulations per visitor per day, resetting at UTC midnight. The
-workspace separately caps the temporary chat at two unique simulations over
-its fixed lifetime, plus five feedback submissions. A fresh session cannot
-mint a fresh daily allowance—the visitor counter keys on a keyed digest of the
-caller—and Start over preserves the workspace counters. Simulations keep a
-workspace-keyed reservation as replay identity; the visitor charge beside it
-is best-effort past admission, and settlement enforces the cap. The current
+Activity never extends the expiry. **Allowances** follow the visitor
+(decision 2026-07-28, re-keyed by operation class 2026-09-08): two unique
+simulations and three searches with sources per visitor per day, resetting at
+UTC midnight. The workspace separately caps the temporary chat at two unique
+simulations over its fixed lifetime, plus five feedback submissions.
+Conversation is not an allowance: it is free, and the usage panel says so with
+no limit. An anonymous endpoint is still not unbounded, so guest turns carry a
+silent anti-abuse ceiling per visitor per day, sized so no real person reaches
+it; it is never rendered or promised as an allowance, and a signed-in account
+carries none. A fresh session cannot mint a fresh daily allowance—the visitor
+counter keys on a keyed digest of the caller—and Start over preserves the
+workspace counters. Simulations keep a workspace-keyed reservation as replay
+identity; the visitor charge beside it is best-effort past admission, and
+settlement enforces the cap. The current
 landing implementation and its centered auth modal remain intact for
 configuration rollback and later conversion work.
 
@@ -564,7 +598,7 @@ If this feels magical and trustworthy, the MVP is working.
 
 When evaluating any feature, ask:
 
-## Does this make it easier for a normal person to turn curiosity into a grounded investing experiment and continue exploring?
+## Does this make it easier for a normal person to bring a money question and get an answer they can check?
 
 If no, it likely should wait.
 

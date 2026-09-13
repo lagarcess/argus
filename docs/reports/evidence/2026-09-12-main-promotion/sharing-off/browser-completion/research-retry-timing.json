@@ -1,0 +1,7 @@
+{
+  "failure_observed_at": "2026-09-13T19:44:28.666Z",
+  "retry_started_at": "2026-09-13T19:46:40.310Z",
+  "wait_seconds": 131.644,
+  "minimum_wait_seconds": 120,
+  "attempt": 2
+}

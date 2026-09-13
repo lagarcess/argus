@@ -1,0 +1,2914 @@
+{
+  "language": "en",
+  "thread_id": "0ad16c51-d6de-4fbb-bae6-28a6b271d4f5",
+  "market_data_provider_mode": "live_provider",
+  "asset_provider_mode": "live_provider",
+  "total_cost_usd": 0.068451,
+  "turns": [
+    {
+      "index": 1,
+      "user_message": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+      "elapsed_s": 45.8,
+      "stage_outcome": "await_approval",
+      "assistant_text": "[confirmation card]",
+      "em_dash_in_reply": false,
+      "requested_field": null,
+      "clarification": null,
+      "response_intent_kind": null,
+      "pending_strategy": {
+        "strategy": {
+          "raw_user_phrasing": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+          "requested_strategy_template": null,
+          "strategy_type": "dca_accumulation",
+          "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+          "asset_universe": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": "monthly",
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "DOCN",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "DOCN",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "provider_resolved_assets": [
+              {
+                "raw_text": "DOCN",
+                "symbol": "DOCN",
+                "asset_class": "equity",
+                "name": "DigitalOcean Holdings, Inc.",
+                "raw_symbol": "DOCN",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NYSE"
+              }
+            ],
+            "recurring_contribution": 100.0,
+            "recurring_cadence": "monthly",
+            "language": "en",
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly",
+              "fee_rate": "10 basis point fee",
+              "slippage": "5 basis points slippage"
+            },
+            "field_provenance": {
+              "comparison_baseline": "stated_run_field_fidelity_audit",
+              "recurring_contribution": "explicit_user",
+              "capital_amount": "recurring_contribution",
+              "cadence": "explicit_user",
+              "fee_rate": "explicit_user",
+              "slippage": "explicit_user"
+            },
+            "raw_strategy_type": "dca_accumulation",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            }
+          }
+        },
+        "requested_field": null,
+        "missing_required_fields": []
+      },
+      "confirmation_payload": {
+        "strategy": {
+          "raw_user_phrasing": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+          "requested_strategy_template": null,
+          "strategy_type": "dca_accumulation",
+          "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+          "asset_universe": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": "monthly",
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "DOCN",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "DOCN",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "provider_resolved_assets": [
+              {
+                "raw_text": "DOCN",
+                "symbol": "DOCN",
+                "asset_class": "equity",
+                "name": "DigitalOcean Holdings, Inc.",
+                "raw_symbol": "DOCN",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NYSE"
+              }
+            ],
+            "recurring_contribution": 100.0,
+            "recurring_cadence": "monthly",
+            "language": "en",
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly",
+              "fee_rate": "10 basis point fee",
+              "slippage": "5 basis points slippage"
+            },
+            "field_provenance": {
+              "comparison_baseline": "stated_run_field_fidelity_audit",
+              "recurring_contribution": "explicit_user",
+              "capital_amount": "recurring_contribution",
+              "cadence": "explicit_user",
+              "fee_rate": "explicit_user",
+              "slippage": "explicit_user"
+            },
+            "raw_strategy_type": "dca_accumulation",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            }
+          }
+        },
+        "optional_parameters": {
+          "initial_capital": {
+            "value": 1000.0,
+            "source": "default",
+            "label": "Initial capital",
+            "description": "Starting cash for the simulated backtest."
+          },
+          "timeframe": {
+            "value": "1D",
+            "source": "default",
+            "label": "Timeframe",
+            "description": "Bar interval used for the simulation."
+          },
+          "fees": {
+            "value": 0.001,
+            "source": "user",
+            "label": "Fees",
+            "description": "Per-trade fee assumption applied during execution."
+          },
+          "slippage": {
+            "value": 0.0005,
+            "source": "user",
+            "label": "Slippage",
+            "description": "Execution slippage assumption expressed as a fraction."
+          },
+          "engine_options": {
+            "value": {},
+            "source": "default",
+            "label": "Engine options",
+            "description": "Reserved execution knobs exposed by the runtime contract."
+          }
+        },
+        "launch_payload": {
+          "strategy_type": "dca_accumulation",
+          "symbol": "DOCN",
+          "symbols": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "starting_capital": 0.0,
+          "recurring_contribution": 100.0,
+          "position_size": null,
+          "cadence": "monthly",
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "en",
+          "requested_date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "_execution_realism": {
+            "enabled": true,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "full_coverage",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "observations_by_symbol": {
+              "DOCN": 251,
+              "SPY": 251
+            },
+            "adjustment_reason": "none",
+            "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe"
+          }
+        },
+        "validation": {
+          "status": "ready_to_run",
+          "executable": true,
+          "date_adjusted": false
+        },
+        "edit_disclosure": null
+      },
+      "run_state": {
+        "intent": "backtest_execution",
+        "semantic_turn_act": "new_idea",
+        "task_relation": "new_task",
+        "missing_required_fields": [],
+        "requested_field": null,
+        "candidate_strategy_draft": {
+          "raw_user_phrasing": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+          "requested_strategy_template": null,
+          "strategy_type": "dca_accumulation",
+          "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+          "asset_universe": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": "monthly",
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "DOCN",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "DOCN",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "provider_resolved_assets": [
+              {
+                "raw_text": "DOCN",
+                "symbol": "DOCN",
+                "asset_class": "equity",
+                "name": "DigitalOcean Holdings, Inc.",
+                "raw_symbol": "DOCN",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NYSE"
+              }
+            ],
+            "recurring_contribution": 100.0,
+            "recurring_cadence": "monthly",
+            "language": "en",
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly",
+              "fee_rate": "10 basis point fee",
+              "slippage": "5 basis points slippage"
+            },
+            "field_provenance": {
+              "comparison_baseline": "stated_run_field_fidelity_audit",
+              "recurring_contribution": "explicit_user",
+              "capital_amount": "recurring_contribution",
+              "cadence": "explicit_user",
+              "fee_rate": "explicit_user",
+              "slippage": "explicit_user"
+            },
+            "raw_strategy_type": "dca_accumulation",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            }
+          }
+        },
+        "optional_parameter_status": {
+          "optional_parameter_opportunity": [
+            "initial_capital",
+            "timeframe",
+            "fees",
+            "slippage",
+            "engine_options"
+          ],
+          "user_preference_overridden_for_turn": false,
+          "confidence": 0.95,
+          "arbitration_mode": "structured_arbitration",
+          "ambiguous_fields": [],
+          "unsupported_constraints": []
+        },
+        "reason_codes": null,
+        "user_goal_summary": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY."
+      },
+      "selected_thread_metadata": {
+        "latest_task_type": "backtest_execution",
+        "last_stage_outcome": "await_approval"
+      },
+      "latest_task_snapshot": {
+        "latest_task_type": "backtest_execution",
+        "completed": false,
+        "pending_strategy_summary": {
+          "raw_user_phrasing": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+          "requested_strategy_template": null,
+          "strategy_type": "dca_accumulation",
+          "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+          "asset_universe": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": "monthly",
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "DOCN",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "DOCN",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "provider_resolved_assets": [
+              {
+                "raw_text": "DOCN",
+                "symbol": "DOCN",
+                "asset_class": "equity",
+                "name": "DigitalOcean Holdings, Inc.",
+                "raw_symbol": "DOCN",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NYSE"
+              }
+            ],
+            "recurring_contribution": 100.0,
+            "recurring_cadence": "monthly",
+            "language": "en",
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly",
+              "fee_rate": "10 basis point fee",
+              "slippage": "5 basis points slippage"
+            },
+            "field_provenance": {
+              "comparison_baseline": "stated_run_field_fidelity_audit",
+              "recurring_contribution": "explicit_user",
+              "capital_amount": "recurring_contribution",
+              "cadence": "explicit_user",
+              "fee_rate": "explicit_user",
+              "slippage": "explicit_user"
+            },
+            "raw_strategy_type": "dca_accumulation",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            }
+          }
+        },
+        "confirmed_strategy_summary": null,
+        "pending_needs": [],
+        "field_provenance": {},
+        "resolution_provenance": [
+          {
+            "field": "asset_universe[0]",
+            "raw_text": "DOCN",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "DOCN",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "medium"
+          }
+        ],
+        "active_draft_reference": null,
+        "active_confirmation_reference": {
+          "artifact_kind": "confirmation",
+          "artifact_id": "confirmation-7699e483-92e3-442d-94c7-3165f22a95b6",
+          "artifact_status": "active",
+          "metadata": {
+            "confirmation_id": "confirmation-7699e483-92e3-442d-94c7-3165f22a95b6",
+            "artifact_type": "confirmation",
+            "confirmation_payload": {
+              "strategy": {
+                "raw_user_phrasing": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+                "requested_strategy_template": null,
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+                "asset_universe": [
+                  "DOCN"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": "monthly",
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "sizing_mode": "capital_amount",
+                "capital_amount": 100.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "DOCN",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "DOCN",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "fee_rate": 0.001,
+                  "slippage": 0.0005,
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "DOCN",
+                      "symbol": "DOCN",
+                      "asset_class": "equity",
+                      "name": "DigitalOcean Holdings, Inc.",
+                      "raw_symbol": "DOCN",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NYSE"
+                    }
+                  ],
+                  "recurring_contribution": 100.0,
+                  "recurring_cadence": "monthly",
+                  "language": "en",
+                  "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+                  "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2025-09-10",
+                    "end": "2026-09-09",
+                    "day_offset": null,
+                    "count": null,
+                    "unit": null,
+                    "anchor": null,
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 1.0,
+                    "evidence": "September 10, 2025 through September 9, 2026"
+                  },
+                  "evidence_spans": {
+                    "strategy_type": "monthly dollar-cost averaging",
+                    "asset_universe": "DOCN",
+                    "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+                    "comparison_baseline": "SPY",
+                    "capital_amount": "$1,000",
+                    "recurring_contribution": "$100 every month",
+                    "cadence": "monthly",
+                    "fee_rate": "10 basis point fee",
+                    "slippage": "5 basis points slippage"
+                  },
+                  "field_provenance": {
+                    "comparison_baseline": "stated_run_field_fidelity_audit",
+                    "recurring_contribution": "explicit_user",
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                    "fee_rate": "explicit_user",
+                    "slippage": "explicit_user"
+                  },
+                  "raw_strategy_type": "dca_accumulation",
+                  "requested_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  }
+                }
+              },
+              "optional_parameters": {
+                "initial_capital": {
+                  "value": 1000.0,
+                  "source": "default",
+                  "label": "Initial capital",
+                  "description": "Starting cash for the simulated backtest."
+                },
+                "timeframe": {
+                  "value": "1D",
+                  "source": "default",
+                  "label": "Timeframe",
+                  "description": "Bar interval used for the simulation."
+                },
+                "fees": {
+                  "value": 0.001,
+                  "source": "user",
+                  "label": "Fees",
+                  "description": "Per-trade fee assumption applied during execution."
+                },
+                "slippage": {
+                  "value": 0.0005,
+                  "source": "user",
+                  "label": "Slippage",
+                  "description": "Execution slippage assumption expressed as a fraction."
+                },
+                "engine_options": {
+                  "value": {},
+                  "source": "default",
+                  "label": "Engine options",
+                  "description": "Reserved execution knobs exposed by the runtime contract."
+                }
+              },
+              "confirmation_id": "confirmation-7699e483-92e3-442d-94c7-3165f22a95b6",
+              "artifact_id": "confirmation-7699e483-92e3-442d-94c7-3165f22a95b6",
+              "launch_payload": {
+                "strategy_type": "dca_accumulation",
+                "symbol": "DOCN",
+                "symbols": [
+                  "DOCN"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "sizing_mode": "capital_amount",
+                "capital_amount": 100.0,
+                "starting_capital": 0.0,
+                "recurring_contribution": 100.0,
+                "position_size": null,
+                "cadence": "monthly",
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "language": "en",
+                "requested_date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "_execution_realism": {
+                  "enabled": true,
+                  "fee_bps": 10.0,
+                  "slippage_bps": 5.0
+                },
+                "coverage_preflight": {
+                  "schema_version": "market_data_coverage_v1",
+                  "outcome": "full_coverage",
+                  "requested_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "observations_by_symbol": {
+                    "DOCN": 251,
+                    "SPY": 251
+                  },
+                  "adjustment_reason": "none",
+                  "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe"
+                }
+              },
+              "validation": {
+                "status": "ready_to_run",
+                "executable": true,
+                "date_adjusted": false
+              }
+            },
+            "launch_payload_hash": "6749f634aa05119e",
+            "canonical_launch_payload_hash": "sha256:6749f634aa05119ed76112a578f0c08321b8772d7e7681ea6ffe89a3a1d8b55c",
+            "strategy_hash": "3f803aaf5cbdc2c0",
+            "validation": {
+              "executable": true,
+              "failure_code": null
+            },
+            "launch_payload": {
+              "strategy_type": "dca_accumulation",
+              "symbol": "DOCN",
+              "symbols": [
+                "DOCN"
+              ],
+              "asset_class": "equity",
+              "timeframe": "1D",
+              "date_range": {
+                "start": "2025-09-10",
+                "end": "2026-09-09"
+              },
+              "requested_date_range": {
+                "start": "2025-09-10",
+                "end": "2026-09-09"
+              },
+              "coverage_preflight": {
+                "schema_version": "market_data_coverage_v1",
+                "outcome": "full_coverage",
+                "requested_date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "effective_date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe",
+                "observations_by_symbol": {
+                  "DOCN": 251,
+                  "SPY": 251
+                }
+              },
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "sizing_mode": "capital_amount",
+              "capital_amount": 100.0,
+              "position_size": null,
+              "starting_capital": 0.0,
+              "recurring_contribution": 100.0,
+              "cadence": "monthly",
+              "parameters": {},
+              "risk_rules": [],
+              "benchmark_symbol": "SPY",
+              "_execution_realism": {
+                "enabled": true,
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0
+              },
+              "language": "en"
+            }
+          }
+        },
+        "latest_backtest_result_reference": null,
+        "latest_collection_action_reference": null,
+        "latest_failed_action_reference": null,
+        "saved_strategy_reference": null,
+        "artifact_references": [
+          {
+            "artifact_kind": "confirmation",
+            "artifact_id": "confirmation-7699e483-92e3-442d-94c7-3165f22a95b6",
+            "artifact_status": "active",
+            "metadata": {
+              "confirmation_id": "confirmation-7699e483-92e3-442d-94c7-3165f22a95b6",
+              "artifact_type": "confirmation",
+              "confirmation_payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+                  "requested_strategy_template": null,
+                  "strategy_type": "dca_accumulation",
+                  "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+                  "asset_universe": [
+                    "DOCN"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": "monthly",
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "sizing_mode": "capital_amount",
+                  "capital_amount": 100.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "DOCN",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "DOCN",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "fee_rate": 0.001,
+                    "slippage": 0.0005,
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "DOCN",
+                        "symbol": "DOCN",
+                        "asset_class": "equity",
+                        "name": "DigitalOcean Holdings, Inc.",
+                        "raw_symbol": "DOCN",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NYSE"
+                      }
+                    ],
+                    "recurring_contribution": 100.0,
+                    "recurring_cadence": "monthly",
+                    "language": "en",
+                    "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+                    "date_range_intent": {
+                      "kind": "explicit_range",
+                      "start": "2025-09-10",
+                      "end": "2026-09-09",
+                      "day_offset": null,
+                      "count": null,
+                      "unit": null,
+                      "anchor": null,
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 1.0,
+                      "evidence": "September 10, 2025 through September 9, 2026"
+                    },
+                    "evidence_spans": {
+                      "strategy_type": "monthly dollar-cost averaging",
+                      "asset_universe": "DOCN",
+                      "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+                      "comparison_baseline": "SPY",
+                      "capital_amount": "$1,000",
+                      "recurring_contribution": "$100 every month",
+                      "cadence": "monthly",
+                      "fee_rate": "10 basis point fee",
+                      "slippage": "5 basis points slippage"
+                    },
+                    "field_provenance": {
+                      "comparison_baseline": "stated_run_field_fidelity_audit",
+                      "recurring_contribution": "explicit_user",
+                      "capital_amount": "recurring_contribution",
+                      "cadence": "explicit_user",
+                      "fee_rate": "explicit_user",
+                      "slippage": "explicit_user"
+                    },
+                    "raw_strategy_type": "dca_accumulation",
+                    "requested_date_range": {
+                      "start": "2025-09-10",
+                      "end": "2026-09-09"
+                    },
+                    "effective_date_range": {
+                      "start": "2025-09-10",
+                      "end": "2026-09-09"
+                    }
+                  }
+                },
+                "optional_parameters": {
+                  "initial_capital": {
+                    "value": 1000.0,
+                    "source": "default",
+                    "label": "Initial capital",
+                    "description": "Starting cash for the simulated backtest."
+                  },
+                  "timeframe": {
+                    "value": "1D",
+                    "source": "default",
+                    "label": "Timeframe",
+                    "description": "Bar interval used for the simulation."
+                  },
+                  "fees": {
+                    "value": 0.001,
+                    "source": "user",
+                    "label": "Fees",
+                    "description": "Per-trade fee assumption applied during execution."
+                  },
+                  "slippage": {
+                    "value": 0.0005,
+                    "source": "user",
+                    "label": "Slippage",
+                    "description": "Execution slippage assumption expressed as a fraction."
+                  },
+                  "engine_options": {
+                    "value": {},
+                    "source": "default",
+                    "label": "Engine options",
+                    "description": "Reserved execution knobs exposed by the runtime contract."
+                  }
+                },
+                "confirmation_id": "confirmation-7699e483-92e3-442d-94c7-3165f22a95b6",
+                "artifact_id": "confirmation-7699e483-92e3-442d-94c7-3165f22a95b6",
+                "launch_payload": {
+                  "strategy_type": "dca_accumulation",
+                  "symbol": "DOCN",
+                  "symbols": [
+                    "DOCN"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": "1D",
+                  "date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "sizing_mode": "capital_amount",
+                  "capital_amount": 100.0,
+                  "starting_capital": 0.0,
+                  "recurring_contribution": 100.0,
+                  "position_size": null,
+                  "cadence": "monthly",
+                  "parameters": {},
+                  "risk_rules": [],
+                  "benchmark_symbol": "SPY",
+                  "language": "en",
+                  "requested_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "_execution_realism": {
+                    "enabled": true,
+                    "fee_bps": 10.0,
+                    "slippage_bps": 5.0
+                  },
+                  "coverage_preflight": {
+                    "schema_version": "market_data_coverage_v1",
+                    "outcome": "full_coverage",
+                    "requested_date_range": {
+                      "start": "2025-09-10",
+                      "end": "2026-09-09"
+                    },
+                    "effective_date_range": {
+                      "start": "2025-09-10",
+                      "end": "2026-09-09"
+                    },
+                    "observations_by_symbol": {
+                      "DOCN": 251,
+                      "SPY": 251
+                    },
+                    "adjustment_reason": "none",
+                    "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe"
+                  }
+                },
+                "validation": {
+                  "status": "ready_to_run",
+                  "executable": true,
+                  "date_adjusted": false
+                }
+              },
+              "launch_payload_hash": "6749f634aa05119e",
+              "canonical_launch_payload_hash": "sha256:6749f634aa05119ed76112a578f0c08321b8772d7e7681ea6ffe89a3a1d8b55c",
+              "strategy_hash": "3f803aaf5cbdc2c0",
+              "validation": {
+                "executable": true,
+                "failure_code": null
+              },
+              "launch_payload": {
+                "strategy_type": "dca_accumulation",
+                "symbol": "DOCN",
+                "symbols": [
+                  "DOCN"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "requested_date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "coverage_preflight": {
+                  "schema_version": "market_data_coverage_v1",
+                  "outcome": "full_coverage",
+                  "requested_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe",
+                  "observations_by_symbol": {
+                    "DOCN": 251,
+                    "SPY": 251
+                  }
+                },
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "sizing_mode": "capital_amount",
+                "capital_amount": 100.0,
+                "position_size": null,
+                "starting_capital": 0.0,
+                "recurring_contribution": 100.0,
+                "cadence": "monthly",
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "_execution_realism": {
+                  "enabled": true,
+                  "fee_bps": 10.0,
+                  "slippage_bps": 5.0
+                },
+                "language": "en"
+              }
+            }
+          }
+        ],
+        "last_unresolved_follow_up": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY."
+      },
+      "route_receipts": [
+        {
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 2032,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 853,
+            "completion_tokens": 75,
+            "total_tokens": 928,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00111935,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:21:36.047255+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 17855,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 10870,
+            "completion_tokens": 2157,
+            "total_tokens": 13027,
+            "cached_tokens": 192,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0187784,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:21:54.445381+00:00"
+        },
+        {
+          "task": "interpretation_repair",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "FocusedStrategyExtraction",
+          "latency_ms": 4460,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 3536,
+            "completion_tokens": 476,
+            "total_tokens": 4012,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0054756,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:21:58.907686+00:00",
+          "repair_effect": {
+            "schema_version": "argus_repair_effect/v1",
+            "trigger_reason": "required_strategy_shape_missing",
+            "repair_applied": true,
+            "changed_fields": [
+              "artifact_target",
+              "candidate_strategy_draft.capital_amount",
+              "candidate_strategy_draft.date_range_intent",
+              "candidate_strategy_draft.field_provenance",
+              "candidate_strategy_draft.recurring_contribution",
+              "detected_user_language",
+              "intent",
+              "uses_latest_result_context"
+            ],
+            "before_fingerprint": "3ef08736a5b36accc6730aec160359a6d50b2f78cdfeab3207c405f25cb644b3",
+            "after_fingerprint": "19e6941d34c77bd6718b50ff99ef95cf2584c5b8d6376654cece7eee4309be1c",
+            "no_op_reason": null
+          }
+        },
+        {
+          "task": "field_fidelity",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "latency_ms": 1722,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 2464,
+            "completion_tokens": 143,
+            "total_tokens": 2607,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0033031,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:22:00.674031+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "DcaContractAudit",
+          "latency_ms": 4764,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 1485,
+            "completion_tokens": 513,
+            "total_tokens": 1998,
+            "cached_tokens": 192,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00293715,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:22:08.770398+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "DcaContributionRoleAudit",
+          "latency_ms": 10328,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 1357,
+            "completion_tokens": 1188,
+            "total_tokens": 2545,
+            "cached_tokens": 192,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00446465,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:22:19.099298+00:00"
+        }
+      ],
+      "turn_cost_usd": 0.036078,
+      "provider_calls": [
+        {
+          "order": 1,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 2003,
+          "content": {
+            "all_traded_asset_mentions_included": true,
+            "asset_mentions": [
+              {
+                "raw_text": "DOCN",
+                "role": "traded_asset",
+                "mention_kind": "ticker",
+                "confidence": 0.9
+              },
+              {
+                "raw_text": "SPY",
+                "role": "benchmark",
+                "mention_kind": "ticker",
+                "confidence": 0.9
+              }
+            ]
+          },
+          "usage": {
+            "prompt_tokens": 853,
+            "completion_tokens": 75,
+            "total_tokens": 928,
+            "cost": 0.00111935,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 128,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00111935,
+              "upstream_inference_prompt_cost": 0.00093185,
+              "upstream_inference_completions_cost": 0.0001875
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        },
+        {
+          "order": 2,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 17842,
+          "content": {
+            "intent": "strategy_drafting",
+            "task_relation": "new_task",
+            "user_goal_summary": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+            "requires_clarification": false,
+            "detected_user_language": "en",
+            "candidate_strategy_draft": {
+              "raw_user_phrasing": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+              "language": "en",
+              "strategy_type": "dca_accumulation",
+              "asset_universe": [
+                "DOCN"
+              ],
+              "asset_class": "equity",
+              "cadence": "monthly",
+              "date_range": {
+                "start": "2025-09-10",
+                "end": "2026-09-09"
+              },
+              "date_range_raw_text": "from September 10, 2025 through September 9, 2026",
+              "date_range_intent": {
+                "kind": "explicit_range",
+                "start": "2025-09-10",
+                "end": "2026-09-09",
+                "evidence": "from September 10, 2025 through September 9, 2026"
+              },
+              "initial_capital": 1000,
+              "total_capital": null,
+              "comparison_baseline": "SPY",
+              "extra_parameters": {
+                "fee_rate": 0.001,
+                "slippage": 0.0005
+              }
+            },
+            "missing_required_fields": [],
+            "assistant_response": "Understood. Setting up monthly DCA on DOCN with $1000 starting capital plus $100 monthly contributions from September 10 2025 to September 9 2026, benchmarked to SPY, with 10 bp fees and 5 bp slippage.",
+            "uses_latest_result_context": false,
+            "confidence": 0.95,
+            "reason_codes": [],
+            "semantic_turn_act": "new_idea",
+            "result_followup_focus": null,
+            "artifact_target": "none"
+          },
+          "usage": {
+            "prompt_tokens": 10870,
+            "completion_tokens": 2157,
+            "total_tokens": 13027,
+            "cost": 0.0187784,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0187784,
+              "upstream_inference_prompt_cost": 0.0133859,
+              "upstream_inference_completions_cost": 0.0053925
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1594,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        },
+        {
+          "order": 3,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "FocusedStrategyExtraction",
+          "latency_ms": 4452,
+          "content": {
+            "is_testable_strategy": true,
+            "user_goal_summary": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+            "requires_clarification": false,
+            "language": null,
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "DOCN"
+            ],
+            "asset_class": null,
+            "timeframe": null,
+            "date_range": null,
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "comparison_baseline": "SPY",
+            "capital_amount": 1000,
+            "recurring_contribution": 100,
+            "cadence": "monthly",
+            "entry_logic": null,
+            "exit_logic": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "indicator": null,
+            "indicator_period": null,
+            "entry_threshold": null,
+            "exit_threshold": null,
+            "missing_required_fields": [],
+            "assistant_response": null,
+            "confidence": 0.95,
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly"
+            }
+          },
+          "usage": {
+            "prompt_tokens": 3536,
+            "completion_tokens": 476,
+            "total_tokens": 4012,
+            "cost": 0.0054756,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 128,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0054756,
+              "upstream_inference_prompt_cost": 0.0042856,
+              "upstream_inference_completions_cost": 0.00119
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        },
+        {
+          "order": 4,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "StatedRunFieldFidelityAudit",
+          "latency_ms": 1717,
+          "content": {
+            "capital_amount": 1000,
+            "recurring_contribution_amount": 100,
+            "cadence": "monthly",
+            "timeframe": null,
+            "date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "comparison_baseline": "SPY",
+            "fee": {
+              "rate": 0.001,
+              "evidence_span": "10 basis point fee"
+            },
+            "slippage": {
+              "rate": 0.0005,
+              "evidence_span": "5 basis points slippage"
+            },
+            "confidence": 0.8
+          },
+          "usage": {
+            "prompt_tokens": 2464,
+            "completion_tokens": 143,
+            "total_tokens": 2607,
+            "cost": 0.0033031,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 128,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0033031,
+              "upstream_inference_prompt_cost": 0.0029456,
+              "upstream_inference_completions_cost": 0.0003575
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        },
+        {
+          "order": 5,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "DcaContractAudit",
+          "latency_ms": 4760,
+          "content": {
+            "is_recurring_buy_request": true,
+            "recurring_contribution_amount": 100,
+            "cadence": "monthly",
+            "total_budget_amount": null,
+            "total_budget_source": null,
+            "confidence": 0.95
+          },
+          "usage": {
+            "prompt_tokens": 1485,
+            "completion_tokens": 513,
+            "total_tokens": 1998,
+            "cost": 0.00293715,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00293715,
+              "upstream_inference_prompt_cost": 0.00165465,
+              "upstream_inference_completions_cost": 0.0012825
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 457,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        },
+        {
+          "order": 6,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "DcaContributionRoleAudit",
+          "latency_ms": 10322,
+          "content": {
+            "recurring_contribution_explicit": true,
+            "total_budget_not_recurring": true,
+            "confidence": 0.9
+          },
+          "usage": {
+            "prompt_tokens": 1357,
+            "completion_tokens": 1188,
+            "total_tokens": 2545,
+            "cost": 0.00446465,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00446465,
+              "upstream_inference_prompt_cost": 0.00149465,
+              "upstream_inference_completions_cost": 0.00297
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1157,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "user_message": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+      "elapsed_s": 29.3,
+      "stage_outcome": "await_approval",
+      "assistant_text": "[confirmation card]",
+      "em_dash_in_reply": false,
+      "requested_field": null,
+      "clarification": null,
+      "response_intent_kind": null,
+      "pending_strategy": {
+        "strategy": {
+          "raw_user_phrasing": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+          "requested_strategy_template": null,
+          "strategy_type": "dca_accumulation",
+          "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+          "asset_universe": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": "monthly",
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "DOCN",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "DOCN",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "provider_resolved_assets": [
+              {
+                "raw_text": "DOCN",
+                "symbol": "DOCN",
+                "asset_class": "equity",
+                "name": "DigitalOcean Holdings, Inc.",
+                "raw_symbol": "DOCN",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NYSE"
+              }
+            ],
+            "recurring_contribution": 100.0,
+            "recurring_cadence": "monthly",
+            "language": "en",
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly",
+              "fee_rate": "10 basis point fee",
+              "slippage": "5 basis points slippage"
+            },
+            "field_provenance": {
+              "comparison_baseline": "stated_run_field_fidelity_audit",
+              "recurring_contribution": "recurring_contribution",
+              "capital_amount": "recurring_contribution",
+              "cadence": "explicit_user",
+              "fee_rate": "explicit_user",
+              "slippage": "explicit_user",
+              "initial_capital": "starting_capital"
+            },
+            "raw_strategy_type": "dca_accumulation",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "initial_capital": 1000.0
+          }
+        },
+        "requested_field": null,
+        "missing_required_fields": []
+      },
+      "confirmation_payload": {
+        "strategy": {
+          "raw_user_phrasing": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+          "requested_strategy_template": null,
+          "strategy_type": "dca_accumulation",
+          "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+          "asset_universe": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": "monthly",
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "DOCN",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "DOCN",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "provider_resolved_assets": [
+              {
+                "raw_text": "DOCN",
+                "symbol": "DOCN",
+                "asset_class": "equity",
+                "name": "DigitalOcean Holdings, Inc.",
+                "raw_symbol": "DOCN",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NYSE"
+              }
+            ],
+            "recurring_contribution": 100.0,
+            "recurring_cadence": "monthly",
+            "language": "en",
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly",
+              "fee_rate": "10 basis point fee",
+              "slippage": "5 basis points slippage"
+            },
+            "field_provenance": {
+              "comparison_baseline": "stated_run_field_fidelity_audit",
+              "recurring_contribution": "recurring_contribution",
+              "capital_amount": "recurring_contribution",
+              "cadence": "explicit_user",
+              "fee_rate": "explicit_user",
+              "slippage": "explicit_user",
+              "initial_capital": "starting_capital"
+            },
+            "raw_strategy_type": "dca_accumulation",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "initial_capital": 1000.0
+          }
+        },
+        "optional_parameters": {
+          "initial_capital": {
+            "value": 1000.0,
+            "source": "user",
+            "label": "Initial capital",
+            "description": "Starting cash for the simulated backtest."
+          },
+          "timeframe": {
+            "value": "1D",
+            "source": "default",
+            "label": "Timeframe",
+            "description": "Bar interval used for the simulation."
+          },
+          "fees": {
+            "value": 0.001,
+            "source": "user",
+            "label": "Fees",
+            "description": "Per-trade fee assumption applied during execution."
+          },
+          "slippage": {
+            "value": 0.0005,
+            "source": "user",
+            "label": "Slippage",
+            "description": "Execution slippage assumption expressed as a fraction."
+          },
+          "engine_options": {
+            "value": {},
+            "source": "default",
+            "label": "Engine options",
+            "description": "Reserved execution knobs exposed by the runtime contract."
+          }
+        },
+        "launch_payload": {
+          "strategy_type": "dca_accumulation",
+          "symbol": "DOCN",
+          "symbols": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": "1D",
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "starting_capital": 1000.0,
+          "recurring_contribution": 100.0,
+          "position_size": null,
+          "cadence": "monthly",
+          "parameters": {},
+          "risk_rules": [],
+          "benchmark_symbol": "SPY",
+          "language": "en",
+          "requested_date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "_execution_realism": {
+            "enabled": true,
+            "fee_bps": 10.0,
+            "slippage_bps": 5.0
+          },
+          "coverage_preflight": {
+            "schema_version": "market_data_coverage_v1",
+            "outcome": "full_coverage",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "observations_by_symbol": {
+              "DOCN": 251,
+              "SPY": 251
+            },
+            "adjustment_reason": "none",
+            "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe"
+          }
+        },
+        "validation": {
+          "status": "ready_to_run",
+          "executable": true,
+          "date_adjusted": false
+        },
+        "edit_disclosure": null
+      },
+      "run_state": {
+        "intent": "backtest_execution",
+        "semantic_turn_act": "answer_pending_need",
+        "task_relation": "continue",
+        "missing_required_fields": [],
+        "requested_field": null,
+        "candidate_strategy_draft": {
+          "raw_user_phrasing": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+          "requested_strategy_template": null,
+          "strategy_type": "dca_accumulation",
+          "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+          "asset_universe": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": "monthly",
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "DOCN",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "DOCN",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "provider_resolved_assets": [
+              {
+                "raw_text": "DOCN",
+                "symbol": "DOCN",
+                "asset_class": "equity",
+                "name": "DigitalOcean Holdings, Inc.",
+                "raw_symbol": "DOCN",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NYSE"
+              }
+            ],
+            "recurring_contribution": 100.0,
+            "recurring_cadence": "monthly",
+            "language": "en",
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly",
+              "fee_rate": "10 basis point fee",
+              "slippage": "5 basis points slippage"
+            },
+            "field_provenance": {
+              "comparison_baseline": "stated_run_field_fidelity_audit",
+              "recurring_contribution": "recurring_contribution",
+              "capital_amount": "recurring_contribution",
+              "cadence": "explicit_user",
+              "fee_rate": "explicit_user",
+              "slippage": "explicit_user",
+              "initial_capital": "starting_capital"
+            },
+            "raw_strategy_type": "dca_accumulation",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "initial_capital": 1000.0
+          }
+        },
+        "optional_parameter_status": {
+          "optional_parameter_opportunity": [
+            "initial_capital",
+            "timeframe",
+            "fees",
+            "slippage",
+            "engine_options"
+          ],
+          "user_preference_overridden_for_turn": false,
+          "confidence": 0.85,
+          "arbitration_mode": "structured_arbitration",
+          "ambiguous_fields": [],
+          "unsupported_constraints": [],
+          "initial_capital": 1000.0
+        },
+        "reason_codes": null,
+        "user_goal_summary": "User changed a visible confirmation assumption."
+      },
+      "selected_thread_metadata": {
+        "latest_task_type": "backtest_execution",
+        "last_stage_outcome": "await_approval"
+      },
+      "latest_task_snapshot": {
+        "latest_task_type": "backtest_execution",
+        "completed": false,
+        "pending_strategy_summary": {
+          "raw_user_phrasing": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+          "requested_strategy_template": null,
+          "strategy_type": "dca_accumulation",
+          "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+          "asset_universe": [
+            "DOCN"
+          ],
+          "asset_class": "equity",
+          "timeframe": null,
+          "cadence": "monthly",
+          "entry_logic": null,
+          "exit_logic": null,
+          "date_range": {
+            "start": "2025-09-10",
+            "end": "2026-09-09"
+          },
+          "sizing_mode": "capital_amount",
+          "capital_amount": 100.0,
+          "position_size": null,
+          "risk_rules": [],
+          "assumptions": [],
+          "comparison_baseline": "SPY",
+          "refinement_of": null,
+          "entry_rule": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "DOCN",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "DOCN",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "extra_parameters": {
+            "fee_rate": 0.001,
+            "slippage": 0.0005,
+            "provider_resolved_assets": [
+              {
+                "raw_text": "DOCN",
+                "symbol": "DOCN",
+                "asset_class": "equity",
+                "name": "DigitalOcean Holdings, Inc.",
+                "raw_symbol": "DOCN",
+                "provider": "alpaca",
+                "exchange": "AssetExchange.NYSE"
+              }
+            ],
+            "recurring_contribution": 100.0,
+            "recurring_cadence": "monthly",
+            "language": "en",
+            "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+            "date_range_intent": {
+              "kind": "explicit_range",
+              "start": "2025-09-10",
+              "end": "2026-09-09",
+              "day_offset": null,
+              "count": null,
+              "unit": null,
+              "anchor": null,
+              "year": null,
+              "endpoint": null,
+              "confidence": 1.0,
+              "evidence": "September 10, 2025 through September 9, 2026"
+            },
+            "evidence_spans": {
+              "strategy_type": "monthly dollar-cost averaging",
+              "asset_universe": "DOCN",
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "comparison_baseline": "SPY",
+              "capital_amount": "$1,000",
+              "recurring_contribution": "$100 every month",
+              "cadence": "monthly",
+              "fee_rate": "10 basis point fee",
+              "slippage": "5 basis points slippage"
+            },
+            "field_provenance": {
+              "comparison_baseline": "stated_run_field_fidelity_audit",
+              "recurring_contribution": "recurring_contribution",
+              "capital_amount": "recurring_contribution",
+              "cadence": "explicit_user",
+              "fee_rate": "explicit_user",
+              "slippage": "explicit_user",
+              "initial_capital": "starting_capital"
+            },
+            "raw_strategy_type": "dca_accumulation",
+            "requested_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "effective_date_range": {
+              "start": "2025-09-10",
+              "end": "2026-09-09"
+            },
+            "initial_capital": 1000.0
+          }
+        },
+        "confirmed_strategy_summary": null,
+        "pending_needs": [],
+        "field_provenance": {},
+        "resolution_provenance": [
+          {
+            "field": "asset_universe[0]",
+            "raw_text": "DOCN",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "DOCN",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "medium"
+          }
+        ],
+        "active_draft_reference": null,
+        "active_confirmation_reference": {
+          "artifact_kind": "confirmation",
+          "artifact_id": "confirmation-cf97b713-81c3-4cf2-afd6-ccf57e36de73",
+          "artifact_status": "active",
+          "metadata": {
+            "confirmation_id": "confirmation-cf97b713-81c3-4cf2-afd6-ccf57e36de73",
+            "artifact_type": "confirmation",
+            "confirmation_payload": {
+              "strategy": {
+                "raw_user_phrasing": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+                "requested_strategy_template": null,
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+                "asset_universe": [
+                  "DOCN"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": "monthly",
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "sizing_mode": "capital_amount",
+                "capital_amount": 100.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "DOCN",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "DOCN",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "fee_rate": 0.001,
+                  "slippage": 0.0005,
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "DOCN",
+                      "symbol": "DOCN",
+                      "asset_class": "equity",
+                      "name": "DigitalOcean Holdings, Inc.",
+                      "raw_symbol": "DOCN",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NYSE"
+                    }
+                  ],
+                  "recurring_contribution": 100.0,
+                  "recurring_cadence": "monthly",
+                  "language": "en",
+                  "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+                  "date_range_intent": {
+                    "kind": "explicit_range",
+                    "start": "2025-09-10",
+                    "end": "2026-09-09",
+                    "day_offset": null,
+                    "count": null,
+                    "unit": null,
+                    "anchor": null,
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 1.0,
+                    "evidence": "September 10, 2025 through September 9, 2026"
+                  },
+                  "evidence_spans": {
+                    "strategy_type": "monthly dollar-cost averaging",
+                    "asset_universe": "DOCN",
+                    "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+                    "comparison_baseline": "SPY",
+                    "capital_amount": "$1,000",
+                    "recurring_contribution": "$100 every month",
+                    "cadence": "monthly",
+                    "fee_rate": "10 basis point fee",
+                    "slippage": "5 basis points slippage"
+                  },
+                  "field_provenance": {
+                    "comparison_baseline": "stated_run_field_fidelity_audit",
+                    "recurring_contribution": "recurring_contribution",
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                    "fee_rate": "explicit_user",
+                    "slippage": "explicit_user",
+                    "initial_capital": "starting_capital"
+                  },
+                  "raw_strategy_type": "dca_accumulation",
+                  "requested_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "initial_capital": 1000.0
+                }
+              },
+              "optional_parameters": {
+                "initial_capital": {
+                  "value": 1000.0,
+                  "source": "user",
+                  "label": "Initial capital",
+                  "description": "Starting cash for the simulated backtest."
+                },
+                "timeframe": {
+                  "value": "1D",
+                  "source": "default",
+                  "label": "Timeframe",
+                  "description": "Bar interval used for the simulation."
+                },
+                "fees": {
+                  "value": 0.001,
+                  "source": "user",
+                  "label": "Fees",
+                  "description": "Per-trade fee assumption applied during execution."
+                },
+                "slippage": {
+                  "value": 0.0005,
+                  "source": "user",
+                  "label": "Slippage",
+                  "description": "Execution slippage assumption expressed as a fraction."
+                },
+                "engine_options": {
+                  "value": {},
+                  "source": "default",
+                  "label": "Engine options",
+                  "description": "Reserved execution knobs exposed by the runtime contract."
+                }
+              },
+              "confirmation_id": "confirmation-cf97b713-81c3-4cf2-afd6-ccf57e36de73",
+              "artifact_id": "confirmation-cf97b713-81c3-4cf2-afd6-ccf57e36de73",
+              "launch_payload": {
+                "strategy_type": "dca_accumulation",
+                "symbol": "DOCN",
+                "symbols": [
+                  "DOCN"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "sizing_mode": "capital_amount",
+                "capital_amount": 100.0,
+                "starting_capital": 1000.0,
+                "recurring_contribution": 100.0,
+                "position_size": null,
+                "cadence": "monthly",
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "language": "en",
+                "requested_date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "_execution_realism": {
+                  "enabled": true,
+                  "fee_bps": 10.0,
+                  "slippage_bps": 5.0
+                },
+                "coverage_preflight": {
+                  "schema_version": "market_data_coverage_v1",
+                  "outcome": "full_coverage",
+                  "requested_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "observations_by_symbol": {
+                    "DOCN": 251,
+                    "SPY": 251
+                  },
+                  "adjustment_reason": "none",
+                  "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe"
+                }
+              },
+              "validation": {
+                "status": "ready_to_run",
+                "executable": true,
+                "date_adjusted": false
+              }
+            },
+            "launch_payload_hash": "6154d8ca0c73f6f7",
+            "canonical_launch_payload_hash": "sha256:6154d8ca0c73f6f70f8138aac9765ba4353c6c6f960ba646fcce15807024a3bd",
+            "strategy_hash": "758dd3327f9f83d7",
+            "validation": {
+              "executable": true,
+              "failure_code": null
+            },
+            "launch_payload": {
+              "strategy_type": "dca_accumulation",
+              "symbol": "DOCN",
+              "symbols": [
+                "DOCN"
+              ],
+              "asset_class": "equity",
+              "timeframe": "1D",
+              "date_range": {
+                "start": "2025-09-10",
+                "end": "2026-09-09"
+              },
+              "requested_date_range": {
+                "start": "2025-09-10",
+                "end": "2026-09-09"
+              },
+              "coverage_preflight": {
+                "schema_version": "market_data_coverage_v1",
+                "outcome": "full_coverage",
+                "requested_date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "effective_date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe",
+                "observations_by_symbol": {
+                  "DOCN": 251,
+                  "SPY": 251
+                }
+              },
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "sizing_mode": "capital_amount",
+              "capital_amount": 100.0,
+              "position_size": null,
+              "starting_capital": 1000.0,
+              "recurring_contribution": 100.0,
+              "cadence": "monthly",
+              "parameters": {},
+              "risk_rules": [],
+              "benchmark_symbol": "SPY",
+              "_execution_realism": {
+                "enabled": true,
+                "fee_bps": 10.0,
+                "slippage_bps": 5.0
+              },
+              "language": "en"
+            }
+          }
+        },
+        "latest_backtest_result_reference": null,
+        "latest_collection_action_reference": null,
+        "latest_failed_action_reference": null,
+        "saved_strategy_reference": null,
+        "artifact_references": [
+          {
+            "artifact_kind": "confirmation",
+            "artifact_id": "confirmation-cf97b713-81c3-4cf2-afd6-ccf57e36de73",
+            "artifact_status": "active",
+            "metadata": {
+              "confirmation_id": "confirmation-cf97b713-81c3-4cf2-afd6-ccf57e36de73",
+              "artifact_type": "confirmation",
+              "confirmation_payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+                  "requested_strategy_template": null,
+                  "strategy_type": "dca_accumulation",
+                  "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+                  "asset_universe": [
+                    "DOCN"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": "monthly",
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "sizing_mode": "capital_amount",
+                  "capital_amount": 100.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "DOCN",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "DOCN",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "fee_rate": 0.001,
+                    "slippage": 0.0005,
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "DOCN",
+                        "symbol": "DOCN",
+                        "asset_class": "equity",
+                        "name": "DigitalOcean Holdings, Inc.",
+                        "raw_symbol": "DOCN",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NYSE"
+                      }
+                    ],
+                    "recurring_contribution": 100.0,
+                    "recurring_cadence": "monthly",
+                    "language": "en",
+                    "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+                    "date_range_intent": {
+                      "kind": "explicit_range",
+                      "start": "2025-09-10",
+                      "end": "2026-09-09",
+                      "day_offset": null,
+                      "count": null,
+                      "unit": null,
+                      "anchor": null,
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 1.0,
+                      "evidence": "September 10, 2025 through September 9, 2026"
+                    },
+                    "evidence_spans": {
+                      "strategy_type": "monthly dollar-cost averaging",
+                      "asset_universe": "DOCN",
+                      "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+                      "comparison_baseline": "SPY",
+                      "capital_amount": "$1,000",
+                      "recurring_contribution": "$100 every month",
+                      "cadence": "monthly",
+                      "fee_rate": "10 basis point fee",
+                      "slippage": "5 basis points slippage"
+                    },
+                    "field_provenance": {
+                      "comparison_baseline": "stated_run_field_fidelity_audit",
+                      "recurring_contribution": "recurring_contribution",
+                      "capital_amount": "recurring_contribution",
+                      "cadence": "explicit_user",
+                      "fee_rate": "explicit_user",
+                      "slippage": "explicit_user",
+                      "initial_capital": "starting_capital"
+                    },
+                    "raw_strategy_type": "dca_accumulation",
+                    "requested_date_range": {
+                      "start": "2025-09-10",
+                      "end": "2026-09-09"
+                    },
+                    "effective_date_range": {
+                      "start": "2025-09-10",
+                      "end": "2026-09-09"
+                    },
+                    "initial_capital": 1000.0
+                  }
+                },
+                "optional_parameters": {
+                  "initial_capital": {
+                    "value": 1000.0,
+                    "source": "user",
+                    "label": "Initial capital",
+                    "description": "Starting cash for the simulated backtest."
+                  },
+                  "timeframe": {
+                    "value": "1D",
+                    "source": "default",
+                    "label": "Timeframe",
+                    "description": "Bar interval used for the simulation."
+                  },
+                  "fees": {
+                    "value": 0.001,
+                    "source": "user",
+                    "label": "Fees",
+                    "description": "Per-trade fee assumption applied during execution."
+                  },
+                  "slippage": {
+                    "value": 0.0005,
+                    "source": "user",
+                    "label": "Slippage",
+                    "description": "Execution slippage assumption expressed as a fraction."
+                  },
+                  "engine_options": {
+                    "value": {},
+                    "source": "default",
+                    "label": "Engine options",
+                    "description": "Reserved execution knobs exposed by the runtime contract."
+                  }
+                },
+                "confirmation_id": "confirmation-cf97b713-81c3-4cf2-afd6-ccf57e36de73",
+                "artifact_id": "confirmation-cf97b713-81c3-4cf2-afd6-ccf57e36de73",
+                "launch_payload": {
+                  "strategy_type": "dca_accumulation",
+                  "symbol": "DOCN",
+                  "symbols": [
+                    "DOCN"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": "1D",
+                  "date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "sizing_mode": "capital_amount",
+                  "capital_amount": 100.0,
+                  "starting_capital": 1000.0,
+                  "recurring_contribution": 100.0,
+                  "position_size": null,
+                  "cadence": "monthly",
+                  "parameters": {},
+                  "risk_rules": [],
+                  "benchmark_symbol": "SPY",
+                  "language": "en",
+                  "requested_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "_execution_realism": {
+                    "enabled": true,
+                    "fee_bps": 10.0,
+                    "slippage_bps": 5.0
+                  },
+                  "coverage_preflight": {
+                    "schema_version": "market_data_coverage_v1",
+                    "outcome": "full_coverage",
+                    "requested_date_range": {
+                      "start": "2025-09-10",
+                      "end": "2026-09-09"
+                    },
+                    "effective_date_range": {
+                      "start": "2025-09-10",
+                      "end": "2026-09-09"
+                    },
+                    "observations_by_symbol": {
+                      "DOCN": 251,
+                      "SPY": 251
+                    },
+                    "adjustment_reason": "none",
+                    "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe"
+                  }
+                },
+                "validation": {
+                  "status": "ready_to_run",
+                  "executable": true,
+                  "date_adjusted": false
+                }
+              },
+              "launch_payload_hash": "6154d8ca0c73f6f7",
+              "canonical_launch_payload_hash": "sha256:6154d8ca0c73f6f70f8138aac9765ba4353c6c6f960ba646fcce15807024a3bd",
+              "strategy_hash": "758dd3327f9f83d7",
+              "validation": {
+                "executable": true,
+                "failure_code": null
+              },
+              "launch_payload": {
+                "strategy_type": "dca_accumulation",
+                "symbol": "DOCN",
+                "symbols": [
+                  "DOCN"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "requested_date_range": {
+                  "start": "2025-09-10",
+                  "end": "2026-09-09"
+                },
+                "coverage_preflight": {
+                  "schema_version": "market_data_coverage_v1",
+                  "outcome": "full_coverage",
+                  "requested_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-10",
+                    "end": "2026-09-09"
+                  },
+                  "preflight_id": "sha256:cff3924f98ed239541fa96954ba7eb8a9e7ff57cefd0e807a3c78b60cc2832fe",
+                  "observations_by_symbol": {
+                    "DOCN": 251,
+                    "SPY": 251
+                  }
+                },
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "sizing_mode": "capital_amount",
+                "capital_amount": 100.0,
+                "position_size": null,
+                "starting_capital": 1000.0,
+                "recurring_contribution": 100.0,
+                "cadence": "monthly",
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "_execution_realism": {
+                  "enabled": true,
+                  "fee_bps": 10.0,
+                  "slippage_bps": 5.0
+                },
+                "language": "en"
+              }
+            }
+          }
+        ],
+        "last_unresolved_follow_up": "User changed a visible confirmation assumption."
+      },
+      "route_receipts": [
+        {
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 1067,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 818,
+            "completion_tokens": 44,
+            "total_tokens": 862,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0009981,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:22:20.841587+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 12287,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 13605,
+            "completion_tokens": 1550,
+            "total_tokens": 15155,
+            "cached_tokens": 192,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.02067965,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:22:33.130171+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "ArtifactAssumptionEditPlan",
+          "latency_ms": 13808,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 5387,
+            "completion_tokens": 1665,
+            "total_tokens": 7052,
+            "cached_tokens": 192,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.01069465,
+          "context_packet_ids": [],
+          "created_at": "2026-09-11T04:22:46.940407+00:00"
+        }
+      ],
+      "turn_cost_usd": 0.032372,
+      "provider_calls": [
+        {
+          "order": 7,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 1060,
+          "content": {
+            "all_traded_asset_mentions_included": true,
+            "asset_mentions": [
+              {
+                "raw_text": "SPY",
+                "role": "benchmark",
+                "mention_kind": "ticker",
+                "confidence": 0.9
+              }
+            ]
+          },
+          "usage": {
+            "prompt_tokens": 818,
+            "completion_tokens": 44,
+            "total_tokens": 862,
+            "cost": 0.0009981,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 128,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0009981,
+              "upstream_inference_prompt_cost": 0.0008881,
+              "upstream_inference_completions_cost": 0.00011
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        },
+        {
+          "order": 8,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 12267,
+          "content": {
+            "intent": "strategy_drafting",
+            "task_relation": "refine",
+            "user_goal_summary": "Refine DCA strategy to set $1000 as initial starting capital only with $100 monthly recurring contributions after that and no total contribution cap, while keeping the original dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+            "requires_clarification": false,
+            "detected_user_language": "en",
+            "candidate_strategy_draft": {
+              "raw_user_phrasing": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+              "language": "en",
+              "requested_strategy_template": null,
+              "strategy_type": "dca_accumulation",
+              "strategy_thesis": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. Compare with SPY.",
+              "asset_universe": [
+                "DOCN"
+              ],
+              "asset_class": "equity",
+              "cadence": "monthly",
+              "date_range": {
+                "start": "2025-09-10",
+                "end": "2026-09-09"
+              },
+              "date_range_raw_text": "September 10, 2025 through September 9, 2026",
+              "date_range_intent": {
+                "kind": "explicit_range",
+                "start": "2025-09-10",
+                "end": "2026-09-09",
+                "confidence": 1.0,
+                "evidence": "September 10, 2025 through September 9, 2026"
+              },
+              "capital_amount": 100.0,
+              "initial_capital": 1000.0,
+              "total_capital": null,
+              "comparison_baseline": "SPY",
+              "extra_parameters": {
+                "fee_rate": 0.001,
+                "slippage": 0.0005
+              }
+            },
+            "semantic_turn_act": "refine_current_idea",
+            "artifact_target": "pending_refinement"
+          },
+          "usage": {
+            "prompt_tokens": 13605,
+            "completion_tokens": 1550,
+            "total_tokens": 15155,
+            "cost": 0.02067965,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.02067965,
+              "upstream_inference_prompt_cost": 0.01680465,
+              "upstream_inference_completions_cost": 0.003875
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1070,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        },
+        {
+          "order": 9,
+          "model": "x-ai/grok-4.3",
+          "schema_name": "ArtifactAssumptionEditPlan",
+          "latency_ms": 13796,
+          "content": {
+            "outcome": "ready_to_confirm",
+            "operations": [
+              {
+                "op": "set",
+                "target": "starting_capital",
+                "number": 1000
+              },
+              {
+                "op": "set",
+                "target": "recurring_contribution",
+                "number": 100
+              },
+              {
+                "op": "set",
+                "target": "cadence",
+                "value": "monthly"
+              }
+            ],
+            "confidence": 0.85
+          },
+          "usage": {
+            "prompt_tokens": 5387,
+            "completion_tokens": 1665,
+            "total_tokens": 7052,
+            "cost": 0.01069465,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.01069465,
+              "upstream_inference_prompt_cost": 0.00653215,
+              "upstream_inference_completions_cost": 0.0041625
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1574,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

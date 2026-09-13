@@ -131,6 +131,37 @@ def test_ceiling_claim_failure_fails_closed(monkeypatch) -> None:
     assert evidence.claim_research_provider_attempt().available is False
 
 
+@pytest.mark.parametrize("invocations", [0, 1])
+def test_repeated_tool_calls_keep_distinct_cost_correlations(
+    monkeypatch, invocations: int
+) -> None:
+    from faker import Faker
+
+    fake = Faker()
+    gateway = _LedgerGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    request_id, user_id, conversation_id, message_id = [fake.uuid4() for _ in range(4)]
+    call_ids = [fake.uuid4(), fake.uuid4()]
+    for call_id in call_ids:
+        research = _research()
+        research["usage"]["invocations"] = invocations
+        evidence.record_research_turn_evidence(
+            research=research,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            request_id=request_id,
+            tool_call_id=call_id,
+        )
+    assert [entry["request_id"] for entry in gateway.entries] == [request_id] * 2
+    assert [
+        entry["usage_metadata"]["tool_call_id"] for entry in gateway.entries
+    ] == call_ids
+    assert len({entry["correlation_id"] for entry in gateway.entries}) == 2
+    assert all(entry["billable_quantity"] == 1 for entry in gateway.entries)
+    assert all(entry["cost_amount"] == 0.005 for entry in gateway.entries)
+
+
 def test_supabase_claims_global_and_guest_capacity_in_one_rpc(monkeypatch) -> None:
     calls: list[tuple[str, dict[str, Any]]] = []
 

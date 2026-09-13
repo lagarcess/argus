@@ -1,0 +1,10 @@
+{
+  "path": "/Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/.env",
+  "sha256": "6a428549c310bd43ea51b46f2c106602284618c44bbe41b382b0289728edf45d",
+  "mtime_ns": 1789165000013090571,
+  "mtime_precedes_baseline_start": true,
+  "checked_at": 1789269521.202115,
+  "binding": "Verify the same content hash after both runs. Both use this explicit path and identical process environment; no alternate env file is present.",
+  "unchanged_after_both_processes": true,
+  "checked_after_pair": "2026-09-13T04:09:29.080268+00:00"
+}

@@ -46,7 +46,9 @@ class ResearchPricingRecorder:
                 self._executor, record_unpriced_research_spend, spend
             )
         except Exception:  # noqa: BLE001
-            logger.error(
+            # The cause travels with the evidence: a ledger that refuses a
+            # row is only diagnosable from the log line that says why.
+            logger.opt(exception=True).error(
                 "research_cost_unrecorded recorder=failed {}", spend.model_dump_json()
             )
 
@@ -85,7 +87,6 @@ def record_unpriced_research_spend(spend: UnpricedResearchSpend) -> None:
             "cost_currency": "USD",
             "cost_source": "unavailable",
             "latency_ms": spend.usage.latency_ms,
-            "status": "succeeded",
             "usage_metadata": {"pricing_status": "unpriced", **report},
         }
     )

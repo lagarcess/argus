@@ -348,8 +348,43 @@ def run_backtest_job(
             )
         timings.record_elapsed("result_readout_total", phase_started)
 
+        from argus.domain.result_readout_content import readout_metadata
+
+        result_card = {
+            **result_card,
+            **readout_metadata(
+                surface="quick_take",
+                text=result_readout.text,
+                language=str(request.get("language") or "en"),
+                source=result_readout.source,
+                fallback_used=result_readout.fallback_used,
+                failure_mode=result_readout.failure_mode,
+            ),
+        }
+
         from argus.domain.backtest_run_builder import build_backtest_run_from_result
 
+        binding = _request_tool_binding(running)
+        if binding is not None:
+            from argus.agent_runtime.tools.registered_backtest import (
+                backtest_execution_result,
+            )
+            from argus.domain.tool_contracts import ToolOutcome
+            from argus.domain.tool_job_binding import tool_card_for_job_completion
+
+            completed_card = tool_card_for_job_completion(
+                binding,
+                ToolOutcome(
+                    status="succeeded",
+                    result=backtest_execution_result(
+                        {"result": envelope, "result_card": result_card}
+                    ).model_dump(mode="json"),
+                ),
+            )
+            result_card = {
+                **result_card,
+                "tool_result_cards": [completed_card.model_dump(mode="json")],
+            }
         run = build_backtest_run_from_result(
             conversation_id=conversation_id,
             result_card=result_card,
@@ -532,6 +567,14 @@ def run_backtest_job(
             source_error=exc,
             timings=timings,
         )
+
+
+def _request_tool_binding(row: Mapping[str, Any]) -> dict[str, Any] | None:
+    launch = row.get("launch_payload")
+    if not isinstance(launch, dict):
+        return None
+    binding = launch.get("tool_binding")
+    return binding if isinstance(binding, dict) else None
 
 
 def _delete_withheld_run(gateway: Any, *, user_id: str, run_id: str) -> bool:

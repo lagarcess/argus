@@ -1,0 +1,4 @@
+registered-weekend-en-390: greeting="What should we look into?" expected=day_d served_interest={"markets":false}
+registered-weekend-en-1280: greeting="What should we look into?" expected=day_d served_interest={"markets":false}
+registered-weekend-es-419-390: greeting="¿Qué te gustaría investigar?" expected=day_d served_interest={"markets":false}
+registered-weekend-es-419-1280: greeting="¿Qué te gustaría investigar?" expected=day_d served_interest={"markets":false}

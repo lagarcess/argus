@@ -25,6 +25,7 @@ from argus.domain.backtest_finalization import (
     finalize_backtest_completion,
     finalize_direct_backtest_completion,
 )
+from argus.domain.decision_attachment import decision_message_metadata
 from argus.domain.evidence import (
     CapturedEvidence,
     attach_decision_to_result_card,
@@ -420,8 +421,7 @@ def _attach_decision_to_cached_result_surfaces(
                 decision_id=decision.id,
                 decision_state=decision.decision_state,
             )
-            metadata["decision_note_id"] = decision.id
-            metadata["decision_state"] = decision.decision_state
+            metadata = decision_message_metadata(metadata, decision=decision)
             updated_messages.append(message.model_copy(update={"metadata": metadata}))
             changed = True
         if changed:

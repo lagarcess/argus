@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import i18next from "i18next";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { I18nextProvider } from "react-i18next";
 
 import {
   ChatStreamError,
@@ -11,8 +15,33 @@ import {
 } from "../lib/argus-api";
 import { commandPaletteRequestIsCurrent } from "../lib/command-palette-items";
 import { effectivePaletteLayout } from "../components/sidebar/command-palette/paletteLayout";
+import ChatMessage from "../components/chat/ChatMessage";
+import { standaloneStreamStatusVisible } from "../components/chat/chat-message-projection";
+import type { Message } from "../components/chat/types";
+import en from "../public/locales/en/common.json";
 
 const root = join(import.meta.dir, "..");
+
+async function renderConfirmationMessage(kind?: string, active = true) {
+  const i18n = i18next.createInstance();
+  await i18n.init({ lng: "en", fallbackLng: false, resources: { en: { translation: en } } });
+  const message = {
+    id: "confirmation-message", role: "ai", kind: "strategy_confirmation",
+    confirmation: {
+      ...(kind === undefined ? {} : { kind }),
+      confirmation_id: "confirmation-1",
+      confirmation_state: active ? "active" : "superseded",
+      title: "AAPL", status: active ? "ready_to_run" : "updated",
+      statusLabel: active ? "Ready to run" : "Updated", summary: "Review this test.",
+      rows: [{ key: "assets", label: "Assets", value: "AAPL" }],
+      actions: [{ id: "run-backtest", type: "run_backtest", label: "Run backtest",
+        payload: { confirmation_id: "confirmation-1" } }],
+    },
+  } as unknown as Message;
+  return renderToStaticMarkup(createElement(
+    I18nextProvider, { i18n }, createElement(ChatMessage, { message }),
+  ));
+}
 
 function readChatImplementationSource(): string {
   return [
@@ -94,8 +123,8 @@ describe("Argus Alpha frontend contract", () => {
       join(root, "components/sidebar/ChatSidebar.tsx"),
       "utf-8",
     );
-    const settings = readFileSync(
-      join(root, "components/views/SettingsView.tsx"),
+    const deleted = readFileSync(
+      join(root, "components/settings/DeletedItemsView.tsx"),
       "utf-8",
     );
     const palette = readFileSync(
@@ -115,11 +144,11 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain("CollectionsView");
     expect(chat).not.toContain("CollectionPicker");
     expect(sidebar).not.toContain("Collections");
-    expect(settings).not.toContain("collection");
-    expect(settings).toContain("items.filter(isDeletedItemVisible)");
-    expect(settings).not.toContain("strategy");
-    expect(settings).not.toContain("<Layers");
-    expect(settings).not.toContain("{item.type}");
+    expect(deleted).not.toContain("collection");
+    expect(deleted).toContain("items.filter(isDeletedItemVisible)");
+    expect(deleted).not.toContain("strategy");
+    expect(deleted).not.toContain("<Layers");
+    expect(deleted).not.toContain("{item.type}");
     expect(palette).toContain("item.canManageConversation");
     expect(
       existsSync(join(root, "components/views/CollectionsView.tsx")),
@@ -333,7 +362,11 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(chat).toContain("content: message.content");
-    expect(message).toContain('message.kind === "strategy_result"');
+    // The card's gate is the shared settled-result check, which owns the kind test.
+    expect(message).toContain("isSettledStrategyResult(message)");
+    expect(
+      readFileSync(join(root, "lib/chat-result-message.ts"), "utf-8"),
+    ).toContain('message.kind === "strategy_result"');
     expect(message).toContain("const displayContent = getDisplayContent()");
     expect(message).toContain("displayContent &&");
     expect(message).toContain("<StrategyResultCard");
@@ -597,7 +630,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).toContain("chartTimeLookupKey");
   });
 
-  test("chat renders structured confirmation cards with card-scoped actions only", () => {
+  test("chat renders structured confirmation cards with card-scoped actions only", async () => {
     const chat = readChatImplementationSource();
     const message = readFileSync(
       join(root, "components/chat/ChatMessage.tsx"),
@@ -627,7 +660,9 @@ describe("Argus Alpha frontend contract", () => {
     // that the floating composer strip is gone.
     expect(message).toContain("slide-in-from-bottom-2");
     expect(message).toContain("<StrategyConfirmationCard");
-    expect(message).toContain("confirmation={message.confirmation}");
+    const markup = await renderConfirmationMessage("backtest");
+    expect(markup).toContain("argus-confirmation-reveal");
+    expect(markup.match(/Run backtest/g)).toHaveLength(1);
     expect(message).toContain("onAction={onAction}");
   });
 
@@ -1004,9 +1039,9 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(chat).toContain('event.event === "stage_start"');
-    expect(chat).toContain("chat.status.${event.data.stage}");
-    expect(locale).toContain('"interpret": "Understanding your idea..."');
-    expect(locale).toContain('"execute": "Running backtest..."');
+    expect(chat).toContain("toolProgressText(event.data.tool_progress ?? null, t)");
+    expect(locale).not.toContain('"interpret": "Understanding your idea..."');
+    expect(locale).not.toContain('"execute": "Running backtest..."');
   });
 
   test("latest pending assistant response hides feedback before stage_start arrives", () => {
@@ -1039,10 +1074,10 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain("latestAssistantContent");
-    expect(chat).toMatch(
-      /const showStreamStatus = Boolean\s*\(\s*visibleStreamStatus && latestAssistantContent\.length === 0,?\s*\)/,
-    );
+    const message: Message = { id: crypto.randomUUID(), role: "ai", kind: "text", content: "" };
+    expect(standaloneStreamStatusVisible([message], true)).toBe(true);
+    expect(standaloneStreamStatusVisible([{ ...message, content: "The answer has begun." }], true)).toBe(false);
+    expect(chat).toContain("standaloneStreamStatusVisible(messages, Boolean(visibleStreamStatus))");
     expect(chat).toContain("{showStreamStatus && (");
   });
 
@@ -1172,24 +1207,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("message.confirmation.actions");
   });
 
-  test("confirmation cards render active artifact actions", () => {
-    const card = readFileSync(
-      join(root, "components/chat/StrategyConfirmationCard.tsx"),
-      "utf-8",
-    );
-    const message = readFileSync(
-      join(root, "components/chat/ChatMessage.tsx"),
-      "utf-8",
-    );
-
-    expect(card).toContain("onAction?: (action: ChatActionOption) => void");
-    expect(card).toContain("confirmation.actions");
-    expect(card).toContain('confirmation.confirmation_state === "active"');
-    expect(card).toContain("!confirmation.confirmation_state");
-    expect(card).not.toContain("ArrowRight");
-    expect(message).toContain("<StrategyConfirmationCard");
-    expect(message).toContain("confirmation={message.confirmation}");
-    expect(message).toContain("onAction={onAction}");
+  test.each([undefined, "backtest"])("only active recognized confirmation kind %p renders Run", async (kind) => {
+    expect(await renderConfirmationMessage(kind)).toContain("Run backtest");
+    expect(await renderConfirmationMessage(kind, false)).not.toContain("Run backtest");
+    expect(await renderConfirmationMessage("future_calculation")).not.toContain("Run backtest");
   });
 
   test("result cards render only active artifact scoped actions", () => {
@@ -1526,20 +1547,28 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const decisionsApi = readFileSync(join(root, "lib/decisions-api.ts"), "utf-8");
+    const affordance = readFileSync(
+      join(root, "components/chat/DecisionAffordance.tsx"),
+      "utf-8",
+    );
 
     expect(api).toContain("export async function createEvidenceDecision");
     expect(api).toContain("decision_state: DecisionState");
-    expect(card).toContain("const response = await createEvidenceDecision");
-    expect(card).toContain("result.evidenceArtifactId");
-    expect(card).toContain(
-      "setSavedDecisionState(response.decision.decision_state)",
-    );
-    expect(card).toContain("decisionChipClassName");
-    expect(card).toContain("border-[#5ba897]/18 bg-transparent");
-    expect(card).toContain("selectedDecisionState === state");
-    expect(card).toContain("DECISION_NOTE_MAX_LENGTH");
-    expect(card).toContain("nextDecisionNoteValue(");
-    expect(card).not.toContain("maxLength={DECISION_NOTE_MAX_LENGTH}");
+    // One affordance owns capture; the route follows the typed attachment.
+    expect(decisionsApi).toContain("export async function saveDecision");
+    expect(decisionsApi).toContain("export async function createMessageDecision");
+    expect(decisionsApi).toContain('attachment.kind === "evidence_artifact"');
+    expect(affordance).toContain("await saveDecision(attachment, {");
+    expect(card).toContain('kind: "evidence_artifact", artifactId: result.evidenceArtifactId');
+    expect(card).toContain("setSavedDecisionState(decision.decision_state)");
+    expect(card).not.toContain("createEvidenceDecision");
+    expect(affordance).toContain("decisionChipClassName");
+    expect(affordance).toContain("border-[#5ba897]/18 bg-transparent");
+    expect(affordance).toContain("draft.selectedState === state");
+    expect(affordance).toContain("DECISION_NOTE_MAX_LENGTH");
+    expect(affordance).toContain("nextDecisionNoteValue(");
+    expect(affordance).not.toContain("maxLength={DECISION_NOTE_MAX_LENGTH}");
   });
 
   test("omnisearch dossier verbs reuse ordinary send and owner-checked decision paths", () => {
@@ -2869,14 +2898,14 @@ describe("Argus Alpha frontend contract", () => {
     expect(page).toContain('params.get("preview") === "true"');
   });
 
-  test("settings subscription section is feature-flagged off by default", () => {
-    const settings = readFileSync(
-      join(root, "components/views/SettingsView.tsx"),
-      "utf-8",
+  test("no settings surface offers a subscription", () => {
+    // The only subscription section lived in the unreachable full-page view.
+    expect(existsSync(join(root, "components/views/SettingsView.tsx"))).toBe(
+      false,
     );
-
-    expect(settings).toContain("NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION");
-    expect(settings).toContain("{showSubscriptionSection && (");
+    expect(readFileSync(join(root, ".env.local.example"), "utf-8")).not.toContain(
+      "NEXT_PUBLIC_ARGUS_SHOW_SUBSCRIPTION",
+    );
   });
 
   test("sidebar keeps omnisearch enabled without legacy strategy navigation", () => {

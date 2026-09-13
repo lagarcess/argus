@@ -1,0 +1,187 @@
+{
+  "records": [
+    {
+      "tag": "selection-390-es-419",
+      "width": 390,
+      "language": "es-419",
+      "allEnabled": false,
+      "choices": [
+        {
+          "question": "Synthetic example: buy $200 of AAPL monthly with modeled costs.",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 1: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 2: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 3: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored example without typed sources",
+          "checked": false,
+          "disabled": true,
+          "reason": "El contenido de las fuentes no se puede compartir. Esta respuesta no tiene fuentes publicadas compatibles."
+        },
+        {
+          "question": "Authored example with an unlisted URL",
+          "checked": false,
+          "disabled": true,
+          "reason": "La respuesta no se puede compartir. La respuesta contiene un enlace que no aparece en sus fuentes."
+        },
+        {
+          "question": "Authored example shaped by memory",
+          "checked": false,
+          "disabled": true,
+          "reason": "Esta respuesta usa recuerdos personales."
+        },
+        {
+          "question": "Authored clarification example",
+          "checked": false,
+          "disabled": true,
+          "reason": "Este tipo de respuesta no se puede compartir."
+        },
+        {
+          "question": "Authored confirmation example",
+          "checked": false,
+          "disabled": true,
+          "reason": "Este tipo de respuesta no se puede compartir."
+        },
+        {
+          "question": "Authored degraded example",
+          "checked": false,
+          "disabled": true,
+          "reason": "La investigaci\u00f3n no se complet\u00f3 con toda su evidencia."
+        },
+        {
+          "question": "Authored example: include record bf06c016-e7ef-43b9-a358-0afc9951bc13",
+          "checked": false,
+          "disabled": true,
+          "reason": "La pregunta no se puede compartir. El texto contiene informaci\u00f3n privada o c\u00f3digos."
+        },
+        {
+          "question": "Authored example: which answer field is refused?",
+          "checked": false,
+          "disabled": true,
+          "reason": "La respuesta no se puede compartir. El texto contiene informaci\u00f3n privada o c\u00f3digos."
+        },
+        {
+          "question": "Authored fifth eligible example: selection must respect the four-answer cap.",
+          "checked": false,
+          "disabled": true,
+          "reason": "Un enlace puede incluir hasta 4 respuestas. El\u00edgelas de forma individual."
+        }
+      ],
+      "noteRefusal": {
+        "status": 422,
+        "text": "Tu nota no se puede compartir. El texto contiene informaci\u00f3n privada o c\u00f3digos."
+      },
+      "overflow": false
+    },
+    {
+      "tag": "selection-1280-es-419",
+      "width": 1280,
+      "language": "es-419",
+      "allEnabled": false,
+      "choices": [
+        {
+          "question": "Synthetic example: buy $200 of AAPL monthly with modeled costs.",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 1: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 2: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 3: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored example without typed sources",
+          "checked": false,
+          "disabled": true,
+          "reason": "El contenido de las fuentes no se puede compartir. Esta respuesta no tiene fuentes publicadas compatibles."
+        },
+        {
+          "question": "Authored example with an unlisted URL",
+          "checked": false,
+          "disabled": true,
+          "reason": "La respuesta no se puede compartir. La respuesta contiene un enlace que no aparece en sus fuentes."
+        },
+        {
+          "question": "Authored example shaped by memory",
+          "checked": false,
+          "disabled": true,
+          "reason": "Esta respuesta usa recuerdos personales."
+        },
+        {
+          "question": "Authored clarification example",
+          "checked": false,
+          "disabled": true,
+          "reason": "Este tipo de respuesta no se puede compartir."
+        },
+        {
+          "question": "Authored confirmation example",
+          "checked": false,
+          "disabled": true,
+          "reason": "Este tipo de respuesta no se puede compartir."
+        },
+        {
+          "question": "Authored degraded example",
+          "checked": false,
+          "disabled": true,
+          "reason": "La investigaci\u00f3n no se complet\u00f3 con toda su evidencia."
+        },
+        {
+          "question": "Authored example: include record bf06c016-e7ef-43b9-a358-0afc9951bc13",
+          "checked": false,
+          "disabled": true,
+          "reason": "La pregunta no se puede compartir. El texto contiene informaci\u00f3n privada o c\u00f3digos."
+        },
+        {
+          "question": "Authored example: which answer field is refused?",
+          "checked": false,
+          "disabled": true,
+          "reason": "La respuesta no se puede compartir. El texto contiene informaci\u00f3n privada o c\u00f3digos."
+        },
+        {
+          "question": "Authored fifth eligible example: selection must respect the four-answer cap.",
+          "checked": false,
+          "disabled": true,
+          "reason": "Un enlace puede incluir hasta 4 respuestas. El\u00edgelas de forma individual."
+        }
+      ],
+      "noteRefusal": {
+        "status": 422,
+        "text": "Tu nota no se puede compartir. El texto contiene informaci\u00f3n privada o c\u00f3digos."
+      },
+      "overflow": false
+    }
+  ],
+  "publications": 0
+}

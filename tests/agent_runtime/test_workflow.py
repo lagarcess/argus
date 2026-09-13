@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 import pytest
@@ -42,6 +42,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.api.chat.confirmation import runtime_confirmation_card
+from argus.domain.market_data.capabilities import EASTERN
 from argus.nlp.natural_time import resolve_date_range_intent
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -1956,9 +1957,9 @@ async def test_spanish_explicit_day_range_survives_confirmation_payload(
 @pytest.mark.asyncio
 async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
     monkeypatch,
+    freeze_new_york_clock,
 ) -> None:
     from argus.agent_runtime import resolution as resolution_module
-    from argus.agent_runtime.stages import interpret as interpret_module
 
     monkeypatch.setattr(
         resolution_module,
@@ -1966,12 +1967,7 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
 
-    class FrozenDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 6, 15)
-
-    monkeypatch.setattr(interpret_module, "date", FrozenDate)
+    freeze_new_york_clock(datetime(2026, 6, 15, 20, 17, tzinfo=EASTERN))
 
     interpreter = SpanishDateAnswerInterpreter()
     workflow = build_workflow(
@@ -2043,7 +2039,16 @@ async def test_workflow_spanish_change_dates_answer_reenters_interpreter(
         today=date(2026, 6, 15),
     )
     assert expected_range is not None
-    assert strategy["date_range"] == expected_range.payload
+    extra_parameters = strategy["extra_parameters"]
+    assert extra_parameters["requested_date_range"] == expected_range.payload
+    # Confirm reads the same clock, so an end of today is clamped to the last
+    # complete session and the clamp is recorded.
+    adjustment = extra_parameters["data_availability_adjustment"]
+    assert adjustment["original_end"] == expected_range.payload["end"]
+    assert strategy["date_range"] == {
+        "start": expected_range.payload["start"],
+        "end": adjustment["through"],
+    }
     assert answer_result["pending_strategy"]["requested_field"] is None
     assert answer_result["pending_strategy"]["missing_required_fields"] == []
 

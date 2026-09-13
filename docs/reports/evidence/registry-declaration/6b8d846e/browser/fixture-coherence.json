@@ -1,0 +1,38 @@
+{
+  "dca_accumulation": {
+    "principal_owner": "DcaCapitalPlan.total_invested(authored contribution_count)",
+    "principal": 600.0,
+    "net_return_pct": 18.4,
+    "profit": 110.4,
+    "ending_value": 710.4,
+    "chart_start_value": 200.0,
+    "chart_end_value": 710.4,
+    "chart_start_date": "2024-01-02",
+    "chart_end_date": "2024-03-01",
+    "chart_semantics": "Authored linear profit accrual across weekdays, plus actual monthly DCA contribution facts; no engine execution",
+    "cash_value_by_locale": {
+      "en": "$600 -> $710",
+      "es-419": "$600 -> $710"
+    },
+    "starting_capital": 0.0,
+    "recurring_contribution": 200.0,
+    "contribution_count": 3,
+    "cadence": "monthly"
+  },
+  "signal_strategy": {
+    "principal_owner": "engine_config.starting_capital",
+    "principal": 10000,
+    "net_return_pct": 18.4,
+    "profit": 1840.0,
+    "ending_value": 11840.0,
+    "chart_start_value": 10000.0,
+    "chart_end_value": 11840.0,
+    "chart_start_date": "2024-01-02",
+    "chart_end_date": "2024-03-01",
+    "chart_semantics": "Authored linear profit accrual across weekdays, plus actual monthly DCA contribution facts; no engine execution",
+    "cash_value_by_locale": {
+      "en": "$10,000 -> $11,840",
+      "es-419": "$10,000 -> $11,840"
+    }
+  }
+}

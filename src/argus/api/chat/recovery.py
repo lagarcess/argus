@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from loguru import logger
@@ -708,11 +708,85 @@ def failed_action_metadata_fallback_context(
     return None
 
 
+def _tool_result_metadata_fallback_context(
+    *, user_id: str, conversation_id: str
+) -> RuntimeFallbackContext | None:
+    from argus.api.chat.tool_results import tool_cards_from_metadata
+
+    messages = _recent_messages_for_conversation(
+        user_id=user_id, conversation_id=conversation_id, limit=20
+    )
+    batches = []
+    for message in reversed(messages):
+        if message.role != "assistant" or not isinstance(message.metadata, dict):
+            continue
+        if message.metadata.get("tool_result_cards"):
+            batches.append(tool_cards_from_metadata(message.metadata))
+            continue
+        if _metadata_supersedes_failed_action(message.metadata):
+            break
+    cards = {}
+    for batch in reversed(batches):
+        for card in batch:
+            cards[card.artifact_id] = card
+    if not cards:
+        return None
+    references = [
+        ArtifactReference(
+            artifact_kind="tool_result",
+            artifact_id=card.artifact_id,
+            artifact_status=card.artifact_state,
+            metadata=card.model_dump(mode="json"),
+        )
+        for card in cards.values()
+    ]
+    return RuntimeFallbackContext(
+        latest_task_snapshot=TaskSnapshot(completed=True, artifact_references=references),
+        selected_thread_metadata={
+            "fallback_source": "message_metadata",
+        },
+        artifact_references=references,
+    )
+
+
 def ordinary_turn_metadata_fallback_context(
     *,
     user_id: str,
     conversation_id: str,
     language: str | None = None,
+) -> RuntimeFallbackContext | None:
+    primary = _ordinary_artifact_fallback_context(
+        user_id=user_id, conversation_id=conversation_id, language=language
+    )
+    tool_fallback = _tool_result_metadata_fallback_context(
+        user_id=user_id, conversation_id=conversation_id
+    )
+    if tool_fallback is None:
+        return primary
+    if primary is None:
+        return tool_fallback
+    tool_references = tool_fallback.artifact_references or []
+    tool_ids = {ref.artifact_id for ref in tool_references}
+    references = [
+        ref
+        for ref in primary.artifact_references or []
+        if ref.artifact_kind != "tool_result" or ref.artifact_id not in tool_ids
+    ] + tool_references
+    snapshot = primary.latest_task_snapshot or tool_fallback.latest_task_snapshot
+    return replace(
+        primary,
+        artifact_references=references,
+        latest_task_snapshot=snapshot.model_copy(
+            update={"artifact_references": references}, deep=True
+        ),
+    )
+
+
+def _ordinary_artifact_fallback_context(
+    *,
+    user_id: str,
+    conversation_id: str,
+    language: str | None,
 ) -> RuntimeFallbackContext | None:
     primary_fallback = confirmation_metadata_fallback_context(
         user_id=user_id,
@@ -835,13 +909,16 @@ def _artifact_references_include(
 
 
 def _metadata_supersedes_failed_action(metadata: dict[str, Any]) -> bool:
+    from argus.agent_runtime.artifacts.lifecycle import has_completed_tool_answer
+
     pending_without_failed_action = bool(
         metadata.get("pending_strategy")
         and not metadata.get("failed_action")
         and not metadata.get("latest_failed_action_reference")
     )
     return bool(
-        metadata.get("result_card")
+        has_completed_tool_answer(metadata)
+        or metadata.get("result_card")
         or metadata.get("result_run_id")
         or metadata.get("latest_run_id")
         or metadata.get("confirmation_card")

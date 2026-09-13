@@ -1,0 +1,42 @@
+[
+  {
+    "label": "nvda-future-value-es",
+    "language": "es-419",
+    "width": 1280,
+    "screenshot": "nvda-future-value-es-1280-es-419.png",
+    "errors": [],
+    "textChars": 1392,
+    "mentionsScenario": true,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "nvda-future-value-es",
+    "language": "es-419",
+    "width": 390,
+    "screenshot": "nvda-future-value-es-390-es-419.png",
+    "errors": [],
+    "textChars": 1350,
+    "mentionsScenario": true,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "nvda-grow-into",
+    "language": "en",
+    "width": 1280,
+    "screenshot": "nvda-grow-into-1280-en.png",
+    "errors": [],
+    "textChars": 1624,
+    "mentionsScenario": true,
+    "mentionsCannotPredict": false
+  },
+  {
+    "label": "nvda-grow-into",
+    "language": "en",
+    "width": 390,
+    "screenshot": "nvda-grow-into-390-en.png",
+    "errors": [],
+    "textChars": 1585,
+    "mentionsScenario": true,
+    "mentionsCannotPredict": false
+  }
+]

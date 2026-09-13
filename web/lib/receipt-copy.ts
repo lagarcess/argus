@@ -1,5 +1,6 @@
 import enCommon from "@/public/locales/en/common.json";
 import esCommon from "@/public/locales/es-419/common.json";
+import { createInstance } from "i18next";
 import { SPANISH_ENABLED, type ArgusLanguage } from "./language-features";
 
 /**
@@ -44,6 +45,15 @@ export function receiptLanguageFromAcceptLanguage(
 export function receiptCopy(language: ArgusLanguage): ReceiptCopy {
   return COPY[language] ?? COPY.en;
 }
+
+// The card's display owners need the same catalog translator on the standalone
+// SSR page and inside the owner's preview, without a browser i18n provider.
+const receiptI18n = createInstance();
+void receiptI18n.init({
+  initAsync: false, fallbackLng: "en", interpolation: { escapeValue: false },
+  resources: { en: { translation: enCommon }, "es-419": { translation: esCommon } },
+});
+export const receiptTranslator = (language: ArgusLanguage) => receiptI18n.getFixedT(language);
 
 export function formatReceiptDate(
   value: string | null | undefined,

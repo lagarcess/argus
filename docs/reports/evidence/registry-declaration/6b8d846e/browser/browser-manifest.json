@@ -1,0 +1,588 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "authored_rendered_fixture",
+  "source_sha": "6b8d846e8543d532ecbfac73b9d744a3b1ac1ec2",
+  "source_files_unchanged_after_capture": true,
+  "primary_source_and_tests_clean_after_capture": true,
+  "production_web_source": "git archive of the exact source SHA; no production changes in the archive",
+  "locales": [
+    "en",
+    "es-419"
+  ],
+  "behavioral_viewport_widths": [
+    1280,
+    390
+  ],
+  "source_fixture_convention": "The unchanged repository generator runs inside the isolated archive, where its relative docs/reports/evidence/registry output lands. The authored temporary wrapper replaces only DCA/MACD fixture values with coherent inputs before the final browser run.",
+  "test_instrumentation": "Original 14 test bodies unchanged; two evidence-hook statements prepended. Two authored signal controls added only to the isolated archive. Exact wrappers are under harness/.",
+  "unique_browser_cases": 16,
+  "provider_calls": 0,
+  "interpreter_calls": 0,
+  "backtest_handler_calls": 0,
+  "real_api_calls": 0,
+  "paid_spend_usd": 0,
+  "network_guard": "Service workers blocked. HTTP and WebSocket routes outside loopback are denied. Every API request must be fulfilled by an authored route; unmatched API requests abort and fail. Progress additionally uses an authored fetch stream.",
+  "assertions": [
+    "English and es-419 localized card/progress labels",
+    "Typed zero remains known and the declared unknown remains blank",
+    "Two input edits and two revision advances, invalid edit withheld, reload retains result and sibling",
+    "Latest-message eligibility and pending-edit cancellation on send",
+    "Repeated asynchronous calls complete out of order and both survive reload",
+    "Canonical DCA cadence, zero seed, contribution and modeled costs remain visible",
+    "Authored MACD control retains fast/slow/signal windows, chart and modeled costs before and after reload"
+  ],
+  "screenshots": [
+    {
+      "path": "screenshots/signal-card-en.png",
+      "sha256": "7ed9fd37f01354bff038adf11043882341588e455be62b27d311a4a1cc60a74e",
+      "pixel_size": {
+        "width": 281,
+        "height": 1039
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "MACD +18.4%, $10,000 to $11,840, 12/26/9 windows, date window and modeled costs readable; plotted final value and date match the typed snapshot.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/signal-card-en.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 1000
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 44,
+            "cardTop": 60
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 1142.5,
+            "cardHeight": 1038.5
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/signal-card-es-419.png",
+      "sha256": "99ba51c6560f138d47654ee694cd29477ae2708ec4346ded5ed7a6ce5418d0d5",
+      "pixel_size": {
+        "width": 287,
+        "height": 1039
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "MACD +18.4%, $10,000 to $11,840, 12/26/9 windows, date window and modeled costs readable; plotted final value and date match the typed snapshot.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/signal-card-es-419.png",
+        "originalViewport": {
+          "width": 390,
+          "height": 1000
+        },
+        "viewport": {
+          "width": 390,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 44,
+            "cardTop": 60
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 1142.5,
+            "cardHeight": 1038.5
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-backtest-en.png",
+      "sha256": "0e2935c53d16392552f7360093beb2c085775750b09604346945fc4a1c3a7eea",
+      "pixel_size": {
+        "width": 273,
+        "height": 1022
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "DCA +18.4%, $600 to rounded $710 ending value, monthly $200 contribution, zero seed, date window and modeled costs readable; plotted final value is $710.40 in the typed fixture.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-backtest-en.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 27,
+            "cardTop": 77
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 1125.5,
+            "cardHeight": 1021.5
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-backtest-es-419.png",
+      "sha256": "e6b6e0dc42720ab704df58eabbffa6c2c5e02c003e6ec239342e5bb07ac98f42",
+      "pixel_size": {
+        "width": 318,
+        "height": 1022
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "DCA +18.4%, $600 to rounded $710 ending value, monthly $200 contribution, zero seed, date window and modeled costs readable; plotted final value is $710.40 in the typed fixture.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-backtest-es-419.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 27,
+            "cardTop": 77
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 1125.5,
+            "cardHeight": 1021.5
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-card-en-1280.png",
+      "sha256": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+      "pixel_size": {
+        "width": 268,
+        "height": 345
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Localized chrome, answer zero, known zero, other seven and unknown to-solve remain readable; names are declared test-only identifiers.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-card-en-1280.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 188,
+            "cardTop": 0
+          },
+          "after": {
+            "scrollTop": 28,
+            "cardTop": 160,
+            "cardBottom": 505,
+            "cardHeight": 345
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-card-en-390.png",
+      "sha256": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+      "pixel_size": {
+        "width": 268,
+        "height": 345
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Localized chrome, answer zero, known zero, other seven and unknown to-solve remain readable; names are declared test-only identifiers.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-card-en-390.png",
+        "originalViewport": {
+          "width": 390,
+          "height": 900
+        },
+        "viewport": {
+          "width": 390,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 188,
+            "cardTop": 0
+          },
+          "after": {
+            "scrollTop": 28,
+            "cardTop": 160,
+            "cardBottom": 505,
+            "cardHeight": 345
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-card-es-419-1280.png",
+      "sha256": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+      "pixel_size": {
+        "width": 265,
+        "height": 345
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Localized chrome, answer zero, known zero, other seven and unknown to-solve remain readable; names are declared test-only identifiers.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-card-es-419-1280.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 188,
+            "cardTop": 0
+          },
+          "after": {
+            "scrollTop": 28,
+            "cardTop": 160,
+            "cardBottom": 505,
+            "cardHeight": 345
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-card-es-419-390.png",
+      "sha256": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+      "pixel_size": {
+        "width": 265,
+        "height": 345
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Localized chrome, answer zero, known zero, other seven and unknown to-solve remain readable; names are declared test-only identifiers.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-card-es-419-390.png",
+        "originalViewport": {
+          "width": 390,
+          "height": 900
+        },
+        "viewport": {
+          "width": 390,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 188,
+            "cardTop": 0
+          },
+          "after": {
+            "scrollTop": 28,
+            "cardTop": 160,
+            "cardBottom": 505,
+            "cardHeight": 345
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-history-en.png",
+      "sha256": "6fe1075536e0a0a67556370281d305c7511e7017c6441ae08e5ee1575cec50db",
+      "pixel_size": {
+        "width": 1280,
+        "height": 900
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Earlier card is read-only and later saved user message remains visible; all product chrome is retained.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-history-en.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 1000
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 0,
+            "cardTop": 104
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 433,
+            "cardHeight": 329
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-history-es-419.png",
+      "sha256": "2c177d7fc85b5c776f0d08a846e57a248eb6790ea9ac54a8cae477e03ec23d47",
+      "pixel_size": {
+        "width": 1280,
+        "height": 900
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Earlier card is read-only and later saved user message remains visible; all product chrome is retained.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-history-es-419.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 1000
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 0,
+            "cardTop": 104
+          },
+          "after": {
+            "scrollTop": 0,
+            "cardTop": 104,
+            "cardBottom": 433,
+            "cardHeight": 329
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-jobs-en.png",
+      "sha256": "c7f882aa3fe151d6814dfc95950cb2dd2cabfcc72e9abe37511c23da601dcf11",
+      "pixel_size": {
+        "width": 1280,
+        "height": 1500
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Both completed results remain visible in order, first 40 then zero, with latest card editable; product chrome retained.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-jobs-en.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 192,
+            "cardTop": 340.75
+          },
+          "after": {
+            "scrollTop": 192,
+            "cardTop": 340.75,
+            "cardBottom": 669.75,
+            "cardHeight": 329
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-jobs-es-419.png",
+      "sha256": "0539afeb11d0c6cda85d2bd564ee917b280a5f136d23619a215a8084c92cbc2b",
+      "pixel_size": {
+        "width": 1280,
+        "height": 1500
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Both completed results remain visible in order, first 40 then zero, with latest card editable; product chrome retained.",
+      "scroll_capture": {
+        "path": "/private/tmp/registry-declaration-browser-6b8d846e/screenshots/tool-jobs-es-419.png",
+        "originalViewport": {
+          "width": 1280,
+          "height": 900
+        },
+        "viewport": {
+          "width": 1280,
+          "height": 1500
+        },
+        "requestedCardTop": 160,
+        "actualScroll": {
+          "before": {
+            "scrollTop": 192,
+            "cardTop": 340.75
+          },
+          "after": {
+            "scrollTop": 192,
+            "cardTop": 340.75,
+            "cardBottom": 669.75,
+            "cardHeight": 329
+          }
+        }
+      }
+    },
+    {
+      "path": "screenshots/tool-progress-en.png",
+      "sha256": "179c8a3d539e2c4cd3a4c833f6e8a7e0cf78132ee048a6518509683744cbff8c",
+      "pixel_size": {
+        "width": 1280,
+        "height": 1000
+      },
+      "run": "coherent_full_matrix",
+      "locale": "en",
+      "visually_inspected": true,
+      "inspection": "Declared Checking 0 or Revisando 0 progress is visible in the normal muted shimmer style; no result card invented."
+    },
+    {
+      "path": "screenshots/tool-progress-es-419.png",
+      "sha256": "73a7627126ddc3afd238e79f70fde26b42ff2658c48bc1fb4c629bd3ca65c53f",
+      "pixel_size": {
+        "width": 1280,
+        "height": 1000
+      },
+      "run": "coherent_full_matrix",
+      "locale": "es-419",
+      "visually_inspected": true,
+      "inspection": "Declared Checking 0 or Revisando 0 progress is visible in the normal muted shimmer style; no result card invented."
+    }
+  ],
+  "capture_note": "All 14 selected images come from this post-merge 16-case run. Reused the exact previous scroll helper with only the scratch output path changed: real transcript scrolling and recorded viewport heights, no styles changed and no chrome hidden. Earlier evidence remains linked, not duplicated.",
+  "server_cleanup": {
+    "port": 3196,
+    "playwright_processes_exited": true,
+    "listener_present_after_runs": false,
+    "verification": "lsof -nP -iTCP:3196 -sTCP:LISTEN returned exit 1 with no output"
+  },
+  "limitations": "Authored fixture acceptance only: no live model, real API/recompute backend, provider data or backtest execution claim.",
+  "archived_file_sha256": {
+    "README.md": "2274bb4fc3147b9c258e094e686abddf685c72adb5cf4397d67fd0caf3f914ce",
+    "backtest-cards.json": "5d0a14d8fabd517bcb64041c2f25037dbaea777319bd252f068f4bab7922eaf3",
+    "browser.log": "1f19955575d0e11aacbf9209415519743dea9a1a24fa5dc9a27d6b248a60817b",
+    "coherent-matrix-results.json": "17bfb009e4ee8362a59c03b4159f9ff9b9feb607e2b5045ed26936a76b26e8fe",
+    "command.txt": "efe58c9f096e148790e0535bf600f4b5778704210d8eee9916549556fed1c445",
+    "fixture-coherence.json": "7f49e8dc63cdb7831b7419acd0cdc1ac569c32e265bd91a1c594969466b44907",
+    "fixture-generation.log": "a47304c72edb66c6b4730491cebd31a139d28b42e7f60c1af3e114b298cfeb55",
+    "generate-fixtures.py": "54af2456c7ef6e961db7a782b48a9a22796364adb148e55915377812d2661fc5",
+    "harness/mobile-shell-fixture.ts": "2d3e8f43c342980d4d3b2a32594b2f4e853a01049ca3547519f5e966eb131683",
+    "harness/registry-evidence-hooks.ts": "3f5e050a4d958264d13b040acbd0cd100518b66db79be3fa02fb74018f5e15e4",
+    "harness/registry-fixture.py": "14992c317fe0d18e392d7ed62e38b746340d726e07e3a5bebacf4c36e9824e1f",
+    "harness/registry-signal-control.spec.ts": "8e6ec18448cd68f98d7cf54320437beac36fd70476b2349de0b28299dc63b16f",
+    "harness/tool-registry.spec.ts": "0104b0ba789b1873e3852cdb5e0970526b39df43a6d1063dee9023aed12613ac",
+    "network/a-later-saved-user-message-makes-old-tool-inputs-read-only-en.json": "fc09f0c10e75c6cf1c3b15a374e70149f6e1963126263ade9c89d02aad2f3db5",
+    "network/a-later-saved-user-message-makes-old-tool-inputs-read-only-es-419.json": "19f8766cb8572bf6dee2830d2e08331b4bb62387f133f31530dc128dd854bae9",
+    "network/authored-signal-card-retains-macd-windows-and-chart-across-reload-en.json": "ab7c2ce3df500dcbdf71c33c75cdf79870f92854908c06822fc6a9777178d2ad",
+    "network/authored-signal-card-retains-macd-windows-and-chart-across-reload-es-419.json": "83efd7350683be7f65654580c41800b2de4170c696039a005c0a2b3ad0aa052c",
+    "network/declared-backtest-keeps-dca-assumptions-and-the-receipt-visual-en.json": "6678656e2441e9811d71097fda78f46fd688f928cef4fb1674b72e52e7889989",
+    "network/declared-backtest-keeps-dca-assumptions-and-the-receipt-visual-es-419.json": "2bca169e167d9ee3447703d3355c5c3e96500c3685125ca9407781477dc9e658",
+    "network/executing-call-progress-is-localizable-without-another-turn-en.json": "3eed509669645f672ec6fad079d001f2f31e6289b6342f4e76b4db477bb1daab",
+    "network/executing-call-progress-is-localizable-without-another-turn-es-419.json": "3aef990f816a766026e7189a58f67a8e20f62ae412829ac4c04444bc4b11e527",
+    "network/repeated-asynchronous-calls-settle-independently-en.json": "fd940938a176816ba0aedb54e74d268e2fe666d8ac2e6a8b7c5cd7f6dd278768",
+    "network/repeated-asynchronous-calls-settle-independently-es-419.json": "379a9cbd527358434caf72523aedaa46e3ab708e9ca7921c1cb97eba451dad58",
+    "network/sending-another-turn-cancels-the-pending-tool-edit-en.json": "a3bca6d28969032690f7163cd64f3d8c19cbfb118f3353ffe8d1f68e368822c9",
+    "network/sending-another-turn-cancels-the-pending-tool-edit-es-419.json": "42d9bdb55f58986784fcb9a47c0c9fa4ca61def0d3bdffcc4baa69d45f7f4a42",
+    "network/tool-results-live-recompute-and-reload-en-1280.json": "7c03b61206a3516df93c964ae13a7c3f2ae44b07d75da1670d18a1d817713508",
+    "network/tool-results-live-recompute-and-reload-en-390.json": "4032d562aad2992598bbff3fb1cb4d7f2aa9f263a50778013e82fc26b5b87bb1",
+    "network/tool-results-live-recompute-and-reload-es-419-1280.json": "158c807bbec850f796fb867bc3401e214884e6ec78478130529c591c4e3690e5",
+    "network/tool-results-live-recompute-and-reload-es-419-390.json": "136f683390ea00a53743e4a5eb35d6506d3eede7fc56b9ffe838c251b81cf49c",
+    "provenance.json": "71db8c1187dd9f3ed423b0f6ea87b290cd3dc88f1abd8eff9da7c2d9f3ed1680",
+    "registry.playwright.config.ts": "dcbb4b416bec383b55c3a4365bd0e42760c03f09273d2fd51bfec432dd4967bf",
+    "screenshots/signal-card-en.png": "7ed9fd37f01354bff038adf11043882341588e455be62b27d311a4a1cc60a74e",
+    "screenshots/signal-card-es-419.png": "99ba51c6560f138d47654ee694cd29477ae2708ec4346ded5ed7a6ce5418d0d5",
+    "screenshots/tool-backtest-en.png": "0e2935c53d16392552f7360093beb2c085775750b09604346945fc4a1c3a7eea",
+    "screenshots/tool-backtest-es-419.png": "e6b6e0dc42720ab704df58eabbffa6c2c5e02c003e6ec239342e5bb07ac98f42",
+    "screenshots/tool-card-en-1280.png": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+    "screenshots/tool-card-en-390.png": "f3cc779524e6683520207cd481a5222634240ef038ddd876f15535945cb5cbb7",
+    "screenshots/tool-card-es-419-1280.png": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+    "screenshots/tool-card-es-419-390.png": "bb05b42125016aa11590a6927711de964c9bfaab48f1a364826a45c5535967b7",
+    "screenshots/tool-history-en.png": "6fe1075536e0a0a67556370281d305c7511e7017c6441ae08e5ee1575cec50db",
+    "screenshots/tool-history-es-419.png": "2c177d7fc85b5c776f0d08a846e57a248eb6790ea9ac54a8cae477e03ec23d47",
+    "screenshots/tool-jobs-en.png": "c7f882aa3fe151d6814dfc95950cb2dd2cabfcc72e9abe37511c23da601dcf11",
+    "screenshots/tool-jobs-es-419.png": "0539afeb11d0c6cda85d2bd564ee917b280a5f136d23619a215a8084c92cbc2b",
+    "screenshots/tool-progress-en.png": "179c8a3d539e2c4cd3a4c833f6e8a7e0cf78132ee048a6518509683744cbff8c",
+    "screenshots/tool-progress-es-419.png": "73a7627126ddc3afd238e79f70fde26b42ff2658c48bc1fb4c629bd3ca65c53f",
+    "scroll-capture.cjs": "81f746d874434d6b203280be3f0a05ef02d6ae6b8b089a9b011ec225f842e166",
+    "scroll-captures.jsonl": "3b3d6a459de70175f2597891d0ea447176e660efb35dc6b176af916f8e2e62b3",
+    "signal-cards.json": "870392fbee52304a7a1f79003d1e33f8ff4051c65e369de5f0ab90af1f2839de",
+    "tool-cards.json": "35f3786eca400c82bebc445ca3dba0df444d9f1edfd919f735592a93529d5fb9",
+    "tool-progress.json": "9062af124011023f543f4fa9d2d540e01ad305e4cea72bfdee6ef1145a946f0b",
+    "verify-bundle.py": "ccd0edaf277565fb23625aadf60318e6702cf6830c1776335a21b80ec75ab176"
+  },
+  "runs": {
+    "coherent_full_matrix": {
+      "report": "coherent-matrix-results.json",
+      "stats": {
+        "startTime": "2026-09-10T09:12:23.201Z",
+        "duration": 57388.648,
+        "expected": 16,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "playwright_version": "1.59.1",
+      "observed_mocked_api_requests": 208,
+      "external_requests": 0,
+      "unhandled_api_requests": 0,
+      "page_errors": 0,
+      "network_logs": "network",
+      "acceptance": true
+    }
+  },
+  "selected_run": "coherent_full_matrix",
+  "numeric_fixture_ledger": "fixture-coherence.json",
+  "archive_source_verification": "Compared every tracked web file in the archive with git archive of source_sha after final browser exit: only web/e2e/tool-registry.spec.ts differed, by the documented evidence-hook prefix. Added temporary signal/hook files are retained under harness/.",
+  "fixture_correction": "Reused the corrected b17 numeric fixture logic unchanged. Principal comes from engine config or DcaCapitalPlan; profit, ending value and chart endpoints derive from that principal and authored net return. The generator now hashes the merged ChatInterface owner as additional provenance.",
+  "integration_sha": "3ceada309a450c12335ad6e1048ab141ce1680bb",
+  "recapture_reason": "Integration PR #581 changed the shared ChatInterface owner; repeated the same corrected 16-case rendered-fixture matrix and 14 screenshots on a fresh exact-head archive.",
+  "prior_evidence": "../../b17d2577/browser/README.md",
+  "earlier_evidence_preserved": true,
+  "fixture_hashes_match_prior_corrected_bundle": {
+    "tool-cards.json": true,
+    "tool-progress.json": true,
+    "backtest-cards.json": true,
+    "signal-cards.json": true,
+    "fixture-coherence.json": true
+  }
+}

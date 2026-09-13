@@ -1,0 +1,51 @@
+Registry declaration rendered-fixture acceptance
+Source SHA: b17d25775028b7d7e2ea2f30ab35348291c973cc
+Source repository: /Users/garces/.codex/worktrees/aa72/private-alpha-next
+Isolated root: /private/tmp/registry-declaration-browser-b17d2577
+No source edits, dependency installation, provider calls, real API calls or paid evals.
+
+Preparation
+- Extracted `git archive b17d25775028b7d7e2ea2f30ab35348291c973cc web` into the isolated root's checkout/ directory. This is an archive, not a Git worktree.
+- Linked the existing repository web/node_modules at the isolated root and checkout/web/node_modules.
+- Copied the retained configs and authored evidence hook/signal spec into the isolated root/checkout. Prepended only these two statements to the archived original tool-registry.spec.ts:
+  import { installRegistryEvidenceHooks } from "./registry-evidence-hooks";
+  installRegistryEvidenceHooks();
+- The exact resulting test files are retained under harness/. Config/helper paths intentionally preserve the execution host paths.
+
+Initial fixture generation, superseded (cwd: source repository)
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python /private/tmp/registry-declaration-browser-b17d2577/generate-fixtures.py > /private/tmp/registry-declaration-browser-b17d2577/fixture-generation.log 2>&1
+Result: exit 0; socket/DNS blocked, zero network attempts; real declaration/presentation owners with authored inputs, no handler execution.
+
+Initial full matrix, superseded (cwd: isolated root)
+REGISTRY_SCREENSHOT_DIR=/private/tmp/registry-declaration-browser-b17d2577/screenshots node /Users/garces/.codex/worktrees/aa72/private-alpha-next/web/node_modules/@playwright/test/cli.js test --config /private/tmp/registry-declaration-browser-b17d2577/registry.playwright.config.ts > /private/tmp/registry-declaration-browser-b17d2577/browser.log 2>&1
+Result: exit 0; 16 passed in 58.2s; original 14 cases plus two authored signal controls.
+Archived JSON: full-matrix-results.json (execution output name: playwright-results.json).
+
+Initial readable-card recapture, superseded (cwd: isolated root)
+REGISTRY_SCREENSHOT_DIR=/private/tmp/registry-declaration-browser-b17d2577/screenshots REGISTRY_NETWORK_DIR=/private/tmp/registry-declaration-browser-b17d2577/capture-network NODE_OPTIONS='--require /private/tmp/registry-declaration-browser-b17d2577/scroll-capture.cjs' node /Users/garces/.codex/worktrees/aa72/private-alpha-next/web/node_modules/@playwright/test/cli.js test --config /private/tmp/registry-declaration-browser-b17d2577/registry-capture.playwright.config.ts --grep 'declared backtest|authored signal|tool results live|repeated asynchronous' > /private/tmp/registry-declaration-browser-b17d2577/capture.log 2>&1
+Result: exit 0; 10 passed in 39.9s; existing cases only, same source/fixtures/assertions.
+Capture helper applies real scrolling and disclosed height changes only; no styles or hidden chrome. Initial images remain in scratch screenshots-initial/. Selected images and geometry logs are archived here.
+The guard's REGISTRY_NETWORK_DIR output override was added for this rerun to preserve the full matrix's separate logs; guard behavior was unchanged.
+
+Visual review then found the authored DCA/MACD inputs had inconsistent profit, percentage and chart values. The prior affected inputs/generator/provenance/images are retained under superseded/. The complete initial scratch outputs remain at isolated-root/superseded-inconsistent-fixtures/. They are not acceptance evidence for those numbers.
+
+Corrected fixture generation (cwd: source repository)
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python /private/tmp/registry-declaration-browser-b17d2577/generate-fixtures.py > /private/tmp/registry-declaration-browser-b17d2577/coherent-fixture-generation.log 2>&1
+Result: exit 0; zero network attempts. Existing engine starting capital or DcaCapitalPlan owns principal; +18.4% determines profit/ending value and chart endpoints. Chart dates equal the snapshot start/end dates. fixture-coherence.json records the derivations. Only the authored temporary generator changed.
+
+Final corrected full matrix (cwd: isolated root)
+REGISTRY_SCREENSHOT_DIR=/private/tmp/registry-declaration-browser-b17d2577/screenshots REGISTRY_NETWORK_DIR=/private/tmp/registry-declaration-browser-b17d2577/coherent-network NODE_OPTIONS='--require /private/tmp/registry-declaration-browser-b17d2577/scroll-capture.cjs' node /Users/garces/.codex/worktrees/aa72/private-alpha-next/web/node_modules/@playwright/test/cli.js test --config /private/tmp/registry-declaration-browser-b17d2577/registry.playwright.config.ts > /private/tmp/registry-declaration-browser-b17d2577/coherent-browser.log 2>&1
+Result: exit 0; same 16 cases passed in 54.7s, no skip/retry/flaky cases. 208 observed mocked API requests; zero external requests, unhandled API requests or page errors.
+Archived JSON: coherent-matrix-results.json (execution output name: playwright-results.json).
+All 14 selected images now come from this final run. Its exact scroll/viewport records replace the selected scroll-captures.jsonl; the original record is preserved in scratch. History uses the helper's 900-pixel capture height, progress retains 1000; other viewport adjustments are listed in README and manifest. No styles or chrome were hidden.
+
+Process cleanup/read-only source checks (cwd: source repository)
+lsof -nP -iTCP:3195 -sTCP:LISTEN
+Result: exit 1, no output; no listener remained. Both Playwright commands had exited 0 and closed their owned browser/server.
+git rev-parse HEAD
+Result: b17d25775028b7d7e2ea2f30ab35348291c973cc
+git status --porcelain --untracked-files=all -- src tests web
+Result: exit 0, no output.
+
+Archived offline validation (cwd: source repository; no network, writes or providers)
+.venv/bin/python docs/reports/evidence/registry-declaration/b17d2577/browser/verify-bundle.py

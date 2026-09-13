@@ -9,16 +9,6 @@ export type GuestGateDecision =
   | { kind: "choose_non_empty" }
   | { kind: "convert"; reason: GuestConversionReason };
 
-export function decideGuestMessageGate(input: {
-  accountKind: AccountKind;
-  availableNow: boolean;
-}): GuestGateDecision {
-  if (input.accountKind !== "guest" || input.availableNow) {
-    return { kind: "allow" };
-  }
-  return { kind: "convert", reason: "message_limit" };
-}
-
 export function decideGuestSimulationGate(input: {
   accountKind: AccountKind;
   availableNow: boolean;
@@ -34,10 +24,21 @@ export function decideGuestSimulationGate(input: {
   return { kind: "convert", reason: "simulation_limit" };
 }
 
-export function guestSimulationPrecheckResetAt(input: {
+export type GuestSimulationReset = {
+  resetAt: string | null;
+  resetKind: "daily" | "workspace";
+};
+
+/** The horizon that holds the guest, as the backend named it. */
+export function guestSimulationPrecheckReset(input: {
   day: { period_end: string } | null;
-}): string | null {
-  return input.day?.period_end ?? null;
+  guest_session: { period_end: string } | null;
+  limiting_window: "hour" | "day" | "guest_session" | null;
+}): GuestSimulationReset {
+  if (input.limiting_window === "guest_session" && input.guest_session) {
+    return { resetAt: input.guest_session.period_end, resetKind: "workspace" };
+  }
+  return { resetAt: input.day?.period_end ?? null, resetKind: "daily" };
 }
 
 export function decideGuestNewConversationGate(input: {

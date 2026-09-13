@@ -1,0 +1,685 @@
+{
+  "label": "ahorro-5000-6pct",
+  "language": "es-419",
+  "question": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+  "asked_at": "2026-09-10T20:07:13.499131+00:00",
+  "tree": "base",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "needs_clarification"
+    },
+    {
+      "type": "stage_start",
+      "stage": "clarify"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "await_user_reply"
+    },
+    {
+      "type": "token",
+      "content": "What date window should I use?"
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "await_user_reply",
+        "assistant_prompt": "What date window should I use?",
+        "assistant_response": "What date window should I use?",
+        "clarification": {
+          "kind": "clarification",
+          "reason_code": "missing_period",
+          "prompt_source": "degraded_fallback",
+          "requested_field": "asset_universe",
+          "requested_fields": [
+            "asset_universe",
+            "date_range"
+          ],
+          "semantic_needs": [
+            "asset_target",
+            "period"
+          ],
+          "payload": {
+            "strategy": {
+              "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+              "requested_strategy_template": null,
+              "strategy_type": "dca_accumulation",
+              "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+              "asset_universe": [],
+              "asset_class": null,
+              "timeframe": null,
+              "cadence": "monthly",
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": 5000.0,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [
+                "6% annual return"
+              ],
+              "comparison_baseline": null,
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [],
+              "extra_parameters": {
+                "assumed_annual_return": 0.06,
+                "recurring_contribution": 5000.0,
+                "language": "es-419",
+                "evidence_spans": {
+                  "capital_amount": "5,000 pesos al mes",
+                  "cadence": "al mes",
+                  "date_range": "en 10 años"
+                },
+                "recurring_cadence": "monthly",
+                "field_provenance": {
+                  "capital_amount": "recurring_contribution",
+                  "cadence": "explicit_user",
+                  "recurring_contribution": "explicit_user"
+                },
+                "raw_strategy_type": "dca_accumulation"
+              }
+            }
+          },
+          "options": []
+        },
+        "response_intent": {
+          "kind": "clarification",
+          "semantic_needs": [
+            "asset_target",
+            "period"
+          ],
+          "requested_fields": [
+            "asset_universe",
+            "date_range"
+          ],
+          "facts": {
+            "strategy": {
+              "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+              "requested_strategy_template": null,
+              "strategy_type": "dca_accumulation",
+              "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+              "asset_universe": [],
+              "asset_class": null,
+              "timeframe": null,
+              "cadence": "monthly",
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": 5000.0,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [
+                "6% annual return"
+              ],
+              "comparison_baseline": null,
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [],
+              "extra_parameters": {
+                "assumed_annual_return": 0.06,
+                "recurring_contribution": 5000.0,
+                "language": "es-419",
+                "evidence_spans": {
+                  "capital_amount": "5,000 pesos al mes",
+                  "cadence": "al mes",
+                  "date_range": "en 10 años"
+                },
+                "recurring_cadence": "monthly",
+                "field_provenance": {
+                  "capital_amount": "recurring_contribution",
+                  "cadence": "explicit_user",
+                  "recurring_contribution": "explicit_user"
+                },
+                "raw_strategy_type": "dca_accumulation"
+              }
+            },
+            "current_user_message": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+            "language": "es-419"
+          },
+          "options": []
+        },
+        "pending_strategy": {
+          "strategy": {
+            "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+            "requested_strategy_template": null,
+            "strategy_type": "dca_accumulation",
+            "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+            "asset_universe": [],
+            "asset_class": null,
+            "timeframe": null,
+            "cadence": "monthly",
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": null,
+            "sizing_mode": null,
+            "capital_amount": 5000.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [
+              "6% annual return"
+            ],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {
+              "assumed_annual_return": 0.06,
+              "recurring_contribution": 5000.0,
+              "language": "es-419",
+              "evidence_spans": {
+                "capital_amount": "5,000 pesos al mes",
+                "cadence": "al mes",
+                "date_range": "en 10 años"
+              },
+              "recurring_cadence": "monthly",
+              "field_provenance": {
+                "capital_amount": "recurring_contribution",
+                "cadence": "explicit_user",
+                "recurring_contribution": "explicit_user"
+              },
+              "raw_strategy_type": "dca_accumulation"
+            }
+          },
+          "requested_field": null,
+          "missing_required_fields": [
+            "asset_universe",
+            "date_range"
+          ],
+          "response_intent": {
+            "kind": "clarification",
+            "semantic_needs": [
+              "asset_target",
+              "period"
+            ],
+            "requested_fields": [
+              "asset_universe",
+              "date_range"
+            ],
+            "facts": {
+              "strategy": {
+                "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "requested_strategy_template": null,
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "asset_universe": [],
+                "asset_class": null,
+                "timeframe": null,
+                "cadence": "monthly",
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 5000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [
+                  "6% annual return"
+                ],
+                "comparison_baseline": null,
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [],
+                "extra_parameters": {
+                  "assumed_annual_return": 0.06,
+                  "recurring_contribution": 5000.0,
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "5,000 pesos al mes",
+                    "cadence": "al mes",
+                    "date_range": "en 10 años"
+                  },
+                  "recurring_cadence": "monthly",
+                  "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                    "recurring_contribution": "explicit_user"
+                  },
+                  "raw_strategy_type": "dca_accumulation"
+                }
+              },
+              "current_user_message": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+              "language": "es-419"
+            },
+            "options": []
+          },
+          "clarification": {
+            "kind": "clarification",
+            "reason_code": "missing_period",
+            "prompt_source": "degraded_fallback",
+            "requested_field": "asset_universe",
+            "requested_fields": [
+              "asset_universe",
+              "date_range"
+            ],
+            "semantic_needs": [
+              "asset_target",
+              "period"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "requested_strategy_template": null,
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "asset_universe": [],
+                "asset_class": null,
+                "timeframe": null,
+                "cadence": "monthly",
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 5000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [
+                  "6% annual return"
+                ],
+                "comparison_baseline": null,
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [],
+                "extra_parameters": {
+                  "assumed_annual_return": 0.06,
+                  "recurring_contribution": 5000.0,
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "5,000 pesos al mes",
+                    "cadence": "al mes",
+                    "date_range": "en 10 años"
+                  },
+                  "recurring_cadence": "monthly",
+                  "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                    "recurring_contribution": "explicit_user"
+                  },
+                  "raw_strategy_type": "dca_accumulation"
+                }
+              }
+            },
+            "options": []
+          }
+        },
+        "message_id": "133e18b9-478a-4fbd-ad79-33a096f70058",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "acd79a00-d3ec-45d4-9d61-2b35d43cbc61",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "1a5b8063-5548-41a8-80d2-753c2b20549a",
+        "conversation_id": "acd79a00-d3ec-45d4-9d61-2b35d43cbc61",
+        "role": "user",
+        "content": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+        "created_at": "2026-09-10T20:07:13.531690Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "acd79a00-d3ec-45d4-9d61-2b35d43cbc61",
+            "request_id": "572f23f8-43d0-4e6a-865f-ecf0a1324037",
+            "started_at": "2026-09-10T20:07:13.531681+00:00"
+          }
+        }
+      },
+      {
+        "id": "133e18b9-478a-4fbd-ad79-33a096f70058",
+        "conversation_id": "acd79a00-d3ec-45d4-9d61-2b35d43cbc61",
+        "role": "assistant",
+        "content": "What date window should I use?",
+        "created_at": "2026-09-10T20:08:06.068427Z",
+        "metadata": {
+          "conversation_mode": "setup",
+          "agent_runtime_stage_outcome": "await_user_reply",
+          "response_intent": {
+            "kind": "clarification",
+            "semantic_needs": [
+              "asset_target",
+              "period"
+            ],
+            "requested_fields": [
+              "asset_universe",
+              "date_range"
+            ],
+            "facts": {
+              "strategy": {
+                "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "requested_strategy_template": null,
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "asset_universe": [],
+                "asset_class": null,
+                "timeframe": null,
+                "cadence": "monthly",
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 5000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [
+                  "6% annual return"
+                ],
+                "comparison_baseline": null,
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [],
+                "extra_parameters": {
+                  "assumed_annual_return": 0.06,
+                  "recurring_contribution": 5000.0,
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "5,000 pesos al mes",
+                    "cadence": "al mes",
+                    "date_range": "en 10 años"
+                  },
+                  "recurring_cadence": "monthly",
+                  "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                    "recurring_contribution": "explicit_user"
+                  },
+                  "raw_strategy_type": "dca_accumulation"
+                }
+              },
+              "current_user_message": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+              "language": "es-419"
+            },
+            "options": []
+          },
+          "clarification": {
+            "kind": "clarification",
+            "reason_code": "missing_period",
+            "prompt_source": "degraded_fallback",
+            "requested_field": "asset_universe",
+            "requested_fields": [
+              "asset_universe",
+              "date_range"
+            ],
+            "semantic_needs": [
+              "asset_target",
+              "period"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "requested_strategy_template": null,
+                "strategy_type": "dca_accumulation",
+                "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "asset_universe": [],
+                "asset_class": null,
+                "timeframe": null,
+                "cadence": "monthly",
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 5000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [
+                  "6% annual return"
+                ],
+                "comparison_baseline": null,
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [],
+                "extra_parameters": {
+                  "assumed_annual_return": 0.06,
+                  "recurring_contribution": 5000.0,
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "5,000 pesos al mes",
+                    "cadence": "al mes",
+                    "date_range": "en 10 años"
+                  },
+                  "recurring_cadence": "monthly",
+                  "field_provenance": {
+                    "capital_amount": "recurring_contribution",
+                    "cadence": "explicit_user",
+                    "recurring_contribution": "explicit_user"
+                  },
+                  "raw_strategy_type": "dca_accumulation"
+                }
+              }
+            },
+            "options": []
+          },
+          "pending_strategy": {
+            "strategy": {
+              "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+              "requested_strategy_template": null,
+              "strategy_type": "dca_accumulation",
+              "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+              "asset_universe": [],
+              "asset_class": null,
+              "timeframe": null,
+              "cadence": "monthly",
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": 5000.0,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [
+                "6% annual return"
+              ],
+              "comparison_baseline": null,
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [],
+              "extra_parameters": {
+                "assumed_annual_return": 0.06,
+                "recurring_contribution": 5000.0,
+                "language": "es-419",
+                "evidence_spans": {
+                  "capital_amount": "5,000 pesos al mes",
+                  "cadence": "al mes",
+                  "date_range": "en 10 años"
+                },
+                "recurring_cadence": "monthly",
+                "field_provenance": {
+                  "capital_amount": "recurring_contribution",
+                  "cadence": "explicit_user",
+                  "recurring_contribution": "explicit_user"
+                },
+                "raw_strategy_type": "dca_accumulation"
+              }
+            },
+            "requested_field": null,
+            "missing_required_fields": [
+              "asset_universe",
+              "date_range"
+            ],
+            "response_intent": {
+              "kind": "clarification",
+              "semantic_needs": [
+                "asset_target",
+                "period"
+              ],
+              "requested_fields": [
+                "asset_universe",
+                "date_range"
+              ],
+              "facts": {
+                "strategy": {
+                  "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                  "requested_strategy_template": null,
+                  "strategy_type": "dca_accumulation",
+                  "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                  "asset_universe": [],
+                  "asset_class": null,
+                  "timeframe": null,
+                  "cadence": "monthly",
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 5000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [
+                    "6% annual return"
+                  ],
+                  "comparison_baseline": null,
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [],
+                  "extra_parameters": {
+                    "assumed_annual_return": 0.06,
+                    "recurring_contribution": 5000.0,
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "capital_amount": "5,000 pesos al mes",
+                      "cadence": "al mes",
+                      "date_range": "en 10 años"
+                    },
+                    "recurring_cadence": "monthly",
+                    "field_provenance": {
+                      "capital_amount": "recurring_contribution",
+                      "cadence": "explicit_user",
+                      "recurring_contribution": "explicit_user"
+                    },
+                    "raw_strategy_type": "dca_accumulation"
+                  }
+                },
+                "current_user_message": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                "language": "es-419"
+              },
+              "options": []
+            },
+            "clarification": {
+              "kind": "clarification",
+              "reason_code": "missing_period",
+              "prompt_source": "degraded_fallback",
+              "requested_field": "asset_universe",
+              "requested_fields": [
+                "asset_universe",
+                "date_range"
+              ],
+              "semantic_needs": [
+                "asset_target",
+                "period"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                  "requested_strategy_template": null,
+                  "strategy_type": "dca_accumulation",
+                  "strategy_thesis": "¿Cuánto tendré en 10 años si ahorro 5,000 pesos al mes al 6%?",
+                  "asset_universe": [],
+                  "asset_class": null,
+                  "timeframe": null,
+                  "cadence": "monthly",
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 5000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [
+                    "6% annual return"
+                  ],
+                  "comparison_baseline": null,
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [],
+                  "extra_parameters": {
+                    "assumed_annual_return": 0.06,
+                    "recurring_contribution": 5000.0,
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "capital_amount": "5,000 pesos al mes",
+                      "cadence": "al mes",
+                      "date_range": "en 10 años"
+                    },
+                    "recurring_cadence": "monthly",
+                    "field_provenance": {
+                      "capital_amount": "recurring_contribution",
+                      "cadence": "explicit_user",
+                      "recurring_contribution": "explicit_user"
+                    },
+                    "raw_strategy_type": "dca_accumulation"
+                  }
+                }
+              },
+              "options": []
+            }
+          },
+          "agent_runtime_turn": {
+            "turn_id": "1a5b8063-5548-41a8-80d2-753c2b20549a",
+            "request_id": "572f23f8-43d0-4e6a-865f-ecf0a1324037",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 52.57,
+  "summary": {
+    "label": "ahorro-5000-6pct",
+    "language": "es-419",
+    "elapsed_seconds": 52.57,
+    "stage_outcomes": [
+      "needs_clarification",
+      "await_user_reply"
+    ],
+    "answered": false,
+    "recovery_code": null,
+    "clarification_kind": "clarification",
+    "clarification_reason_code": "missing_period",
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "What date window should I use?",
+    "shape": null,
+    "degraded": null,
+    "rows": 0,
+    "sources": [],
+    "research_usage": null,
+    "next_experiments": []
+  }
+}

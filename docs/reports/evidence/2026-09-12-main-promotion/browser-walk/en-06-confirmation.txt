@@ -1,0 +1,57 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "New chat":
+      - generic: New chat
+    - button "Search":
+      - generic: Search
+    - button "Recents":
+      - generic: Recents
+    - button "Settings":
+      - generic: Settings
+  - heading "Test KO recurring buys" [level=1]
+  - button "Share conversation":
+  - button "Chat options":
+  - status
+  - region "Conversation":
+    - generic: Test buying Coca-Cola (KO) every month from January 2020 through December 2024, starting with $5,000 and adding $200 monthly.
+    - button "Copy Plain Text":
+    - paragraph: I adjusted the test period to Jul 27, 2020 – Dec 31, 2024 because Argus has price data for KO only from Jul 27, 2020.
+    - generic: KO
+    - heading "Recurring Buys" [level=3]
+    - text: Ready to run
+    - term: Contribution
+    - definition: $200 monthly
+    - term: Period
+    - definition:
+      - generic: Jul 27, 2020 → Dec 31, 2024
+    - term: Starting capital
+    - definition: $5,000
+    - generic: Stocks
+    - generic: Daily data
+    - generic: No fees
+    - generic: No slippage
+    - generic: "Benchmark: SPY"
+    - button "Edit amounts":
+      - text: Edit amounts
+    - button "Edit dates":
+      - text: Edit dates
+    - button "Edit costs":
+      - text: Edit costs
+    - button "Run backtest":
+      - text: Run backtest
+    - button "Change assumptions":
+      - text: Change assumptions
+    - button "Cancel":
+      - text: Cancel
+    - button "Good response":
+    - button "Poor response":
+    - button "More Actions":
+  - button "Mention an asset or indicator":
+  - combobox "Add a follow-up"
+  - generic: Add a follow-up
+  - generic "Message is empty":
+    - button "Send message" [disabled]:
+  - paragraph: Argus can make mistakes. For education only. Not financial advice.

@@ -17,9 +17,8 @@ import { useGuestConversion } from "@/components/guest/useGuestConversion";
 import { useGuestShellActions } from "@/components/guest/useGuestShellActions";
 import { getUsageAllowances } from "@/lib/argus-api";
 import {
-  decideGuestMessageGate,
   decideGuestSimulationGate,
-  guestSimulationPrecheckResetAt,
+  guestSimulationPrecheckReset,
   isExactGuestRunReplay,
 } from "@/lib/guest-capability-gates";
 import { replaceGuestConversation } from "@/lib/guest-api";
@@ -34,6 +33,7 @@ import {
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
 import { randomId } from "@/lib/random-id";
+import type { ReceiptShareTarget } from "@/lib/receipt-selection";
 
 export type GuestResumeSend = (
   text: string,
@@ -109,6 +109,7 @@ export function useGuestExperience({
   const [isReplacingConversation, setIsReplacingConversation] = useState(false);
   const [resumeDecisionTarget, setResumeDecisionTarget] =
     useState<GuestDecisionResumeTarget | null>(null);
+  const [receiptShareTarget, setReceiptShareTarget] = useState<ReceiptShareTarget | null>(null);
   const pendingGuestAdmissionRef = useRef<AbortController | null>(null);
 
   useEffect(
@@ -121,11 +122,7 @@ export function useGuestExperience({
 
   const resumeGuestAction = useCallback(
     async (action: GuestPendingAction) => {
-      if (action.reason === "message_limit") {
-        await sendRef.current?.(action.text, action.mentions, undefined, {
-          bypassGuestGate: true,
-        });
-      } else if (action.reason === "simulation_limit") {
+      if (action.reason === "simulation_limit") {
         await sendRef.current?.(
           action.action.label || action.action.value || "",
           action.action,
@@ -134,6 +131,8 @@ export function useGuestExperience({
         );
       } else if (action.reason === "save_decision") {
         setResumeDecisionTarget(action.target);
+      } else if (action.reason === "share_result") {
+        setReceiptShareTarget({ conversationId: action.conversationId, messageId: action.messageId });
       } else if (action.reason === "new_conversation") {
         await startNewChat();
       }
@@ -190,13 +189,7 @@ export function useGuestExperience({
   });
 
   const admitSend = useCallback(
-    async ({
-      text,
-      mentions,
-      action,
-      starterSelection,
-      language,
-    }: GuestSendAdmissionInput) => {
+    async ({ action, starterSelection, language }: GuestSendAdmissionInput) => {
       const admissionController = guestBootstrapRequired
         ? new AbortController()
         : null;
@@ -244,56 +237,40 @@ export function useGuestExperience({
           });
         }
 
+        // Conversation is compute and never gated; only a run reads the
+        // execution allowance before it is sent.
+        if (action?.type !== "run_backtest") return true;
         try {
           const usage = await getUsageAllowances();
           if (admissionCancelled()) return false;
-          if (action?.type === "run_backtest") {
-            const decision = decideGuestSimulationGate({
-              accountKind: "guest",
-              availableNow: usage.allowances.backtests.available_now,
-              exactReplay: isExactGuestRunReplay(messages, action),
-            });
-            if (decision.kind === "convert") {
-              // The prompt is the answer to a spent allowance, so it opens
-              // whether or not there is a conversation to replay into. Only
-              // the pending action needs one; gating the prompt on it left a
-              // returning guest pressing send against silence.
-              conversion.requestConversion(
-                decision.reason,
-                conversationId
-                  ? {
-                      reason: "simulation_limit",
-                      conversationId,
-                      actionId: randomId(),
-                      action,
-                    }
-                  : null,
-                "signup",
-                guestSimulationPrecheckResetAt(usage.allowances.backtests),
-                "daily",
-              );
-              return false;
-            }
-          } else if (!action?.type) {
-            const decision = decideGuestMessageGate({
-              accountKind: "guest",
-              availableNow: usage.allowances.messages.available_now,
-            });
-            if (decision.kind === "convert") {
-              conversion.requestConversion(
-                decision.reason,
-                conversationId
-                  ? {
-                      reason: "message_limit",
-                      conversationId,
-                      actionId: randomId(),
-                      text,
-                      mentions,
-                    }
-                  : null,
-              );
-              return false;
-            }
+          const decision = decideGuestSimulationGate({
+            accountKind: "guest",
+            availableNow: usage.allowances.execution.available_now,
+            exactReplay: isExactGuestRunReplay(messages, action),
+          });
+          if (decision.kind === "convert") {
+            // The prompt is the answer to a spent allowance, so it opens
+            // whether or not there is a conversation to replay into. Only
+            // the pending action needs one; gating the prompt on it left a
+            // returning guest pressing send against silence.
+            const reset = guestSimulationPrecheckReset(
+              usage.allowances.execution,
+            );
+            conversion.requestConversion(
+              decision.reason,
+              conversationId
+                ? {
+                    reason: "simulation_limit",
+                    conversationId,
+                    actionId: randomId(),
+                    action,
+                  }
+                : null,
+              "signup",
+              reset.resetAt,
+              reset.resetKind,
+            );
+            return false;
           }
           return true;
         } catch {
@@ -403,11 +380,27 @@ export function useGuestExperience({
     [conversion],
   )
 
+  const requestReceiptShare = useCallback((sourceConversationId: string, messageId?: string) => {
+    if (sourceConversationId !== conversationId) return;
+    if (account?.account_kind === "guest") {
+      if (messageId) conversion.requestConversion("share_result", {
+        reason: "share_result", conversationId: sourceConversationId, messageId, actionId: randomId(),
+      }, "signup");
+      return;
+    }
+    setReceiptShareTarget({ conversationId: sourceConversationId, messageId });
+  }, [account?.account_kind, conversationId, conversion]);
+
   return {
     ...shell,
     admitSend,
     recoverGuestSimulationRejection,
     requestGuestSearchUpgrade,
+    receiptSharing: {
+      target: receiptShareTarget?.conversationId === conversationId ? receiptShareTarget : null,
+      request: requestReceiptShare,
+      close: () => setReceiptShareTarget(null),
+    },
     resumeDecisionTarget,
     resumeDecisionArtifactId,
     resumeDecisionMessageId,

@@ -209,8 +209,9 @@ def _unsupported_recovery_fallback(
             else " What historical period would you like to examine?"
         )
         return (
-            "I cannot predict future performance. I can test how the same idea "
-            f"performed over a historical period instead.{offer}"
+            "There is no market data for a period that has not happened yet, so "
+            "I cannot run a test over it. I can test how the same idea performed "
+            f"over a historical period, or research what analysts expect.{offer}"
         )
     if reason_code == "unsupported_time_granularity":
         raw_value = _unsupported_raw_value(response_intent)

@@ -5,6 +5,18 @@ from typing import Any
 from argus.api.schemas import ChatStreamRequest, Message
 
 
+def discovery_recovery_code(recovery: Any) -> str | None:
+    """Only retryable discovery refusals use recoverable turn settlement."""
+    if not isinstance(recovery, dict) or recovery.get("retryable") is not True:
+        return None
+    code = recovery.get("code")
+    return (
+        code
+        if code in {"discovery_search_failed", "discovery_suggestions_unavailable"}
+        else None
+    )
+
+
 def durable_retry_last_turn_metadata(
     request_message: Message,
     *,
@@ -82,3 +94,15 @@ def retry_last_turn_metadata(
     return {
         "retry_last_turn": retry_payload,
     }
+
+
+def live_retry_payload(message: Message) -> dict[str, Any] | None:
+    """Stream the message-shaped retry; history keeps the durable anchor."""
+    retry = (
+        message.metadata.get("retry_last_turn")
+        if isinstance(message.metadata, dict)
+        else None
+    )
+    if not isinstance(retry, dict):
+        return None
+    return {key: retry[key] for key in ("message", "action") if key in retry}

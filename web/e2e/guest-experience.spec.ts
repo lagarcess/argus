@@ -408,7 +408,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
       );
       expect(resumedUsage.status).toBe(200);
       expect(
-        resumedUsage.body.allowances.backtests.guest_session,
+        resumedUsage.body.allowances.execution.guest_session,
       ).toMatchObject({
         limit: 2,
         used: 1,
@@ -867,8 +867,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
           "/me/usage",
         );
         expect(usage.status).toBe(200);
-        const messageWindow = usage.body.allowances.messages.guest_session;
-        const simulationWindow = usage.body.allowances.backtests.guest_session;
+        const simulationWindow = usage.body.allowances.execution.guest_session;
         const database = ownerSnapshot(primaryOwner);
         const graph = conversationGraph(primaryOwner, primaryConversation);
         const messages = await apiJson<MessageList>(
@@ -883,13 +882,13 @@ test("@guest-experience exact-head 20-check matrix", async ({
               .length > 0,
         ).length;
         primaryResultFacts = latestResultFacts(messages.body.items);
-        expect(messageWindow.used).toBe(database.chat_units);
-        expect(messageWindow.period_end).toBe(primaryExpiry);
+        // Conversation is compute and reports no window at all.
+        expect(usage.body.allowances.compute.limiting_window).toBeNull();
         expect(simulationWindow.used).toBe(database.simulation_units);
         expect(simulationWindow.limit).toBe(2);
         expect(simulationWindow.remaining).toBe(1);
         expect(simulationWindow.period_end).toBe(primaryExpiry);
-        expect(usage.body.allowances.backtests.available_now).toBe(true);
+        expect(usage.body.allowances.execution.available_now).toBe(true);
         expect(database.simulation_units).toBe(1);
         expect(messages.status).toBe(200);
         expect(
@@ -906,9 +905,7 @@ test("@guest-experience exact-head 20-check matrix", async ({
             primaryResultFacts.evidenceId === graph.evidence[0],
         ).toBe(true);
         const card = resultCards(page);
-        const uiMessageUnits = await confirmationCards(page).count();
         const uiSimulationUnits = await card.count();
-        expect(uiMessageUnits).toBe(messageWindow.used);
         expect(uiSimulationUnits).toBe(simulationWindow.used);
         await expect(card).toHaveCount(1);
         await expect(card.getByTestId("result-equity-chart")).toBeVisible();
@@ -1379,12 +1376,15 @@ test("@guest-experience exact-head 20-check matrix", async ({
         );
         await thirdRunButton.click();
         const usageAtGate = (await (await usageResponse).json()) as GuestUsage;
-        expect(usageAtGate.allowances.backtests.guest_session).toMatchObject({
+        expect(usageAtGate.allowances.execution.guest_session).toMatchObject({
           limit: 2,
           used: 2,
           remaining: 0,
         });
-        expect(usageAtGate.allowances.backtests.available_now).toBe(false);
+        expect(usageAtGate.allowances.execution.available_now).toBe(false);
+        expect(usageAtGate.allowances.execution.limiting_window).toBe(
+          "guest_session",
+        );
         const dialog = page.getByRole("dialog", { name: "Sign in" });
         await expect(dialog).toBeVisible();
         await expect(

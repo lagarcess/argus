@@ -154,6 +154,15 @@ def normalize_cost_ledger_entry(entry: dict[str, Any]) -> dict[str, Any]:
     two write paths cannot drift. ``occurred_at`` is left untouched here; each
     backend fills it with its own timestamp helper when the value is absent.
     """
+    research_rail = (
+        entry["source"] == "research" and entry["feature_area"] == "research_rail"
+    )
+    metadata = entry.get("metadata") or {}
+    if research_rail:
+        # These rows never observed one common success fact. Keep legacy
+        # discovery's fallback-derived status and identify new rail rows
+        # without reinterpreting the append-only, unversioned history.
+        metadata = {**metadata, "research_ledger_contract": "argus_research_ledger/v2"}
     return {
         "source": entry["source"],
         "service": entry["service"],
@@ -181,8 +190,8 @@ def normalize_cost_ledger_entry(entry: dict[str, Any]) -> dict[str, Any]:
         "cost_currency": entry.get("cost_currency") or "USD",
         "cost_source": entry.get("cost_source") or "unavailable",
         "latency_ms": entry.get("latency_ms"),
-        "status": entry.get("status") or "succeeded",
-        "metadata": entry.get("metadata") or {},
+        "status": None if research_rail else entry.get("status") or "succeeded",
+        "metadata": metadata,
         "occurred_at": entry.get("occurred_at"),
     }
 

@@ -21,6 +21,7 @@ from argus.agent_runtime.strategy_contract import strategy_can_be_approved
 from argus.domain.backtesting.confirmation_preflight import (
     materialize_confirmation_strategy,
     prepare_confirmation_launch,
+    restore_coverage_limited_by,
 )
 
 
@@ -60,7 +61,10 @@ def revalidated_confirmation_candidate(
         return None, "confirmation_not_executable"
 
     active_id = new_confirmation_id()
-    candidate["launch_payload"] = validation.launch_payload
+    candidate["launch_payload"] = restore_coverage_limited_by(
+        validation.launch_payload,
+        preflight_launch_payload=preflight.launch_payload,
+    )
     candidate["confirmation_id"] = active_id
     candidate["artifact_id"] = active_id
     candidate["validation"] = {

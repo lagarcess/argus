@@ -1,0 +1,36 @@
+{
+  "status": "pass",
+  "checked_at": "2026-09-13T07:39:10.376891+00:00",
+  "completed_pairs": 10,
+  "alternating_order_verified": true,
+  "all_native_attempt_hashes_verified": true,
+  "native_full_scorecard_hashes": {
+    "baseline-eval-scorecard-ee9c3491.json": "ec7e3301fbc796c38265313a61282a882d2564bcd761e7084ffcc05c91c7792a",
+    "candidate-eval-scorecard-df7aee12.json": "712420b741f6922a29b5e935a6d2a01fe833a40bc33d134d5f97c7617ce4d0cd"
+  },
+  "environment_source_hash_unchanged": true,
+  "native_worktrees_clean": true,
+  "all_non_doc_git_paths_unchanged": true,
+  "validator_unchanged": true,
+  "tracked_cost_usd": 6.012941633499993,
+  "guard_reserve_usd": 1.1600000000000001,
+  "guarded_total_usd": 7.172941633499994,
+  "combined_cap_usd": 12.5,
+  "research_http_errors_after_resume": [
+    {
+      "kind": "research_http_error",
+      "attempt": 9,
+      "http_status": 500,
+      "method": "POST",
+      "time": 1789284822.2875898,
+      "side": "candidate"
+    }
+  ],
+  "prior_http_status_not_retained_attempts": [
+    1,
+    3
+  ],
+  "cooldowns": [],
+  "founder_merge_disposition_pending": true,
+  "no_runtime_fix": true
+}

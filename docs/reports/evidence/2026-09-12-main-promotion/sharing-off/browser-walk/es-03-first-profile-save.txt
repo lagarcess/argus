@@ -1,0 +1,59 @@
+- alert
+- main:
+  - complementary:
+    - button "Expand sidebar":
+    - generic: argus
+    - button "Nuevo chat":
+      - generic: Nuevo chat
+    - button "Buscar":
+      - generic: Buscar
+    - button "Recientes":
+      - generic: Recientes
+    - button "Cerrar perfil"
+    - dialog "Perfil":
+      - heading "Perfil" [level=2]
+      - button "Cerrar perfil":
+      - button "Editar avatar":
+        - generic: P
+      - button "Editar nombre para mostrar":
+        - generic: Promoción ES
+      - generic: "@promotion-off-es-20260913"
+      - generic: promotion-off-es-20260913@example.test
+      - button:
+        - generic: Color del avatar
+        - generic: Ocultar
+      - radiogroup:
+        - radio [checked]:
+          - generic: P
+        - radio:
+          - generic: P
+        - radio:
+          - generic: P
+        - radio:
+          - generic: P
+        - radio:
+          - generic: P
+        - radio:
+          - generic: P
+        - radio:
+          - generic: P
+      - generic: ¿Cómo quieres que Argus te llame?
+      - button "¿Cómo quieres que Argus te llame?":
+        - generic: Lucía
+      - generic: Idioma de la app
+      - button "Idioma de la app": es
+    - button "Ajustes":
+      - generic: Ajustes
+  - heading [level=1]
+  - status
+  - paragraph: ¿Qué te gustaría investigar?
+  - status: ¿Qué te gustaría investigar?
+  - button "Menciona un activo o indicador":
+  - combobox "Pregunta sobre cualquier empresa o idea"
+  - generic: Pregunta sobre cualquier empresa o idea
+  - generic "El mensaje está vacío":
+    - button "Enviar mensaje" [disabled]:
+  - paragraph: Argus puede equivocarse. Solo con fines educativos. No es asesoría financiera.
+  - button "¿Cómo gana dinero Netflix?"
+  - button "Compara Costco con Walmart y Target"
+  - button "¿Y si hubiera comprado Coca-Cola cada mes durante cinco años?"

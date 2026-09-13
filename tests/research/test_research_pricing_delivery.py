@@ -1,4 +1,5 @@
-"""Billing drift must not erase a provider answer that passed grounding."""
+"""Billing drift must not erase a provider answer that passed grounding, and
+the rate table follows the invoice the provider actually sends."""
 
 from __future__ import annotations
 
@@ -20,7 +21,6 @@ from argus.api.chat.research_pricing_evidence import (
 )
 from argus.domain.research import billing, pricing
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
-from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.supabase_gateway import SupabaseGateway
 from fastapi import FastAPI
@@ -47,6 +47,22 @@ def ledger(monkeypatch):
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setattr(billing, "_recorder", record_unpriced_research_spend)
     return gateway.entries
+
+
+@pytest.fixture
+def mismatched_rates(monkeypatch):
+    """A table that disagrees with the served model's invoice, the way the
+    published page disagreed with every sol invoice until the table followed
+    the bill: the output rate here is one no invoice carries."""
+    model = "openai/gpt-5.6-sol"
+    monkeypatch.setitem(
+        pricing.MODEL_RATE_TABLE_USD_PER_MILLION,
+        model,
+        tuple(
+            replace(tier, output_usd_per_million=Decimal("100"))
+            for tier in pricing.MODEL_RATE_TABLE_USD_PER_MILLION[model]
+        ),
+    )
 
 
 @pytest.fixture
@@ -92,16 +108,25 @@ def test_recorded_answer_reaches_user_despite_rate_disagreement(monkeypatch, com
     result = _run("What was Apple's latest close?")
 
     assert result is not None
-    assert "312.41" in result.stage_patch["assistant_response"]
+    assert "316.22" in result.stage_patch["assistant_response"]
     assert "degraded" not in result.stage_patch["research"]
     assert result.stage_patch["research"]["usage"]["cost_usd"] is None
 
 
 @pytest.mark.parametrize(
-    "probe", ["equity_steps2", "thorough_comparison_web_search_citations"]
+    "probe",
+    [
+        "fast_quote_typed",
+        "typed_rows_current_external",
+        "thorough_typed_background",
+        "market_pulse_retry_finance_only",
+    ],
 )
 def test_recorded_invoice_reconciles_against_current_rates(probe, ledger, alerts):
-    """Changing the rates without matching recorded evidence fails this check."""
+    """Changing the rates without matching recorded evidence fails this check:
+    the sol and opus invoices recorded on 2026-09-09 are what the table must
+    reconcile. Two of them read no cache and carry no cache_read_cost key at
+    all, which the reader once rejected as an invalid invoice."""
     response = recorded_agent_response(probe)
     client = PerplexityAgentClient("test", transport=RecordingTransport([response]))
     packet = client.run_research("quote", RESEARCH_CONFIG_SPECS["fast"])
@@ -110,38 +135,64 @@ def test_recorded_invoice_reconciles_against_current_rates(probe, ledger, alerts
     assert not alerts
 
 
-def test_live_netflix_response_survives_the_production_pricing_mismatch(
+def test_an_invoice_at_the_earlier_published_schedule_is_unpriced_not_reread(
+    ledger, alerts
+):
+    """The 2026-08-07 recording was billed at the page's $5 and $30. The
+    provider bills $4 and $20 now, and the table follows the bill, so the
+    earlier invoice is recorded as unpriced spend for a person to reconcile
+    rather than silently accepted at either schedule."""
+    response = recorded_agent_response("equity_steps2")
+    client = PerplexityAgentClient("test", transport=RecordingTransport([response]))
+    packet = client.run_research("quote", RESEARCH_CONFIG_SPECS["fast"])
+    assert packet.answer_markdown
+    assert packet.usage.cost_usd is None
+    assert ledger[0]["usage_metadata"]["reason"] == "rate_mismatch"
+    assert ledger[0]["usage_metadata"]["reported_cost"]["total_cost"] == 0.05395
+    assert any("rate_mismatch" in message for message in alerts)
+
+
+def test_the_live_netflix_invoice_reconciles_at_the_billed_rates(
     monkeypatch,
     netflix_response,
+    ledger,
+    alerts,
 ):
+    """The invoice the old table rejected at output_cost ($0.01416 for 708
+    tokens against $0.02124 expected) is exactly what $20 per million
+    bills, so the answer now carries its real cost and no unpriced row."""
     result = _netflix_result(monkeypatch, netflix_response)
     assert "Netflix" in result.stage_patch["assistant_response"]
     sidecar = result.stage_patch["research"]
     assert "degraded" not in sidecar
     assert sidecar["sources"]
-    assert sidecar["usage"]["cost_usd"] is None
+    assert sidecar["usage"]["cost_usd"] == pytest.approx(0.08591)
     assert set(sidecar["usage"]) == {
         "invocations",
         "latency_ms",
         "cost_usd",
         "cache_status",
     }
+    assert not ledger
+    assert not alerts
     public = json.dumps(result.stage_patch)
     assert netflix_response["id"] not in public
     assert netflix_response["model"] not in public
-    assert "expected_min_usd" not in public
 
 
 def test_unpriced_invoice_reaches_real_gateway_insert_and_error_alert(
     monkeypatch,
     netflix_response,
     alerts,
+    mismatched_rates,
 ):
     client = _RecordingSupabaseClient()
     monkeypatch.setattr(api_state, "supabase_gateway", SupabaseGateway(client=client))
     monkeypatch.setattr(billing, "_recorder", record_unpriced_research_spend)
     _netflix_result(monkeypatch, netflix_response)
     entry = client.inserted_by_table["cost_ledger_entries"]
+    assert entry["status"] is None
+    assert entry["metadata"] == {"research_ledger_contract": "argus_research_ledger/v2"}
     assert entry["cost_amount"] is None
     assert entry["cost_source"] == "unavailable"
     assert entry["provider_request_id"] == netflix_response["id"]
@@ -150,11 +201,11 @@ def test_unpriced_invoice_reaches_real_gateway_insert_and_error_alert(
     assert report["pricing_status"] == "unpriced"
     assert report["reported_cost"]["total_cost"] == 0.08591
     assert report["reported_component_usd"] == 0.01416
-    assert report["expected_min_usd"] == report["expected_max_usd"] == 0.02124
+    assert report["expected_min_usd"] == report["expected_max_usd"] == 0.0708
     assert any(
         "research_cost_unpriced" in message
         and "0.08591" in message
-        and "0.02124" in message
+        and "0.0708" in message
         for message in alerts
     )
     # Private report has no prompt, answer, source text, or unrelated metadata.
@@ -176,6 +227,7 @@ def test_terminal_metering_cannot_turn_unpriced_spend_into_zero(
     monkeypatch,
     netflix_response,
     ledger,
+    mismatched_rates,
 ):
     result = _netflix_result(monkeypatch, netflix_response)
     record_research_turn_evidence(
@@ -196,6 +248,7 @@ def test_accounting_failure_does_not_recreate_the_outage(
     netflix_response,
     alerts,
     recorder_state,
+    mismatched_rates,
 ):
     def fail(_spend):
         raise RuntimeError("secret database detail must not enter logs")
@@ -221,7 +274,7 @@ def test_unknown_served_model_returns_answer_with_unpriced_spend(ledger, alerts)
     assert packet.answer_markdown
     assert packet.usage.cost_usd is None
     assert ledger[0]["usage_metadata"]["reason"] == "unknown_model_rate"
-    assert ledger[0]["usage_metadata"]["reported_cost"]["total_cost"] == 0.05395
+    assert ledger[0]["usage_metadata"]["reported_cost"]["total_cost"] == 0.0487
     assert any("unknown_model_rate" in message for message in alerts)
 
 
@@ -244,8 +297,12 @@ def test_incomplete_billing_metadata_cannot_erase_a_valid_answer(malformation, l
     assert packet.answer_markdown
     assert packet.usage.cost_usd is None
     assert ledger[0]["usage_metadata"]["pricing_status"] == "unpriced"
-    if malformation != "missing_usage":
-        assert packet.usage.finance_search_invocations == 1
+    # The recorded output keeps its retrieval record; the count is unknown
+    # only when the invoice itself is gone, never a zero.
+    assert packet.tool_results == ("finance_results",)
+    assert packet.usage.finance_search_invocations == (
+        None if malformation == "missing_usage" else 1
+    )
 
 
 @pytest.mark.parametrize(
@@ -263,7 +320,7 @@ def test_invalid_invoice_does_not_discard_answer(cost, ledger):
 
 
 def test_repeated_background_completion_records_invoice_once(
-    netflix_response, ledger, alerts
+    netflix_response, ledger, alerts, mismatched_rates
 ):
     client = PerplexityAgentClient(
         "test", transport=RecordingTransport([netflix_response, netflix_response])
@@ -278,16 +335,23 @@ def test_repeated_background_completion_records_invoice_once(
 
 
 def test_background_empty_answer_still_fails_closed(netflix_response):
+    """A completed run whose answer cannot be read is the job's terminal
+    failure: polling again cannot change a completed answer, so the poller
+    must not spend its deadline retrying it."""
     netflix_response["output"] = []
     client = PerplexityAgentClient(
         "test", transport=RecordingTransport([netflix_response])
     )
-    with pytest.raises(ResearchUnavailableError, match="empty_answer"):
-        client.poll_background(netflix_response["id"])
+
+    poll = client.poll_background(netflix_response["id"])
+
+    assert poll.terminal and poll.status == "failed"
+    assert poll.packet is None
+    assert str(poll.failure_detail).startswith("empty_answer")
 
 
 def test_api_lifespan_installs_and_removes_the_ledger_adapter(
-    monkeypatch, netflix_response, ledger
+    monkeypatch, netflix_response, ledger, mismatched_rates
 ):
     monkeypatch.setattr(billing, "_recorder", None)
     monkeypatch.setattr(api_state, "CHECKPOINTER_MODE", "memory")
@@ -316,6 +380,7 @@ def test_slow_ledger_cannot_hold_a_completed_provider_answer(
     ledger,
     alerts,
     write_fails,
+    mismatched_rates,
 ):
     started = threading.Event()
     release = threading.Event()
@@ -358,7 +423,7 @@ def test_slow_ledger_cannot_hold_a_completed_provider_answer(
 
 
 def test_shutdown_cancels_queued_invoices_without_starting_more_writes(
-    monkeypatch, netflix_response, ledger, alerts
+    monkeypatch, netflix_response, ledger, alerts, mismatched_rates
 ):
     started = threading.Event()
     release = threading.Event()

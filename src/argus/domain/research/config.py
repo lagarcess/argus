@@ -6,7 +6,14 @@ the documentation's fast row says ``max_steps=1``, but a live probe on
 2026-08-07 showed the first step is consumed by the finance skill load, so
 ``max_steps=1`` returns "I can't retrieve live market data" with zero tool
 invocations even for an equity control. ``max_steps=2`` grounds correctly with
-one invocation. Probe evidence: docs/reports/evidence/research-rail/probes/.
+one invocation. Probe evidence: docs/reports/evidence/377/probes/.
+
+The retrieval parameters (grounded-finance board, "Retrieval parameters") ride
+the same spec: a model fallback chain, the strict typed-output schema, the
+response language, the web search context size, a recency filter derived from
+the question's data class, and the asking user's declared country as the user
+location. They are configuration per question shape, derived by
+:func:`retrieval_spec`; nothing here routes.
 """
 
 from __future__ import annotations
@@ -14,11 +21,62 @@ from __future__ import annotations
 import os
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
+from argus.domain.research.cache import DataClass, data_class_for
 from argus.domain.research.contracts import CapabilityClass, QuestionShape
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
+
+RecencyFilter = Literal["hour", "day", "week", "month", "year"]
+SearchContextSize = Literal["low", "medium", "high"]
+
+# Provider limits on the Agents API: a fallback chain of at most five models
+# and a domain filter of at most twenty entries.
+MAX_FALLBACK_MODELS = 5
+MAX_SOURCE_DOMAINS = 20
+
+# The two models the pricing validator can reconcile, so a fallback never
+# turns into an unpriced invoice. Each tier lists the other as its fallback:
+# a provider hiccup on the primary is served by the second model rather than
+# by nothing. The invoice names the model that served, so a fallback is
+# visible on every receipt.
+PRIMARY_MODEL = "openai/gpt-5.6-sol"
+THOROUGH_MODEL = "anthropic/claude-opus-4-7"
+
+# System-level contract for every typed retrieval call. This text steers
+# Perplexity, not the interpreter; it is frozen by the recorded probe in
+# tests/research, not by the interpreter fingerprint.
+RETRIEVAL_INSTRUCTIONS = (
+    "You are the retrieval service of a finance calculator. Every current "
+    "figure you state must come from a retrieval call made in this response; "
+    "never answer from memory, and if retrieval returns nothing, say only that "
+    "the figure could not be retrieved. Reply in the requested JSON shape. "
+    "answer_markdown is the prose for the reader: no links, no list of sources, "
+    "no mention of tools, providers or models. Every figure answer_markdown "
+    "states appears once in rows, with the URL of the retrieved page it was "
+    "read from."
+)
+
+# The same contract for a question whose answer is computed (decision 10):
+# the inputs are the retrieved figures and are rowed; the scenario values are
+# the model's arithmetic and are never rowed. Frozen by its own recording
+# under docs/reports/evidence/decision-10/probes.
+SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
+    " This question asks what something will be worth, what it must grow "
+    "into, or what it is worth today, so the answer is a set of scenarios you "
+    "compute. The retrieved figures are the inputs: the current price, "
+    "published forecasts, analyst targets, growth rates and valuation "
+    "multiples, each rowed with the page it was read from. The scenario values "
+    "are your own arithmetic from those inputs, written out step by step in "
+    "answer_markdown and never rowed; no page needs to state them. Give the "
+    "result as labeled scenario ranges (for example bear, base and bull), each "
+    "written as low to high. When no published forecast covers the full "
+    "horizon, build the scenarios from the nearest published horizon and say "
+    "what you assumed. Say that a figure could not be retrieved only when no "
+    "input at all was retrieved. Never present one number as the future, and "
+    "never say what the reader should do."
+)
 
 
 def research_rail_enabled() -> bool:
@@ -26,48 +84,173 @@ def research_rail_enabled() -> bool:
     return os.getenv("ARGUS_RESEARCH_RAIL_ENABLED", "").strip().lower() in TRUE_VALUES
 
 
+class RetrievalLocation(BaseModel):
+    """Where the reader is, in the provider's own shape."""
+
+    model_config = ConfigDict(frozen=True)
+
+    country: str
+    region: str | None = None
+    city: str | None = None
+
+    @field_validator("country")
+    @classmethod
+    def _iso_alpha_2(cls, value: str) -> str:
+        code = value.strip().upper()
+        if len(code) != 2 or not code.isalpha():
+            raise ValueError("country must be an ISO 3166-1 alpha-2 code")
+        return code
+
+
 class ResearchConfigSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     shape: QuestionShape
-    model: str
+    # Tried in order until one serves; the invoice names the one that did.
+    models: tuple[str, ...]
     max_steps: int
     max_output_tokens: int
     tools: tuple[str, ...]
     reasoning_effort: Literal["low", "medium", "high"] | None = None
     background: bool = False
     timeout_seconds: float = 45.0
+    search_context_size: SearchContextSize | None = None
+    # Request the strict typed shape (answer plus cited rows) instead of prose.
+    typed_output: bool = True
+    # The provider-facing contract sent with a typed request.
+    instructions: str = RETRIEVAL_INSTRUCTIONS
+    # Per-call retrieval facts, derived from the question by retrieval_spec().
+    language: str | None = None
+    location: RetrievalLocation | None = None
+    recency: RecencyFilter | None = None
+    source_domains: tuple[str, ...] = ()
+
+    @property
+    def model(self) -> str:
+        return self.models[0]
+
+    @field_validator("models")
+    @classmethod
+    def _bounded_chain(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        chain = tuple(model.strip() for model in value if model.strip())
+        if not 1 <= len(chain) <= MAX_FALLBACK_MODELS:
+            raise ValueError(f"models must name 1 to {MAX_FALLBACK_MODELS} models")
+        return chain
+
+    @field_validator("source_domains")
+    @classmethod
+    def _bounded_domains(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return normalized_source_domains(value)
+
+
+def normalized_source_domains(domains: tuple[str, ...]) -> tuple[str, ...]:
+    """Lower-cased registrable hosts, unique, within the provider's ceiling."""
+    seen: list[str] = []
+    for raw in domains:
+        host = raw.strip().lower()
+        host = host.removeprefix("https://").removeprefix("http://").split("/", 1)[0]
+        if host and host not in seen:
+            seen.append(host)
+    if len(seen) > MAX_SOURCE_DOMAINS:
+        raise ValueError(f"a domain filter holds at most {MAX_SOURCE_DOMAINS} domains")
+    return tuple(seen)
 
 
 RESEARCH_CONFIG_SPECS: dict[QuestionShape, ResearchConfigSpec] = {
     "fast": ResearchConfigSpec(
         shape="fast",
-        model="openai/gpt-5.6-sol",
-        # Documented as 1; probed to need 2 (skill load consumes a step).
-        max_steps=2,
+        models=(PRIMARY_MODEL, THOROUGH_MODEL),
+        # Documented as 1; probed 2026-08-07 to need 2 (the skill load consumes
+        # a step) and 2026-09-10 to need 4 when the ticker is not already
+        # resolved: a lookup and then the quote, or the answer is "could not
+        # be retrieved" (docs/reports/evidence/open-the-gates/probes/
+        # nike-unresolved-fast-*.json). A step budget is room, never a rule;
+        # the model stops when it has the figure.
+        max_steps=4,
         max_output_tokens=1024,
         tools=("finance_search",),
         timeout_seconds=30.0,
     ),
     "balanced": ResearchConfigSpec(
         shape="balanced",
-        model="openai/gpt-5.6-sol",
+        models=(PRIMARY_MODEL, THOROUGH_MODEL),
         max_steps=5,
         max_output_tokens=2048,
         tools=("web_search", "finance_search", "fetch_url"),
         reasoning_effort="low",
-        timeout_seconds=75.0,
+        # A scenario answer (forecasts, targets and multiples, the arithmetic
+        # written out) took 122s on this configuration and timed out at 75s
+        # on every forward-looking question in the decision 10 after picture
+        # (docs/reports/evidence/decision-10/probes/scenario-balanced-180s.json).
+        # The ceiling is room, never a rule; a quick answer still returns quickly.
+        timeout_seconds=150.0,
+        search_context_size="medium",
     ),
     "thorough": ResearchConfigSpec(
         shape="thorough",
-        model="anthropic/claude-opus-4-7",
+        models=(THOROUGH_MODEL, PRIMARY_MODEL),
         max_steps=10,
         max_output_tokens=4096,
         tools=("web_search", "finance_search", "fetch_url"),
         background=True,
         timeout_seconds=30.0,
+        search_context_size="high",
     ),
 }
+
+# How old a web page may be, by the section 7 data class of the question.
+# The class already says how fast the answer goes stale, which is the same
+# fact a recency filter asks for, so freshness has one owner: a closed
+# window is closed_ohlcv and is never filtered to the past week, and a
+# current survey is movers and never cites a year-old page as today's move.
+RECENCY_BY_DATA_CLASS: dict[DataClass, RecencyFilter | None] = {
+    "quotes": "week",
+    "movers": "week",
+    "analyst_estimates": "month",
+    "fundamentals": None,
+    "peers_constituents": None,
+    "closed_ohlcv": None,
+    "filings_transcripts": None,
+}
+
+def iso_language(language_tag: str | None) -> str:
+    """ISO 639-1 code from a BCP 47 tag: es-419 to es, en to en."""
+    return str(language_tag or "en").split("-", 1)[0].strip().lower() or "en"
+
+
+def retrieval_spec(
+    shape: QuestionShape,
+    *,
+    question_kind: str | None,
+    country: str | None,
+    closed_period: bool = False,
+    language_tag: str | None = "en",
+    scenario: bool = False,
+) -> ResearchConfigSpec:
+    """The documented configuration for a shape, with this question's
+    retrieval parameters: response language, the asking user's declared
+    country as the location, recency by data class, and the scenario contract
+    when the answer is computed from published inputs.
+
+    ``country`` has no default: every caller says whose question it builds,
+    and a user without a country sends no location."""
+    return RESEARCH_CONFIG_SPECS[shape].model_copy(
+        update={
+            "language": iso_language(language_tag),
+            "location": RetrievalLocation(country=country) if country else None,
+            "recency": RECENCY_BY_DATA_CLASS[
+                data_class_for(
+                    question_kind=question_kind,
+                    closed_period=closed_period,
+                    scenario=scenario,
+                )
+            ],
+            "instructions": (
+                SCENARIO_RETRIEVAL_INSTRUCTIONS if scenario else RETRIEVAL_INSTRUCTIONS
+            ),
+        }
+    )
+
 
 # Chat must never hang: thorough runs go through background mode and the job
 # lifecycle. The poller gives up after this deadline and fails the job honestly.

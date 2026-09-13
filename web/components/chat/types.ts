@@ -7,6 +7,7 @@ import type {
 import type { ConfirmationDisplayFacts } from "@/lib/confirmation-assumptions-display";
 import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
 import type { MemoryRecallItem } from "@/lib/memory-recalls";
+import type { ResultReadoutContent } from "@/lib/result-readout-content";
 import type { ResultReadoutFacts } from "@/lib/result-readout-facts";
 
 export type StrategyResultMetric = {
@@ -122,6 +123,7 @@ export type ChatMention = {
 
 export type StrategyResultPayload = {
   readoutFacts?: ResultReadoutFacts | null;
+  readoutContent?: ResultReadoutContent | null;
   strategyName: string;
   strategyLabel?: string;
   symbols?: string[];
@@ -201,6 +203,7 @@ export type StrategyConfirmationPeriodAdjustment = {
   code: string;
   requested_date_range: StrategyConfirmationDateRange;
   effective_date_range: StrategyConfirmationDateRange;
+  limited_by?: { symbol: string; first_available: string };
 };
 
 export type StrategyConfirmationBenchmarkAdjustment = {
@@ -210,12 +213,12 @@ export type StrategyConfirmationBenchmarkAdjustment = {
 };
 
 /** §3.2: requested changes the edit turn could not apply, with reasons. */
-export type StrategyConfirmationEditDisclosure = {
-  unapplied: { op: string; target: string; reason: string }[];
-  note?: string | null;
-};
+export type StrategyConfirmationEditDisclosure =
+  import("@/lib/artifact-edit-disclosure").ArtifactEditDisclosure;
 
 export type StrategyConfirmationPayload = {
+  /** Legacy wire cards may omit kind; the shared boundary normalizes them. */
+  kind?: "backtest";
   confirmation_id?: string;
   confirmation_state?: "active" | "superseded" | "cancelled";
   asset_class?: AssetClass | null;
@@ -295,6 +298,10 @@ export type StrategyPathContext = {
   optionalParameters?: Record<string, unknown> | null;
 };
 
+export type ToolJob = {
+  call_id: string; tool_name: string; artifact_id: string; job: BacktestJob; resultMessageId?: string;
+};
+
 export type Message = {
   id: string;
   /** Hidden durable message ids that should focus this projected transcript row. */
@@ -312,23 +319,28 @@ export type Message = {
     | "conversation_load_failure"
     | "superseded_runtime_failure";
   content?: string;
+  /** Read-time projection of a durable, unfinished show_breakdown request. */
+  pendingBreakdown?: { turnId: string; requestId: string; conversationId: string };
   mentions?: ChatMention[];
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
+  toolResultCards?: import("@/lib/tool-result-card").ToolResultCard[];
+  hasUnavailableToolResults?: boolean;
+  toolJobs?: ToolJob[];
   resultReadoutFacts?: ResultReadoutFacts | null;
+  resultReadoutContent?: ResultReadoutContent | null;
   confirmation?: StrategyConfirmationPayload;
   backtestJob?: BacktestJob;
   // The message a terminal research job produced, once it is in the view;
   // until then the card keeps polling for it.
   researchResultMessageId?: string;
+  resultBreakdownJobId?: string;
   isLoadingResult?: boolean;
   actions?: ChatActionOption[];
   artifactId?: string;
   artifactType?: ArtifactType;
   artifactStatus?: string;
   savedStrategyId?: string | null;
-  /** Canonical fact key for a latest-result fact answer; localized heading chrome. */
-  resultFactHeadingKey?: string | null;
   /** Typed degraded/offline recovery display rendered through web i18n. */
   recoveryDisplay?: RecoveryDisplay | null;
   /** Existing backend-owned strategy facts used to prove turn continuity. */
@@ -338,13 +350,28 @@ export type Message = {
   discovery?: DiscoverySidecar | null;
   /** Typed sources from a research turn; the one surface every shape uses. */
   researchSources?: DiscoverySource[] | null;
+  /**
+   * The research sidecar's typed degraded code. Sources under it are the
+   * pages Argus read and could not verify the answer with: where Argus
+   * looked, never the sources of an answer.
+   */
+  researchDegradedCode?: string | null;
   /** Backend post-turn saved-decision recalls; rendered as context only. */
   memoryRecalls?: MemoryRecallItem[] | null;
+  /** Backend-declared computation behind a computed answer; it offers a decision. */
+  computation?: import("@/lib/decision-contract").DecisionComputation | null;
+  /** Current decision stamped on a computed answer by the backend. */
+  decisionNoteId?: string | null;
+  decisionState?: DecisionState | null;
   /** Backend-owned structured context for a retest receipt turn. */
   retestReceipt?: import("@/lib/chat-retest").RetestReceipt | null;
   /** Ephemeral optimistic presentation; never hydrated or persisted. */
   retestReceiptPending?: boolean;
   nextExperiments?: import("@/lib/chat-next-experiments").NextExperimentRow[];
+  /** The rows' run when the message carries no result card; continuity rows anchor on it. */
+  nextExperimentsSourceRunId?: string | null;
+  /** One ordered list of tests and questions under an answer about a result. */
+  nextSteps?: import("@/lib/chat-next-steps").NextStep[] | null;
 };
 
 export type DiscoverySource = {

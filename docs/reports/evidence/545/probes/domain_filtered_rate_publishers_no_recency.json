@@ -1,0 +1,691 @@
+{
+  "probe": "domain_filtered_rate_publishers_no_recency",
+  "purpose": "mechanism demonstration: the same candidate rate publishers with no recency filter",
+  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
+  "captured_at": "2026-09-09T01:22:32.845913+00:00",
+  "elapsed_s": 17.64,
+  "request_overrides": {},
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "¿Qué tasa de interés pasiva promedio pagan los bancos dominicanos hoy por un certificado financiero a un año en pesos?\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nResponde en español latinoamericano (es-419).",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_domain_filter": [
+                "popularenlinea.com",
+                "sb.gob.do",
+                "bancentral.gov.do"
+              ]
+            },
+            "user_location": {
+              "country": "DO"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "es",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                    "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "label": {
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "subject",
+                      "symbol",
+                      "label",
+                      "value",
+                      "kind",
+                      "unit",
+                      "as_of",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "background": false,
+        "completed_at": 1788916935,
+        "created_at": 1788916935,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_a5b8d6be-d4c7-4ace-b3b7-e35bd33e9411",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "name": "finance",
+            "type": "skill_loaded"
+          },
+          {
+            "queries": [
+              "site:bancentral.gov.do tasas de interés pasivas certificados financieros 360 días septiembre 2026",
+              "Banco Central República Dominicana tasas pasivas certificados financieros 1 año pesos hoy",
+              "site:sb.gob.do tasas interés pasivas certificados financieros 360 días"
+            ],
+            "results": [
+              {
+                "id": 1,
+                "last_updated": "2026-09-07",
+                "snippet": "|--|\n...\n|Tasa de política monetaria|\n|Septiembre 2026\n## 5.25%|\n|Tasas de interés(promedio ponderado)Agosto 2026|\n...\n|Interbancaria|\n|Activa B.M.|\n|Pasiva B.M.|\n...\n|Total|",
+                "source": "web",
+                "title": "Banco Central de la República Dominicana",
+                "url": "https://www.bancentral.gov.do/"
+              },
+              {
+                "id": 2,
+                "last_updated": "2026-08-24",
+                "snippet": "Tasas de interés activas y pasivas anual promedio ponderada de las entidades de intermediación financiera\n1. Nominales Activas y Pasivas",
+                "source": "web",
+                "title": "Sector monetario y financiero",
+                "url": "https://www.bancentral.gov.do/a/d/2536-banco-central-de-la-republica-dominicana"
+              },
+              {
+                "id": 3,
+                "last_updated": "2026-04-20",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Resultados Notas del Banco Central",
+                "url": "https://www.bancentral.gov.do/a/d/2712-resultados-notas-del-banco-central"
+              },
+              {
+                "date": "2018-01-01",
+                "id": 4,
+                "last_updated": "2026-02-04",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Notas del Banco Central",
+                "url": "https://www.bancentral.gov.do/a/d/2711-notas-del-banco-central"
+              },
+              {
+                "id": 5,
+                "last_updated": "2026-03-24",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Resultados certificados de inversión especial",
+                "url": "https://www.bancentral.gov.do/a/d/2716-resultados-certificados-de-inversion-especial"
+              },
+              {
+                "id": 6,
+                "last_updated": "2026-03-27",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Letras del Banco Central",
+                "url": "https://www.bancentral.gov.do/a/d/2708-letras-del-banco-central"
+              },
+              {
+                "date": "2018-01-01",
+                "id": 7,
+                "last_updated": "2026-02-01",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Subasta",
+                "url": "https://www.bancentral.gov.do/a/d/2598-subasta"
+              },
+              {
+                "id": 8,
+                "last_updated": "2026-06-16",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Certificados de inversión a plazo fijo",
+                "url": "https://www.bancentral.gov.do/a/d/2705-certificados-de-inversion-a-plazo-fijo"
+              },
+              {
+                "id": 9,
+                "last_updated": "2026-07-24",
+                "snippet": "Institucional\n...\nSolicitud certificación de tasas\n...\nEncuesta de gastos e ingresos",
+                "source": "web",
+                "title": "Estadísticas SIPARD",
+                "url": "https://www.bancentral.gov.do/a/d/5004-estadisticas-sipard"
+              },
+              {
+                "id": 10,
+                "last_updated": "2026-09-08",
+                "snippet": "528,660,016 \n10.50% \n...\nPor tipo \n Tasa \nTasa \npromedio  \npromedio \nMoneda  \nponderado  \nMoneda \nponderado \nnacional\nanual (%) \nextranjera \nanual (%) \nTotal  \n...\n2025 \nDe 0 a 15 días  \n...\nDe 16 a 30 días \n...\nTasa promedio \nponderada \nAcreedores \n Modalidad \n Garantía \nanual \nPlazo \nSaldo DOP \n31 de diciembre de 2025 \n...\n     7,819,623,670       3,544,157,754 ",
+                "source": "web",
+                "title": "Estados financieros 31 de diciembre de 2025 (Con el informe ...",
+                "url": "https://www.sb.gob.do/media/q1lptsj1/31-de-diciembre-2025.pdf"
+              },
+              {
+                "id": 11,
+                "last_updated": "2026-08-26",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Certificados de inversión de largo plazo del Banco Central",
+                "url": "https://www.bancentral.gov.do/a/d/2713-certificados-de-inversion-de-largo-plazo-del-banco-central"
+              },
+              {
+                "id": 12,
+                "last_updated": "2026-03-04",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Convocatorias de las Notas del Banco Central",
+                "url": "https://www.bancentral.gov.do/a/d/4086-convocatorias-de-las-notas-del-banco-central"
+              },
+              {
+                "id": 13,
+                "last_updated": "2026-07-10",
+                "snippet": "Por tipo de inversionista\na. 2014-2025",
+                "source": "web",
+                "title": "Certificados de inversión con rendición anticipada",
+                "url": "https://www.bancentral.gov.do/a/d/2707-certificados-de-inversion-con-rendicion-anticipada"
+              },
+              {
+                "id": 14,
+                "last_updated": "2026-05-07",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Certificados de inversión especial",
+                "url": "https://www.bancentral.gov.do/a/d/2715-certificados-de-inversion-especial"
+              },
+              {
+                "date": "2018-01-01",
+                "id": 15,
+                "last_updated": "2026-02-05",
+                "snippet": "BCRD mantiene su tasa de política m...\nSala de prensa",
+                "source": "web",
+                "title": "BCRD mantiene su tasa de política monetaria en 5.25 ...",
+                "url": "https://www.bancentral.gov.do/a/d/6480"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "Síguenos en\nFacebook\n\nSíguenos en\nX\n\nSuscríbete a\nYouTube\n\nSíguenos en\nInstagram\n\nES\n\nInstitucional\n\nAdministración Monetaria y Financiera\n\nDescripción\n\nOrganigrama\n\nJunta Monetaria\n\nMiembros JM\n\nSobre Nosotros\n\nHistoria\n\nFunciones\n\nPlan Estratégico\n\nOrganigrama\n\nSobre el Gobernador\n\nPrincipales Funcionarios\n\nGobernadores\n\nBalance General\n\nEstados Financieros\n\nEstados Financieros del Fondo de Contingencia y del Fondo de Consolidación Bancaria\n\nMemorias\n\nContacto\n\nNormativa\n\nLeyes, decretos y disposiciones afines\n\nLeyes en Proceso\n\nReglamentos Vigentes\n\nReglamentos en Proceso\n\nInstructivos\n\nResoluciones JM\n\nCódigo global de conducta del mercado cambiario\n\nEstadísticas\n\nSector Real\n\nPrecios\n\nSector Fiscal\n\nSector Externo\n\nSector Monetario y Financiero\n\nSector Turismo\n\nMercado de Trabajo\n\nEncuesta Continua (ENCFT)\n\nEncuesta Tradicional (ENFT) con población ajustada por zona y regiones\n\nSistemas de pago\n\nMercado Cambiario\n\nEncuesta de gastos e ingresos\n\nCalendario Publicación\n\nPublicaciones\n\nPublicaciones\n\nCalendario Publicación\n\nSistema Financiero\n\nInforme de estabilidad financiera\n\nNormativa del SF\n\nEstadísticas del SF\n\nEntidades Financieras\n\nFondo de Contingencia\n\nSistemas de Pago\n\nPortada\n\nInformación General\n\nMarco Legal\n\nEstadísticas\n\nSIPA\n\nPagos al instante\n\nSPRICS\n\nPublicaciones\n\nPreguntas Frecuentes\n\nServicios\n\nTransparencia\n\nEstás aquí:\n\nPortada\n\nEstadísticas\n\nSector monetario y financiero\n\nEstadísticas Económicas\n\nPrecios\n\nCálculo de variaciones del Índice de Precios al Consumidor IPC\n\nActualización de valores por la variación del Índice de Precios al Consumidor IPC\n\nMercado cambiario\n\nSolicitud certificación de tasas\n\nMercado de trabajo\n\nEncuesta tradicional (ENFT) con población ajustada por zona y regiones\n\nEncuesta continua (ENCFT)\n\nSector real\n\nSector fiscal\n\nSector externo\n\nSector monetario y financiero\n\nSector turismo\n\nSistemas de pago\n\nEncuesta de gastos e ingresos\n\nBanco Central de la República Dominicana\n\nSector monetario y financiero\n\nSi no puede visualizar los documentos Excel, es posible que necesite Microsoft 365. Para acceder a Microsoft 365,\nclic aquí\n\nSi no puede visualizar los documentos, es posible que necesite instalar Acrobat Reader. Para descargar el visor PDF,\nclic aquí\n\nIndicadores monetarios y financieros del Banco Central\n\nI. Indicadores Armonizados BCRD\n\na.\nVariaciones Porcentuales y Absolutas\n\nb.\nSerie Mensual 1996-2026\n\n2.\nOperaciones Monetarias Diarias\n\nTasas de interés del Banco Central\n\nTasa de Política Monetaria\n\nTasas de Interés Depósitos Remunerados y Ventanilla Lombarda 2004-2012\n\nTasas de Facilidades Permanentes 2013-2025\n\nTasas de Interés de Operaciones de Mercado Abierto\n\nIndicadores monetarios de las otras sociedades de depósitos (OSD)\n\n1. Indicadores Armonizados OSD (Activos y Pasivos Externos, Préstamos y Depósitos)\n\na.\nVariaciones Porcentuales y Absolutas\n\nb.\nSerie Mensual 1996-2026\n\n2. Préstamos por Destino\n\na.\nVariaciones Porcentuales y Absolutas\n\nb.\nSerie Mensual 1996-2026\n\nTasas de interés activas y pasivas anual promedio ponderada de las entidades de intermediación financiera\n\n1. Nominales Activas y Pasivas\n\na. Mensuales hasta el 2007\n\nSeleccione\n\nTasas Activas\n\n-- Bancos Múltiples\n\n-- Asociaciones de Ahorros y Préstamos\n\n-- Banco de Ahorro y Crédito\n\n-- Corporaciones de Ahorro y Crédito\n\nTasas Pasivas\n\n-- Bancos Múltiples\n\n-- Asociaciones de Ahorros y Préstamos\n\n-- Banco de Ahorro y Crédito\n\n-- Corporaciones de Ahorro y Crédito\n\nTasas Activas y Pasivas US$ (1996-2006)\n\nb. Mensuales 2008-2012\n\nSeleccione\n\nTasas Activas\n\n-- Bancos Múltiples\n\n-- Asociaciones de Ahorros y Préstamos\n\n-- Bancos de Ahorro y Crédito\n\n-- Corporaciones de Ahorro y Crédito\n\nTasas Pasivas\n\n-- Bancos Múltiples\n\n-- Asociaciones de Ahorros y Préstamos\n\n-- Bancos de Ahorro y Crédito\n\n-- Corporaciones de Ahorro y Crédito\n\nTasas Activas y Pasivas US$ 2007-2010\n\n-- Activa US$ - Plazo-2011-2012\n\n-- Pasiva US$ - Plazo-2011-2012\n\nc. Mensuales 2013-2016\n\nSeleccione\n\nTasas Activas\n\n-- Bancos Múltiples\n\n-- Asociaciones de Ahorros y Préstamos\n\n-- Bancos de Ahorro y Crédito\n\n-- Corporaciones de Ahorro y Crédito\n\nTasas Pasivas\n\n-- Bancos Múltiples\n\n-- Asociaciones de Ahorros y Préstamos\n\n-- Bancos de Ahorro y Crédito\n\n-- Corporaciones de Ahorro y Crédito\n\n-- Activa US$ - Plazo-2013-2016\n\n-- Pasiva US$ - Plazo-2013-2016\n\nd. Mensuales 2017-2026\n\nSeleccione\n\nTasas Activas\n\n-- Bancos Múltiples\n\n-- Asociaciones de Ahorros y Préstamos\n\n-- Bancos de Ahorro y Crédito\n\n-- Corporaciones de Ahorro y Crédito\n\nTasas Pasivas\n\n-- Bancos Múltiples\n\n-- Asociaciones de Ahorros y Préstamos\n\n-- Bancos de Ahorro y Crédito\n\n-- Corporaciones de Ahorro y Crédito\n\n-- Activa US$\n\n-- Pasiva US$\n\ne. Semanales Activas y Pasivas\n\nActivas y Pasivas en RD$\n\nActivas y Pasivas en US$\n\nSeleccione\n\nBancos Múltiples\n\n-- Año 2026\n\n-- Año 2025\n\n-- Año 2024\n\n-- Año 2023\n\n-- Año 2022\n\n-- Año 2021\n\n-- Año 2020\n\n-- Año 2019\n\n-- Año 2018\n\n-- Año 2017\n\n-- Año 2016\n\n-- Año 2015\n\n-- Año 2014\n\n-- Año 2013\n\n-- Año 2012\n\n-- Año 2011\n\n-- Año 2010\n\n-- Año 2009\n\n-- Año 2008\n\nAsociaciones\n\n-- Año 2026\n\n-- Año 2025\n\n-- Año 2024\n\n-- Año 2023\n\n-- Año 2022\n\n-- Año 2021\n\n-- Año 2020\n\n-- Año 2019\n\n-- Año 2018\n\n-- Año 2017\n\n-- Año 2016\n\n-- Año 2015\n\n-- Año 2014\n\n-- Año 2013\n\n-- Año 2012\n\n-- Año 2011\n\n-- Año 2010\n\n-- Año 2009\n\n-- Año 2008\n\nBancos de Ahorro y Crédito\n\n-- Año 2026\n\n-- Año 2025\n\n-- Año 2024\n\n-- Año 2023\n\n-- Año 2022\n\n-- Año 2021\n\n-- Año 2020\n\n-- Año 2019\n\n-- Año 2018\n\n-- Año 2017\n\n-- Año 2016\n\n-- Año 2015\n\n-- Año 2014\n\n-- Año 2013\n\n-- Año 2012\n\n-- Año 2011\n\n-- Año 2010\n\n-- Año 2009\n\n-- Año 2008\n\n2. Tasas activas y pasivas diarias por entidad hasta 2026\n\nSeleccione\n\nBancos Múltiples\n\n-- Año 2026\n\n-- Año 2025\n\n-- Año 2024\n\n-- Año 2023\n\n-- Año 2022\n\n-- Año 2021\n\n-- Año 2020\n\n-- Año 2019\n\n-- Año 2018\n\n-- Año 2017\n\n-- Año 2016\n\n-- Año 2015\n\n-- Año 2014\n\n-- Año 2013\n\n-- Año 2012\n\n-- Año 2011\n\n-- Año 2010\n\n-- Año 2009\n\n-- Año 2008\n\n-- Año 2007\n\nAsoc. Ahorros y Préstamos\n\n-- Año 2026\n\n-- Año 2025\n\n-- Año 2024\n\n-- Año 2023\n\n-- Año 2022\n\n-- Año 2021\n\n-- Año 2020\n\n-- Año 2019\n\n-- Año 2018\n\n-- Año 2017\n\n-- Año 2016\n\n-- Año 2015\n\n-- Año 2014\n\n-- Año 2013\n\n-- Año 2012\n\n-- Año 2011\n\n-- Año 2010\n\n-- Año 2009\n\n-- Año 2008\n\n-- Año 2007\n\n-- Año 2006\n\n-- Año 2005\n\n-- Año 2004\n\n-- Año 2003\n\n-- Año 2002\n\n-- Año 2001\n\n-- Año 2000\n\nBancos de Ahorro y Créditos\n\n-- Año 2026\n\n-- Año 2025\n\n-- Año 2024\n\n-- Año 2023\n\n-- Año 2022\n\n-- Año 2021\n\n-- Año 2020\n\n-- Año 2019\n\n-- Año 2018\n\n-- Año 2017\n\n-- Año 2016\n\n-- Año 2015\n\n-- Año 2014\n\n-- Año 2013\n\n-- Año 2012\n\n-- Año 2011\n\n-- Año 2010\n\n-- Año 2009\n\n-- Año 2008\n\n-- Año 2007\n\n-- Año 2006\n\n-- Año 2005\n\n-- Año 2004\n\n-- Año 2003\n\n-- Año 2002\n\n-- Año 2001\n\n-- Año 2000\n\nCorporaciones de Crédito\n\n-- Año 2026\n\n-- Año 2025\n\n-- Año 2024\n\n-- Año 2023\n\n-- Año 2022\n\n-- Año 2021\n\n-- Año 2020\n\n-- Año 2019\n\n-- Año 2018\n\n3. Reales\n\nSeleccione\n\n2008-2026\n\n2000-2007\n\n4. Operaciones interbancarias por monto y tasa\n\na)\nOperaciones a plazos de 1 a 7 días\n\nb)\nMensual 2000-2026\n\nc)\nMensual por plazos 2018-2026\n\nd) Diario\n\nSeleccione\n\n-- Año 2026\n\n-- Año 2025\n\n-- Año 2024\n\n-- Año 2023\n\n-- Año 2022\n\n-- Año 2021\n\n-- Año 2020\n\n-- Año 2019\n\n-- Año 2018\n\n-- Año 2017\n\n-- Año 2016\n\n-- Año 2015\n\n-- Año 2014\n\n-- Año 2013\n\n-- Año 2012\n\n-- Año 2011\n\n-- Año 2010\n\n-- Año 2009\n\n-- Año 2008\n\n5. Volatilidades de Riesgo de Mercado\n\na)\nVolatilidades de tasas de interés\n\nb)\nVolatilidades de tipo de cambio en dólar\n\nc)\nVolatilidades de tipo de cambio en euro\n\n6.\nCosto y márgenes de intermediación de la banca múltiple 2002-2007\n\nCuadros estadísticas monetarias y financieras armonizadas (EMFA)\n\nGlosario Estadísticas Armonizadas\n\nNotas explicativas de las Estadísticas Monetarias y Financieras\n\nI. Panoramas\n\n1.\nPanorama Banco Central (PBC)\n\n2.\nPanorama de las otras sociedades de depósito (POSD)\n\na.\nPanorama de los bancos múltiples (excluidos offshore)\n\n3.\nPanorama de las sociedades de depósito (PSD)\n\n4.\nPanorama Otras Sociedades Financieras (OSF)\n\n5.\nPanorama Sociedades Financieras (SF)\n\nII. Balances Sectoriales\n\n1.\nBalance sectorial de las OSD: Resumen por instrumentos\n\n2.\nBalance sectorial de las OSD: Instrumentos y sectores institucionales (Activos)\n\na.\nBalance sectorial de las OSD: Instrumentos y sectores institucionales (Activos en MN)\n\nb.\nBalance sectorial de las OSD: Instrumentos y sectores institucionales (Activos en ME)\n\n3.\nBalance sectorial de las OSD: Instrumentos y sectores institucionales (Pasivos)\n\na.\nBalance sectorial de las OSD: Instrumentos y sectores institucionales (Pasivos en MN)\n\nb.\nBalance sectorial de las OSD: Instrumentos y sectores institucionales (Pasivos en ME)\n\nIII. Base Monetaria y Agregados Monetarios\n\n1.\nBase monetaria\n\n2.\nAgregados monetarios\n\n3.\nAgregados monetarios por sectores\n\n4.\nEncaje bancario requerido y efectivo por monedas\n\nIV. Agregados de Crédito\n\n1.\nCrédito al sector público no financiero del BC\n\n2.\nCrédito al sector público no financiero de las OSD\n\nV. Tasas de Interés\n\n1.\nValores subastados del Banco Central por plazos de colocación en MN\n\n2.\nTasas de interés bancarias activas en MN\n\n3.\nTasas de interés bancarias activas en ME\n\n4.\nTasas de interés bancarias pasivas en MN\n\n5.\nTasas de interés bancarias pasivas en ME\n\nVI. Otros Indicadores\n\n1.\nComposición del capital y equilibrio en ME del BC\n\n2.\nComposición del capital y equilibrio en ME de las OSD\n\n3.\nActivos externos netos del BC y OSD\n\n4.\nCaptación de los Bancos Múltiples por Provincias\n\n5.\nCanalización de los Bancos Múltiples por Provincias\n\nEstadísticas Tradicionales (Disponibles hasta el 29 de Junio de 2012)\n\n",
+                "title": "Sector monetario y financiero",
+                "url": "https://www.bancentral.gov.do/a/d/2536-banco-central-de-la-republica-dominicana"
+              },
+              {
+                "snippet": "- Informe de la economía\n- Mercado cambiario\n- Divisas convertibles\n- Tasa del dólar BC\n- Plataforma Cambiaria BCRD\n- Operaciones mercado abierto (títulos-valores)\n- Indice de precios al consumidor\n- Producto Interno Bruto\n- Indicadores monetarios y financieros\n- Indicadores BCRD\n- Indicadores OSD\n- Tasas de interés\n- Activas\n- Pasivas\n- Operaciones monetarias diarias\n- Tasa de política monetaria\n- **Agosto 23**, La economía de la República Dominicana: hacia un nuevo sistema de pagos instantáneos\n- **Agosto 12**, La dinámica reciente del tipo de cambio y el esquema de metas de inflación\n- **Agosto 4**, República Dominicana: Apreciación, fundamentos de mercado y resiliencia cambiaria en el nuevo entorno internacional\n\n##### Variables Macroeconómicas\n\n###### Inflación\n|Meta de inflación|\n|--|\n|## 4.0% ± 1.0%|\n|Inflación(variación %)Agosto 2026|\n|--|\n|Interanual|\n|Acumulada|\n|Mensual|\n|Inflación subyacenteAgosto 2026|\n|--|\n|Interanual|\n|Acumulada|\n|Mensual|\n\n###### Monetarias\n|Tasa de política monetaria|\n|--|\n|Septiembre 2026\r \r\n ## 5.25%|\n|Tasas de interés(promedio ponderado)Agosto 2026|\n|--|\n|Interbancaria|\n|Activa B.M.|\n|Pasiva B.M.|\n|Préstamos privados(variación % interanual)Agosto 2026|\n|--|\n|Mon. nacional|\n|Total|\n\n###### Sector real\n\n###### Sector externo\n|Tipo de cambio7 de Septiembre 2026|\n|--|\n|Compra\r\n ## 58.5789|\n|Reservas internacionales(en US$ MM)Agosto 2026|\n|--|\n|Brutas|\n|Netas|\n|Cuenta corriente(como % del PIB)|\n|--|\n|2023|\n|2024|\n|2025|",
+                "title": "Banco Central de la República Dominicana",
+                "url": "https://www.bancentral.gov.do/"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "queries": [
+              "BCRD agosto 2026 tasa pasiva 360 días bancos múltiples",
+              "República Dominicana septiembre 2026 certificado financiero 1 año tasa promedio bancos",
+              "tasas pasivas bancos múltiples 2026 360 días RD$"
+            ],
+            "results": [
+              {
+                "id": 16,
+                "last_updated": "2026-09-07",
+                "snippet": "|Tasas de interés(promedio ponderado)Agosto 2026|\n...\n|Activa B.M.|\n|Pasiva B.M.|\n...\n|Total|",
+                "source": "web",
+                "title": "Banco Central de la República Dominicana",
+                "url": "https://www.bancentral.gov.do/"
+              },
+              {
+                "id": 17,
+                "last_updated": "2026-09-03",
+                "snippet": "de interés promedio ponderada (TIPP) activa y pasiva de la banca múltiple cerraron en junio 2026 \ncon niveles de 13.60% y 7.34%, (+0.32 y +1.06 p. p. trimestral) respectivamente, estableciendo el \nmargen de intermediación por tasas en +6.26% (-0.73 p.p. desde su nivel en el trimestre pasado).\n...\nTasa de interés (media móvil 10 días)\nenero 2025 - agosto 2026\nTPM\nPromedio\nPreferencial\nInterbancaria\n58.8 \n57.3 \n59.1 \n59.7 \n 56.0\n...\n60.0\n...\n64.0\n65.0",
+                "source": "web",
+                "title": "[PDF] Y ajustar el lenguaje mplm +|",
+                "url": "https://sb.gob.do/media/eymkxtmz/itdsf-junio_2026_pdf.pdf"
+              },
+              {
+                "id": 18,
+                "last_updated": "2026-08-24",
+                "snippet": "-- Año 2008\n2. Tasas activas y pasivas diarias por entidad hasta 2026\n...\nBancos Múltiples",
+                "source": "web",
+                "title": "Sector monetario y financiero",
+                "url": "https://www.bancentral.gov.do/a/d/2536-banco-central-de-la-republica-dominicana"
+              },
+              {
+                "id": 19,
+                "last_updated": "2026-04-20",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Resultados Notas del Banco Central",
+                "url": "https://www.bancentral.gov.do/a/d/2712-resultados-notas-del-banco-central"
+              },
+              {
+                "date": "2018-01-01",
+                "id": 20,
+                "last_updated": "2026-02-04",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Notas del Banco Central",
+                "url": "https://www.bancentral.gov.do/a/d/2711-notas-del-banco-central"
+              },
+              {
+                "id": 21,
+                "last_updated": "2026-08-12",
+                "snippet": "|**2.\nTasas activas y pasivas diarias por entidad hasta 2026**| |",
+                "source": "web",
+                "title": "Sector monetario y financiero",
+                "url": "https://www.bancentral.gov.do/a/CustomView/2536-sector-monetario-y-financiero"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 22,
+                "last_updated": "2026-09-08",
+                "snippet": "Última actualización: 07/09/2026\n...\n|Fecha|Moneda|Valor|",
+                "source": "web",
+                "title": "Tasas de monedas convertibles",
+                "url": "https://www.bancentral.gov.do/SectorExterno/HistoricoTasasConvertibles"
+              },
+              {
+                "id": 23,
+                "last_updated": "2026-03-27",
+                "snippet": "Por tipo de inversionista\n...\nPlazos promedio de vencimiento de valores",
+                "source": "web",
+                "title": "Letras del Banco Central",
+                "url": "https://www.bancentral.gov.do/a/d/2708-letras-del-banco-central"
+              },
+              {
+                "id": 24,
+                "last_updated": "2026-07-24",
+                "snippet": "Estados Financieros del Fondo de Contingencia y del Fondo de Consolidación Bancaria\n...\nEncuesta de gastos e ingresos",
+                "source": "web",
+                "title": "Estadísticas SIPARD",
+                "url": "https://www.bancentral.gov.do/a/d/5004-estadisticas-sipard"
+              },
+              {
+                "id": 25,
+                "last_updated": "2026-08-26",
+                "snippet": "|Periodo ▲|Compra promedio|Apre/depre acumulada (%)|Apre/depre interanual (%)|Venta promedio|Apre/depre acumulada (%)|Apre/depre interanual (%)|",
+                "source": "web",
+                "title": "Historico de Tasas - Banco Central de la República Dominicana",
+                "url": "https://www.bancentral.gov.do/SectorExterno/HistoricoTasas"
+              },
+              {
+                "id": 26,
+                "last_updated": "2026-08-16",
+                "snippet": "8.43% \n2026 – 2041 \n...\n  9.54% \n2026 – 2035 \nCertificados \nfinancieros \nBanco Múltiple BHD, S. A. \n...\nDe 181 a 360 días\n13,814,181,186 \n6.54% \n 3,690,965,538 \n2.79% \n 17,505,146,724 \n...\nDe 181 a 360 días  \n...\nA) Banco Central (BCRD)\nBanco Central de \nla República \nDominicana \nFacilidad de \nliquidez rápida (i) \nTítulos valores \ndel BCRD y \ndel Ministerio \nde Hacienda \n3.00% \n2026-\n2028 \n14,447,603,472\n…\nAcreedores \nModalidad \nGarantía \nTasa \npromedio \nponderada \nPlazo \nSaldo \nDOP \na) En moneda nacional:\nA) Banco Central (BCRD)\nBanco Central de \nla República \nDominicana \nFacilidad de \nliquidez rápida (i) \nTítulos valores \ndel BCRD y \ndel Ministerio \nde Hacienda \n3.00% \n2025 -\n2026 \n18,595,978,569\n…\n...\nMoneda \nTasa \npromedio \nponderada % \nPlazo de \nvencimiento \nSaldo \nDOP \nVarios (a) \nBonos de deuda \nsubordinada \nDOP \n10.25% \nNoviembre 2026 -\noctubre 2033 \n20,000,000,000\n…\n...\nLos pasivos con tasas de interés variables ascienden a DOP459,559,371,629 \n...\nEl Reglamento de Riesgo de Liquidez establece que los vencimientos de pasivos para ",
+                "source": "web",
+                "title": "BANCO POPULAR DOMINICANO, S. A. - BANCO MÚLTIPLE",
+                "url": "https://www.sb.gob.do/media/qfip2fsg/31-de-diciembre-2025.pdf"
+              },
+              {
+                "id": 27,
+                "last_updated": "2026-07-11",
+                "snippet": "BCRD mantiene su tasa de política m...\nSala de prensa",
+                "source": "web",
+                "title": "BCRD mantiene su tasa de política monetaria en 5.25 % ...",
+                "url": "https://www.bancentral.gov.do/a/d/6498-bcrd-mantiene-su-tasa-de-politica-monetaria-en-525--anual"
+              },
+              {
+                "id": 28,
+                "last_updated": "2026-06-26",
+                "snippet": "Estados Financieros del Fondo de Contingencia y del Fondo de Consolidación Bancaria\n...\nEncuesta de gastos e ingresos",
+                "source": "web",
+                "title": "Precios - Banco Central de la República Dominicana",
+                "url": "https://www.bancentral.gov.do/a/d/2534-precios"
+              },
+              {
+                "id": 29,
+                "last_updated": "2026-06-16",
+                "snippet": "Por tipo de inversionista\na. 2014-2026",
+                "source": "web",
+                "title": "Certificados de inversión a plazo fijo",
+                "url": "https://www.bancentral.gov.do/a/d/2705-certificados-de-inversion-a-plazo-fijo"
+              },
+              {
+                "id": 30,
+                "last_updated": "2026-07-09",
+                "snippet": "BCRD mantiene su tasa de política m...\nSala de prensa",
+                "source": "web",
+                "title": "BCRD mantiene su tasa de política monetaria en 5.25 % ...",
+                "url": "https://www.bancentral.gov.do/a/d/6553-bcrd-mantiene-su-tasa-de-politica-monetaria-en-525--anual"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"No pude recuperar una tasa pasiva promedio vigente y verificable específicamente para certificados financieros en pesos a un año de los bancos dominicanos. No sería correcto estimarla usando la tasa pasiva general del sistema.\",\"rows\":[]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_8293cfa9-1d37-4557-96d7-47a7def24da7",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_domain_filter": [
+                "popularenlinea.com",
+                "sb.gob.do",
+                "bancentral.gov.do"
+              ]
+            },
+            "user_location": {
+              "country": "DO"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.06566,
+            "cache_read_cost": 0.01209,
+            "currency": "USD",
+            "input_cost": 6e-05,
+            "output_cost": 0.0113,
+            "tool_calls_cost": 0.0055,
+            "tool_calls_cost_details": {
+              "fetch_url": 0.0005,
+              "search_web": 0.005
+            },
+            "total_cost": 0.09461
+          },
+          "input_tokens": 43382,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 13132,
+            "cache_read_input_tokens": 30235,
+            "cached_tokens": 30235
+          },
+          "output_tokens": 565,
+          "output_tokens_details": {
+            "reasoning_tokens": 214
+          },
+          "tool_calls_details": {
+            "fetch_url": {
+              "cost_usd": 0.0005,
+              "invocation": 1
+            },
+            "search_web": {
+              "cost_usd": 0.005,
+              "invocation": 2
+            }
+          },
+          "total_tokens": 43947
+        },
+        "user": null
+      }
+    }
+  ],
+  "packet": {
+    "typed_answer": true,
+    "uncited_rows": 0,
+    "rows": [],
+    "sources": [
+      {
+        "url": "https://www.bancentral.gov.do/",
+        "title": "Banco Central de la República Dominicana",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2536-banco-central-de-la-republica-dominicana",
+        "title": "Sector monetario y financiero",
+        "source_date": "2026-08-24"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2712-resultados-notas-del-banco-central",
+        "title": "Resultados Notas del Banco Central",
+        "source_date": "2026-04-20"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2711-notas-del-banco-central",
+        "title": "Notas del Banco Central",
+        "source_date": "2018-01-01"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2716-resultados-certificados-de-inversion-especial",
+        "title": "Resultados certificados de inversión especial",
+        "source_date": "2026-03-24"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2708-letras-del-banco-central",
+        "title": "Letras del Banco Central",
+        "source_date": "2026-03-27"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2598-subasta",
+        "title": "Subasta",
+        "source_date": "2018-01-01"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2705-certificados-de-inversion-a-plazo-fijo",
+        "title": "Certificados de inversión a plazo fijo",
+        "source_date": "2026-06-16"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/5004-estadisticas-sipard",
+        "title": "Estadísticas SIPARD",
+        "source_date": "2026-07-24"
+      },
+      {
+        "url": "https://www.sb.gob.do/media/q1lptsj1/31-de-diciembre-2025.pdf",
+        "title": "Estados financieros 31 de diciembre de 2025 (Con el informe ...",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2713-certificados-de-inversion-de-largo-plazo-del-banco-central",
+        "title": "Certificados de inversión de largo plazo del Banco Central",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/4086-convocatorias-de-las-notas-del-banco-central",
+        "title": "Convocatorias de las Notas del Banco Central",
+        "source_date": "2026-03-04"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2707-certificados-de-inversion-con-rendicion-anticipada",
+        "title": "Certificados de inversión con rendición anticipada",
+        "source_date": "2026-07-10"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2715-certificados-de-inversion-especial",
+        "title": "Certificados de inversión especial",
+        "source_date": "2026-05-07"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/6480",
+        "title": "BCRD mantiene su tasa de política monetaria en 5.25 ...",
+        "source_date": "2018-01-01"
+      },
+      {
+        "url": "https://sb.gob.do/media/eymkxtmz/itdsf-junio_2026_pdf.pdf",
+        "title": "[PDF] Y ajustar el lenguaje mplm +|",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/CustomView/2536-sector-monetario-y-financiero",
+        "title": "Sector monetario y financiero",
+        "source_date": "2026-08-12"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/SectorExterno/HistoricoTasasConvertibles",
+        "title": "Tasas de monedas convertibles",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/SectorExterno/HistoricoTasas",
+        "title": "Historico de Tasas - Banco Central de la República Dominicana",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://www.sb.gob.do/media/qfip2fsg/31-de-diciembre-2025.pdf",
+        "title": "BANCO POPULAR DOMINICANO, S. A. - BANCO MÚLTIPLE",
+        "source_date": "2026-08-16"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/6498-bcrd-mantiene-su-tasa-de-politica-monetaria-en-525--anual",
+        "title": "BCRD mantiene su tasa de política monetaria en 5.25 % ...",
+        "source_date": "2026-07-11"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/2534-precios",
+        "title": "Precios - Banco Central de la República Dominicana",
+        "source_date": "2026-06-26"
+      },
+      {
+        "url": "https://www.bancentral.gov.do/a/d/6553-bcrd-mantiene-su-tasa-de-politica-monetaria-en-525--anual",
+        "title": "BCRD mantiene su tasa de política monetaria en 5.25 % ...",
+        "source_date": "2026-07-09"
+      }
+    ],
+    "tool_results": [
+      "search_results",
+      "fetch_url_results",
+      "search_results"
+    ],
+    "tickers": [],
+    "usage": {
+      "invocations": 0,
+      "finance_search_invocations": 0,
+      "web_search_invocations": 2,
+      "fetch_url_invocations": 1,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 17637,
+      "cost_usd": null,
+      "input_tokens": 43382,
+      "output_tokens": 565,
+      "cache_creation_input_tokens": 13132,
+      "cache_read_input_tokens": 30235
+    },
+    "answer_markdown": "No pude recuperar una tasa pasiva promedio vigente y verificable específicamente para certificados financieros en pesos a un año de los bancos dominicanos. No sería correcto estimarla usando la tasa pasiva general del sistema."
+  },
+  "error": null
+}

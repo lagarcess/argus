@@ -1,0 +1,15 @@
+Controlled pre-fix regression run; provider credentials disabled by tests/conftest.py.
+Command: poetry run pytest tests/agent_runtime/test_edit_carrier_conflicts.py -q --no-cov
+
+collected 5 items
+E           KeyError: 'edit_disclosure'
+E       assert 8000.0 == 9000.0
+E       AssertionError: assert [{'op': 'clea...': 'capital'}] == [{'op': 'clea...': 'capital'}]
+E
+E         At index 0 diff: {'op': 'clear', 'target': 'starting_capital', 'reason': 'unsupported_operation'} != {'op': 'clear', 'target': 'capital', 'reason': 'unsupported_operation'}
+E         Left contains one more item: {'op': 'clear', 'reason': 'not_materialized', 'target': 'capital'}
+E         Use -v to get more diff
+FAILED tests/agent_runtime/test_edit_carrier_conflicts.py::test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-main]
+FAILED tests/agent_runtime/test_edit_carrier_conflicts.py::test_typed_capital_owns_application_and_conflicting_flat_value_is_disclosed[False-recovery]
+FAILED tests/agent_runtime/test_edit_carrier_conflicts.py::test_refused_target_alias_has_one_authoritative_receipt
+========================= 3 failed, 2 passed in 2.27s ==========================

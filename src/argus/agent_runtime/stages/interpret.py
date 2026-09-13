@@ -10,8 +10,10 @@ import json
 import os
 from dataclasses import dataclass
 from datetime import date
+from collections.abc import Sequence
 from typing import Any
 
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.agent_runtime.artifact_edit_planner import plan_artifact_assumption_edit
 from argus.agent_runtime.artifacts.patch_policy import (
     executable_artifact_patch_missing_fields,
@@ -48,7 +50,6 @@ from argus.agent_runtime.profile.response_profile import (
 )
 from argus.agent_runtime.recovery_messages import (
     recovery_message,
-    recovery_state_stage_patch,
     retry_last_turn_stage_patch,
 )
 from argus.agent_runtime.resolution import AssetResolution, callable_accepts_keyword
@@ -56,10 +57,9 @@ from argus.agent_runtime.resolution import (
     resolve_asset_candidate as runtime_resolve_asset_candidate,
 )
 from argus.agent_runtime.response_language import response_language_instruction
-from argus.agent_runtime.response_style import result_followup_response_intent
+from argus.agent_runtime.result_followup_answers import answered_result_followup_patch
 from argus.agent_runtime.result_followups import (
     compose_private_alpha_save_response,
-    compose_result_followup_response,
     fallback_private_alpha_save_response,
 )
 from argus.agent_runtime.rule_specs import (
@@ -240,6 +240,7 @@ from argus.agent_runtime.stages.interpret_internal.interpreter_unavailable_conti
 )
 from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
     LatestResultFactComposerDeclined,
+    stored_fact_key,
 )
 from argus.agent_runtime.stages.interpret_internal.latest_result_answer import (
     latest_result_answer_stage_result_if_applicable as _latest_result_answer_stage_result_if_applicable,
@@ -275,6 +276,7 @@ from argus.agent_runtime.stages.interpret_internal.shared import (  # noqa: F401
     _selected_requested_field,
     _should_preserve_prior_asset_context,
     _strategy_supplies_executable_rule_edit,
+    _pending_setup_continuation_reason_codes,
     _strategy_supplies_explicit_turn_money,
     _supported_experiment_fact_packet,
 )
@@ -579,6 +581,13 @@ async def _stage_result_from_interpretation(
         interpretation=interpretation,
         snapshot=snapshot,
         artifact_target=artifact_target,
+        current_user_message=state.current_user_message,
+        selected_thread_metadata=selected_thread_metadata,
+    )
+    hidden_context_guard_reason_codes += _pending_setup_continuation_reason_codes(
+        interpretation=interpretation,
+        prior=_active_strategy_from_snapshot(snapshot),
+        selected_thread_metadata=selected_thread_metadata,
         current_user_message=state.current_user_message,
     )
     if clear_assistant_response_for_hidden_context:
@@ -1142,6 +1151,7 @@ async def _stage_result_from_interpretation(
         snapshot=snapshot,
         current_user_message=state.current_user_message,
         language=user.language_preference,
+        recent_messages=state.recent_thread_history,
     )
     if isinstance(latest_result_fact_answer, LatestResultFactComposerDeclined):
         declined_edit_result = await _planned_edit_after_fact_composer_decline(
@@ -1176,6 +1186,7 @@ async def _stage_result_from_interpretation(
         snapshot=snapshot,
         current_user_message=state.current_user_message,
         language=user.language_preference,
+        recent_messages=state.recent_thread_history,
     )
     if followup_result is not None:
         return followup_result
@@ -1230,6 +1241,7 @@ async def _stage_result_from_interpretation(
         current_user_message=state.current_user_message,
         decision=decision,
         assistant_response=interpretation.assistant_response,
+        recent_messages=state.recent_thread_history,
     )
     if latest_result_recovery is not None:
         return latest_result_recovery
@@ -1437,7 +1449,7 @@ def _complete_current_message_date_endpoint_patch(
 ) -> tuple[dict[str, str] | None, bool]:
     if date_range is None:
         return date_range, False
-    current_date = date.today()
+    current_date = new_york_today()
     rolling_patch = _rolling_window_range_from_endpoint_patch(
         strategy.extra_parameters.get("date_range_intent"),
         date_range=date_range,
@@ -1558,7 +1570,7 @@ def _explicit_date_range_from_strategy_for_repair(
     *,
     language: str | None,
 ) -> dict[str, str] | None:
-    current_date = date.today()
+    current_date = new_york_today()
     intent = strategy.extra_parameters.get("date_range_intent")
     intent_kind = (
         str(intent.get("kind") or "").strip() if isinstance(intent, dict) else ""
@@ -1627,7 +1639,7 @@ def _complete_date_range_lacks_stated_window_support(
         _date_range_from_strategy_bounded_evidence(
             strategy,
             language=language,
-            today=date.today(),
+            today=new_york_today(),
         )
         is not None
     ):
@@ -1713,8 +1725,7 @@ def _date_range_from_strategy_bounded_evidence(
 def _repair_pending_date_answer_route_when_pending_need_is_active(
     **kwargs: Any,
 ) -> StructuredInterpretation:
-    # This module's date stays the clock seam tests patch.
-    return _route_repair_pending_date_answer(today=date.today(), **kwargs)
+    return _route_repair_pending_date_answer(today=new_york_today(), **kwargs)
 
 
 def _repair_pending_date_answer_noop_from_current_message(
@@ -1750,7 +1761,7 @@ def _repair_pending_date_answer_noop_from_current_message(
         return interpretation
     resolved_range = resolve_date_range_text(
         text,
-        today=date.today(),
+        today=new_york_today(),
         languages=dateparser_languages_for_user_language(language),
     )
     if resolved_range is None:
@@ -2424,6 +2435,7 @@ async def _interpreter_unavailable_result(
         user=user,
         snapshot=snapshot,
         current_user_message=current_user_message,
+        recent_messages=state.recent_thread_history,
     )
     if result_followup is not None:
         return result_followup
@@ -2449,7 +2461,7 @@ async def _interpreter_unavailable_result(
             language=user.language_preference,
             snapshot=snapshot,
             selected_thread_metadata=selected_metadata,
-            today=date.today(),
+            today=new_york_today(),
             reason_code="pending_date_answer_interpreter_unavailable_repaired",
             user_goal_summary=(
                 "User supplied the requested date range while structured "
@@ -2755,25 +2767,21 @@ async def _latest_result_followup_when_interpreter_unavailable(
     user: UserState,
     snapshot: TaskSnapshot | None,
     current_user_message: str,
+    recent_messages: Sequence[Any] = (),
 ) -> StageResult | None:
     if snapshot is None or snapshot.latest_backtest_result_reference is None:
         return None
     if not current_user_message.strip():
         return None
     reference = snapshot.latest_backtest_result_reference
-    metadata = dict(reference.metadata)
-    response = await compose_result_followup_response(
-        metadata=metadata,
+    stage_patch = await answered_result_followup_patch(
+        metadata=dict(reference.metadata),
         focus="general",
         user_message=current_user_message,
         language=user.language_preference,
+        recent_messages=recent_messages,
+        source_run_id=reference.artifact_id,
     )
-    used_recovery = response is None
-    if response is None:
-        response = recovery_message(
-            "latest_result_followup_unavailable",
-            language=user.language_preference,
-        )
     effective_profile = resolve_effective_response_profile(
         user=user,
         explicit_overrides=None,
@@ -2802,20 +2810,7 @@ async def _latest_result_followup_when_interpreter_unavailable(
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
-        stage_patch={
-            "assistant_response": response,
-            # Failure prose never wears result chrome; the recovery patch
-            # owns this message's presentation.
-            **(
-                recovery_state_stage_patch(
-                    "latest_result_followup_unavailable",
-                    language=user.language_preference,
-                    retryable=True,
-                )
-                if used_recovery
-                else {"response_intent": result_followup_response_intent("general")}
-            ),
-        },
+        stage_patch=stage_patch,
     )
 
 
@@ -2826,6 +2821,7 @@ async def _latest_result_followup_recovery_if_applicable(
     current_user_message: str,
     decision: InterpretDecision,
     assistant_response: str | None,
+    recent_messages: Sequence[Any] = (),
 ) -> StageResult | None:
     unanchored_strategy_route = (
         "unanchored_strategy_route_suppressed" in decision.reason_codes
@@ -2844,6 +2840,7 @@ async def _latest_result_followup_recovery_if_applicable(
     reference = snapshot.latest_backtest_result_reference
     metadata = dict(reference.metadata)
     focus = decision.result_followup_focus or "general"
+    stage_patch: dict[str, Any]
     if save_requested:
         response = await compose_private_alpha_save_response(
             metadata=metadata,
@@ -2854,34 +2851,16 @@ async def _latest_result_followup_recovery_if_applicable(
             response = fallback_private_alpha_save_response(
                 language=user.language_preference
             )
+        stage_patch = {"assistant_response": response}
     else:
-        response = await compose_result_followup_response(
+        stage_patch = await answered_result_followup_patch(
             metadata=metadata,
             focus=focus,
             user_message=current_user_message,
             language=user.language_preference,
-        )
-        used_recovery = response is None
-        if response is None:
-            response = recovery_message(
-                "latest_result_followup_unavailable",
-                language=user.language_preference,
-            )
-    if save_requested:
-        used_recovery = False
-    stage_patch: dict[str, Any] = {
-        "assistant_response": response,
-    }
-    # Failure prose never wears result chrome; the recovery patch owns it.
-    if not save_requested and not used_recovery:
-        stage_patch["response_intent"] = result_followup_response_intent(focus)
-    if used_recovery:
-        stage_patch.update(
-            recovery_state_stage_patch(
-                "latest_result_followup_unavailable",
-                language=user.language_preference,
-                retryable=True,
-            )
+            recent_messages=recent_messages,
+            source_run_id=reference.artifact_id,
+            stored_fact=stored_fact_key(decision=decision, snapshot=snapshot),
         )
     effective_profile = resolve_effective_response_profile(
         user=user,

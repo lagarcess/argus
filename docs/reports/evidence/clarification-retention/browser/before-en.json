@@ -1,0 +1,67 @@
+{
+  "label": "before",
+  "lang": "en",
+  "turns": [
+    {
+      "index": 1,
+      "message": "Test monthly dollar-cost averaging in DOCN from September 10, 2025 through September 9, 2026. Start with $1,000 of starting capital, then contribute $100 every month. The $1,000 is starting capital, not a total contribution cap. Compare with SPY. Model a 10 basis point fee and 5 basis points slippage per trade.",
+      "elapsed_s": 46,
+      "screenshot": "/private/tmp/claude-501/-Users-garces-Documents-projects-repos-argus--claude-worktrees-argus-retrieval-parameters-1d0d3c/1387e0ef-4a6d-479e-8202-0df2b419bc67/scratchpad/demo/before-en-turn1.png",
+      "assistant_content": "Ready to test recurring buys for DOCN over September 10, 2025 - September 9, 2026.",
+      "stage_outcome": "await_approval",
+      "reply_rewrites": null,
+      "confirmation_summary": "Ready to test recurring buys for DOCN over September 10, 2025 - September 9, 2026.",
+      "launch": {
+        "symbols": [
+          "DOCN"
+        ],
+        "starting_capital": 0,
+        "recurring_contribution": 100,
+        "cadence": "monthly",
+        "date_range": {
+          "start": "2025-09-10",
+          "end": "2026-09-09"
+        },
+        "benchmark_symbol": "SPY",
+        "execution_realism": {
+          "enabled": true,
+          "fee_bps": 10,
+          "slippage_bps": 5
+        }
+      },
+      "em_dash_visible": false,
+      "em_dash_persisted": false
+    },
+    {
+      "index": 2,
+      "message": "Use $1,000 as starting capital only. There is no contribution cap. Add $100 monthly after the initial investment. Keep the dates, SPY benchmark, 10 bps fee and 5 bps slippage.",
+      "elapsed_s": 27,
+      "screenshot": "/private/tmp/claude-501/-Users-garces-Documents-projects-repos-argus--claude-worktrees-argus-retrieval-parameters-1d0d3c/1387e0ef-4a6d-479e-8202-0df2b419bc67/scratchpad/demo/before-en-turn2.png",
+      "assistant_content": "Ready to test recurring buys for DOCN over September 10, 2025 - September 9, 2026.",
+      "stage_outcome": "await_approval",
+      "reply_rewrites": null,
+      "confirmation_summary": "Ready to test recurring buys for DOCN over September 10, 2025 - September 9, 2026.",
+      "launch": {
+        "symbols": [
+          "DOCN"
+        ],
+        "starting_capital": 1000,
+        "recurring_contribution": 100,
+        "cadence": "monthly",
+        "date_range": {
+          "start": "2025-09-10",
+          "end": "2026-09-09"
+        },
+        "benchmark_symbol": "SPY",
+        "execution_realism": {
+          "enabled": true,
+          "fee_bps": 10,
+          "slippage_bps": 5
+        }
+      },
+      "em_dash_visible": false,
+      "em_dash_persisted": false
+    }
+  ],
+  "conversationId": "4279be70-16f7-4ec6-b182-c7cbe7d8b5f1"
+}

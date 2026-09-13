@@ -51,6 +51,8 @@ ARGUS_STRUCTURED_MODEL=local-qa/disabled
 ARGUS_STRUCTURED_FALLBACK_MODEL=local-qa/disabled
 ARGUS_CONTEXT_MODEL=local-qa/disabled
 ARGUS_CONTEXT_FALLBACK_MODEL=local-qa/disabled
+ARGUS_READOUT_MODEL=openai/gpt-5.6-luna
+ARGUS_READOUT_FALLBACK_MODEL=openai/gpt-5.6-luna
 EOF
 
 cat > "$FRONTEND_ENV_TMP" <<EOF

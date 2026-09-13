@@ -50,7 +50,6 @@ def _user() -> User:
         display_name=None,
         language="en",
         locale="en-US",
-        theme="dark",
         is_admin=False,
         onboarding=OnboardingState(),
         created_at=now,

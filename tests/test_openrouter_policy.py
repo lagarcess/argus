@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import time
-from datetime import date
 from typing import Any
 
 import pytest
@@ -31,6 +29,10 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.domain.market_data import clear_asset_cache
+from argus.domain.market_data.new_york_clock import new_york_today
+from argus.domain.research.contracts import ResearchUsage
+from argus.domain.research.perplexity_agent import StructuredAgentResult
+from argus.domain.result_readout_research import RESULT_RESEARCH_LIMITS
 from argus.llm import openrouter
 from argus.llm.openrouter import (
     log_openrouter_failure,
@@ -43,6 +45,8 @@ from argus.llm.openrouter_key_policy import (
 )
 from fastapi import FastAPI
 from langgraph.checkpoint.memory import MemorySaver
+
+from tests.result_readout_fixtures import readout_draft
 
 
 @pytest.fixture(autouse=True)
@@ -285,15 +289,6 @@ class FakeStructuredModel:
         FakeChatOpenRouter.structured_invoked_messages.append(messages)
         if FakeChatOpenRouter.structured_response is not None:
             return FakeChatOpenRouter.structured_response
-        schema_name = getattr(self.schema, "__name__", "")
-        if schema_name == "ResultBreakdownDraft":
-            return self.schema(  # type: ignore[misc, operator]
-                answer_blocks=[
-                    "The tested result is grounded in the stored result and its caveat.",
-                    "Use the card metrics as the source of truth.",
-                ],
-                fact_ids=["title", "caveat"],
-            )
         return LLMInterpretationResponse(
             intent="conversation_followup",
             task_relation="new_task",
@@ -305,40 +300,27 @@ class FakeStructuredModel:
         return self.invoke([])
 
 
-class SlowBreakdownModel:
-    def with_structured_output(self, _schema: object) -> "SlowBreakdownModel":
-        return self
-
-    def invoke(self, _messages: list[dict[str, str]]) -> object:
-        time.sleep(0.2)
-        return None
-
-
-class SlowBreakdownSchemaClient:
-    def __call__(self, **_kwargs: Any) -> object:
-        time.sleep(0.2)
-        return None
-
-
-class FakeBreakdownSchemaClient:
-    def __init__(self, response: object | None = None) -> None:
+class FakeBreakdownAgentClient:
+    def __init__(self, response: dict[str, Any] | None = None) -> None:
         self.response = response
         self.calls: list[dict[str, Any]] = []
+        self.usage = ResearchUsage(model="openai/gpt-5.6-luna")
 
-    def __call__(self, **kwargs: Any) -> object:
-        self.calls.append(kwargs)
-        if self.response is not None:
-            return self.response
-        schema = kwargs["schema_model"]
-        return schema(
-            answer_blocks=[
-                (
-                    "The stored result is grounded in the completed backtest and "
-                    "its historical-simulation caveat."
-                ),
-                "Use the card metrics as the source of truth.",
-            ],
-            fact_ids=["title", "caveat"],
+    def run_structured(self, prompt, spec, **kwargs) -> StructuredAgentResult:
+        self.calls.append({"prompt": prompt, "spec": spec, **kwargs})
+        draft = (
+            self.response
+            if self.response is not None
+            else readout_draft(
+                "The stored result is grounded in the completed backtest and its historical-simulation caveat."
+            )
+        )
+        return StructuredAgentResult(
+            draft=draft,
+            sources=(),
+            usage=self.usage,
+            tool_results=(),
+            provider_response_id=None,
         )
 
 
@@ -445,12 +427,36 @@ def test_reasoning_effort_override_is_sent_in_json_schema_payload(
     assert payload["reasoning"] == {"effort": effort}
 
 
+@pytest.mark.parametrize("task", openrouter.OPENROUTER_TASK_MODEL_TIERS)
+@pytest.mark.parametrize("model", ["openai/gpt-5.6-luna", "anthropic/test-model"])
+def test_json_schema_payload_omits_temperature_only_for_readout_tier(
+    task: openrouter.OpenRouterTask,
+    model: str,
+) -> None:
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+
+    profile = openrouter_profile_for_task(task)
+    payload = openrouter._json_schema_payload(
+        model=model,
+        messages=[{"role": "user", "content": "hello"}],
+        schema_model=LLMDateRangeIntent,
+        schema_name="LLMDateRangeIntent",
+        profile=profile,
+    )
+
+    if openrouter.openrouter_model_tier_for_task(task) == "readout":
+        assert "temperature" not in payload
+    else:
+        assert payload["temperature"] == profile.temperature
+    if not model.startswith("anthropic/"):
+        assert payload["provider"] == {"require_parameters": True}
+
+
 def test_interpretation_repair_uses_structured_tier_without_reasoning() -> None:
     profile = openrouter_profile_for_task("interpretation_repair")
 
     assert (
-        openrouter.openrouter_model_tier_for_task("interpretation_repair")
-        == "structured"
+        openrouter.openrouter_model_tier_for_task("interpretation_repair") == "structured"
     )
     assert profile.temperature == 0
     assert profile.reasoning_effort == "none"
@@ -476,7 +482,7 @@ def test_result_summary_timeout_budget_is_safe_for_render_workflows(
     FakeChatOpenRouter.calls.clear()
     FakeChatOpenRouter.structured_response = None
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/model")
+    monkeypatch.setenv("ARGUS_READOUT_MODEL", "openai/gpt-5.6-luna")
     monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
 
     model = openrouter.build_openrouter_model("result_summary")
@@ -492,7 +498,7 @@ def test_openrouter_task_timeout_budget_can_be_overridden(
     FakeChatOpenRouter.calls.clear()
     FakeChatOpenRouter.structured_response = None
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
-    monkeypatch.setenv("ARGUS_CHAT_MODEL", "chat/model")
+    monkeypatch.setenv("ARGUS_READOUT_MODEL", "openai/gpt-5.6-luna")
     monkeypatch.setenv("ARGUS_OPENROUTER_RESULT_SUMMARY_TIMEOUT_SECONDS", "27")
     monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
 
@@ -512,6 +518,8 @@ def test_openrouter_model_routing_uses_task_specific_tiers(monkeypatch) -> None:
     monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "structured/fallback")
     monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "context/primary")
     monkeypatch.setenv("ARGUS_CONTEXT_FALLBACK_MODEL", "context/fallback")
+    monkeypatch.setenv("ARGUS_READOUT_MODEL", "openai/gpt-5.6-luna")
+    monkeypatch.setenv("ARGUS_READOUT_FALLBACK_MODEL", "openai/gpt-5.6-luna")
 
     assert openrouter.resolve_openrouter_model(task="name_suggestion") == (
         "utility/primary"
@@ -541,16 +549,26 @@ def test_openrouter_model_routing_uses_task_specific_tiers(monkeypatch) -> None:
         )
         == "structured/fallback"
     )
-    assert openrouter.resolve_openrouter_model(task="result_breakdown") == (
+    assert openrouter.resolve_openrouter_model(task="capability_conflict") == (
         "context/primary"
     )
     assert (
         openrouter.resolve_openrouter_model(
-            task="result_breakdown",
+            task="capability_conflict",
             fallback=True,
         )
         == "context/fallback"
     )
+    assert openrouter.openrouter_model_tier_for_task("result_summary") == "readout"
+    assert openrouter.resolve_openrouter_model(task="result_summary") == (
+        "openai/gpt-5.6-luna"
+    )
+    assert openrouter.resolve_openrouter_model(task="result_summary", fallback=True) == (
+        "openai/gpt-5.6-luna"
+    )
+    assert openrouter_structured_model_candidates(task="result_summary") == [
+        "openai/gpt-5.6-luna"
+    ]
 
 
 def test_openrouter_structured_candidates_follow_task_tier(monkeypatch) -> None:
@@ -563,19 +581,21 @@ def test_openrouter_structured_candidates_follow_task_tier(monkeypatch) -> None:
         "structured/primary",
         "structured/fallback",
     ]
-    assert openrouter_structured_model_candidates(task="result_breakdown") == [
+    assert openrouter_structured_model_candidates(task="capability_conflict") == [
         "context/primary",
         "context/fallback",
     ]
 
 
-def test_openrouter_factory_uses_context_model_for_result_breakdown(monkeypatch) -> None:
+def test_openrouter_factory_uses_context_model_for_capability_conflict(
+    monkeypatch,
+) -> None:
     FakeChatOpenRouter.calls.clear()
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.setenv("ARGUS_CONTEXT_MODEL", "context/primary")
     monkeypatch.setattr(openrouter, "ChatOpenRouter", FakeChatOpenRouter)
 
-    model = openrouter.build_openrouter_model("result_breakdown")
+    model = openrouter.build_openrouter_model("capability_conflict")
 
     assert model is not None
     assert FakeChatOpenRouter.calls[0]["model_name"] == "context/primary"
@@ -584,7 +604,7 @@ def test_openrouter_factory_uses_context_model_for_result_breakdown(monkeypatch)
 def test_openrouter_factory_returns_none_without_key(monkeypatch) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
-    assert openrouter.build_openrouter_model("result_breakdown") is None
+    assert openrouter.build_openrouter_model("capability_conflict") is None
 
 
 def test_structured_model_uses_argus_tier_models_unless_explicitly_overridden(
@@ -633,81 +653,77 @@ def test_structured_interpreter_uses_bounded_interpretation_profile(
     }
 
 
-def test_result_breakdown_uses_direct_json_schema_client(monkeypatch) -> None:
+def test_result_breakdown_uses_structured_agent_with_only_web_tools(monkeypatch) -> None:
     from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient()
+    fake_schema = FakeBreakdownAgentClient()
 
     text = chat_service.llm_result_breakdown_message(
         {
             "title": "AAPL test",
+            "symbols": ["AAPL"],
             "context_packets": [{"id": "packet-1", "provider": "fred"}],
         },
-        invoke_json_schema_func=fake_schema,
+        client=fake_schema,
     )
 
     assert text is not None
-    assert fake_schema.calls[0]["task"] == "result_breakdown"
+    assert len(fake_schema.calls) == 1
     assert fake_schema.calls[0]["schema_model"].__name__ == "ResultBreakdownDraft"
     assert fake_schema.calls[0]["schema_name"] == "ResultBreakdownDraft"
-    assert fake_schema.calls[0]["context_packet_ids"] == ["packet-1"]
+    spec = fake_schema.calls[0]["spec"]
+    assert spec.models == ("openai/gpt-5.6-luna",)
+    assert set(spec.tools) == {"web_search", "fetch_url"}
+    assert spec.timeout_seconds > 0
+    assert fake_schema.calls[0]["limits"] == RESULT_RESEARCH_LIMITS
+    assert "AAPL" in fake_schema.calls[0]["prompt"]
+    assert "sources" in fake_schema.calls[0]["instructions"].lower()
 
 
 def test_result_breakdown_prompt_carries_product_language_contract() -> None:
     from argus.api.chat.breakdown import _result_breakdown_llm_messages
 
     messages = _result_breakdown_llm_messages(
-        fact_bank={
-            "symbols": "AAPL",
-            "total_return": "+46.7%",
+        facts={
+            "symbols": ["AAPL"],
             "benchmark_symbol": "SPY",
-            "caveat": "Evidencia historica, no asesoría.",
+            "facts": {},
         },
-        required_fact_ids={"symbols", "total_return", "caveat"},
         language="es-419",
     )
 
-    assert "product_language" in messages[0]["content"]
-    assert "fact_ids" in messages[0]["content"]
     assert "Answer in Spanish" in messages[0]["content"]
-    assert "es-419" in messages[1]["content"]
+    assert "Search for sources" in messages[1]["content"]
 
 
-def test_result_breakdown_schema_requires_visible_blocks_and_fact_ids() -> None:
-    from argus.api.chat.breakdown import ResultBreakdownDraft
+def test_result_breakdown_schema_requires_complete_text_language_and_figures() -> None:
+    from argus.domain.result_readout_sources import ResultBreakdownDraft
     from pydantic import ValidationError
 
     schema = ResultBreakdownDraft.model_json_schema()
 
-    assert {"answer_blocks", "fact_ids"}.issubset(set(schema["required"]))
+    assert set(schema["required"]) == {
+        "language",
+        "text",
+        "figures",
+    }
+    assert set(schema["properties"]) == {
+        "language",
+        "text",
+        "figures",
+    }
     with pytest.raises(ValidationError):
         ResultBreakdownDraft.model_validate({})
     with pytest.raises(ValidationError):
-        ResultBreakdownDraft.model_validate({"answer_blocks": [], "fact_ids": []})
+        ResultBreakdownDraft.model_validate({"text": None})
 
 
 def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
     from argus.api.chat import breakdown as chat_service
 
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": [
-                "The fact_bank says here's the deeper read.",
-            ],
-            "fact_ids": [
-                "title",
-                "symbols",
-                "date_range",
-                "total_return",
-                "benchmark_symbol",
-                "benchmark_return",
-                "benchmark_comparison",
-                "max_drawdown",
-                "assumptions",
-                "caveat",
-            ],
-        }
+    fake_schema = FakeBreakdownAgentClient(
+        readout_draft("The fact_bank says here's the deeper read.", [], language="en")
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -729,7 +745,7 @@ def test_spanish_result_breakdown_rejects_mixed_language_llm_output() -> None:
             "assumptions": ["Solo largo.", "Referencia: SPY."],
         },
         language="es-419",
-        invoke_json_schema_func=fake_schema,
+        client=fake_schema,
     )
 
     assert text is None
@@ -772,24 +788,6 @@ def test_spanish_result_breakdown_fallback_uses_reader_language() -> None:
     assert "Superó por 23.6 puntos porcentuales" in text
     assert "Prueba siguiente: Prueba siguiente" not in text
     assert "lectura más detallada" not in text
-
-
-def test_result_breakdown_llm_has_hard_action_budget() -> None:
-    from argus.api.chat.breakdown import llm_result_breakdown_message
-
-    failures: list[dict[str, Any]] = []
-
-    text = llm_result_breakdown_message(
-        {"title": "AAPL test"},
-        invoke_json_schema_func=SlowBreakdownSchemaClient(),
-        log_openrouter_failure_func=lambda **kwargs: failures.append(kwargs),
-        timeout_seconds=0.01,
-    )
-
-    assert text is None
-    assert failures
-    assert failures[0]["task"] == "result_breakdown"
-    assert "timed out" in failures[0]["message"]
 
 
 def test_default_interpreter_uses_direct_schema_client(monkeypatch) -> None:
@@ -1101,9 +1099,7 @@ def test_default_interpreter_repairs_underfilled_indicator_threshold_parameters(
         "AssetGroundingAudit",
         "FocusedStrategyExtraction",
     ]
-    parameters = result.candidate_strategy_draft.extra_parameters[
-        "indicator_parameters"
-    ]
+    parameters = result.candidate_strategy_draft.extra_parameters["indicator_parameters"]
     assert parameters["indicator"] == "rsi"
     assert parameters["entry_threshold"] == 20
     assert parameters["exit_threshold"] == 60
@@ -1340,13 +1336,9 @@ def test_default_interpreter_repairs_capability_misroute_for_buy_curiosity(
     assert result.candidate_strategy_draft.date_range == "past year"
 
 
-def test_default_interpreter_repairs_social_sentiment_trade_misroute(
-    monkeypatch,
-) -> None:
-    from argus.agent_runtime import llm_interpreter
-
-    seen_schema_names: list[str] = []
-
+def _sentiment_misroute_schema(
+    seen_schema_names: list[str], *, asset_universe: list[str]
+):
     async def fake_direct_schema(**kwargs: Any) -> object:
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
@@ -1359,41 +1351,81 @@ def test_default_interpreter_repairs_social_sentiment_trade_misroute(
                 semantic_turn_act="educational_question",
                 capability_question_focus="supported_indicators",
             )
-        assert schema_model is FocusedStrategyExtraction
-        return FocusedStrategyExtraction(
-            is_testable_strategy=True,
-            user_goal_summary="Trade based on Reddit sentiment.",
-            strategy_type="reddit_sentiment",
-            strategy_thesis="Use Reddit sentiment as the trade signal.",
-            entry_logic="Reddit sentiment turns positive",
-            assistant_response="Reddit sentiment is not executable yet.",
-        )
+        if schema_model is FocusedStrategyExtraction:
+            return FocusedStrategyExtraction(
+                is_testable_strategy=True,
+                user_goal_summary="Trade based on Reddit sentiment.",
+                strategy_type="reddit_sentiment",
+                strategy_thesis="Use Reddit sentiment as the trade signal.",
+                asset_universe=asset_universe,
+                entry_logic="Reddit sentiment turns positive",
+                assistant_response="Reddit sentiment is not executable yet.",
+            )
+        neutral_response = _neutral_repair_schema_response(schema_model)
+        assert neutral_response is not None, schema_model
+        return neutral_response
 
+    return fake_direct_schema
+
+
+def _interpret_sentiment_misroute(
+    monkeypatch, *, message: str, asset_universe: list[str]
+):
+    from argus.agent_runtime import llm_interpreter
+
+    seen_schema_names: list[str] = []
     monkeypatch.setattr(
         llm_interpreter,
         "invoke_openrouter_json_schema",
-        fake_direct_schema,
+        _sentiment_misroute_schema(seen_schema_names, asset_universe=asset_universe),
     )
     monkeypatch.setattr(
         llm_interpreter,
         "openrouter_structured_model_candidates",
         _structured_model_candidates,
     )
-
     interpreter = OpenRouterStructuredInterpreter(
         contract=build_default_capability_contract()
     )
     result = interpreter(
         InterpretationRequest(
-            current_user_message="trade based on Reddit sentiment",
+            current_user_message=message,
             recent_thread_history=[],
             latest_task_snapshot=None,
             user=UserState(user_id="u1"),
         )
     )
-
     assert result is not None
-    assert seen_schema_names == [
+    return result, seen_schema_names
+
+
+def test_default_interpreter_keeps_primary_read_on_factless_sentiment_misroute(
+    monkeypatch,
+) -> None:
+    # No asset and no number in the message: the focused strategy repair has
+    # nothing to work with, so the primary read's capability answer stands.
+    result, seen_schema_names = _interpret_sentiment_misroute(
+        monkeypatch, message="trade based on Reddit sentiment", asset_universe=[]
+    )
+
+    assert seen_schema_names == ["LLMInterpretationResponse"]
+    assert result.semantic_turn_act == "educational_question"
+    assert result.capability_question_focus == "supported_indicators"
+    assert result.unsupported_constraints == []
+
+
+def test_default_interpreter_repairs_social_sentiment_trade_misroute(
+    monkeypatch,
+) -> None:
+    # A named asset is a current-turn fact: the same misroute still repairs
+    # to a typed refusal that keeps the idea.
+    result, seen_schema_names = _interpret_sentiment_misroute(
+        monkeypatch,
+        message="trade Tesla based on Reddit sentiment",
+        asset_universe=["TSLA"],
+    )
+
+    assert seen_schema_names[:2] == [
         "LLMInterpretationResponse",
         "FocusedStrategyExtraction",
     ]
@@ -1641,7 +1673,7 @@ def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
     draft = result.candidate_strategy_draft
     assert draft.date_range == {
         "start": "2022-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert draft.capital_amount == 10000
     assert "stated_run_field_fidelity_audit" in result.reason_codes
@@ -1709,9 +1741,7 @@ def test_default_interpreter_blocks_auto_simplified_buy_hold_for_ambiguous_rule(
     assert result.requires_clarification is True
     assert result.candidate_strategy_draft.strategy_type is None
     assert len(result.ambiguous_fields) == 2
-    assert (
-        "blocked_auto_simplification_for_ambiguous_rule" in result.reason_codes
-    )
+    assert "blocked_auto_simplification_for_ambiguous_rule" in result.reason_codes
 
 
 def test_default_interpreter_retries_empty_unsupported_clarification(
@@ -2507,13 +2537,13 @@ def test_interpretation_llm_has_hard_turn_budget(monkeypatch) -> None:
     assert interpreter.last_status == "failed"
 
 
-def test_result_breakdown_prompt_asks_for_fact_bank_references(
+def test_result_breakdown_prompt_uses_run_facts_and_surface_ownership(
     monkeypatch,
 ) -> None:
     from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient()
+    fake_schema = FakeBreakdownAgentClient()
 
     chat_service.llm_result_breakdown_message(
         {
@@ -2531,29 +2561,20 @@ def test_result_breakdown_prompt_asks_for_fact_bank_references(
                 }
             },
         },
-        invoke_json_schema_func=fake_schema,
+        client=fake_schema,
     )
 
-    messages = fake_schema.calls[0]["messages"]
-    system_prompt = messages[0]["content"]
-    user_payload = messages[1]["content"]
-    assert "non-template" in system_prompt.lower()
-    assert "answer_blocks" in system_prompt
-    assert "fact_ids" in system_prompt
-    assert "grounding metadata" in system_prompt.lower()
-    assert "plain language" in system_prompt.lower()
-    assert "curiosity-forward" in system_prompt.lower()
-    assert "dense financial pdf" in system_prompt.lower()
-    assert "try next surface owns those" in system_prompt.lower()
-    assert "profitable trades" in system_prompt.lower()
-    assert "alternative benchmarks" in system_prompt.lower()
-    assert "stayed in cash" in system_prompt.lower()
-    assert "provider names" in system_prompt.lower()
-    assert "context packet language" in system_prompt.lower()
-    assert "market or macro backdrop" in system_prompt.lower()
-    assert "fact_bank" in user_payload
-    assert "runnable_next_tests" not in user_payload
-    assert "draft_only_or_future_tests" not in user_payload
+    system_prompt = fake_schema.calls[0]["instructions"]
+    user_payload = fake_schema.calls[0]["prompt"]
+    assert "sources" in system_prompt.lower()
+    assert "holding" in user_payload.lower()
+    assert "benchmark" in user_payload.lower()
+    assert "AAPL" in user_payload and "SPY" in user_payload
+    assert "Total return on starting capital" in user_payload
+    for internal in ("portfolio.total_return", "total_return_pct", "series", "markers"):
+        assert internal not in user_payload
+    for removed in ("citations entry", "occurrence", "answer_blocks"):
+        assert removed not in system_prompt
 
 
 def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
@@ -2562,36 +2583,17 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": [
-                (
-                    "AAPL Buy and Hold tested AAPL across past year using the "
-                    "stored backtest setup."
-                ),
-                (
-                    "AAPL finished at +39.5% while SPY returned +25.6%, a 13.9 "
-                    "percentage point lead."
-                ),
-                (
-                    "The largest drawdown was -13.8%. Assumptions: Universe: AAPL. "
-                    "Benchmark: SPY. This is historical simulation evidence, not a "
-                    "prediction."
-                ),
+    fake_schema = FakeBreakdownAgentClient(
+        readout_draft(
+            "AAPL Buy and Hold tested AAPL across past year using the stored backtest setup.\n\nAAPL finished at +39.5% while SPY returned +25.6%, a 13.9 percentage point lead.\n\nThe largest drawdown was -13.8%. Assumptions: Universe: AAPL. Benchmark: SPY. This is historical simulation evidence, not a prediction.",
+            [
+                ("Total return on starting capital", 39.5),
+                ("Benchmark return", 25.6),
+                ("Return difference versus benchmark", 13.9),
+                ("Worst drop from a prior high", -13.8),
             ],
-            "fact_ids": [
-                "title",
-                "symbols",
-                "date_range",
-                "total_return",
-                "benchmark_symbol",
-                "benchmark_return",
-                "benchmark_comparison",
-                "max_drawdown",
-                "assumptions",
-                "caveat",
-            ],
-        }
+            language="en",
+        )
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -2625,7 +2627,7 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
                 }
             },
         },
-        invoke_json_schema_func=fake_schema,
+        client=fake_schema,
     )
 
     assert text is not None
@@ -2641,67 +2643,23 @@ def test_result_breakdown_renders_structured_fact_references_from_fact_bank(
     assert "not a prediction" in text.lower()
 
 
-def test_result_breakdown_fact_bank_uses_user_safe_benchmark_comparison() -> None:
-    from argus.api.chat import breakdown as chat_service
-
-    fact_bank = chat_service.result_breakdown_fact_bank(
-        {
-            "title": "AAPL Buy and Hold",
-            "symbols": ["AAPL"],
-            "benchmark_symbol": "QQQ",
-            "raw_metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 15.1,
-                        "benchmark_return_pct": 20.4,
-                        "delta_vs_benchmark_pct": -5.3,
-                        "max_drawdown_pct": -11.3,
-                    }
-                }
-            },
-            "assumptions": ["Universe: AAPL.", "Benchmark: QQQ."],
-        }
-    )
-
-    assert fact_bank["benchmark_comparison"] == "Lagged by 5.3 percentage points"
-    assert fact_bank["benchmark_delta_magnitude"] == "5.3 percentage points"
-    assert "benchmark_delta" not in fact_bank
-
-
 def test_result_breakdown_fact_parts_join_with_professional_spacing(
     monkeypatch,
 ) -> None:
     from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": [
-                "BABA Buy and Hold tested BABA over last month and returned +1.7%.",
-                (
-                    "SPY returned +26.6%, so BABA lagged by 24.9 percentage points "
-                    "versus that benchmark."
-                ),
-                (
-                    "The max drawdown was -36.8%. Assumptions: Universe: BABA. "
-                    "Benchmark: SPY. A useful next check is one of the supported "
-                    "same-asset-class variations. This is historical simulation "
-                    "evidence, not a prediction."
-                ),
+    fake_schema = FakeBreakdownAgentClient(
+        readout_draft(
+            "BABA Buy and Hold tested BABA over last month and returned +1.7%.\n\nSPY returned +26.6%, so BABA lagged by 24.9 percentage points versus that benchmark.\n\nThe max drawdown was -36.8%. Assumptions: Universe: BABA. Benchmark: SPY. A useful next check is one of the supported same-asset-class variations. This is historical simulation evidence, not a prediction.",
+            [
+                ("Total return on starting capital", 1.7),
+                ("Benchmark return", 26.6),
+                ("Return difference versus benchmark", -24.9),
+                ("Worst drop from a prior high", -36.8),
             ],
-            "fact_ids": [
-                "title",
-                "symbols",
-                "date_range",
-                "total_return",
-                "benchmark_symbol",
-                "benchmark_return",
-                "benchmark_comparison",
-                "max_drawdown",
-                "assumptions",
-                "caveat",
-            ],
-        }
+            language="en",
+        )
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -2722,7 +2680,7 @@ def test_result_breakdown_fact_parts_join_with_professional_spacing(
             },
             "assumptions": ["Universe: BABA.", "Benchmark: SPY."],
         },
-        invoke_json_schema_func=fake_schema,
+        client=fake_schema,
     )
 
     assert text is not None
@@ -2746,23 +2704,7 @@ def test_result_breakdown_rejects_empty_generated_body(
     from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": [],
-            "fact_ids": [
-                "benchmark_return",
-                "benchmark_comparison",
-                "title",
-                "symbols",
-                "date_range",
-                "total_return",
-                "benchmark_symbol",
-                "max_drawdown",
-                "assumptions",
-                "caveat",
-            ],
-        }
-    )
+    fake_schema = FakeBreakdownAgentClient(readout_draft("", [], language="en"))
 
     text = chat_service.llm_result_breakdown_message(
         {
@@ -2786,87 +2728,7 @@ def test_result_breakdown_rejects_empty_generated_body(
                 "Benchmark: SPY.",
             ],
         },
-        invoke_json_schema_func=fake_schema,
-    )
-
-    assert text is None
-
-
-def test_result_breakdown_rejects_quick_take_headings(monkeypatch) -> None:
-    from argus.api.chat import breakdown as chat_service
-
-    del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": ["### Quick Take\nThis should not render."],
-            "fact_ids": [
-                "title",
-                "symbols",
-                "date_range",
-                "total_return",
-                "benchmark_symbol",
-                "benchmark_return",
-                "benchmark_comparison",
-                "max_drawdown",
-                "assumptions",
-                "caveat",
-            ],
-        }
-    )
-
-    text = chat_service.llm_result_breakdown_message(
-        {
-            "title": "AAPL Buy and Hold",
-            "symbols": ["AAPL"],
-            "benchmark_symbol": "SPY",
-            "date_range": "past year",
-            "raw_metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 39.5,
-                        "benchmark_return_pct": 25.6,
-                        "delta_vs_benchmark_pct": 13.9,
-                        "max_drawdown_pct": -13.8,
-                    }
-                }
-            },
-            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
-        },
-        invoke_json_schema_func=fake_schema,
-    )
-
-    assert text is None
-
-
-def test_result_breakdown_falls_back_on_invalid_fact_reference(monkeypatch) -> None:
-    from argus.api.chat import breakdown as chat_service
-
-    del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": ["The future expectation is higher than the saved run."],
-            "fact_ids": ["future_return"],
-        }
-    )
-
-    text = chat_service.llm_result_breakdown_message(
-        {
-            "title": "AAPL Buy and Hold",
-            "symbols": ["AAPL"],
-            "benchmark_symbol": "SPY",
-            "raw_metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 39.5,
-                        "benchmark_return_pct": 25.6,
-                        "delta_vs_benchmark_pct": 13.9,
-                        "max_drawdown_pct": -13.8,
-                    }
-                }
-            },
-            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
-        },
-        invoke_json_schema_func=fake_schema,
+        client=fake_schema,
     )
 
     assert text is None
@@ -2876,33 +2738,16 @@ def test_result_breakdown_rejects_mismatched_visible_fact_values(monkeypatch) ->
     from argus.api.chat import breakdown as chat_service
 
     del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": [
-                (
-                    "AAPL Buy and Hold tested AAPL across past year using the "
-                    "stored backtest setup."
-                ),
-                (
-                    "AAPL finished at +46.7% while SPY returned +20.0%, a 13.9 "
-                    "percentage point lead."
-                ),
-                (
-                    "Benchmark: SPY. This is historical simulation evidence, not a "
-                    "prediction."
-                ),
+    fake_schema = FakeBreakdownAgentClient(
+        readout_draft(
+            "AAPL Buy and Hold tested AAPL across past year using the stored backtest setup.\n\nAAPL finished at +46.7% while SPY returned +20.0%, a 13.9 percentage point lead.\n\nBenchmark: SPY. This is historical simulation evidence, not a prediction.",
+            [
+                ("Total return on starting capital", 46.7),
+                ("Benchmark return", 20.0),
+                ("Return difference versus benchmark", 13.9),
             ],
-            "fact_ids": [
-                "title",
-                "symbols",
-                "date_range",
-                "total_return",
-                "benchmark_symbol",
-                "benchmark_return",
-                "benchmark_comparison",
-                "caveat",
-            ],
-        }
+            language="en",
+        )
     )
 
     text = chat_service.llm_result_breakdown_message(
@@ -2923,94 +2768,7 @@ def test_result_breakdown_rejects_mismatched_visible_fact_values(monkeypatch) ->
             },
             "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
         },
-        invoke_json_schema_func=fake_schema,
-    )
-
-    assert text is None
-
-
-def test_result_breakdown_rejects_user_visible_internal_context_terms(
-    monkeypatch,
-) -> None:
-    from argus.api.chat import breakdown as chat_service
-
-    del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": [
-                (
-                    "Macro snapshots from the FRED data packet provide background "
-                    "market conditions but do not influence trades."
-                )
-            ],
-            "fact_ids": [
-                "title",
-                "symbols",
-                "date_range",
-                "total_return",
-                "benchmark_symbol",
-                "benchmark_return",
-                "benchmark_comparison",
-                "max_drawdown",
-                "assumptions",
-                "caveat",
-            ],
-        }
-    )
-
-    text = chat_service.llm_result_breakdown_message(
-        {
-            "title": "AAPL Buy and Hold",
-            "symbols": ["AAPL"],
-            "benchmark_symbol": "SPY",
-            "date_range": "past year",
-            "raw_metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 39.5,
-                        "benchmark_return_pct": 25.6,
-                        "delta_vs_benchmark_pct": 13.9,
-                        "max_drawdown_pct": -13.8,
-                    }
-                }
-            },
-            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
-        },
-        invoke_json_schema_func=fake_schema,
-    )
-
-    assert text is None
-
-
-def test_result_breakdown_requires_core_fact_coverage(monkeypatch) -> None:
-    from argus.api.chat import breakdown as chat_service
-
-    del monkeypatch
-    fake_schema = FakeBreakdownSchemaClient(
-        {
-            "answer_blocks": ["The run needs more context."],
-            "fact_ids": ["caveat"],
-        }
-    )
-
-    text = chat_service.llm_result_breakdown_message(
-        {
-            "title": "AAPL Buy and Hold",
-            "symbols": ["AAPL"],
-            "benchmark_symbol": "SPY",
-            "raw_metrics": {
-                "aggregate": {
-                    "performance": {
-                        "total_return_pct": 39.5,
-                        "benchmark_return_pct": 25.6,
-                        "delta_vs_benchmark_pct": 13.9,
-                        "max_drawdown_pct": -13.8,
-                    }
-                }
-            },
-            "assumptions": ["Universe: AAPL.", "Benchmark: SPY."],
-        },
-        invoke_json_schema_func=fake_schema,
+        client=fake_schema,
     )
 
     assert text is None
@@ -3026,14 +2784,10 @@ def test_result_breakdown_path_does_not_use_regex_prose_scanner() -> None:
     assert "re.findall" not in source
 
 
-def test_result_breakdown_fallback_is_structured_educational_and_grounded(
-    monkeypatch,
-) -> None:
-    from argus.api.chat.breakdown import result_breakdown_message
+def test_result_breakdown_fallback_is_structured_educational_and_grounded() -> None:
+    from argus.api.chat.breakdown import result_breakdown_message_with_metadata
     from argus.api.schemas import BacktestRun
     from argus.domain.store import utcnow
-
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     run = BacktestRun(
         id="run-1",
@@ -3078,7 +2832,9 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
         trades=[],
     )
 
-    text = result_breakdown_message(run)
+    text = result_breakdown_message_with_metadata(
+        run, client=FakeBreakdownAgentClient({})
+    ).text
 
     assert "### Quick Breakdown" not in text
     assert "deeper read" in text
@@ -3099,14 +2855,13 @@ def test_result_breakdown_fallback_is_structured_educational_and_grounded(
     assert "-13.8%" in text
 
 
-def test_result_breakdown_metadata_records_deterministic_fallback(
-    monkeypatch,
+@pytest.mark.parametrize("rejected", [False, True])
+def test_result_breakdown_metadata_preserves_usage_for_complete_outcomes(
+    rejected: bool,
 ) -> None:
     from argus.api.chat.breakdown import result_breakdown_message_with_metadata
     from argus.api.schemas import BacktestRun
     from argus.domain.store import utcnow
-
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
     run = BacktestRun(
         id="run-1",
@@ -3150,12 +2905,18 @@ def test_result_breakdown_metadata_records_deterministic_fallback(
         trades=[],
     )
 
-    message = result_breakdown_message_with_metadata(run)
+    client = FakeBreakdownAgentClient({} if rejected else None)
+    message = result_breakdown_message_with_metadata(run, client=client)
 
-    assert message.source == "deterministic_fallback"
-    assert message.fallback_used is True
-    assert message.failure_mode == "llm_unavailable_or_contract_rejected"
-    assert "**Setup.**" in message.text
+    assert message.source == (
+        "deterministic_fallback" if rejected else "llm_breakdown_stage"
+    )
+    assert message.fallback_used is rejected
+    assert message.failure_mode == ("invalid_draft" if rejected else None)
+    assert len(client.calls) == 1
+    assert message.usage is client.usage
+    assert message.sources == ()
+    assert ("**Setup.**" in message.text) is rejected
 
 
 @pytest.mark.asyncio
@@ -3250,6 +3011,12 @@ def test_openrouter_failure_log_reports_raising_origin(monkeypatch) -> None:
         raise ValueError(
             "OpenRouter interpretation returned an incomplete strategy draft"
         )
+
+    # The logger selects Argus frames; a checkout's directory name is incidental.
+    # Give this isolated raising fixture a module path inside that package.
+    _raise_local_rejection.__code__ = _raise_local_rejection.__code__.replace(
+        co_filename="/fixture/argus/test_openrouter_policy.py"
+    )
 
     try:
         _raise_local_rejection()
@@ -3592,7 +3359,7 @@ def test_route_receipt_capture_collects_current_runtime_calls() -> None:
     token = openrouter.begin_openrouter_route_receipt_capture()
     openrouter.record_openrouter_route_receipt(
         task="result_summary",
-        model_name="chat/model",
+        model_name="openai/gpt-5.6-luna",
         mode="chat_model",
         schema_name=None,
         latency_ms=42,
@@ -3710,10 +3477,10 @@ def test_route_receipt_latency_summary_keeps_failure_and_context_evidence() -> N
         token_usage={"total_tokens": 30},
     )
     openrouter.record_openrouter_route_receipt(
-        task="result_breakdown",
+        task="capability_conflict",
         model_name="context/primary",
         mode="json_schema",
-        schema_name="ResultBreakdown",
+        schema_name="SupportedStrategyCapabilityConflictAudit",
         latency_ms=2400,
         outcome="succeeded",
         context_packet_ids=["packet-2", "packet-1"],
@@ -3982,7 +3749,7 @@ def test_direct_chat_completion_tries_configured_fallback_and_records_usage(
 
     result = asyncio.run(
         openrouter.invoke_openrouter_chat_completion(
-            task="result_summary",
+            task="chat_composer",
             messages=[{"role": "user", "content": "summarize"}],
             context_packet_ids=["packet-1"],
         )

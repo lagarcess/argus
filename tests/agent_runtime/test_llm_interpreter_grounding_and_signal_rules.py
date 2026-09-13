@@ -1,4 +1,6 @@
 # ruff: noqa: F403, F405
+from argus.domain.market_data.new_york_clock import new_york_today
+
 from tests.agent_runtime._llm_interpreter_common import *
 
 
@@ -833,9 +835,13 @@ def test_llm_interpreter_prompt_preserves_valuation_as_valid_context() -> None:
 
     assert "valuation and fundamental language is valid investing intent" in prompt
     assert "p/e" in prompt
-    assert "concept is financially real" in prompt
-    assert "executable historical price/indicator rule" in prompt
+    # Decision 10: valuation language is answered by research; the engine
+    # boundary and its proxy apply only to a rule the user wants to test.
+    assert "is a research question" in prompt
+    assert "do not steer it toward a backtest" in prompt
+    assert "only when the user wants to test a rule" in prompt
     assert "supported proxy" in prompt
+    assert "cannot predict future performance" not in prompt
 
 def test_llm_interpreter_prompt_understands_crossover_shorthand() -> None:
     interpreter = OpenRouterStructuredInterpreter(
@@ -857,7 +863,8 @@ def test_llm_interpreter_prompt_uses_provider_date_allowances() -> None:
 
     prompt = interpreter._system_prompt().lower()
 
-    assert "equity launch history starts in 2016" in prompt
+    assert "do not invent a history limit or a start year for any asset" in prompt
+    assert "2016" not in prompt
     assert "bounded recent-data window" in prompt
     assert "1h, 4h, or 1d" in prompt
     assert "preserve those requested fields" in prompt
@@ -935,8 +942,8 @@ def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
     strategy = _strategy_from_llm(draft)
 
     assert strategy.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
-        "end": date.today().isoformat(),
+        "start": date(new_york_today().year - 1, new_york_today().month, new_york_today().day).isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert strategy.extra_parameters["date_range_intent"] == {
         "kind": "rolling_window",
@@ -1044,8 +1051,8 @@ def test_current_message_run_field_contract_uses_canonical_intent_not_phrase_sca
 
     assert repaired is not None
     assert repaired.candidate_strategy_draft.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
-        "end": date.today().isoformat(),
+        "start": date(new_york_today().year - 1, new_york_today().month, new_york_today().day).isoformat(),
+        "end": new_york_today().isoformat(),
     }
 
 def test_current_message_run_field_contract_recovers_supported_current_turn_window() -> None:
@@ -1097,8 +1104,8 @@ def test_current_message_run_field_contract_recovers_supported_current_turn_wind
     assert repaired.assistant_response is None
     assert repaired.missing_required_fields == []
     assert repaired.candidate_strategy_draft.date_range == {
-        "start": date(date.today().year - 1, date.today().month, date.today().day).isoformat(),
-        "end": date.today().isoformat(),
+        "start": date(new_york_today().year - 1, new_york_today().month, new_york_today().day).isoformat(),
+        "end": new_york_today().isoformat(),
     }
 
 @pytest.mark.asyncio
@@ -3754,7 +3761,7 @@ async def test_money_only_underfilled_strategy_uses_supported_rule_repair(
     assert draft.asset_universe == ["TSLA"]
     assert draft.date_range == {
         "start": "2022-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert draft.capital_amount == 10000
     assert draft.strategy_type == "signal_strategy"
@@ -3865,7 +3872,7 @@ async def test_plain_50_200_crossover_does_not_fall_through_to_unsupported_copy(
     assert draft.asset_class == "equity"
     assert draft.date_range == {
         "start": "2022-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert draft.capital_amount == 10000
     assert draft.entry_rule == {
@@ -4151,7 +4158,7 @@ async def test_unsupported_supported_rule_classification_gets_signal_rule_repair
     assert draft.asset_universe == ["TSLA"]
     assert draft.date_range == {
         "start": "2022-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert draft.capital_amount == 10000
     assert draft.entry_logic == "50-day SMA crosses above 200-day SMA"

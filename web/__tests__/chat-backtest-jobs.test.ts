@@ -529,7 +529,7 @@ describe("chat backtest jobs", () => {
     expect(updated.result?.actions?.[0].payload?.run_id).toBe("run-1");
   });
 
-  test("succeeded durable job replaces queued placeholder with completed readout", () => {
+  test("succeeded durable job rejects legacy readout prose and clears queued placeholder", () => {
     const resultReadout =
       "**Quick take**\n\nBackend generated readout.\n\n- Tested: AAPL buy and hold.";
     const [updated] = applyBacktestJobUpdate([queuedJobMessage()], {
@@ -539,11 +539,11 @@ describe("chat backtest jobs", () => {
         finished_at: "2026-06-06T12:00:04Z",
       }),
       run: run(),
-      result_readout: resultReadout,
+      result_readout: resultReadout as never,
     });
 
     expect(updated.kind).toBe("strategy_result");
-    expect(updated.content).toBe(resultReadout);
+    expect(updated.content).toBe("");
     expect(updated.content).not.toContain("I started the backtest");
     expect(updated.content).not.toContain("as soon as it is ready");
   });

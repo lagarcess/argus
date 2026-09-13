@@ -36,6 +36,7 @@ from argus.agent_runtime.workflow_contract import (
     TOKEN_STREAM_NODES,
     WORKFLOW_NODE_NAMES,
 )
+from argus.domain.result_readout_content import READOUT_METADATA_KEYS
 from argus.observability.product_events import capture_product_event
 
 MAX_RECENT_THREAD_HISTORY = 6
@@ -226,6 +227,7 @@ async def stream_agent_turn_events(
         "payload": _public_result(final_state),
         "_turn_progress": turn_progress_evidence(),
         "_discovery_usage": final_state.get("discovery_usage"),
+        "_tool_effects": final_state.get("tool_effects"),
     }
 
 
@@ -355,6 +357,7 @@ def _compose_runtime_response(result: dict[str, Any]) -> dict[str, Any]:
 
 def _public_result(result: dict[str, Any]) -> dict[str, Any]:
     allowed_keys = {
+        *READOUT_METADATA_KEYS,
         "stage_outcome",
         "assistant_prompt",
         "assistant_response",
@@ -383,6 +386,7 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "recovery",
         "discovery",
         "next_experiments",
+        "next_steps",
         "research",
         "research_job_request",
     }
@@ -402,6 +406,12 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         if (
             "confirmation_payload" not in serialized
             and "discovery" not in serialized
+            and not serialized.get("final_response_payload", {}).get("tool_result_cards")
+            and not getattr(
+                getattr(run_state, "final_response_payload", None),
+                "tool_result_cards",
+                [],
+            )
             and getattr(run_state, "semantic_turn_act", None) != "asset_discovery"
             and getattr(run_state, "confirmation_payload", None) is not None
         ):

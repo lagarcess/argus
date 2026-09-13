@@ -1,0 +1,181 @@
+{
+  "records": [
+    {
+      "tag": "cap-five-390-en",
+      "width": 390,
+      "language": "en",
+      "allEnabled": false,
+      "choices": [
+        {
+          "question": "Synthetic example: buy $200 of AAPL monthly with modeled costs.",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 1: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 2: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 3: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored example without typed sources",
+          "checked": false,
+          "disabled": true,
+          "reason": "The sources cannot be shared. This answer has no supported publisher sources."
+        },
+        {
+          "question": "Authored example with an unlisted URL",
+          "checked": false,
+          "disabled": true,
+          "reason": "The answer cannot be shared. The answer contains a link outside its listed sources."
+        },
+        {
+          "question": "Authored example shaped by memory",
+          "checked": false,
+          "disabled": true,
+          "reason": "This answer uses personal memory."
+        },
+        {
+          "question": "Authored clarification example",
+          "checked": false,
+          "disabled": true,
+          "reason": "This type of answer cannot be shared."
+        },
+        {
+          "question": "Authored confirmation example",
+          "checked": false,
+          "disabled": true,
+          "reason": "This type of answer cannot be shared."
+        },
+        {
+          "question": "Authored degraded example",
+          "checked": false,
+          "disabled": true,
+          "reason": "The research did not complete with full supporting evidence."
+        },
+        {
+          "question": "Authored example: include record bf06c016-e7ef-43b9-a358-0afc9951bc13",
+          "checked": false,
+          "disabled": true,
+          "reason": "The question cannot be shared. The text contains private information or codes."
+        },
+        {
+          "question": "Authored example: which answer field is refused?",
+          "checked": false,
+          "disabled": true,
+          "reason": "The answer cannot be shared. The text contains private information or codes."
+        },
+        {
+          "question": "Authored fifth eligible example: selection must respect the four-answer cap.",
+          "checked": false,
+          "disabled": true,
+          "reason": "A link can include up to 4 answers. Choose them individually."
+        }
+      ],
+      "noteRefusal": null,
+      "overflow": false
+    },
+    {
+      "tag": "cap-five-1280-en",
+      "width": 1280,
+      "language": "en",
+      "allEnabled": false,
+      "choices": [
+        {
+          "question": "Synthetic example: buy $200 of AAPL monthly with modeled costs.",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 1: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 2: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored sharing example 3: what does this record explain?",
+          "checked": true,
+          "disabled": false,
+          "reason": null
+        },
+        {
+          "question": "Authored example without typed sources",
+          "checked": false,
+          "disabled": true,
+          "reason": "The sources cannot be shared. This answer has no supported publisher sources."
+        },
+        {
+          "question": "Authored example with an unlisted URL",
+          "checked": false,
+          "disabled": true,
+          "reason": "The answer cannot be shared. The answer contains a link outside its listed sources."
+        },
+        {
+          "question": "Authored example shaped by memory",
+          "checked": false,
+          "disabled": true,
+          "reason": "This answer uses personal memory."
+        },
+        {
+          "question": "Authored clarification example",
+          "checked": false,
+          "disabled": true,
+          "reason": "This type of answer cannot be shared."
+        },
+        {
+          "question": "Authored confirmation example",
+          "checked": false,
+          "disabled": true,
+          "reason": "This type of answer cannot be shared."
+        },
+        {
+          "question": "Authored degraded example",
+          "checked": false,
+          "disabled": true,
+          "reason": "The research did not complete with full supporting evidence."
+        },
+        {
+          "question": "Authored example: include record bf06c016-e7ef-43b9-a358-0afc9951bc13",
+          "checked": false,
+          "disabled": true,
+          "reason": "The question cannot be shared. The text contains private information or codes."
+        },
+        {
+          "question": "Authored example: which answer field is refused?",
+          "checked": false,
+          "disabled": true,
+          "reason": "The answer cannot be shared. The text contains private information or codes."
+        },
+        {
+          "question": "Authored fifth eligible example: selection must respect the four-answer cap.",
+          "checked": false,
+          "disabled": true,
+          "reason": "A link can include up to 4 answers. Choose them individually."
+        }
+      ],
+      "noteRefusal": null,
+      "overflow": false
+    }
+  ],
+  "publications": 0
+}

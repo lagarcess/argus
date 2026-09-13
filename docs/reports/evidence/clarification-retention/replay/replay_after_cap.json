@@ -1,0 +1,149 @@
+{
+  "variant": "cap",
+  "turns": [
+    {
+      "index": 1,
+      "outcome": "await_approval",
+      "assistant_text": "[confirmation card]",
+      "em_dash": false,
+      "provider_calls": [
+        "LLMInterpretationResponse",
+        "DcaContractAudit",
+        "DcaContributionRoleAudit",
+        "StatedRunFieldFidelityAudit"
+      ],
+      "missing_required_fields": [],
+      "requested_field": null,
+      "unsupported_constraints": [],
+      "draft": {
+        "strategy_type": "dca_accumulation",
+        "asset_universe": [
+          "DOCN"
+        ],
+        "date_range": {
+          "start": "2025-09-10",
+          "end": "2026-09-09"
+        },
+        "cadence": "monthly",
+        "capital_amount": 100.0,
+        "comparison_baseline": "SPY"
+      },
+      "extra": {
+        "initial_capital": 1000.0,
+        "recurring_contribution": 100.0,
+        "total_capital": null,
+        "total_budget": null,
+        "fee_rate": 0.001,
+        "slippage": 0.0005
+      },
+      "provenance": {
+        "strategy_type": "explicit_user",
+        "asset_universe": "explicit_user",
+        "date_range": "explicit_user",
+        "initial_capital": "explicit_user",
+        "recurring_contribution": "explicit_user",
+        "cadence": "explicit_user",
+        "comparison_baseline": "stated_run_field_fidelity_audit",
+        "capital_amount": "recurring_contribution",
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user"
+      },
+      "semantic_turn_act": "new_idea",
+      "task_relation": "new_task",
+      "reason_codes": null,
+      "thread_metadata": {
+        "last_stage_outcome": "await_approval"
+      },
+      "launch": {
+        "symbols": [
+          "DOCN"
+        ],
+        "starting_capital": 1000.0,
+        "recurring_contribution": 100.0,
+        "cadence": "monthly",
+        "date_range": {
+          "start": "2025-09-10",
+          "end": "2026-09-09"
+        },
+        "benchmark_symbol": "SPY"
+      }
+    },
+    {
+      "index": 2,
+      "outcome": "await_approval",
+      "assistant_text": "[confirmation card]",
+      "em_dash": false,
+      "provider_calls": [
+        "LLMInterpretationResponse",
+        "LLMInterpretationResponse",
+        "ArtifactAssumptionEditPlan(unscripted)",
+        "ArtifactAssumptionEditPlan(unscripted)",
+        "DcaContractAudit",
+        "StrategyFamilyContinuityAudit(unscripted)",
+        "DcaContributionRoleAudit",
+        "FocusedDateWindowExtraction",
+        "FocusedStrategyExtraction",
+        "FocusedDateWindowExtraction",
+        "StatedRunFieldFidelityAudit",
+        "FocusedDateWindowExtraction",
+        "ArtifactAssumptionEditPlan(unscripted)",
+        "ArtifactAssumptionEditPlan(unscripted)"
+      ],
+      "missing_required_fields": [],
+      "requested_field": null,
+      "unsupported_constraints": [],
+      "draft": {
+        "strategy_type": "dca_accumulation",
+        "asset_universe": [
+          "DOCN"
+        ],
+        "date_range": {
+          "start": "2025-09-10",
+          "end": "2026-09-09"
+        },
+        "cadence": "monthly",
+        "capital_amount": 100.0,
+        "comparison_baseline": "SPY"
+      },
+      "extra": {
+        "initial_capital": 1000.0,
+        "recurring_contribution": 100.0,
+        "total_capital": null,
+        "total_budget": null,
+        "fee_rate": 0.001,
+        "slippage": 0.0005
+      },
+      "provenance": {
+        "strategy_type": "explicit_user",
+        "asset_universe": "explicit_user",
+        "date_range": "explicit_user",
+        "initial_capital": "explicit_user",
+        "recurring_contribution": "explicit_user",
+        "cadence": "explicit_user",
+        "comparison_baseline": "stated_run_field_fidelity_audit",
+        "capital_amount": "recurring_contribution",
+        "fee_rate": "explicit_user",
+        "slippage": "explicit_user"
+      },
+      "semantic_turn_act": "new_idea",
+      "task_relation": "new_task",
+      "reason_codes": null,
+      "thread_metadata": {
+        "last_stage_outcome": "await_approval"
+      },
+      "launch": {
+        "symbols": [
+          "DOCN"
+        ],
+        "starting_capital": 1000.0,
+        "recurring_contribution": 100.0,
+        "cadence": "monthly",
+        "date_range": {
+          "start": "2025-09-10",
+          "end": "2026-09-09"
+        },
+        "benchmark_symbol": "SPY"
+      }
+    }
+  ]
+}

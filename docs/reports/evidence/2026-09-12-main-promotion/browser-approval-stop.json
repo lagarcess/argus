@@ -1,0 +1,35 @@
+{
+  "status": "browser_walk_approval_stop",
+  "measured_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "ab_pairs": 10,
+  "native_ab_failures": {
+    "baseline": 0,
+    "candidate": 6
+  },
+  "replay_conversations": 15,
+  "replay_turns": 38,
+  "refusal_rule_passed": 38,
+  "refusal_rule_failed": 0,
+  "allowance_turns": 0,
+  "replay_research_delivery_failure_count": 1,
+  "replay_research_http_statuses": [
+    429
+  ],
+  "eval_tracked_usd": 6.0129416335,
+  "eval_reserve_usd": 1.16,
+  "eval_guarded_usd": 7.1729416335,
+  "eval_cap_usd": 12.5,
+  "replay_tracked_usd": 1.70731696526,
+  "replay_reserve_usd": 0.18,
+  "replay_guarded_usd": 1.88731696526,
+  "replay_cap_usd": 4,
+  "browser_spent_usd": 0,
+  "browser_cap_usd": 3,
+  "first_follow_up": "Research retry on provider errors",
+  "founder_decision_at_merge": "Whether to promote with the research retry still pending",
+  "decision_needed_now": "Approve the headed browser walk",
+  "private_replay_data_deleted": true,
+  "production_writes": false,
+  "merge_performed": false,
+  "final_exact_head_review_pending": true
+}

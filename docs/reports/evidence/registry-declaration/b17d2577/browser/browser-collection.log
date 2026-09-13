@@ -1,0 +1,20 @@
+(node:57915) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Listing tests:
+  registry-signal-control.spec.ts:13:7 › authored signal card retains MACD windows and chart across reload en
+  registry-signal-control.spec.ts:13:7 › authored signal card retains MACD windows and chart across reload es-419
+  tool-registry.spec.ts:24:7 › a later saved user message makes old tool inputs read-only en
+  tool-registry.spec.ts:40:7 › sending another turn cancels the pending tool edit en
+  tool-registry.spec.ts:77:7 › declared backtest keeps DCA assumptions and the receipt visual en
+  tool-registry.spec.ts:103:7 › executing-call progress is localizable without another turn en
+  tool-registry.spec.ts:135:9 › tool results live, recompute and reload en 1280
+  tool-registry.spec.ts:135:9 › tool results live, recompute and reload en 390
+  tool-registry.spec.ts:24:7 › a later saved user message makes old tool inputs read-only es-419
+  tool-registry.spec.ts:40:7 › sending another turn cancels the pending tool edit es-419
+  tool-registry.spec.ts:77:7 › declared backtest keeps DCA assumptions and the receipt visual es-419
+  tool-registry.spec.ts:103:7 › executing-call progress is localizable without another turn es-419
+  tool-registry.spec.ts:135:9 › tool results live, recompute and reload es-419 1280
+  tool-registry.spec.ts:135:9 › tool results live, recompute and reload es-419 390
+  tool-registry.spec.ts:199:7 › repeated asynchronous calls settle independently en
+  tool-registry.spec.ts:199:7 › repeated asynchronous calls settle independently es-419
+Total: 16 tests in 2 files

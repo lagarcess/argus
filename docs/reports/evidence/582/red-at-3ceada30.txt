@@ -1,0 +1,37 @@
+# Red at 3ceada30: tests changed, app source untouched
+
+## poetry run pytest tests/test_profile_theme_retired.py tests/test_alpha_api.py::test_me_returns_contract_user_profile tests/test_alpha_api_supabase.py::test_patch_me_supabase_ignores_retired_profile_fields -q --no-cov
+FAILED tests/test_profile_theme_retired.py::test_no_profile_model_declares_a_theme[User]
+FAILED tests/test_profile_theme_retired.py::test_no_profile_model_declares_a_theme[GuestUser]
+FAILED tests/test_profile_theme_retired.py::test_no_profile_model_declares_a_theme[ProfilePatch]
+FAILED tests/test_profile_theme_retired.py::test_the_contract_declares_no_theme
+FAILED tests/test_profile_theme_retired.py::test_a_row_that_still_has_the_column_is_read_without_it
+FAILED tests/test_profile_theme_retired.py::test_patch_me_ignores_a_theme_and_saves_the_rest
+FAILED tests/test_profile_theme_retired.py::test_a_new_profile_is_created_without_a_theme
+FAILED tests/test_profile_theme_retired.py::test_the_mock_user_is_created_without_a_theme
+FAILED tests/test_alpha_api.py::test_me_returns_contract_user_profile - Asser...
+FAILED tests/test_alpha_api_supabase.py::test_patch_me_supabase_ignores_retired_profile_fields
+============================== 10 failed in 4.87s ==============================
+
+## cd web && bun test __tests__/profile-propagation.test.ts
+Expected to not contain: "components/settings/AppearanceModal.tsx"
+Received: [ "components/sidebar/ProfileMenu.tsx", "components/settings/LanguageModal.tsx",
+(fail) a saved profile reaches the greeting > a profile field has one way to the server [34.49ms]
+ 19 pass
+ 1 fail
+
+## cd web && bunx playwright test e2e/profile-language-save.spec.ts
+  ✓  2 [chromium] › e2e/profile-language-save.spec.ts:178:7 › a refused save is shown and put back (en account picks es-419) (2.4s)
+  ✓  1 [chromium] › e2e/profile-language-save.spec.ts:178:7 › a refused save is shown and put back (es-419 account picks en) (2.4s)
+  ✓  4 [chromium] › e2e/profile-language-save.spec.ts:228:5 › a save the account took is kept when its reply fails (1.0s)
+  ✓  3 [chromium] › e2e/profile-language-save.spec.ts:206:5 › a saved language reaches the account and survives a reload (1.7s)
+  ✓  5 [chromium] › e2e/profile-language-save.spec.ts:246:5 › a save that outlives its panel cannot close the panel that replaced it (990ms)
+  ✓  6 [chromium] › e2e/profile-language-save.spec.ts:316:5 › the front door keeps a language in this browser and writes no profile (889ms)
+  ✘  7 [chromium] › e2e/profile-language-save.spec.ts:340:7 › a theme change stays in this browser and writes no profile (en) (864ms)
+  ✘  8 [chromium] › e2e/profile-language-save.spec.ts:340:7 › a theme change stays in this browser and writes no profile (es-419) (886ms)
+    +     "theme": "light",
+    > 362 |     expect(writes).toEqual([]);
+    +     "theme": "dark",
+    > 362 |     expect(writes).toEqual([]);
+  2 failed
+  6 passed (6.8s)

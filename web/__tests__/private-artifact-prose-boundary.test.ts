@@ -54,6 +54,30 @@ function rootReaderInventory(overrides = new Map<string, string>()): Record<stri
   return inventory;
 }
 
+function readoutReaderInventory(overrides = new Map<string, string>()): Record<string, number> {
+  const inventory: Record<string, number> = {};
+  for (const path of sourceFiles(root)) {
+    const file = relative(root, path);
+    const source = overrides.get(file) ?? readFileSync(path, "utf8");
+    const fields = new Set(["result_readout_content", "readoutContent", "resultReadoutContent"]);
+    if (file === "lib/result-readout-content.ts") fields.add("text");
+    const record = (node: ts.Node, expression: string) => {
+      const identity = `${file}:${functionOwner(node)}:${expression}`;
+      inventory[identity] = (inventory[identity] ?? 0) + 1;
+    };
+    for (const read of privateReads(source, fields)) record(read.node, read.expression);
+    const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node) && ["resultReadoutContentFromMetadata", "resultReadoutText"].includes(node.expression.getText())) {
+        record(node, node.expression.getText());
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(parsed);
+  }
+  return inventory;
+}
+
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (entry.name.startsWith(".") || ["node_modules", "__tests__", "e2e", "public", "test-results", "playwright-report"].includes(entry.name)) return [];
@@ -71,12 +95,14 @@ describe("private artifact prose AST boundary", () => {
       "components/chat/ChatMessage.tsx:UserMessageContent:content": 1,
       // Generic text fallthrough after every typed artifact returns. Counts
       // are exact: adding a raw-text fallback inside an artifact branch fails.
-      "components/chat/ChatMessage.tsx:getCopyText:message.content": 1,
+      "lib/chat-message-copy-text.ts:chatMessageCopyText:message.content": 1,
       "components/chat/ChatMessage.tsx:getDisplayContent:message.content": 1,
       // General transcript hydration/stream state consumes the scrubbed DTO.
       "components/chat/chat-message-projection.ts:applyEmptyFinalFallback:options.content": 1,
       "components/chat/chat-message-projection.ts:hydrateMessagesFromApi:message.content": 1,
       "components/chat/chat-message-projection.ts:messageStreamPresentation:message.content": 1,
+      // Presence-only status check moved out of ChatInterface; it never renders prose.
+      "components/chat/chat-message-projection.ts:standaloneStreamStatusVisible:latestAssistant?.content": 1,
       "lib/chat-message-hydration.ts:hydrateTextMessageFromApi:message.content": 1,
       "lib/chat-message-hydration.ts:hydrateTextMessageFromApi:options.retryRequestMessage.content": 1,
       "lib/chat-message-hydration.ts:precedingUserMessageForRetryableRecovery:candidate.content": 1,
@@ -88,8 +114,8 @@ describe("private artifact prose AST boundary", () => {
   test.each(rootProseFields)("detects a real artifact-template fallback mutation: %s", (field) => {
     const file = "lib/result-card-view-model.ts";
     const source = readFileSync(join(root, file), "utf8");
-    const mutated = source.replace("readout: resultQuickTakeText(result.readoutFacts, t, locale),",
-      `readout: result.${field} || resultQuickTakeText(result.readoutFacts, t, locale),`);
+    const mutated = source.replace("readout: resultQuickTakeText(result.readoutFacts, t, locale, result.readoutContent),",
+      `readout: result.${field} || resultQuickTakeText(result.readoutFacts, t, locale, result.readoutContent),`);
     expect(mutated).not.toBe(source);
     expect(rootReaderInventory(new Map([[file, mutated]]))).not.toEqual(rootReaderInventory());
   });
@@ -104,22 +130,51 @@ describe("private artifact prose AST boundary", () => {
     expect(privateReads(`function template(card, response, record, fallback) { ${source} }`).length).toBeGreaterThan(0);
   });
 
+
+  test("only the closed-envelope reader and its typed transports may read new prose", () => {
+    expect(readoutReaderInventory()).toEqual({
+      "components/chat/ChatInterface.tsx:handleStreamEvent:baseCard.readoutContent": 1,
+      "components/chat/ChatInterface.tsx:handleStreamEvent:resultReadoutContentFromMetadata": 3,
+      "components/chat/chat-message-projection.ts:hydrateMessagesFromApi:card.readoutContent": 1,
+      "components/chat/chat-message-projection.ts:hydrateMessagesFromApi:resultReadoutContentFromMetadata": 2,
+      "lib/argus-api.ts:resultCardFromConversationCard:resultReadoutContentFromMetadata": 1,
+      "lib/artifact-response-transport.ts:localizeArtifactFinalPayload:resultReadoutContentFromMetadata": 2,
+      "lib/chat-backtest-jobs.ts:resultMessageFromRun:baseCard.readoutContent": 1,
+      "lib/chat-backtest-jobs.ts:resultMessageFromRun:resultReadoutContentFromMetadata": 1,
+      "lib/chat-final-message.ts:mergeFinalTextMessage:resultReadoutContent": 1,
+      "lib/chat-message-hydration.ts:hydrateTextMessageFromApi:resultReadoutContentFromMetadata": 1,
+      "lib/result-card-view-model.ts:resultCardViewModel:result.readoutContent": 1,
+      "lib/result-readout-content.ts:parseReadoutContent:record.text": 4,
+      "lib/result-readout-content.ts:resultReadoutContentFromMetadata:record.result_readout_content": 1,
+      "lib/result-readout-content.ts:resultReadoutText:readout.text": 1,
+      "lib/result-readout-display.ts:resultBreakdownText:resultReadoutText": 1,
+      "lib/result-readout-display.ts:resultMessageReadoutText:message.result?.readoutContent": 1,
+      "lib/result-readout-display.ts:resultMessageReadoutText:message.resultReadoutContent": 2,
+      "lib/result-readout-display.ts:resultQuickTakeText:resultReadoutText": 1,
+    });
+  });
+
+  test.each([
+    "result.result_readout_content?.text",
+    "result.readoutContent?.text",
+    "resultReadoutContentFromMetadata(result)?.text",
+    "(() => { const { readoutContent: saved } = result; return saved?.text; })()",
+  ])("detects a readout that bypasses version, language or frame validation: %s", (expression) => {
+    const file = "lib/result-card-view-model.ts";
+    const source = readFileSync(join(root, file), "utf8");
+    const mutated = source.replace("readout: resultQuickTakeText(", `readout: ${expression} || resultQuickTakeText(`);
+    expect(mutated).not.toBe(source);
+    expect(readoutReaderInventory(new Map([[file, mutated]]))).not.toEqual(readoutReaderInventory());
+  });
+
   test("every web consumer is barred from reading retained source fields", () => {
     const forbidden: string[] = [];
-    let reservedNullReads = 0;
     for (const path of sourceFiles(root)) {
       for (const read of privateReads(readFileSync(path, "utf8"))) {
-        // Founder-reserved #543 file. Its one existing argument is inert:
-        // the public DTO is null-only and backend serialization tests enforce it.
-        const call = read.node.parent;
-        if (relative(root, path) === "lib/chat-backtest-jobs.ts" && read.expression === "response.result_readout"
-          && ts.isCallExpression(call) && call.expression.getText() === "resultMessageFromRun" && call.arguments[2] === read.node) {
-          reservedNullReads += 1;
-        } else forbidden.push(`${relative(root, path)}: ${read.expression}`);
+        forbidden.push(`${relative(root, path)}: ${read.expression}`);
       }
     }
     expect(forbidden).toEqual([]);
-    expect(reservedNullReads).toBe(1);
     const api = ts.createSourceFile("api.ts", readFileSync(join(root, "lib/argus-api.ts"), "utf8"), ts.ScriptTarget.Latest, true);
     let nullOnly = false;
     function verify(node: ts.Node): void {

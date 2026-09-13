@@ -1,0 +1,13 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "attempt": 1,
+  "native_degraded_code": "research_unavailable_http_error",
+  "http_status": 500,
+  "evidence_source": "Native persisted degraded.code and API research_grounded warning detail=http 500",
+  "provider_error_local_log_time": "2026-09-13 14:43:46.071",
+  "local_process_timezone": "America/Chicago",
+  "sources_published": false,
+  "classification": "Provider-side research delivery failure, same disclosed failure mode already accepted for promotion disposition",
+  "retry_limit": 1,
+  "minimum_wait_seconds": 120
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -8,11 +9,69 @@ from argus.api.chat.route_receipts import persist_route_receipts
 from argus.llm.openrouter import OpenRouterRouteReceipt
 from argus.observability import cost_ledger as cost_ledger_module
 from argus.observability.cost_ledger import (
+    normalize_cost_ledger_entry,
     openrouter_cost_ledger_entry_from_receipt,
     persist_openrouter_cost_ledger_entries,
 )
+from faker import Faker
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("status", [None, "succeeded", "failed", "skipped"])
+@pytest.mark.parametrize("task", ["balanced_lookup", "invoice_reconciliation"])
+def test_research_rail_normalizer_retires_status_without_mutating_evidence(
+    status: str | None, task: str
+) -> None:
+    fake = Faker()
+    entry = {
+        "source": "research",
+        "feature_area": "research_rail",
+        "service": "perplexity_agent",
+        "provider": "perplexity_agent",
+        "task": task,
+        "correlation_id": fake.uuid4(),
+        "status": status,
+        "usage_metadata": {"degraded_code": "research_unavailable_malformed_response"},
+        "metadata": {"trace": fake.uuid4(), "research_ledger_contract": "stale"},
+    }
+    before = deepcopy(entry)
+    row = normalize_cost_ledger_entry(entry)
+    assert row["status"] is None
+    assert row["metadata"] == {
+        **entry["metadata"],
+        "research_ledger_contract": "argus_research_ledger/v2",
+    }
+    assert row["usage_metadata"] == entry["usage_metadata"]
+    assert entry == before
+    del entry["status"]
+    assert normalize_cost_ledger_entry(entry)["status"] is None
+
+
+@pytest.mark.parametrize(
+    ("source", "feature_area"),
+    [
+        ("research", "discovery"),
+        ("api_turn", "research_rail"),
+        ("render_workflow", "result_readout"),
+    ],
+)
+@pytest.mark.parametrize("status", [None, "succeeded", "failed", "skipped"])
+def test_other_ledger_rows_retain_status_and_metadata(
+    source: str, feature_area: str, status: str | None
+) -> None:
+    entry = {
+        "source": source,
+        "feature_area": feature_area,
+        "service": "test",
+        "provider": "test",
+        "correlation_id": Faker().uuid4(),
+        "status": status,
+        "metadata": {"surface": "chat"},
+    }
+    row = normalize_cost_ledger_entry(entry)
+    assert row["status"] == (status or "succeeded")
+    assert row["metadata"] == entry["metadata"]
 
 
 class _FakeCostLedgerGateway:
@@ -132,7 +191,9 @@ def test_openrouter_receipt_builds_provider_cost_ledger_entry() -> None:
 
 def test_persist_route_receipts_also_appends_cost_ledger_entries(monkeypatch) -> None:
     gateway = _FakeCostLedgerGateway()
-    monkeypatch.setattr("argus.api.chat.route_receipts.api_state.supabase_gateway", gateway)
+    monkeypatch.setattr(
+        "argus.api.chat.route_receipts.api_state.supabase_gateway", gateway
+    )
 
     repair_effect = {
         "schema_version": "argus_repair_effect/v1",

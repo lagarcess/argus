@@ -1,0 +1,28 @@
+{
+  "phase": "case_retry",
+  "state": "completed",
+  "combined_limit_usd": 7.5,
+  "candidate_sha": "df7aee12955f667e31057464d62c72287fb12247",
+  "environment_identical_to_full_run": true,
+  "initial_event_count": 1281,
+  "tracked_cost_usd": 4.88888657926,
+  "guard_reserve_usd": 1.02,
+  "guarded_total_usd": 5.90888657926,
+  "unpriced_non_skipped_receipts": 46,
+  "pid": 94284,
+  "command": [
+    "poetry",
+    "run",
+    "pytest",
+    "-c",
+    "/private/tmp/argus-promotion-20260912-candidate-eval/pyproject.toml",
+    "/private/tmp/argus-promotion-20260912-eval-control/test_approved_followup.py",
+    "-q",
+    "-k",
+    "case_retry"
+  ],
+  "started_at": 1789278801.438325,
+  "exit_code": 0,
+  "finished_at": 1789278920.640678,
+  "environment_source_unchanged_after_run": true
+}

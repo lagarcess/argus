@@ -1976,7 +1976,6 @@ class _ExistingProfileClient:
             "display_name": "Mock Developer",
             "language": "en",
             "locale": "en-US",
-            "theme": "dark",
             "is_admin": True,
             "onboarding": {
                 "completed": True,

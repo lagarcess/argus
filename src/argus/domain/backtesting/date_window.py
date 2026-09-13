@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from argus.domain.market_data.new_york_clock import new_york_today
+
 
 def validate_backtest_date_window(
     *,
@@ -13,5 +15,5 @@ def validate_backtest_date_window(
 
     if start >= end:
         raise ValueError("invalid_chronological_date_range")
-    if end > (today or date.today()):
+    if end > (today or new_york_today()):
         raise ValueError("future_end_date")

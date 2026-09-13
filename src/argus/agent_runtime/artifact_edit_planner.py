@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import date
 from typing import Any, Literal, get_args
 
 from loguru import logger
@@ -27,6 +26,7 @@ from argus.domain.backtesting.rules import (
     rule_spec_from_moving_average_crossover_rules,
 )
 from argus.domain.capability_registry import RegisteredStrategyTemplate
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema,
     openrouter_structured_model_candidates,
@@ -332,7 +332,7 @@ def _artifact_assumption_edit_messages(
                 "you could not change and why. For mixed add and remove turns, use "
                 "separate asset operations; do not collapse the removed asset into "
                 "the final traded list. "
-                f"Today is {date.today().isoformat()}. {language_line} Return only "
+                f"Today is {new_york_today().isoformat()}. {language_line} Return only "
                 "JSON matching the schema."
             ),
         },

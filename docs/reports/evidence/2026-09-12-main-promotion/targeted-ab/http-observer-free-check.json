@@ -1,0 +1,9 @@
+{
+  "synthetic_only": true,
+  "http_429_retained": true,
+  "threaded_http_503_retained": true,
+  "success_not_error": true,
+  "profile_hooks_restored": true,
+  "no_headers_urls_bodies": true,
+  "native_functions_unchanged": true
+}

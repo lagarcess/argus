@@ -176,6 +176,7 @@ def test_equity_calendar_only_boundaries_are_calendar_alignment(
 
     assert prepared.outcome == "adjusted_coverage"
     assert prepared.adjustment_reason == "calendar_alignment"
+    assert prepared.limited_by is None
     assert prepared.effective_date_range.model_dump() == {
         "start": session_days[0],
         "end": session_days[-1],
@@ -520,6 +521,8 @@ def test_effective_window_uses_observed_boundaries_for_every_series() -> None:
         and frame.index[-1].date().isoformat() == "2024-01-17"
         for frame in prepared.bars_by_symbol.values()
     )
+    # An interleaved gap, not one series' first bar, sets this start.
+    assert prepared.limited_by is None
 
 
 def test_sparse_history_is_rejected_with_typed_recovery_code() -> None:

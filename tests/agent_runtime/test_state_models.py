@@ -1,3 +1,5 @@
+from typing import get_args
+
 import pytest
 from argus.agent_runtime.capabilities.contract import (
     CapabilityContract,
@@ -9,6 +11,7 @@ from argus.agent_runtime.capabilities.contract import (
     ValidationRule,
     build_default_capability_contract,
 )
+from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
@@ -29,6 +32,21 @@ from argus.agent_runtime.state.models import (
     normalize_resolution_provenance_items,
 )
 from pydantic import ValidationError
+
+
+@pytest.mark.parametrize(
+    "intent", get_args(LLMInterpretationResponse.model_fields["intent"].annotation)
+)
+def test_checkpoint_preserves_the_existing_interpreter_intent(intent: str) -> None:
+    state = RunState(current_user_message="", intent=intent)
+    restored = RunState.model_validate_json(state.model_dump_json())
+    snapshot = TaskSnapshot(latest_task_type=restored.intent)
+
+    assert restored.intent == intent
+    assert (
+        TaskSnapshot.model_validate_json(snapshot.model_dump_json()).latest_task_type
+        == intent
+    )
 
 
 def make_valid_contract_kwargs() -> dict:

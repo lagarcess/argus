@@ -917,6 +917,10 @@ def _backtest_job_response(
             raise _by_action_internal_error(request)
     readout = _result_readout_from_job(job) if run is not None else None
     readout_metadata = _result_readout_metadata_from_job(job) if run is not None else {}
+    if run is not None:
+        from argus.domain.result_readout_content import stored_readout_metadata
+
+        readout_metadata.update(stored_readout_metadata(run.conversation_result_card))
     # A decoration on the status report, never a precondition for it: a
     # transient messages read failure must not turn a finished job into a 500.
     result_message = _research_result_message(user_id=user_id, job=job)

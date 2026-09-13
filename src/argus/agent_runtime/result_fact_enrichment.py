@@ -119,7 +119,19 @@ def enriched_result_fact_entries(metadata: dict[str, Any]) -> dict[str, str]:
         entries["final_value"] = format_money(final.value, currency=currency)
         entries["final_date"] = final.time
 
-    trough = _drawdown_trough(points)
+    # The engine's stored window is measured on the same path as the percentage;
+    # a run stored before it dates the drop from the chart.
+    stored_trough = _string_at(
+        metadata, ("metrics", "aggregate", "risk", "max_drawdown_trough_date")
+    )
+    stored_depth = metric_number(
+        metadata, paths=(("metrics", "aggregate", "risk", "max_drawdown_pct"),)
+    )
+    trough = (
+        (stored_trough, stored_depth)
+        if isinstance(stored_trough, str) and stored_depth is not None
+        else _drawdown_trough(points)
+    )
     if trough is not None:
         # Depth is computed at the trough that dates the drawdown; the
         # aggregate metric remains available as max_drawdown.

@@ -1113,7 +1113,7 @@ describe("rail source discipline", () => {
       "utf-8",
     );
     expect(cardSrc).toContain(
-      "onDecisionSaved?.(response.decision.decision_state)",
+      "onDecisionSaved?.(decision.decision_state)",
     );
     expect(interfaceSrc).toContain("messagesWithSavedDecisionState(");
     expect(projectionSrc).toContain(

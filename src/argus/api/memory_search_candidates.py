@@ -460,6 +460,11 @@ def _build_memory_search_index(
     ideas = [row.model_dump() for row in idea_refs]
     evidence = [row.model_dump() for row in evidence_refs]
     decisions = [row.model_dump() for row in decision_refs]
+    _attach_decision_message_text(
+        store,
+        decisions=decisions,
+        visible_conversation_ids=visible_conversation_ids,
+    )
     evidence_by_id = {str(row["id"]): row for row in evidence}
     runs_by_conversation = _group_rows(runs, field="conversation_id")
     ideas_by_conversation = _group_rows(ideas, field="source_conversation_id")
@@ -1481,6 +1486,36 @@ def _decision_search_text(
             str(decision.get("decision_state") or ""),
             str(evidence.get("title") or "") if evidence is not None else "",
             str(evidence.get("digest") or "") if evidence is not None else "",
+            str(decision.get("attachment_text") or ""),
         )
         if value
     )
+
+
+def _attach_decision_message_text(
+    store: Any,
+    *,
+    decisions: list[dict[str, Any]],
+    visible_conversation_ids: set[str],
+) -> None:
+    """A computed-answer decision recalls through the answer it attaches to,
+    the way a backtest decision recalls through its evidence title and digest.
+    The text rides the decision row as ``attachment_text``."""
+    wanted = {
+        str(message_id)
+        for decision in decisions
+        if (message_id := decision.get("source_message_id"))
+    }
+    if not wanted:
+        return
+    with store.conversation_message_lock:
+        text_by_message_id = {
+            message.id: message.content
+            for conversation_id in visible_conversation_ids
+            for message in store.messages.get(conversation_id, [])
+            if message.id in wanted and message.role == "assistant"
+        }
+    for decision in decisions:
+        message_id = decision.get("source_message_id")
+        if message_id is not None and message_id in text_by_message_id:
+            decision["attachment_text"] = text_by_message_id[message_id]

@@ -15,6 +15,7 @@ from argus.api.routers import auth as auth_router
 from argus.api.schemas import (
     GuestAccountSignupRequest,
     GuestHandoffCreateRequest,
+    GuestPendingAction,
     OnboardingState,
     User,
 )
@@ -40,7 +41,6 @@ def _profile(*, user_id: str, email: str | None) -> User:
         display_name=None,
         language="en",
         locale="en-US",
-        theme="dark",
         is_admin=False,
         onboarding=OnboardingState(),
         created_at=now,
@@ -307,12 +307,11 @@ def test_login_reconciles_cookie_bound_handoff_before_returning_session() -> Non
     assert response.status_code == 200
     assert response.json()["guest_claim"] == {
         "conversation_id": CONVERSATION_ID,
-        "pending_action": {
-            "reason": "keep_history",
-            "conversation_id": CONVERSATION_ID,
-            "action_id": "new-chat-1",
-            "artifact_id": None,
-        },
+        "pending_action": GuestPendingAction(
+            reason="keep_history",
+            conversation_id=CONVERSATION_ID,
+            action_id="new-chat-1",
+        ).model_dump(mode="json"),
     }
     gateway.claim_guest_workspace_handoff.assert_called_once_with(
         handoff_id=HANDOFF_ID,

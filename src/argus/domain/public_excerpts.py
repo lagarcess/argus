@@ -40,6 +40,10 @@ from argus.domain.backtesting.rules.signals import (
     _opposite_moving_average_crossover_rule as engine_mirrored_exit_rule,
 )
 from argus.domain.credential_shapes import credential_shape_in
+from argus.domain.result_figures import shown_benchmark_gap
+from argus.domain.result_readout_facts import (
+    engine_config_from_snapshot as _engine_config,
+)
 
 PUBLIC_EXCERPT_ID_BYTES = 24
 PUBLIC_EXCERPT_PATH_PREFIX = "/r/"
@@ -152,7 +156,14 @@ class PublicExcerptOwnerNoteError(ValueError):
 
 
 class PublicExcerptSourceError(ValueError):
-    """The artifact cannot back a receipt."""
+    """The selected source cannot back a receipt, with owner-readable typed context."""
+
+    def __init__(
+        self, message: str, *, reason: str = "unsupported_turn", field: str | None = None
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.field = field
 
 
 class PublicExcerptUnreadableError(RuntimeError):
@@ -322,13 +333,43 @@ def audit_public_excerpt_document(
 
 def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem:
     """Owner-facing row. Carries no source id, only what the owner needs to act."""
+    from argus.domain.public_excerpt_kinds import document_kind
+
+    payload = snapshot.payload
+    if payload.schema_version == 1:
+        title, symbols, dates = payload.idea_title, payload.symbols, payload.date_range
+    else:
+        title = snapshot.title
+        symbols = list(
+            dict.fromkeys(
+                symbol
+                for turn in payload.turns
+                for symbol in (
+                    turn.anchor_symbols
+                    if turn.kind == "research_answer"
+                    else turn.fact_bank.symbols
+                )
+            )
+        )
+        dates = None
+        if len(payload.turns) == 1 and payload.turns[0].kind == "backtest":
+            config = payload.turns[0].fact_bank.config_snapshot
+            if config.date_range:
+                dates = PublicExcerptDateRange(
+                    start=config.date_range.start, end=config.date_range.end
+                )
+            elif config.start_date and config.end_date:
+                dates = PublicExcerptDateRange(
+                    start=config.start_date, end=config.end_date
+                )
     return PublicExcerptListItem(
         id=snapshot.id,
         public_id=snapshot.public_id,
         path=public_excerpt_path(snapshot.public_id),
-        title=snapshot.payload.idea_title,
-        symbols=list(snapshot.payload.symbols),
-        date_range=snapshot.payload.date_range,
+        title=title,
+        symbols=symbols,
+        date_range=dates,
+        kind=document_kind(payload),
         created_at=snapshot.created_at,
         revoked_at=snapshot.revoked_at,
         revocation_reason=snapshot.revocation_reason,
@@ -339,9 +380,12 @@ def snapshot_public_view(snapshot: PublicExcerptSnapshot) -> PublicExcerptView:
     """Projection for an unauthenticated viewer. Revoked receipts keep nothing."""
     if snapshot.revoked_at is not None:
         return PublicExcerptView(public_id=snapshot.public_id, status="revoked")
+    from argus.domain.public_excerpt_kinds import document_kind
+
     return PublicExcerptView(
         public_id=snapshot.public_id,
         status="available",
+        kind=document_kind(snapshot.payload),
         created_at=snapshot.created_at,
         payload=snapshot.payload,
     )
@@ -554,8 +598,9 @@ def _benchmark_metrics(performance: dict[str, Any]) -> list[PublicExcerptMetric]
     The card renders this one as a sentence, in English in both languages (see the
     issue filed against ``benchmark_comparison_from_delta``), so the numbers behind
     it are taken from where the engine put them. Both are frozen: the benchmark's
-    return so the page can show what it did, and the engine's own delta so the
-    comparison is not re-derived by subtracting two already rounded strings.
+    return so the page can show what it did, and the gap ``shown_benchmark_gap``
+    states, the difference of the two returns as shown, so the frozen comparison
+    matches the figures beside it.
     """
     metrics: list[PublicExcerptMetric] = []
     benchmark_return = _amount(performance.get("benchmark_return_pct"))
@@ -566,7 +611,11 @@ def _benchmark_metrics(performance: dict[str, Any]) -> list[PublicExcerptMetric]
                 value=f"{benchmark_return:+.1f}%",
             )
         )
-    delta = _amount(performance.get("delta_vs_benchmark_pct"))
+    delta = shown_benchmark_gap(
+        _amount(performance.get("total_return_pct")),
+        benchmark_return,
+        _amount(performance.get("delta_vs_benchmark_pct")),
+    )
     if delta is not None:
         # Bare, because its unit is percentage points and that unit is a word.
         metrics.append(
@@ -630,20 +679,6 @@ def _assumptions(
     if len(assumptions) > MAX_ASSUMPTIONS:
         raise PublicExcerptSourceError(_UNDESCRIBABLE_ASSUMPTIONS)
     return assumptions
-
-
-def _engine_config(config_snapshot: object) -> dict[str, Any]:
-    """The engine config the run executed, whichever snapshot shape wraps it.
-
-    Same two shapes ``_strategy_facts`` handles. The direct engine path stores the
-    config itself; the agent path repeats part of it in ``resolved_parameters`` and
-    carries a whole copy under ``engine_config``. The run builder lifts that copy to
-    the top level and the launch envelope leaves it nested, so both places are read.
-    The copy is what the engine was actually handed, so it is merged last and wins.
-    """
-    snapshot = _mapping(config_snapshot)
-    merged = {**snapshot, **_mapping(snapshot.get("resolved_parameters"))}
-    return {**merged, **_mapping(merged.get("engine_config"))}
 
 
 def _is_recurring_contribution_run(

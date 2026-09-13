@@ -101,10 +101,15 @@ import {
   POST_TURN_TITLE_REFRESH_DELAYS_MS,
 } from "@/lib/chat-conversation-view-helpers";
 import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
+import { toolResultRecomputeHandler } from "@/lib/tool-result-recompute";
+import { toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
+import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
+import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import {
   discoveryCandidateMention,
   discoverySidecarFromMetadata,
+  researchDegradedCodeFromMetadata,
   researchSourcesForFinalPayload,
 } from "@/lib/chat-discovery-sidecar";
 import {
@@ -112,8 +117,11 @@ import {
   recoveryDisplayFromMetadata,
   retryableAssistantRecoveryCode,
 } from "@/lib/chat-recovery-display";
-import { nextExperimentRowsFromMetadata } from "@/lib/chat-next-experiments";
-import { resultFactHeadingKeyFromMetadata } from "@/lib/result-followup-heading";
+import {
+  nextExperimentRowsFromMetadata,
+  nextExperimentsSourceRunIdFromMetadata,
+} from "@/lib/chat-next-experiments";
+import { nextStepsFromMetadata } from "@/lib/chat-next-steps";
 import {
   loadAllConversationMessagePages,
   resolveOrdinaryTransportAmbiguityView,
@@ -130,6 +138,7 @@ import {
 import {
   applyBacktestJobUpdate,
   backtestJobFromFinalPayload,
+  toolJobsFromMetadata,
   backtestJobMessage,
 } from "@/lib/chat-backtest-jobs";
 import {
@@ -157,8 +166,9 @@ import {
 } from "@/lib/chat-transcript-session-cache";
 import { renamePrefillTitle } from "@/lib/chat-title-display";
 import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
-import SettingsView from "../views/SettingsView";
 import ChatHeaderMenu from "./ChatHeaderMenu";
+import { ShareReceiptPanel } from "./ShareReceiptAction";
+import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
@@ -167,10 +177,10 @@ import ConversationRetrievalState, {
 } from "./ConversationRetrievalState";
 import FeedbackDialog from "../feedback/FeedbackDialog";
 import { feedbackContextForSubmission } from "@/lib/feedback-context";
+import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
 import {
   type ChatActionOption,
   type Message,
-  type StrategyConfirmationPayload,
 } from "./types";
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
@@ -185,9 +195,13 @@ import {
   messageStreamPresentation,
   messagesWithSavedDecisionState,
   settleOpenConfirmationsFromFinalPayload,
+  standaloneStreamStatusVisible,
 } from "./chat-message-projection";
-import { openFeedbackDialogState } from "./feedback-dialog-state";
+import { openFeedbackDialogState, type ChatFeedbackDialogState } from "./feedback-dialog-state";
+import FeedbackAsk from "../feedback/FeedbackAsk";
 import { messageElementRegistrar } from "./transcript-element-refs";
+import { usePendingBreakdownRecovery } from "./usePendingBreakdownRecovery";
+import { retirePendingBreakdown } from "@/lib/pending-result-breakdown";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
 import SidebarShell from "@/components/sidebar/SidebarShell";
 import ChatShellMenuTrigger from "@/components/chat/ChatShellMenuTrigger";
@@ -288,12 +302,7 @@ export default function ChatInterface() {
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
   const { toast, showToast, hideToast } = useChatToast();
   const [isRecentsExpanded, setIsRecentsExpanded] = useState(true);
-  const [feedbackState, setFeedbackState] = useState<{
-    isOpen: boolean;
-    type: "bug" | "feature" | "general" | "rating";
-    rating?: "positive" | "negative";
-    context?: Record<string, unknown>;
-  }>({ isOpen: false, type: "general" });
+  const [feedbackState, setFeedbackState] = useState<ChatFeedbackDialogState>({ isOpen: false, type: "general" });
   const [sidebarMode, setSidebarMode] = useState<SidebarMode>("collapsed");
   const [isSidebarPreferenceModalOpen, setIsSidebarPreferenceModalOpen] =
     useState(false);
@@ -384,6 +393,12 @@ export default function ChatInterface() {
       promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
     }, [activityTranscriptReadiness, invalidateTranscriptForMutation]);
   useBacktestJobPolling(messages, canApplyConversationOwnedUpdate, setMessages, handleDurableJobCompletion);
+  const handlePendingBreakdownSettled = useCallback((targetConversationId: string) => {
+    invalidateTranscriptForMutation(targetConversationId, "durable_result_action");
+    promoteCanonicalConversationActivityTranscript({ conversationId: targetConversationId, activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness });
+    void refreshHistory();
+  }, [activityTranscriptReadiness, invalidateTranscriptForMutation, refreshHistory]);
+  usePendingBreakdownRecovery(messages, conversationId, setMessages, t("chat.error_load"), handlePendingBreakdownSettled);
 
   const retireActiveTranscriptPresentationForNavigation = useCallback(() => {
     setStreamStatus(null);
@@ -1213,12 +1228,7 @@ export default function ChatInterface() {
         );
         clearNeutralGuestSubmission();
         if (!canApplyVisibleStreamUpdate()) return;
-        const stageKey = `chat.status.${event.data.stage}`;
-        const detail = event.data.detail;
-        setStreamStatus(
-          (detail ? t(`${stageKey}_detail`, { detail }) || t(stageKey) : t(stageKey)) ||
-            t("chat.status.preparing"),
-        );
+        setStreamStatus(toolProgressText(event.data.tool_progress ?? null, t));
       }
       if (event.event === "token") {
         if (!requestSessions.authorize(requestSession, "token")) return;
@@ -1315,8 +1325,9 @@ export default function ChatInterface() {
           typeof finalPayload.message_id === "string"
             ? finalPayload.message_id
             : undefined;
+        const finalAssistantId = finalMessageId ?? assistantId;
         setMessages((prev) =>
-          applyRetestReceipt(prev, userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
+          applyRetestReceipt(retirePendingBreakdown(prev, requestSession.identity.requestId), userMsg.id, retestReceiptFromFinalPayload(finalPayload)),
         );
         const finalRecoveryDisplay = recoveryDisplayFromMetadata(finalPayload);
         const finalStrategyPathContext =
@@ -1325,7 +1336,15 @@ export default function ChatInterface() {
           finalPayload.recovery,
         );
         const finalDiscovery = discoverySidecarFromMetadata(finalPayload);
+        const finalToolCards = toolCardsFromMetadata(finalPayload);
+        const finalToolCardsUnavailable = hasUnavailableToolCards(finalPayload);
+        const finalToolJobs = toolJobsFromMetadata(finalPayload);
         const finalMemoryRecalls = memoryRecallsFromFinalPayload(finalPayload);
+        const finalNextExperiments =
+          nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
+        const finalNextExperimentsSourceRunId =
+          nextExperimentsSourceRunIdFromMetadata(finalPayload);
+        const finalNextSteps = nextStepsFromMetadata(finalPayload, finalNextExperiments);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1353,14 +1372,10 @@ export default function ChatInterface() {
         }
         const finalHasFailedAction = hasFailedActionMetadata(finalPayload);
         const finalBacktestJob = backtestJobFromFinalPayload(finalPayload);
-        if (event.data.confirmation) {
-          const confirmation = event.data
-            .confirmation as StrategyConfirmationPayload;
-          const finalAssistantId = finalMessageId ?? assistantId;
+        const confirmation = pendingArtifactCardFromPayload(event.data.confirmation);
+        if (confirmation) {
           // Researched peer adds ride the ordinary Try-next surface below
           // the card's turn (research rail, spec section 6).
-          const confirmationNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1368,18 +1383,18 @@ export default function ChatInterface() {
                   id: finalAssistantId,
                   role: "ai",
                   kind: "strategy_confirmation",
+                  toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                   content: undefined,
                   confirmation,
                   strategyPathContext: finalStrategyPathContext,
                   actions: confirmation.actions ?? [],
-                  nextExperiments: confirmationNextExperiments,
+                  nextExperiments: finalNextExperiments,
                 }),
               ),
             ),
           );
         } else if (event.data.run) {
           const run = event.data.run as BacktestRun;
-          const finalAssistantId = finalMessageId ?? assistantId;
           const baseCard = resultCardFromRun(run);
           const resultActions = hydrateResultActionsForRun(
             baseCard.actions ?? [],
@@ -1387,11 +1402,10 @@ export default function ChatInterface() {
           );
           const card = {
             ...baseCard,
+            readoutContent: resultReadoutContentFromMetadata(finalPayload, baseCard.readoutContent),
             savedStrategyId: run.strategy_id ?? null,
             actions: resultActions,
           };
-          const finalNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1399,6 +1413,7 @@ export default function ChatInterface() {
                   id: finalAssistantId,
                   role: "ai",
                   kind: "strategy_result",
+                  toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                   content: finalText || undefined,
                   result: card,
                   actions: resultActions,
@@ -1410,13 +1425,12 @@ export default function ChatInterface() {
             ),
           );
         } else if (finalBacktestJob) {
-          const finalAssistantId = finalMessageId ?? assistantId;
-          const finalBacktestJobMessage = backtestJobMessage({
+          const finalBacktestJobMessage = { ...backtestJobMessage({
             id: finalAssistantId,
             content: finalText || undefined,
             job: finalBacktestJob,
             metadata: finalPayload,
-          });
+          }), toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs };
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               normalizeConfirmationHistory(
@@ -1431,21 +1445,20 @@ export default function ChatInterface() {
               ),
             ),
           );
-        } else if (finalText) {
-          const finalFactHeadingKey =
-            resultFactHeadingKeyFromMetadata(finalPayload);
-          const finalTextNextExperiments =
-            nextExperimentRowsFromMetadata(finalPayload) ?? undefined;
+        } else if (finalText || finalToolCards.length || finalToolCardsUnavailable || finalToolJobs.length) {
           const finalResearchSources = researchSourcesForFinalPayload(finalPayload);
+          const finalResearchDegradedCode =
+            researchDegradedCodeFromMetadata(finalPayload);
           const finalTextPresentation =
-            action?.type === "show_breakdown" ? "result_breakdown" : undefined;
+            finalPayload.artifact_presentation_kind === "result" ? "result_readout"
+              : finalRecoveryDisplay?.kind === "result_breakdown" || action?.type === "show_breakdown" ? "result_breakdown" : undefined;
           setMessages((prev) => {
-            const finalAssistantId = finalMessageId ?? assistantId;
             const nextMessages = replaceOrAppendFinalAssistantMessage(
               prev.map((m) =>
                 mergeFinalTextMessage(m, {
                   assistantId,
                   finalText,
+                  toolResultCards: finalToolCards,
                   finalActions: finalTextActions,
                   recoveryDisplay: finalRecoveryDisplay,
                   strategyPathContext: finalStrategyPathContext,
@@ -1453,9 +1466,13 @@ export default function ChatInterface() {
                   discovery: finalDiscovery,
                   memoryRecalls: finalMemoryRecalls,
                   researchSources: finalResearchSources,
-                  nextExperiments: finalTextNextExperiments,
+                  researchDegradedCode: finalResearchDegradedCode,
+                  nextExperiments: finalNextExperiments,
+                  resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
+                  resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
+                  nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
+                  nextSteps: finalNextSteps,
                   contentPresentation: finalTextPresentation,
-                  resultFactHeadingKey: finalFactHeadingKey,
                 }),
               ),
               assistantId,
@@ -1464,6 +1481,7 @@ export default function ChatInterface() {
                 role: "ai",
                 kind: "text",
                 content: finalText,
+                toolResultCards: finalToolCards, hasUnavailableToolResults: finalToolCardsUnavailable, toolJobs: finalToolJobs,
                 actions:
                   finalTextActions.length > 0 ? finalTextActions : undefined,
                 recoveryDisplay: finalRecoveryDisplay,
@@ -1472,9 +1490,13 @@ export default function ChatInterface() {
                 discovery: finalDiscovery,
                 memoryRecalls: finalMemoryRecalls,
                 researchSources: finalResearchSources,
-                nextExperiments: finalTextNextExperiments,
+                researchDegradedCode: finalResearchDegradedCode,
+                nextExperiments: finalNextExperiments,
+                resultReadoutFacts: resultReadoutFacts(finalPayload.result_fact_bank),
+                resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
+                nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
+                nextSteps: finalNextSteps,
                 contentPresentation: finalTextPresentation,
-                resultFactHeadingKey: finalFactHeadingKey,
               },
             );
             if (
@@ -1960,6 +1982,11 @@ export default function ChatInterface() {
     t,
   }));
 
+  const handleToolRecompute = toolResultRecomputeHandler(() => ({
+    source: () => ({ conversationId: activeConversationIdRef.current, latestMessageId: latestMessagesRef.current.at(-1)?.id, busy: sendAdmissionInFlightRef.current || conversationActivity.isConversationLocked(activeConversationIdRef.current) }),
+    setMessages, invalidate: (id) => invalidateTranscriptForMutation(id, "durable_result_action"), reload: loadConversation,
+  }));
+
   const omnisearch = omnisearchActionHandlers(() => ({
     closeOverlay: () => setSearchOverlayOpen(false),
     loadConversation,
@@ -2076,14 +2103,7 @@ export default function ChatInterface() {
   // the conversation's actions.
   const nextMovesEnabled =
     !turnInFlight && !hasActiveArtifactActionSet(messages);
-  const latestAssistantContent =
-    [...messages]
-      .reverse()
-      .find((message) => message.role === "ai")
-      ?.content?.trim() ?? "";
-  const showStreamStatus = Boolean(
-    visibleStreamStatus && latestAssistantContent.length === 0,
-  );
+  const showStreamStatus = standaloneStreamStatusVisible(messages, Boolean(visibleStreamStatus));
   const showConversationDisclaimer = shouldShowConversationDisclaimer(
     messages,
     isStreamingResponse,
@@ -2359,6 +2379,8 @@ export default function ChatInterface() {
                 conversationId &&
                 canManageConversation ? (
                 <ChatHeaderMenu
+                  conversationId={conversationId}
+                  onShare={guestExperience.receiptSharing.request}
                   isOpen={showChatOptions}
                   onToggleOpen={() => setShowChatOptions(!showChatOptions)}
                   onRequestClose={closeChatOptions}
@@ -2453,11 +2475,12 @@ export default function ChatInterface() {
                             message={msg}
                             onAction={handleAction}
                             onDirectEdit={handleDirectEditConfirmation}
+                            onToolRecompute={(card, changes) => handleToolRecompute(msg.id, card, changes)}
                             onFeedback={(type, context, rating) => {
                               void handleMessageFeedback(type, context, rating);
                             }}
                             onToast={showToast}
-                            isLatest={isLatestAi}
+                            isLatest={isLatestAi} latestMessageId={messages.at(-1)?.id}
                             isStreaming={isWorkingMessage}
                             conversationId={conversationId}
                             memoryProposalEnabled={memoryChrome.proposalEnabled}
@@ -2494,6 +2517,7 @@ export default function ChatInterface() {
                         </span>
                       </div>
                     )}
+                    <FeedbackAsk conversationId={conversationId} messages={messages} answerArriving={isStreamingResponse} enabled={canSubmitFeedback} onToast={showToast} onTellUsMore={(context) => setFeedbackState(openFeedbackDialogState("general", context, undefined, conversationId))} />
                     <div ref={latestActivitySentinelRef} data-testid="latest-activity-sentinel" className="h-px" aria-hidden="true" />
                     <div ref={bottomRef} className="h-28" aria-hidden="true" />
                   </div>
@@ -2536,24 +2560,6 @@ export default function ChatInterface() {
           </div>
         )}
 
-        {currentView === "settings" && (
-          <SettingsView
-            onClose={() => setCurrentView("chat")}
-            onLogout={() => {
-              void handleLogout();
-            }}
-            onHistoryMutated={refreshHistory}
-            onFeedback={(type, context) => {
-              setFeedbackState({
-                isOpen: true,
-                type,
-                context: { ...context, conversation_id: conversationId },
-              });
-              setIsSidebarOpen(false);
-            }}
-          />
-        )}
-
         <ChatToast
           message={toast?.message ?? null}
           variant={toast?.variant}
@@ -2570,6 +2576,7 @@ export default function ChatInterface() {
         context={feedbackState.context}
       />
       <GuestExperienceSurfaces experience={guestExperience} />
+      {evidenceReceiptSharingEnabled && guestExperience.receiptSharing.target && <ShareReceiptPanel key={guestExperience.receiptSharing.target.conversationId} {...guestExperience.receiptSharing.target} onClose={guestExperience.receiptSharing.close} />}
       {isSidebarPreferenceModalOpen && (
         <SidebarPreferenceModal
           mode={sidebarMode}

@@ -5,6 +5,8 @@ from copy import deepcopy
 from typing import Any
 
 from argus.api.schemas import BacktestRun, Message
+from argus.domain.result_readout_content import stored_readout_metadata
+from argus.domain.result_readout_facts import result_readout_config
 
 _PUBLIC_BACKTEST_JOB_KEYS = (
     "id",
@@ -38,7 +40,7 @@ def result_fact_bank(run: BacktestRun) -> dict[str, Any]:
         "symbols": list(run.symbols),
         "benchmark_symbol": run.benchmark_symbol,
         "metrics": deepcopy(run.metrics),
-        "config_snapshot": deepcopy(run.config_snapshot),
+        "config_snapshot": result_readout_config(run.config_snapshot),
         "result_card": deepcopy(run.conversation_result_card),
         "context_packets": deepcopy(context_packets)
         if isinstance(context_packets, list)
@@ -83,6 +85,7 @@ def hydrate_completed_backtest_job_messages(
         next_metadata = dict(metadata)
         next_metadata.update(
             {
+                **stored_readout_metadata(run.conversation_result_card),
                 "conversation_mode": "result_review",
                 "agent_runtime_stage_outcome": "ready_to_respond",
                 "backtest_job": _public_backtest_job(job),
@@ -95,6 +98,20 @@ def hydrate_completed_backtest_job_messages(
                 "result_fact_bank": result_fact_bank(run),
             }
         )
+        bound_cards = run.conversation_result_card.get("tool_result_cards")
+        if isinstance(bound_cards, list) and bound_cards:
+            from argus.domain.tool_contracts import ToolResultCard
+
+            completed_cards = [
+                ToolResultCard.model_validate(card).model_dump(mode="json")
+                for card in bound_cards
+            ]
+            completed_call_ids = {card["call_id"] for card in completed_cards}
+            next_metadata["tool_result_cards"] = [
+                card
+                for card in metadata.get("tool_result_cards", [])
+                if card.get("call_id") not in completed_call_ids
+            ] + completed_cards
         readout = _result_readout(job)
         next_experiments = _job_next_experiments(job)
         if next_experiments is not None:

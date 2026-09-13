@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -19,6 +19,8 @@ from argus.agent_runtime.state.models import (
     UnsupportedConstraint,
     UserState,
 )
+from argus.domain.market_data.capabilities import EASTERN
+from argus.domain.market_data.new_york_clock import new_york_today
 
 
 @dataclass(frozen=True)
@@ -3593,17 +3595,18 @@ def test_refine_strategy_result_action_preserves_result_parameters_without_llm()
 def test_result_followup_date_patch_routes_to_confirmation_without_guidance(
     monkeypatch,
 ) -> None:
-    from argus.agent_runtime.stages import interpret_actions as action_module
+    from argus.agent_runtime import result_followup_answers as answers_module
+    from argus.agent_runtime.result_conversation import ResultConversationAnswer
 
     called: list[dict[str, Any]] = []
 
-    async def _unexpected_followup(**kwargs: object) -> str:
+    async def _unexpected_followup(**kwargs: object) -> ResultConversationAnswer:
         called.append(dict(kwargs))
-        return "Try next: change the date range."
+        return ResultConversationAnswer(text="Try next: change the date range.")
 
     monkeypatch.setattr(
-        action_module,
-        "_compose_result_followup_with_timeout",
+        answers_module,
+        "compose_result_conversation_answer",
         _unexpected_followup,
     )
     reference = ArtifactReference(
@@ -3673,8 +3676,9 @@ def test_result_followup_date_patch_routes_to_confirmation_without_guidance(
 
 
 def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -> None:
+    from argus.agent_runtime import result_followup_answers as answers_module
+    from argus.agent_runtime.result_conversation import ResultConversationAnswer
     from argus.agent_runtime.stages import interpret as interpret_module
-    from argus.agent_runtime.stages import interpret_actions as action_module
 
     monkeypatch.setattr(
         interpret_module,
@@ -3682,12 +3686,12 @@ def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -
         lambda symbol: ResolvedAssetStub(symbol.upper(), "equity"),
     )
 
-    async def _bad_followup(**_: object) -> str:
-        return "Try next: change the date range."
+    async def _bad_followup(**_: object) -> ResultConversationAnswer:
+        return ResultConversationAnswer(text="Try next: change the date range.")
 
     monkeypatch.setattr(
-        action_module,
-        "_compose_result_followup_with_timeout",
+        answers_module,
+        "compose_result_conversation_answer",
         _bad_followup,
     )
     pending = StrategySummary(
@@ -3737,14 +3741,15 @@ def test_pending_refinement_blocks_latest_result_followup_capture(monkeypatch) -
 
 
 def test_latest_result_followup_requires_validated_artifact_target(monkeypatch) -> None:
-    from argus.agent_runtime.stages import interpret_actions as action_module
+    from argus.agent_runtime import result_followup_answers as answers_module
+    from argus.agent_runtime.result_conversation import ResultConversationAnswer
 
-    async def _grounded_followup(**_: object) -> str:
-        return "This answer used the latest result facts."
+    async def _grounded_followup(**_: object) -> ResultConversationAnswer:
+        return ResultConversationAnswer(text="This answer used the latest result facts.")
 
     monkeypatch.setattr(
-        action_module,
-        "_compose_result_followup_with_timeout",
+        answers_module,
+        "compose_result_conversation_answer",
         _grounded_followup,
     )
 
@@ -4540,21 +4545,16 @@ def test_fresh_complete_restatement_route_repair_handles_different_benchmark(
 )
 def test_future_end_date_blocks_confirmation_before_run(
     monkeypatch,
+    freeze_new_york_clock,
     asset: str,
     baseline: str,
     start: str,
     end: str,
     message: str,
 ) -> None:
-    from argus.agent_runtime import strategy_contract as strategy_contract_module
     from argus.agent_runtime.stages import interpret as interpret_module
 
-    class FrozenDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 6, 1)
-
-    monkeypatch.setattr(strategy_contract_module, "date", FrozenDate)
+    freeze_new_york_clock(datetime(2026, 6, 1, 20, 17, tzinfo=EASTERN))
     monkeypatch.setattr(
         interpret_module,
         "resolve_asset",
@@ -6258,11 +6258,11 @@ def test_stated_run_fidelity_audit_skips_aligned_focused_repair_capital() -> Non
             strategy_thesis="Backtest TSLA when the 50 SMA crosses the 200 SMA.",
             asset_universe=["TSLA"],
             asset_class="equity",
-            date_range={"start": "2022-01-01", "end": date.today().isoformat()},
+            date_range={"start": "2022-01-01", "end": new_york_today().isoformat()},
             date_range_intent=LLMDateRangeIntent(
                 kind="explicit_range",
                 start="2022-01-01",
-                end=date.today().isoformat(),
+                end=new_york_today().isoformat(),
                 evidence="from January 2022 to today",
             ),
             capital_amount=10000,

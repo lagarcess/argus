@@ -38,6 +38,30 @@ export function layoutsEqual(a: ResponsiveLayout, b: ResponsiveLayout): boolean 
   );
 }
 
+let browserLayout = DESKTOP_LAYOUT;
+
+/** Stable external-store snapshot: later client mounts read the current band. */
+export function responsiveLayoutSnapshot(): ResponsiveLayout {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return DESKTOP_LAYOUT;
+  }
+  const next = {
+    isBelowTablet: window.matchMedia(BELOW_TABLET_QUERY).matches,
+    isBelowDesktop: window.matchMedia(BELOW_DESKTOP_QUERY).matches,
+  };
+  if (!layoutsEqual(browserLayout, next)) browserLayout = next;
+  return browserLayout;
+}
+
+export function subscribeResponsiveLayout(onChange: () => void): () => void {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return () => {};
+  }
+  const queries = [BELOW_TABLET_QUERY, BELOW_DESKTOP_QUERY].map((query) => window.matchMedia(query));
+  queries.forEach((query) => query.addEventListener("change", onChange));
+  return () => queries.forEach((query) => query.removeEventListener("change", onChange));
+}
+
 export type ViewportBand = "narrow" | "wide";
 
 /**

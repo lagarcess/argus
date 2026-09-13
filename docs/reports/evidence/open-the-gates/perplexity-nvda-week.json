@@ -1,0 +1,343 @@
+{
+  "label": "nvda-week",
+  "question": "why is NVIDIA stock moving this week?",
+  "asked_at": "2026-09-10T00:22:05.546365+00:00",
+  "source": "Perplexity Agent API, question as typed, no Argus instructions or schema",
+  "request": {
+    "models": [
+      "openai/gpt-5.6-sol"
+    ],
+    "input": "why is NVIDIA stock moving this week?",
+    "tools": [
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "web_search"
+      }
+    ],
+    "max_steps": 5
+  },
+  "http_status": 200,
+  "elapsed_seconds": 21.74,
+  "answer_text": "NVIDIA (NVDA) is **down 2.90% this week through Wednesday’s close**, falling from **$230.36 Friday to $223.67 Wednesday**. The U.S. market was closed Monday for Labor Day.\n\nThe move appears driven by several factors rather than one major negative announcement:\n\n- **Profit-taking near record highs.** NVDA entered the week close to its May record after gaining strongly the previous week, encouraging investors to lock in gains.\n- **Positioning ahead of today’s Goldman Sachs conference.** Investors are waiting for Jensen Huang’s comments on AI demand, margins, China exposure, and the Vera Rubin rollout at the [Goldman Sachs Communacopia + Technology Conference](https://finance.yahoo.com/markets/stocks/articles/dear-nvidia-stock-fans-mark-194239279.html).\n- **Renewed skepticism about AI spending economics.** Short seller Jim Chanos questioned GPU-rental returns, while concerns about “circular financing”—chip suppliers investing in customers that then buy their hardware—have resurfaced.\n- **Competition concerns.** Alternative AI chips and custom silicon from companies such as Qualcomm and large cloud providers are keeping valuation concerns in focus.\n- **Insider selling.** Director Mark Stevens reportedly sold more than 1 million shares in early September. Such sales may be preplanned, but their size can weigh on sentiment near record levels.\n- **Ex-dividend adjustment.** NVDA trades ex-dividend today, September 10, for a **$0.25 dividend**. In isolation, that mechanically reduces the share price by $0.25 at the opening.\n\nImportantly, Wednesday’s trading volume was **79,204,871 shares**, below the **134,578,656-share average**, so the decline does not look like heavy, broad-based liquidation.\n\n**Bottom line:** This week’s weakness looks primarily like consolidation and event-related caution after a strong run—not evidence of a sudden deterioration in NVIDIA’s AI-chip demand. Today’s reaction will likely depend heavily on what Huang says at the Goldman conference.",
+  "tool_results": [
+    "finance_results",
+    "finance_results",
+    "search_results"
+  ],
+  "usage": {
+    "cost": {
+      "cache_creation_cost": 0.0471,
+      "cache_read_cost": 0.00602,
+      "currency": "USD",
+      "input_cost": 5e-05,
+      "output_cost": 0.02226,
+      "tool_calls_cost": 0.0125,
+      "tool_calls_cost_details": {
+        "finance_search": 0.01,
+        "search_web": 0.0025
+      },
+      "total_cost": 0.08793
+    },
+    "input_tokens": 24490,
+    "input_tokens_details": {
+      "cache_creation_input_tokens": 9419,
+      "cache_read_input_tokens": 15059,
+      "cached_tokens": 15059
+    },
+    "output_tokens": 1113,
+    "output_tokens_details": {
+      "reasoning_tokens": 478
+    },
+    "tool_calls_details": {
+      "finance_search": {
+        "cost_usd": 0.01,
+        "invocation": 2
+      },
+      "search_web": {
+        "cost_usd": 0.0025,
+        "invocation": 1
+      }
+    },
+    "total_tokens": 25603
+  },
+  "response": {
+    "background": false,
+    "completed_at": 1788999703,
+    "created_at": 1788999703,
+    "error": null,
+    "frequency_penalty": 0,
+    "id": "resp_118c4489-c8be-47a0-b3c4-4caebd0dbc63",
+    "incomplete_details": null,
+    "instructions": null,
+    "max_output_tokens": null,
+    "max_tool_calls": null,
+    "metadata": {},
+    "model": "openai/gpt-5.6-sol",
+    "object": "response",
+    "output": [
+      {
+        "name": "finance",
+        "type": "skill_loaded"
+      },
+      {
+        "categories": [
+          "tickers_lookup"
+        ],
+        "results": [
+          {
+            "category": "tickers_lookup",
+            "content": "Ticker matches:\n\n| query | ticker | name |\n| --- | --- | --- |\n| NVIDIA | NVDA | NVIDIA Corporation |",
+            "tickers": null
+          }
+        ],
+        "tickers": null,
+        "type": "finance_results"
+      },
+      {
+        "categories": [
+          "quote"
+        ],
+        "results": [
+          {
+            "category": "quote",
+            "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open. Volume fields are raw share counts (crypto: token units).\n| symbol | name | timestamp | fetched_at | market_status | price | change | changesPercentage | previousClose | volume | avgVolume | dayLow | dayHigh | afterHoursPrice | afterHoursChange | afterHoursPercentChange |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-09 20:00:00 UTC | 2026-09-10 00:21:52 UTC | after_hours | 223.67 | -2.06 | -0.91 | 225.73 | 79,204,871 | 134,578,656 | 223.47 | 226.18 | 223.67 | -0.00 | -0 |\n\nData available in: `NVDA_quotes_95fedb.csv` (row key column: symbol)",
+            "sources": [
+              "https://www.perplexity.ai/finance/NVDA"
+            ],
+            "tickers": [
+              "NVDA"
+            ]
+          }
+        ],
+        "tickers": [
+          "NVDA"
+        ],
+        "type": "finance_results"
+      },
+      {
+        "queries": [
+          "NVIDIA stock September 10 2026 news",
+          "NVDA stock moving this week September 2026",
+          "NVIDIA shares September 9 2026 catalyst"
+        ],
+        "results": [
+          {
+            "date": "2026-08-04",
+            "id": 1,
+            "last_updated": "2026-09-09",
+            "snippet": "Dividend\nNVDA announced a cash dividend of $0.25 with an ex-date of Sep. 10, 2026\nAll News Earnings Calls Press Releases SEC Filings",
+            "source": "web",
+            "title": "NVIDIA Corporation (NVDA) Latest Stock News & Headlines",
+            "url": "https://finance.yahoo.com/quote/NVDA/news/"
+          },
+          {
+            "date": "2026-09-08",
+            "id": 2,
+            "last_updated": "2026-09-09",
+            "snippet": "- NVDA\n-2.01%\n...\nIts fundamentals remain strong, and now another potential catalyst is coming into view.\nNvidia is set to take the stage at the Goldman Sachs Communacopia + Technology Conference on Thursday, Sept. 10. The company's executive team might discuss its corporate strategy, market demand, and financial outlook during the conference, giving investors a fresh look at how Nvidia sees the next phase of the AI boom unfolding.\n...\nNVDA stock carries a consensus \"Strong Buy\" rating, with 45 of the 50 analysts covering the company recommending a \"Strong Buy.\"\nThree analysts see it as a \"Moderate Buy,\" while just one has a \"Hold\" rating and one calls for a \"Strong Sell.\"\nAnd the upside Wall Street sees is anything but modest.\nThe average price target of $325.17 points to about 44% potential upside, while the Street-high target of $515 suggests Nvidia could rally as much as 128% from current levels.",
+            "source": "web",
+            "title": "Dear Nvidia Stock Fans, Mark Your Calendars for September 10",
+            "url": "https://finance.yahoo.com/markets/stocks/articles/dear-nvidia-stock-fans-mark-194239279.html"
+          },
+          {
+            "date": "2026-09-05",
+            "id": 3,
+            "last_updated": "2026-09-09",
+            "snippet": "- NVDA\n-0.91%\n**What happened:** Nvidia (NVDA) stock rose as much as 2% on Friday before giving up some of its gains, putting the stock within striking distance of a new record high.\n...\nThe stock closed at $230.36, just shy of its record high of $235.74 on May 14.\n...\n223.67 -2.06 (-0.91%)",
+            "source": "web",
+            "title": "Nvidia stock moves closer to all-time high - Yahoo Finance",
+            "url": "https://finance.yahoo.com/markets/article/nvidia-stock-moves-closer-to-all-time-high-193309793.html"
+          },
+          {
+            "date": "2026-08-04",
+            "id": 4,
+            "last_updated": "2026-09-09",
+            "snippet": "224.29 -1.44 (-0.64%)\nAs of 10:39:05 AM EDT.\nMarket Open.\n...\nDividend\nNVDA announced a cash dividend of $0.25 with an ex-date of Sep. 10, 2026\n(NVDA)\n...\nNvidia continues to dominate the AI market, with analysts projecting strong growth and strategic acquisitions.\nRecent reports highlight significant revenue increases and optimistic forecasts for the company's future performance, despite some market concerns.",
+            "source": "web",
+            "title": "NVIDIA Corporation (NVDA) Stock Price, News, Quote & ...",
+            "url": "https://finance.yahoo.com/quote/NVDA/latest-news/"
+          },
+          {
+            "date": "2026-09-09",
+            "id": 5,
+            "last_updated": "2026-09-09",
+            "snippet": "224.22 -1.51 (-0.67%)\n...\nDividend\nNVDA announced a cash dividend of $0.25 with an ex-date of Sep. 10, 2026\nChart Range Bar\n...\n- Ex-Dividend Date Sep 10, 2026",
+            "source": "web",
+            "title": "NVIDIA Corporation (NVDA) Stock Price, News, Quote & ...",
+            "url": "https://finance.yahoo.com/quote/NVDA/"
+          },
+          {
+            "date": "2026-09-09",
+            "id": 6,
+            "last_updated": "2026-09-09",
+            "snippet": "Last Updated: Sep 9, 2026 4:00 p.m.\nEDTReal time quote\n## $ 223.67\n** -2.06 -0.91%\n...\n|$225.73|\n...\n- Ex-Dividend Date Sep 10, 2026\n...\nengages in the design and manufacture of computer graphics processors, chipsets, and related multimedia software.",
+            "source": "web",
+            "title": "NVIDIA Corp. Stock Quote (U.S. - NVDA - MarketWatch",
+            "url": "https://www.marketwatch.com/investing/stock/nvda"
+          },
+          {
+            "date": "2026-09-05",
+            "id": 7,
+            "last_updated": "2026-09-09",
+            "snippet": "NVDA: 224.06 -1.67 (-0.74%)\n...\nLast | 10:03 AM EDT\n224.06-1.67 (-0.74%)\n...\n### EVENTS\n- Earnings Date11/20/2026(est)\n- Ex Div Date09/10/2026\n- Div Amount0.25\n- Split Date-\n...\n## Content From Our Affiliates\n- Jim Chanos Challenges Nvidia GPU Rental Economics as H100 Rates Jump 22%42 Min AgoTipRanks\n- U.S. Says China Is Using American AI Models to Close the AI Gap1 Hour AgoTipRanks\n- Notable open interest changes for September 9th1 Hour AgoTipRanks\n- HP Inc.\ncollaborates with Red Hat, Nvidia to deliver enterprise AI platform2 Hours AgoTipRanks\n- Broadcom (AVGO) Is Storming the AI Market.\nI’m Bullish2 Hours AgoTipRanks\n...\n|SYMBOL|LAST|CHG|%CHG|\n...\n|NVDA|223.93|-1.80|-0.7974|",
+            "source": "web",
+            "title": "NVDA: NVIDIA Corporation - Stock Price, Quote and News",
+            "url": "https://www.cnbc.com/quotes/NVDA"
+          },
+          {
+            "date": "2026-09-04",
+            "id": 8,
+            "last_updated": "2026-09-06",
+            "snippet": "**What happened:** Nvidia (NVDA) stock rose as much as 2% on Friday before giving up some of its gains, putting the stock within striking distance of a new record high.\n**What's behind the move: ** Nvidia extended its advance from the previous session as AI-related semiconductor stocks continued to climb.\nThe stock closed at $230.36, just shy of its record high of $235.74 on May 14.\n...\nMeanwhile, on Thursday, Nvidia announced the acquisition of open-weight AI model hub, Hugging Face, for nearly $13 billion.\n...\n- NVDA NVIDIA Corporation 230.36+1.91(+0.84%)",
+            "source": "web",
+            "title": "Nvidia stock extends gains to hover near all-time highs",
+            "url": "https://finance.yahoo.com/markets/article/nvidia-stock-extends-gains-to-hover-near-all-time-highs-193309793.html"
+          },
+          {
+            "date": "2026-09-04",
+            "id": 9,
+            "last_updated": "2026-09-08",
+            "snippet": "**What happened:** Nvidia (NVDA) stock rose as much as 2% on Friday before giving up some of its gains, putting the stock within striking distance of a new record high.\n...\nThe stock closed at $230.36, just shy of its record high of $235.74 on May 14.\n...\nMeanwhile, on Thursday, Nvidia announced the acquisition of open-weight AI model hub, Hugging Face, for nearly $13 billion.",
+            "source": "web",
+            "title": "Nvidia drops nearly 5%, leading chip stocks lower amid ...",
+            "url": "https://finance.yahoo.com/markets/article/nvidia-drops-nearly-5-leading-chip-stocks-lower-amid-renewed-worries-of-circular-financing-193309793.html"
+          },
+          {
+            "date": "2026-09-04",
+            "id": 10,
+            "last_updated": "2026-09-05",
+            "snippet": "Nvidia recovered from a stock slump on Monday and ended the week up 6.8 percent at $232.24, buoyed by the acquisition of open-source provider Hugging Face finalized on Friday.\n...\n**Nvidia: +6.8% to $232.24**\nThe week began for Nvidia with a setback: on Monday, the chip company invested $3.5 billion in convertible bonds of partner MediaTek – a bond investors can later exchange for shares.\nNvidia stock closed nearly five percent lower at $217.55, as investors again feared circular financing structures in the AI industry, according to Bloomberg.\nThe stock turned around over the course of the week: on Friday, Nvidia sealed the purchase of Hugging Face for $12.93 billion, after reports had put the price at around $14 billion in between.\nThe same day, it emerged that Nvidia’s equity portfolio in other companies had grown to $99 billion within twelve months.\nThe stock now trades just below its 52-week high of $235.74.\n...\nNext week, Nvidia and MediaTek are set to close their convertible bond (September 8), and on September 16 the Fed decides on interest rates.",
+            "source": "web",
+            "title": "AI Stock Week: Nvidia Recovers 6.8 Percent to $232 · Beckmann",
+            "url": "https://beckmann.ai/en/ai-economy/2026-09/ai-stock-week-nvidia-rate-fears"
+          },
+          {
+            "date": "2026-09-05",
+            "id": 11,
+            "last_updated": "2026-09-08",
+            "snippet": "+0.84%\n...\nYet **Nvidia **(NASDAQ: NVDA) stock has gained ground in seven of the past 10 Septembers, with a median return of about 1.5%.",
+            "source": "web",
+            "title": "Jensen Huang Just Sent a Signal That Could Matter More ...",
+            "url": "https://finance.yahoo.com/markets/stocks/articles/jensen-huang-just-sent-signal-091400657.html"
+          },
+          {
+            "date": "2026-09-09",
+            "id": 12,
+            "last_updated": "2026-09-09",
+            "snippet": "Nvidia stock closed at USD 225.73 on September 8, 2026, about 4.6% below its USD 236.54 all-time high as investors await Jensen Huang's Goldman Sachs fireside chat on September 10.\nThe company recently reported USD 96 billion in quarterly revenue, up 106% year over year, and guided to USD 108 billion for the current quarter.\nNvidia Corporation stock (ISIN US67066G1040) closed at USD 225.73 on Nasdaq on September 8, 2026, leaving the shares about 4.6% below their all-time high of USD 236.54 ahead of a closely watched Goldman Sachs fireside chat with CEO Jensen Huang on September 10, 2026.Invezz For investors, the stock's proximity to its record high and the upcoming AI-focused appearance create a clear near-term catalyst.\n...\nAccording to Invezz on September 9, 2026, Jensen Huang is scheduled to participate in a fireside chat at Goldman Sachs' Communacopia + Technology Conference on September 10, 2026, at 8:50 a.m.\nPacific Time, with the discussion expected to focus on AI demand, enterprise adoption and Nvidia's next-generation hardware.\nThe same report notes that Nvidia stock closed at USD 225.73 on September 8, 2026, down 2.01 percent on the day, and that this closing level left the shares roughly 4.6 percent below the all-time high of USD 236.54.Invezz This quantified gap to the record offers a concrete benchmark for how investors may judge the impact of any new guidance or AI commentary from Huang.",
+            "source": "web",
+            "title": "Nvidia stock edges lower ahead Goldman AI fireside chat",
+            "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-edges-lower-ahead-goldman-ai-fireside-chat/70075275"
+          },
+          {
+            "date": "2026-09-09",
+            "id": 13,
+            "last_updated": "2026-09-09",
+            "snippet": "NVIDIA (NVDA) News Today $223.67 -2.06 (-0.91%) Closing price 04:00 PM EasternExtended Trading$223.53 -0.14 (-0.06%) As of 07:46 PM Eastern Extended trading is trading that happens on electronic markets outside of regular trading hours.\n...\nNVIDIA Corporation (NASDAQ: NVDA) is facing mixed investor signals.\nShares have decreased as investors weigh profit-taking, insider selling and competition against strong AI infrastructure demand, new customer commitments and upcoming catalysts.\nPositive Sentiment: NVIDIA’s AI infrastructure expansion received a potential boost from a reported $3.1 billion Indonesia deal, which could broaden its international data-center and AI deployment pipeline.\nNvidia Expands AI Infrastructure Push With Indonesia Deal Positive Sentiment: OpenAI reportedly plans to spend approximately $750 billion on compute infrastructure through 2030 and remains capacity-constrained, reinforcing the long-term demand outlook for NVIDIA’s GPUs and networking products.\n...\nJensen Huang on NVIDIA Chip Rental Economics Positive Sentiment: NVIDIA is also extending its ecosystem through investments in Verily Health and a reported $12.9 billion Hugging Face transaction, strengthening potential exposure to healthcare AI, open-source models and software.\nVerily Health Investment Neutral Sentiment: CEO Jensen Huang’s scheduled September 10 fireside chat at Goldman Sachs’ Communacopia + Technology Conference is a near-term catalyst.\nInvestors may seek updates on demand, supply, margins, China exposure and the Vera Rubin product roadmap.\nNVIDIA September 10 Catalyst Negative Sentiment: Director Mark Stevens sold a combined 1,022,239 shares worth roughly $235.6 million in early September.\nWhile planned insider sales do not necessarily indicate weaker fundamentals, their size can pressure sentiment near record highs.\nNVIDIA Director Insider Sale Negative Sentiment: Short seller Jim Chanos questioned whether GPU-rental economics can support NVIDIA’s valuation, while Qualcomm’s AI infrastructure agreement with Amazon highlights increasing competition from custom and alternative chips.\nJim Chanos Challenges NVIDIA GPU Rental Economics Negative Sentiment: Michael Burry exited his December 2026 NVIDIA put positions but retained longer-dated puts.",
+            "source": "web",
+            "title": "NVDA News Today | Why did NVIDIA stock go down today?",
+            "url": "https://www.marketbeat.com/stocks/NASDAQ/NVDA/news/"
+          },
+          {
+            "date": "2026-09-09",
+            "id": 14,
+            "last_updated": "2026-09-09",
+            "snippet": "Its fundamentals remain strong, and now another potential catalyst is coming into view.\nNvidia is set to take the stage at the Goldman Sachs Communacopia + Technology Conference on Thursday, Sept. 10. The company's executive team might discuss its corporate strategy, market demand, and financial outlook during the conference, giving investors a fresh look at how Nvidia sees the next phase of the AI boom unfolding.\n...\nNVDA stock is up 34% over the past year and 21% so far in 2026, compared with gains of 18.3% over the past year and 12.3% in 2026 for the S&P 500 Index ($SPX).\n...\nThe stock is now closing in on its all-time high of $236.54, reached on May 14, and is down just 3% from that peak.\n...\nIn its fiscal 2027 second-quarter results, published on Aug. 26, Nvidia once again delivered extraordinary growth, with revenue soaring 106% year-over-year (YoY) to $96.22 billion, compared with $46.74 billion a year earlier.\n...\nFor fiscal 2027's third quarter, the company projects revenue of $108 billion, plus or minus 2%.\n...\nWall Street's confidence in Nvidia remains hard to miss.\nNVDA stock carries a consensus \"Strong Buy\" rating, with 45 of the 50 analysts covering the company recommending a \"Strong Buy.\"\nThree analysts see it as a \"Moderate Buy,\" while just one has a \"Hold\" rating and one calls for a \"Strong Sell.\"\nAnd the upside Wall Street sees is anything but modest.\nThe average price target of $325.17 points to about 44% potential upside, while the Street-high target of $515 suggests Nvidia could rally as much as 128% from current levels.",
+            "source": "web",
+            "title": "Dear Nvidia Stock Fans, Mark Your Calendars for September 10",
+            "url": "https://www.barchart.com/story/news/4497506/dear-nvidia-stock-fans-mark-your-calendars-for-september-10"
+          },
+          {
+            "date": "2026-08-28",
+            "id": 15,
+            "last_updated": "2026-08-28",
+            "snippet": "Nvidia Corporation (US67066G1040) stock climbed after the company said revenue reached $96.2 billion in the second quarter ended July 26, 2026, while non-GAAP earnings per share came in at $2.22 and data center revenue hit $89.0 billion.\n...\nThe same release said Vera Rubin is now in full production, with racks running at partners including CoreWeave, Google Cloud, Microsoft Azure, Oracle Cloud Infrastructure and Nebius.\nIt also said NVIDIA plans to pay a quarterly cash dividend of $0.25 per share on October 1, 2026, to holders of record on September 10, 2026.",
+            "source": "web",
+            "title": "Nvidia stock climbs after $96.2 billion quarter and 70% forecast",
+            "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-climbs-after-96-2-billion-quarter-and-70-percent-forecast/70012105"
+          }
+        ],
+        "type": "search_results"
+      },
+      {
+        "content": [
+          {
+            "annotations": [],
+            "text": "NVIDIA (NVDA) is **down 2.90% this week through Wednesday’s close**, falling from **$230.36 Friday to $223.67 Wednesday**. The U.S. market was closed Monday for Labor Day.\n\nThe move appears driven by several factors rather than one major negative announcement:\n\n- **Profit-taking near record highs.** NVDA entered the week close to its May record after gaining strongly the previous week, encouraging investors to lock in gains.\n- **Positioning ahead of today’s Goldman Sachs conference.** Investors are waiting for Jensen Huang’s comments on AI demand, margins, China exposure, and the Vera Rubin rollout at the [Goldman Sachs Communacopia + Technology Conference](https://finance.yahoo.com/markets/stocks/articles/dear-nvidia-stock-fans-mark-194239279.html).\n- **Renewed skepticism about AI spending economics.** Short seller Jim Chanos questioned GPU-rental returns, while concerns about “circular financing”—chip suppliers investing in customers that then buy their hardware—have resurfaced.\n- **Competition concerns.** Alternative AI chips and custom silicon from companies such as Qualcomm and large cloud providers are keeping valuation concerns in focus.\n- **Insider selling.** Director Mark Stevens reportedly sold more than 1 million shares in early September. Such sales may be preplanned, but their size can weigh on sentiment near record levels.\n- **Ex-dividend adjustment.** NVDA trades ex-dividend today, September 10, for a **$0.25 dividend**. In isolation, that mechanically reduces the share price by $0.25 at the opening.\n\nImportantly, Wednesday’s trading volume was **79,204,871 shares**, below the **134,578,656-share average**, so the decline does not look like heavy, broad-based liquidation.\n\n**Bottom line:** This week’s weakness looks primarily like consolidation and event-related caution after a strong run—not evidence of a sudden deterioration in NVIDIA’s AI-chip demand. Today’s reaction will likely depend heavily on what Huang says at the Goldman conference.",
+            "type": "output_text"
+          }
+        ],
+        "id": "msg_5be67e22-3425-4054-afd7-5e10ba1b29a9",
+        "role": "assistant",
+        "status": "completed",
+        "type": "message"
+      }
+    ],
+    "parallel_tool_calls": true,
+    "presence_penalty": 0,
+    "previous_response_id": null,
+    "prompt_cache_key": null,
+    "reasoning": null,
+    "safety_identifier": null,
+    "service_tier": "default",
+    "status": "completed",
+    "store": true,
+    "temperature": 1,
+    "text": {
+      "format": {
+        "type": "text"
+      }
+    },
+    "tool_choice": "auto",
+    "tools": [
+      {
+        "type": "finance_search"
+      },
+      {
+        "type": "web_search"
+      }
+    ],
+    "top_logprobs": 0,
+    "top_p": 1,
+    "truncation": "",
+    "usage": {
+      "cost": {
+        "cache_creation_cost": 0.0471,
+        "cache_read_cost": 0.00602,
+        "currency": "USD",
+        "input_cost": 5e-05,
+        "output_cost": 0.02226,
+        "tool_calls_cost": 0.0125,
+        "tool_calls_cost_details": {
+          "finance_search": 0.01,
+          "search_web": 0.0025
+        },
+        "total_cost": 0.08793
+      },
+      "input_tokens": 24490,
+      "input_tokens_details": {
+        "cache_creation_input_tokens": 9419,
+        "cache_read_input_tokens": 15059,
+        "cached_tokens": 15059
+      },
+      "output_tokens": 1113,
+      "output_tokens_details": {
+        "reasoning_tokens": 478
+      },
+      "tool_calls_details": {
+        "finance_search": {
+          "cost_usd": 0.01,
+          "invocation": 2
+        },
+        "search_web": {
+          "cost_usd": 0.0025,
+          "invocation": 1
+        }
+      },
+      "total_tokens": 25603
+    },
+    "user": null
+  }
+}

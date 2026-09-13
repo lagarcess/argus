@@ -1,3 +1,5 @@
+import { resultReadoutContentFromMetadata } from "./result-readout-content";
+import { toolCardsFromMetadata, hasUnavailableToolCards } from "./tool-result-card";
 import {
   getConversationMessages,
   type ApiMessage,
@@ -17,7 +19,6 @@ import {
   unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
 } from "./chat-recovery-display";
-import { resultFactHeadingKeyFromMetadata } from "./result-followup-heading";
 import type {
   ChatActionOption,
   ChatMention,
@@ -516,15 +517,15 @@ export function hydrateTextMessageFromApi(
     role: message.role === "user" ? "user" : "ai",
     kind: "text",
     content: message.content,
+    toolResultCards: isAssistant ? toolCardsFromMetadata(metadata) : undefined,
+    hasUnavailableToolResults: isAssistant && hasUnavailableToolCards(metadata),
     mentions: mentions.length > 0 ? mentions : undefined,
     actions: actions.length > 0 ? actions : undefined,
     contentPresentation: isAssistant
       ? runtimeFailureContentPresentation(metadata, options.contentPresentation)
       : undefined,
-    resultFactHeadingKey: isAssistant
-      ? resultFactHeadingKeyFromMetadata(metadata)
-      : undefined,
     recoveryDisplay: recoveryDisplayFromMetadata(metadata),
+    resultReadoutContent: isAssistant ? resultReadoutContentFromMetadata(metadata) : undefined,
     strategyPathContext: strategyPathContextFromMetadata(metadata, message.id),
     assistantRecoveryCode: isAssistant
       ? retryableAssistantRecoveryCode(metadata.recovery)

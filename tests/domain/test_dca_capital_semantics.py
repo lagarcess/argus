@@ -26,6 +26,7 @@ from argus.domain.dca_capital import (
     dca_capital_config_fields,
     dca_capital_plan_from_config,
 )
+from argus.domain.market_data.new_york_clock import new_york_today
 
 _SOURCE_ROOT = pathlib.Path(__file__).resolve().parents[2] / "src" / "argus"
 
@@ -907,7 +908,7 @@ def test_the_committed_browser_evidence_is_what_the_confirm_stage_produces(
         evidence
     )
     assert produced["capabilities"]["edit_constraints"]["date_window"]["max_end"] == (
-        date.today().isoformat()
+        new_york_today().isoformat()
     )
     # The card the pictures vouch for has to be one a user could actually run.
     assert evidence["status"] == "ready_to_run"

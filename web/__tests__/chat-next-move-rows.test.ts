@@ -17,6 +17,10 @@ const panel = readFileSync(
   join(root, "components/chat/DiscoverySourcesPanel.tsx"),
   "utf-8",
 );
+const sourcesList = readFileSync(
+  join(root, "components/chat/ResearchSourcesList.tsx"),
+  "utf-8",
+);
 const chat = readFileSync(
   join(root, "components/chat/ChatInterface.tsx"),
   "utf-8",
@@ -252,20 +256,22 @@ describe("who retires an action", () => {
 
 describe("sources panel", () => {
   test("renders persisted sidecar evidence without re-querying", () => {
-    expect(panel).toContain("sidecar.sources.map");
+    expect(panel).toContain("sources={sidecar.sources}");
+    expect(sourcesList).toContain("sources.map");
+    expect(sourcesList).not.toContain("fetch(");
     expect(panel).not.toContain("fetch(");
     expect(panel).not.toContain("useEffect(() => {\n    void load");
   });
 
   test("links open in a new tab with no opener handle or referrer", () => {
-    expect(panel).toContain('target="_blank"');
-    expect(panel).toContain('rel="noopener noreferrer"');
+    expect(sourcesList).toContain('target="_blank"');
+    expect(sourcesList).toContain('rel="noopener noreferrer"');
   });
 
   test("the visible domain comes from the href being opened, not the provider title", () => {
-    const link = panel.slice(
-      panel.indexOf("href={source.url}"),
-      panel.indexOf("</a>"),
+    const link = sourcesList.slice(
+      sourcesList.indexOf("href={source.url}"),
+      sourcesList.indexOf("</a>"),
     );
     expect(link).toContain("{source.domain}");
     // A title may be absent or misleading; the domain always renders.

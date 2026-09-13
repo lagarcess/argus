@@ -32,6 +32,7 @@ _AUTHORITATIVE_ARTIFACT_KEYS = {
     "latest_run_id",
     "result_card",
     "result_run_id",
+    "tool_result_cards",
 }
 _RUNTIME_FAILURE_SUPERSEDED_KEY = "agent_runtime_failure_superseded"
 

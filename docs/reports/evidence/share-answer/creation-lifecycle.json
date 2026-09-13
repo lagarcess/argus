@@ -1,0 +1,106 @@
+{
+  "records": [
+    {
+      "case": "research-en-focused-created",
+      "selected": 1,
+      "kind": "research_answer",
+      "public_path": "/r/amnz0w_LKZTlgqAxmFPJbULhXxRLcBfQ",
+      "preview_status": 200,
+      "create_status": 200,
+      "requests": [
+        {
+          "phase": "preview",
+          "method": "POST"
+        },
+        {
+          "phase": "publish",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "case": "research-en-focused-reused",
+      "selected": 1,
+      "kind": "research_answer",
+      "public_path": "/r/amnz0w_LKZTlgqAxmFPJbULhXxRLcBfQ",
+      "preview_status": 200,
+      "create_status": 200,
+      "requests": [
+        {
+          "phase": "preview",
+          "method": "POST"
+        },
+        {
+          "phase": "publish",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "case": "research-en-focused-reshared",
+      "selected": 1,
+      "kind": "research_answer",
+      "public_path": "/r/jZ_wvymb9V35DLWZHRtUcnSg6DbnFkh3",
+      "preview_status": 200,
+      "create_status": 200,
+      "requests": [
+        {
+          "phase": "preview",
+          "method": "POST"
+        },
+        {
+          "phase": "publish",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "case": "research-es-419-created",
+      "selected": 1,
+      "kind": "research_answer",
+      "public_path": "/r/Is22yuwUqhDNMW9aEkaGa5GK_wWtnKuJ",
+      "preview_status": 200,
+      "create_status": 200,
+      "requests": [
+        {
+          "phase": "preview",
+          "method": "POST"
+        },
+        {
+          "phase": "publish",
+          "method": "POST"
+        }
+      ]
+    },
+    {
+      "case": "mixed-four-after-dca-fix",
+      "selected": 4,
+      "kind": "mixed",
+      "public_path": "/r/Ya5-LEwh_K-l7r5x_DCzsGpMeU7Nu7XG",
+      "preview_status": 200,
+      "create_status": 200,
+      "requests": [
+        {
+          "phase": "preview",
+          "method": "POST"
+        },
+        {
+          "phase": "publish",
+          "method": "POST"
+        }
+      ]
+    }
+  ],
+  "live_selection_reuses_record_after_fresh_validation": true,
+  "manual_revoke_then_share_creates_new_record": true,
+  "old_link_remains_tombstoned": true,
+  "private_record_and_source_ids_omitted": true,
+  "dca_correction": {
+    "old_snapshot_revoked_through_settings": true,
+    "new_snapshot_created_through_header": true,
+    "record_identity_changed": true,
+    "stored_snapshot_not_rewritten": true,
+    "old_public_path": "/r/EcELtMFZ4oHk3Duf1IpzhYV1MrzsVGoZ",
+    "revoke_status": 200
+  }
+}

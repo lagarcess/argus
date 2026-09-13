@@ -1,0 +1,64 @@
+{
+  "state": "spend_stop",
+  "command": [
+    "poetry",
+    "run",
+    "pytest",
+    "tests/evals/test_measurement_eval_live.py",
+    "-q"
+  ],
+  "shas": {
+    "baseline": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+    "candidate": "df7aee12955f667e31057464d62c72287fb12247"
+  },
+  "combined_limit_usd": 3.5,
+  "environment": {
+    "PATH": "/Users/garces/.codex/worktrees/eca1/private-alpha-next/.venv/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "HOME": "/Users/garces",
+    "VIRTUAL_ENV": "/Users/garces/.codex/worktrees/eca1/private-alpha-next/.venv",
+    "PYTHONPATH": "src:web:/private/tmp/argus-promotion-20260912-eval-control",
+    "PYTEST_PLUGINS": "promotion_observer",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1",
+    "NUMBA_CACHE_DIR": "/private/tmp/argus-promotion-20260912-eval-control/numba-cache",
+    "ARGUS_RUN_LIVE_EVALS": "1",
+    "ARGUS_EVAL_ENV_FILE": "/Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/.env",
+    "ARGUS_MARKET_DATA_PROVIDER_MODE": "live_provider",
+    "ARGUS_ASSET_PROVIDER_MODE": "live_provider"
+  },
+  "observer_sha256": "10a63f591b691b32996b300db84bb71dae2575092feb68899e4cc021629b63a3",
+  "runs": {
+    "baseline": {
+      "preflight": {
+        "argus_import_local": true,
+        "all_imported_argus_modules_local": true,
+        "cases": 62,
+        "user_turns": 73
+      },
+      "pid": 50520,
+      "started_at": 1789267913.619273,
+      "exit_code": 1,
+      "finished_at": 1789270552.134825
+    },
+    "candidate": {
+      "preflight": {
+        "argus_import_local": true,
+        "all_imported_argus_modules_local": true,
+        "cases": 71,
+        "user_turns": 84
+      },
+      "pid": 53524,
+      "started_at": 1789270552.139616,
+      "exit_code": -15,
+      "finished_at": 1789272427.687555
+    }
+  },
+  "reported_cost_usd": 2.7352358294,
+  "cost_by_side": {
+    "baseline": 1.390784977984,
+    "candidate": 1.344450851416
+  },
+  "unpriced_non_skipped_receipts": 34,
+  "unbilled_and_unpriced_guard_reserve_usd": 0.78,
+  "active_side": "candidate"
+}

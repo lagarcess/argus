@@ -1,0 +1,430 @@
+{
+  "label": "rerun-regressed-b7bdca4e",
+  "tree": "/Users/garces/Documents/projects/repos/argus/.claude/worktrees/scout-loop-extraction-cost-a90464",
+  "candidate_sha": "b7bdca4e9335131b85d43acdb97a543f9fc3c357",
+  "market_data_provider_mode": "live_provider",
+  "asset_provider_mode": "live_provider",
+  "captured_at": "2026-09-11T09:24:15.387708+00:00",
+  "records": [
+    {
+      "id": "asset_discovery_comparison_anchor_english_issue_244",
+      "status": "passed",
+      "failed_checks": [],
+      "infrastructure_errors": [],
+      "semantic_turn_act": "asset_discovery",
+      "intent": "conversation_followup",
+      "result_followup_focus": null,
+      "reason_codes": null,
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "next_experiment_kinds": [],
+      "recovery_code": null,
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00028985
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.01630215
+        },
+        {
+          "task": "discovery_model_knowledge",
+          "schema": "discovery_model_knowledge",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0011696
+        },
+        {
+          "task": "discovery_voicing",
+          "schema": null,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 4.545e-05
+        },
+        {
+          "task": "chat_composer",
+          "schema": "ArgusProseJudgeResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 5.43921e-05
+        }
+      ],
+      "billed_cost_usd": 0.017861
+    },
+    {
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "status": "failed",
+      "failed_checks": [
+        "semantic_turn_act: expected 'asset_discovery', got None",
+        "asset_discovery: expected payload {'relationship': 'category', 'anchor_symbols': [], 'asset_class_hint': 'crypto', 'category_description_includes_any': ['trend', 'crypto'], 'needs_current_facts': True}, got None",
+        "offered.actionable: nothing the user can act on reached the turn (offered={'response': True, 'launch_payload': {}, 'clarification': {}, 'discovery_symbols': [], 'next_experiment_kinds': [], 'recovery_option_ids': [], 'recovery_code': 'interpreter_unavailable', 'named_unavailable': [], 'dropped_not_named': [], 'actionable': False})",
+        "offered.min_discovery_rows: expected at least 1, got 0 ([])",
+        "offered.names_unavailable: the turn offered nothing the user can act on and did not name what it found and could not use"
+      ],
+      "infrastructure_errors": [],
+      "semantic_turn_act": null,
+      "intent": "conversation_followup",
+      "result_followup_focus": null,
+      "reason_codes": null,
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "next_experiment_kinds": [],
+      "recovery_code": "interpreter_unavailable",
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0002136
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError",
+          "usage_cost_usd": null
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "failed",
+          "failure_mode": "ValidationError",
+          "usage_cost_usd": null
+        },
+        {
+          "task": "interpretation_repair",
+          "schema": "FocusedStrategyExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00482435
+        },
+        {
+          "task": "interpretation_repair",
+          "schema": "FocusedStrategyExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.006407
+        },
+        {
+          "task": "chat_composer",
+          "schema": "ArgusProseJudgeResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 5.266e-05
+        }
+      ],
+      "billed_cost_usd": 0.011498
+    },
+    {
+      "id": "capability_honesty_options_straddle_tsla",
+      "status": "passed",
+      "failed_checks": [],
+      "infrastructure_errors": [],
+      "semantic_turn_act": "unsupported_request",
+      "intent": "unsupported_or_out_of_scope",
+      "result_followup_focus": null,
+      "reason_codes": null,
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply"
+      ],
+      "next_experiment_kinds": [],
+      "recovery_code": null,
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0002886
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.01738215
+        },
+        {
+          "task": "interpretation",
+          "schema": "DcaContractAudit",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0027056
+        },
+        {
+          "task": "interpretation",
+          "schema": "DcaContractAudit",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00279
+        },
+        {
+          "task": "interpretation_repair",
+          "schema": "FocusedDateWindowExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00249185
+        },
+        {
+          "task": "clarification",
+          "schema": "ClarificationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00018054
+        },
+        {
+          "task": "chat_composer",
+          "schema": "ArgusProseJudgeResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 5.3088e-05
+        }
+      ],
+      "billed_cost_usd": 0.025892
+    },
+    {
+      "id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "status": "passed",
+      "failed_checks": [],
+      "infrastructure_errors": [],
+      "semantic_turn_act": "new_idea",
+      "intent": "backtest_execution",
+      "result_followup_focus": null,
+      "reason_codes": null,
+      "stage_outcomes": [
+        "needs_clarification",
+        "await_user_reply",
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "next_experiment_kinds": [],
+      "recovery_code": null,
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0002986
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError",
+          "usage_cost_usd": null
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0120321
+        },
+        {
+          "task": "clarification",
+          "schema": "ClarificationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00027695
+        },
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00087935
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00568985
+        },
+        {
+          "task": "interpretation",
+          "schema": "DcaContractAudit",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00334925
+        },
+        {
+          "task": "interpretation",
+          "schema": "DcaContractAudit",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.003213
+        },
+        {
+          "task": "interpretation",
+          "schema": "StrategyFamilyContinuityAudit",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0027309
+        },
+        {
+          "task": "interpretation",
+          "schema": "DcaContributionRoleAudit",
+          "outcome": "failed",
+          "failure_mode": "TimeoutError",
+          "usage_cost_usd": null
+        },
+        {
+          "task": "interpretation_repair",
+          "schema": "FocusedDateWindowExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0023906
+        },
+        {
+          "task": "field_fidelity",
+          "schema": "StatedRunFieldFidelityAudit",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00251935
+        }
+      ],
+      "billed_cost_usd": 0.03338
+    },
+    {
+      "id": "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "status": "passed",
+      "failed_checks": [],
+      "infrastructure_errors": [],
+      "semantic_turn_act": "new_idea",
+      "intent": "strategy_drafting",
+      "result_followup_focus": null,
+      "reason_codes": null,
+      "stage_outcomes": [
+        "ready_for_confirmation",
+        "await_approval"
+      ],
+      "next_experiment_kinds": [],
+      "recovery_code": null,
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0002886
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.0057651
+        }
+      ],
+      "billed_cost_usd": 0.006054
+    },
+    {
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "status": "passed",
+      "failed_checks": [],
+      "infrastructure_errors": [],
+      "semantic_turn_act": "educational_question",
+      "intent": "conversation_followup",
+      "result_followup_focus": null,
+      "reason_codes": null,
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "next_experiment_kinds": [
+        "research_test_single"
+      ],
+      "recovery_code": null,
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00098685
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00659885
+        },
+        {
+          "task": "chat_composer",
+          "schema": "ArgusProseJudgeResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00018396
+        }
+      ],
+      "billed_cost_usd": 0.00777
+    },
+    {
+      "id": "ordinary_conversation_capability_indicator_question_en",
+      "status": "passed",
+      "failed_checks": [],
+      "infrastructure_errors": [],
+      "semantic_turn_act": "educational_question",
+      "intent": "conversation_followup",
+      "result_followup_focus": null,
+      "reason_codes": null,
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "next_experiment_kinds": [],
+      "recovery_code": null,
+      "assistant_text": null,
+      "receipt_outcomes": [
+        {
+          "task": "asset_mention_preflight",
+          "schema": "LLMAssetMentionExtraction",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.00088935
+        },
+        {
+          "task": "interpretation",
+          "schema": "LLMInterpretationResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 0.01613935
+        },
+        {
+          "task": "chat_composer",
+          "schema": null,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 5.121e-05
+        },
+        {
+          "task": "chat_composer",
+          "schema": "ArgusProseJudgeResponse",
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "usage_cost_usd": 4.54972e-05
+        }
+      ],
+      "billed_cost_usd": 0.017125
+    }
+  ],
+  "billed_cost_usd": 0.11958
+}

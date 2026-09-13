@@ -1,10 +1,9 @@
 """Research rail metering: one flat meter for users, rich classes underneath.
 
-For a signed-in account, research turns count as ordinary chat turns (spec
-section 9) and the message allowance is the meter. A guest is the exception
-(section 9b): ten free messages spent entirely on the most expensive shape is
-not an allowance anyone sized, so a guest carries a small research allowance of
-their own, keyed to the visitor. What this module owns:
+Retrieval is the grounding operation class: metered per retrieval, never per
+turn. A signed-in account has no research window of its own and is bounded
+only by the shared ceiling. A guest carries a small research allowance keyed
+to the visitor (spec section 9b). What this module owns:
 
 - the shared global daily ceiling, atomically claimed immediately before a
   cache miss enters provider work;
@@ -27,11 +26,14 @@ from typing import Any
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.chat.discovery_evidence import discovery_meter
 from argus.domain.research.admission import ResearchAttemptAdmission
 from argus.domain.research.config import research_rail_enabled
+from argus.domain.research.contracts import ResearchUsage
 from argus.domain.usage_limits import (
     GLOBAL_RESEARCH_CEILING_SUBJECT,
     GUEST_RESEARCH_VISITOR_LIMITS,
+    UsageMeter,
     align_usage_period,
     global_research_daily_ceiling,
     read_memory_usage,
@@ -56,6 +58,23 @@ def _ceiling_limits() -> list[tuple[str, int]]:
     return [("day", global_research_daily_ceiling())]
 
 
+def research_meter(*, is_guest: bool) -> UsageMeter:
+    """The per-visitor research counter the atomic claim charges; a signed-in
+    account has no window of its own on it."""
+    return UsageMeter(
+        resource=RESEARCH_USAGE_RESOURCE,
+        limits=list(GUEST_RESEARCH_VISITOR_LIMITS) if is_guest else [],
+    )
+
+
+def grounding_meter(*, is_guest: bool) -> UsageMeter:
+    """Which meter grounds a retrieval: the one the live rail charges, so the
+    allowance projection can never name a counter the charge does not."""
+    if research_rail_enabled():
+        return research_meter(is_guest=is_guest)
+    return discovery_meter(is_guest=is_guest)
+
+
 def guest_research_visitor_key(
     *, is_guest: bool, client_identity: str | None
 ) -> str | None:
@@ -75,10 +94,8 @@ def claim_research_provider_attempt(
     """Atomically claim capacity immediately before billable provider work.
 
     Two bounds are owned here: the shared global circuit breaker, and, for a
-    guest, that visitor's own daily research allowance. A signed-in user still
-    meters research through their message allowance (spec section 9); a guest
-    does not, because ten free messages spent entirely on the most expensive
-    shape is not an allowance anyone sized.
+    guest, that visitor's own daily research allowance. A signed-in user has
+    no research window of their own.
 
     Flag-off short-circuits to available. Fails closed: without writable truth,
     no research spend is allowed, and
@@ -87,6 +104,7 @@ def claim_research_provider_attempt(
     if not research_rail_enabled():
         return ResearchAttemptAdmission(available=True)
     now = datetime.now(timezone.utc)
+    guest_meter = research_meter(is_guest=True)
     try:
         if api_state.supabase_gateway is not None:
             client = api_state.supabase_gateway.client
@@ -94,10 +112,10 @@ def claim_research_provider_attempt(
                 "claim_research_usage",
                 {
                     "p_guest_visitor_key": guest_visitor_key,
-                    "p_resource": RESEARCH_USAGE_RESOURCE,
+                    "p_resource": guest_meter.resource,
                     "p_global_visitor_key": GLOBAL_CEILING_KEY,
                     "p_global_limit": global_research_daily_ceiling(),
-                    "p_guest_limit": GUEST_RESEARCH_VISITOR_LIMITS[0][1],
+                    "p_guest_limit": dict(guest_meter.limits)["day"],
                 },
             ).execute()
             payload = getattr(result, "data", None)
@@ -109,6 +127,7 @@ def claim_research_provider_attempt(
             )
         return _claim_memory_research_usage(
             guest_visitor_key=guest_visitor_key,
+            guest_meter=guest_meter,
             now=now,
         )
     except Exception as exc:  # noqa: BLE001
@@ -122,6 +141,7 @@ def claim_research_provider_attempt(
 def _claim_memory_research_usage(
     *,
     guest_visitor_key: str | None,
+    guest_meter: UsageMeter,
     now: datetime,
 ) -> ResearchAttemptAdmission:
     """Process-local twin of the database transaction used in tests/dev."""
@@ -131,8 +151,8 @@ def _claim_memory_research_usage(
             guest_within = memory_visitor_within_limits(
                 api_state.store.visitor_usage_counters,
                 visitor_key=guest_visitor_key,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
+                resource=guest_meter.resource,
+                limits=list(guest_meter.limits),
                 now=now,
             )
             if not guest_within:
@@ -153,8 +173,8 @@ def _claim_memory_research_usage(
             settle_memory_visitor_usage(
                 api_state.store.visitor_usage_counters,
                 visitor_key=guest_visitor_key,
-                resource=RESEARCH_USAGE_RESOURCE,
-                limits=list(GUEST_RESEARCH_VISITOR_LIMITS),
+                resource=guest_meter.resource,
+                limits=list(guest_meter.limits),
                 now=now,
             )
         return ResearchAttemptAdmission(available=True)
@@ -185,6 +205,7 @@ def settle_research_turn(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
+    tool_call_id: str | None = None,
 ) -> None:
     """Post-terminal evidence for a turn that may carry a research sidecar."""
     research = runtime_result.get("research")
@@ -196,6 +217,7 @@ def settle_research_turn(
         conversation_id=conversation_id,
         message_id=message_id,
         request_id=request_id,
+        tool_call_id=tool_call_id,
     )
 
 
@@ -206,6 +228,7 @@ def record_research_turn_evidence(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
+    tool_call_id: str | None = None,
 ) -> None:
     """Append one capability-classed ledger row for every research turn."""
     if not isinstance(research, dict):
@@ -219,12 +242,43 @@ def record_research_turn_evidence(
         conversation_id=conversation_id,
         message_id=message_id,
         request_id=request_id,
+        tool_call_id=tool_call_id,
     )
     capture_research_turn_event(
         research=research,
         user_id=user_id,
         conversation_id=conversation_id,
         message_id=message_id,
+    )
+
+
+def record_result_breakdown_spend(
+    *,
+    usage: ResearchUsage | None,
+    failure_mode: str | None,
+    user_id: str,
+    conversation_id: str | None,
+    request_id: str | None,
+) -> None:
+    """The received invoice counts even when the readout falls back entirely.
+
+    The shared Agent client separately sends unpriceable invoices to the existing
+    unpriced-spend recorder. This row owns the action's spend, never its prose.
+    """
+    if usage is None:
+        return
+    _append_ledger_row(
+        research={
+            "capability_class": "result_breakdown",
+            "shape": "balanced",
+            "degraded": {"code": failure_mode} if failure_mode else None,
+        },
+        usage=usage.model_dump(mode="json"),
+        user_id=user_id,
+        conversation_id=conversation_id,
+        message_id=None,
+        request_id=request_id,
+        feature_area="result_readout",
     )
 
 
@@ -236,18 +290,26 @@ def _append_ledger_row(
     conversation_id: str | None,
     message_id: str | None,
     request_id: str | None,
+    tool_call_id: str | None = None,
+    feature_area: str = "research_rail",
 ) -> None:
     gateway = api_state.supabase_gateway
     if gateway is None:
         return
     capability_class = str(research.get("capability_class") or "unknown")
+    paid = cache_status_of(usage) == "miss"
     correlation_id = request_id or message_id or conversation_id or user_id
+    if tool_call_id is not None:
+        correlation_id = f"{correlation_id}:{tool_call_id}"
     degraded = research.get("degraded")
     entry = {
         "source": "research",
         "service": "perplexity_agent",
         "provider": "perplexity_agent",
-        "feature_area": "research_rail",
+        "feature_area": feature_area,
+        "model": usage.get("model"),
+        "input_tokens": usage.get("input_tokens") if paid else None,
+        "output_tokens": usage.get("output_tokens") if paid else None,
         "task": capability_class,
         "user_id": user_id,
         "conversation_id": conversation_id,
@@ -259,6 +321,18 @@ def _append_ledger_row(
             "shape": research.get("shape"),
             "cache_status": cache_status_of(usage),
             "invocations": usage.get("invocations"),
+            **{
+                key: usage[key]
+                for key in (
+                    "web_search_invocations",
+                    "fetch_url_invocations",
+                    "finance_search_invocations",
+                    "cache_creation_input_tokens",
+                    "cache_read_input_tokens",
+                )
+                if key in usage
+            },
+            **({"tool_call_id": tool_call_id} if tool_call_id is not None else {}),
             **(
                 {"degraded_code": degraded.get("code")}
                 if isinstance(degraded, dict) and degraded.get("code")
@@ -266,13 +340,19 @@ def _append_ledger_row(
             ),
         },
         "billable_unit": "request",
-        "billable_quantity": 1 if cache_status_of(usage) == "miss" else 0,
-        "cost_amount": usage.get("cost_usd"),
+        "billable_quantity": 1 if paid else 0,
+        # What this turn paid, not what the answer cost whoever retrieved it. A
+        # cache hit serves a record with an invoice on it and spends nothing, so
+        # its cost and latency belong to the miss that stored the record and are
+        # already on that row; repeating them here would let any report that
+        # sums the column charge one retrieval twice.
+        "cost_amount": usage.get("cost_usd") if paid else None,
         "cost_source": (
-            "provider_reported" if usage.get("cost_usd") is not None else "unavailable"
+            "provider_reported"
+            if paid and usage.get("cost_usd") is not None
+            else "unavailable"
         ),
-        "latency_ms": usage.get("latency_ms"),
-        "status": "succeeded",
+        "latency_ms": usage.get("latency_ms") if paid else None,
     }
     try:
         gateway.create_cost_ledger_entry(entry=entry)

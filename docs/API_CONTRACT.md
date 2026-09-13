@@ -118,6 +118,15 @@ Unauthenticated `/auth/login` and `/auth/signup` attempts are also protected by
 short-window alpha throttles before allowlist or provider calls. These limits
 return the same `429` Problem Details shape with `code: "too_many_requests"`.
 
+Guest conversation turns carry a silent anti-abuse ceiling per visitor per
+UTC day (`guest_compute_turns` in `visitor_usage_counters`, 300 completed
+turns), sized so no real person reaches it. It is not an allowance:
+`GET /me/usage` reports conversation as unbounded and never projects this
+counter, and no product surface names it. At the ceiling `POST /chat/stream`
+answers the same `429` shape with `code: "too_many_requests"` and
+`Retry-After` set to the seconds until the UTC day resets. Run actions are
+execution and do not count; signed-in accounts carry no such ceiling.
+
 Supported rate-limit headers where applicable:
 - `X-RateLimit-Limit`
 - `X-RateLimit-Remaining`
@@ -620,6 +629,35 @@ persisted solely to represent abandonment.
 
 ### Public evidence receipts
 
+#### Approved answer-sharing extension
+
+The Share the answer lane extends this same API and snapshot lifecycle under
+[`conversation-sharing.md`](specs/conversation-sharing.md) section 4.5, including
+the founder's 2026-09-09 selection decision. It does not introduce a second sharing
+system. Version 1 receipts retain their payload and rendering. Version 2 introduces
+typed receipt kinds and a closed `turns` wrapper, with one or more turns from
+one owned conversation in conversation order; nothing bounds the count but the
+conversation itself. The research payload is exactly the
+closed field list in that spec's section 4.2.
+
+The owner can read share candidates, preview a selection, and create its receipt
+under `/conversations/{conversation_id}/public-excerpt-candidates`,
+`/conversations/{conversation_id}/public-excerpt-preview`, and
+`/conversations/{conversation_id}/public-excerpt`. Candidate reads supply typed
+eligibility reasons and field identities for localization; the frontend never
+classifies prose. Preview and creation share the same validation, with final
+creation checking every source and the previewed payload digest again. One refused
+turn refuses the entire selection. All owner endpoints require
+`can_save_decision`, and the artifact endpoint becomes an adapter through the same
+turn eligibility and receipt identity. The existing public route, owner list,
+revoke, tombstone, rate limits, and flag-off byte identity continue to apply.
+
+The reader receives only a frozen snapshot. No live source reads, fork, prompt
+seed, history copy, refresh, or rerun are part of this extension. The public action
+is Continue with Argus and lands at guest entry without carried state. The
+selection preview bounds but does not eliminate the cross-turn inference risk
+explicitly accepted in section 4.5: the owner sees exactly what they publish.
+
 Behind the default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag. While it is
 off, every path below answers exactly as a route that does not exist: status 404
 with body `{"detail":"Not Found"}`, produced by the same handler an unmatched path
@@ -631,7 +669,10 @@ Owner endpoints, authenticated, registered accounts only (`can_save_decision`):
 
 | Method   | Path                                               | Purpose |
 | :------- | :------------------------------------------------- | :------ |
-| `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Freeze a receipt from an owned completed backtest |
+| `GET`    | `/conversations/{conversation_id}/public-excerpt-candidates` | List all assistant turns with server-owned eligibility |
+| `POST`   | `/conversations/{conversation_id}/public-excerpt-preview` | Validate selected turns and return their exact public rendering payload |
+| `POST`   | `/conversations/{conversation_id}/public-excerpt` | Recheck and freeze the previewed selection |
+| `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Compatibility adapter to the same single-message receipt |
 | `GET`    | `/public-excerpts`                                 | The owner's receipt list for Data Controls |
 | `DELETE` | `/public-excerpts/{snapshot_id}`                   | Revoke, immediately and irreversibly |
 
@@ -647,6 +688,31 @@ A result whose conversation has been deleted is no longer shareable: creation an
 if the deletion lands mid-request. Revoking is idempotent, and only the state
 transition emits `receipt_revoked`.
 
+Candidate reads return `{items}`, where each item is
+`{message_id, question, kind, eligible, reason, field}`; the client counts the
+eligible items, and no limit is part of the contract. Unsupported turns
+remain in the list with `eligible: false`. The reason is a closed language-neutral
+enum, and the client displays it in the owner's language. The private message id
+is a selection input only; it never reaches a public snapshot payload.
+
+Preview takes `{message_ids: UUID[], owner_note?: string | null}`. There must be
+one or more distinct assistant message ids from this owned conversation. A
+request carries at most 500 ids, a transport bound no conversation reaches and
+not a product limit; the selection screen never shows it. The
+server puts them in conversation order and returns
+`{payload, payload_digest, kind, existing_receipt}`. Every turn passes the same
+eligibility and privacy checks independently. No snapshot or funnel creation
+event is written by preview. When this selection already has a live receipt,
+preview returns that receipt's frozen payload and note.
+
+Creation takes the same selection plus the required `payload_digest`. It repeats
+the source checks and refuses with `409 receipt_preview_changed` if the public
+content no longer matches the preview. A successful call returns
+`{receipt: PublicExcerptListItem}`. Selection identity depends on the canonical
+message selection, not the payload digest or owner note. Concurrent creation and
+the artifact compatibility endpoint resolve the same live record. One refused turn means
+no receipt is created for any part of the selection.
+
 `POST /evidence-artifacts/{artifact_id}/public-excerpt` takes
 `{"owner_note": string | null}`, bounded at 280 characters, and returns
 `{"receipt": PublicExcerptListItem}`. Creating a receipt for a result that already
@@ -655,9 +721,11 @@ when two concurrent requests race on the insert. Only a real insert emits the
 `receipt_created` funnel event, so a retry or a reload cannot inflate the
 acquisition funnel's creation stage.
 
-`PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range,
+`PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range, kind,
 created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
-as ISO dates. It carries no source conversation, run, or artifact id. Clients
+as ISO dates or null for research. `kind` is `backtest`, `research_answer`, or
+`mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
+`removed_by_argus`. It carries no source conversation, message, run, or artifact id. Clients
 compose the shareable url as `origin + path`, so the backend owns no origin
 configuration.
 
@@ -669,7 +737,7 @@ cannot take down. The cursor is keyset on `(created_at, id)` so identical
 timestamps cannot drop or repeat a row across pages.
 
 `GET /public/receipts/{public_id}` returns
-`{public_id, status, indexing, created_at, payload}`:
+`{public_id, status, kind, indexing, created_at, payload}`:
 
 - `status` is `available` or `revoked`; `indexing` is always `noindex, nofollow`.
 - A revoked receipt returns `200` with `status: "revoked"`, `payload: null`, and
@@ -681,6 +749,8 @@ timestamps cannot drop or repeat a row across pages.
   one.
 - The request carries no credentials, and `payload` is the closed set documented in
   `docs/DATA_MODEL.md` section 12.1.3.
+- `kind` derives from the frozen payload. A revoked or unknown receipt carries no
+  kind or source information; both render the same tombstone.
 - A stored payload this build cannot parse answers `503` with `Retry-After` and
   code `receipt_unavailable`, which the viewer's page reads as temporarily
   unavailable. It is not a tombstone: the row is intact, and telling a viewer their
@@ -688,13 +758,18 @@ timestamps cannot drop or repeat a row across pages.
   an uncaught error, because this is the one Argus surface a stranger arrives at
   from a message.
 
-`POST /public/receipt-funnel` takes `{"stage": "viewed" | "try_argus"}` and returns
+`POST /public/receipt-funnel` takes
+`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "mixed"}`
+(kind defaults to `backtest` for compatible callers) and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
 rendered page rather than counted when the receipt is read, because that read also
 answers the metadata pass and the preview image; a link pasted into a chat would
 otherwise log views nobody caused. It exists because the Try Argus tap
 happens on a page nobody is signed in to, and the alternative, a marker on the
 guest entry url, is ruled out: sharing adds no new parameter to that surface.
+An owner preview reports no view, and a multi-turn public page reports one view.
+Tombstones and unavailable pages with no known kind do not emit kind-attributed
+events; they never guess that the missing document was a backtest.
 
 Rate limits: receipt creation is 10 per hour and 30 per day, keyed by both user id
 and client identity, answering `429` with `Retry-After`. The funnel endpoint is 60
@@ -702,20 +777,23 @@ per hour per client identity.
 
 Error codes specific to this surface: `receipt_note_rejected` (422, the note carries
 an identifier, a credential-shaped value, or a value assigned to something that names
-a credential), `receipt_source_unsupported` (422, not a completed backtest result, or
-a strategy the public projection cannot describe completely), and
+a credential), `receipt_source_unsupported` (422, an ineligible turn or source),
+`receipt_preview_changed` (409, the exact preview must be shown again), and
 `receipt_sanitization_failed` (500, the payload could not be proven free of
 never-expose data, so nothing was published).
 
-A receipt either states the strategy that ran, in full, or it is not created. The
-projection covers buy and hold, recurring contributions, indicator thresholds, buy
-the dip, moving average crossovers (including a crossover whose exit windows differ
-from its entry windows, which the rule compiler allows), and MACD crossovers. A
-generic `rule_spec` condition tree, or any shape added later without a projection,
-answers `receipt_source_unsupported` rather than publishing a page that names a
-strategy without describing it.
+Selection refusals retain `context.reason` and `context.field` in Problem Details.
+Field is `question`, `answer`, `owner_note`, or `sources` where applicable. The
+backend sends typed facts, and the owner UI supplies localized explanations. It
+never repairs a refused field by redacting or truncating it.
 
-The payload freezes no rendered prose. A link is opened by people whose language
+A receipt either states the strategy that ran, in full, or it is not created. The
+version 2 projection reads the same typed config, figures, costs and rules as the
+result card, through a closed public fact-bank subset. A source that cannot project
+fully answers `receipt_source_unsupported`; the receipt never invents missing
+facts from the result prose.
+
+The version 1 backtest payload remains unchanged. A link is opened by people whose language
 has nothing to do with the author's, so `assumptions`, `strategy_facts`, `metrics`,
 and `date_range` all carry closed keys and bare scalars, and every sentence, label,
 number format, and date format is composed by the reader's client in the reader's
@@ -724,6 +802,21 @@ that remain, `idea_title` and `owner_note`. A run whose assumptions, numbers, or
 tested window will not project into that form answers
 `receipt_source_unsupported`; there is no passthrough string field, because one
 would reopen this defect under a new name.
+
+Version 2 uses the closed `turns` wrapper, including for new singleton shares.
+Research leaves freeze exactly the question, answer, typed sources and dates,
+retrieval date, symbols, asset class, typed offered next step, note, content
+language, framing and provenance listed in section 4.2 of the sharing spec. These
+audited author fields remain in the author's language. Labels, date and number
+formats remain in the reader's language. No usage, raw card, provider, model,
+memory, executable action text or private id is included.
+
+The sole header entry belongs to registered owners. The former per-turn guest
+conversion entry is dormant. The compatible `share_result` pending action carries
+`conversation_id`, `action_id` and a required `message_id`; `artifact_id` remains
+exclusive to `save_decision`. If a compatibility caller resumes that action after
+claim, the same panel opens on its verified message. No anonymous owner can
+create a receipt. See conversation-sharing.md section 6 for the final placement.
 
 The same rule cuts the other way: a projection that cannot describe something
 refuses rather than dropping it silently. An unknown metric key is refused, and a
@@ -836,7 +929,9 @@ Application-facing user object.
   "preferred_name": "Alex",
   "language": "en",
   "locale": "en-US",
-  "theme": "dark",
+  "country": "MX",
+  "currency_override": null,
+  "currency": "MXN",
   "is_admin": false,
   "onboarding": {
     "completed": false,
@@ -863,6 +958,14 @@ Application-facing user object.
     opts out after opting in.
   - A registered-account preference. Guest responses omit it entirely, and the
     database policies keep it off the guest surface.
+- `country` is where the user lives, an ISO 3166-1 alpha-2 code chosen in
+  Settings. It is stated, never inferred from conversation, IP or behavior
+  (decision 8). Research sends it as the reader's location; null sends none.
+- `currency` is read-only: `currency_override` when the user chose one,
+  otherwise the currency the country implies (the first tender currency CLDR
+  records there with no end date), and null when neither is known. Only the
+  override is stored.
+  - All three are registered-account preferences. Guest responses omit them.
 - `email` is for auth/contact, not primary UX identity.
 - `username` is optional for Alpha unless implemented.
 - Supabase Auth owns identity/session.
@@ -937,7 +1040,11 @@ messages may store `pending_strategy`, `confirmation_card`,
 may also include `artifact_id`, `artifact_type`, `artifact_status`,
 `active_artifact_id`, `supersedes_artifact_id`, `saved_strategy_id`,
 `failed_action`, `retry_last_turn`, `recovery`, `clarification`,
-`result_fact_bank`, and `discovery`. User messages created by action chips may store
+`result_fact_bank`, and `discovery`. When the reply's punctuation was rewritten
+at the point it became visible (the copy rule allows no em dash in any
+language), the assistant message and the live `final` payload carry
+`reply_rewrites`, for example `{"em_dash": 1}`; the key is absent when nothing
+was rewritten. User messages created by action chips may store
 `chat_action` so the transcript can hydrate the selected chip as an action item
 after reload. Action chip requests and
 persisted `chat_action` metadata should preserve `label` plus `labelKey` so
@@ -949,6 +1056,9 @@ can execute. Older legacy cards without that identity are transcript history
 and cannot execute. Confirmation cards should include stable
 machine-readable fields alongside display labels:
 
+- `kind`: new cards emit `"backtest"`. The web intake boundary normalizes only
+  an absent legacy kind to backtest; an explicit unknown kind cannot render a
+  backtest card or its execution actions.
 - `status`: stable confirmation status code such as `ready_to_run`, `running`,
   `run_complete`, or `could_not_run`.
 - `statusLabel`: legacy/user-facing fallback label for old clients and old
@@ -977,9 +1087,12 @@ machine-readable fields alongside display labels:
   action always keeps its normal localized label. There is no second action,
   modal, toast, or client-owned execution state.
 - `period_adjustment`: optional typed sidecar with
-  `code = effective_window_adjusted`, `requested_date_range`, and
-  `effective_date_range`. The frontend renders one localized, provider-neutral
-  assistant lead-in directly above the corrected card. The backend emits this
+  `code = effective_window_adjusted`, `requested_date_range`,
+  `effective_date_range`, and optional `limited_by = { symbol,
+  first_available }`. The frontend renders one localized, provider-neutral
+  assistant lead-in directly above the corrected card. When `limited_by` is
+  present the lead-in names that symbol and its first available date; cards
+  without it keep the shared data window reason. The backend emits this
   sidecar only when `data_coverage.adjustment_reason =
   provider_coverage_adjustment`; ordinary calendar alignment, full coverage,
   and legacy coverage without a reason omit it. Clients must not infer the
@@ -1014,12 +1127,180 @@ Clients must use `status` and `rows[].key` for behavior. They must not infer
 card state from translated display labels. Result actions that mutate state must
 reference a canonical run id. `result_fact_bank` is a backend-provided,
 run-derived context object for result follow-ups; it is not a second metrics
-source of truth. Legacy `saved_strategy_id` metadata remains readable after
-reload, but clients must not use it to expose a new write action.
+source of truth. On every public read it also carries `figures`, the
+one-decimal display projection of its own `metrics` (`total_return_pct`,
+`benchmark_return_pct`, `delta_vs_benchmark_pct`, `benchmark_comparison_claim`,
+`max_drawdown_pct`, plus `gross_total_return_pct`, `net_total_return_pct` and
+`return_drag_pct` when costs were modeled). `delta_vs_benchmark_pct` is the shown
+return minus the shown benchmark return, and `return_drag_pct` is the shown gross
+return minus the shown net return; the stored engine value is quoted only when a
+return is missing. Public runs carry the same `figures` beside their
+`metrics`. The backend rounds once, with the same rounding its own prose uses;
+clients print those digits verbatim with locale separators and grouping and
+never round `metrics` for display. Legacy `saved_strategy_id` metadata remains
+readable after reload, but clients must not use it to expose a new write action.
 
-Result Quick Take, result breakdown, and dossier outcome prose render from the
-same typed run facts in the current workspace language. Original LLM result
-prose remains immutable audit/model context, not a presentation fallback.
+Result Quick Take and Breakdown may carry the additive, closed
+`result_readout_content` object:
+
+```json
+{
+  "schema_version": "result_readout/v1",
+  "surface": "quick_take",
+  "language": "en",
+  "text": "The complete, validated model readout."
+}
+```
+
+`surface` is `quick_take | breakdown`; `language` is `en | es-419` and records
+the workspace language at composition time. `text` is the accepted complete
+model draft, or null when generation/grounding failed. Unknown envelope fields
+are invalid. The envelope is persisted at creation, transported through live
+finals, message metadata, completed job responses and the canonical result
+card, and never reconstructed from legacy prose. Breakdown messages carry
+their own envelope. The web displays text only for a supported envelope whose
+surface and language match the frame and current workspace language.
+Missing/legacy, malformed, failed or mismatched envelopes use the existing
+typed template. Readouts saved before this lane remain template-only. A new
+Breakdown request, including one for an older run, creates a new message with
+the current workspace language; it does not replace any saved readout. There is no read-time
+model call, translation, historical rewrite or partial-draft display.
+`result_readout_source`, `result_readout_fallback_used` and optional
+`result_readout_failure_mode` record generation provenance for both surfaces;
+existing Breakdown provenance remains read-compatible.
+
+The card owns numerical reporting. Quick take tells the first-glance historical
+story; Breakdown develops what holding through the run involved and the
+tradeoffs, without repeating Quick take or the card's figures. A figure appears
+in prose only when needed to explain a point, through the existing fact
+references. A supported next historical test may follow naturally from that
+story; it is not investment advice and does not replace the typed action
+controls. Frames, labels and their order are unchanged.
+
+Before creating that public envelope, both composers derive facts from the same
+internal labeled fact sheet. Each fact identifies its canonical value, unit, meaning,
+scope, return basis and stored or derived source. Executed fills are distinct
+from completed trades; annualized volatility is distinct from daily returns;
+ending nominal equity is distinct from whole-period extrema; starting capital
+is distinct from recurring contributions. Optional chart data retains its
+dated series meaning. Historical drawdown endpoints are unavailable unless
+retained evidence supports their chronological reconstruction; a nominal DCA
+chart cannot establish a flow-adjusted drawdown event.
+
+Quick take receives the full labeled sheet. Breakdown receives only labeled
+headline scalar facts a sentence could need: tested dates, return and benchmark
+comparison, risk, capital and contributions, costs, ending and peak value, and
+executed fills versus completed round trips. Available drawdown endpoints remain
+explicitly labeled. Chart series, markers, internal field paths and full row
+metadata never enter its provider request. The full sheet remains an internal
+source for this projection; search cannot add to or replace stored run facts.
+
+The internal structured model draft contains `language`, complete `text`, and
+`figures`. Each declared run figure carries its supplied `fact_key` and the
+`value` as written, without a quote or occurrence index. Breakdown uses the
+supplied plain-language fact label as the key. Model input provides the card's
+rounded display values: one decimal for percentages, whole dollars for USD
+account values, and localized dates. Stored facts retain their original precision.
+One reference per distinct fact
+is sufficient even when the prose repeats the number. Code checks each declared
+key and value against that run fact within display rounding, with exact counts
+and calendar dates. It does not require numeric occurrence coverage: a number
+without a reference, including a number in an asset name such as S&P 500, does
+not reject the readout. Invalid declared references reject the complete draft.
+The model-reported written language must
+match the normalized workspace request; a mismatch records `language_mismatch`
+and uses complete fallback. This is a structured self-report, not an independent
+language classifier, and references do not establish arbitrary prose entailment.
+Model quality therefore still requires case-by-case factual review. Invalid
+schema, empty drafts and provider failure also select complete fallback. There
+are no benchmark-claim or internal-field prose regex gates, required mentions,
+figure limits, or per-occurrence bookkeeping.
+
+Quick take is composed on the OpenRouter `readout` tier, with both model keys
+set to `openai/gpt-5.6-luna` and no search. Only readout-tier requests omit
+`temperature`; every other tier keeps its existing parameters. Breakdown uses a readout-owned Luna
+constant through the existing Perplexity Agent client with only `web_search`
+and `fetch_url`. Its public message kind stays `result_breakdown`; it is no
+longer an OpenRouter task. The chat and context environment keys retain their
+other task owners. Before dispatch, Breakdown claims capacity through the same
+request-scoped research admission owner as research answers. Guest allowance or
+global capacity refusal makes no provider call and selects the complete template
+with `result_readout_failure_mode = research_capacity_exhausted`.
+
+Breakdown uses the same three-field internal draft contract. Its short request
+asks what happened to the assets during the tested window and why, what holding
+through it was like, and how the test compared with the benchmark, explained for
+a normal person with sources. `source_figures` and `citations` are not model
+output fields. Code does not request or validate per-claim quotes, occurrences
+or dates. The run remains the sole owner of simulation figures; web search adds
+historical context and never modifies or resolves a run fact.
+
+Perplexity's returned sources travel separately in the existing
+`research.sources` sidecar on live finals and persisted message metadata. The
+shared research source projection owns each entry's `title`, `domain`, `url` and
+optional `source_date`, including the existing source selection and cap. The
+web uses its existing Sources button and panel for Breakdown on completion and
+after reload; dates use the current workspace locale. Fallbacks retain returned
+sources with the research sidecar's degraded code, so the panel describes where
+Argus looked. An absent source date does not discard prose.
+
+Code does not append a bibliography to accepted `text`. The writing brief asks
+for short descriptive inline link text in the supporting sentence, never a bare
+URL. Before saving an accepted Breakdown, code retains hyperlinks only to URLs
+returned with that draft. A bare returned URL uses its source title; a link to
+an unreturned URL loses its link while preserving its visible words. This same
+saved text travels in live finals and reloads. No additional readout envelope
+fields or figure references are exposed. The writing brief asks the model to
+distinguish documented
+events from inference and excludes forecasts and investing advice. Returned
+sources do not prove the truth of every claim; factual review remains required.
+Received Breakdown usage is recorded through the shared
+research cost ledger even when the draft is rejected; unpriced usage retains the
+existing invoice-reconciliation path.
+
+Fact sheets and figure references are internal generation inputs/output, not
+additional public readout fields. The closed public envelope above is unchanged.
+Only accepted complete prose crosses it; language/figure rejection details use
+the existing source/fallback/failure metadata. No read-time composition or
+historical rewrite is introduced.
+
+While a Breakdown is pending, its existing frame owns exactly one localized
+working state; the generic stream status row does not repeat it. With durable
+persistence, the action first reserves a `chat.research` job and saves its
+acknowledgement, then starts completion work outside the browser stream. The
+acknowledgement carries `artifact_presentation_kind = breakdown` and the existing
+`backtest_job` envelope. Job polling serves the saved complete answer as
+`result_message`; its `backtest_job_id` replaces that job's pending frame, live
+and after reload. The shared research finalizer persists the answer before
+linking `execution_metadata.research_result_message_id` and settling the job.
+The job stores the source run id and requested language, never another run or
+chart series. A disconnect neither cancels composition nor starts another call.
+
+Development memory persistence has no job endpoint. Its retained completion task
+uses the existing ordinary-turn finalizer even when the stream is canceled.
+Reload derives its pending frame from the saved `show_breakdown` user action and
+accepted/running lifecycle, then the existing turn-recovery reader obtains the
+saved terminal answer without calling a model. The completed response selects
+accepted prose or the template. Empty
+pending content is not evidence that saved run facts are insufficient, and empty
+legacy message content does not leave a completed envelope permanently working.
+
+The internal headline facts include the worst drawdown's high and low balances,
+dates and dollar decline computed from unrounded balances, plus the whole-test
+peak date. Dated headline groups are ordered before composition. Display rounding
+is applied after arithmetic; chart series and markers stay out of the Breakdown
+request. Missing dated evidence remains unavailable.
+
+Template readouts and dossier outcomes render from the same typed run facts
+in the current workspace language. The figures those
+surfaces share with the result card (returns, the benchmark gap, worst drop)
+are the backend's `figures`: rounded once from the engine's returns, with the
+gap stated as the difference of the two returns as shown, and printed verbatim
+in the workspace locale. Only the backend owner states that difference and no
+reader rounds a figure a second time, so the card, the prose beside it, and the
+dossier cannot show two numbers for one fact. Original LLM result prose remains
+immutable audit/model context, not a presentation fallback. Only the versioned, creation-time envelope above
+authorizes visible model readout text.
 Public result messages carry empty `content`; live result finals carry empty
 `assistant_response`. Public run/card payloads omit stored `quick_take`,
 `breakdown`, `result_readout`, and `audit_context`, including nested copies.
@@ -1344,10 +1625,20 @@ optional when reading older records. Requested and effective ranges remain
 independent provenance; consumers must not classify their difference with
 fixed day thresholds.
 
+When one series' own history sets a start later than the request and the first
+session the window could open, new coverage records also carry
+`limited_by = { symbol, first_available }`: the series whose first bar is the
+effective start, and that bar's ISO date. Calendar alignment, full coverage,
+starts set by interleaved gaps, and older records omit it. Like
+`adjustment_reason`, it is provenance and is not part of the launch identity.
+
 `save_strategy` is accepted only as a stale-action compatibility request. It
 never mutates Strategy records; Argus responds that the completed run remains
 available in conversation/history. Completed runs are captured automatically as
 evidence, while user commitment is represented by an explicit `DecisionNote`.
+A `DecisionNote` attaches to a computation: a backtest's evidence artifact, or
+the message that carried a computed answer (see "Decisions on computed
+answers" in section 15).
 
 **Result chart contract:**
 - `chart.kind` is currently `portfolio_equity`.
@@ -1536,6 +1827,8 @@ across symbols.
 ```json
 {
   "max_drawdown_pct": -9.2,
+  "max_drawdown_peak_date": "2025-02-18",
+  "max_drawdown_trough_date": "2025-08-01",
   "volatility_pct": 18.6,
   "downside_deviation_pct": 11.4,
   "worst_trade_pct": -4.1,
@@ -1548,6 +1841,8 @@ across symbols.
 {
   "win_rate": 0.57,
   "total_trades": 42,
+  "buy_fills": 21,
+  "sell_fills": 21,
   "profit_factor": 1.6,
   "sharpe_ratio": 1.15,
   "sortino_ratio": 1.42,
@@ -1566,7 +1861,10 @@ divided by absolute gross negative realized P&L after modeled fees and
 slippage. It is `null` when there are no completed trades or no losing trade,
 and it is `0.0` when completed trades lose money without any winning trade.
 `total_trades` retains its existing executed-fill meaning; it is not a count of
-completed positions. If a close and a new open share one timestamp, the
+completed positions. `buy_fills` and `sell_fills` count executed buy and sell
+fills. A fixed-capital run's `total_trades` is their sum; a contributions run's
+`total_trades` equals `buy_fills`, and its `sell_fills` is `0` because a
+recurring plan only buys. If a close and a new open share one timestamp, the
 canonical ledger applies the close before the open. The same ordered fills own
 both portfolio equity and closed-trade P&L.
 
@@ -1576,6 +1874,8 @@ For example, an open buy-and-hold position persists:
 {
   "win_rate": null,
   "total_trades": 1,
+  "buy_fills": 1,
+  "sell_fills": 0,
   "profit_factor": null
 }
 ```
@@ -1599,7 +1899,11 @@ the run, meaning the fixed bankroll at the first bar, or the first funded
 bar's deposits on a contributions run. `max_drawdown_pct` reads the wealth
 path from that baseline, so a first-bar execution cost (fees plus slippage)
 is itself a fall from the baseline and can never hide behind a flat
-post-entry price. `volatility_pct` and `sharpe_ratio` use exactly one return
+post-entry price. `max_drawdown_peak_date` and `max_drawdown_trough_date`
+date that drop on the same path: the first close at its high and the close at
+its low. The start is `null` when the drop begins at the baseline, both are
+`null` when the path never drops, and runs stored before these keys have
+neither. `volatility_pct` and `sharpe_ratio` use exactly one return
 per real bar interval, with the funding bar's execution jump compounded into
 the first funded interval; no fabricated zero observation joins the sample.
 A window with fewer than two real return intervals reports `volatility_pct`
@@ -1691,6 +1995,7 @@ because an accumulation plan never closes a position.
 - Ratio fields are decimal ratios (e.g., `win_rate: 0.57`).
 - Currency-like `profit` depends on configured starting capital.
 - `metrics.aggregate.performance.portfolio_value_range` stores the aggregate strategy portfolio equity close peak/lowest values during the run period. These values must match `chart.value_summary` when chart data is available.
+- `metrics.aggregate.performance.execution_realism` appears only when the run modeled nonzero fees or slippage. Beside `fee_bps`, `slippage_bps`, `gross_total_return_pct`, `net_total_return_pct`, and `return_drag_pct`, it stores `modeled_fee_cost` and `modeled_slippage_cost`: the dollars the strategy's own fills paid, summed over symbols and rounded to cents. A buy spends its market value plus both costs, and a sell returns its market value minus both. `modeled_cost_total` is the sum of the two rounded amounts. Benchmark fills and the zero-cost gross comparison never add to these amounts. Runs stored before these keys existed omit them.
 - Conversation result cards use fixed beginner-friendly defaults.
 - All supported engine metrics are persisted in `metrics`.
 - AI may answer follow-up questions using `metrics.aggregate` and `metrics.by_symbol`.
@@ -2104,7 +2409,7 @@ permanent accounts rather than allowing them.
   and server capabilities with the ordinary profile.
 
 The response includes `user`, `account_kind`, a nullable `guest` summary with
-expiry plus limits `1/10/2/5`, typed `capabilities`, and the
+expiry plus limits `1/2/5`, typed `capabilities`, and the
 server-authoritative `public_account_access_enabled` presentation permission.
 Public account creation is absent unless that last value is true.
 Guest capability truth distinguishes owner-scoped current-workspace search
@@ -2376,8 +2681,10 @@ Retrieve the current authenticated user profile and preferences.
     "display_name": "Alex",
     "language": "en",
     "locale": "en-US",
-    "theme": "dark",
     "avatar_theme": "ocean",
+    "country": "MX",
+    "currency_override": null,
+    "currency": "MXN",
     "is_admin": false,
     "onboarding": {
       "completed": false,
@@ -2393,33 +2700,38 @@ Retrieve the current authenticated user profile and preferences.
 
 ## `GET /me/usage`
 
-Return the authenticated user's current private-alpha message and simulation
-allowance truth. This is an owner-only read surface. The backend returns
-zero-state windows when a counter row does not exist; reading usage does not
-create or increment a counter.
+Return the authenticated account's current allowance truth keyed by operation
+class. This is an owner-only read surface. The backend returns zero-state
+windows when a counter row does not exist; reading usage does not create or
+increment a counter.
 
-**Response:**
+Three operation classes, one meter each:
+
+| Class | Covers | Metered |
+| --- | --- | --- |
+| `compute` | Conversation: interpretation, answers, clarifications, edits | Never. Free and unlimited. |
+| `grounding` | A retrieval that produces cited facts | Per retrieval. |
+| `execution` | A backtest run | Per unique durable admission. |
+
+**Response (registered account, research rail on):**
 ```json
 {
   "allowances": {
-    "messages": {
-      "hour": {
-        "limit": 60,
-        "used": 3,
-        "remaining": 57,
-        "period_end": "2026-07-21T15:00:00Z"
-      },
-      "day": {
-        "limit": 200,
-        "used": 12,
-        "remaining": 188,
-        "period_end": "2026-07-22T00:00:00Z"
-      },
+    "compute": {
+      "hour": null,
+      "day": null,
       "guest_session": null,
       "available_now": true,
-      "limiting_window": "hour"
+      "limiting_window": null
     },
-    "backtests": {
+    "grounding": {
+      "hour": null,
+      "day": null,
+      "guest_session": null,
+      "available_now": true,
+      "limiting_window": null
+    },
+    "execution": {
       "hour": {
         "limit": 10,
         "used": 1,
@@ -2440,46 +2752,107 @@ create or increment a counter.
 }
 ```
 
-Guests receive the same typed resource keys with `hour` and `guest_session`
-set to `null`. Their visitor-owned UTC-day counter is returned as `day`; for
-example, message usage at 8/10 reports `used: 8`, `remaining: 2`, UTC midnight
-as `period_end`, and `limiting_window: "day"`. A 2/2 guest simulation counter
-reports `available_now: false`. The separate workspace-lifetime ceiling is
-enforced during admission and is not misrepresented as another UI reset
-window.
+**Response (guest whose workspace allowance is spent):**
+```json
+{
+  "allowances": {
+    "compute": {
+      "hour": null,
+      "day": null,
+      "guest_session": null,
+      "available_now": true,
+      "limiting_window": null
+    },
+    "grounding": {
+      "hour": null,
+      "day": {
+        "limit": 3,
+        "used": 1,
+        "remaining": 2,
+        "period_end": "2026-07-22T00:00:00Z"
+      },
+      "guest_session": null,
+      "available_now": true,
+      "limiting_window": "day"
+    },
+    "execution": {
+      "hour": null,
+      "day": {
+        "limit": 2,
+        "used": 0,
+        "remaining": 2,
+        "period_end": "2026-07-22T00:00:00Z"
+      },
+      "guest_session": {
+        "limit": 2,
+        "used": 2,
+        "remaining": 0,
+        "period_end": "2026-07-27T14:03:09Z"
+      },
+      "available_now": false,
+      "limiting_window": "guest_session"
+    }
+  }
+}
+```
 
 **Allowance semantics:**
-- `messages` reports the `chat_messages` counters; `backtests` reports the
-  `backtest_runs` counters charged by unique durable simulation admission.
-- Registered accounts receive both active UTC calendar windows. Guests receive
-  only the visitor-owned UTC `day` window. Every populated window carries the
-  exact backend-owned `period_end`; clients may localize its display, but must
-  not infer or replace it with a countdown, local timer, or `Retry-After` value.
+- Every class carries the same five keys. An unbounded class has every window
+  `null`, `available_now: true`, and `limiting_window: null`. `compute` is
+  always unbounded. `grounding` is unbounded for a signed-in account while the
+  research rail is on: no per-account research window exists, only the shared
+  daily ceiling, which is a circuit breaker rather than an allowance and is
+  not projected here.
+- `grounding` reports the counter the live retrieval rail claims. Rail on, that
+  is `research_searches`: guests receive the visitor-owned UTC `day` window of
+  three. Rail off, it is `discovery_searches`: guests receive two per visitor
+  day and signed-in accounts receive the discovery `hour` and `day` windows.
+- `execution` reports the `backtest_runs` counters charged by unique durable
+  simulation admission. Registered accounts receive both UTC calendar windows.
+  Guests receive the visitor-owned UTC `day` window and the workspace-lifetime
+  `guest_session` window, whose `period_end` is the fixed workspace expiry,
+  because admission enforces both.
+- Every populated window carries the exact backend-owned `period_end`; clients
+  may localize its display, but must not infer or replace it with a countdown,
+  local timer, or `Retry-After` value.
 - `remaining` is computed by the backend as `max(limit - used, 0)`. Settlement
   is truthful accounting, not a ceiling: `used` may exceed `limit` after
-  concurrent in-flight turns settle, and `remaining` clamps at zero.
-- `available_now` is backend-derived: for registered accounts it is true when
-  both calendar windows have capacity; for guests it follows the visitor-owned
-  UTC `day` window. The separate workspace ceiling is admission-only.
-- `limiting_window` is backend-derived: registered accounts use the calendar
-  window with the smaller remaining capacity (`day` on ties), while guests use
-  `day`. The frontend must not compute, estimate, or hardcode quota truth; it
-  renders these derived fields.
-- The UI emphasizes the daily allowance and reveals the hourly window whenever
-  `limiting_window` is `hour` or the hourly window is exhausted.
+  concurrent in-flight admissions settle, and `remaining` clamps at zero.
+- `available_now` is backend-derived and true only when every window the class
+  carries has capacity. A guest whose workspace counter is at 2/2 reads
+  `available_now: false` even after the visitor day has reset (#546).
+- `limiting_window` is backend-derived: the window with the smaller remaining
+  capacity, and on ties the window whose `period_end` is later (`day` over
+  `hour`; for a guest, whichever of `day` and `guest_session` ends later, which
+  on the workspace's final calendar day is `day`). The frontend must not compute, estimate, or
+  hardcode quota truth; it renders these derived fields and reads
+  `limiting_window` to choose which reset horizon to show.
+- The UI emphasizes the daily allowance, reveals the hourly window whenever
+  `limiting_window` is `hour`, and reveals the workspace window whenever it is
+  `guest_session`.
+- `messages` and `backtests` are deprecated aliases of `compute` and
+  `execution`, present in every response (omitted from the examples above)
+  so deployed web bundles keep a stable shape during the rollout, as `GET /me`
+  does for `onboarding`. They are derived from the classes, marked
+  `deprecated` in the OpenAPI artifact, and are removed after the first
+  promotion that carries the operation-class keys. New clients must not read
+  them.
 
 **Accounting semantics:**
-- One message unit settles atomically with the first durable insert of an
-  ordinary turn's terminal product message (normal answers, clarifications,
-  honest supported/unsupported boundary responses, and structured-action
-  acknowledgments). Malformed, unauthenticated, duplicate-replay, abandoned,
-  and Argus infrastructure-failed turns settle zero. A committed terminal
-  response followed by transport disconnect remains exactly one unit.
-- `chat.run_backtest` action turns consume the simulation allowance at unique
-  durable admission instead of a message unit; replays and pre-admission
-  rejections (including data-window preflight) consume zero, and a
-  post-admission execution or finalization failure still counts exactly one.
-  Chat and direct API launches follow the same rule.
+- Conversation is compute. Ordinary turns settle no allowance at entry or at
+  their terminal outcome, are never rejected for an exhausted allowance, and
+  write no `chat_messages` row; that resource survives only in historical rows.
+  A guest turn additionally counts one unit against the silent anti-abuse
+  ceiling described under Rate Limiting, in the same terminal transaction; that
+  counter is not an allowance and is not projected here.
+- Grounding capacity is claimed atomically immediately before billable
+  provider work (see the research rail section); cache hits, unconfigured
+  providers, and replays claim nothing.
+- `chat.run_backtest` action turns consume the execution allowance at unique
+  durable admission; replays and pre-admission rejections (including
+  data-window preflight) consume zero, and a post-admission execution or
+  finalization failure still counts exactly one. Chat and direct API launches
+  follow the same rule.
 
 **Error rules:**
 - `401 Unauthorized`: authentication is missing or invalid.
@@ -2490,8 +2863,8 @@ window.
 
 ## `GET /market/session`
 
-Return which session US equities are in. Owner-authenticated read; it holds no
-per-account state.
+Return which session US equities are in, and what the caller's own records show
+interest in. Owner-authenticated read.
 
 **Response:**
 ```json
@@ -2500,9 +2873,23 @@ per-account state.
     "phase": "closed_weekend",
     "is_market_day": false,
     "as_of": "2026-08-09T13:04:22-04:00"
+  },
+  "interest": {
+    "markets": true
   }
 }
 ```
+
+**Interest semantics:**
+- `interest` has one backend owner, `argus.api.demonstrated_interest`, and it
+  reads only typed records the caller owns. It never classifies message text
+  and never reads personalization memory.
+- `markets` is `true` once the caller owns a completed backtest run.
+- Guests are answered like anyone else. The empty chat greets a guest from the
+  neutral pool regardless of `interest`, because that is a greeting rule, not a
+  fact about the caller.
+- `interest` is `null` when the caller's records are unreadable. Clients treat
+  `null` as no shown interest, and the session is still returned.
 
 **Session semantics:**
 - `phase` is one of `pre_market`, `open`, `after_hours`, `closed_weekend`,
@@ -2540,8 +2927,9 @@ Update profile preferences. Partial update semantics are supported.
   "preferred_name": "Alex",
   "language": "es",
   "locale": "es-419",
-  "theme": "dark",
-  "avatar_theme": "plum"
+  "avatar_theme": "plum",
+  "country": "DO",
+  "currency_override": "USD"
 }
 ```
 
@@ -2564,8 +2952,24 @@ Update profile preferences. Partial update semantics are supported.
 - Avatar themes are registered-account preferences. Guests cannot update a
   profile, and guest-facing `/me` and `/auth/session` responses omit
   `avatar_theme`.
-- A legacy `onboarding` object from an old client is ignored; the API cannot
-  write onboarding state.
+- `country` accepts an officially assigned ISO 3166-1 alpha-2 code in any
+  case. A grouping or user-assigned region such as `EU` or `XK`, or a country
+  name, returns 422. `null` or an empty value clears it, and a user with no
+  country sends no research location.
+- `currency_override` accepts an ISO 4217 code CLDR records in tender in some
+  country with no end date; other codes return 422. The accepted codes change
+  only with the installed CLDR data, never with the date, so the Settings
+  picker's generated list and the API always agree within one build. `null`
+  clears it, and `currency` returns to the one the country implies. A stored
+  code the standards later retire still reads back; only an edit is held to
+  the current codes.
+- `currency` is derived and cannot be written; a patch that sends it is
+  ignored.
+- Country and currency are registered-account preferences. Guests cannot
+  update a profile, and guest-facing responses omit all three fields.
+- A legacy `onboarding` object or `theme` from an old client is ignored; the
+  API cannot write either. The chosen theme stays in the browser, so the
+  account holds no theme.
 
 ---
 
@@ -2919,6 +3323,59 @@ stores nothing and makes no LLM, provider, or market-data call.
 
 # 12. Chat Streaming Endpoint
 
+### Declared tool calls and results
+
+The neutral transport `ToolCall` is `{tool_name, call_id, arguments}`. Each
+declaration supplies its callable's typed argument and return schemas. Calls are
+ordered, bounded by `MAX_TOOL_CALLS`, and have distinct call IDs. The dispatcher
+supports different tools and repeated calls; a local call bypasses backtest
+launch preparation. The existing validated Run action enters this dispatcher
+with its confirmed canonical strategy.
+
+The interpreter retains its seven intents, system prompt and response schema.
+It does not select calls from this catalog in this lane. The declaration-derived
+catalog is available to runtime consumers without changing the model contract.
+
+An actual invocation emits `stage_start.tool_progress` containing
+`{locale_key, interpolation_args, call_id, tool_name}`. Interpolation values are
+typed argument facts; the client selects localized copy from `locale_key`.
+Stage-only events carry operational state and display a neutral loader. They do
+not imply strategy extraction, backtest execution, or metric calculation.
+
+Final payloads and persisted assistant metadata carry `tool_result_cards` as a
+list. Each card is `{kind: "tool_result", schema_version: 1, tool_name, call_id,
+artifact_id, input_revision, card_type, card_version, arguments, outcome,
+presentation, artifact_state}`. The outcome status is `succeeded`, `invalid`,
+`ambiguous`, `bounded`, or `unavailable`. Only success has a typed result;
+unsuccessful outcomes contain a failure code and affected field names and cannot
+present an answer. The declaration validates the result before projecting it.
+`presentation` contains a localized title, answer, supporting rows, inputs,
+notes, and optional narrative, public source citations and a typed visual.
+Facts retain their raw value; optional `value_text` supplies localized display
+for typed tokens. Input facts preserve units, editability and the retained
+unknown. Their `visibility` defaults to `private`; a declaration explicitly
+marks shareable input facts `public`. This display contract does not
+replace any tool's argument or result model.
+
+`tool_jobs` retains asynchronous work as
+`[{call_id, tool_name, artifact_id, job}]`. Existing job polling and result-message
+publication resolve each entry independently, including repeated calls and
+out-of-order completions. The legacy `result_card` still identifies a backtest;
+general tools never manufacture runs or use that key to force publication.
+
+`POST /conversations/{conversation_id}/tool-results/{artifact_id}/recompute`
+takes `{message_id, input_revision, arguments}`, where `arguments` is a nonempty
+partial edit. Only a declared local, unconfirmed, editable tool is eligible.
+The endpoint verifies ownership, current message/card liveness and revision,
+retains the original unknown, validates all cross-argument rules, and invokes
+the same callable. Zero remains a known input. It returns `{message}` after a
+guarded update of the same artifact with its next revision; it adds no chat turn.
+Missing/foreign results return 404, dead artifacts return
+`409 artifact_action_invalid_state`, stale revisions or racing writes return
+`409 tool_result_changed`, and rejected inputs return
+`422 tool_arguments_invalid`. A missing or incompatible declaration binding
+returns `422 tool_inputs_not_editable`.
+
 ### Structured Action Semantics
 
 `action` payloads are structured product operations, not plain user text.
@@ -2940,7 +3397,19 @@ stores nothing and makes no LLM, provider, or market-data call.
 - `show_breakdown` requires canonical result run context. A stale
   `save_strategy` request also requires that context, but is non-mutating and
   returns the historical-run continuity response.
-- `show_breakdown` may return varied LLM-authored markdown. The backend derives an internal fact bank from canonical result context, lets the LLM structure educational sections with fact references, and renders those facts deterministically. Invalid fact references or malformed generated breakdowns must fall back to grounded deterministic prose. Assistant message metadata must record `result_breakdown_source`, `result_breakdown_fallback_used`, and, when applicable, `result_breakdown_failure_mode` so optional Explain-result fallback does not masquerade as the normal LLM path.
+- `show_breakdown` composes complete model text from labeled headline run facts
+  and searched historical context, without sending chart series or internal paths. New
+  run readouts use the versioned `result_readout_content` transport described
+  under Message. Declared run figures must match their fact keys within display
+  rounding; missing references do not reject prose. Language, schema or declared
+  figure failure selects the whole template; there are no quote/occurrence,
+  required-mention, figure-count, benchmark-claim or internal-field regex checks.
+  Generation failure selects the typed template and
+  records `result_readout_source`, `result_readout_fallback_used`, and
+  `result_readout_failure_mode`. Existing `result_breakdown_*` provenance is
+  retained for compatibility. An older run can receive a newly requested,
+  newly language-stamped Breakdown; readouts already saved before this lane
+  remain on the current templates.
 - `select_response_option` is valid only for typed response-intent options. Its
   payload must include the durable assistant `message_id` that presented the
   option as `source_assistant_id`, plus the exact `option_id` and
@@ -3114,7 +3583,7 @@ Contract rules:
   backtests and ordinary follow-ups make zero Search calls.
 - A retryable discovery recovery finalizes its chat turn as
   `recoverable_failed` with a durable `retry_last_turn` anchored to the
-  persisted user request, and does not settle the message allowance.
+  persisted user request, and settles no allowance.
 - Charging: the per-subject search allowance settles only for usable results
   (no `fallback_code`); the global daily ceiling counts every attempt.
 
@@ -3412,6 +3881,11 @@ both the recovery route and the facts available to deterministic fallback copy:
 - A surviving `unsupported_strategy_logic` capability constraint may use
   `unsupported_recovery` with supported simplification options. Only this
   capability route may say that Argus cannot run a strategy.
+- `future_performance` is a test asked over a window that points forward from
+  today. There is no market data for it, so the recovery says so, offers the
+  historical test, and mentions that Argus can research what analysts expect.
+  It is not a refusal of forward-looking questions: those are research answers
+  (decision 10, 2026-09-10) and never produce `unsupported_recovery`.
 - Incomplete or unparseable extraction is a normal clarification outcome. It
   asks for the missing executable detail and must not be represented as a
   strategy-capability refusal.
@@ -3528,7 +4002,18 @@ user evidence span contradicts it. Missing or unknown provenance is never a
 default, and no execution field is exempt merely because of its name.
 Explicit strategy intent or a strategy turn act keeps builder ownership even
 when all execution fields are defaults. Research admission derives that
-decision from the same strategy-route predicate as the interpret stage.
+decision from the same strategy-route predicate as the interpret stage. One
+exception is typed: a strategy claim whose `date_range_intent` is a
+`future_window` is not a runnable test, so it never outranks a question
+payload. Forward-looking and valuation questions (what an asset will be worth,
+what price it must grow into, fair value, analyst targets) are grounded on
+publisher pages and answered as labeled scenarios, with the historical test
+offered as a next experiment; the runtime records
+`research_answers_future_horizon_question` on the interpretation when that
+exception decided the route. A claim about crypto or a currency pair (a
+forecast, a company story, why it moved) is grounded the same way with the
+provider's finance tool left out of the request; a figure about them still
+answers from Argus's own data with the `asset_class_not_covered` note.
 For a find operation, `asset_discovery` owns the search parameters and
 `needs_current_facts`. A missing discovery payload uses missing-target
 recovery; it never implies that stale model knowledge is sufficient.
@@ -3548,6 +4033,18 @@ final payload and persisted metadata:
         "domain": "example.com",
         "url": "https://example.com/filing",
         "source_date": "2026-07-16"
+      }
+    ],
+    "rows": [
+      {
+        "subject": "Netflix",
+        "symbol": "NFLX",
+        "label": "Q2 2026 revenue",
+        "value": 11079000000,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-07-16",
+        "source_url": "https://example.com/filing"
       }
     ],
     "retrieved_at": "2026-08-07T15:04:05Z",
@@ -3589,6 +4086,7 @@ Contract rules:
   three provider-backed research questions per UTC day; signed-in users have
   no separate per-user research allowance, but every provider attempt uses the
   shared ceiling. `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` defaults to `5000`.
+  `GET /me/usage` projects this meter as the `grounding` operation class.
   Ordinary chat turns, cache hits, unconfigured-provider paths, and idempotent
   persisted thorough-job replays do not claim capacity. An unreadable or
   unwritable
@@ -3602,6 +4100,44 @@ Contract rules:
   Unpriced calls carry the reported invoice, expected range and discrepancy
   in ledger metadata and emit an ERROR alert. Transport, malformed answer,
   empty answer and missing required source evidence still fail closed.
+- **A turn is billed for every response it read, not for the one it
+  published.** `usage` describes the turn's provider work: a turn that called
+  the provider twice reports both calls' `invocations`, `latency_ms` and
+  `cost_usd` added together, whether it published the first response, the
+  second, or neither. A count or cost the invoices did not all establish is
+  null for the turn, never the part of it that was known. So a retry the turn
+  discarded, a claim withheld for want of a public publisher, and a response
+  billed and then rejected as unreadable all reach the cost ledger at what
+  they cost; only a turn that reached no provider reports zero and
+  `cache_status: "bypass"`. A cache hit is the one turn whose `usage`
+  describes something other than its own work: it serves a stored record and
+  republishes that record's invocations, latency and cost as provenance, and
+  because it spent nothing, its ledger row carries `billable_quantity: 0` with
+  no cost and no latency. The retrieval is charged once, on the miss that
+  stored it. A completed thorough run whose answer cannot be
+  read posts no sidecar to a reader, so its spend is recorded on the ledger
+  directly. None of this is reader-facing: `usage` is server-side evidence,
+  and cost never appears on a public surface.
+- Research-rail cost rows (`source = "research"`, `feature_area =
+  "research_rail"`) carry SQL `status = NULL`, including capability-class
+  turns and `invoice_reconciliation` anomalies. The shared insert normalizer
+  stamps `metadata.research_ledger_contract = "argus_research_ledger/v2"`.
+  Unversioned historical rows retain their original values; they are not
+  correctly scored successes. `degraded_code`, `cache_status`, and
+  `pricing_status` keep their existing meanings. Legacy discovery rows
+  (`feature_area = "discovery"`) retain status derived from `fallback_code`;
+  other sources retain their existing status contract. This is ledger-only:
+  no provider-read channel, sidecar field, reader projection, or backfill.
+- Retrieval evidence is independent of the invoice. The provider's returned
+  output is the retrieval record: finance and web result items and the
+  citations they carry. Survey grounding and the single survey retry read
+  that record, plus any tool count the invoice did establish, so a usable
+  answer whose invoice is missing or malformed is delivered without a second
+  paid request. `usage.invocations` is the finance_search count the turn's
+  invoices established, summed over every response it read. It is null when an
+  invoice did not establish a count and is never spelled as zero unless the
+  provider reported zero; an Argus-built turn that ran no provider call
+  reports zero.
 - A pure quote or market-data number may use `fast`; its public source list may
   be empty because provider provenance belongs to the route receipt rather
   than a publisher link. A narrative, causal, or explanatory clause is typed
@@ -3612,7 +4148,8 @@ Contract rules:
   finance citation channel. If none survives sanitization and question-aware
   selection after that retry, Argus emits
   `research_unavailable_missing_public_sources` and does not publish the
-  unsupported claim.
+  unsupported claim. A response that retrieved nothing at all has no page to
+  select from and is `research_not_grounded` instead.
 - Section 2's five shapes are one rail. Market pulse ("what's moving
   today"), screening ("semiconductor stocks under a 20 P/E"), and sector
   radar ("what's happening in cybersecurity") use the balanced tier and
@@ -3625,14 +4162,22 @@ Contract rules:
   answer itself names. One- and two-character tickers count only when their
   notation is unambiguous, such as a cashtag, parentheses, a table cell, or
   the resolved company name on the same line.
-- Survey grounding counts finance, web, and URL retrieval independently. A
+- Survey grounding counts finance, web, and URL retrieval independently,
+  reading returned tool output first and invoice counts second. A
   survey with no retrieval carries `degraded.code = "survey_not_grounded"`
   and replaces unsupported prose with the precise retrieval failure. A survey
-  that retrieved but names no resolver-verified ticker carries
+  that retrieved but names no resolver-verified ticker, or whose typed
+  answer states no cited figure at all, carries
   `degraded.code = "survey_synthesis_incomplete"` and says that sources were
-  found but the requested assets could not be extracted. Neither failure
-  renders subject-dependent figure or asset copy, and neither emits a
-  runnable row.
+  found but the requested assets could not be extracted; a survey is
+  accepted only with a figure and a verified name, on the first attempt or
+  after the one concrete retry. Neither failure renders subject-dependent
+  figure or asset copy, and neither emits a runnable row. The same retrieval
+  record decides every other research answer, inline or background, before
+  any publisher requirement: a response that retrieved nothing carries
+  `degraded.code = "research_not_grounded"`, replaces its prose with the
+  retrieval failure and carries no rows, while the subjects the user named
+  stay testable.
 - Every `peers[]` entry passed provider-backed asset resolution before
   emission; unresolvable names never become actionable anywhere.
 - `sources` carries the same typed shape grounded discovery emits
@@ -3644,10 +4189,105 @@ Contract rules:
   dated source published before the period implied by the question, keeps at
   most one page per publisher, and caps the drawer at five. An undated live
   page remains eligible because it can plausibly describe the current period.
-  When a current market pulse, screen, or sector radar has no explicit period,
-  the question date is its freshness lower bound. Classifier-supplied period
-  lower bounds are ISO-date typed; a malformed value is rejected instead of
-  turning a bounded question into an unbounded one.
+  The question date is the date the question is asked on by the New York
+  calendar, never the server's date or UTC's; one owner dates it for the
+  inline turn and for the background job request, which carries it to
+  completion. When a current market pulse, screen, or sector radar has no
+  explicit period, the question date is its freshness lower bound. Wherever a
+  lower bound applies, a source dated more than one day past the question
+  date is dropped: no civil clock is a full day ahead of New York, so a
+  publisher stamping pages in UTC can date a page one day ahead and no
+  further. Classifier-supplied period lower bounds are ISO-date typed; a
+  malformed value is rejected instead of turning a bounded question into an
+  unbounded one.
+- **Retrieval produces typed rows, never prose** (grounded-finance board,
+  operating rule 4). Every provider call requests a strict `json_schema`
+  response: the answer prose plus `rows`, one per figure the answer states,
+  each `{subject, symbol, label, value, kind, unit, as_of, source_url}` with
+  `value` a plain number, `subject` the entity the figure describes, and
+  `kind` one of `currency`, `percent`, `multiple`, `count`; a currency row
+  names its unit by an ISO 4217 code known to the maintained currency data
+  Babel ships, never a copied list, or the answer is malformed, and an answer
+  carrying more rows than the packet holds (64) is malformed rather than cut.
+  A row's `source_url` is the citation the model wrote: the page it names is
+  the figure's source, whether or not the same response retrieved that page,
+  and it is `null` for a figure read from the provider's own finance data,
+  whose evidence is the tool result and whose provider host is scrubbed at
+  parse time. Fetched pages are typed sources too, without a publisher date.
+  A row the model wrote with no citation at all is kept, with
+  `source_url: null`, after the cited rows, and the turn says so beneath the
+  answer, naming the figure from the row's own typed subject and label
+  ("I couldn't tie Apple analyst target price to a source."). **A retrieved
+  answer publishes.** No retrieved answer is withheld for a row or a missing
+  row: the strict schema is what keeps a figure from memory unrepresentable,
+  and composition does not second-guess it. A response that retrieved nothing
+  has no source for anything it says, so it is withheld as
+  `research_not_grounded`, or `survey_not_grounded` for a survey. `rows`
+  is additive on the sidecar and may be empty; a degraded turn always
+  carries an empty list, enforced by the sidecar builder. A JSON-shaped
+  answer that is not the schema (an invalid row, an answer the output budget
+  truncated) is a broken contract, never prose: it fails closed as
+  `research_unavailable_malformed_response`, is never cached, and a
+  completed background run carrying one fails its job. Genuine prose under a
+  typed request is delivered and recorded as prose.
+- **A withheld survey keeps its retrieval record and is cached like an
+  answer.** The withholding left is the survey's own, unchanged from before
+  the typed contract, and the same no-retrieval rule for every other answer:
+  `survey_synthesis_incomplete` when the survey retrieved but its prose names
+  no asset the resolver verifies, `survey_not_grounded` when a survey never
+  retrieved, `research_not_grounded` when any other answer never
+  retrieved, and `scenario_inputs_uncited` when a computed scenario
+  (decision 10, `research_query.scenario_question`) retrieved but no input
+  row cites a public page, on the inline and the background path alike; the
+  scenario contract is also part of the research cache identity, so a packet
+  answered under the ordinary retrieval contract never serves a scenario
+  question. Whatever withholds the
+  prose, the turn's `sources` are the pages the response actually retrieved,
+  selected exactly as for a published answer (period-plausible, one page per
+  publisher, retrieval order, at most five): no ranking, no content check,
+  and nothing the packet did not return. `survey_synthesis_incomplete`
+  carries them because it retrieved. `survey_not_grounded` and
+  `research_not_grounded` never retrieved,
+  the other `research_unavailable_*` codes have no packet,
+  `research_capacity_exhausted` and `asset_class_not_covered` ran no provider
+  call, and `research_unavailable_missing_public_sources` composes from its
+  real packet but means no retrieved page survived selection; all of those
+  carry an empty list by construction.
+  Clients render a degraded turn's sources as where Argus looked, never as
+  the sources of an answer: the same drawer, framed by the typed
+  `degraded.code`, so a page that yielded no figure is never presented as
+  having informed one. A withheld packet that carries a retrieval record is
+  stored in the shared cache under the same key as a published one, for its
+  data class TTL capped at one day (`WITHHELD_TTL_SECONDS`): whether a figure
+  is published somewhere changes on the scale of days, not minutes, so an
+  identical question inside that window is answered from the record with
+  `cache_status: "hit"`, the same withheld note and sources, and no provider
+  spend or capacity claim. A packet without a retrieval record is never
+  stored, published or withheld, because a model that did not look is
+  evidence about the model and not about the world and the shared cache
+  holds provider packets about public markets, never one turn's prose for
+  every other user; a malformed or unavailable response has no packet to
+  store; and a packet withheld for want of a required public source is not
+  stored.
+- **Retrieval parameters are configuration per question shape.** Each call
+  sends a model fallback chain (`models`, the primary and the other priced
+  model, served in order; the invoice names the model that served), the
+  reader's language (`language_preference`, ISO 639-1 from the profile
+  language), the shape's web search context size, a recency filter derived
+  from the question's section 7 data class (current classes a week, analyst
+  estimates a month, quarterly and closed classes none, so a closed window is
+  never filtered to the past week), and the asking user's declared country
+  as the reader's location on the web search tool (the profile's `country`,
+  ISO 3166-1 alpha-2). A user without a country sends no location, and no
+  deployment-wide country stands in for one. A thorough job's typed request
+  carries the country, so the job sends the location of the user who asked.
+  The research cache key includes that country, so a search made for one
+  country's readers never answers another's. No domain filter is sent.
+- Current external facts ("why is NVDA moving this week") are claim-shaped:
+  they ground through the balanced shape with publisher sources required and
+  a one-week recency filter, and persist the ordinary `research` sidecar with
+  typed, dated `sources`. Publisher URLs are never written into the prose
+  (#545). Flag off, the pre-rail search-and-voice path is unchanged.
 - Assistant prose never contains provider tool names. The guard derives from
   the `tools` tuples in `research.config`, so a newly configured tool is
   covered the day it is added, and it reaches the vocabulary families around
@@ -3663,7 +4303,9 @@ Contract rules:
   or more subjects were compared, peer suggestions, and the open thread, in
   a consumable shape. It is not a memory record and carries none of the four
   memory categories. The rail only emits; nothing reads or writes memory
-  here, and consumption ships in the memory lane.
+  here, and consumption ships in the memory lane. The app does not render
+  `follow_up`; a research answer that later offers next steps adopts the
+  `next_steps` list instead of a new shape.
 - `etf_constituents` questions ("what's inside SPY?", top holdings, weights)
   ground through the balanced shape; the provider's `etf_holdings` table is
   parsed deterministically, weight order preserved, and each named holding
@@ -3698,9 +4340,9 @@ Contract rules:
   provider run. `operation_scope` rides every serialized job surface,
   including the polling payload; absent means an ordinary backtest.
 - Thorough answers join the shared research cache like every other shape:
-  the finalized packet is stored under the requesting turn's key, and an
-  identical question within the class TTL answers inline with
-  `cache_status: "hit"`, no job, and no provider spend.
+  the finalized packet is stored under the requesting turn's key, a withheld
+  one under the capped TTL above, and an identical question within the TTL
+  answers inline with `cache_status: "hit"`, no job, and no provider spend.
 - Runnable rows name assets in one vocabulary: a short display name derived
   from the resolver's own name (listing boilerplate like "Common Stock" or
   "Inc." stripped, share classes kept) plus the resolver-verified ticker.
@@ -3726,7 +4368,7 @@ Contract rules:
 ## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets`
 
 Grows or restores the active confirmation's basket **without spending a
-turn**: no message allowance, no interpretation, no LLM call. Available only
+turn**: no allowance, no interpretation, no LLM call. Available only
 while `ARGUS_RESEARCH_RAIL_ENABLED` and `ARGUS_IN_PLACE_CARD_EDITS_ENABLED`
 are both on (404 otherwise; the in-place surface ships default off until
 the run-consumption guard lane closes).
@@ -3758,7 +4400,7 @@ nothing.
 ## `POST /conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit`
 
 Edits the active confirmation's capital, dates, or costs **without spending a
-turn**: no message allowance, no interpretation, no LLM call, no backtest
+turn**: no allowance, no interpretation, no LLM call, no backtest
 row. Available only while `ARGUS_IN_PLACE_CARD_EDITS_ENABLED` is on (404
 otherwise); the surface ships default off until the run-consumption guard
 lane closes, and while dark, cards advertise no `direct_edits` so the
@@ -3895,8 +4537,8 @@ nothing.
 - The card also advertises `capabilities.edit_constraints`, the engine's own
   accepted-value envelope: `capital.min`/`capital.max` (the run-time
   starting-capital band), `fees.max` and `slippage.max` (decimal rate caps),
-  and `date_window.max_end` plus a per-asset-class `date_window.min_start`
-  provider history floor. The client renders and pre-checks against these
+  and `date_window.max_end` (today by the New York calendar) plus a
+  per-asset-class `date_window.min_start` provider history floor. The client renders and pre-checks against these
   values and never restates them; the confirm preflight enforces the same
   imported constants, so a card whose `validation.status` is `ready_to_run`
   can never violate run-time validation.
@@ -3929,6 +4571,12 @@ nothing.
   `edit_disclosure` (`{"unapplied": [{"op", "target", "reason"}], "note"?}`)
   and clients render it as a lead-in above the card. The disclosure
   describes one transition and never persists onto later cards.
+- Shared artifact edit accounting owns this guarantee for normal and recovery
+  card paths. A requested target that does not materialize carries
+  `reason: "not_materialized"`. When nothing changes and there is no specific
+  refusal, the receipt is `{"op": "edit", "target": "requested_change",
+  "reason": "no_change_applied"}`. Clients localize that receipt and prioritize
+  it over planner prose; they never guess which unextracted change was intended.
 
 ---
 
@@ -4074,13 +4722,16 @@ Supabase `backtest_jobs` remains the source of truth, and API SSE must still end
 with the current chat turn instead of staying open for workflow-duration
 execution.
 
-For completed workflow-backed jobs, `result_readout` retains the original
-explain-stage prose privately in storage and is always null in the public
-response. Readers voice canonical run facts at the same presentation boundary
-used for in-stream and reloaded results. `result_readout_source` and
-`result_readout_fallback_used` expose whether the normal LLM/schema-grounded
-path produced the readout or whether Argus intentionally fell back to the
-deterministic safety renderer.
+For completed workflow-backed jobs, legacy `result_readout` remains private
+in storage and is always null in the public response. New jobs expose
+`result_readout_content`, the closed, language-tagged envelope derived from the
+canonical run card, through the same presentation boundary used for in-stream
+and reloaded results. Readers show its complete text only when its language
+matches the workspace; missing, null, invalid, or mismatched envelopes use the
+current template. `result_readout_source`, `result_readout_fallback_used`, and
+`result_readout_failure_mode` record whether composition succeeded or selected
+the template fallback. A reader-language mismatch does not change these saved
+creation-time diagnostics or trigger another model call.
 
 For a terminal `chat.research` job, `run` is null and `result_message` is the
 message the job produced: the persisted answer on success, the persisted
@@ -4098,9 +4749,49 @@ sidecar attached to in-stream results (`version: "argus_next_experiments/v1"`,
 localized row label, `why` is a typed reason (`code` + `params`, e.g.
 `beat_benchmark` with `points`), and prebaked rows add `detail` (a short
 suffix such as the pre-resolved peer symbol) plus `send_text` (the exact
-localized sentence a tap submits as an ordinary user turn). The frontend
+localized sentence a tap submits as an ordinary user turn). Reason params are
+one-decimal display figures the backend rounded: `points` is the magnitude of
+the run's shown benchmark gap (the `figures` `delta_vs_benchmark_pct`) and
+`drawdown` is its `max_drawdown_pct`; a
+gap inside the in-line cut carries no benchmark reason. The client prints them
+verbatim in the workspace locale, so the reason never quotes a different
+number than the card above it. The frontend
 renders rows only from this sidecar and never invents rows; `null` or an
 unknown `version` means no Try next section.
+
+A result follow-up (`semantic_turn_act: "result_followup"`) is answered by the
+model on a plain assistant message: `assistant_response` is the answer in the
+workspace language, and no `response_intent` heading is attached. Under the
+answer, `next_steps` carries one ordered list of three to five steps
+(`version: "argus_next_steps/v1"`) in the order the answer recommends them. Each
+item is either `{type: "test", kind}`, a runnable test Argus attaches from the
+latest result's Try next offer, or `{type: "question", text}`, a question the
+reader could ask next. The same message's `next_experiments` carries exactly the
+listed tests' rows, in list order and without `why` (the answer gives the
+reasons), and names its run as `source_run_id`. A tapped test submits what its
+row submits under a card, including the `refine_strategy` action with that
+`run_id` for `change_date_range` and `compare_buy_and_hold`; a tapped question
+sends its text as an ordinary user turn. The frontend renders one Try next
+section from `next_steps`, resolving each test to its row and dropping items it
+cannot resolve. A message without `next_steps` shows its `next_experiments` rows
+alone, which is the shape under a result card before any follow-up answer. When
+the reader asked what to try next (`result_followup_focus: "next_experiment"`)
+and the answer lists no steps, or no model answered and the retryable
+`recovery.code = "latest_result_followup_unavailable"` is shown, the list holds
+the result's tests alone (#590). `next_steps` is not specific to results: a
+research answer can adopt it later without a new shape, and research answers
+carry only `next_experiments` today.
+
+```json
+"next_steps": {
+  "version": "argus_next_steps/v1",
+  "items": [
+    {"type": "test", "kind": "recurring_monthly_buys"},
+    {"type": "question", "text": "What drove DOCN's drop between February and August 2025?"},
+    {"type": "test", "kind": "change_date_range"}
+  ]
+}
+```
 
 When the user selects `change_date_range` or `compare_buy_and_hold`, the web
 client submits a result-presented `refine_strategy` action whose payload carries
@@ -4259,6 +4950,8 @@ Completed chat-launched backtests auto-capture P1 evidence sidecars. The
 result-card metadata may include `idea_id`, `idea_version_id`,
 `evidence_artifact_id`, `evidence_lifecycle`, `artifact_type = "backtest"`,
 and after explicit decision capture, `decision_note_id` and `decision_state`.
+The two decision fields are derived on each transcript read from
+`decision_notes`, which owns them; the stored card copy is not the source.
 These are stable ids/enums and must not be localized.
 
 ## `POST /evidence-artifacts/{id}/decision`
@@ -4309,6 +5002,8 @@ or corrupt legacy user text.
     "idea_version_id": "uuid",
     "evidence_artifact_id": "uuid",
     "source_conversation_id": "uuid",
+    "source_message_id": null,
+    "computation": null,
     "decision_state": "promising",
     "note": "Worth revisiting after the next earnings cycle.",
     "created_at": "timestamp",
@@ -4342,6 +5037,106 @@ or corrupt legacy user text.
   validation. The response follows the standard RFC 9457 Problem Details shape
   with `code = "decision_capture_failed"`. Clients should show a retryable
   failure state and must not invent a saved decision locally.
+
+## Decisions on computed answers
+
+A decision attaches to a computation and carries what a re-run needs. Every
+`DecisionNote` has exactly one attachment:
+
+- A backtest decision attaches to its evidence artifact: `evidence_artifact_id`,
+  `idea_id`, and `idea_version_id` are set; `source_message_id` and
+  `computation` are `null`. Its computation is derived on read from the run
+  behind the artifact, `{"kind": "backtest", "inputs": {"source_run_id": "<run
+  id>"}}`, because that immutable run owns the inputs.
+- A computed-answer decision attaches to the assistant message that carried the
+  answer: `source_message_id` and `computation` are set; the three lineage ids
+  are `null`. The computation is stored on the decision, so the decision keeps
+  its inputs after the message is gone.
+
+A computed answer declares its computation in message metadata:
+`metadata.computation = {"kind": "<registered kind>", "inputs": {...}}`. `kind`
+is a lowercase slug of at most 80 characters; `inputs` is a JSON object of at
+most 32 keys that serializes to at most 8,192 characters. Only the backend
+writes this field. On every transcript read, the backend derives
+`decision_note_id` and `decision_state` for the message from `decision_notes`,
+the one owner of that fact, exactly as it does for a result card; a stored copy
+on the message is never trusted, and a decision the owner no longer holds is
+not shown. Clients render that state instead of inferring one. A message
+without a valid declaration offers no decision.
+
+### `POST /conversations/{conversation_id}/messages/{message_id}/decision`
+
+Create or update the current decision on an owned computed answer. Registered
+accounts only (`can_save_decision`); guests receive `403
+account_conversion_required` with `context.reason = "save_decision"`. The body
+is the same `DecisionNoteCreate` as the evidence-artifact route, with the same
+500-character note bound. One current decision exists per owned answer
+message; a repeated write updates its state and note and keeps the first stored
+computation and `created_at`.
+
+**Response:** `{"decision": DecisionNote}` with `source_message_id` and
+`computation` set and the lineage ids `null`.
+
+**Error rules:**
+- `404 Not Found`: the message is missing, not owned, not in the named
+  conversation, or not an assistant message. `code = "not_found"`.
+- `409 Decision Attachment Unsupported`: the message declares no valid
+  computation. `code = "decision_attachment_unsupported"`.
+- `500 Decision Capture Failed`: `code = "decision_capture_failed"`, same
+  client rule as the evidence route.
+
+### `GET /decisions/{decision_id}`
+
+Open an owned decision. The backend re-runs its computation from the stored
+inputs and returns the decision, the effective computation, and the outcome.
+The re-run happens only when the decision is opened; nothing reaches out.
+
+```json
+{
+  "decision": { "...": "DecisionNote" },
+  "computation": { "kind": "backtest", "inputs": { "source_run_id": "uuid" } },
+  "rerun": {
+    "kind": "backtest",
+    "inputs": { "source_run_id": "uuid" },
+    "status": "confirmation_required",
+    "result": null,
+    "retest": { "type": "retest_run", "source_run_id": "uuid", "...": "..." },
+    "reason_code": null
+  }
+}
+```
+
+`rerun.status`:
+- `computed`: `result` carries the kind's typed result; `retest` is `null`.
+- `confirmation_required`: the backtest kind. `retest` is the same typed
+  `retest_run` action the run dossier offers, because a backtest earns its
+  confirmation by cost and never executes on open.
+- `unavailable`: nothing ran, and `reason_code` says why, as a code and never
+  prose: `kernel_unavailable` (the kind is not registered),
+  `invalid_inputs` (the stored inputs no longer satisfy the kind),
+  `inputs_not_editable`, `run_unavailable`, or `retest_unavailable`.
+
+`404 Not Found` when the decision is missing or not owned.
+
+### `POST /decisions/{decision_id}/rerun`
+
+Re-run with changed inputs. Body: `{"inputs": {...}}`, overrides merged over
+the stored inputs under the same bounds as a declared computation. Returns
+`DecisionOpenResponse`. A re-run never changes the decision or its stored
+computation. Overrides that fail the kind's typed inputs return `422
+validation_error` with the field errors in `context.errors`. The backtest
+kind's inputs are not editable: overrides answer `unavailable` with
+`inputs_not_editable` rather than minting a run.
+
+### Search and dossiers
+
+A computed-answer decision joins the same decision index as a backtest
+decision. It matches by its note, its state, and the text of the answer it
+attaches to; the conversation carries its state in `decision_states`; the
+`decision_state` filter and ledger groups count it. `dossier` stays `null`
+unless the conversation also has an evidence-backed run, and
+`GET /conversations/{conversation_id}/run-dossiers` is unchanged: it projects
+runs, so only backtest decisions appear there.
 
 ---
 
@@ -4723,6 +5518,30 @@ symbol lineage. This protects the bounded per-keystroke read contract.
 
 # 17.1 Private Alpha Observability Envelope
 
+### Internal question/outcome evidence
+
+The Refusal log observes terminal chat replies and validated artifact-action
+requests rejected before message storage. This adds no public endpoint, request
+field, response metadata, SSE frame, visible copy, or model-facing text.
+The service-only `refusal_log` SQL view is documented in
+`docs/DATA_MODEL.md` under `refusal_observations and refusal_log`.
+
+Accepted turns link the exact persisted user/assistant messages and read their
+question, action, original outcome metadata, and response from those owners.
+Rejected actions retain the submitted question, validated action, actual HTTP
+status, and unchanged problem response. Caller-supplied artifact/conversation
+ids remain claims; the evidence writer neither resolves them nor treats them
+as proof of ownership. Repeated rejected requests count independently even when
+they reuse `X-Request-ID`.
+
+The writer observes all terminal replies without identifying which ones are
+refusals or deciding whether a boundary is correct. Observation failure leaves
+the public response and allowance behavior unchanged and emits only a
+content-free operational failure. This evidence remains internal to Supabase,
+outside frontend reads, PostHog, model context, and the live-eval fingerprint.
+
+### Product event envelope
+
 P1 defines a stable measurement envelope for product analytics, future cost
 accounting, and eval readiness. B3 slice 2 emits the approved product-event set
 to PostHog when `POSTHOG_PROJECT_TOKEN` and an explicit PostHog region or host
@@ -4971,16 +5790,34 @@ limit returns `429` with `code: "too_many_requests"` and `Retry-After`.
 
 Feedback context is privacy-sanitized by the backend before persistence. The
 backend keeps only known scalar artifact/app keys such as `source`, `surface`,
-`message_id`, `conversation_id`, `artifact_id`, `artifact_type`, result,
-confirmation, backtest-job, rating, tag, timestamp, and attachment-count
+`message_id`, `conversation_id`, `artifact_id`, `artifact_type`,
+`evidence_artifact_id`, result, confirmation, backtest-job, rating, tag, timestamp,
+and attachment-count
 metadata. Raw browser URLs are not persisted; when a URL or legacy
 `metadata.path` is provided, the backend stores only a queryless `page_path`
 with UUID-like path segments redacted. Unknown nested blobs, prompts, emails,
 tokens, and arbitrary browser metadata are dropped.
 
 Guest feedback does not require an email and does not consume chat or simulation
-allowance. Conversation and artifact identifiers are attached only after the
-user explicitly opts in; raw transcript content is never attached by default.
+allowance. A one-tap rating, from message thumbs or the chat's feedback ask,
+carries the identifiers of the message it rates. Written feedback from the
+feedback dialog attaches conversation and artifact identifiers only after the
+user opts in. Raw transcript content is never attached.
+
+The chat's feedback ask sends `context.source: "feedback_ask"` with a one-tap
+`context.rating` of `positive`, `neutral`, or `negative`, plus the identifiers
+message thumbs send for the result it follows, such as `conversation_id` and
+`message_id`. Its optional detail goes through the feedback dialog under the
+opt-in above. The detail keeps the ask's `source` but carries no rating, so only
+the tap's row holds the rating. Message thumbs send `positive` or `negative`.
+
+Every accepted submission, guest or registered and of any type, is emailed to
+`support@get-argus.com` after the response is sent, through the Resend SMTP
+credential the access welcome email already uses
+(`ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD`). The email carries the type, account kind,
+profile language, message, and the sanitized context above, and adds no contact
+details the submission did not already carry. A missing credential or a failed
+delivery is logged and never changes the response or the saved feedback.
 
 For `account_deletion_request`, clients send a one-click support request from
 the account surface. The backend enriches `context` with authenticated account

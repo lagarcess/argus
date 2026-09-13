@@ -37,6 +37,10 @@ class ClosedTrade:
 class LongOnlyExecutionResult:
     equity_curve: pd.Series
     closed_trades: tuple[ClosedTrade, ...]
+    # Dollars the fills paid: a buy spends market value plus both costs, and a
+    # sell returns market value minus both.
+    modeled_fee_cost: float
+    modeled_slippage_cost: float
 
 
 @dataclass(frozen=True)
@@ -45,6 +49,8 @@ class DcaSimulationResult:
 
     ``external_flows`` holds the deposit landing on each bar, so metric code
     can subtract exactly the cash this curve invested and nothing else.
+    ``modeled_fee_cost`` and ``modeled_slippage_cost`` are the dollars its
+    buys paid, so each invested deposit is market value plus both.
     ``deferred_fill_count`` counts deposits whose buy waited for a later
     observed price instead of executing on their own bar.
     """
@@ -52,6 +58,8 @@ class DcaSimulationResult:
     equity_curve: pd.Series
     invested_capital: float
     external_flows: pd.Series
+    modeled_fee_cost: float
+    modeled_slippage_cost: float
     deferred_fill_count: int = 0
 
 
@@ -245,6 +253,8 @@ def _execute_long_only_ledger(
     opened_at: pd.Timestamp | None = None
     opening_capital = 0.0
     shares = 0.0
+    fee_cost = 0.0
+    slippage_cost = 0.0
     closed: list[ClosedTrade] = []
     equity_values: list[float] = []
     processed_fills = 0
@@ -269,6 +279,9 @@ def _execute_long_only_ledger(
                 opening_capital = cash
                 shares = opening_capital / cash_per_share
                 cash = 0.0
+                market_value = shares * market_price
+                slippage_cost += market_value * slippage
+                fee_cost += market_value * (1.0 + slippage) * fees
                 continue
 
             if event.side == "sell" and event.action == "close":
@@ -276,6 +289,8 @@ def _execute_long_only_ledger(
                     raise ValueError("execution_position_not_open")
                 gross_proceeds = shares * market_price * (1.0 - slippage)
                 net_proceeds = gross_proceeds * (1.0 - fees)
+                slippage_cost += shares * market_price * slippage
+                fee_cost += gross_proceeds * fees
                 closed.append(
                     ClosedTrade(
                         symbol=open_symbol,
@@ -306,6 +321,8 @@ def _execute_long_only_ledger(
             dtype=float,
         ),
         closed_trades=tuple(closed),
+        modeled_fee_cost=float(fee_cost),
+        modeled_slippage_cost=float(slippage_cost),
     )
 
 
@@ -383,9 +400,12 @@ def _dca_equity_curve(
     invested_capital = starting_capital + float(entry_mask.sum()) * contribution
     if invested_capital <= 0:
         invested_capital = contribution
+    market_value_bought = shares_bought * close
     return DcaSimulationResult(
         equity_curve=equity.astype(float),
         invested_capital=invested_capital,
         external_flows=external_flows,
+        modeled_fee_cost=float((market_value_bought * (1.0 + slippage) * fees).sum()),
+        modeled_slippage_cost=float((market_value_bought * slippage).sum()),
         deferred_fill_count=deferred_fill_count,
     )

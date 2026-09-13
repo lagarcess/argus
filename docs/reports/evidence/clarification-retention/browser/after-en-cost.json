@@ -1,0 +1,16 @@
+{
+  "calls": 14,
+  "total_cost_usd": 0.068537,
+  "by_call": {
+    "asset_mention_preflight:LLMAssetMentionExtraction:x-ai/grok-4.3:succeeded": 0.000706,
+    "field_fidelity:StatedRunFieldFidelityAudit:x-ai/grok-4.3:succeeded": 0.001286,
+    "interpretation:ArtifactAssumptionEditPlan:x-ai/grok-4.3:succeeded": 0.022274,
+    "interpretation:AssetGroundingAudit:x-ai/grok-4.3:succeeded": 0.002752,
+    "interpretation:DcaContractAudit:x-ai/grok-4.3:succeeded": 0.003139,
+    "interpretation:DcaContributionRoleAudit:x-ai/grok-4.3:succeeded": 0.008984,
+    "interpretation:LLMInterpretationResponse:x-ai/grok-4.3:succeeded": 0.027455,
+    "interpretation_repair:FocusedStrategyExtraction:x-ai/grok-4.3:succeeded": 0.001901,
+    "name_suggestion:name_suggestion:google/gemini-2.5-flash-lite:skipped": 0.0,
+    "name_suggestion:name_suggestion:google/gemini-2.5-flash-lite:succeeded": 3.8e-05
+  }
+}

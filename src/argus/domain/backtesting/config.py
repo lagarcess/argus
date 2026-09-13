@@ -12,6 +12,7 @@ from argus.domain.capability_registry import ALLOWED_TEMPLATES
 from argus.domain.indicators import normalize_indicator_parameters
 from argus.domain.market_data import resolve_asset
 from argus.domain.market_data.capabilities import validate_market_data_window
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
 AssetClass = Literal["equity", "crypto", "currency_pair"]
@@ -176,7 +177,7 @@ def normalize_backtest_config(
     classify_symbol_func=classify_symbol,
     default_benchmark_func=default_benchmark,
 ) -> dict[str, Any]:
-    today = date.today()
+    today = new_york_today()
     end_default = today - timedelta(days=1)
     end = _to_date(payload.get("end_date") or end_default)
     start = _to_date(payload.get("start_date") or (end - timedelta(days=365)))

@@ -10,11 +10,22 @@ from argus.agent_runtime.state.models import FinalResponsePayload
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "web" / "lib" / "chat-final-response-payload.ts"
+TYPE_REFERENCES = {
+    "#/$defs/ToolResultCard": ("ToolResultCard", "./tool-result-card"),
+}
 
 
-def _typescript_type(schema: dict[str, Any]) -> str:
+def _typescript_type(schema: dict[str, Any], imports: set[tuple[str, str]]) -> str:
+    if "$ref" in schema:
+        reference = TYPE_REFERENCES.get(schema["$ref"])
+        if reference is None:
+            raise ValueError(f"Unknown frontend type reference: {schema['$ref']}")
+        imports.add(reference)
+        return reference[0]
     if "anyOf" in schema:
-        return " | ".join(_typescript_type(item) for item in schema["anyOf"])
+        return " | ".join(_typescript_type(item, imports) for item in schema["anyOf"])
+    if schema.get("type") == "array":
+        return f"Array<{_typescript_type(schema['items'], imports)}>"
     if schema.get("type") in {"string", "null"}:
         return str(schema["type"])
     if schema.get("type") == "object" and schema.get("additionalProperties") is True:
@@ -25,8 +36,9 @@ def _typescript_type(schema: dict[str, Any]) -> str:
 def render_final_response_type() -> str:
     schema = FinalResponsePayload.model_json_schema()
     required = set(schema.get("required", []))
+    imports: set[tuple[str, str]] = set()
     fields = [
-        f"  {name}{'' if name in required else '?'}: {_typescript_type(field)};"
+        f"  {name}{'' if name in required else '?'}: {_typescript_type(field, imports)};"
         for name, field in schema["properties"].items()
     ]
     return "\n".join(
@@ -35,6 +47,11 @@ def render_final_response_type() -> str:
             "// Run: poetry run python scripts/generate_chat_final_response_type.py",
             "// Do not edit by hand; the backend model owns these fields.",
             "",
+            *[
+                f'import type {{ {name} }} from "{source}";'
+                for name, source in sorted(imports)
+            ],
+            *([""] if imports else []),
             "export type ChatFinalResponsePayload = {",
             *fields,
             "};",

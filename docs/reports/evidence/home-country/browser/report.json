@@ -1,0 +1,102 @@
+{
+  "web": "http://localhost:3000",
+  "api": "http://127.0.0.1:8000/api/v1",
+  "steps": [
+    {
+      "language": "en",
+      "step": "panel opened with a browser suggestion; nothing saved",
+      "account": {
+        "country": null,
+        "currency_override": null,
+        "currency": null
+      }
+    },
+    {
+      "language": "en",
+      "step": "picked Mexico; the API derived MXN",
+      "account": {
+        "country": "MX",
+        "currency_override": null,
+        "currency": "MXN"
+      }
+    },
+    {
+      "language": "en",
+      "step": "overrode the currency with USD",
+      "account": {
+        "country": "MX",
+        "currency_override": "USD",
+        "currency": "USD"
+      }
+    },
+    {
+      "language": "en",
+      "step": "after a reload",
+      "account": {
+        "country": "MX",
+        "currency_override": "USD",
+        "currency": "USD"
+      }
+    },
+    {
+      "language": "en",
+      "step": "refused save shown and put back",
+      "patch_status": 422,
+      "alert": "Could not update your country yet.",
+      "account": {
+        "country": "MX",
+        "currency_override": "USD",
+        "currency": "USD"
+      }
+    },
+    {
+      "language": "es-419",
+      "step": "panel opened with a browser suggestion; nothing saved",
+      "account": {
+        "country": null,
+        "currency_override": null,
+        "currency": null
+      }
+    },
+    {
+      "language": "es-419",
+      "step": "picked Mexico; the API derived MXN",
+      "account": {
+        "country": "MX",
+        "currency_override": null,
+        "currency": "MXN"
+      }
+    },
+    {
+      "language": "es-419",
+      "step": "overrode the currency with USD",
+      "account": {
+        "country": "MX",
+        "currency_override": "USD",
+        "currency": "USD"
+      }
+    },
+    {
+      "language": "es-419",
+      "step": "after a reload",
+      "account": {
+        "country": "MX",
+        "currency_override": "USD",
+        "currency": "USD"
+      }
+    },
+    {
+      "language": "es-419",
+      "step": "refused save shown and put back",
+      "patch_status": 422,
+      "alert": "No pudimos actualizar tu país todavía.",
+      "account": {
+        "country": "MX",
+        "currency_override": "USD",
+        "currency": "USD"
+      }
+    }
+  ],
+  "en_page_errors": [],
+  "es-419_page_errors": []
+}

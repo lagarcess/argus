@@ -1,0 +1,1267 @@
+{
+  "label": "nvda-future-value-es",
+  "language": "es-419",
+  "question": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+  "asked_at": "2026-09-10T19:59:38.145451+00:00",
+  "tree": "base",
+  "source": "local Argus API (memory persistence, mock auth), real interpreter and research provider",
+  "events": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "needs_clarification"
+    },
+    {
+      "type": "stage_start",
+      "stage": "clarify"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "await_user_reply"
+    },
+    {
+      "type": "token",
+      "content": "I cannot predict future performance. I can test how the same idea performed over a historical period instead. Which direction should I take: Test this idea over a historical period or Compare with buy and hold?"
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "await_user_reply",
+        "assistant_prompt": "I cannot predict future performance. I can test how the same idea performed over a historical period instead. Which direction should I take: Test this idea over a historical period or Compare with buy and hold?",
+        "assistant_response": "I cannot predict future performance. I can test how the same idea performed over a historical period instead. Which direction should I take: Test this idea over a historical period or Compare with buy and hold?",
+        "clarification": {
+          "kind": "unsupported_recovery",
+          "reason_code": "future_performance",
+          "prompt_source": "degraded_fallback",
+          "requested_field": "unsupported_constraints",
+          "requested_fields": [
+            "unsupported_constraints"
+          ],
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "payload": {
+            "strategy": {
+              "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+              "requested_strategy_template": null,
+              "strategy_type": "buy_and_hold",
+              "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+              "asset_universe": [
+                "NVDA"
+              ],
+              "asset_class": "equity",
+              "timeframe": null,
+              "cadence": null,
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": 10000.0,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": "SPY",
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "NVDA",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "resolved",
+                  "canonical_symbol": "NVDA",
+                  "asset_class": "equity",
+                  "validated_by": "provider_catalog",
+                  "confidence": "medium"
+                }
+              ],
+              "extra_parameters": {
+                "provider_resolved_assets": [
+                  {
+                    "raw_text": "NVDA",
+                    "symbol": "NVDA",
+                    "asset_class": "equity",
+                    "name": "NVIDIA Corporation Common Stock",
+                    "raw_symbol": "NVDA",
+                    "provider": "alpaca",
+                    "exchange": "AssetExchange.NASDAQ"
+                  }
+                ],
+                "language": "es-419",
+                "evidence_spans": {
+                  "capital_amount": "$10,000",
+                  "asset_universe": "NVDA"
+                },
+                "field_provenance": {
+                  "capital_amount": "explicit_user",
+                  "asset_universe": "explicit_user"
+                },
+                "raw_strategy_type": "buy_and_hold",
+                "future_horizon_intent": {
+                  "kind": "future_window",
+                  "start": null,
+                  "end": null,
+                  "day_offset": null,
+                  "count": 10.0,
+                  "unit": "year",
+                  "anchor": "today",
+                  "year": null,
+                  "endpoint": null,
+                  "confidence": 0.95,
+                  "evidence": "dentro de diez años"
+                }
+              }
+            },
+            "raw_value": "dentro de diez años"
+          },
+          "options": [
+            {
+              "id": "option_0",
+              "replacement_values": {
+                "requested_field": "date_range"
+              },
+              "compatibility_label": "Test this idea over a historical period"
+            },
+            {
+              "id": "buy_and_hold",
+              "replacement_values": {
+                "strategy_type": "buy_and_hold",
+                "requested_field": "date_range"
+              },
+              "compatibility_label": "Compare with buy and hold historically"
+            }
+          ]
+        },
+        "response_intent": {
+          "kind": "unsupported_recovery",
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "requested_fields": [],
+          "facts": {
+            "strategy": {
+              "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+              "requested_strategy_template": null,
+              "strategy_type": "buy_and_hold",
+              "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+              "asset_universe": [
+                "NVDA"
+              ],
+              "asset_class": "equity",
+              "timeframe": null,
+              "cadence": null,
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": 10000.0,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": "SPY",
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "NVDA",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "resolved",
+                  "canonical_symbol": "NVDA",
+                  "asset_class": "equity",
+                  "validated_by": "provider_catalog",
+                  "confidence": "medium"
+                }
+              ],
+              "extra_parameters": {
+                "provider_resolved_assets": [
+                  {
+                    "raw_text": "NVDA",
+                    "symbol": "NVDA",
+                    "asset_class": "equity",
+                    "name": "NVIDIA Corporation Common Stock",
+                    "raw_symbol": "NVDA",
+                    "provider": "alpaca",
+                    "exchange": "AssetExchange.NASDAQ"
+                  }
+                ],
+                "language": "es-419",
+                "evidence_spans": {
+                  "capital_amount": "$10,000",
+                  "asset_universe": "NVDA"
+                },
+                "field_provenance": {
+                  "capital_amount": "explicit_user",
+                  "asset_universe": "explicit_user"
+                },
+                "raw_strategy_type": "buy_and_hold",
+                "future_horizon_intent": {
+                  "kind": "future_window",
+                  "start": null,
+                  "end": null,
+                  "day_offset": null,
+                  "count": 10.0,
+                  "unit": "year",
+                  "anchor": "today",
+                  "year": null,
+                  "endpoint": null,
+                  "confidence": 0.95,
+                  "evidence": "dentro de diez años"
+                }
+              }
+            },
+            "current_user_message": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+            "language": "es-419",
+            "unsupported_constraints": [
+              {
+                "category": "future_performance",
+                "raw_value": "dentro de diez años",
+                "explanation": "Argus cannot predict future performance. It can test how the same idea performed over a historical period instead.",
+                "simplification_options": [
+                  {
+                    "label": "Test this idea over a historical period",
+                    "replacement_values": {
+                      "requested_field": "date_range"
+                    }
+                  },
+                  {
+                    "label": "Compare with buy and hold historically",
+                    "replacement_values": {
+                      "strategy_type": "buy_and_hold",
+                      "requested_field": "date_range"
+                    }
+                  }
+                ]
+              }
+            ],
+            "preserved_optional_parameter_status": {
+              "optional_parameter_opportunity": [
+                "initial_capital",
+                "timeframe",
+                "fees",
+                "slippage",
+                "engine_options"
+              ],
+              "user_preference_overridden_for_turn": false,
+              "confidence": 0.8,
+              "arbitration_mode": "structured_arbitration",
+              "ambiguous_fields": []
+            }
+          },
+          "options": [
+            {
+              "label": "Test this idea over a historical period",
+              "replacement_values": {
+                "requested_field": "date_range"
+              },
+              "id": "option_0"
+            },
+            {
+              "label": "Compare with buy and hold historically",
+              "replacement_values": {
+                "strategy_type": "buy_and_hold",
+                "requested_field": "date_range"
+              },
+              "id": "buy_and_hold"
+            }
+          ]
+        },
+        "resolution_provenance": [
+          {
+            "field": "asset_universe[0]",
+            "raw_text": "NVDA",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "NVDA",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "medium"
+          }
+        ],
+        "pending_strategy": {
+          "strategy": {
+            "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+            "asset_universe": [
+              "NVDA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": null,
+            "sizing_mode": null,
+            "capital_amount": 10000.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": "SPY",
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [
+              {
+                "field": "asset_universe[0]",
+                "raw_text": "NVDA",
+                "source": "llm_extraction",
+                "candidate_kind": "asset",
+                "resolution_status": "resolved",
+                "canonical_symbol": "NVDA",
+                "asset_class": "equity",
+                "validated_by": "provider_catalog",
+                "confidence": "medium"
+              }
+            ],
+            "extra_parameters": {
+              "provider_resolved_assets": [
+                {
+                  "raw_text": "NVDA",
+                  "symbol": "NVDA",
+                  "asset_class": "equity",
+                  "name": "NVIDIA Corporation Common Stock",
+                  "raw_symbol": "NVDA",
+                  "provider": "alpaca",
+                  "exchange": "AssetExchange.NASDAQ"
+                }
+              ],
+              "language": "es-419",
+              "evidence_spans": {
+                "capital_amount": "$10,000",
+                "asset_universe": "NVDA"
+              },
+              "field_provenance": {
+                "capital_amount": "explicit_user",
+                "asset_universe": "explicit_user"
+              },
+              "raw_strategy_type": "buy_and_hold",
+              "future_horizon_intent": {
+                "kind": "future_window",
+                "start": null,
+                "end": null,
+                "day_offset": null,
+                "count": 10.0,
+                "unit": "year",
+                "anchor": "today",
+                "year": null,
+                "endpoint": null,
+                "confidence": 0.95,
+                "evidence": "dentro de diez años"
+              }
+            }
+          },
+          "requested_field": null,
+          "missing_required_fields": [
+            "date_range"
+          ],
+          "response_intent": {
+            "kind": "unsupported_recovery",
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "requested_fields": [],
+            "facts": {
+              "strategy": {
+                "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "requested_strategy_template": null,
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "$10,000",
+                    "asset_universe": "NVDA"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "explicit_user",
+                    "asset_universe": "explicit_user"
+                  },
+                  "raw_strategy_type": "buy_and_hold",
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.95,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "current_user_message": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+              "language": "es-419",
+              "unsupported_constraints": [
+                {
+                  "category": "future_performance",
+                  "raw_value": "dentro de diez años",
+                  "explanation": "Argus cannot predict future performance. It can test how the same idea performed over a historical period instead.",
+                  "simplification_options": [
+                    {
+                      "label": "Test this idea over a historical period",
+                      "replacement_values": {
+                        "requested_field": "date_range"
+                      }
+                    },
+                    {
+                      "label": "Compare with buy and hold historically",
+                      "replacement_values": {
+                        "strategy_type": "buy_and_hold",
+                        "requested_field": "date_range"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "preserved_optional_parameter_status": {
+                "optional_parameter_opportunity": [
+                  "initial_capital",
+                  "timeframe",
+                  "fees",
+                  "slippage",
+                  "engine_options"
+                ],
+                "user_preference_overridden_for_turn": false,
+                "confidence": 0.8,
+                "arbitration_mode": "structured_arbitration",
+                "ambiguous_fields": []
+              }
+            },
+            "options": [
+              {
+                "label": "Test this idea over a historical period",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "id": "option_0"
+              },
+              {
+                "label": "Compare with buy and hold historically",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "id": "buy_and_hold"
+              }
+            ]
+          },
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+            "prompt_source": "degraded_fallback",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "requested_strategy_template": null,
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "$10,000",
+                    "asset_universe": "NVDA"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "explicit_user",
+                    "asset_universe": "explicit_user"
+                  },
+                  "raw_strategy_type": "buy_and_hold",
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.95,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "raw_value": "dentro de diez años"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Test this idea over a historical period"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Compare with buy and hold historically"
+              }
+            ]
+          }
+        },
+        "message_id": "865e3863-5f47-432c-ba7f-6085afd6a55d",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "04cb4223-ef73-4cb7-9364-56f71c868233",
+  "done": true,
+  "messages": {
+    "items": [
+      {
+        "id": "cda9b442-9649-4c73-a2c3-3d8b36dabda7",
+        "conversation_id": "04cb4223-ef73-4cb7-9364-56f71c868233",
+        "role": "user",
+        "content": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+        "created_at": "2026-09-10T19:59:38.178047Z",
+        "metadata": {
+          "agent_runtime_turn": {
+            "status": "started",
+            "conversation_id": "04cb4223-ef73-4cb7-9364-56f71c868233",
+            "request_id": "1d8ce201-c0de-45af-b3a1-1c9c9ebf1239",
+            "started_at": "2026-09-10T19:59:38.178039+00:00"
+          }
+        }
+      },
+      {
+        "id": "865e3863-5f47-432c-ba7f-6085afd6a55d",
+        "conversation_id": "04cb4223-ef73-4cb7-9364-56f71c868233",
+        "role": "assistant",
+        "content": "I cannot predict future performance. I can test how the same idea performed over a historical period instead. Which direction should I take: Test this idea over a historical period or Compare with buy and hold?",
+        "created_at": "2026-09-10T20:00:06.817313Z",
+        "metadata": {
+          "conversation_mode": "setup",
+          "agent_runtime_stage_outcome": "await_user_reply",
+          "response_intent": {
+            "kind": "unsupported_recovery",
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "requested_fields": [],
+            "facts": {
+              "strategy": {
+                "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "requested_strategy_template": null,
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "$10,000",
+                    "asset_universe": "NVDA"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "explicit_user",
+                    "asset_universe": "explicit_user"
+                  },
+                  "raw_strategy_type": "buy_and_hold",
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.95,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "current_user_message": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+              "language": "es-419",
+              "unsupported_constraints": [
+                {
+                  "category": "future_performance",
+                  "raw_value": "dentro de diez años",
+                  "explanation": "Argus cannot predict future performance. It can test how the same idea performed over a historical period instead.",
+                  "simplification_options": [
+                    {
+                      "label": "Test this idea over a historical period",
+                      "replacement_values": {
+                        "requested_field": "date_range"
+                      }
+                    },
+                    {
+                      "label": "Compare with buy and hold historically",
+                      "replacement_values": {
+                        "strategy_type": "buy_and_hold",
+                        "requested_field": "date_range"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "preserved_optional_parameter_status": {
+                "optional_parameter_opportunity": [
+                  "initial_capital",
+                  "timeframe",
+                  "fees",
+                  "slippage",
+                  "engine_options"
+                ],
+                "user_preference_overridden_for_turn": false,
+                "confidence": 0.8,
+                "arbitration_mode": "structured_arbitration",
+                "ambiguous_fields": []
+              }
+            },
+            "options": [
+              {
+                "label": "Test this idea over a historical period",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "id": "option_0"
+              },
+              {
+                "label": "Compare with buy and hold historically",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "id": "buy_and_hold"
+              }
+            ]
+          },
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "future_performance",
+            "prompt_source": "degraded_fallback",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "requested_strategy_template": null,
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "asset_universe": [
+                  "NVDA"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 10000.0,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "NVDA",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "NVDA",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "NVDA",
+                      "symbol": "NVDA",
+                      "asset_class": "equity",
+                      "name": "NVIDIA Corporation Common Stock",
+                      "raw_symbol": "NVDA",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "es-419",
+                  "evidence_spans": {
+                    "capital_amount": "$10,000",
+                    "asset_universe": "NVDA"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "explicit_user",
+                    "asset_universe": "explicit_user"
+                  },
+                  "raw_strategy_type": "buy_and_hold",
+                  "future_horizon_intent": {
+                    "kind": "future_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 10.0,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.95,
+                    "evidence": "dentro de diez años"
+                  }
+                }
+              },
+              "raw_value": "dentro de diez años"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Test this idea over a historical period"
+              },
+              {
+                "id": "buy_and_hold",
+                "replacement_values": {
+                  "strategy_type": "buy_and_hold",
+                  "requested_field": "date_range"
+                },
+                "compatibility_label": "Compare with buy and hold historically"
+              }
+            ]
+          },
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "raw_text": "NVDA",
+              "source": "llm_extraction",
+              "candidate_kind": "asset",
+              "resolution_status": "resolved",
+              "canonical_symbol": "NVDA",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "confidence": "medium"
+            }
+          ],
+          "pending_strategy": {
+            "strategy": {
+              "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+              "requested_strategy_template": null,
+              "strategy_type": "buy_and_hold",
+              "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+              "asset_universe": [
+                "NVDA"
+              ],
+              "asset_class": "equity",
+              "timeframe": null,
+              "cadence": null,
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": 10000.0,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": "SPY",
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "NVDA",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "resolved",
+                  "canonical_symbol": "NVDA",
+                  "asset_class": "equity",
+                  "validated_by": "provider_catalog",
+                  "confidence": "medium"
+                }
+              ],
+              "extra_parameters": {
+                "provider_resolved_assets": [
+                  {
+                    "raw_text": "NVDA",
+                    "symbol": "NVDA",
+                    "asset_class": "equity",
+                    "name": "NVIDIA Corporation Common Stock",
+                    "raw_symbol": "NVDA",
+                    "provider": "alpaca",
+                    "exchange": "AssetExchange.NASDAQ"
+                  }
+                ],
+                "language": "es-419",
+                "evidence_spans": {
+                  "capital_amount": "$10,000",
+                  "asset_universe": "NVDA"
+                },
+                "field_provenance": {
+                  "capital_amount": "explicit_user",
+                  "asset_universe": "explicit_user"
+                },
+                "raw_strategy_type": "buy_and_hold",
+                "future_horizon_intent": {
+                  "kind": "future_window",
+                  "start": null,
+                  "end": null,
+                  "day_offset": null,
+                  "count": 10.0,
+                  "unit": "year",
+                  "anchor": "today",
+                  "year": null,
+                  "endpoint": null,
+                  "confidence": 0.95,
+                  "evidence": "dentro de diez años"
+                }
+              }
+            },
+            "requested_field": null,
+            "missing_required_fields": [
+              "date_range"
+            ],
+            "response_intent": {
+              "kind": "unsupported_recovery",
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "requested_fields": [],
+              "facts": {
+                "strategy": {
+                  "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                  "requested_strategy_template": null,
+                  "strategy_type": "buy_and_hold",
+                  "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 10000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "NVDA",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA",
+                        "asset_class": "equity",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "raw_symbol": "NVDA",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "capital_amount": "$10,000",
+                      "asset_universe": "NVDA"
+                    },
+                    "field_provenance": {
+                      "capital_amount": "explicit_user",
+                      "asset_universe": "explicit_user"
+                    },
+                    "raw_strategy_type": "buy_and_hold",
+                    "future_horizon_intent": {
+                      "kind": "future_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 10.0,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.95,
+                      "evidence": "dentro de diez años"
+                    }
+                  }
+                },
+                "current_user_message": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                "language": "es-419",
+                "unsupported_constraints": [
+                  {
+                    "category": "future_performance",
+                    "raw_value": "dentro de diez años",
+                    "explanation": "Argus cannot predict future performance. It can test how the same idea performed over a historical period instead.",
+                    "simplification_options": [
+                      {
+                        "label": "Test this idea over a historical period",
+                        "replacement_values": {
+                          "requested_field": "date_range"
+                        }
+                      },
+                      {
+                        "label": "Compare with buy and hold historically",
+                        "replacement_values": {
+                          "strategy_type": "buy_and_hold",
+                          "requested_field": "date_range"
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "preserved_optional_parameter_status": {
+                  "optional_parameter_opportunity": [
+                    "initial_capital",
+                    "timeframe",
+                    "fees",
+                    "slippage",
+                    "engine_options"
+                  ],
+                  "user_preference_overridden_for_turn": false,
+                  "confidence": 0.8,
+                  "arbitration_mode": "structured_arbitration",
+                  "ambiguous_fields": []
+                }
+              },
+              "options": [
+                {
+                  "label": "Test this idea over a historical period",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  },
+                  "id": "option_0"
+                },
+                {
+                  "label": "Compare with buy and hold historically",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold",
+                    "requested_field": "date_range"
+                  },
+                  "id": "buy_and_hold"
+                }
+              ]
+            },
+            "clarification": {
+              "kind": "unsupported_recovery",
+              "reason_code": "future_performance",
+              "prompt_source": "degraded_fallback",
+              "requested_field": "unsupported_constraints",
+              "requested_fields": [
+                "unsupported_constraints"
+              ],
+              "semantic_needs": [
+                "simplification_choice"
+              ],
+              "payload": {
+                "strategy": {
+                  "raw_user_phrasing": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                  "requested_strategy_template": null,
+                  "strategy_type": "buy_and_hold",
+                  "strategy_thesis": "¿Cuánto valdrán $10,000 en NVDA dentro de diez años?",
+                  "asset_universe": [
+                    "NVDA"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": null,
+                  "sizing_mode": null,
+                  "capital_amount": 10000.0,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "NVDA",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "NVDA",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "NVDA",
+                        "symbol": "NVDA",
+                        "asset_class": "equity",
+                        "name": "NVIDIA Corporation Common Stock",
+                        "raw_symbol": "NVDA",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "es-419",
+                    "evidence_spans": {
+                      "capital_amount": "$10,000",
+                      "asset_universe": "NVDA"
+                    },
+                    "field_provenance": {
+                      "capital_amount": "explicit_user",
+                      "asset_universe": "explicit_user"
+                    },
+                    "raw_strategy_type": "buy_and_hold",
+                    "future_horizon_intent": {
+                      "kind": "future_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 10.0,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.95,
+                      "evidence": "dentro de diez años"
+                    }
+                  }
+                },
+                "raw_value": "dentro de diez años"
+              },
+              "options": [
+                {
+                  "id": "option_0",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Test this idea over a historical period"
+                },
+                {
+                  "id": "buy_and_hold",
+                  "replacement_values": {
+                    "strategy_type": "buy_and_hold",
+                    "requested_field": "date_range"
+                  },
+                  "compatibility_label": "Compare with buy and hold historically"
+                }
+              ]
+            }
+          },
+          "agent_runtime_turn": {
+            "turn_id": "cda9b442-9649-4c73-a2c3-3d8b36dabda7",
+            "request_id": "1d8ce201-c0de-45af-b3a1-1c9c9ebf1239",
+            "status": "completed",
+            "terminal": true,
+            "reconciled_outcome": null,
+            "failure_code": null,
+            "retryable": false
+          },
+          "artifact_presentation_kind": null
+        }
+      }
+    ],
+    "next_cursor": null
+  },
+  "elapsed_seconds": 28.67,
+  "summary": {
+    "label": "nvda-future-value-es",
+    "language": "es-419",
+    "elapsed_seconds": 28.67,
+    "stage_outcomes": [
+      "needs_clarification",
+      "await_user_reply"
+    ],
+    "answered": false,
+    "recovery_code": null,
+    "clarification_kind": "unsupported_recovery",
+    "clarification_reason_code": "future_performance",
+    "reason_codes": null,
+    "intent": null,
+    "semantic_turn_act": null,
+    "assistant_text": "I cannot predict future performance. I can test how the same idea performed over a historical period instead. Which direction should I take: Test this idea over a historical period or Compare with buy and hold?",
+    "shape": null,
+    "degraded": null,
+    "rows": 0,
+    "sources": [],
+    "research_usage": null,
+    "next_experiments": []
+  }
+}

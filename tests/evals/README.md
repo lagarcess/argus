@@ -255,6 +255,13 @@ This slice covers the locked built-surface categories present in the fixtures.
 Categories for unbuilt surfaces, including comparison, freshness on return, and
 research-to-test, get added when their lanes land.
 
+`ordinary_conversation` landed with the subtract-the-guardrails lane (PR #565).
+It holds the plain turns the backtest guardrails used to re-read: concept
+questions in both languages, a capability question phrased as education, and a
+market curiosity question. Each must reach an honest answer in the user's
+language with `ready_to_respond`; the scorecard's route receipts show which
+second reads ran, which is the evidence the narrowed gates are measured by.
+
 `asset_discovery_routing` (issue #244) landed with the Grounded Discovery lane.
 It asserts the `semantic_turn_act=asset_discovery` routing boundary and its
 typed payload (relationship, anchors, category terms), plus near-miss negatives

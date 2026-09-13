@@ -1,0 +1,18 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "unauthenticated_readiness_probe": "404; corrected local probe to use the documented ops header, no product change",
+  "api": {
+    "http_status": 200,
+    "seconds": 0.007
+  },
+  "web": {
+    "http_status": 200,
+    "seconds": 0.008
+  },
+  "readiness": {
+    "http_status": 200,
+    "seconds": 5.62,
+    "status": "ready"
+  },
+  "prod_web_build_exit_code": 0
+}

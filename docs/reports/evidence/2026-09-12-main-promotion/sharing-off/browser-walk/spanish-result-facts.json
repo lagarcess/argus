@@ -1,0 +1,67 @@
+{
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "read_only_disposable_database": true,
+  "status": "completed",
+  "symbols": [
+    "KO"
+  ],
+  "aggregate_metrics": {
+    "risk": {
+      "volatility_pct": 16.29,
+      "max_drawdown_pct": -20.95,
+      "max_drawdown_peak_date": "2022-04-21",
+      "max_drawdown_trough_date": "2023-10-05"
+    },
+    "efficiency": {
+      "win_rate": null,
+      "buy_fills": 53,
+      "sell_fills": 0,
+      "sharpe_ratio": 0.49,
+      "total_trades": 53,
+      "profit_factor": null
+    },
+    "performance": {
+      "profit": 2761.45,
+      "return_basis": "contributions",
+      "total_return_pct": 16.64,
+      "execution_realism": {
+        "enabled": true,
+        "fee_bps": 10.0,
+        "slippage_bps": 5.0,
+        "return_drag_pct": 0.17,
+        "modeled_fee_cost": 16.58,
+        "modeled_cost_total": 24.87,
+        "net_total_return_pct": 16.64,
+        "modeled_slippage_cost": 8.29,
+        "gross_total_return_pct": 16.81
+      },
+      "benchmark_coverage": {
+        "target_points": 1109,
+        "observed_ratio": 1.0,
+        "observed_points": 1109,
+        "deferred_fill_count": 0
+      },
+      "benchmark_return_pct": 51.27,
+      "annualized_return_pct": 5.12,
+      "portfolio_value_range": {
+        "source": "strategy_portfolio_equity_close",
+        "currency": "USD",
+        "peak_value": 22039.91,
+        "lowest_value": 6190.71
+      },
+      "delta_vs_benchmark_pct": -34.64
+    }
+  },
+  "feedback_count": 1,
+  "jobs": [
+    {
+      "status": "succeeded",
+      "operation_scope": "chat.run_backtest"
+    },
+    {
+      "status": "succeeded",
+      "operation_scope": "chat.research"
+    }
+  ],
+  "raw_identifiers_retained": false
+}

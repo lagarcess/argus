@@ -1,0 +1,42 @@
+[
+  {
+    "case": "research-es-419",
+    "language": "en",
+    "status": 200,
+    "size": [
+      1200,
+      630
+    ],
+    "source": "Existing server-rendered image route; unauthenticated HTTP"
+  },
+  {
+    "case": "research-es-419",
+    "language": "es-419",
+    "status": 200,
+    "size": [
+      1200,
+      630
+    ],
+    "source": "Existing server-rendered image route; unauthenticated HTTP"
+  },
+  {
+    "case": "mixed",
+    "language": "en",
+    "status": 200,
+    "size": [
+      1200,
+      630
+    ],
+    "source": "Existing server-rendered image route; unauthenticated HTTP"
+  },
+  {
+    "case": "mixed",
+    "language": "es-419",
+    "status": 200,
+    "size": [
+      1200,
+      630
+    ],
+    "source": "Existing server-rendered image route; unauthenticated HTTP"
+  }
+]

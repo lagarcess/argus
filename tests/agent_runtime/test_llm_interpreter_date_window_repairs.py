@@ -1,4 +1,9 @@
 # ruff: noqa: F403, F405
+from datetime import datetime
+
+from argus.domain.market_data.capabilities import EASTERN
+from argus.domain.market_data.new_york_clock import new_york_today
+
 from tests.agent_runtime._llm_interpreter_common import *
 
 
@@ -178,16 +183,11 @@ async def test_retry_word_inside_new_prompt_uses_focused_strategy_repair(
 @pytest.mark.asyncio
 async def test_current_year_so_far_repairs_llm_year_end_date_range(
     monkeypatch,
+    freeze_new_york_clock,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
-    from argus.nlp import natural_time as natural_time_module
 
-    class FrozenDate(date):
-        @classmethod
-        def today(cls) -> date:
-            return cls(2026, 6, 30)
-
-    monkeypatch.setattr(natural_time_module, "date", FrozenDate)
+    freeze_new_york_clock(datetime(2026, 6, 30, 20, 17, tzinfo=EASTERN))
 
     async def repair_stub(*, failed_response, request, **kwargs):
         del kwargs
@@ -614,19 +614,15 @@ async def test_llm_interpreter_does_not_convert_capability_question_to_guidance(
     assert "vague_strategy_start_guidance" not in ready_response.reason_codes
 
 @pytest.mark.asyncio
-async def test_llm_interpreter_repairs_unfocused_capability_answer(
+async def test_llm_interpreter_keeps_educational_prose_without_a_second_read(
     monkeypatch,
 ) -> None:
+    # The primary read owns capability_question_focus on an educational turn;
+    # its answer is not re-read by the capability audit.
     from argus.agent_runtime import llm_interpreter as interpreter_module
 
     async def audit_stub(**kwargs):
-        assert kwargs["schema_name"] == "CapabilitySideQuestionAudit"
-        return interpreter_module.CapabilitySideQuestionAudit(
-            is_capability_question=True,
-            focus="supported_indicators",
-            assistant_response=None,
-            confidence=0.88,
-        )
+        raise AssertionError(f"unexpected second read: {kwargs['schema_name']}")
 
     monkeypatch.setattr(
         interpreter_module,
@@ -637,13 +633,13 @@ async def test_llm_interpreter_repairs_unfocused_capability_answer(
         intent="conversation_followup",
         task_relation="continue",
         requires_clarification=False,
-        user_goal_summary="User asks whether Bollinger Bands are supported.",
-        assistant_response="Bollinger Bands are not supported yet.",
+        user_goal_summary="User asks what a moving average is.",
+        assistant_response="A moving average smooths prices over a window.",
         semantic_turn_act="educational_question",
         artifact_target="none",
     )
     request = InterpretationRequest(
-        current_user_message="Can I use Bollinger Bands?",
+        current_user_message="What is a moving average?",
         recent_thread_history=[],
         latest_task_snapshot=None,
         user=UserState(user_id="u1"),
@@ -655,11 +651,10 @@ async def test_llm_interpreter_repairs_unfocused_capability_answer(
         request=request,
     )
 
-    assert ready_response.intent == "conversation_followup"
     assert ready_response.semantic_turn_act == "educational_question"
-    assert ready_response.capability_question_focus == "supported_indicators"
-    assert ready_response.assistant_response is None
-    assert "capability_side_question_audit" in ready_response.reason_codes
+    assert ready_response.capability_question_focus is None
+    assert ready_response.assistant_response == response.assistant_response
+    assert "capability_side_question_audit" not in ready_response.reason_codes
 
 @pytest.mark.asyncio
 async def test_material_execution_evidence_routes_to_structured_repair_before_capability(
@@ -2017,7 +2012,7 @@ async def test_unprovenanced_calendar_year_intent_uses_focused_date_window_audit
     assert "FocusedDateWindowExtraction" in calls
     assert ready_response.candidate_strategy_draft.date_range == {
         "start": "2023-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert ready_response.candidate_strategy_draft.date_range_raw_text == (
         "from 2023 to date"
@@ -2123,7 +2118,7 @@ async def test_raw_date_evidence_does_not_trust_mismatched_calendar_year_intent(
     assert "FocusedDateWindowExtraction" in calls
     assert ready_response.candidate_strategy_draft.date_range == {
         "start": "2023-01-01",
-        "end": date.today().isoformat(),
+        "end": new_york_today().isoformat(),
     }
     assert ready_response.candidate_strategy_draft.date_range_raw_text == (
         "from 2023 to date"

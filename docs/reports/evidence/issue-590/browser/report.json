@@ -1,0 +1,80 @@
+[
+  {
+    "language": "en",
+    "conversation_id": "be48acd1-cdfe-4c1c-a4d7-2efa5578b704",
+    "timings": {
+      "confirmation_seconds": 18.9,
+      "result_seconds": 10.6,
+      "followup_seconds": 21.6,
+      "date_row_seconds": 7.9
+    },
+    "try_next_sections": 1,
+    "rows": [
+      "↳\nTry monthly recurring buys·Worst drop was -15.5%",
+      "↳\nTry a supported SMA/EMA crossover",
+      "↳\nTest a different date range"
+    ],
+    "after_followup_text": "Here is what you can try next from this result. Test a different date range What period would you like to test instead?",
+    "recovery_shown": false,
+    "followup_typed_next_experiment": true,
+    "date_row_request": {
+      "action": {
+        "type": "refine_strategy",
+        "label": "Test a different date range",
+        "labelKey": "chat.next_experiments.labels.change_date_range",
+        "payload": {
+          "run_id": "51c5b268-e2b2-5206-86f3-ca1f64dc685b",
+          "next_experiment_kind": "change_date_range"
+        },
+        "presentation": "result"
+      }
+    },
+    "after_date_row_text": "Test a different date range What period would you like to test instead?",
+    "page_errors": [],
+    "screenshots": [
+      "en-1-*.png",
+      "en-2-*.png",
+      "en-3-*.png",
+      "en-4-*.png"
+    ]
+  },
+  {
+    "language": "es-419",
+    "conversation_id": "82c65bcc-0eb8-40a7-bd69-ad7b5777522d",
+    "timings": {
+      "confirmation_seconds": 33.9,
+      "result_seconds": 10.6,
+      "followup_seconds": 37.4,
+      "date_row_seconds": 8.8
+    },
+    "try_next_sections": 1,
+    "rows": [
+      "↳\nProbar compras mensuales recurrentes·La peor caída fue -15.5%",
+      "↳\nProbar un cruce SMA/EMA compatible",
+      "↳\nProbar otro rango de fechas"
+    ],
+    "after_followup_text": "Esto es lo que puedes probar después a partir de este resultado. Probar otro rango de fechas ¿Qué período te gustaría probar? Puedes darme fechas exactas o un rango relativo, como 'últimos 6 meses' o '2023 completo'.",
+    "recovery_shown": false,
+    "followup_typed_next_experiment": true,
+    "date_row_request": {
+      "action": {
+        "type": "refine_strategy",
+        "label": "Probar otro rango de fechas",
+        "labelKey": "chat.next_experiments.labels.change_date_range",
+        "payload": {
+          "run_id": "d5daa89a-8916-5c8d-be43-ec3822e28e5c",
+          "next_experiment_kind": "change_date_range"
+        },
+        "presentation": "result"
+      }
+    },
+    "after_date_row_text": "Probar otro rango de fechas ¿Qué período te gustaría probar? Puedes darme fechas exactas o un rango relativo, como 'últimos 6 meses' o '2023 completo'.",
+    "page_errors": [],
+    "screenshots": [
+      "es-419-1-*.png",
+      "es-419-2-*.png",
+      "es-419-3-*.png",
+      "es-419-4-*.png"
+    ]
+  }
+]

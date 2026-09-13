@@ -1,0 +1,40 @@
+Registry declaration: post-merge rendered-fixture acceptance
+Source SHA: 6b8d846e8543d532ecbfac73b9d744a3b1ac1ec2
+Integrated SHA: 3ceada309a450c12335ad6e1048ab141ce1680bb
+Source repository: /Users/garces/.codex/worktrees/aa72/private-alpha-next
+Isolated root: /private/tmp/registry-declaration-browser-6b8d846e
+Reason: shared ChatInterface owner changed in the integration merge; repeat the same corrected 16 cases and 14 screenshots.
+
+Preparation
+- Extracted `git archive 6b8d846e8543d532ecbfac73b9d744a3b1ac1ec2 web` into isolated-root/checkout/. This is an archive, not a Git worktree.
+- Linked existing source web/node_modules at isolated-root/node_modules and checkout/web/node_modules; no dependency installation.
+- Reused the corrected b17 generator, guard, signal controls, Playwright config and scroll helper, changing only isolated paths, exact source SHA and local port 3196. Added ChatInterface to the source-hash inventory. Fixture logic and browser test cases are unchanged.
+- Prepended only these two statements to the archived original tool-registry.spec.ts:
+  import { installRegistryEvidenceHooks } from "./registry-evidence-hooks";
+  installRegistryEvidenceHooks();
+- Exact resulting test/control files are retained under harness/. Absolute paths retain the execution host context.
+- An initial provenance inventory path typo was corrected in the temporary wrapper before browser execution; the failed offline log remains only in scratch as fixture-generation-initial-provenance-path.log. It did not call providers or change source.
+
+Offline fixture generation (cwd: source repository)
+PYTHONDONTWRITEBYTECODE=1 .venv/bin/python /private/tmp/registry-declaration-browser-6b8d846e/generate-fixtures.py > /private/tmp/registry-declaration-browser-6b8d846e/fixture-generation.log 2>&1
+Result: exit 0; socket/DNS blocked with zero attempts. All five generated fixture/ledger hashes match the corrected b17 bundle.
+
+Browser matrix and captures (cwd: isolated root)
+REGISTRY_SCREENSHOT_DIR=/private/tmp/registry-declaration-browser-6b8d846e/screenshots REGISTRY_NETWORK_DIR=/private/tmp/registry-declaration-browser-6b8d846e/network NODE_OPTIONS='--require /private/tmp/registry-declaration-browser-6b8d846e/scroll-capture.cjs' node /Users/garces/.codex/worktrees/aa72/private-alpha-next/web/node_modules/@playwright/test/cli.js test --config /private/tmp/registry-declaration-browser-6b8d846e/registry.playwright.config.ts > /private/tmp/registry-declaration-browser-6b8d846e/browser.log 2>&1
+Result: exit 0; 16 passed in 57.4s, zero skipped/failed/flaky cases. 208 intercepted API requests; zero external requests, unhandled API requests or page errors. All 14 screenshots visually inspected.
+Archived JSON: coherent-matrix-results.json (execution output: playwright-results.json).
+The retained helper uses only real scrolling and disclosed viewport heights; it does not hide chrome or change styles. Its exact geometry records are in scroll-captures.jsonl.
+
+Cleanup/source verification
+lsof -nP -iTCP:3196 -sTCP:LISTEN
+Result: exit 1, no output. Playwright's browser/server exited with the completed run.
+git rev-parse HEAD
+Result: 6b8d846e8543d532ecbfac73b9d744a3b1ac1ec2
+git status --porcelain --untracked-files=all -- src tests web
+Result: exit 0, no output.
+Compared every tracked web file in the isolated archive with `git archive` of source SHA: only the original registry spec's documented evidence-hook prefix differed. Added temporary hook/signal controls are retained under harness/.
+
+Archived offline verification (cwd: source repository; no network or writes)
+.venv/bin/python docs/reports/evidence/registry-declaration/6b8d846e/browser/verify-bundle.py
+
+No real API/provider/interpreter/backtest/eval calls, source edits, commits, pushes or dependency installation. The earlier b17 evidence bundle is preserved untouched and linked from README.

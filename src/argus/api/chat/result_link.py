@@ -16,6 +16,7 @@ from typing import Any
 from loguru import logger
 
 from argus.agent_runtime.recovery_messages import recovery_message, recovery_state
+from argus.api.artifact_presentation import reader_run
 from argus.api.chat.backtest_jobs import (
     REAL_BACKTEST_JOB_KIND,
     _utcnow_iso,
@@ -113,9 +114,7 @@ def link_shadow_backtest_job_result(
                     job_id=context.created_job_id,
                     standing_status=str(linked.get("status") or ""),
                 )
-            return ResultLinkOutcome(
-                publishable=True, reason="linked", job=dict(linked)
-            )
+            return ResultLinkOutcome(publishable=True, reason="linked", job=dict(linked))
         logger.warning(
             "Result link refused; publication is withheld so a restored "
             "card can never sit beside a result",
@@ -179,6 +178,20 @@ def apply_result_link_outcome(
         dev_memory_fallback_enabled=dev_memory_fallback_enabled,
     )
     if not link_outcome.publishable:
+        # The declared card is another projection of this same withheld run.
+        # Other calls on this turn keep their own independent results.
+        bound = getattr(run, "conversation_result_card", {}).get("tool_result_cards", [])
+        call_ids = {
+            card["call_id"]
+            for card in bound
+            if isinstance(card, dict) and "call_id" in card
+        }
+        for document in (metadata, runtime_result):
+            cards = document.get("tool_result_cards")
+            if isinstance(cards, list):
+                document["tool_result_cards"] = [
+                    card for card in cards if card.get("call_id") not in call_ids
+                ]
         return ResultPublication(
             publishable=False,
             assistant_text=_withhold_refused_result_publication(
@@ -205,7 +218,7 @@ def apply_result_link_outcome(
     context_packets = result_card.get("context_packets")
     if isinstance(context_packets, list):
         metadata["context_packets"] = context_packets
-    runtime_result["run"] = run.model_dump(mode="json")
+    runtime_result["run"] = reader_run(run).model_dump(mode="json")
     return ResultPublication(publishable=True, result_card=result_card)
 
 

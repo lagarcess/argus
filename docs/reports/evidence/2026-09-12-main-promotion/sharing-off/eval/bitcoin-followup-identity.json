@@ -1,0 +1,29 @@
+{
+  "case_id": "capability_honesty_future_performance_btc_regression",
+  "verified_at": "2026-09-13T21:37:57.488668+00:00",
+  "candidate_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+  "environment": "B, native full live eval, both provider modes live_provider",
+  "observation": "The authored fixture explicitly names Bitcoin; the judged rendered next-experiment label names the Grayscale BTC equity ETF.",
+  "visible_label": "Test Grayscale Bitcoin Mini Trust ETF (BTC) since July 2024",
+  "classification": "P2 wrong follow-up identity; nonblocking observation",
+  "verification_scope": "Confirmed native rendered-label mismatch. No follow-up was clicked, no wrong-instrument execution is claimed, and no production user session was replayed.",
+  "resolver_proof": {
+    "ee9c3491fa6219502f1e94abc5d9e661a06839d9": {
+      "ast_sha256": "3d9bef5908efe8c81a7f1050332997324f51f8a9f8ab8c44c87bc33684599577",
+      "line": 228,
+      "end_line": 254
+    },
+    "4fd587bf24ce39b794c2228d61f94693826d0da2": {
+      "ast_sha256": "3d9bef5908efe8c81a7f1050332997324f51f8a9f8ab8c44c87bc33684599577",
+      "line": 273,
+      "end_line": 299
+    }
+  },
+  "cause_scope": "The shared resolver only passes the bare symbol to resolve_asset and does not use query.asset_class_hint. Its AST is identical on deployed and candidate builds. The native result does not retain the query hint, so its value on this exact turn is not asserted.",
+  "related_issues": [
+    244,
+    599
+  ],
+  "product_change_made": false,
+  "issue_url": "https://github.com/lagarcess/argus/issues/611"
+}

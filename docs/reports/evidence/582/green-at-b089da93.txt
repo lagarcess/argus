@@ -1,0 +1,12 @@
+# Green at b089da93, clean tracked tree
+
+## cd web && bunx playwright test e2e/profile-language-save.spec.ts
+  ✓  1 [chromium] › e2e/profile-language-save.spec.ts:178:7 › a refused save is shown and put back (en account picks es-419) (2.2s)
+  ✓  2 [chromium] › e2e/profile-language-save.spec.ts:178:7 › a refused save is shown and put back (es-419 account picks en) (2.2s)
+  ✓  4 [chromium] › e2e/profile-language-save.spec.ts:228:5 › a save the account took is kept when its reply fails (1.0s)
+  ✓  3 [chromium] › e2e/profile-language-save.spec.ts:206:5 › a saved language reaches the account and survives a reload (1.7s)
+  ✓  5 [chromium] › e2e/profile-language-save.spec.ts:246:5 › a save that outlives its panel cannot close the panel that replaced it (961ms)
+  ✓  6 [chromium] › e2e/profile-language-save.spec.ts:316:5 › the front door keeps a language in this browser and writes no profile (881ms)
+  ✓  7 [chromium] › e2e/profile-language-save.spec.ts:340:7 › a theme change stays in this browser and writes no profile (en) (1.7s)
+  ✓  8 [chromium] › e2e/profile-language-save.spec.ts:340:7 › a theme change stays in this browser and writes no profile (es-419) (1.7s)
+  8 passed (7.5s)

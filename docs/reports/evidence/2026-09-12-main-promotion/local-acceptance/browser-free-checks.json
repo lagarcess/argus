@@ -1,0 +1,55 @@
+{
+  "measured_head": "df7aee12955f667e31057464d62c72287fb12247",
+  "browser": "visible Codex in-app browser; Chrome provider unavailable",
+  "web_origin": "http://localhost:3136",
+  "api_origin": "http://localhost:8136",
+  "production_build": true,
+  "passed": [
+    "English guest empty greeting",
+    "disposable local signup",
+    "English signed-in empty greeting",
+    "first display-name save",
+    "saved display name retained after reload",
+    "home country set to United States; currency derives USD",
+    "English Usage labels: Usage, Conversation, Searches with sources, Simulations"
+  ],
+  "pending": [
+    "backtest and result surfaces",
+    "feedback ask once and saved rating",
+    "two cumulative card edits",
+    "clarifying reply fact retention",
+    "research with sources",
+    "decision saved on a result",
+    "sharing create, signed-out phone view and revoke",
+    "Spanish surfaces"
+  ],
+  "paid_turns": 0,
+  "reported_cost_usd": 0,
+  "images": [
+    {
+      "path": "browser/01-en-guest-greeting.png",
+      "sha256": "4ab488b7def097aed6ca0110466edaa5da3166fe9cc5a52fb39d5972142ad23a"
+    },
+    {
+      "path": "browser/02-en-signed-in-greeting.png",
+      "sha256": "f9d775897939fb5f98a2111b96134828fa420ab18b731da52d889226a0695cfd"
+    },
+    {
+      "path": "browser/03-en-first-profile-save.png",
+      "sha256": "4a91405e131a556b7e400620c03a5bc8a2db1cab8bbfa7c262e4b47346487f73"
+    },
+    {
+      "path": "browser/04-en-profile-save-reload.png",
+      "sha256": "4a91405e131a556b7e400620c03a5bc8a2db1cab8bbfa7c262e4b47346487f73"
+    },
+    {
+      "path": "browser/05-en-home-country.png",
+      "sha256": "02119611ec365238390a6d5dbe506958fa6ee7196e632edc66a22f2daedd9ec5"
+    },
+    {
+      "path": "browser/06-en-usage-labels.png",
+      "sha256": "3d33b24117279bfc10b0e88f4574c9c0126cee2e8ca4f970ad7bfe724e441cc6"
+    }
+  ],
+  "privacy": "Only a synthetic reserved-domain QA address appears in profile screenshots. No production identities or user text were selected or captured."
+}

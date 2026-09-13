@@ -1,0 +1,243 @@
+{
+  "probe": "retry_variant_no_instructions",
+  "purpose": "isolation: the strict schema without the instructions text",
+  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
+  "captured_at": "2026-09-09T01:23:20.526264+00:00",
+  "elapsed_s": 3.76,
+  "request_overrides": {
+    "instructions": null
+  },
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "Retrieve today's top gainers, top losers, and most active US-listed stocks with their percentage moves, prices, and volumes.\nThe user asked: anything interesting moving today\nLead with the figures you retrieve and state their as-of time. If retrieval fails, say only that you could not retrieve current figures. Do not write a sources line, include links, or name any tool, provider, or internal system.\nAnswer in English.",
+        "tools": [
+          {
+            "type": "finance_search"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "en",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                    "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "label": {
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "subject",
+                      "symbol",
+                      "label",
+                      "value",
+                      "kind",
+                      "unit",
+                      "as_of",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "response": {
+        "background": false,
+        "completed_at": 1788916996,
+        "created_at": 1788916996,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_2efcb1d9-83d5-4c75-a5ef-a17573f8e92c",
+        "incomplete_details": null,
+        "instructions": null,
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "name": "finance",
+            "type": "skill_loaded"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"I could not retrieve current figures.\",\"rows\":[]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_ac17b098-1a5c-4284-912d-9c5f3caf9877",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "finance_search"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.02694,
+            "cache_read_cost": 0.00182,
+            "currency": "USD",
+            "input_cost": 2e-05,
+            "output_cost": 0.00168,
+            "total_cost": 0.03046
+          },
+          "input_tokens": 9934,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 5388,
+            "cache_read_input_tokens": 4540,
+            "cached_tokens": 4540
+          },
+          "output_tokens": 84,
+          "output_tokens_details": {
+            "reasoning_tokens": 36
+          },
+          "total_tokens": 10018
+        },
+        "user": null
+      }
+    }
+  ],
+  "packet": {
+    "typed_answer": true,
+    "uncited_rows": 0,
+    "rows": [],
+    "sources": [],
+    "tool_results": [],
+    "tickers": [],
+    "usage": {
+      "invocations": 0,
+      "finance_search_invocations": 0,
+      "web_search_invocations": 0,
+      "fetch_url_invocations": 0,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 0,
+      "cost_usd": null,
+      "input_tokens": 9934,
+      "output_tokens": 84,
+      "cache_creation_input_tokens": 5388,
+      "cache_read_input_tokens": 4540
+    },
+    "answer_markdown": "I could not retrieve current figures."
+  },
+  "error": null
+}

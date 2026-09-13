@@ -1,0 +1,34 @@
+{
+  "key": "buy_and_hold",
+  "language": "en",
+  "steps": [
+    {
+      "step": "01-card",
+      "sent": "Buy and hold DOCN since September 2023 against SPY.",
+      "seconds": 22.3,
+      "answer": "DOCN\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$1,000\nPERIOD\nSep 1, 2023 → Sep 11, 2026\nStocks\nDaily data\nThrough Sep 11\nNo fees\nNo slippage\nBenchmark: SPY\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel",
+      "research_rows": 0,
+      "billed_usd": 0.0238694
+    },
+    {
+      "step": "02-result",
+      "seconds": 8.2,
+      "answer": "DOCN\nBuy and Hold\n\nSep 1, 2023 → Sep 11, 2026 · Daily data\n\nSimulation Complete\n\t\n\t\n\n\t\n\t\nTradingView Lightweight Charts\n1M\n3M\nYTD\n1Y\nAll\nRange details\n\nVisible period: Sep 1, 2023 to Sep 11, 2026.\n\nEnding value\n\n$4,594\n\n+$3,594 gain · +359.4% total return\n\nCompared with SPY\nBeat by 290.0 percentage points\nWorst drop\n-44.9%\n\nStocks · Historical simulation · No fees/slippage · Not advice\n\nView details\nExplain result\nRefine idea\nAdd decision\nQUICK TAKE\n\nBuying DOCN once and holding it through this historical run turned $1,000 invested into $3,594 of profit, ahead of SPY by 290.0 percentage points. The tradeoff was a rough ride: the investment later fell 44.9% from an earlier high before finishing at $4,594. Holding delivered much more than the benchmark here, but with substantially sharper swings along the way.\n\nTRY NEXT\n↳\nTest a different date range·Beat the benchmark by 290.0 points\n↳\nTest the same setup on a similar asset\n↳\nTry monthly recurring buys",
+      "billed_usd": 0.0066849999999999965
+    },
+    {
+      "step": "03-worst-drop",
+      "sent": "When was the worst drop?",
+      "seconds": 22.1,
+      "answer": "The worst drop in this test began on February 18, 2025. At that point the portfolio was worth $1,747. It ended on August 1, 2025, after falling to $963. The dollar decline during that stretch was $784, a drop of 44.9% from the prior high. After hitting that low, the investment later recovered and finished the test at $4,594.\n\nTRY NEXT\n↳\nWhat happened to DOCN's business between February and August 2025 that could explain that drop?\n↳\nTry monthly recurring buys\n↳\nTry a moving average crossover\n↳\nTest a different date range",
+      "research_rows": 0,
+      "billed_usd": 0.021283650000000015,
+      "try_next_under_answer": true,
+      "heading_elements": 0,
+      "starts_with_old_heading": false
+    }
+  ],
+  "page_errors": [],
+  "conversation_url": "http://127.0.0.1:3595/chat?conversation=1e62d3e2-e0ed-49ce-8082-f7c2280296b1",
+  "try_next_check": "the locale label for Try next, compared without letter case, because the section label renders in capitals"
+}

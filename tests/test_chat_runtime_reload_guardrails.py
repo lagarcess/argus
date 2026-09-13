@@ -5140,25 +5140,27 @@ def test_show_breakdown_action_without_canonical_run_id_does_not_use_latest(
     monkeypatch,
 ) -> None:
     from argus.api import state as api_state
-    from argus.api.routers import agent as agent_router
+    from argus.api.chat import breakdown
 
     captured: dict[str, Any] = {}
 
-    def _breakdown(run: BacktestRun | None, *, language: str) -> SimpleNamespace:
+    def _breakdown(
+        run: BacktestRun | None, *, language: str
+    ) -> breakdown.ResultBreakdownMessage:
         captured["run"] = run
-        return SimpleNamespace(
+        return breakdown.ResultBreakdownMessage(
             text=(
                 "I could not find the completed backtest to explain."
                 if run is None
                 else "Unexpected latest-run breakdown."
             ),
-            source="missing_result" if run is None else "latest_result",
+            source="missing_result" if run is None else "llm_breakdown_stage",
             fallback_used=True,
             failure_mode="missing_result" if run is None else None,
         )
 
     monkeypatch.setattr(
-        agent_router,
+        breakdown,
         "result_breakdown_message_with_metadata",
         _breakdown,
     )
@@ -5728,32 +5730,9 @@ def test_issue_272_ordinary_turn_composes_owned_facts_after_failed_action(
     assert api_state.store.backtest_runs == runs_before_recovery
     assert len(api_state.store.backtest_runs) - len(runs_before_recovery) == 0
     assert api_state.store.backtest_jobs == jobs_before_recovery == {}
-    usage_after_recovery = api_state.store.usage_counters
-    assert {
-        key: value
-        for key, value in usage_after_recovery.items()
-        if key[1] != "chat_messages"
-    } == {
-        key: value
-        for key, value in usage_before_recovery.items()
-        if key[1] != "chat_messages"
-    }
-    for window in ("hour", "day"):
-        chat_key = (user_id, "chat_messages", window)
-        chat_before = int(
-            (usage_before_recovery.get(chat_key) or {}).get("used_count") or 0
-        )
-        chat_after = int(
-            (usage_after_recovery.get(chat_key) or {}).get("used_count") or 0
-        )
-        assert chat_after - chat_before == 1
-
-        run_key = (user_id, "backtest_runs", window)
-        runs_before = int(
-            (usage_before_recovery.get(run_key) or {}).get("used_count") or 0
-        )
-        runs_after = int((usage_after_recovery.get(run_key) or {}).get("used_count") or 0)
-        assert runs_after - runs_before == 0
+    # Conversation is compute and a recovered card runs nothing: no counter
+    # moves.
+    assert api_state.store.usage_counters == usage_before_recovery
     assert get_openrouter_route_receipts() == []
     snapshot = captured["fallback_latest_task_snapshot"]
     assert snapshot.active_confirmation_reference is not None

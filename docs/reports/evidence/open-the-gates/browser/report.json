@@ -1,0 +1,112 @@
+{
+  "candidates": {
+    "nike": [
+      {
+        "width": 1280,
+        "language": "en",
+        "checkboxDisabled": true,
+        "dialogText": "Share conversation\n\nChoose the answers to include. You will see the exact public page before making a link. Anyone with the link can read the selected content and note.\n\nShare conversation\nSelect all eligible\n\n0 of 0 selected\n\nwhat's the price of nike today\n\nThe sources cannot be shared. This answer has no supported publisher sources.\n\nAdd a note if you want\n\nAnyone with the link can read this. Keep it free of anything private.\n\nPreview public page",
+        "errors": []
+      },
+      {
+        "width": 390,
+        "language": "en",
+        "checkboxDisabled": true,
+        "dialogText": "Share conversation\n\nChoose the answers to include. You will see the exact public page before making a link. Anyone with the link can read the selected content and note.\n\nShare conversation\nSelect all eligible\n\n0 of 0 selected\n\nwhat's the price of nike today\n\nThe sources cannot be shared. This answer has no supported publisher sources.\n\nAdd a note if you want\n\nAnyone with the link can read this. Keep it free of anything private.\n\nPreview public page",
+        "errors": []
+      }
+    ],
+    "appleEs": [
+      {
+        "width": 1280,
+        "language": "es-419",
+        "checkboxDisabled": true,
+        "dialogText": "Compartir conversación\n\nElige las respuestas que quieres incluir. Verás la página pública exacta antes de crear un enlace. Cualquier persona con el enlace podrá leer el contenido elegido y la nota.\n\nCompartir conversación\nSeleccionar todas las elegibles\n\n0 de 0 seleccionados\n\n¿A cuánto está la acción de Apple hoy y cuánto subió esta semana?\n\nEl contenido de las fuentes no se puede compartir. Esta respuesta no tiene fuentes publicadas compatibles.\n\nAgrega una nota si quieres\n\nCualquiera con el enlace puede leer esto. No pongas nada privado.\n\nVista previa de la página pública",
+        "errors": []
+      },
+      {
+        "width": 390,
+        "language": "es-419",
+        "checkboxDisabled": true,
+        "dialogText": "Compartir conversación\n\nElige las respuestas que quieres incluir. Verás la página pública exacta antes de crear un enlace. Cualquier persona con el enlace podrá leer el contenido elegido y la nota.\n\nCompartir conversación\nSeleccionar todas las elegibles\n\n0 de 0 seleccionados\n\n¿A cuánto está la acción de Apple hoy y cuánto subió esta semana?\n\nEl contenido de las fuentes no se puede compartir. Esta respuesta no tiene fuentes publicadas compatibles.\n\nAgrega una nota si quieres\n\nCualquiera con el enlace puede leer esto. No pongas nada privado.\n\nVista previa de la página pública",
+        "errors": []
+      }
+    ]
+  },
+  "publication": {
+    "dialogText": "Share conversation\n\nChoose the answers to include. You will see the exact public page before making a link. Anyone with the link can read the selected content and note.\n\nShare conversation\nSelect all eligible\nClear selection\n\n1 of 1 selected\n\nwhy is NVIDIA stock moving this week?\nAdd a note if you want\n\nAnyone with the link can read this. Keep it free of anything private.\n\nPreview public page",
+    "previewStatus": 200,
+    "createStatus": 200,
+    "previewText": "Tested with Argus\nARGUS LOOKED THIS UP ON SEPTEMBER 10, 2026\nwhy is NVIDIA stock moving this week?\n\nNVIDIA is moving lower this week mainly because investors are reassessing near-term risks after its recent rally, not because of one clearly verified company shock.\n\nThe main themes in public reporting are:\n\nConcern about Chinese competition: Reuters highlighted increasingly capable Chinese AI companies as a potential challenge to NVIDIA’s competitive moat.\nCaution before management comments: Traders were awaiting CEO Jensen Huang’s scheduled appearance at Goldman Sachs’ technology conference on Thursday, where demand, enterprise adoption and next-generation products were expected to be discussed.\nProfit-taking and valuation sensitivity: The shares entered the week near recent highs, making them more vulnerable to selling when fresh positive news was limited.\nInsider selling added to the headlines: A regulatory filing showed that director Mark Stevens recently sold shares. That may affect sentiment, but there is no verified evidence that it caused the broader move.\n\nThe latest available quote was $223.67 as of September 9, 2026, down 0.91% for that session. A reliable full-week return was unavailable, so I would not infer one from incomplete trading data.\n\nIn short: this week’s weakness looks like a combination of competitive concerns, event-related caution and profit-taking rather than a fundamental announcement that suddenly changed NVIDIA’s outlook. This is market context, not investment advice.\n\nSOURCES\nNvidia stock is 5% below its record: why September 10 suddenly matters\n\ninvezz.com · Sep 9, 2026\n\nDear Nvidia Stock Fans, Mark Your Calendars for September 10\n\nfinance.yahoo.com · Sep 8, 2026\n\nJ.P. Morgan Research Report Analysis: Behind NVIDIA’s FY28 Revenue Guidance for 70% Growth, Inference Has Become the La…\n\nwww.techflowpost.com · Sep 4, 2026\n\nNvidia stock edges lower ahead Goldman AI fireside chat\n\nwww.ad-hoc-news.de · Sep 9, 2026\n\nPrediction: Sept. 10 Will Be a Big Day for Nvidia ...\n\nwww.fool.com · Sep 8, 2026\n\nWHAT ARGUS OFFERED NEXT\n\nArgus offered to test buying and holding NVDA.\n\nThis records what these sources reported on that date. It is not advice or a prediction. Things may have changed since. Nothing was bought or simulated here.",
+    "url": "http://127.0.0.1:3590/r/ouXMEd5zyJaExH1meaWYCoNQUK-cEwND",
+    "errors": []
+  },
+  "public": [
+    {
+      "width": 1280,
+      "status": 200,
+      "cookies": [],
+      "robots": "noindex, nofollow, nocache",
+      "text": "Tested with Argus\nARGUS LOOKED THIS UP ON SEPTEMBER 10, 2026\nwhy is NVIDIA stock moving this week?\n\nNVIDIA is moving lower this week mainly because investors are reassessing near-term risks after its recent rally, not because of one clearly verified company shock.\n\nThe main themes in public reporting are:\n\nConcern about Chinese competition: Reuters highlighted increasingly capable Chinese AI companies as a potential challenge to NVIDIA’s competitive moat.\nCaution before management comments: Traders were awaiting CEO Jensen Huang’s scheduled appearance at Goldman Sachs’ technology conference on Thursday, where demand, enterprise adoption and next-generation products were expected to be discussed.\nProfit-taking and valuation sensitivity: The shares entered the week near recent highs, making them more vulnerable to selling when fresh positive news was limited.\nInsider selling added to the headlines: A regulatory filing showed that director Mark Stevens recently sold shares. That may affect sentiment, but there is no verified evidence that it caused the broader move.\n\nThe latest available quote was $223.67 as of September 9, 2026, down 0.91% for that session. A reliable full-week return was unavailable, so I would not infer one from incomplete trading data.\n\nIn short: this week’s weakness looks like a combination of competitive concerns, event-related caution and profit-taking rather than a fundamental announcement that suddenly changed NVIDIA’s outlook. This is market context, not investment advice.\n\nSOURCES\nNvidia stock is 5% below its record: why September 10 suddenly matters\n\ninvezz.com · Sep 9, 2026\n\nDear Nvidia Stock Fans, Mark Your Calendars for September 10\n\nfinance.yahoo.com · Sep 8, 2026\n\nJ.P. Morgan Research Report Analysis: Behind NVIDIA’s FY28 Revenue Guidance for 70% Growth, Inference Has Become the La…\n\nwww.techflowpost.com · Sep 4, 2026\n\nNvidia stock edges lower ahead Goldman AI fireside chat\n\nwww.ad-hoc-news.de · Sep 9, 2026\n\nPrediction: Sept. 10 Will Be a Big Day for Nvidia ...\n\nwww.fool.com · Sep 8, 2026\n\nWHAT ARGUS OFFERED NEXT\n\nArgus offered to test buying and holding NVDA.\n\nThis records what these sources reported on that date. It is not advice or a prediction. Things may have changed since. Nothing was bought or simulated here.\n\nResearch from that date, not advice.\n\nContinue with Argus",
+      "links": [
+        {
+          "text": "Nvidia stock is 5% below its record: why September 10 suddenly matters",
+          "href": "https://invezz.com/news/2026/09/09/nvidia-stock-is-5-below-its-record-why-september-10-suddenly-matters/"
+        },
+        {
+          "text": "Dear Nvidia Stock Fans, Mark Your Calendars for September 10",
+          "href": "https://finance.yahoo.com/markets/stocks/articles/dear-nvidia-stock-fans-mark-194239279.html"
+        },
+        {
+          "text": "J.P. Morgan Research Report Analysis: Behind NVIDIA’s FY28 Revenue Guidance for 70% Growth, Inference Has Become the La…",
+          "href": "https://www.techflowpost.com/en-US/article/33741"
+        },
+        {
+          "text": "Nvidia stock edges lower ahead Goldman AI fireside chat",
+          "href": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-edges-lower-ahead-goldman-ai-fireside-chat/70075275"
+        },
+        {
+          "text": "Prediction: Sept. 10 Will Be a Big Day for Nvidia ...",
+          "href": "https://www.fool.com/investing/2026/09/08/prediction-sept-10-will-be-a-big-day-for-nvidia-shareholders-here-s-what-to-watch/"
+        },
+        {
+          "text": "Continue with Argus",
+          "href": "/"
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "status": 200,
+      "cookies": [],
+      "robots": "noindex, nofollow, nocache",
+      "text": "Tested with Argus\nARGUS LOOKED THIS UP ON SEPTEMBER 10, 2026\nwhy is NVIDIA stock moving this week?\n\nNVIDIA is moving lower this week mainly because investors are reassessing near-term risks after its recent rally, not because of one clearly verified company shock.\n\nThe main themes in public reporting are:\n\nConcern about Chinese competition: Reuters highlighted increasingly capable Chinese AI companies as a potential challenge to NVIDIA’s competitive moat.\nCaution before management comments: Traders were awaiting CEO Jensen Huang’s scheduled appearance at Goldman Sachs’ technology conference on Thursday, where demand, enterprise adoption and next-generation products were expected to be discussed.\nProfit-taking and valuation sensitivity: The shares entered the week near recent highs, making them more vulnerable to selling when fresh positive news was limited.\nInsider selling added to the headlines: A regulatory filing showed that director Mark Stevens recently sold shares. That may affect sentiment, but there is no verified evidence that it caused the broader move.\n\nThe latest available quote was $223.67 as of September 9, 2026, down 0.91% for that session. A reliable full-week return was unavailable, so I would not infer one from incomplete trading data.\n\nIn short: this week’s weakness looks like a combination of competitive concerns, event-related caution and profit-taking rather than a fundamental announcement that suddenly changed NVIDIA’s outlook. This is market context, not investment advice.\n\nSOURCES\nNvidia stock is 5% below its record: why September 10 suddenly matters\n\ninvezz.com · Sep 9, 2026\n\nDear Nvidia Stock Fans, Mark Your Calendars for September 10\n\nfinance.yahoo.com · Sep 8, 2026\n\nJ.P. Morgan Research Report Analysis: Behind NVIDIA’s FY28 Revenue Guidance for 70% Growth, Inference Has Become the La…\n\nwww.techflowpost.com · Sep 4, 2026\n\nNvidia stock edges lower ahead Goldman AI fireside chat\n\nwww.ad-hoc-news.de · Sep 9, 2026\n\nPrediction: Sept. 10 Will Be a Big Day for Nvidia ...\n\nwww.fool.com · Sep 8, 2026\n\nWHAT ARGUS OFFERED NEXT\n\nArgus offered to test buying and holding NVDA.\n\nThis records what these sources reported on that date. It is not advice or a prediction. Things may have changed since. Nothing was bought or simulated here.\n\nResearch from that date, not advice.\n\nContinue with Argus",
+      "links": [
+        {
+          "text": "Nvidia stock is 5% below its record: why September 10 suddenly matters",
+          "href": "https://invezz.com/news/2026/09/09/nvidia-stock-is-5-below-its-record-why-september-10-suddenly-matters/"
+        },
+        {
+          "text": "Dear Nvidia Stock Fans, Mark Your Calendars for September 10",
+          "href": "https://finance.yahoo.com/markets/stocks/articles/dear-nvidia-stock-fans-mark-194239279.html"
+        },
+        {
+          "text": "J.P. Morgan Research Report Analysis: Behind NVIDIA’s FY28 Revenue Guidance for 70% Growth, Inference Has Become the La…",
+          "href": "https://www.techflowpost.com/en-US/article/33741"
+        },
+        {
+          "text": "Nvidia stock edges lower ahead Goldman AI fireside chat",
+          "href": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-edges-lower-ahead-goldman-ai-fireside-chat/70075275"
+        },
+        {
+          "text": "Prediction: Sept. 10 Will Be a Big Day for Nvidia ...",
+          "href": "https://www.fool.com/investing/2026/09/08/prediction-sept-10-will-be-a-big-day-for-nvidia-shareholders-here-s-what-to-watch/"
+        },
+        {
+          "text": "Continue with Argus",
+          "href": "/"
+        }
+      ]
+    }
+  ]
+}

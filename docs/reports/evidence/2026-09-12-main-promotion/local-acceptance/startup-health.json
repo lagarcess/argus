@@ -1,0 +1,57 @@
+[
+  {
+    "name": "api_health",
+    "status": 200,
+    "seconds": 0.009,
+    "payload": {
+      "status": "healthy",
+      "version": "1.0.0-alpha"
+    }
+  },
+  {
+    "name": "web",
+    "status": 200,
+    "seconds": 0.018,
+    "payload": {
+      "html_present": true
+    }
+  },
+  {
+    "name": "readiness",
+    "status": 200,
+    "seconds": 4.223,
+    "payload": {
+      "status": "ready",
+      "checks": [
+        {
+          "name": "agent_runtime_workflow",
+          "status": "ready",
+          "duration_ms": 2496
+        },
+        {
+          "name": "supabase",
+          "status": "ready",
+          "duration_ms": 16
+        },
+        {
+          "name": "asset_universe",
+          "status": "ready",
+          "duration_ms": 1706,
+          "provider_mode": "live_provider",
+          "alias_count": 35248,
+          "required_symbols": [
+            "AAPL",
+            "MSFT",
+            "SPY"
+          ],
+          "resolved_symbols": [
+            "AAPL",
+            "MSFT",
+            "SPY"
+          ],
+          "missing_symbols": []
+        }
+      ]
+    }
+  }
+]

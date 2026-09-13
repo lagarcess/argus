@@ -14,6 +14,7 @@ from typing import Any
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from loguru import logger
 
+from argus.domain.market_data.new_york_clock import new_york_today
 from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401
     _apply_legacy_flat_edit_fields,
     _edit_plan_reshapes_non_recurring_strategy,
@@ -178,7 +179,7 @@ from argus.agent_runtime.interpreter.execution_cost_capability import (
     has_execution_cost_candidate,
 )
 from argus.agent_runtime.interpreter.unsupported_admission import (
-    future_performance_capability_clause,
+    future_test_window_capability_clause,
     requested_strategy_template_capability_clause,
 )
 from argus.agent_runtime.interpreter.pending_option import (  # noqa: F401
@@ -268,6 +269,7 @@ from argus.agent_runtime.interpreter.shared import (  # noqa: F401
     _latest_result_date_window,
     _selected_requested_field_base,
     _supported_dca_cadence_value,
+    repaired_turn_act,
 )
 from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _asset_recovery_query_is_explicit_ticker,
@@ -291,6 +293,7 @@ from argus.agent_runtime.interpreter.signal_rule import (  # noqa: F401
     _supported_signal_rule_planning_response,
 )
 from argus.agent_runtime.interpreter import simplification_options as _options
+from argus.agent_runtime.interpreter.latest_result_context import latest_result_interpreter_context
 from argus.agent_runtime.interpreter.starting_capital import (  # noqa: F401
     _draft_has_grounded_non_dca_starting_capital,
     _focused_strategy_extraction_has_material_fields,
@@ -730,8 +733,8 @@ class OpenRouterStructuredInterpreter:
                     )
                 )
             if request.latest_task_snapshot.latest_backtest_result_reference is not None:
-                latest_result = (
-                    request.latest_task_snapshot.latest_backtest_result_reference.metadata
+                latest_result = latest_result_interpreter_context(
+                    request.latest_task_snapshot.latest_backtest_result_reference
                 )
             if request.latest_task_snapshot.latest_failed_action_reference is not None:
                 latest_failed_action = request.latest_task_snapshot.latest_failed_action_reference.model_dump(
@@ -786,7 +789,7 @@ class OpenRouterStructuredInterpreter:
                     f"Active confirmation reference JSON, if any: "
                     f"{active_confirmation if active_confirmation else 'none'}\n"
                     f"Latest result fact bank JSON, if any: "
-                    f"{latest_result if latest_result else 'none'}\n"
+                    f"{json.dumps(latest_result, sort_keys=True) if latest_result else 'none'}\n"
                     + (
                         "When the current message reuses the latest result's "
                         "window ('same time period', 'mismo periodo', 'same "
@@ -878,7 +881,7 @@ class OpenRouterStructuredInterpreter:
             + "When the user gives exact start/end dates, "
             "preserve them as date_range {'start':'YYYY-MM-DD','end':'YYYY-MM-DD'}; "
             "never replace them with past year, last year, or another default period. "
-            f"The current runtime date is {date.today().isoformat()}; if the user "
+            f"The current runtime date is {new_york_today().isoformat()}; if the user "
             "says today, now, or current, preserve that endpoint as 'today' or the "
             "current runtime date, not a stale model date.\n\n"
             + crossover_shorthand_prompt_clause()
@@ -887,20 +890,21 @@ class OpenRouterStructuredInterpreter:
             "other executable signal by yourself. If the user does not name the "
             "indicator, threshold, crossover, or price rule, mark the entry rule as "
             "missing or ask for the executable definition.\n\n"
-            + future_performance_capability_clause()
+            + future_test_window_capability_clause()
             + "Valuation and fundamental language is valid investing intent, not user "
-            "error. If the user says a stock looked cheap, undervalued, expensive, "
-            "or references P/E, earnings, revenue, margins, or fundamentals, preserve "
-            "that meaning. The current engine cannot execute valuation or fundamental "
-            "data as entry/exit rules, so do not pretend those rules are runnable. "
-            "Ask for a supported proxy when needed, such as buy-and-hold over the "
-            "period they care about, DCA, a supported RSI threshold, or a supported "
-            "moving-average/signal rule. Explain the boundary in product language: "
-            "the concept is financially real, but Argus needs an executable historical "
-            "price/indicator rule to simulate it today.\n\n"
+            "error. Whether a stock is cheap, expensive or fairly valued, and what "
+            "its P/E, earnings, revenue, margins or fundamentals say, is a research "
+            "question: fill research_query and let it be answered; do not steer it "
+            "toward a backtest. Only when the user wants to test a rule built on "
+            "valuation or fundamentals (buy when the P/E is under 15) does the "
+            "engine boundary apply: it cannot execute valuation or fundamental data "
+            "as entry/exit rules, so preserve the meaning, say so in product "
+            "language, and offer a supported proxy such as buy-and-hold, DCA, an RSI "
+            "threshold, or a moving-average/signal rule over the period they care about.\n\n"
             "Use data-availability allowances as deterministic capability truth. "
-            "Equity launch history starts in 2016 for the current launch path, so "
-            "do not invent a shorter 3-year limit for equities. Currency-pair "
+            "Do not invent a history limit or a start year for any asset, such as a "
+            "3-year limit for equities; deterministic validation owns each asset's "
+            "available window. Currency-pair "
             "intraday history has a bounded recent-data window, and this launch path "
             "supports 1h, 4h, or 1D for currency-pair tests. Let deterministic "
             "validation decide the exact runnable window. If the user asks for an "
@@ -1794,12 +1798,8 @@ def _response_needs_capability_side_question_audit(
         return False
     if pending_field:
         return True
-    if (
-        response.intent == "conversation_followup"
-        and response.semantic_turn_act == "educational_question"
-        and bool(response.assistant_response)
-    ):
-        return True
+    # A plain educational turn keeps the primary's typed focus; only a
+    # strategy-flow shape earns a second read.
     return _is_vague_strategy_start(response)
 
 
@@ -2036,7 +2036,9 @@ async def _dca_contract_audited_response(
                 message="DCA contract audit failed; trying next candidate model",
             )
             continue
-        repaired = _response_from_dca_contract_audit(response=response, audit=audit)
+        repaired = _response_from_dca_contract_audit(
+            response=response, audit=audit, request=request
+        )
         if repaired is not None:
             return repaired
     return response
@@ -3283,11 +3285,20 @@ async def _repair_incomplete_strategy_extraction(
             continue
         if not _focused_strategy_extraction_has_material_fields(extraction):
             annotate_repair(after=failed_response, repair_applied=False, no_op_reason="no_material_fields")
+            if not extraction.is_testable_strategy:
+                # A clear "no strategy here" is an answer; only a read that
+                # calls the turn testable yet extracts nothing moves on.
+                return None
             continue
         base_response = failed_response
-        if _request_has_active_strategy_context(
-            request
-        ) and _selected_requested_field_base(request):
+        # The pending setup fills the re-read only for a turn that answers
+        # the runtime's question; a fresh task is filled from itself alone.
+        turn = repaired_turn_act(
+            base_act=failed_response.semantic_turn_act,
+            base_relation=failed_response.task_relation,
+            request=request,
+        )
+        if turn.answers_pending and _selected_requested_field_base(request):
             pending_draft = _pending_strategy_draft_from_request_or_response(
                 response=failed_response,
                 request=request,
@@ -4876,17 +4887,19 @@ async def _focused_strategy_repair_after_candidate_failures(
         request
     ) and not _request_current_turn_has_material_execution_evidence(request):
         return None
+    # No model read the act; the owner decides it from the pending state.
+    turn = repaired_turn_act(base_act=None, base_relation=None, request=request)
     seed_response = LLMInterpretationResponse(
         intent="strategy_drafting",
-        task_relation="new_task",
+        task_relation=turn.task_relation,
         requires_clarification=True,
         user_goal_summary=request.current_user_message,
         candidate_strategy_draft=LLMStrategyDraft(
             raw_user_phrasing=request.current_user_message,
             strategy_thesis=request.current_user_message,
         ),
-        reason_codes=["structured_interpretation_candidates_failed"],
-        semantic_turn_act="new_idea",
+        reason_codes=["structured_interpretation_candidates_failed", *turn.reason_codes],
+        semantic_turn_act=turn.semantic_turn_act,
     )
     logger.bind(
         llm_task=_INTERPRETATION_REPAIR_TASK,

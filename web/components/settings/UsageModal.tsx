@@ -14,9 +14,11 @@ import {
   allowanceMeterTone,
   classifyAllowance,
   formatAllowancePeriodEnd,
+  isUnboundedAllowance,
   showsHourlyWindow,
+  showsWorkspaceWindow,
   type AllowanceMeterTone,
-  type UsageAllowance,
+  type OperationClassAllowance,
   type UsageAllowanceResponse,
 } from "@/lib/usage-allowance";
 
@@ -29,7 +31,7 @@ type UsageModalProps = {
 };
 
 type AllowanceSectionProps = {
-  allowance: UsageAllowance;
+  allowance: OperationClassAllowance;
   label: string;
   locale: "en-US" | "es-419";
 };
@@ -42,12 +44,29 @@ const METER_TONE_CLASS: Record<AllowanceMeterTone, string> = {
 
 function AllowanceSection({ allowance, label, locale }: AllowanceSectionProps) {
   const { t } = useTranslation();
+  if (isUnboundedAllowance(allowance)) {
+    // Nothing to meter: no gauge, no reset, only the label and the fact.
+    return (
+      <section aria-label={label}>
+        <div className="flex items-baseline justify-between gap-3">
+          <h3 className="text-[14px] font-medium text-black dark:text-white">
+            {label}
+          </h3>
+          <p className="text-[13px] font-medium text-black/70 dark:text-white/75">
+            {t("settings.data.usage_panel.no_limit")}
+          </p>
+        </div>
+      </section>
+    );
+  }
   const state = classifyAllowance(allowance);
   const day = allowance.day;
   const hour = allowance.hour;
   const meterTone = allowanceMeterTone(allowance);
   const dayExhausted = state === "exhausted";
   const hourLimited = state === "hourly_limited";
+  const workspace = allowance.guest_session;
+  const workspaceLimited = workspace !== null && workspace.remaining === 0;
   const progress =
     day.limit === 0
       ? 100
@@ -107,6 +126,24 @@ function AllowanceSection({ allowance, label, locale }: AllowanceSectionProps) {
           })}
           <time dateTime={hour.period_end}>
             {formatAllowancePeriodEnd(hour.period_end, locale)}
+          </time>
+        </p>
+      ) : null}
+
+      {workspace !== null && showsWorkspaceWindow(allowance) ? (
+        <p
+          className={`mt-1 text-[12px] ${
+            workspaceLimited
+              ? "text-[#b94c55] dark:text-[#e7a2a8]"
+              : "text-black/45 dark:text-white/45"
+          }`}
+        >
+          {t("settings.data.usage_panel.workspace_available", {
+            count: workspace.remaining,
+            time: "",
+          })}
+          <time dateTime={workspace.period_end}>
+            {formatAllowancePeriodEnd(workspace.period_end, locale)}
           </time>
         </p>
       ) : null}
@@ -188,13 +225,19 @@ export default function UsageModal({
             <>
               <div className="pt-2">
                 <AllowanceSection
-                  allowance={usage.allowances.messages}
-                  label={t("settings.data.usage_panel.messages")}
+                  allowance={usage.allowances.compute}
+                  label={t("settings.data.usage_panel.conversation")}
                   locale={locale}
                 />
                 <div className="my-4 border-t border-black/[0.05] dark:border-white/[0.06]" />
                 <AllowanceSection
-                  allowance={usage.allowances.backtests}
+                  allowance={usage.allowances.grounding}
+                  label={t("settings.data.usage_panel.searches")}
+                  locale={locale}
+                />
+                <div className="my-4 border-t border-black/[0.05] dark:border-white/[0.06]" />
+                <AllowanceSection
+                  allowance={usage.allowances.execution}
                   label={t("settings.data.usage_panel.simulations")}
                   locale={locale}
                 />
@@ -220,7 +263,8 @@ export default function UsageModal({
                     id="argus-usage-what-counts"
                     className="space-y-2 pb-1 text-[12px] leading-relaxed text-black/45 dark:text-white/45"
                   >
-                    <p>{t("settings.data.usage_panel.message_rule")}</p>
+                    <p>{t("settings.data.usage_panel.conversation_rule")}</p>
+                    <p>{t("settings.data.usage_panel.search_rule")}</p>
                     <p>{t("settings.data.usage_panel.simulation_rule")}</p>
                   </div>
                 ) : null}

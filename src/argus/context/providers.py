@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any
 
 import httpx
 
 from argus.context.packets import ContextPacket, ContextPacketFact
+from argus.domain.market_data.new_york_clock import new_york_today
 
 FRED_API_BASE = "https://api.stlouisfed.org/fred"
 ALPACA_DATA_BASE = "https://data.alpaca.markets"
@@ -286,7 +287,7 @@ def build_alpaca_market_movers_packet(
     movers: dict[str, Any],
 ) -> ContextPacket:
     facts: list[ContextPacketFact] = []
-    retrieved_date = datetime.now(timezone.utc).date()
+    retrieved_date = new_york_today()
     for group in ("gainers", "losers"):
         rows = movers.get(group)
         if not isinstance(rows, list):
@@ -330,7 +331,7 @@ def build_alpaca_most_actives_packet(
     by: str,
     most_actives: list[dict[str, Any]],
 ) -> ContextPacket:
-    retrieved_date = datetime.now(timezone.utc).date()
+    retrieved_date = new_york_today()
     facts: list[ContextPacketFact] = []
     for item in most_actives[:20]:
         if not isinstance(item, dict):

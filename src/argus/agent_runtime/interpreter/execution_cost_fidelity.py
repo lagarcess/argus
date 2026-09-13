@@ -81,7 +81,9 @@ def apply_cost_fidelity(
             draft._validated_execution_cost_evidence[draft_field] = validated_marker
             changed = True
 
+    audit_read_a_cost = bool(validated_fields or grounded_conflicts)
     unresolved_fields: list[str] = []
+    dropped_zero_fields: list[str] = []
     for field_name in ("fee_rate", "slippage"):
         if field_name in validated_fields:
             continue
@@ -95,10 +97,21 @@ def apply_cost_fidelity(
             # silently drops a stated cost (#367). A conflicting audit above
             # still wins, because it read the same message and disagreed.
             continue
-        if field_name in grounded_conflicts or _introduces_unowned_cost(
+        introduces_cost = _introduces_unowned_cost(
             draft, field_name=field_name, prior_strategy=prior_strategy
+        )
+        if field_name in grounded_conflicts or (
+            introduces_cost
+            and _ungrounded_cost_owes_question(
+                draft,
+                field_name=field_name,
+                prior_strategy=prior_strategy,
+                audit_read_a_cost=audit_read_a_cost,
+            )
         ):
             unresolved_fields.append(field_name)
+        elif introduces_cost:
+            dropped_zero_fields.append(field_name)
         if field_name in draft.extra_parameters:
             draft.extra_parameters.pop(field_name, None)
             changed = True
@@ -110,6 +123,11 @@ def apply_cost_fidelity(
             changed = True
         draft._validated_execution_cost_evidence.pop(field_name, None)
 
+    if dropped_zero_fields:
+        response.reason_codes = list(
+            dict.fromkeys([*response.reason_codes, "execution_cost_default_zero_dropped"])
+        )
+        changed = True
     if not unresolved_fields:
         return changed
     for field_name in unresolved_fields:
@@ -376,6 +394,25 @@ def _introduces_unowned_cost(
         return True
     prior_rate = _owned_prior_cost(prior_strategy, field_name=field_name)
     return prior_rate is None or candidate_rate != prior_rate
+
+
+def _ungrounded_cost_owes_question(
+    draft: LLMStrategyDraft,
+    *,
+    field_name: str,
+    prior_strategy: StrategySummary | None,
+    audit_read_a_cost: bool,
+) -> bool:
+    """An ungrounded cost is asked about unless it is a zero with no sign of a
+    stated cost: no owned cost to clear, no cost the audit read, no quoted span."""
+    if _owned_prior_cost(prior_strategy, field_name=field_name) is not None:
+        return True
+    value = draft.extra_parameters.get(field_name)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != 0:
+        return True
+    return audit_read_a_cost or bool(
+        str(draft.evidence_spans.get(field_name) or "").strip()
+    )
 
 
 def _owned_prior_cost(

@@ -138,10 +138,10 @@ def test_narrative_clause_can_never_use_the_fast_configuration(monkeypatch) -> N
 
     assert result is not None
     body = __import__("json").loads(transport.requests[0].content.decode())
-    assert body["tools"] == [
-        {"type": "web_search"},
-        {"type": "finance_search"},
-        {"type": "fetch_url"},
+    assert [tool["type"] for tool in body["tools"]] == [
+        "web_search",
+        "finance_search",
+        "fetch_url",
     ]
     assert body["max_steps"] == RESEARCH_CONFIG_SPECS["balanced"].max_steps
     assert result.stage_patch["research"]["shape"] == "balanced"
@@ -250,10 +250,7 @@ def test_company_claim_retries_without_the_provider_only_citation_channel(
     assert result is not None
     assert len(transport.requests) == 2
     retry_body = __import__("json").loads(transport.requests[1].content.decode())
-    assert retry_body["tools"] == [
-        {"type": "web_search"},
-        {"type": "fetch_url"},
-    ]
+    assert [tool["type"] for tool in retry_body["tools"]] == ["web_search", "fetch_url"]
     assert result.stage_patch["research"]["sources"] == [
         {
             "title": "www.apple.com",
@@ -315,7 +312,8 @@ def test_thorough_cache_hit_answers_inline_without_a_job(monkeypatch) -> None:
         ),
         latency_ms=1200,
     )
-    ra.store_research_packet_for_job(job_request, packet)
+    composed = ra.compose_completed_research(job_request=job_request, packet=packet)
+    ra.store_research_packet_for_job(job_request, packet, composed)
 
     second = _run("Compare Netflix and Apple over three years", user=SPANISH_USER)
     assert second is not None

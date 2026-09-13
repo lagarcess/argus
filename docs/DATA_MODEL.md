@@ -112,6 +112,7 @@ private_alpha_allowlist
 profiles
    ├── conversations
    │      ├── messages
+   │      │      └── decision_notes             # decisions on computed answers
    │      ├── chat_turn_lifecycles
    │      ├── backtest_jobs
    │      └── backtest_runs
@@ -148,9 +149,10 @@ Represents the application-facing user profile. Supabase Auth owns identity and 
 - `preferred_name`: `text` (Nullable; 1 to 40 characters when present)
 - `language`: `text` (Default: `'en'`)
 - `locale`: `text` (Default: `'en-US'`)
-- `theme`: `text` (Default: `'dark'`)
 - `avatar_theme`: `avatar_theme` enum (Default: `'ocean'`; one of `ocean`,
   `plum`, `teal`, `ember`, `gold`, `indigo`, or `slate`)
+- `country`: `text` (Nullable; an ISO 3166-1 alpha-2 code when present)
+- `currency_override`: `text` (Nullable; an ISO 4217 code when present)
 - `is_admin`: `boolean` (Default: `false`)
 - `onboarding`: `jsonb` (legacy/inert; the applied migration defaults new rows
   to the historical shape below)
@@ -187,6 +189,18 @@ product behavior reads it, and no API path writes it.
   runtime path writes it. A registered-account preference: restrictive
   policies read the trusted `is_anonymous` JWT claim to keep it off the guest
   surface, because anonymous Auth users share the `authenticated` role.
+- `country` is where the user lives. It is chosen in Settings and never
+  inferred from conversation, IP or behavior (decision 8). Research sends it
+  as the reader's location, and a user with no country sends no location.
+- `currency_override` is a currency the user chose over the one their country
+  implies. The resolved currency is not stored: the API derives it from the
+  override when there is one, otherwise from the country (the first tender
+  currency CLDR records there with no end date, so it changes only with the
+  installed CLDR data, never with the date).
+- Both constraints check only a code's shape. Which codes are assigned is
+  checked when an edit is accepted, so a code the standards later retire still
+  loads. Both columns are registered-account preferences under the same
+  restrictive policies as `preferred_name`, and guest responses omit them.
 - `profiles.email` is null only for a verified anonymous Auth user. Permanent
   profiles require the verified provider email. Fake or placeholder guest
   addresses are forbidden.
@@ -482,8 +496,8 @@ Represents individual messages within a conversation.
   row, inserts the message, and updates `last_message_preview` in one
   transaction. `PUBLIC`, `anon`, and `authenticated` cannot execute the
   function or mutate `messages` directly.
-- The one sanctioned in-place rewrite, a non-turn edit of a pending
-  confirmation card, uses the service-role-only
+- Sanctioned non-turn edits of a pending confirmation card or an editable local
+  tool result use the service-role-only
   `update_conversation_message_artifact` RPC on the same serialized spine: it
   locks the owned conversation row and applies only while the caller's read
   still holds, comparing both the row's `metadata` and the conversation's
@@ -491,6 +505,16 @@ Represents individual messages within a conversation.
   last-writer win). When the rewritten row is the conversation's latest
   message it carries `last_message_preview` with it while leaving
   `updated_at` untouched, so a non-turn change never reorders recents.
+- `metadata.tool_result_cards` owns ordered general tool artifacts. Each card
+  stores call/artifact identity, input revision, declaration card type/version,
+  arguments, typed outcome, presentation and lifecycle state together. A local
+  recompute retains the unknown, treats zero as known, and increments the
+  revision through the same guarded writer. Sibling cards remain unchanged.
+  Tool outcomes do not require a Strategy, Idea, EvidenceArtifact or backtest
+  run. `metadata.tool_jobs` associates each asynchronous job with its call and
+  artifact identity; repeated calls remain independent through completion and
+  reload. The message remains the durable owner after direct edits, rather than
+  writing a competing checkpoint copy.
 - A confirmation card's liveness truth lives on its own row:
   `metadata.confirmation_card.confirmation_state` (`active`, `consumed`,
   `cancelled`, `superseded`). Run admission stamps `consumed` through the
@@ -546,11 +570,27 @@ Represents individual messages within a conversation.
   or destructive historical rewrite is permitted.
 - Original result `content`, card `quick_take`/`breakdown`, and job
   `result_readout` remain immutable private audit/model context. Public reader
-  projections omit them and voice only typed facts from the canonical run.
+  projections omit them. New compositions store a closed
+  `result_readout_content` envelope on the run's result card (Quick take) or
+  assistant message metadata (Breakdown), with version, surface, authoring
+  workspace language, and complete accepted text or null on fallback. Job and
+  message read projections derive the Quick take envelope from its run card.
+  Readers may show its text only when their language matches; every other case
+  uses typed facts. This is additive JSON metadata, with no migration, backfill,
+  read-time model call or rewritten historical content. Source and fallback
+  provenance use the existing `result_readout_*` fields. The exact closed
+  transport is documented in API_CONTRACT.md's Message section.
+  A new draft's structured reported language must match the requested workspace
+  language before accepted text is stamped. Its quoted-figure references are
+  checked against one labeled fact sheet and remain internal; they do not
+  widen the persisted/public envelope. Language or reference mismatch stores
+  null text with the existing fallback/failure provenance, never a partial.
   Existing `result_fact_bank` is a read projection, not a second metrics owner;
   missing historical transport facts are repaired on read using owner and
-  conversation scoped run identity. No language-specific rows or backfill are
-  needed. Failed evidence lookup yields localized unavailable text, never
+  conversation scoped run identity. Its `figures` (and a public run's
+  `figures`) are derived on read from the persisted two-decimal `metrics`,
+  never stored: one backend rounding, no client rounding, no backfill. No
+  language-specific rows or backfill are needed. Failed evidence lookup yields localized unavailable text, never
   saved-prose fallback. Python and TypeScript AST guards pin private readers.
 - Message metadata may contain reloadable chat artifacts such as
   `pending_strategy`, `confirmation_card`, `confirmation_payload`,
@@ -835,6 +875,7 @@ Represents an immutable result of a simulation. Every run is reproducible from i
 - Runs are immutable after completion.
 - `benchmark_symbol` is derived from `asset_class` defaults in Alpha (`SPY` for equities, `BTC` for crypto, tested pair for currency pairs).
 - `metrics.aggregate.performance.portfolio_value_range` stores aggregate strategy portfolio equity close peak/lowest values for the run period.
+- Every `metrics` `efficiency` block, aggregate and per symbol, stores `buy_fills` and `sell_fills` beside `total_trades`. When costs were modeled, `metrics.aggregate.performance.execution_realism` also stores `modeled_fee_cost`, `modeled_slippage_cost`, and `modeled_cost_total` in dollars. Older rows omit these keys, and readers treat a missing key as unknown, never zero. No migration is required.
 - `chart` stores the aggregate portfolio equity curve, its matching `value_summary`, and capped executed-fill markers used by the result card. Multi-symbol runs store the portfolio curve, not separate comparison series.
 - New chart writers also persist two optional additive objects inside the same
   immutable `chart` JSON: `exploration_policy` (generic range-eligibility hints
@@ -1014,27 +1055,56 @@ Payload rules:
 
 ### decision_notes
 
-Explicit user judgment after reviewing evidence. P1 stores the current decision
-for an evidence artifact, not an append-only decision history. A later slice may
-add history if the product needs audit trails.
+Explicit user judgment on a computation. A decision attaches to exactly one
+computation owner and stores the current decision, not an append-only history:
+
+- A backtest decision attaches to its evidence artifact. `evidence_artifact_id`,
+  `idea_id`, and `idea_version_id` are set; `source_message_id` and
+  `computation` are null. The run behind the artifact owns the inputs, so
+  readers derive the computation (`backtest` with the run id) instead of
+  storing a copy.
+- A computed-answer decision attaches to the assistant message that carried
+  the answer. `source_message_id` and `computation` are set; the three lineage
+  columns are null. The computation is stored so the decision survives the
+  message and can be re-run when opened.
 
 Fields:
 - `id`: `uuid` (Primary Key)
-- `idea_id`: `uuid` (References `ideas.id` ON DELETE CASCADE)
-- `idea_version_id`: `uuid` (References `idea_versions.id` ON DELETE CASCADE)
-- `evidence_artifact_id`: `uuid` (References `evidence_artifacts.id` ON DELETE CASCADE)
+- `idea_id`: `uuid` (Nullable, references `ideas.id` ON DELETE CASCADE)
+- `idea_version_id`: `uuid` (Nullable, references `idea_versions.id` ON DELETE CASCADE)
+- `evidence_artifact_id`: `uuid` (Nullable, references `evidence_artifacts.id` ON DELETE CASCADE)
 - `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
 - `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
+- `source_message_id`: `uuid` (Nullable, references `messages.id` ON DELETE SET NULL)
+- `computation`: `jsonb` (Nullable; `{"kind": <slug>, "inputs": <object>}`)
 - `decision_state`: `text` (`watching`, `promising`, `rejected`, `revisit_later`)
 - `note`: `text` (Nullable)
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
 
 Constraints:
+- `decision_notes_attachment_check`: `(evidence_artifact_id is not null) <>
+  (computation is not null)`, one owner per row.
+- `decision_notes_evidence_lineage_check`: `idea_id` and `idea_version_id` are
+  null exactly when `evidence_artifact_id` is null.
 - `UNIQUE(user_id, evidence_artifact_id)` enforces one current decision per
   user-owned evidence artifact.
+- `UNIQUE(user_id, source_message_id)` enforces one current decision per
+  user-owned answer message. Nulls do not collide.
 - Duplicate POST/retry semantics update the existing decision row and return the
-  canonical current decision.
+  canonical current decision; a repeated write on a computed answer keeps the
+  first stored computation.
+- The message metadata that declares a computation (`metadata.computation`)
+  is written once by the backend. The decision beside it (`decision_note_id`,
+  `decision_state`) is not stored on the message: every transcript read derives
+  it from this table through `argus.api.decision_message_reads`, for computed
+  answers and result cards alike, so no second durable copy can disagree with
+  the row.
+- Migration `20260908120000_decision_notes_attach_to_computations.sql` relaxes
+  the three lineage columns and adds the attachment columns and constraints;
+  no row is rewritten and no object is removed. The promotion gate classifies
+  it destructive only because `alter column ... drop not null` carries the
+  word the classifier reads as destructive.
 - The public decision write contract accepts at most 500 note characters. The
   durable column remains nullable `text` so previously accepted longer notes
   stay readable; no migration or destructive truncation is introduced.
@@ -1118,6 +1188,83 @@ Deferred durable surfaces:
 - Route-receipt to cost/eval/product-event joins beyond existing product
   records.
 
+### refusal_observations and refusal_log
+
+`refusal_observations` is private question/outcome evidence for the grounded-finance
+board's Refusal log and rejected artifact actions (#314). It observes every
+terminal chat reply so a boundary stated only in prose is retained too. A row
+does not assert that its answer is a refusal, a bug, or a missing capability.
+Those judgments belong to the reader; the writer adds no semantic taxonomy.
+
+`RefusalObservation` in `src/argus/observability/refusal_log.py` is the frozen
+Python write contract. Stored fields are:
+
+- `id`: generated `uuid`; each rejected request receives an independent identity.
+- `user_id`: verified actor `uuid`, references `profiles.id` ON DELETE CASCADE.
+- `request_id`: supplied/generated request correlation `text`, never a dedupe key.
+- `conversation_id`: nullable `text`. For rejected requests it is only the
+  submitted claim; it may be malformed, nonexistent, or belong to someone else.
+  It is not a foreign key and never authorizes or resolves an artifact.
+- `request_message_id`, `response_message_id`: nullable `uuid` pointers to the
+  exact canonical messages, both ON DELETE CASCADE. A terminal pair requires
+  both pointers; `response_message_id` is unique to prevent repeat persistence
+  from inflating frequency. The insert guard verifies the owner, conversation,
+  user/assistant roles, and existing runtime turn identity when available.
+- `asked`, `action`, `outcome`: nullable `text`, `jsonb` object, and `jsonb` object.
+  Linked turns must leave them null because messages already own those facts.
+  Requests rejected before message storage retain the submitted question,
+  validated action, and original HTTP problem here, without rewriting the shape.
+- `status_code`: actual transport status, `200` for accepted streams and `400`–`599`
+  for rejected requests; this is not a semantic outcome category.
+- `created_at`: insertion `timestamptz`.
+
+`refusal_log` is a service-only view with `security_invoker = true`. It exposes
+the same identity/status columns plus `asked`, `action`, `outcome`, and `response`.
+For linked turns it reads exact user-message content, `metadata.chat_action`,
+the full original assistant metadata, and assistant content. For rejected
+requests it reads the retained question/action/problem and has no response
+message. It never pairs by timestamp or joins rejected target claims.
+
+RLS is enabled with no client policies. `PUBLIC`, `anon`, and `authenticated`
+have no table or view access. The service role has table `INSERT`/`SELECT` and
+view `SELECT` only; there is no update/delete API, frontend surface, model-context
+projection, or PostHog export. Deleting either linked message removes its
+observation; deleting the actor removes both linked and rejected observations.
+Conversation deletion removes linked observations through message cascades.
+Rejected observations follow actor deletion because their conversation id is
+only a claim. A failed write logs only a content-free operational failure and
+does not change the original response or allowance settlement.
+
+Read frequency from existing outcome fields without assigning write-time labels:
+
+```sql
+-- Original clarification shapes, including successful-context rows with null codes.
+select outcome #>> '{clarification,reason_code}' as reason_code, count(*)
+from public.refusal_log
+where created_at >= now() - interval '7 days'
+  and response_message_id is not null
+group by outcome #>> '{clarification,reason_code}'
+order by count(*) desc;
+
+-- Original rejected-action problems; repeated request ids still count separately.
+select action ->> 'type' as action_type, status_code,
+       outcome ->> 'code' as code, count(*)
+from public.refusal_log
+where created_at >= now() - interval '7 days' and status_code >= 400
+group by action ->> 'type', status_code, outcome ->> 'code'
+order by count(*) desc;
+
+-- Read the actual question and response before judging whether Argus could answer.
+select created_at, asked, action, outcome, response
+from public.refusal_log
+where created_at >= now() - interval '7 days'
+order by created_at desc;
+```
+
+The additive migration is `20260908205041_add_refusal_observations.sql`.
+Rollback removes the view, table, and its pair-validation function after removing
+the observation hooks. No model-facing or public request/response contract changes.
+
 ### cost_ledger_entries
 
 Append-only operational spend records. This table is the first-party source for
@@ -1156,7 +1303,9 @@ Fields:
   `reconciled`, `unavailable`)
 - `latency_ms`: `integer` (Nullable)
 - `status`: `text` (`succeeded`, `failed`, `skipped`, `estimated`,
-  `reconciled`)
+  `reconciled`); nullable only for `source = "research"` and
+  `feature_area = "research_rail"`, whose new rows always carry SQL NULL.
+  Legacy discovery rows and other sources still require status.
 - `metadata`: `jsonb` (Default: `{}`)
 - `occurred_at`: `timestamptz`
 - `created_at`: `timestamptz`
@@ -1166,9 +1315,21 @@ Append-only rules:
   frontend read paths in the private-alpha slice.
 - The migration grants service-role `insert` and `select` only. RLS is enabled,
   and no `anon` or `authenticated` policies are added.
-- Rollback is one reversible step: drop `public.cost_ledger_entries`.
+- Writer rollbacks retain the ledger table and its permanent rows.
 
 Current write hooks:
+- The shared insert normalizer owns the research-rail status retirement:
+  capability-class turns and invoice anomalies carry null status and
+  `metadata.research_ledger_contract = "argus_research_ledger/v2"`.
+  Detailed outcome/cache/pricing fields are unchanged. Legacy discovery
+  retains its `fallback_code`-derived status and receives no new marker.
+  Existing unversioned rows are left untouched, not reinterpreted or backfilled.
+  Migration `20260909225701` follows the sharing migration `20260909183646`.
+  Its `DROP NOT NULL` is classified destructive by the promotion gate, despite
+  deleting no object and rewriting no row; the founder applies it at promotion
+  before deploying the new writer. The database default remains for legacy
+  writers. Roll back application code only; retain the nullable schema and
+  existing versioned rows instead of rewriting history to restore NOT NULL.
 - Unreconciled Perplexity Agent responses append an anomaly row at the response
   boundary, correlated for invoice reconciliation by provider response id. They have
   `cost_amount = null`, `cost_source = "unavailable"`, and
@@ -1177,6 +1338,8 @@ Current write hooks:
   success is independent of invoice reconciliation. Anomaly rows have unknown
   billable quantity and no cost amount; existing capability-class turn metering
   remains unchanged. Both records retain null cost for an unpriced call.
+  Tool invocation counts inside `usage_metadata` are null when the invoice did
+  not establish them; a null count is unknown, not zero.
 - API chat turns append OpenRouter cost rows from persisted route receipts.
 - Grounded-discovery turns append one `source = "research"` row per attempted
   Search call with `feature_area = "discovery"`, provider identity, latency,
@@ -1200,15 +1363,21 @@ Cost model notes:
 
 ## 12.1.3 public_excerpt_snapshots
 
-A public evidence receipt: an immutable, sanitized snapshot of one completed
-backtest, created by its owner and revocable by its owner. Behind the default-off
-`ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag.
+A public evidence receipt: an immutable, sanitized snapshot of one or more
+eligible answers selected from one conversation, created by a registered owner
+and revocable by that owner. This extends the existing receipt table behind the
+default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag.
 
-The pipeline is `EvidenceArtifact -> PublicExcerptSnapshot -> PublicExcerptView`.
+The pipeline is `owned assistant messages -> PublicExcerptSnapshot ->
+PublicExcerptView`. Backtest messages resolve their canonical EvidenceArtifact
+and run through this same boundary. The artifact endpoint is a compatibility
+adapter to that same selection service and singleton identity. The header opens
+the sole user-facing selection flow. Existing live version 1 receipts are reused
+unchanged.
+
 The snapshot is frozen at creation and the public read never queries the source
-conversation. Immutable means the numbers never move: re-running the idea later
-produces a new artifact and leaves the receipt showing what it showed the day it
-was shared.
+conversation, message, run or provider. Asking again or rerunning produces new
+source material and leaves the earlier receipt unchanged.
 
 Fields:
 - `id`: `uuid` (Primary Key)
@@ -1221,34 +1390,59 @@ Fields:
   ON DELETE SET NULL)
 - `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
   ON DELETE SET NULL)
+- `kind`: `text` (`backtest`, `research_answer`, or `mixed`; existing rows default
+  to `backtest`)
+- `source_message_ids`: `uuid[]` (Private selected assistant messages; one or more
+  for new receipts, empty for legacy rows)
+- `source_run_ids`, `source_artifact_ids`: `uuid[]` (Private selected backtest
+  sources)
+- `selection_key`: `text` (Nullable for legacy rows; canonical sha256 selection
+  identity, independent of note and payload content)
 - `title`: `text`
 - `payload`: `jsonb` (the closed public payload; see below)
 - `payload_digest`: `text` (`^[0-9a-f]{64}$`, sha256 over the canonical payload)
 - `created_at`: `timestamptz`
 - `revoked_at`: `timestamptz` (Nullable)
-- `revocation_reason`: `text` (Nullable, `owner_revoked` or `source_deleted`)
+- `revocation_reason`: `text` (Nullable, `owner_revoked`, `source_deleted`, or
+  `removed_by_argus`)
 
-The source references are `ON DELETE SET NULL` rather than cascade so a tombstone
-outlives whatever it pointed at. They exist only for revocation and the owner's
-audit list; the public read never selects them.
+The legacy scalar source references are `ON DELETE SET NULL` rather than cascade
+so a tombstone outlives whatever it pointed at. The new private source arrays are
+immutable provenance; insert and deletion triggers enforce their ownership and
+liveness. These source identifiers never enter the public read or public payload.
 
 ### Closed payload
 
-`payload` carries exactly these keys and no others, enforced by `extra="forbid"`
+Version 1 `payload` carries exactly these keys and no others, enforced by `extra="forbid"`
 on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
 `idea_title`, `asset_class`, `symbols`, `strategy_facts`, `assumptions`,
 `date_range`, `metrics`, `benchmark_symbol`, `visual`, `owner_note`,
 `content_language`, `framing`, `provenance_mark`.
 
+Version 2 is a closed outer `{schema_version: 2, kind: "turns", turns: [...]}`
+wrapper. It contains one or more per-turn payloads in conversation order. Each
+turn has a closed `kind` discriminator. The exact research leaf is specified by
+`docs/specs/conversation-sharing.md` section 4.2; no field is added to that leaf.
+The backtest leaf freezes the card's closed typed fact bank, title, visual, note,
+content language, framing and provenance. `public_excerpt_fact_schemas.py` closes
+every nested config, rule, figure and cost field. The public renderer reads the
+same result fact and display owners as the result card.
+
+Every selected turn independently passes the shared eligibility and privacy audit
+at preview and creation. A refusal refuses the entire selection. The owner sees
+the exact public rendering before creation; its digest must still match when
+creation rechecks the sources. The preview bounds the accepted cross-turn
+inference risk; it does not eliminate it.
+
 Source conversation ids, route receipts, provider or model metadata, retry
-payloads, raw transcripts, broker or account data, and user-private memory are
-never present. `argus.domain.public_excerpts.audit_public_excerpt_payload` audits
+payloads, unselected transcript content, broker or account data, and user-private
+memory are never present. `argus.domain.public_excerpts.audit_public_excerpt_payload` audits
 keys and values before any receipt is written and fails closed, so a payload that
 cannot be proven clean is never stored.
 
-### Nothing rendered is frozen
+### Version 1 display values remain unchanged
 
-A receipt is read by strangers, so the payload freezes facts and never sentences.
+The version 1 backtest payload freezes typed facts rather than rendered labels.
 `strategy_facts`, `assumptions`, and `metrics` are each a list of `{key, value}`
 under a closed key enum (`StrategyFactKey`, `AssumptionKey`, `MetricKey`), where
 `value` is the bare scalar the run reported, and `date_range` is `{start, end}` as
@@ -1294,10 +1488,13 @@ about a live link. Owner-side reads are not wrapped this way; an owner's list is
 the only place a receipt can be revoked, so a row it cannot parse should surface
 loudly rather than vanish from that list.
 
-`idea_title` and `owner_note` are the only author-written fields, and
-`content_language` names the language they are in. `owner_note` is also the only
-free-text field: bounded at 280 characters, stripped of control characters, and
-refused if it contains an identifier or a credential-shaped token.
+Version 1 author text remains `idea_title` and `owner_note`. A research leaf also
+carries its whitespace-normalized question (at most 500 characters) and answer
+markdown (at most 4,000). A note is bounded at 280. Each field is audited and
+refused with a named field if it contains an identifier, credential shape, private
+id or never-expose marker. Answers with prose URLs absent verbatim from typed
+sources are refused. No redaction or truncation repairs an ineligible answer.
+`content_language` names the author's language; reader chrome remains live.
 
 `visual` freezes the run's equity series, downsampled to at most 500 points with
 the endpoints preserved. The public view renders it client side; nothing is
@@ -1307,7 +1504,8 @@ fetched at view time.
 
 `prevent_public_excerpt_immutable_update` rejects any change to `id`,
 `public_id`, `owner_id`, `title`, `payload`, `payload_digest`, or `created_at`,
-and rejects any change to the revocation columns once `revoked_at` is set.
+and also freezes `kind`, `selection_key` and the private source arrays. It
+rejects any change to the revocation columns once `revoked_at` is set.
 Revocation is one way.
 
 `enforce_public_excerpt_source_is_live` refuses an insert whose source conversation
@@ -1319,10 +1517,17 @@ application check cannot do: a check-then-insert could pass and have the delete
 commit before the insert lands, whereas the lock makes a concurrent soft delete block
 the insert, which then reads the delete's result and refuses.
 
+For selected turns, the same insert trigger locks and verifies every named
+assistant message, run and artifact against the same owner and conversation.
+It acquires source locks in deterministic order. No selected source can disappear
+between an application check and publication without either refusing creation or
+revoking the snapshot.
+
 `revoke_public_excerpts_for_deleted_source` revokes a receipt when its source
 goes away, so deleting a chat cannot leave a live public page behind:
 - `conversations` soft delete (`deleted_at` null to not null)
-- `conversations`, `backtest_runs`, or `evidence_artifacts` hard delete
+- `conversations`, `messages`, `backtest_runs`, or `evidence_artifacts` hard delete;
+  every selected source participates, not only the first turn
 
 Every branch skips rows whose owner profile is already gone. Account deletion
 cascades to conversations and fires the purge trigger while the profile no longer
@@ -1333,6 +1538,10 @@ A partial unique index on `(owner_id, evidence_artifact_id) where revoked_at is
 null` allows at most one live receipt per result, so re-sharing returns the
 existing link instead of minting a second page the owner must revoke twice.
 Revoked rows are excluded, so revoking does not forbid sharing that result again.
+A second partial unique index on `(owner_id, selection_key)` gives all new
+selections the same insert-race recovery. A new singleton backtest retains its
+artifact identity too, so the compatibility endpoint and message selection return
+the same live record. A different multi-turn selection is a different receipt.
 
 Note a pre-existing constraint: a conversation with a captured idea spine cannot
 be hard deleted at all, because `idea_versions.source_conversation_id` is
@@ -1667,7 +1876,8 @@ Tracks resource consumption for quotas and limits.
 
 ### Alpha Enums
 - **Resource**: `chat_messages`, `backtest_runs`, `backtest_jobs`, `feedback`,
-  `discovery_searches`
+  `discovery_searches` (account rows); `guest_compute_turns` lives only in
+  `visitor_usage_counters`
 - **Period**: `hour`, `day`, `guest_session`
 
 ### Discovery Search Accounting
@@ -1685,9 +1895,10 @@ Tracks resource consumption for quotas and limits.
 ### Notes
 - Usage counters are operational safety data, not monetization data in Alpha.
 - For `guest_session`, `period_start` equals `guest_workspaces.created_at` and
-  `period_end` equals its fixed seven-day `expires_at`. Limits are ten completed
-  assistant terminals, two unique simulation admissions, and five feedback
-  submissions over the identity lifetime.
+  `period_end` equals its fixed seven-day `expires_at`. Limits are two unique
+  simulation admissions and five feedback submissions over the identity
+  lifetime. Conversation is compute and is not metered: `chat_messages` rows
+  are retired history that no product path writes.
 - Registered users continue to use the existing UTC hour/day accounting.
 
 ---
@@ -1696,11 +1907,15 @@ Tracks resource consumption for quotas and limits.
 
 Tracks visitor-scoped and shared provider allowances without inventing a
 profile owner. This is intentionally separate from `usage_counters`, whose
-`user_id` is a foreign key to `profiles.id`.
+`user_id` is a foreign key to `profiles.id`. It also holds the guest compute
+anti-abuse ceiling (`guest_compute_turns`, one unit per completed guest turn,
+settled in the terminal transaction), which is not an allowance and is never
+projected by `GET /me/usage`.
 
 ### Fields
 - `visitor_key`: `text` (opaque keyed digest; never a raw address)
-- `resource`: `text` (`discovery_searches`, `research_searches`)
+- `resource`: `text` (`discovery_searches`, `research_searches`,
+  `guest_compute_turns`)
 - `period`: `text` (`day`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`

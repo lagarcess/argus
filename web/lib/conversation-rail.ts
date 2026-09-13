@@ -1,6 +1,7 @@
 import type { Message } from "@/components/chat/types";
 import type { DecisionState } from "@/lib/argus-api";
 import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
+import { isSettledStrategyResult } from "@/lib/chat-result-message";
 
 /**
  * Conversation activity rail ("turn map") derivation and interaction gating.
@@ -384,11 +385,7 @@ export function deriveConversationRailTicks(
       }
       return;
     }
-    if (
-      message.kind === "strategy_result" &&
-      message.result &&
-      !message.isLoadingResult
-    ) {
+    if (isSettledStrategyResult(message)) {
       const result = message.result;
       ticks.push({
         messageId: message.id,

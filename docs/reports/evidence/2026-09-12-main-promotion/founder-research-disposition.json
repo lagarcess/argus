@@ -1,0 +1,99 @@
+{
+  "status": "classified_pending_founder_merge_decision",
+  "authority": "Founder direction in this promotion task",
+  "provider_window": {
+    "evidence_source": "Founder-provided observations from other requests; not independently re-queried in this task",
+    "observed_before_ab_utc": [
+      "2026-09-13T06:27:00Z",
+      "2026-09-13T06:30:00Z"
+    ],
+    "code": "research_unavailable_http_error",
+    "founder_confirmed_same_error_window_includes_candidate_attempts": [
+      1,
+      3
+    ]
+  },
+  "candidate_attempt_dispositions": [
+    {
+      "attempts": [
+        1,
+        3
+      ],
+      "classification": "provider_side_research_delivery_failure",
+      "not_a_candidate_request_defect": true,
+      "reason": "Independent provider error observations predate the A/B; unchanged case inputs also produced published research on other attempts.",
+      "prior_http_status": "not_retained"
+    },
+    {
+      "attempts": [
+        4
+      ],
+      "classification": "no_worse_than_production",
+      "reason": "The response fell back to the same future-performance limitation production gives; its native prose judge passed.",
+      "native_typed_failure_retained": true
+    }
+  ],
+  "cause": "Forward-looking questions now depend on research. The native research path returns a disclosed search-unavailable answer immediately on a provider error, without retrying that provider error. A provider error window therefore becomes visible as delivery failures.",
+  "code_evidence": [
+    {
+      "path": "src/argus/agent_runtime/research_grounded.py",
+      "line": 299,
+      "fact": "ResearchUnavailableError immediately returns unavailable_result."
+    },
+    {
+      "path": "src/argus/domain/research/perplexity_agent.py",
+      "line": 343,
+      "fact": "HTTP errors raise ResearchUnavailableError without an error retry."
+    }
+  ],
+  "first_follow_up": "Add a research retry on provider errors, preserving usage and cost accounting and disclosing unavailability if delivery still fails.",
+  "retry_implemented": false,
+  "validator_unchanged": true,
+  "native_results_unchanged": true,
+  "ab_direction": {
+    "complete_to_pairs": 10,
+    "retain_first_four_pairs": true,
+    "failure_gap_stop_applies": false,
+    "combined_cap_usd": 12.5,
+    "retain_http_status_on_new_research_http_errors": true,
+    "cooldown_seconds_after_three_consecutive_candidate_research_delivery_failures": 900
+  },
+  "replay_direction": "After A/B completion, replay the 15-conversation union with 38 turns under its separate $4 stop. Then wait for the founder before the browser walk.",
+  "promotion_acceptance": "Founder decides at merge stop whether to promote with the research retry still pending.",
+  "continuation_observations": [
+    {
+      "attempt": 6,
+      "classification": "research_delivery_timeout",
+      "code": "research_unavailable_timeout",
+      "http_status": "no_response_status",
+      "native_failure_retained": true
+    },
+    {
+      "attempt": 9,
+      "classification": "provider_side_research_delivery_failure",
+      "code": "research_unavailable_http_error",
+      "http_status": 500,
+      "native_failure_retained": true
+    },
+    {
+      "attempt": 10,
+      "classification": "production_equivalent_limitation_answer",
+      "basis": "Release-captain comparison against deployed attempt 10: both disclose inability to predict future values and offer historical testing; both prose judges pass. Same observed category as founder-dispositioned attempt 4.",
+      "native_typed_failure_retained": true,
+      "founder_merge_disposition_pending": true
+    }
+  ],
+  "completed_ab": {
+    "pairs": 10,
+    "native_failures": {
+      "baseline": 0,
+      "candidate": 6
+    },
+    "candidate_research_publication_count": 4,
+    "candidate_provider_http_error_count": 3,
+    "candidate_research_timeout_count": 1,
+    "candidate_future_limitation_count": 2,
+    "cooldowns_required": 0,
+    "http_status_after_resume": 500
+  }
+}

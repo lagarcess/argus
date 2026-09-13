@@ -8,6 +8,7 @@ TIER_PRIMARY_ENV: dict[str, tuple[str, ...]] = {
     "chat": ("ARGUS_CHAT_MODEL",),
     "structured": ("ARGUS_STRUCTURED_MODEL",),
     "context": ("ARGUS_CONTEXT_MODEL",),
+    "readout": ("ARGUS_READOUT_MODEL",),
 }
 
 TIER_FALLBACK_ENV: dict[str, tuple[str, ...]] = {
@@ -15,4 +16,5 @@ TIER_FALLBACK_ENV: dict[str, tuple[str, ...]] = {
     "chat": ("ARGUS_CHAT_FALLBACK_MODEL",),
     "structured": ("ARGUS_STRUCTURED_FALLBACK_MODEL",),
     "context": ("ARGUS_CONTEXT_FALLBACK_MODEL",),
+    "readout": ("ARGUS_READOUT_FALLBACK_MODEL",),
 }
