@@ -76,4 +76,4 @@ The full scorecard is preserved unchanged. Reruns are separate observations on t
 | `ordinary_conversation_price_question_en` | passed | passed | not needed |
 | `spanish_ui_english_user_msft_hold_h1_2024` | passed | passed | not needed |
 
-Exact failed checks and changes are in `full-comparison.json` and `partial-reruns.json`.
+Machine-readable check codes and rerun completion states are in `case-comparison.json`. Detailed raw artifacts remain local.
