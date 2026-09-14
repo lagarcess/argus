@@ -28,6 +28,7 @@ from argus.api.search_assembly import (
     memory_search_read,
     scored_supabase_search_items,
 )
+from argus.api.search_computed import attach_answer_dossiers, with_computed_results
 from argus.api.search_utils import search_rank_key
 from argus.domain.postgres_search_reader import (
     SearchCursorError,
@@ -327,6 +328,22 @@ def search(
     if has_more and page_items:
         _, last_item = page_items[-1]
         next_cursor = encode_cursor(last_item.updated_at.isoformat(), last_item.id)
+    # Computed answers join after the read: the run dossier projection and its
+    # SQL stay as they are, and the asset row counts every result.
+    hydrated_items = attach_answer_dossiers(
+        [item for _, item in page_items],
+        user=user,
+        decision_action_availability=decision_action_availability,
+    )
+    page_items = list(
+        zip((score for score, _ in page_items), hydrated_items, strict=True)
+    )
+    asset_rollup = with_computed_results(
+        asset_rollup,
+        user=user,
+        query=query,
+        guest_conversation_id=workspace_conversation_id,
+    )
     capture_product_event(
         "recall_usage",
         user_id=user.id,

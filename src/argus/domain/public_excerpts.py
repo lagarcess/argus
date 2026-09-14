@@ -331,6 +331,15 @@ def audit_public_excerpt_document(
     )
 
 
+def _public_turn_symbols(turn: Any) -> list[str]:
+    """The asset identities a turn publishes; a calculation publishes none."""
+    if turn.kind == "research_answer":
+        return list(turn.anchor_symbols)
+    if turn.kind == "backtest":
+        return list(turn.fact_bank.symbols)
+    return []
+
+
 def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem:
     """Owner-facing row. Carries no source id, only what the owner needs to act."""
     from argus.domain.public_excerpt_kinds import document_kind
@@ -342,13 +351,7 @@ def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem
         title = snapshot.title
         symbols = list(
             dict.fromkeys(
-                symbol
-                for turn in payload.turns
-                for symbol in (
-                    turn.anchor_symbols
-                    if turn.kind == "research_answer"
-                    else turn.fact_bank.symbols
-                )
+                symbol for turn in payload.turns for symbol in _public_turn_symbols(turn)
             )
         )
         dates = None

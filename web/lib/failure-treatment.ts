@@ -35,27 +35,27 @@ export const degradedValueClass = "italic text-[#8d969e] dark:text-white/45";
 // styling, so the amber family folds in here with the rest of the vocabulary.
 
 export const retryableNoticeContainerClass =
-  "flex w-full items-start gap-3 rounded-[14px] border border-amber-700/25 bg-amber-500/[0.06] px-4 py-3 dark:border-amber-300/20 dark:bg-amber-300/[0.06]";
+  "flex w-full flex-wrap items-start gap-3 rounded-[14px] border border-amber-700/25 bg-amber-500/[0.06] px-4 py-3 dark:border-amber-300/20 dark:bg-amber-300/[0.06]";
 
 export const retryableNoticeIconClass =
   "mt-0.5 h-4 w-4 shrink-0 text-amber-800/70 dark:text-amber-300/70";
 
 export const retryableNoticeBodyClass =
-  "min-w-0 flex-1 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75";
+  "min-w-0 grow basis-[10rem] text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75";
 
 export const retryableNoticeRetryPillClass =
-  "shrink-0 self-center rounded-full border border-amber-700/30 px-3 py-1.5 text-[13px] font-medium text-amber-900/80 transition-colors hover:bg-amber-500/10 dark:border-amber-300/30 dark:text-amber-200/90 dark:hover:bg-amber-300/10";
+  "max-w-full shrink-0 self-center rounded-full border border-amber-700/30 px-3 py-1.5 text-[13px] font-medium text-amber-900/80 transition-colors hover:bg-amber-500/10 dark:border-amber-300/30 dark:text-amber-200/90 dark:hover:bg-amber-300/10";
 
 // ── Quiet (non-retryable) notice ────────────────────────────────────────────
 
 export const quietNoticeContainerClass =
-  "flex w-full items-start gap-3 rounded-[14px] border border-black/12 bg-black/[0.03] px-4 py-3 dark:border-white/12 dark:bg-white/[0.04]";
+  "flex w-full flex-wrap items-start gap-3 rounded-[14px] border border-black/12 bg-black/[0.03] px-4 py-3 dark:border-white/12 dark:bg-white/[0.04]";
 
 export const quietNoticeIconClass =
   "mt-0.5 h-4 w-4 shrink-0 text-black/50 dark:text-white/55";
 
 export const quietNoticeBodyClass =
-  "min-w-0 flex-1 text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75";
+  "min-w-0 grow basis-[10rem] text-[15px] leading-[1.55] tracking-[0.2px] text-black/75 dark:text-white/75";
 
 // ── Panel-scale failure state (palette, composer discovery) ─────────────────
 

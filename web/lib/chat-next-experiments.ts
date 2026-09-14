@@ -143,6 +143,8 @@ export function nextExperimentsSourceRunIdFromMetadata(
 }
 
 const RESEARCH_ADD_PEER_KIND_PREFIX = "research_add_peer";
+/** A research answer's calculation, offered on the reader's own figures. */
+export const CALCULATION_OFFER_KIND = "calculation_offer";
 
 export function nextExperimentAction(
   row: NextExperimentRow,
@@ -160,6 +162,12 @@ export function nextExperimentAction(
       type: "add_confirmation_peer",
       payload: { symbols },
     };
+  }
+  if (row.kind === CALCULATION_OFFER_KIND) {
+    // The typed action carries no figures: the backend keeps the ones the
+    // answer cited and asks only for the reader's own.
+    const label = localizedLabel || row.label;
+    return { label, value: label, type: "calculation_offer" };
   }
   // A prebaked row sends its fully specified ask; nothing is missing, so
   // the normal lifecycle answers with the next confirmation card.

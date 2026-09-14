@@ -1,4 +1,4 @@
-import { toolCardsFromMetadata, hasUnavailableToolCards } from "@/lib/tool-result-card";
+import { answerAssumptionsFromMetadata, toolCardsFromMetadata, hasUnavailableToolCards } from "@/lib/tool-result-card";
 import {
   resultCardFromConversationCard,
   type ApiMessage,
@@ -19,6 +19,7 @@ import {
   decisionComputationFromMetadata,
   decisionStateFromValue,
 } from "@/lib/decision-contract";
+import { continuedFromMetadata } from "@/lib/computation-contract";
 import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { pendingArtifactCardFromPayload } from "@/lib/pending-artifact-card";
@@ -326,6 +327,7 @@ export function hydrateMessagesFromApi(
       const toolResultCards = message.role !== "user" ? toolCardsFromMetadata(metadata) : undefined;
       const hasUnavailableToolResults = message.role !== "user" && hasUnavailableToolCards(metadata);
       const toolJobs = message.role !== "user" ? toolJobsFromMetadata(metadata) : undefined;
+      const answerAssumptions = message.role !== "user" ? answerAssumptionsFromMetadata(metadata) : null;
       const isBreakdown = message.role !== "user" && (metadata.artifact_presentation_kind === "breakdown" || isBreakdownActionMetadata(metadata));
       const chatAction = metadata.chat_action as ChatActionOption | undefined;
       const confirmation = pendingArtifactCardFromPayload(metadata.confirmation_card);
@@ -453,7 +455,7 @@ export function hydrateMessagesFromApi(
           isBreakdown
             ? "result_breakdown"
             : undefined,
-      }), toolJobs };
+      }), toolJobs, ...(answerAssumptions ? { answerAssumptions } : {}) };
       if (isBreakdown) {
         return {
           ...hydratedText,
@@ -484,6 +486,7 @@ export function hydrateMessagesFromApi(
         // A computed answer declares its computation; the backend stamps
         // the current decision beside it. Both are rendered, never inferred.
         const computation = decisionComputationFromMetadata(metadata);
+        const continuedFrom = continuedFromMetadata(metadata);
         if (
           discovery ||
           nextExperiments ||
@@ -494,6 +497,7 @@ export function hydrateMessagesFromApi(
         ) {
           return {
             ...hydratedText,
+            ...(continuedFrom ? { continuedFrom } : {}),
             ...(computation
               ? {
                   computation,

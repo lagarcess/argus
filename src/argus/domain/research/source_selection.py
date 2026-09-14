@@ -1,9 +1,9 @@
 """Question-aware selection for the public research sources drawer.
 
 Provider parsing retains a bounded evidence pool. This module is the one
-public selection step: it removes citations that cannot plausibly describe
-the question's period, keeps one page per publisher, then applies the drawer
-cap. Retrieval order is preserved among eligible publishers. It also owns the
+public selection step: it keeps the pages a typed answer cites, removes
+citations that cannot plausibly describe the question's period, keeps one page
+per publisher, then applies the drawer cap. Retrieval order is preserved among eligible publishers. It also owns the
 date a question is asked on, the date every bound here is read against.
 """
 
@@ -14,7 +14,7 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 from argus.domain.market_data.new_york_clock import new_york_today
-from argus.domain.research.contracts import MAX_SOURCES, ResearchSource
+from argus.domain.research.contracts import MAX_SOURCES, ResearchPacket, ResearchSource
 
 _CURRENT_SURVEY_KINDS = frozenset({"market_pulse", "screening", "sector_radar"})
 # No civil clock is a full day ahead of New York, so a publisher stamping pages
@@ -26,6 +26,34 @@ def question_date() -> date:
     """The date a research question is asked on, by the New York calendar the
     US markets it asks about keep."""
     return new_york_today()
+
+
+def answer_sources(packet: ResearchPacket) -> tuple[ResearchSource, ...]:
+    """The pages an answer relies on, in the order it names them.
+
+    A typed answer names the retrieved pages it relies on and cites a page for
+    each figure and each page input, and only those are candidates: a search
+    hit the answer never cites supports nothing it says, and a page this
+    response never retrieved is not one Argus read. Prose names no pages, so its
+    retrieved pages stand as they arrived.
+    """
+    if not packet.typed_answer:
+        return packet.sources
+    retrieved = {_page_key(source.url): source for source in packet.sources}
+    cited: dict[str, ResearchSource] = {}
+    figure_pages = [row.source_url for row in packet.rows if row.source_url] + [
+        str(item.get("source_url"))
+        for calculation in packet.calculations
+        for item in calculation.get("inputs") or []
+        if isinstance(item, dict)
+        and item.get("source") == "page"
+        and item.get("source_url")
+    ]
+    for url in (*packet.source_urls, *figure_pages):
+        page = retrieved.get(_page_key(url))
+        if page is not None:
+            cited.setdefault(_page_key(url), page)
+    return tuple(cited.values())
 
 
 def select_public_sources(
@@ -88,6 +116,15 @@ def _period_plausible(
     if published < period_start:
         return False
     return question_as_of is None or published <= question_as_of + _PUBLISHER_DATE_LEAD
+
+
+def _page_key(url: str) -> str:
+    """One page however its URL was written: host case, a leading www, a
+    trailing slash or a fragment do not make another page."""
+    parts = urlparse(url.strip())
+    host = (parts.hostname or "").lower().removeprefix("www.")
+    query = f"?{parts.query}" if parts.query else ""
+    return f"{host}{parts.path.rstrip('/')}{query}"
 
 
 def _publisher_key(url: str) -> str:

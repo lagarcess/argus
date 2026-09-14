@@ -137,3 +137,37 @@ def test_a_questions_only_list_carries_no_rows() -> None:
         {"type": "question", "text": QUESTIONS["es-419"]}
     ]
     assert "next_experiments" not in patch
+
+
+def test_a_research_answer_lists_its_tests_then_two_to_four_questions() -> None:
+    from argus.agent_runtime.result_next_steps import research_next_steps
+
+    rows = {
+        "version": "argus_next_experiments/v1",
+        "rows": [
+            {"kind": "calculation_market_counterfactual", "label": "a"},
+            {"kind": "research_test_single", "label": "b"},
+            {"kind": "research_test_versus", "label": "c"},
+        ],
+    }
+    follow_up = {
+        "questions": [
+            "What is an APR?",
+            "what is an apr?",
+            "",
+            "How are annual fees charged?",
+            "Do rewards expire?",
+            "What is a balance transfer?",
+            "How is interest compounded?",
+        ]
+    }
+    items = research_next_steps(follow_up, rows)["next_steps"]["items"]
+    assert [item["type"] for item in items] == ["test"] * 3 + ["question"] * 2
+    assert [item["text"] for item in items[3:]] == [
+        "What is an APR?",
+        "How are annual fees charged?",
+    ]
+    questions_only = research_next_steps(follow_up, None)
+    assert len(questions_only["next_steps"]["items"]) == 4
+    assert "next_experiments" not in questions_only
+    assert research_next_steps(None, None) == {}

@@ -174,3 +174,28 @@ each final call was made:
    (highlighting the last landmark above the viewport) was discussed and
    parked — with artifact-only ticks most reading positions sit between
    landmarks, so it only earns its place if tick density ever grows.
+
+## Addendum 2026-09-11: "Backtest finished" widens to "result"
+
+Founder decision, 2026-09-11, recorded with the Any grounded math lane on the
+grounded finance board.
+
+1. **The result kind.** The tick kind `backtest_completed` becomes `result`,
+   labeled "Result" / "Resultado". A result is a settled backtest, or an
+   assistant message with a backend-declared `metadata.computation` whose card
+   of that kind succeeded. Nothing is ever inferred from prose: a message
+   without the marker never ticks, however computed it reads, and a research
+   answer still does not tick.
+2. **Unchanged.** Decision saved still supersedes a result tick for the same
+   turn, needed attention is unchanged, and existing backtest ticks behave
+   exactly as before, including in reloaded conversations; only the kind's name
+   and label moved.
+3. **Hover.** Hovering a calculation shows its card title and its headline
+   figure, read from the card's typed presentation through the same localized
+   fact rendering the card uses. Run ticks keep their strategy title, symbols,
+   period and metric rows.
+4. **Failure.** A computed answer whose card did not succeed is a needed
+   attention tick; the preview body comes from the one tool outcome treatment
+   owner (`web/lib/tool-outcome-treatment.ts`), never from a tone chosen here.
+5. **Still no durable model and no model call.** Ticks derive at render time
+   from the message marker and card the backend stored.

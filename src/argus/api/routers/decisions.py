@@ -10,11 +10,13 @@ from argus.api.chat.decisions import (
     DecisionRerunInputsError,
     create_decision_for_message,
     open_decision,
+    rerun_message_computation,
 )
 from argus.api.decision_contract import (
     DecisionNoteCreate,
     DecisionOpenResponse,
     DecisionRerunRequest,
+    MessageComputationRerunResponse,
     MessageDecisionResponse,
 )
 from argus.api.dependencies import current_user, problem, require_account_capability
@@ -84,7 +86,7 @@ def open_decision_route(
     user: User = Depends(current_user),  # noqa: B008
 ) -> DecisionOpenResponse:
     try:
-        decision, computation, rerun = open_decision(user=user, decision_id=decision_id)
+        decision, computation, reruns = open_decision(user=user, decision_id=decision_id)
     except DecisionNotFoundError as exc:
         raise problem(
             request,
@@ -93,7 +95,7 @@ def open_decision_route(
             title="Not Found",
             detail=str(exc),
         ) from exc
-    return DecisionOpenResponse(decision=decision, computation=computation, rerun=rerun)
+    return DecisionOpenResponse(decision=decision, computation=computation, reruns=reruns)
 
 
 @router.post("/decisions/{decision_id}/rerun", response_model=DecisionOpenResponse)
@@ -104,10 +106,11 @@ def rerun_decision_route(
     user: User = Depends(current_user),  # noqa: B008
 ) -> DecisionOpenResponse:
     try:
-        decision, computation, rerun = open_decision(
+        decision, computation, reruns = open_decision(
             user=user,
             decision_id=decision_id,
             overrides=payload.inputs,
+            calculation=payload.calculation,
         )
     except DecisionNotFoundError as exc:
         raise problem(
@@ -126,4 +129,51 @@ def rerun_decision_route(
             detail="Re-run inputs are invalid.",
             context={"errors": exc.errors},
         ) from exc
-    return DecisionOpenResponse(decision=decision, computation=computation, rerun=rerun)
+    return DecisionOpenResponse(decision=decision, computation=computation, reruns=reruns)
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages/{message_id}/computation/rerun",
+    response_model=MessageComputationRerunResponse,
+)
+def rerun_message_computation_route(
+    conversation_id: str,
+    message_id: str,
+    payload: DecisionRerunRequest,
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> MessageComputationRerunResponse:
+    try:
+        computation, reruns = rerun_message_computation(
+            user=user,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            overrides=payload.inputs,
+            calculation=payload.calculation,
+        )
+    except DecisionMessageNotFoundError as exc:
+        raise problem(
+            request,
+            status_code=404,
+            code="not_found",
+            title="Not Found",
+            detail=str(exc),
+        ) from exc
+    except DecisionAttachmentUnsupportedError as exc:
+        raise problem(
+            request,
+            status_code=409,
+            code="decision_attachment_unsupported",
+            title="Decision Attachment Unsupported",
+            detail=str(exc),
+        ) from exc
+    except DecisionRerunInputsError as exc:
+        raise problem(
+            request,
+            status_code=422,
+            code="validation_error",
+            title="Validation Error",
+            detail="Re-run inputs are invalid.",
+            context={"errors": exc.errors},
+        ) from exc
+    return MessageComputationRerunResponse(computation=computation, reruns=reruns)

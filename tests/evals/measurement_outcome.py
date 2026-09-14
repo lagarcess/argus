@@ -8,6 +8,9 @@ from the harness so the projection and its comparison stay one idea.
 
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from tests.evals.measurement_assertions import (
@@ -179,6 +182,97 @@ def rendered_beside_reply(
             "retryable": bool(recovery.get("retryable")),
         }
 
+    final = _patch_value("final_response_payload")
+    final = final if isinstance(final, dict) else {}
+    cards = [
+        _tool_card_surface(card)
+        for card in (final.get("tool_result_cards") or [])
+        if isinstance(card, dict)
+    ]
+    cards = [card for card in cards if card]
+    if cards:
+        surface["tool_cards"] = cards
+
+    return surface
+
+
+_LOCALE_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "web"
+    / "public"
+    / "locales"
+    / "en"
+    / "common.json"
+)
+
+
+@lru_cache(maxsize=1)
+def _locale() -> dict[str, Any]:
+    return json.loads(_LOCALE_PATH.read_text(encoding="utf-8"))
+
+
+def _localized(text: Any) -> str:
+    """A card's localized text as the English interface renders it."""
+    if not isinstance(text, dict):
+        return ""
+    key = str(text.get("locale_key") or "")
+    node: Any = _locale()
+    for part in key.split("."):
+        node = node.get(part) if isinstance(node, dict) else None
+    rendered = node if isinstance(node, str) else key
+    for name, value in (text.get("interpolation_args") or {}).items():
+        rendered = rendered.replace("{{" + str(name) + "}}", str(value))
+    return rendered
+
+
+def _fact_surface(fact: Any) -> dict[str, Any]:
+    if not isinstance(fact, dict):
+        return {}
+    projected: dict[str, Any] = {"label": _localized(fact.get("label"))}
+    projected["value"] = fact.get("value")
+    unit = _localized(fact.get("unit"))
+    if unit:
+        projected["unit"] = unit
+    source = fact.get("source")
+    if isinstance(source, dict):
+        cited = {
+            key: source[key]
+            for key in ("kind", "title", "url", "date")
+            if source.get(key)
+        }
+        if cited:
+            projected["source"] = cited
+    return projected
+
+
+def _tool_card_surface(card: dict[str, Any]) -> dict[str, Any]:
+    """The computed card as the reader sees it: every figure with its source."""
+    presentation = card.get("presentation")
+    presentation = presentation if isinstance(presentation, dict) else {}
+    outcome = card.get("outcome")
+    outcome = outcome if isinstance(outcome, dict) else {}
+    surface: dict[str, Any] = {
+        "title": _localized(presentation.get("title")),
+        "status": str(outcome.get("status") or ""),
+    }
+    failure = outcome.get("failure")
+    if isinstance(failure, dict) and failure.get("code"):
+        surface["failure"] = {
+            "code": failure["code"],
+            "fields": list(failure.get("fields") or []),
+        }
+    answer = _fact_surface(presentation.get("answer"))
+    if answer:
+        surface["answer"] = answer
+    rows = [_fact_surface(fact) for fact in presentation.get("rows") or []]
+    if rows:
+        surface["rows"] = rows
+    inputs = [_fact_surface(fact) for fact in presentation.get("inputs") or []]
+    if inputs:
+        surface["inputs"] = inputs
+    notes = [_localized(note) for note in presentation.get("notes") or []]
+    if notes:
+        surface["notes"] = notes
     return surface
 
 

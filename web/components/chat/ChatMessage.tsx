@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 import StrategyResultCard from "./StrategyResultCard";
 import ToolResultCard from "./ToolResultCard";
-import type { ToolRecompute } from "@/lib/tool-result-card";
+import { answerAssumptionsText, type ToolRecompute } from "@/lib/tool-result-card";
 import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
@@ -64,6 +64,8 @@ type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
   onToolRecompute?: ToolRecompute;
+  /** Opens another conversation: a continued result, or the chat it came from. */
+  onOpenConversation?: (conversationId: string) => void;
   onDirectEdit?: (
     confirmationId: string,
     edit: ConfirmationDirectEditPayload,
@@ -94,6 +96,7 @@ export default function ChatMessage({
   onAction,
   onDirectEdit,
   onToolRecompute,
+  onOpenConversation,
   onFeedback,
   onToast,
   isLatest,
@@ -241,6 +244,7 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
+  const assumedInputsLine = answerAssumptionsText(message, t, locale);
   const researchSourcesOpen = researchSourcesDisplay(Boolean(message.researchDegradedCode));
   // Chips carry domains and the drawer owns the list; zero sources is the
   // ungrounded marker (derived, never asserted). Canon: DESIGN.md §11.
@@ -450,7 +454,17 @@ export default function ChatMessage({
               </ReactMarkdown>
             </div>
           )}
+          {assumedInputsLine ? (
+            <p data-answer-assumptions className="mt-3 max-w-[min(100%,660px)] text-sm text-black/60 dark:text-white/60">{assumedInputsLine}</p>
+          ) : null}
 
+          {!isUser && message.continuedFrom && onOpenConversation ? (
+            <button type="button" data-continued-from={message.continuedFrom.conversationId}
+              onClick={() => { if (message.continuedFrom) onOpenConversation(message.continuedFrom.conversationId); }}
+              className="mt-3 inline-flex min-h-11 items-center text-left text-[13px] text-black/50 underline decoration-black/20 underline-offset-4 transition-colors hover:text-black dark:text-white/50 dark:decoration-white/20 dark:hover:text-white">
+              {t("tools.compute.continued_from")}
+            </button>
+          ) : null}
           {!isUser && message.toolJobs?.map((pending) => <div key={pending.call_id} className="mt-3 w-full max-w-[min(100%,660px)]">
             <BacktestJobCard job={pending.job} canRetry={false} />
           </div>)}
@@ -469,6 +483,7 @@ export default function ChatMessage({
             <ComputedAnswerDecision
               message={message}
               conversationId={conversationId}
+              onOpenConversation={onOpenConversation}
               onSaved={(decision) => onDecisionSaved?.(decision.decision_state)}
             />
           ) : null}

@@ -1,0 +1,21 @@
+{
+  "head": "9309ecbecae42d5b46a40663945f8b3e3c60d747",
+  "attempts": [
+    {
+      "question": "q7",
+      "attempt": 1,
+      "started_at": "2026-09-13T23:50:28.868417+00:00",
+      "conversation_id": "cb9c4544-b16c-44d5-8d12-075dd64a3565",
+      "message_id": "4b667799-bf07-417b-8f24-3f5cb0647721",
+      "provider_errors": [],
+      "research_degraded": null,
+      "research_usd": 0.34995,
+      "openrouter_usd": 0.01779,
+      "reason_codes": null,
+      "routes": [
+        "research_answers_concept_question"
+      ],
+      "rail_declined": false
+    }
+  ]
+}

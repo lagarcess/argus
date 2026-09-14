@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from functools import partial
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -13,10 +13,12 @@ from argus.api.chat.tool_results import tool_cards_from_metadata
 from argus.api.dependencies import current_user, problem
 from argus.api.message_store import (
     latest_message,
+    message_preview,
     owned_conversation_message,
     update_message_artifact,
 )
 from argus.api.schemas import Message, User
+from argus.domain.computation_marker import computation_from_tool_cards
 from argus.domain.pending_artifacts import (
     DeadPendingArtifactError,
     PendingArtifactLayout,
@@ -142,10 +144,30 @@ async def recompute_tool_result(
         artifact_id=card.artifact_id,
         input_revision=card.input_revision + 1,
     )
-    documents = [
-        (revised if item.artifact_id == artifact else item).model_dump(mode="json")
-        for item in cards
-    ]
+    current = [revised if item.artifact_id == artifact else item for item in cards]
+    documents = [item.model_dump(mode="json") for item in current]
+    # The marker is derived from every current card by its one owner, so a
+    # decision saved after this edit stores every option's current inputs.
+    computation = computation_from_tool_cards(current, catalog=get_tool_catalog())
+    metadata: dict[str, JsonValue] = {"tool_result_cards": documents}
+    if computation is not None:
+        metadata["computation"] = computation.model_dump(mode="json")
+    content, assumptions = _recomputed_answer(source, revised, current)
+    if assumptions is not None:
+        metadata["answer_assumptions"] = assumptions
+
+    def _write(**values: Any) -> Message:
+        # The rewritten prose is the conversation's preview when this answer is its
+        # latest message, as a confirmation edit's is.
+        return update_message_artifact(
+            user_id=user.id,
+            conversation_id=conversation,
+            **values,
+            preview=message_preview(
+                values["content"], role=str(source.role), metadata=values["metadata"]
+            ),
+        )
+
     # The message remains the only durable owner. No checkpoint projection is
     # written here; subsequent turns re-read these current artifact facts.
     try:
@@ -154,17 +176,49 @@ async def recompute_tool_result(
             source_message=source,
             expected_source_metadata=copy.deepcopy(source.metadata),
             expected_latest_message_id=latest.id,
-            prepare=lambda: PendingArtifactUpdate(
-                content=source.content, metadata={"tool_result_cards": documents}
-            ),
-            write=partial(
-                update_message_artifact, user_id=user.id, conversation_id=conversation
-            ),
+            prepare=lambda: PendingArtifactUpdate(content=content, metadata=metadata),
+            write=_write,
         )
     except (StaleMessageArtifactError, DeadPendingArtifactError) as exc:
         raise _changed(request) from exc
     assert updated is not None  # This adapter always supplies a prepared update.
     return ToolResultRecomputeResponse(message=updated)
+
+
+def _recomputed_answer(
+    source: Message, revised: Any, current: list[Any]
+) -> tuple[str, list[dict[str, str]] | None]:
+    """The prose re-rendered from the message's current cards when the answer
+    stated its figures through references, so every figure it states stays a
+    card's, with the assumed inputs it never names; any other prose stays as
+    stored, with nothing to list."""
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_TEMPLATE_KEY,
+        fallback_answer_lead,
+        render_answer_text,
+        template_cards,
+        unstated_assumptions,
+    )
+
+    template = (source.metadata or {}).get(ANSWER_TEMPLATE_KEY)
+    names = template_cards(template) if isinstance(template, dict) else {}
+    by_artifact = {card.artifact_id: card for card in current}
+    if revised.artifact_id not in names.values() or any(
+        artifact not in by_artifact for artifact in names.values()
+    ):
+        return source.content, None
+    assert isinstance(template, dict)
+    text_template = str(template.get("text") or "")
+    cards = {name: by_artifact[artifact] for name, artifact in names.items()}
+    succeeded = all(card.outcome.status == "succeeded" for card in cards.values())
+    if succeeded:
+        text, failure = render_answer_text(text_template, cards)
+        if failure is None:
+            return text, unstated_assumptions(text_template, cards)
+    lead = fallback_answer_lead(
+        str(template.get("language") or "en"), succeeded=succeeded
+    )
+    return lead, []
 
 
 def _changed(request: Request) -> Exception:
