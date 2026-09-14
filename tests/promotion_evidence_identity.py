@@ -66,10 +66,6 @@ def assert_measurement_stands_for(
             f"{name}: {evidence} binds {sha or '<unrecorded>'}, which is not a "
             "commit in this repository."
         )
-    assert measured_sha in manifest or name in _MANIFESTS_PREDATING_MEASURED_SHA_RULE, (
-        f"{name}: {evidence} measured {measured_sha} and stands for "
-        f"{shipped_sha}. Name the measured commit in the manifest."
-    )
     touched = reachable_changes(
         measured_sha, shipped_sha, repository_root=repository_root
     )
@@ -77,6 +73,10 @@ def assert_measurement_stands_for(
         f"{name}: {evidence} measured {measured_sha[:8]}, and {len(touched)} "
         f"file(s) it reaches differ at {shipped_sha[:8]}: "
         f"{', '.join(touched[:12])}. Measure again at {shipped_sha[:8]}."
+    )
+    assert measured_sha in manifest or name in _MANIFESTS_PREDATING_MEASURED_SHA_RULE, (
+        f"{name}: {evidence} measured {measured_sha} and stands for "
+        f"{shipped_sha}. Name the measured commit in the manifest."
     )
 
 
