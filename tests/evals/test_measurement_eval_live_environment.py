@@ -15,57 +15,61 @@ from tests.evals import measurement_eval_scorecard as scorecards
 
 
 def _environment_sources(tmp_path: Path) -> Path:
-    """A repository with a tracked template and symlink, an untracked file, an
-    alias into the template, and a folder link that reaches it from outside."""
+    """A repository holding a template, a symlink out of it and a plain file, with
+    links from outside that reach into it or pass through it."""
 
     repository = tmp_path / "repository"
     repository.mkdir()
-    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
     settings = "ARGUS_TURN_CALL_ALLOWANCE=3\n"
     outside = tmp_path / "live-eval.env"
     outside.write_text(settings, encoding="utf-8")
+    (tmp_path / "outside-link.env").symlink_to(outside)
     (repository / ".env.example").write_text(settings, encoding="utf-8")
     (repository / ".env.link").symlink_to(outside)
-    subprocess.run(
-        ["git", "add", ".env.example", ".env.link"], cwd=repository, check=True
-    )
     (repository / ".env").write_text(settings, encoding="utf-8")
-    (repository / ".env.alias").symlink_to(repository / ".env.example")
     (tmp_path / "via").symlink_to(repository)
+    (tmp_path / "envdir").mkdir()
+    (tmp_path / "envdir" / "live.env").write_text(settings, encoding="utf-8")
+    (repository / "envs").symlink_to(tmp_path / "envdir")
+    (tmp_path / "hop").symlink_to(repository / "envs")
     return repository
 
 
 @pytest.mark.parametrize(
     ("env_file", "refused"),
     [
-        pytest.param("repository/.env.example", True, id="tracked-file"),
-        pytest.param("repository/.env.link", True, id="tracked-symlink-pointing-outside"),
-        pytest.param("repository/.env.alias", True, id="alias-of-a-tracked-file"),
-        pytest.param("via/.env.example", True, id="tracked-file-through-a-linked-folder"),
-        pytest.param("repository/.env", False, id="untracked-file"),
+        pytest.param("repository/.env.example", True, id="template-in-the-repository"),
+        pytest.param("repository/.env.link", True, id="symlink-in-the-repository"),
+        pytest.param("repository/.env", True, id="untracked-file-in-the-repository"),
+        pytest.param("repository/envs/live.env", True, id="folder-link-in-the-repository"),
+        pytest.param("via/.env.example", True, id="link-into-the-repository"),
+        pytest.param("hop/live.env", True, id="link-chain-through-the-repository"),
         pytest.param("live-eval.env", False, id="file-outside-the-repository"),
+        pytest.param("outside-link.env", False, id="link-outside-the-repository"),
     ],
 )
-def test_eval_env_file_may_not_be_a_tracked_repository_file(
+def test_eval_env_file_must_live_outside_the_repository(
     tmp_path: Path, env_file: str, refused: bool
 ) -> None:
-    """A tracked file would feed the measurement settings that evidence identity
-    does not compare, so the eval refuses it as its environment source."""
+    """Evidence identity compares the tree, never the eval's environment, so
+    nothing in the tree may feed that environment, however a path reaches it."""
 
     repository = _environment_sources(tmp_path)
     outcome = (
-        pytest.raises(RuntimeError, match="scorecard_provenance:eval_env_file_tracked")
+        pytest.raises(
+            RuntimeError, match="scorecard_provenance:eval_env_file_inside_repository"
+        )
         if refused
         else nullcontext()
     )
 
     with outcome:
-        scorecards.assert_eval_env_file_untracked(
+        scorecards.assert_eval_env_file_outside_repository(
             tmp_path / env_file, repository_root=repository
         )
 
 
-def test_live_eval_refuses_a_tracked_file_before_loading_it() -> None:
+def test_live_eval_refuses_an_env_file_in_the_repository_before_loading_it() -> None:
     process_env = os.environ.copy()
     process_env.update(
         {
@@ -84,7 +88,7 @@ def test_live_eval_refuses_a_tracked_file_before_loading_it() -> None:
     )
 
     assert completed.returncode != 0
-    assert "scorecard_provenance:eval_env_file_tracked" in completed.stderr
+    assert "scorecard_provenance:eval_env_file_inside_repository" in completed.stderr
 
 
 def test_live_eval_env_preloads_calendar_aware_confirmation(

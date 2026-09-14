@@ -507,47 +507,50 @@ def _worktree_is_clean(repository_root: Path) -> bool:
     return not completed.stdout.strip()
 
 
-def assert_eval_env_file_untracked(
+def assert_eval_env_file_outside_repository(
     env_file: Path, *, repository_root: Path = REPOSITORY_ROOT
 ) -> None:
-    """Refuse a tracked file as the eval's environment source.
+    """Refuse an environment file that lies in the measured repository or is
+    reached through it.
 
-    Promotion evidence identity never compares the release templates, so a
-    setting fed from a tracked file could change without a new measurement. The
-    path counts as named, so a tracked symlink cannot point away, and as
-    resolved, so an alias cannot point into a tracked file.
+    Promotion evidence identity compares the repository's tree, never the eval's
+    environment, so nothing in the tree may feed that environment: not a
+    template, not a symlink, not a link on the way to the file.
     """
 
     root = repository_root.resolve()
-    named = env_file.absolute().parent.resolve() / env_file.name
-    for candidate in dict.fromkeys((named, env_file.resolve())):
-        try:
-            relative = candidate.relative_to(root)
-        except ValueError:
+    if any(path.is_relative_to(root) for path in _paths_opened(env_file)):
+        raise RuntimeError("scorecard_provenance:eval_env_file_inside_repository")
+
+
+# The limit the kernel applies before it reports a symlink loop.
+_MAX_SYMLINK_HOPS = 40
+
+
+def _paths_opened(path: Path) -> list[Path]:
+    """Every absolute path visited to open `path`, expanding each symlink where
+    it is met, as the operating system resolves it."""
+
+    pending = list(path.absolute().parts)
+    current = Path(pending.pop(0))
+    visited = [current]
+    hops = 0
+    while pending:
+        part = pending.pop(0)
+        if part == ".":
             continue
-        try:
-            completed = subprocess.run(
-                [
-                    "git",
-                    "--no-replace-objects",
-                    "--literal-pathspecs",
-                    "ls-files",
-                    "-z",
-                    "--",
-                    relative.as_posix(),
-                ],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-        except (OSError, subprocess.SubprocessError) as exc:
-            raise RuntimeError(
-                "scorecard_provenance:eval_env_file_status_unavailable"
-            ) from exc
-        if completed.stdout:
-            raise RuntimeError("scorecard_provenance:eval_env_file_tracked")
+        # Every symlink is expanded when met, so the parent here is physical.
+        current = current.parent if part == ".." else current / part
+        visited.append(current)
+        if current.is_symlink():
+            hops += 1
+            if hops > _MAX_SYMLINK_HOPS:
+                raise RuntimeError("scorecard_provenance:eval_env_file_link_loop")
+            target = Path(os.readlink(current))
+            base = target if target.is_absolute() else current.parent / target
+            pending = [*base.parts, *pending]
+            current = Path(pending.pop(0))
+    return visited
 
 
 def _provider_usage(results: list[dict[str, Any]]) -> dict[str, Any]:

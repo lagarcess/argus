@@ -9,7 +9,7 @@ import pytest
 
 # Imports no Argus code, so it may load before the environment does.
 from tests.evals.measurement_eval_scorecard import (
-    assert_eval_env_file_untracked,
+    assert_eval_env_file_outside_repository,
     build_scorecard_provenance,
     write_scorecard,
 )
@@ -18,8 +18,9 @@ _EVAL_ENV_FILE = os.getenv("ARGUS_EVAL_ENV_FILE")
 if _EVAL_ENV_FILE:
     # Argus imports load the shared project environment. Preload the explicit
     # live-eval environment so override=False preserves this suite's provider.
-    # A tracked file is refused, because evidence identity never compares it.
-    assert_eval_env_file_untracked(Path(_EVAL_ENV_FILE))
+    # A file in the repository is refused: evidence identity compares the tree,
+    # never the eval's environment.
+    assert_eval_env_file_outside_repository(Path(_EVAL_ENV_FILE))
     load_dotenv(Path(_EVAL_ENV_FILE), override=False)
 
 from argus.domain.market_data.assets import clear_asset_cache

@@ -84,10 +84,11 @@ ARGUS_ASSET_PROVIDER_MODE=live_provider \
 poetry run pytest tests/evals/test_measurement_eval_live.py -q
 ```
 
-`ARGUS_EVAL_ENV_FILE` must name a file the repository does not track, such as
-the untracked `.env`. The harness refuses a tracked file like `.env.example`:
-promotion evidence identity never compares that template, so settings fed from
-it could change without a new measurement.
+`ARGUS_EVAL_ENV_FILE` must name a file outside the checkout being measured, such
+as the canonical `.env` in the integration worktree. The harness refuses any
+file in the repository or reached through it, `.env.example` included:
+promotion evidence identity compares the tree, never the eval's environment, so
+settings fed from the tree could change without a new measurement.
 
 Warning: this deliberately spends real LLM tokens. Use it when you want to
 measure the current real interpret path, not for routine local lint loops.
