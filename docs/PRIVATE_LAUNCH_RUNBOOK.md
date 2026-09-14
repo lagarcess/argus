@@ -846,15 +846,17 @@ the deployed build, and each side of a targeted A/B. Evidence measured at commit
 A stands for commit B when nothing the measurement can reach differs between
 them.
 
-- **Reach is derived, never listed.** It is read from the live eval's own
-  imports in each commit's tree, including imports inside functions and
-  packages named by a string, plus the data files beside that code and the
-  environment it runs in: `pyproject.toml`, `poetry.lock` and `.python-version`.
-- **A change the eval cannot reach keeps the evidence:** `render.yaml`, the
-  release profile, migrations, frontend code, docs, and modules or tests the
-  eval never imports.
-- **A change the eval reaches needs a new measurement.** The gate names the
-  changed files.
+- **Reach fails closed.** Python loads code through imports, strings, plugins,
+  warning filters and startup modules, more channels than a reader can list.
+  So every Python file the eval process could import counts, tests and scripts
+  included. So do the data files beside that code, the pytest configuration on
+  the eval's path, and the environment it runs in: `pyproject.toml`,
+  `poetry.lock` and `.python-version`. Import roots come from the pytest and
+  Poetry configuration, never from a list of product paths.
+- **A change outside that keeps the evidence:** `render.yaml`, the release
+  profile, migrations, frontend code, docs and evidence scripts.
+- **A change inside it needs a new measurement.** The gate names the changed
+  files.
 - **A model or provider change still needs a new run.** The eval reads its own
   environment, not `render.yaml`, so this rule cannot see a model swap there.
   `tests/evals/README.md` requires a live run after any interpreter model or

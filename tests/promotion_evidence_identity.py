@@ -3,17 +3,19 @@
 Every promotion check that binds a measurement to a build asks this module: the
 live eval scorecard, the baseline at the deployed build, and each side of a
 targeted A/B. Evidence measured at commit A stands for build B when nothing the
-measurement can reach differs between them. A config, migration, frontend or
-docs change keeps the evidence; a change to anything the eval imports needs a
-new measurement.
+measurement can reach differs between them.
 
-Reach is read from the measurement's own imports in each commit's tree, never
-from a list of product paths.
+Reach fails closed. Python loads code through imports, strings, plugins, warning
+filters and startup modules, more channels than a reader can list, so every
+Python file the eval process could import counts, with the data beside it, the
+pytest configuration it runs under, and its environment. Only files outside the
+import space change without a new measurement: deploy configuration, migrations,
+frontend code, docs and evidence.
 """
 
 from __future__ import annotations
 
-import ast
+import importlib.machinery
 import posixpath
 import re
 import subprocess
@@ -31,6 +33,11 @@ except ModuleNotFoundError:  # Python 3.10
 # The live eval runs this module under pytest, and the targeted A/B imports it.
 MEASUREMENT_ENTRY = "tests/evals/test_measurement_eval_live.py"
 
+# Longest first, so an extension module's full suffix wins over ".so".
+_MODULE_SUFFIXES = tuple(
+    sorted(importlib.machinery.all_suffixes(), key=len, reverse=True)
+)
+
 # pytest takes its settings from an ini, toml or cfg file in the test's folder or
 # above it, so every such file there can change the run.
 _CONFIG_SUFFIXES = frozenset({".ini", ".toml", ".cfg"})
@@ -39,14 +46,20 @@ _CONFIG_SUFFIXES = frozenset({".ini", ".toml", ".cfg"})
 # only through the files the environment is built from.
 _ENVIRONMENT_FILES = ("pyproject.toml", "poetry.lock", ".python-version")
 
-# Their baselines measured a commit that the deployed build cannot be told apart
-# from, recorded before a manifest had to name the measured commit.
-_MANIFESTS_PREDATING_MEASURED_SHA_RULE = frozenset(
-    {
-        "2026-08-13-api-domain-promotion.md",
-        "2026-08-13-guest-signup-hotfix-promotion.md",
-    }
-)
+# Recorded before this rule and not re-measurable: each baseline measured a commit
+# that differs from the deployed build only in these release-validator tests, and
+# the manifest does not name the measured commit.
+_RECORDS_BEFORE_THIS_RULE: dict[str, frozenset[str]] = {
+    "2026-08-13-api-domain-promotion.md": frozenset(
+        {
+            "tests/release_promotion_evidence_support.py",
+            "tests/test_private_alpha_release_docs.py",
+        }
+    ),
+    "2026-08-13-guest-signup-hotfix-promotion.md": frozenset(
+        {"tests/test_private_alpha_release_docs.py"}
+    ),
+}
 
 _FULL_SHA = re.compile(r"[0-9a-f]{40}")
 
@@ -73,15 +86,20 @@ def assert_measurement_stands_for(
             f"{name}: {evidence} binds {sha or '<unrecorded>'}, which is not a "
             "commit in this repository."
         )
-    touched = reachable_changes(
-        measured_sha, shipped_sha, repository_root=repository_root
-    )
+    known = _RECORDS_BEFORE_THIS_RULE.get(name, frozenset())
+    touched = [
+        path
+        for path in reachable_changes(
+            measured_sha, shipped_sha, repository_root=repository_root
+        )
+        if path not in known
+    ]
     assert not touched, (
         f"{name}: {evidence} measured {measured_sha[:8]}, and {len(touched)} "
         f"file(s) it reaches differ at {shipped_sha[:8]}: "
         f"{', '.join(touched[:12])}. Measure again at {shipped_sha[:8]}."
     )
-    assert measured_sha in manifest or name in _MANIFESTS_PREDATING_MEASURED_SHA_RULE, (
+    assert measured_sha in manifest or name in _RECORDS_BEFORE_THIS_RULE, (
         f"{name}: {evidence} measured {measured_sha} and stands for "
         f"{shipped_sha}. Name the measured commit in the manifest."
     )
@@ -124,25 +142,18 @@ def _reach_at_commit(repository_root: Path, sha: str) -> frozenset[str]:
 
 
 def reach_in_tree(tracked: frozenset[str], read: ReadFiles) -> frozenset[str]:
-    """The measurement's modules, the data beside them, its pytest configuration,
-    and its environment.
-
-    An import counts wherever it appears, inside a function, as a package named
-    by a string, or as a plugin a pytest config names, because code loaded late
-    is measured all the same.
-    """
+    """Every importable Python file, the data beside it, the pytest configuration
+    on the measurement's path, and the environment."""
 
     assert MEASUREMENT_ENTRY in tracked, (
         f"{MEASUREMENT_ENTRY} is missing, so what the measurement reaches is unknown."
     )
-    settings = pytest_settings(tracked, read)
     roots = import_roots(tracked, read)
-    named = [word for values in settings.values() for words in values.values() for word in words]
-    modules = _imported_modules(tracked, read, roots, named)
+    modules = frozenset(path for path in tracked if _importable(path, roots))
     return frozenset(
         modules
         | _data_beside(modules, tracked, roots)
-        | set(settings)
+        | set(pytest_settings(tracked, read))
         | {path for path in _ENVIRONMENT_FILES if path in tracked}
     )
 
@@ -195,6 +206,22 @@ def entry_modules(tracked: frozenset[str], roots: tuple[str, ...]) -> tuple[str,
     return tuple(_module_name(path, roots) for path in paths if path in tracked)
 
 
+def _importable(path: str, roots: tuple[str, ...]) -> bool:
+    """A file with a module suffix whose path under some import root is a dotted
+    module name."""
+
+    suffix = next((suffix for suffix in _MODULE_SUFFIXES if path.endswith(suffix)), None)
+    if suffix is None:
+        return False
+    for root in roots:
+        if root and not path.startswith(f"{root}/"):
+            continue
+        relative = path[len(root) + 1 :] if root else path
+        if all(part.isidentifier() for part in relative[: -len(suffix)].split("/")):
+            return True
+    return False
+
+
 def _pytest_section(path: str, source: bytes) -> dict[str, list[str]]:
     text = source.decode("utf-8")
     if path.endswith(".toml"):
@@ -216,87 +243,18 @@ def _pytest_section(path: str, source: bytes) -> dict[str, list[str]]:
     }
 
 
-def _imported_modules(
-    tracked: frozenset[str],
-    read: ReadFiles,
-    roots: tuple[str, ...],
-    named: Iterable[str],
-) -> frozenset[str]:
-    def resolve(dotted: str) -> tuple[str, ...]:
-        parts = dotted.split(".")
-        if not all(part.isidentifier() for part in parts):
-            return ()
-        matches = []
-        for root in roots:
-            stem = "/".join((root, *parts) if root else parts)
-            # A regular package shadows a same-named module beside it. Roots come
-            # from several configs, so a match under every root counts.
-            for path in (f"{stem}/__init__.py", f"{stem}.py"):
-                if path in tracked:
-                    matches.append(path)
-                    break
-        return tuple(matches)
-
-    found: dict[str, str] = {}
-    pending: dict[str, str] = {}
-
-    def reach(dotted: str) -> None:
-        # Importing a.b.c runs a and a.b first.
-        parts = dotted.split(".")
-        for depth in range(1, len(parts) + 1):
-            module = ".".join(parts[:depth])
-            for path in resolve(module):
-                if path not in found:
-                    pending.setdefault(path, module)
-
-    for module in entry_modules(tracked, roots):
-        reach(module)
-    # A module a pytest config names, such as `-p plugin`, loads before the run.
-    for word in named:
-        if resolve(word.removeprefix("-p")):
-            reach(word.removeprefix("-p"))
-    while pending:
-        batch = dict(pending)
-        pending.clear()
-        found.update(batch)
-        for path, source in read(batch).items():
-            module = batch[path]
-            package = module if path.endswith("__init__.py") else module.rpartition(".")[0]
-            for node in ast.walk(ast.parse(source, filename=path)):
-                if isinstance(node, ast.Import):
-                    for alias in node.names:
-                        reach(alias.name)
-                elif isinstance(node, ast.ImportFrom):
-                    base = _absolute_module(node, package)
-                    for alias in node.names:
-                        reach(f"{base}.{alias.name}" if base else alias.name)
-                elif isinstance(node, ast.Constant) and isinstance(node.value, str):
-                    # importlib.resources.files("pkg") and import_module("pkg").
-                    if resolve(node.value):
-                        reach(node.value)
-    return frozenset(found)
-
-
 def _module_name(path: str, roots: tuple[str, ...]) -> str:
     root = max((root for root in roots if not root or path.startswith(f"{root}/")), key=len)
     relative = path[len(root) + 1 :] if root else path
     return relative.removesuffix(".py").removesuffix("/__init__").replace("/", ".")
 
 
-def _absolute_module(node: ast.ImportFrom, package: str) -> str:
-    if not node.level:
-        return node.module or ""
-    anchor = package.split(".") if package else []
-    anchor = anchor[: max(len(anchor) - node.level + 1, 0)]
-    return ".".join([*anchor, *([node.module] if node.module else [])])
-
-
 def _data_beside(
     modules: frozenset[str], tracked: frozenset[str], roots: tuple[str, ...]
 ) -> frozenset[str]:
     """Package data, where importlib.resources and Path(__file__) find it: a
-    non-Python file in or below a measured module's folder, unless an unmeasured
-    package or an import root in between claims it first."""
+    non-Python file in or below a folder of importable modules, unless a package
+    without one or an import root in between claims it first."""
 
     folders = {str(PurePosixPath(module).parent) for module in modules} - {".", *roots}
     packages = {
@@ -306,7 +264,7 @@ def _data_beside(
     }
     data = set()
     for path in tracked:
-        if path.endswith(".py"):
+        if path in modules:
             continue
         for folder in map(str, PurePosixPath(path).parents):
             if folder in folders:

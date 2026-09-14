@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from tests.promotion_evidence_identity import (
+    _RECORDS_BEFORE_THIS_RULE,
     assert_measurement_stands_for,
     entry_modules,
     import_roots,
@@ -165,9 +166,30 @@ def test_evidence_binds_a_commit_in_this_repository(tmp_path: Path, measured: st
         )
 
 
+def test_record_before_this_rule_allows_only_its_known_difference(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record = tmp_path / "2026-01-01-example-promotion.md"
+    known = REACHED_BY_THE_EVAL["test-module"]
+    monkeypatch.setitem(_RECORDS_BEFORE_THIS_RULE, record.name, frozenset({known}))
+    measured = commit_measured_repository(tmp_path)
+    binding = {
+        "evidence": "the baseline eval scorecard",
+        "measured_sha": measured,
+        "repository_root": tmp_path,
+    }
+
+    assert_measurement_stands_for(
+        "", record, shipped_sha=commit_changes(tmp_path, [known]), **binding
+    )
+    beyond = commit_changes(tmp_path, [REACHED_BY_THE_EVAL["imported-module"]])
+    with pytest.raises(AssertionError, match="Measure again"):
+        assert_measurement_stands_for("", record, shipped_sha=beyond, **binding)
+
+
 def test_reach_covers_every_repository_module_the_measurement_loads() -> None:
-    """Python's own import of the measurement is the ground truth, and reading
-    imports from source must never count fewer files than it loads."""
+    """Python's own import of the measurement is the ground truth, and reach must
+    never count fewer files than it loads."""
 
     listed = subprocess.run(
         ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],

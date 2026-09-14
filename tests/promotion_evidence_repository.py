@@ -32,11 +32,14 @@ _HARNESS = (
     "    return execute(interpret(case))\n"
 )
 
-# Each reaches the measurement, so changing it needs a new one.
+# Each reaches the measurement, so changing it needs a new one. Python the eval
+# never imports is here too, because reach counts whatever it could import.
 REACHED_BY_THE_EVAL = {
     "imported-module": "src/argus/stages.py",
     "lazily-imported-module": "src/argus/engine.py",
     "relatively-imported-module": "src/argus/ledger.py",
+    "module-the-eval-never-imports": "src/argus/unmeasured.py",
+    "test-module": "tests/evals/test_unrelated.py",
     "package-named-by-a-string": "web/argus_display_contract/__init__.py",
     "data-beside-measured-code": "web/argus_display_contract/policy.json",
     "eval-harness": "tests/evals/measurement_eval_harness.py",
@@ -53,8 +56,7 @@ UNREACHED_BY_THE_EVAL = {
     "migration": ("supabase/migrations/20260913000000_example.sql",),
     "frontend": ("web/app/page.tsx",),
     "docs": ("docs/release-manifests/notes.md",),
-    "module-the-eval-never-imports": ("src/argus/unmeasured.py",),
-    "test-the-eval-never-imports": ("tests/evals/test_unrelated.py",),
+    "evidence-script": ("docs/reports/evidence/2026-09-13-promotion/run_pair.py",),
 }
 
 # Files added, deleted or moved: (committed before measuring, committed after,
@@ -83,6 +85,11 @@ STRUCTURAL_CHANGES_REACHED: dict[
         {MEASUREMENT_CASES: json.dumps({"cases": [{"id": "case-c"}]})},
         (MEASUREMENT_CASES,),
     ),
+    "python-startup-module": (
+        {},
+        {"src/sitecustomize.py": "import os\n"},
+        ("src/sitecustomize.py",),
+    ),
     "pytest-config-added-at-the-root": (
         {},
         {".pytest.ini": "[pytest]\naddopts = -p no:cacheprovider\n"},
@@ -96,14 +103,21 @@ STRUCTURAL_CHANGES_REACHED: dict[
         {"tests/evals/plugin.py": "VALUE = 2\n"},
         ("tests/evals/plugin.py",),
     ),
+    "warning-category-a-pytest-config-names": (
+        {
+            "pytest.ini": "[pytest]\nfilterwarnings = ignore::extras.CustomWarning\n",
+            "src/extras.py": "class CustomWarning(Warning):\n    pass\n",
+        },
+        {"src/extras.py": "class CustomWarning(UserWarning):\n    pass\n"},
+        ("src/extras.py",),
+    ),
     "pythonpath-a-pytest-config-declares": (
         {
-            "pytest.ini": "[pytest]\npythonpath = lib\n",
-            "lib/extras.py": "VALUE = 1\n",
-            "tests/evals/measurement_eval_harness.py": f"{_HARNESS}\n\nimport extras\n",
+            "pytest.ini": "[pytest]\npythonpath = vendored-lib\n",
+            "vendored-lib/extras.py": "VALUE = 1\n",
         },
-        {"lib/extras.py": "VALUE = 2\n"},
-        ("lib/extras.py",),
+        {"vendored-lib/extras.py": "VALUE = 2\n"},
+        ("vendored-lib/extras.py",),
     ),
 }
 
@@ -240,6 +254,7 @@ def _layout(case_ids: Iterable[str]) -> dict[str, str]:
         ".github/private-alpha-release-profile.json": "{}\n",
         "supabase/migrations/20260913000000_example.sql": "select 1;\n",
         "docs/release-manifests/notes.md": "# Notes\n",
+        "docs/reports/evidence/2026-09-13-promotion/run_pair.py": "import subprocess\n",
     }
 
 
