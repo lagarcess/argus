@@ -3,14 +3,11 @@ import base from "./breakpoint-baselines.playwright.config";
 
 const config = {
   ...base,
-  testMatch: ["menu-settings-width.spec.ts", "menu-settings-phone-audit.spec.ts"],
-  outputDir: path.resolve(__dirname, "../../temp/menu-settings-width"),
-  snapshotDir: path.resolve(
-    __dirname,
-    "../../docs/reports/evidence/menu-settings-width-contract",
-  ),
-  // Keep these captures beside the audit, with the inherited 100-pixel budget.
-  timeout: 120_000,
+  testMatch: ["menu-settings-phone-audit.spec.ts", "menu-settings-surfaces.spec.ts", "menu-settings-auth-regression.spec.ts"],
+  outputDir: path.resolve(__dirname, "../../temp/menu-settings-contract-audit"),
+  // Observational screenshots use page.screenshot in audit/. This runner never
+  // generates or updates the existing breakpoint screenshot baselines.
+  timeout: 30_000,
   use: { ...base.use, screenshot: "only-on-failure" as const },
 };
 

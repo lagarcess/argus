@@ -192,6 +192,7 @@ export default function ProfileMenu({
   const [avatarThemeError, setAvatarThemeError] = useState<string | null>(null);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isDeleteRequestOpen, setIsDeleteRequestOpen] = useState(false);
+  const isMenuVisible = isOpen && activeModal === null && !isDeleteRequestOpen;
   const [deleteRequestState, setDeleteRequestState] =
     useState<DeleteRequestState>("idle");
   const [usesCommandKey, setUsesCommandKey] = useState(false);
@@ -319,7 +320,7 @@ export default function ProfileMenu({
    * asynchronous, that leaves a phantom entry the next press spends.
    */
   useModalSurface({
-    isOpen: isOpen && isDrawerPlacement && !asSheet,
+    isOpen: isMenuVisible && isDrawerPlacement && !asSheet,
     overlayId: menuOverlayId,
     containerRef: menuRef,
     onDismiss: onClose,
@@ -341,7 +342,7 @@ export default function ProfileMenu({
   // On the rail this is a detached popover rather than a layer, so it keeps the
   // plain dismissal rules a popover has.
   useOverlayLayer({
-    isOpen: isOpen && !isDrawerPlacement && !asSheet,
+    isOpen: isMenuVisible && !isDrawerPlacement && !asSheet,
     overlayId: menuOverlayId,
     containerRef: menuRef,
     onEscape: onClose,
@@ -811,7 +812,7 @@ export default function ProfileMenu({
     [quickJumpItems],
   );
   const { isQuickJumpActive, numberFor } = useQuickJump({
-    enabled: isOpen && !activeModal && !isDeleteRequestOpen,
+    enabled: isMenuVisible,
     items: quickJumpItems,
     onSelect: handleQuickJump,
     usesCommandKey,
@@ -868,10 +869,19 @@ export default function ProfileMenu({
       supportMailto={supportMailto}
       onClose={() => setIsDeleteRequestOpen(false)}
       onSubmit={handleSubmitDeleteRequest}
+      returnFocusRef={anchorRef}
     />
   ) : null;
 
   if (!isOpen && !activeModal && !isDeleteRequestOpen) return null;
+
+  // A child dialog replaces the settings surface, just like the other panels.
+  // Keeping both mounted puts the centered request beneath the tablet sheet.
+  if (deleteRequestDialog) {
+    return typeof document !== "undefined"
+      ? createPortal(deleteRequestDialog, document.body)
+      : deleteRequestDialog;
+  }
 
   // ── Active modal rendering ──────────────────────────────────────────────
   if (activeModal !== null && activeModal !== "profile") {
@@ -937,16 +947,11 @@ export default function ProfileMenu({
         handleLanguageSelect={handleLanguageSelect}
         isSavingLanguage={isSavingLanguage}
         languageError={languageError}
-        deleteRequestDialog={deleteRequestDialog}
       />
     );
   }
 
-  if (!isOpen) {
-    return typeof document !== "undefined" && deleteRequestDialog
-      ? createPortal(deleteRequestDialog, document.body)
-      : deleteRequestDialog;
-  }
+  if (!isOpen) return null;
 
   // ── Menu rendering ──────────────────────────────────────────────────────
 
@@ -1392,22 +1397,8 @@ export default function ProfileMenu({
         {menu}
       </AdaptivePanel>
     );
-    return (
-      <>
-        {createPortal(sheet, document.body)}
-        {deleteRequestDialog
-          ? createPortal(deleteRequestDialog, document.body)
-          : null}
-      </>
-    );
+    return createPortal(sheet, document.body);
   }
 
-  return (
-    <>
-      {isDrawerPlacement ? menu : createPortal(menu, document.body)}
-      {deleteRequestDialog
-        ? createPortal(deleteRequestDialog, document.body)
-        : null}
-    </>
-  );
+  return isDrawerPlacement ? menu : createPortal(menu, document.body);
 }
