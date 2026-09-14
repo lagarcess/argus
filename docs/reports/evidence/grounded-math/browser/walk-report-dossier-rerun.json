@@ -1,0 +1,50 @@
+[
+  {
+    "scene": "search-dossier",
+    "language": "en",
+    "width": 1280,
+    "screenshot": "search-dossier-1280-en.png",
+    "turn": "q6",
+    "query": "expensive",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+    "pass": true
+  },
+  {
+    "scene": "search-dossier",
+    "language": "en",
+    "width": 390,
+    "screenshot": "search-dossier-390-en.png",
+    "turn": "q6",
+    "query": "expensive",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+    "pass": true
+  },
+  {
+    "scene": "search-dossier",
+    "language": "es-419",
+    "width": 1280,
+    "screenshot": "search-dossier-1280-es-419.png",
+    "turn": "q6",
+    "query": "Apple",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+    "pass": true
+  },
+  {
+    "scene": "search-dossier",
+    "language": "es-419",
+    "width": 390,
+    "screenshot": "search-dossier-390-es-419.png",
+    "turn": "q6",
+    "query": "Apple",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+    "pass": true
+  }
+]

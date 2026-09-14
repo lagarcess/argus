@@ -21,8 +21,8 @@ const LANGUAGES = (process.env.GM_LANGUAGES || "en,es-419").split(",");
 const WIDTHS = [[1280, 900], [390, 844]];
 const MOD = process.platform === "darwin" ? "Meta" : "Control";
 const COPY = {
-  en: { addDecision: "Add decision", watching: "Watching", save: "Save decision", run: "Run backtest", ask: "zanzibar trip fund with 300 saved every month" },
-  "es-419": { addDecision: "Agregar decisión", watching: "Observando", save: "Guardar decisión", run: "Ejecutar backtest", ask: "fondo para un viaje a zanzíbar ahorrando 300 cada mes" },
+  en: { addDecision: "Add decision", watching: "Watching", save: "Save decision", run: "Run backtest", search: "Search", ask: "zanzibar trip fund with 300 saved every month" },
+  "es-419": { addDecision: "Agregar decisión", watching: "Observando", save: "Guardar decisión", run: "Ejecutar backtest", search: "Buscar", ask: "fondo para un viaje a zanzíbar ahorrando 300 cada mes" },
 };
 const report = [];
 // What each step should show; the report pairs it with the screenshots and the result.
@@ -107,6 +107,20 @@ async function editFirstInput(tab, factor) {
   const response = await done;
   await tab.waitForTimeout(1500);
   return { from: before, to: next, status: response.status() };
+}
+
+/** Search opens with the shortcut on a wide screen and from the sidebar on a phone. */
+async function openSearch(tab, width, copy) {
+  if (width < 768) {
+    await tab.locator('[data-testid="chat-shell-menu-trigger"]').first().click();
+    await tab.waitForTimeout(600);
+    const dialog = tab.getByRole("dialog");
+    const scope = (await dialog.count()) ? dialog.first() : tab;
+    await scope.getByRole("button", { name: copy.search }).first().click();
+  } else {
+    await tab.keyboard.press(`${MOD}+k`);
+  }
+  await tab.waitForSelector('input[maxlength="512"]', { timeout: 10000 });
 }
 
 const browser = await chromium.launch();
@@ -234,7 +248,12 @@ await scene("failed-lookup", async ({ tab, width, language }) => {
 await scene("no-solution", async ({ tab, width, language }) => {
   await open(tab, SEEDS[`no-solution-${language}`].conversation_id);
   const repair = tab.locator("[data-tool-repair]").first();
-  await repair.waitFor({ timeout: 15000 });
+  const repairable = await repair.waitFor({ timeout: 15000 }).then(() => true, () => false);
+  if (!repairable) {
+    // The wider step already took the repair in this seeded conversation.
+    if (!(await tab.locator("[data-tool-result-card]").count())) throw new Error("no repair and no card");
+    return shot(tab, "failure-no-solution-already-repaired", width, language, { note: "The repair was already taken at the wider width in the same seeded conversation; the recomputed card renders." });
+  }
   const before = await shot(tab, "failure-no-solution", width, language);
   const done = tab.waitForResponse((response) => response.url().includes("/recompute"), { timeout: 30000 });
   await repair.click();
@@ -252,18 +271,20 @@ await scene("rail", async ({ tab, width, language }) => {
   return shot(tab, "rail-result", width, language, { label: await tick.getAttribute("aria-label") }, false);
 });
 
-await scene("search-dossier", async ({ tab, width, language }) => {
+await scene("search-dossier", async ({ tab, width, language, copy }) => {
   const found = computedTurn(language, true);
   if (!found) throw new Error("no computed smoke turn");
   await open(tab, found.record.conversation_id);
-  await tab.keyboard.press(`${MOD}+k`);
-  await tab.waitForSelector('input[maxlength="512"]', { timeout: 10000 });
+  await openSearch(tab, width, copy);
   const words = found.last.message.split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= 4);
   const query = words.sort((left, right) => right.length - left.length)[0];
   await tab.keyboard.type(query);
   await tab.waitForTimeout(3000);
-  await tab.locator("[data-palette-row-index]").first().click();
-  await tab.waitForSelector("[data-answer-dossier]", { timeout: 15000 }).catch(() => {});
+  const row = tab.locator("[data-palette-row-index]").first();
+  // A wide screen previews the row in the dossier pane; a phone opens it as a sheet.
+  if (width < 768) await row.click();
+  else await row.hover();
+  await tab.waitForSelector("[data-answer-dossier]", { timeout: 15000 });
   await tab.waitForTimeout(1500);
   return shot(tab, "search-dossier", width, language, { turn: found.id, query }, false);
 });
@@ -307,8 +328,7 @@ await scene("receipt", async ({ tab, width, language }) => {
 await scene("ask-argus", async ({ tab, width, language, copy }) => {
   await tab.goto(`${WEB}/chat`, { waitUntil: "networkidle" });
   await tab.waitForTimeout(2500);
-  await tab.keyboard.press(`${MOD}+k`);
-  await tab.waitForSelector('input[maxlength="512"]', { timeout: 10000 });
+  await openSearch(tab, width, copy);
   await tab.keyboard.type(copy.ask);
   await tab.waitForSelector("[data-ask-argus-row]", { timeout: 20000 });
   const row = await shot(tab, "ask-argus-row", width, language, {}, false);
@@ -332,7 +352,7 @@ const table = [
 ];
 for (const entry of report) {
   const files = [entry.screenshot, entry.up_to_date, entry.repaired, entry.continued, entry.sent, entry.failure_shot, ...(entry.shots || [])].filter(Boolean);
-  const notes = [entry.error, ...(entry.page_errors || [])].filter(Boolean).join("; ").replace(/\|/g, "/").replace(/\s+/g, " ").slice(0, 300);
+  const notes = [entry.error, entry.note, ...(entry.page_errors || [])].filter(Boolean).join("; ").replace(/\|/g, "/").replace(/\s+/g, " ").slice(0, 300);
   table.push(`| ${entry.scene} | ${entry.language} | ${entry.width} | ${files.map((file) => `[${file}](${file})`).join(", ")} | ${entry.expected || ""} | ${entry.pass ? "pass" : "fail"} | ${notes} |`);
 }
 writeFileSync(`${OUT}/${reportName.replace(/\.json$/, ".md")}`, table.join("\n") + "\n");
