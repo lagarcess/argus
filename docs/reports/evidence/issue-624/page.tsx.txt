@@ -1,0 +1,22 @@
+"use client";
+import { useEffect } from "react";
+import { I18nextProvider } from "react-i18next";
+import { createInstance } from "i18next";
+import en from "@/public/locales/en/common.json";
+import es from "@/public/locales/es-419/common.json";
+const fixtureI18n = createInstance();
+void fixtureI18n.init({lng: "en", resources: {en: {common: en}, "es-419": {common: es}}, defaultNS: "common", interpolation: {escapeValue: false}});
+import StrategyResultCard from "@/components/chat/StrategyResultCard";
+import { resultCardFromConversationCard, type ConversationResultCard } from "@/lib/argus-api";
+import cards from "./cards.json";
+export default function EvidencePage() {
+ const i18n = fixtureI18n;
+ useEffect(() => { void i18n.changeLanguage(new URLSearchParams(window.location.search).get("lang") ?? "en"); }, [i18n]);
+ return <I18nextProvider i18n={i18n}><main style={{maxWidth: 760, margin: "24px auto", padding: 24}}>
+  <h1>Issue #624: synthetic run fixtures</h1>
+  {cards.map((card, index) => <section key={index} style={{marginTop: 32}}>
+   <h2>{index === 0 ? "$1,000.50 start, $0.50 profit" : "DCA half-cent tie: $0.005 profit"}</h2>
+   <StrategyResultCard result={resultCardFromConversationCard(card as ConversationResultCard)} canSaveDecision={false}/>
+  </section>)}
+ </main></I18nextProvider>;
+}

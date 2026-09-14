@@ -57,9 +57,13 @@ def with_currency_fraction_digits(record: dict[str, Any], digits: int) -> dict[s
     return record
 
 
-def format_result_money(value: float, *, fraction_digits: int) -> str:
-    amount = Decimal(str(value)).quantize(
+def rounded_result_money(value: float, *, fraction_digits: int) -> Decimal:
+    return Decimal(str(value)).quantize(
         Decimal(1).scaleb(-fraction_digits), rounding=CURRENCY_ROUNDING
     )
+
+
+def format_result_money(value: float, *, fraction_digits: int) -> str:
+    amount = rounded_result_money(value, fraction_digits=fraction_digits)
     sign = "-" if amount < 0 else ""
     return f"{sign}${abs(amount):,.{fraction_digits}f}"
