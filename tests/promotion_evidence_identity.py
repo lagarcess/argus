@@ -47,7 +47,8 @@ _CONFIG_SUFFIXES = frozenset({".ini", ".toml", ".cfg"})
 # configuration at the root, so every root file counts except the Render
 # Blueprint and environment template the release contract owns, and
 # documentation. The eval never reads either: it refuses an environment file in
-# the repository or reached through it (assert_eval_env_file_outside_repository).
+# the repository, reached through it, or linked to a tracked file
+# (assert_eval_env_file_outside_repository).
 _ROOT_FILES_THE_EVAL_NEVER_READS = frozenset({"render.yaml", ".env.example"})
 _DOCUMENTATION_SUFFIX = ".md"
 

@@ -510,17 +510,51 @@ def _worktree_is_clean(repository_root: Path) -> bool:
 def assert_eval_env_file_outside_repository(
     env_file: Path, *, repository_root: Path = REPOSITORY_ROOT
 ) -> None:
-    """Refuse an environment file that lies in the measured repository or is
-    reached through it.
+    """Refuse an environment file the measured repository owns.
 
     Promotion evidence identity compares the repository's tree, never the eval's
-    environment, so nothing in the tree may feed that environment: not a
-    template, not a symlink, not a link on the way to the file.
+    environment, so nothing the tree owns may feed that environment. An alias
+    lives at one of two layers: a name, where a path lies in the repository or
+    passes through it, or a file, where a hard link or mount opens a tracked
+    file's inode under another name. Both are refused.
     """
 
     root = repository_root.resolve()
     if any(path.is_relative_to(root) for path in _paths_opened(env_file)):
         raise RuntimeError("scorecard_provenance:eval_env_file_inside_repository")
+    try:
+        opened = env_file.stat()
+    except FileNotFoundError:
+        return
+    if (opened.st_dev, opened.st_ino) in _tracked_file_identities(root):
+        raise RuntimeError("scorecard_provenance:eval_env_file_inside_repository")
+
+
+def _tracked_file_identities(root: Path) -> frozenset[tuple[int, int]]:
+    """The device and inode of every file the repository tracks."""
+
+    try:
+        listed = subprocess.run(
+            ["git", "--no-replace-objects", "ls-files", "-z"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            timeout=10,
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            "scorecard_provenance:eval_env_file_identity_unavailable"
+        ) from exc
+    identities = set()
+    for name in listed.decode("utf-8", "surrogateescape").split("\0"):
+        if not name:
+            continue
+        try:
+            status = (root / name).lstat()
+        except OSError:
+            continue
+        identities.add((status.st_dev, status.st_ino))
+    return frozenset(identities)
 
 
 # The limit the kernel applies before it reports a symlink loop.

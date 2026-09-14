@@ -15,16 +15,20 @@ from tests.evals import measurement_eval_scorecard as scorecards
 
 
 def _environment_sources(tmp_path: Path) -> Path:
-    """A repository holding a template, a symlink out of it and a plain file, with
-    links from outside that reach into it or pass through it."""
+    """A repository tracking a template, holding a symlink out of it and a plain
+    file, with links from outside that reach into it, pass through it, or hard
+    link its tracked template."""
 
     repository = tmp_path / "repository"
     repository.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
     settings = "ARGUS_TURN_CALL_ALLOWANCE=3\n"
     outside = tmp_path / "live-eval.env"
     outside.write_text(settings, encoding="utf-8")
     (tmp_path / "outside-link.env").symlink_to(outside)
     (repository / ".env.example").write_text(settings, encoding="utf-8")
+    subprocess.run(["git", "add", ".env.example"], cwd=repository, check=True)
+    os.link(repository / ".env.example", tmp_path / "hard-link.env")
     (repository / ".env.link").symlink_to(outside)
     (repository / ".env").write_text(settings, encoding="utf-8")
     (tmp_path / "via").symlink_to(repository)
@@ -44,6 +48,7 @@ def _environment_sources(tmp_path: Path) -> Path:
         pytest.param("repository/envs/live.env", True, id="folder-link-in-the-repository"),
         pytest.param("via/.env.example", True, id="link-into-the-repository"),
         pytest.param("hop/live.env", True, id="link-chain-through-the-repository"),
+        pytest.param("hard-link.env", True, id="hard-link-to-a-tracked-file"),
         pytest.param("live-eval.env", False, id="file-outside-the-repository"),
         pytest.param("outside-link.env", False, id="link-outside-the-repository"),
     ],
@@ -52,7 +57,8 @@ def test_eval_env_file_must_live_outside_the_repository(
     tmp_path: Path, env_file: str, refused: bool
 ) -> None:
     """Evidence identity compares the tree, never the eval's environment, so
-    nothing in the tree may feed that environment, however a path reaches it."""
+    nothing the tree owns may feed that environment, whatever path or name
+    reaches it."""
 
     repository = _environment_sources(tmp_path)
     outcome = (
