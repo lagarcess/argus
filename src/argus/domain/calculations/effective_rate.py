@@ -5,7 +5,6 @@ from __future__ import annotations
 from pydantic import Field
 
 from argus.domain.calculations._shared import (
-    UNIT_MONTHS_KEY,
     CalculationArguments,
     CalculationResult,
     free_policy,
@@ -16,6 +15,7 @@ from argus.domain.calculations._shared import (
     pct,
     percent_fact,
     percent_input,
+    period_unit,
     text,
 )
 from argus.domain.finance import ratios, tvm
@@ -97,7 +97,9 @@ def present_effective_rate(
         input_fact("compounding_per_year", arguments.compounding_per_year),
         money_input("amount", arguments.amount, currency),
         money_input("fees", arguments.fees, currency),
-        input_fact("periods", arguments.periods, text(UNIT_MONTHS_KEY)),
+        input_fact(
+            "periods", arguments.periods, period_unit(arguments.compounding_per_year)
+        ),
     ]
     title = text("tools.calc.effective_rate.title")
     if outcome.status != "succeeded":

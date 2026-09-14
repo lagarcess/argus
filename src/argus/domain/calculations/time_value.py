@@ -9,7 +9,6 @@ from typing import Literal
 from pydantic import Field
 
 from argus.domain.calculations._shared import (
-    UNIT_MONTHS_KEY,
     CalculationArguments,
     CalculationResult,
     dated_path,
@@ -23,6 +22,7 @@ from argus.domain.calculations._shared import (
     pct,
     percent_fact,
     percent_input,
+    period_unit,
     rounded,
     text,
 )
@@ -193,7 +193,7 @@ def present_time_value(
         money_input("payment", arguments.payment, currency),
         money_input("future_value", arguments.future_value, currency),
         percent_input("annual_rate_pct", arguments.annual_rate_pct),
-        input_fact("periods", arguments.periods, text(UNIT_MONTHS_KEY)),
+        input_fact("periods", arguments.periods, period_unit(arguments.periods_per_year)),
         input_fact("periods_per_year", arguments.periods_per_year),
         input_fact("payment_timing", arguments.payment_timing),
     ]
@@ -201,7 +201,9 @@ def present_time_value(
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
     result = TimeValueResult.model_validate(outcome.result)
-    answer = _fact(result.solved_field, result.solved_value, currency)
+    answer = _fact(
+        result.solved_field, result.solved_value, currency, arguments.periods_per_year
+    )
     rows: list[ToolFact] = [
         money_fact("total_payments", result.total_payments, currency),
         money_fact(
@@ -234,11 +236,11 @@ def present_time_value(
     )
 
 
-def _fact(field: str, value: float, currency: str) -> ToolFact:
+def _fact(field: str, value: float, currency: str, per_year: int) -> ToolFact:
     if field == "annual_rate_pct":
         return percent_fact(field, pct(value))
     if field == "periods":
-        return number_fact(field, rounded(value, 1), text(UNIT_MONTHS_KEY))
+        return number_fact(field, rounded(value, 1), period_unit(per_year))
     return money_fact(field, value, currency)
 
 

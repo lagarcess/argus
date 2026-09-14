@@ -55,9 +55,10 @@ export default function ToolResultCard({ card, onRecompute, disabled = false, de
   const answer = card.presentation.answer;
   const detailsId = `${card.artifact_id}-details`;
   return <article data-tool-result-card={card.card_type} data-input-revision={card.input_revision} data-tool-card-open={open} aria-busy={pending} className={`w-full min-w-0 rounded-2xl border border-black/10 bg-black/[0.015] dark:border-white/10 dark:bg-white/[0.025] ${open ? "p-5" : "px-4 py-2"}`}>
-    {treatment ? <div className="mb-3"><ToolOutcomeNotice treatment={treatment} repairLabel={treatment.repair ? localizedToolText(treatment.repair.label, t) : null} retryLabel={t("tools.card.retry")}
+    {/* A calculation computes the same inputs the same way, so an unavailable
+        outcome offers no retry; changing an input recomputes the card. */}
+    {treatment ? <div className="mb-3"><ToolOutcomeNotice treatment={treatment} repairLabel={treatment.repair ? localizedToolText(treatment.repair.label, t) : null}
       onRepair={eligible ? (repairChanges) => { void submit(repairChanges); } : undefined}
-      onRetry={eligible ? () => { void submit({ ...card.arguments } as Record<string, ToolScalar>); } : undefined}
       disabled={disabled || pending} /></div> : null}
     {collapsible ? <button type="button" data-tool-card-toggle aria-expanded={open} aria-controls={detailsId} onClick={() => setOpen((value) => !value)}
       className="flex min-h-11 w-full min-w-0 items-center justify-between gap-4 text-left">

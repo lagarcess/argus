@@ -5,7 +5,6 @@ from __future__ import annotations
 from pydantic import Field
 
 from argus.domain.calculations._shared import (
-    UNIT_MONTHS_KEY,
     CalculationArguments,
     CalculationResult,
     free_policy,
@@ -17,6 +16,7 @@ from argus.domain.calculations._shared import (
     pct,
     percent_fact,
     percent_input,
+    period_unit,
     rounded,
     text,
 )
@@ -73,7 +73,9 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
         solved_value = end
     elif unknown == "start_value":
         assert per_period is not None and periods is not None
-        start = tvm.present_value(end, -contribution, per_period, periods)
+        # The signed present value is the deposit's cash flow, negative when the
+        # saver pays in; the starting balance is its magnitude.
+        start = -tvm.present_value(end, -contribution, per_period, periods)
         if start < 0:
             start = 0.0
         solved_value = start
@@ -130,7 +132,7 @@ def present_growth(
         money_input("contribution", arguments.contribution, currency),
         money_input("end_value", arguments.end_value, currency),
         percent_input("annual_rate_pct", arguments.annual_rate_pct),
-        input_fact("periods", arguments.periods, text(UNIT_MONTHS_KEY)),
+        input_fact("periods", arguments.periods, period_unit(arguments.periods_per_year)),
         input_fact("periods_per_year", arguments.periods_per_year),
         percent_input("inflation_rate_pct", arguments.inflation_rate_pct),
     ]
@@ -142,7 +144,9 @@ def present_growth(
         answer: ToolFact = percent_fact("annual_rate_pct", pct(result.solved_value))
     elif result.solved_field == "periods":
         answer = number_fact(
-            "periods", rounded(result.solved_value, 1), text(UNIT_MONTHS_KEY)
+            "periods",
+            rounded(result.solved_value, 1),
+            period_unit(arguments.periods_per_year),
         )
     else:
         answer = money_fact(result.solved_field, result.solved_value, currency)

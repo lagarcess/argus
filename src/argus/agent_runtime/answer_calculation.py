@@ -260,7 +260,13 @@ def resolve_calculation(
             arguments[name], sources[name] = price
         else:
             page = pages.get(item.source_url or "")
-            cited = None if page is not None else _evidenced(item.value, evidence)
+            cited = (
+                None
+                if page is not None
+                else _evidenced(
+                    item.value, evidence, name=name, currency=counted_in, symbol=symbol
+                )
+            )
             if item.value is None or (page is None and cited is None):
                 resolved.not_looked_up.append(name)
                 _note(notes, PAGE_UNCITED_REASON_CODE, name=name)
@@ -708,17 +714,29 @@ def page_source(page: ResearchSource, as_of: str | None) -> ToolFactSource:
     )
 
 
-def _evidenced(value: Any, evidence: Sequence[RetrievedRow]) -> RetrievedRow | None:
+def _evidenced(
+    value: Any,
+    evidence: Sequence[RetrievedRow],
+    *,
+    name: str,
+    currency: str,
+    symbol: str | None,
+) -> RetrievedRow | None:
     """The cited row stating this input's figure, when the page it names is the
-    provider's own finance data, whose citation keeps no URL."""
+    provider's own finance data, whose citation keeps no URL: the same number,
+    about the same security, measuring what the input measures."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
+    percent = name.endswith("_pct")
     return next(
         (
             row
             for row in evidence
             if abs(float(row.value) - float(value))
             <= max(abs(float(row.value)) * 1e-6, 1e-9)
+            and not (row.symbol and symbol and row.symbol.upper() != symbol.upper())
+            and (row.kind == "percent") == percent
+            and (row.kind != "currency" or row.unit.strip().upper() == currency)
         ),
         None,
     )

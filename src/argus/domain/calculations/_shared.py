@@ -125,6 +125,16 @@ def input_fact(
     return ToolInputFact(name=name, label=field_label(name), value=value, unit=unit)
 
 
+def period_unit(per_year: int) -> LocalizedText | None:
+    """What one period counts at a frequency: months at twelve a year, years at
+    one; any other frequency is a plain count of periods."""
+    if per_year == 12:
+        return text(UNIT_MONTHS_KEY)
+    if per_year == 1:
+        return text(UNIT_YEARS_KEY)
+    return None
+
+
 def money_input(name: str, value: float | None, currency: str) -> ToolInputFact:
     return input_fact(name, value, currency_unit(currency))
 

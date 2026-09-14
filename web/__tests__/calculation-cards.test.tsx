@@ -72,6 +72,17 @@ describe("declaration-generated calculation cards", () => {
     expect(html).not.toContain("data-tool-answer");
   });
 
+  test("an unavailable calculation offers no retry, since the same inputs compute the same way", async () => {
+    const instance = await translate("en");
+    const { card } = fixture.cards.time_value;
+    const unavailable = { ...card, outcome: { status: "unavailable", result: null, failure: { code: "tool_execution_failed", fields: [] } } } as Card;
+    const html = renderToStaticMarkup(
+      <I18nextProvider i18n={instance}><ToolResultCard card={unavailable} onRecompute={async () => undefined} /></I18nextProvider>,
+    );
+    expect(html).toContain('data-tool-outcome-tone="retryable"');
+    expect(html).not.toContain("data-tool-retry");
+  });
+
   test("the Spanish card copy carries no English fallbacks", async () => {
     const instance = await translate("es-419");
     const { card } = fixture.cards.time_value_payment_below_interest;

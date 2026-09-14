@@ -167,3 +167,23 @@ def test_recompute_keeps_the_unknown_and_marks_the_edited_input_as_stated() -> N
     assert revised.sources["present_value"].kind == "user"
     with pytest.raises(ValueError, match="unknown"):
         item.recompute_arguments(original, {"payment": 1_000})
+
+
+def test_a_yearly_plan_solves_its_periods_in_years() -> None:
+    card = run_calculation(
+        "time_value",
+        {
+            "currency": "USD",
+            "direction": "save",
+            "present_value": 0,
+            "payment": 1_000,
+            "future_value": 5_000,
+            "annual_rate_pct": 0,
+            "periods": None,
+            "periods_per_year": 1,
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    answer = card.presentation.answer
+    assert answer is not None and answer.value == pytest.approx(5.0)
+    assert answer.unit is not None and answer.unit.locale_key == "tools.calc.units.years"

@@ -44,7 +44,26 @@ def test_the_rate_after_inflation_compounds_the_stated_rate_to_a_year_first(
             "inflation_rate_pct": inflation_rate_pct,
         },
     )
-    assert row_value(card, "real_annual_rate_pct") == pytest.approx(real_rate_pct, abs=0.01)
+    assert row_value(card, "real_annual_rate_pct") == pytest.approx(
+        real_rate_pct, abs=0.01
+    )
+
+
+def test_the_starting_balance_a_goal_needs_is_the_deposit_not_zero() -> None:
+    card = run_calculation(
+        "growth_projection",
+        {
+            "currency": "USD",
+            "start_value": None,
+            "contribution": 100,
+            "end_value": 2_000,
+            "annual_rate_pct": 0,
+            "periods": 12,
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    assert answer_value(card) == pytest.approx(800.0)
+    assert row_value(card, "total_contributed") == pytest.approx(2_000.0)
 
 
 def test_the_savings_account_losing_money_shows_a_negative_real_rate() -> None:
@@ -98,3 +117,23 @@ def test_solving_the_rate_and_the_periods_and_naming_an_unreachable_target() -> 
     )
     assert unreachable.outcome.status == "invalid"
     assert unreachable.outcome.failure.fields == ["annual_rate_pct"]
+
+
+@pytest.mark.parametrize(
+    ("per_year", "unit"),
+    [(12, "tools.calc.units.months"), (1, "tools.calc.units.years"), (4, None)],
+)
+def test_periods_are_labeled_by_their_frequency(per_year, unit) -> None:
+    card = run_calculation(
+        "growth_projection",
+        {
+            "currency": "USD",
+            "start_value": 1_000,
+            "end_value": None,
+            "annual_rate_pct": 5,
+            "periods": 8,
+            "periods_per_year": per_year,
+        },
+    )
+    periods = next(fact for fact in card.presentation.inputs if fact.name == "periods")
+    assert (periods.unit.locale_key if periods.unit else None) == unit

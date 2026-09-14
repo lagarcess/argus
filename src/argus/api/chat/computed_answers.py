@@ -435,12 +435,20 @@ async def refresh_computed_answer(
             status="inputs_not_found",
             sources=list(sidecar["sources"]),
         )
-    symbol = next(iter(answer.computation.symbols), None)
+    # Each card's market price is its own asset's; an answer's one symbol stands
+    # in only for a card that names none.
+    symbols = list(answer.computation.symbols)
+    only = symbols[0] if len(symbols) == 1 else None
     return ComputationRefreshResponse(
         computation=answer.computation,
         status="refreshed",
         reruns=[
-            _refreshed_rerun(card, declaration, inputs, symbol=symbol)
+            _refreshed_rerun(
+                card,
+                declaration,
+                inputs,
+                symbol=str(card.arguments.get("symbol") or "") or only,
+            )
             for card, declaration, inputs in zip(
                 answer.cards, declarations, found, strict=True
             )
