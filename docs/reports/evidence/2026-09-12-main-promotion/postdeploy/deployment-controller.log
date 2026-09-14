@@ -1,0 +1,18 @@
+{"checked_at": "2026-09-13T22:51:35.908994+00:00", "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484", "phase": "pre-migration", "autoDeployTrigger": {"argus-api": "off", "argus-app": "off", "argus-backtests": "off"}, "readout_values": {"argus-backtests": {"ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna", "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna"}, "argus-api": {"ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna", "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna"}}}
+2026-09-13T22:51:38.839251+00:00 Preflight verified: all triggers off, four model values match, baseline unchanged, only seven approved migrations missing
+2026-09-13T22:51:41.322881+00:00 Committed approved migration 20260908120000
+2026-09-13T22:51:42.208071+00:00 Committed approved migration 20260908205041
+2026-09-13T22:51:43.068021+00:00 Committed approved migration 20260909183646
+2026-09-13T22:51:43.679167+00:00 Committed approved migration 20260909225701
+2026-09-13T22:51:43.967233+00:00 Committed approved migration 20260910003000
+2026-09-13T22:51:44.704314+00:00 Committed approved migration 20260911120000
+2026-09-13T22:51:44.995007+00:00 Committed approved migration 20260911214608
+2026-09-13T22:51:47.382391+00:00 Post-application migration gate passed; starting serial pinned deploys
+2026-09-13T22:51:47.382860+00:00 Starting argus-api at 3d98057c1e722317f0243fb96fb647771ddae484
+2026-09-13T22:53:37.726305+00:00 argus-api is ready at the merge commit
+2026-09-13T22:53:37.726758+00:00 Starting argus-app at 3d98057c1e722317f0243fb96fb647771ddae484
+2026-09-13T22:55:32.653238+00:00 argus-app is ready at the merge commit
+2026-09-13T22:55:32.653805+00:00 Starting argus-backtests at 3d98057c1e722317f0243fb96fb647771ddae484
+2026-09-13T22:57:29.979437+00:00 argus-backtests is ready at the merge commit
+{"checked_at": "2026-09-13T22:57:31.272919+00:00", "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484", "phase": "post-deploy", "autoDeployTrigger": {"argus-api": "off", "argus-app": "off", "argus-backtests": "off"}, "readout_values": {"argus-backtests": {"ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna", "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna"}, "argus-api": {"ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna", "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna"}}}
+2026-09-13T22:57:31.274549+00:00 All three services are live at the merge commit; all triggers remain off
