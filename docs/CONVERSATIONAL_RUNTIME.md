@@ -115,6 +115,12 @@ messages derive missing transport facts from an owner-scoped canonical run;
 missing evidence is shown honestly in localized copy. This does not replace
 ordinary conversational composition with a deterministic assistant.
 
+**Confirmation card turns carry no prose.** The card builder composes no
+summary sentence and a card turn persists empty content. Model thread history,
+artifact naming and the conversation search text derive from the card's typed
+facts (`argus.domain.confirmation_turn_facts`), so none of them carries the
+language of the turn; the card itself renders from typed keys.
+
 The invariant: prose follows the workspace language everywhere, English and
 Spanish parity is proven by the eval harness (not hardcoded copy), and no runtime
 module carries per-language copy tables, localized stop-word lists, or
