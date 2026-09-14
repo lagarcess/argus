@@ -13,7 +13,6 @@ from argus.agent_runtime.clarification_contract import (
 )
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.state.models import (
-    ConversationMessage,
     PendingNeedName,
     StrategySummary,
 )
@@ -37,7 +36,6 @@ ClarificationDetailTarget = Literal[
 
 class ClarificationRequest(BaseModel):
     current_user_message: str
-    recent_thread_history: list[ConversationMessage] = Field(default_factory=list)
     candidate_strategy_draft: StrategySummary = Field(default_factory=StrategySummary)
     missing_required_fields: list[str] = Field(default_factory=list)
     ambiguous_fields: list[dict[str, Any]] = Field(default_factory=list)
@@ -176,15 +174,8 @@ class OpenRouterClarificationGenerator:
         return
 
     def _messages(self, request: ClarificationRequest) -> list[BaseMessage]:
-        history: list[BaseMessage] = []
-        for item in request.recent_thread_history[-6:]:
-            if not hasattr(item, "role") or not hasattr(item, "content"):
-                continue
-            content = str(item.content)
-            if item.role == "assistant":
-                history.append(AIMessage(content=content))
-            elif item.role == "user":
-                history.append(HumanMessage(content=content))
+        # Interpretation owns conversation history. The writer voices the current
+        # decision, so earlier questions cannot compete with its stored reason.
         context = {
             "language": request.language,
             "current_user_message": request.current_user_message,
@@ -210,6 +201,8 @@ class OpenRouterClarificationGenerator:
                     f"{ARGUS_RESPONSE_STYLE_CONTRACT}\n\n"
                     "Generate exactly one concise, context-aware assistant response "
                     "through the provided schema. "
+                    "Use the current response_intent and typed constraints as the "
+                    "authority for this reply's reason and next step. "
                     "Target 45-90 words unless the user explicitly asks for depth. "
                     "Ask for only the next decision needed, or offer at most three "
                     "short runnable choices. "
@@ -299,7 +292,6 @@ class OpenRouterClarificationGenerator:
                 )
             ),
             SystemMessage(content=json.dumps(context, default=str, sort_keys=True)),
-            *history,
             HumanMessage(content=request.current_user_message),
         ]
 

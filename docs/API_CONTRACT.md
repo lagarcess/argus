@@ -3873,10 +3873,13 @@ degraded_fallback` means clients render localized deterministic copy from
 static i18n bundles using the typed fields. Legacy sidecars without
 `prompt_source` are treated as degraded fallback for reload compatibility.
 The persisted `content` on a degraded fallback remains compatibility transport
-for reload and non-upgraded clients; it is excluded from later interpreter and
-clarifier history and from `last_message_preview` (therefore Recents and
-conversation search). Exact `llm_generated` prose remains eligible for both
-model history and preview surfaces.
+for reload and non-upgraded clients; it is excluded from later interpreter
+history and from `last_message_preview` (therefore Recents and conversation
+search). Exact `llm_generated` prose remains eligible for interpreter history
+and preview surfaces. Clarification and recovery writers receive the current
+typed decision, its options, the current user message, and preferred language;
+they do not receive transcript history. Earlier replies therefore cannot supply
+a competing reason for the current question.
 
 Recoverable streaming error frames may also include the same structured fields
 so live clients can render retry controls immediately, before reload hydration:

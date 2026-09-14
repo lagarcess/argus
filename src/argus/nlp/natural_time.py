@@ -88,6 +88,16 @@ def resolve_date_range_text(
     if len(parsed) < 2:
         return None
 
+    if any(item.period == "year" for item in parsed) and any(
+        item.period == "month"
+        or (item.period == "day" and any(char.isdigit() for char in item.span))
+        for item in parsed
+    ):
+        # A year alongside finer dates may qualify their year rather than name
+        # an endpoint. Search can also drop one of those dates. Do not let this
+        # partial reading overwrite the structured interpreter's full range.
+        return None
+
     first = parsed[0]
     last = parsed[-1]
     if (

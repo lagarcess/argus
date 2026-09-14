@@ -139,7 +139,7 @@ def test_degraded_compatibility_text_stays_durable_but_not_in_history_or_preview
     assert search_items[0][1].matched_text == ("Prueba AAPL con velas de cinco minutos.")
 
 
-def test_llm_generated_recovery_voice_remains_in_history_preview_and_model_messages() -> (
+def test_llm_voice_remains_in_history_preview_and_interpreter_only() -> (
     None
 ):
     user_id = "user-1"
@@ -198,18 +198,20 @@ def test_llm_generated_recovery_voice_remains_in_history_preview_and_model_messa
     clarifier_messages = OpenRouterClarificationGenerator()._messages(
         ClarificationRequest(
             current_user_message="Use the same idea.",
-            recent_thread_history=history,
             language="en",
         )
     )
 
-    for model_messages in (interpreter_messages, clarifier_messages):
+    for model_messages, expected in (
+        (interpreter_messages, [EXACT_LLM_VOICE]),
+        (clarifier_messages, []),
+    ):
         assistant_contents = [
             str(message.content)
             for message in model_messages
             if isinstance(message, AIMessage)
         ]
-        assert assistant_contents == [EXACT_LLM_VOICE]
+        assert assistant_contents == expected
         assert RAW_ENGLISH_FALLBACK not in assistant_contents
 
 

@@ -464,7 +464,6 @@ async def _generate_clarifying_question_result(
         )
     request = ClarificationRequest(
         current_user_message=state.current_user_message,
-        recent_thread_history=state.recent_thread_history,
         candidate_strategy_draft=state.candidate_strategy_draft,
         missing_required_fields=missing_required_fields,
         ambiguous_fields=ambiguous_fields,
