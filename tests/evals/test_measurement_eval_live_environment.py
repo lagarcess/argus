@@ -85,6 +85,25 @@ def test_eval_env_file_must_live_outside_the_repository(
         )
 
 
+def test_eval_env_file_is_in_the_repository_however_the_checkout_is_spelled(
+    tmp_path: Path,
+) -> None:
+    """On a case-insensitive filesystem another spelling opens the same checkout,
+    so containment is decided by the root's identity, not by its name."""
+
+    repository = _environment_sources(tmp_path)
+    respelled = tmp_path / repository.name.upper() / ".env"
+    if not respelled.exists():
+        pytest.skip("this filesystem is case-sensitive, so no spelling alias exists")
+
+    with pytest.raises(
+        RuntimeError, match="scorecard_provenance:eval_env_file_inside_repository"
+    ):
+        scorecards.assert_eval_env_file_outside_repository(
+            respelled, repository_root=repository
+        )
+
+
 def test_live_eval_refuses_an_env_file_in_the_repository_before_loading_it() -> None:
     process_env = os.environ.copy()
     process_env.update(
