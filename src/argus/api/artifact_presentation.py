@@ -56,8 +56,15 @@ def reader_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     # The transport owns this decision, including for legacy persisted rows.
     # Readers consume it instead of independently classifying attached facts.
     public["artifact_presentation_kind"] = kind
-    if kind not in {"result", "breakdown", "assumptions"}:
+    if kind not in {"result", "breakdown", "assumptions", "confirmation"}:
         return public
+    if kind == "confirmation" and isinstance(public.get("confirmation_card"), dict):
+        # Legacy cards persisted an English summary sentence; no reader gets it.
+        public["confirmation_card"] = {
+            key: value
+            for key, value in public["confirmation_card"].items()
+            if key != "summary"
+        }
     if kind == "result" and not isinstance(public.get("result_fact_bank"), dict):
         # An unavailable lookup is still a terminal result, not an empty turn.
         public["result_fact_bank"] = {}

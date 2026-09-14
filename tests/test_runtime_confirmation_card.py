@@ -1116,9 +1116,8 @@ def test_card_prose_is_language_invariant_and_typed_fields_localize() -> None:
     They must not vary with the workspace language, because clients localize
     from the typed fields beside them; a card that ever emits per-language
     prose here has put copy back into the runtime. The typed fields must be
-    present, or the frontend has nothing to localize from. `summary` is not
-    asserted: its English scaffold embeds the language-formatted period, and
-    the preview surface that reads it is tracked separately.
+    present, or the frontend has nothing to localize from. A card composes no
+    summary sentence at all; tests/test_confirmation_turn_prose.py pins that.
     """
     cards = {
         language: runtime_confirmation_card(

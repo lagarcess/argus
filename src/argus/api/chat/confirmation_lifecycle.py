@@ -365,7 +365,7 @@ def apply_pending_card_update(
             confirmation_card=card,
         )
         return PendingArtifactUpdate(
-            content=str(card.get("summary") or ""),
+            content="",
             metadata={
                 "conversation_mode": "confirm",
                 "agent_runtime_stage_outcome": "await_approval",

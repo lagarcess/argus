@@ -10,7 +10,7 @@ from argus.agent_runtime.state.models import ConversationMessage
 from argus.api import state as api_state
 from argus.api.chat.previews import (
     is_degraded_clarification_compatibility_text,
-    plain_text_preview,
+    stored_message_preview,
 )
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import Conversation, Message, MessageRole
@@ -18,6 +18,10 @@ from argus.domain.chat_turn_lifecycle import (
     MemoryChatTurnLifecycleGateway,
     TransitionResult,
     TurnStatus,
+)
+from argus.domain.confirmation_turn_facts import (
+    confirmation_turn_facts,
+    confirmation_turn_history_text,
 )
 from argus.domain.store import utcnow
 from argus.domain.supabase_conversation_messages import StaleMessageArtifactError
@@ -271,19 +275,7 @@ def memory_conversation(
     return conversation
 
 
-def message_preview(
-    content: str,
-    max_length: int = 180,
-    *,
-    role: str = "assistant",
-    metadata: dict[str, Any] | None = None,
-) -> str | None:
-    if is_degraded_clarification_compatibility_text(
-        role=role,
-        metadata=metadata,
-    ):
-        return None
-    return plain_text_preview(content, max_length=max_length)
+message_preview = stored_message_preview
 
 
 def memory_message(
@@ -834,7 +826,18 @@ def load_runtime_thread_history(
             metadata=message.metadata,
         ):
             continue
-        history.append(ConversationMessage(role=message.role, content=message.content))
+        # A card turn reaches the model as the card's typed facts, never prose.
+        card_facts = (
+            confirmation_turn_facts(message.metadata)
+            if message.role == "assistant"
+            else None
+        )
+        content = (
+            confirmation_turn_history_text(card_facts)
+            if card_facts is not None
+            else message.content
+        )
+        history.append(ConversationMessage(role=message.role, content=content))
     return history
 
 

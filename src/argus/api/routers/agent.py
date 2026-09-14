@@ -924,9 +924,7 @@ async def chat_stream(
                     conversation_id=conversation.id,
                     language=runtime_user.language_preference,
                 )
-                confirmation_anchor_text: str | None = None
                 if confirmation_card is not None:
-                    confirmation_anchor_text = str(confirmation_card["summary"])
                     assistant_text = None
                     runtime_result.pop("assistant_response", None)
                     runtime_result.pop("assistant_prompt", None)
@@ -992,7 +990,6 @@ async def chat_stream(
                     metadata["chat_action"] = persisted_chat_action(payload)
                 if result_action_type is not None and payload.action is not None:
                     confirmation_card = None
-                    confirmation_anchor_text = None
                     runtime_result.pop("confirmation", None)
                     runtime_result.pop("confirmation_payload", None)
                     runtime_result.pop("active_confirmation_reference", None)
@@ -1175,8 +1172,11 @@ async def chat_stream(
                     assistant_text = streamed_text
                     runtime_result["assistant_response"] = streamed_text
 
+                # A card turn persists no prose; its readers derive from the card.
                 persisted_text = (
-                    confirmation_anchor_text or assistant_text or streamed_text
+                    ""
+                    if confirmation_card is not None
+                    else assistant_text or streamed_text
                 )
                 assistant_text, persisted_text = reply_rewrites.finalize(
                     runtime_result=runtime_result,
@@ -1184,10 +1184,11 @@ async def chat_stream(
                     assistant_text=assistant_text,
                     persisted_text=persisted_text,
                 )
-                typed_artifact_answer = artifact_presentation_kind(metadata) in {
-                    "assumptions",
-                    "breakdown",
-                } or bool(tool_result_cards)
+                typed_artifact_answer = (
+                    artifact_presentation_kind(metadata) in {"assumptions", "breakdown"}
+                    or confirmation_card is not None
+                    or bool(tool_result_cards)
+                )
                 if not (
                     persisted_text
                     or confirmation_card is not None
