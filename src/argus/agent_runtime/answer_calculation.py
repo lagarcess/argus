@@ -528,9 +528,14 @@ def cited_page_inputs(
     calculation: dict[str, Any] | None,
     sources: Sequence[ResearchSource],
     names: Sequence[str],
+    *,
+    evidence: Sequence[RetrievedRow] = (),
+    currency: str = "",
+    symbol: str | None = None,
 ) -> dict[str, tuple[Any, dict[str, Any]]]:
-    """The named inputs a refreshed answer read from pages it retrieved, each
-    with its page source; anything else in the calculation is ignored."""
+    """The named inputs a refreshed answer read from pages it retrieved, or from
+    the provider's finance data the way publication binds them, each with its
+    source; anything else in the calculation is ignored."""
     if not calculation:
         return {}
     try:
@@ -540,16 +545,22 @@ def cited_page_inputs(
     pages = {source.url: source for source in sources}
     found: dict[str, tuple[Any, dict[str, Any]]] = {}
     for item in request.inputs:
+        if item.name not in names or item.source != "page" or item.value is None:
+            continue
         page = pages.get(item.source_url or "")
-        if (
-            item.name in names
-            and item.source == "page"
-            and page
-            and item.value is not None
-        ):
+        if page is not None:
             found[item.name] = (
                 item.value,
                 page_source(page, item.as_of).model_dump(mode="json"),
+            )
+            continue
+        cited = _evidenced(
+            item.value, evidence, name=item.name, currency=currency, symbol=symbol
+        )
+        if cited is not None:
+            found[item.name] = (
+                item.value,
+                evidence_source(cited, item.as_of).model_dump(mode="json"),
             )
     return found
 

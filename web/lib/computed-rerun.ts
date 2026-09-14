@@ -16,6 +16,16 @@ export function rerunChanges(stored: ToolResultCard, drafts: Record<string, stri
   return toolInputChanges(stored, drafts);
 }
 
+/**
+ * What an edit re-runs, or null when there is nothing to run: an invalid draft,
+ * or drafts back at the stored inputs with no earlier edit's result to replace.
+ */
+export function editRerun(stored: ToolResultCard, drafts: Record<string, string>, hasLatest: boolean): Record<string, ToolScalar> | null {
+  const pending = rerunChanges(stored, drafts);
+  if (!pending || (Object.keys(pending).length === 0 && !hasLatest)) return null;
+  return pending;
+}
+
 export function changesAreEmpty(changes: Record<string, ToolScalar> | null): boolean {
   return changes !== null && Object.keys(changes).length === 0;
 }

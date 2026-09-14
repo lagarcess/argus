@@ -8,7 +8,7 @@ import ComputedRerunPanel from "../components/chat/ComputedRerunPanel";
 import DecisionRerunView from "../components/chat/DecisionRerunView";
 import { CurrentDecisionChip } from "../components/chat/DecisionAffordance";
 import { AnswerDossierView } from "../components/sidebar/command-palette/AnswerDossierView";
-import { changesAreEmpty, rerunCard, rerunChanges } from "../lib/computed-rerun";
+import { changesAreEmpty, editRerun, rerunCard, rerunChanges } from "../lib/computed-rerun";
 import { decisionRerunTreatment } from "../lib/tool-outcome-treatment";
 import type { AnswerDossier } from "../lib/answer-dossier-contract";
 import type { ToolResultCard } from "../lib/tool-result-card";
@@ -43,6 +43,10 @@ describe("a computed re-run beside its stored result", () => {
     expect(changesAreEmpty(rerunChanges(stored, { present_value: "200000" }))).toBe(true);
     expect(rerunChanges(stored, { present_value: "150000" })).toEqual({ present_value: 150000 });
     expect(rerunChanges(stored, { payment: "1" })).toBeNull();
+    expect(editRerun(stored, { present_value: "200000" }, false)).toBeNull();
+    expect(editRerun(stored, { present_value: "200000" }, true)).toEqual({});
+    expect(editRerun(stored, { present_value: "150000" }, false)).toEqual({ present_value: 150000 });
+    expect(editRerun(stored, { payment: "1" }, true)).toBeNull();
   });
 
   for (const language of ["en", "es-419"] as const) {

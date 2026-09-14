@@ -325,7 +325,10 @@ async def refresh_computed_answer(
     from argus.agent_runtime import research_grounded as grounded
     from argus.agent_runtime.answer_calculation import cited_page_inputs
     from argus.agent_runtime.research_answer import _resolved_subjects
-    from argus.agent_runtime.research_calculation import retrieved_pages
+    from argus.agent_runtime.research_calculation import (
+        cited_evidence,
+        retrieved_pages,
+    )
     from argus.agent_runtime.research_query import ResearchQueryExtraction
     from argus.api.chat.research_evidence import claim_research_provider_attempt
     from argus.domain.capability_registry import get_tool_catalog
@@ -419,6 +422,7 @@ async def refresh_computed_answer(
     )
     _record_refresh(user, conversation_id, sidecar)
     pages = retrieved_pages(packet)
+    evidence = cited_evidence(packet)
     found = [
         {}
         if degraded is not None or not inputs
@@ -426,6 +430,9 @@ async def refresh_computed_answer(
             _looked_up(packet, name=name, kind=card.tool_name, single=single),
             pages,
             inputs,
+            evidence=evidence,
+            currency=str(card.arguments.get("currency") or "").strip().upper(),
+            symbol=str(card.arguments.get("symbol") or "") or None,
         )
         for name, card, inputs in zip(names, answer.cards, cited, strict=True)
     ]

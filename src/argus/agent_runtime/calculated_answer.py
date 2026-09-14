@@ -426,10 +426,10 @@ def completed_pending(
     voiced: Sequence[AnswerCalculation],
     notes: list[str],
 ) -> list[AnswerCalculation]:
-    """The pending question's own calculations, each blank it owed (a null input,
-    or a requested field it never listed) filled from the reply when the reply
-    states it; every figure it already held keeps its value and source, whatever
-    the voiced reply wrote."""
+    """The pending question's own calculations, each blank it asked for (a null
+    input, or a requested field it never listed) filled from the reply when the
+    reply states it; every other figure keeps its stored value and source,
+    whatever the voiced reply wrote."""
     try:
         stored = [
             AnswerCalculation.model_validate(item) for item in pending_requests(pending)
@@ -456,11 +456,15 @@ def completed_pending(
         changed = changed or not same
         filled = {item.name: item for item in answer.inputs} if same and answer else {}
         inputs: list[AnswerCalculationInput] = []
+        asked = requested or {item.name for item in request.inputs if item.value is None}
         for item in request.inputs:
             reply = filled.pop(item.name, None)
             if item.value is None:
-                owed = reply is not None and reply.value is not None
-                inputs.append(reply if owed and reply.source != "assumption" else item)
+                stated = reply is not None and reply.value is not None
+                if stated and item.name not in asked:
+                    changed = True
+                owed = stated and item.name in asked and reply.source != "assumption"
+                inputs.append(reply if owed else item)
                 continue
             if reply is not None and (
                 reply.value != item.value or reply.source != item.source

@@ -59,6 +59,14 @@ def compute_price_multiple(arguments: PriceMultipleArguments) -> PriceMultipleRe
     elif unknown == "price":
         assert arguments.per_share is not None and arguments.multiple is not None
         price = arguments.per_share * arguments.multiple
+        if price < 0:
+            # A price below zero is outside the price the input itself accepts.
+            raise no_solution(
+                NoSolution(
+                    field="per_share" if arguments.per_share < 0 else "multiple",
+                    code="price_below_zero",
+                )
+            )
         per_share, multiple, solved_value = arguments.per_share, arguments.multiple, price
     else:
         assert arguments.price is not None and arguments.multiple is not None

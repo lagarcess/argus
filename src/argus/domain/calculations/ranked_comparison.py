@@ -69,17 +69,18 @@ class RankedComparisonResult(CalculationResult):
 def compute_ranked_comparison(
     arguments: RankedComparisonArguments,
 ) -> RankedComparisonResult:
+    # Ranked by position, so items that share a label keep their own symbols.
     ranked = comparison.rank_by_key(
-        [(item.label, item.value) for item in arguments.items], prefer=arguments.prefer
+        [(str(index), item.value) for index, item in enumerate(arguments.items)],
+        prefer=arguments.prefer,
     )
-    symbols = {item.label: item.symbol for item in arguments.items}
     return RankedComparisonResult(
         key_label=arguments.key_label,
         prefer=arguments.prefer,
         rows=[
             RankedRow(
-                label=row.label,
-                symbol=symbols.get(row.label),
+                label=arguments.items[int(row.label)].label,
+                symbol=arguments.items[int(row.label)].symbol,
                 value=row.value,
                 rank=row.rank,
                 gap_to_best=row.gap_to_best,

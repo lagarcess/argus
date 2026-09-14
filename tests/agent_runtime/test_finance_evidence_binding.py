@@ -34,3 +34,29 @@ def test_a_money_row_backs_an_input_only_in_its_currency_and_security() -> None:
     assert (
         _evidenced(7.91, [eps], name="per_share", currency="USD", symbol="AAPL") is None
     )
+
+
+def test_a_refreshed_finance_figure_binds_through_the_evidence_rows() -> None:
+    from argus.agent_runtime.answer_calculation import cited_page_inputs
+
+    eps = _row(label="earnings per share", value=7.91, kind="currency", unit="USD")
+    calculation = {
+        "name": "nvda",
+        "kind": "price_multiple",
+        "inputs": [
+            {
+                "name": "per_share",
+                "value": 7.91,
+                "source": "page",
+                "source_url": "https://www.perplexity.ai/finance/NVDA",
+                "as_of": "2026-09-12",
+            }
+        ],
+    }
+    found = cited_page_inputs(
+        calculation, [], ["per_share"], evidence=[eps], currency="USD", symbol="NVDA"
+    )
+    assert found["per_share"][0] == 7.91
+    assert found["per_share"][1]["kind"] == "page"
+    assert found["per_share"][1].get("url") is None
+    assert cited_page_inputs(calculation, [], ["per_share"]) == {}

@@ -2101,7 +2101,8 @@
         "scenarios_out_of_order": "Los casos bajo, base y alto deben subir en orden; revisa el dato {{field}}.",
         "periods_beyond_limit": "Con este dato {{field}}, el plan tomaría más de 1,200 periodos.",
         "fee_above_balance": "El dato {{field}} se lleva más que todo el saldo cada año.",
-        "fees_need_loan_terms": "Agrega el dato {{field}} para contar las comisiones en la tasa."
+        "fees_need_loan_terms": "Agrega el dato {{field}} para contar las comisiones en la tasa.",
+        "price_below_zero": "Con este dato {{field}}, el precio quedaría por debajo de cero."
       },
       "title": "Resultado",
       "solved_value": "Valor calculado",

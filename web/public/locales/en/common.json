@@ -2101,7 +2101,8 @@
         "scenarios_out_of_order": "The low, base and high cases must rise in order; check the {{field}}.",
         "periods_beyond_limit": "With this {{field}}, the plan would take more than 1,200 periods.",
         "fee_above_balance": "The {{field}} takes more than the whole balance each year.",
-        "fees_need_loan_terms": "Add the {{field}} to count the fees in the rate."
+        "fees_need_loan_terms": "Add the {{field}} to count the fees in the rate.",
+        "price_below_zero": "With this {{field}}, the price would be below zero."
       },
       "title": "Result",
       "solved_value": "Solved value",

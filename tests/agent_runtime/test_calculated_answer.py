@@ -677,3 +677,60 @@ def test_two_options_with_one_name_each_take_their_own_reply(monkeypatch) -> Non
     cards = reply.patch["final_response_payload"]["tool_result_cards"]
     assert [card["arguments"]["periods"] for card in cards] == [48, 60]
     assert [card["arguments"]["annual_rate_pct"] for card in cards] == [14, 12]
+
+
+def test_a_reply_fills_only_the_blanks_the_question_asked_for(monkeypatch) -> None:
+    _voice(
+        monkeypatch,
+        [
+            _voiced(
+                "How many months are left on the loan?",
+                [
+                    *LOAN,
+                    {"name": "periods", "value": None, "source": "user"},
+                    {"name": "start_date", "value": None, "source": "user"},
+                ],
+            ),
+            _voiced(
+                "With {{periods}} months left, the payment is {{payment}}.",
+                [
+                    *LOAN,
+                    {"name": "periods", "value": 48, "source": "user"},
+                    {"name": "start_date", "value": "2026-10-01", "source": "user"},
+                ],
+            ),
+        ],
+    )
+    asked = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="I owe 180,000 on the car at 14 percent. Is paying extra worth it?",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert asked is not None and asked.patch["requested_field"] == "periods"
+
+    class _Interpreter:
+        async def ainvoke(self, request):
+            return _read()
+
+    reply = asyncio.run(
+        interpret_stage_async(
+            state=RunState.new(current_user_message="48", recent_thread_history=[]),
+            user=USER,
+            latest_task_snapshot=None,
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "clarification": asked.patch["clarification"],
+            },
+            structured_interpreter=_Interpreter(),
+        )
+    )
+    assert reply.outcome == "ready_to_respond"
+    card = reply.patch["final_response_payload"]["tool_result_cards"][0]
+    assert card["arguments"]["periods"] == 48
+    assert card["arguments"]["start_date"] is None
+    assert ca.PENDING_KEPT_REASON_CODE in reply.decision.reason_codes
