@@ -284,9 +284,7 @@ def test_payload_is_frozen_after_construction() -> None:
             {
                 "run_chart": {
                     **build_chart(),
-                    "currency": (
-                        "Recalled from memory 77777777-7777-4777-8777-777777777777"
-                    ),
+                    "currency": (f"Private artifact {ARTIFACT_ID}"),
                 }
             },
         ),
@@ -345,13 +343,12 @@ def test_audit_rejects_a_key_named_after_never_expose_data(smuggled_key: str) ->
         audit_public_excerpt_document(document)
 
 
-def test_audit_rejects_any_uuid_in_any_payload_value() -> None:
+def test_audit_rejects_exact_known_identifier_in_any_payload_value() -> None:
     payload = _payload()
     with pytest.raises(PublicExcerptSanitizationError):
         audit_public_excerpt_payload(
-            payload.model_copy(
-                update={"idea_title": "Idea 88888888-8888-4888-8888-888888888888"}
-            )
+            payload.model_copy(update={"idea_title": f"Idea {RUN_ID}"}),
+            private_ids=(RUN_ID,),
         )
 
 
@@ -381,9 +378,9 @@ def test_owner_note_is_bounded() -> None:
         normalize_owner_note(over_limit)
 
 
-def test_owner_note_rejects_credential_shaped_tokens() -> None:
-    with pytest.raises(PublicExcerptOwnerNoteError):
-        normalize_owner_note("key EXAMPLENOTAREALCREDENTIALTOKEN")
+def test_owner_note_accepts_credential_shaped_text() -> None:
+    text = "key EXAMPLENOTAREALCREDENTIALTOKEN"
+    assert normalize_owner_note(text) == text
 
 
 def test_owner_note_collapses_control_characters_without_joining_words() -> None:

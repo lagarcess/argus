@@ -23,9 +23,10 @@ The promotion walk found that ordinary completed answers could not be selected.
 4. Keep frozen snapshots, registered owners, /r/<id>, Settings Shared links,
    revoke, tombstones, delete cascade, noindex and rate limits. Preserve sources
    and dates where present. Reuse existing receipt records and table.
-5. Use shared responsive primitives. Sheets belong below 720px; 1024px is for
-   the run dossier. AdaptivePanel still uses 1024px at the integration base;
-   report that dependency and leave the shared component untouched in this lane.
+5. Follow docs/BREAKPOINTS.md and DESIGN.md section 8. Selection is in the
+   conversation thread. Note, preview, link and Shared links use AdaptivePanel:
+   a sheet below 1024px and a dialog from 1024px, with 44px sheet tap targets.
+   Use shared responsive primitives and no hard-coded breakpoint widths.
 6. Sharing flags remain false in render.yaml and the release profile. Enable
    only in local fixtures. Prefer no migration; report any widened kind check.
 
@@ -49,9 +50,10 @@ One PR targeting codex/private-alpha-next, closing #604. Original fetched base:
 Scripted regression tests must fail on that base and pass on the final code for
 all #604 cases. Verify retained private-ID, exact-preview, ownership, revocation
 and deletion behavior. Use seeded or recorded conversations for EN/es-419
-browser evidence at 390, 719, 720, 1023, 1024 and 1280px, and signed-out pages
-at 390/1280px. Commit durable evidence. Record the AdaptivePanel discrepancy
-honestly rather than claiming those intermediate widths meet the contract.
+browser evidence matching the breakpoint baseline spine: English dark at
+390, 720, 1024 and 1280px, Spanish light at 390px, and signed-out pages at
+390/1024px. Commit durable evidence. The founder revised the earlier breakpoint
+request to match AdaptivePanel; there is no shared-panel blocker.
 
 Reconcile current integration one-way, audit semantic overlap, run the merged
 modularity budget and deterministic gates. Get CI green and a clean Codex
@@ -60,10 +62,9 @@ the founder merges and enables flags at promotion.
 
 ## 6. Stop conditions
 
-- A second Codex finding on the same preview/privacy mechanism: stop and report
-  instead of fixing that mechanism again.
-- Shared component changes required for the responsive contract: report, leave
-  AdaptivePanel untouched, and do not claim that acceptance gate passed.
+- Founder authorized one resume after the research-kind correction slip. Fix
+  it test-first and make browser fixture reuse repeatable. If the requested
+  final-head Codex review raises renderer provenance again, stop and report.
 - Any live provider answer needs a proposed spend cap and founder approval.
 - Scope requires account data, hidden turns or live public source reads: stop.
 

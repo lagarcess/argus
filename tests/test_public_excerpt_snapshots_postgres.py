@@ -304,9 +304,10 @@ def test_soft_deleting_the_conversation_revokes_the_receipt() -> None:
 def test_hard_deleting_a_conversation_is_already_impossible_with_an_idea_spine() -> None:
     """Pre-existing, and it predates receipts entirely.
 
-    ``idea_versions.source_conversation_id`` is ``on delete set null`` while
-    ``prevent_idea_version_immutable_update`` forbids changing that column, so a
-    captured conversation cannot be hard deleted. Argus only soft deletes, so this
+    The idea-version and evidence-artifact source references use ``on delete
+    set null``, while their immutability triggers forbid changing those columns.
+    PostgreSQL may reach either foreign-key action first; a captured conversation
+    cannot be hard deleted. Argus only soft deletes, so this
     never surfaces in the product. Recorded here because it is why the purge
     triggers below are a backstop rather than the live path.
     """
@@ -319,7 +320,7 @@ def test_hard_deleting_a_conversation_is_already_impossible_with_an_idea_spine()
                         "delete from public.conversations where id = %s",
                         (fixture.conversation_id,),
                     )
-                assert "idea_versions immutable fields" in str(failure.value)
+                assert "immutable fields cannot be updated" in str(failure.value)
         finally:
             connection.rollback()
 

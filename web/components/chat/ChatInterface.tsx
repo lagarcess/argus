@@ -168,6 +168,7 @@ import { renamePrefillTitle } from "@/lib/chat-title-display";
 import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
 import ChatHeaderMenu from "./ChatHeaderMenu";
 import { ShareReceiptPanel } from "./ShareReceiptAction";
+import { ReceiptConversationProvider, ReceiptConversationTurn, ReceiptSelectionComposer } from "./ReceiptConversationSelection";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
@@ -2192,6 +2193,7 @@ export default function ChatInterface() {
   }
 
   return (
+    <ReceiptConversationProvider target={evidenceReceiptSharingEnabled ? guestExperience.receiptSharing.target : null} conversationId={conversationId} onClose={guestExperience.receiptSharing.close}>
     <ConversationActivityPresentationProvider
       selectPresentation={conversationActivity.selectPresentation}
       selectAggregatePresentation={conversationActivity.selectAggregatePresentation} selectOperationLabel={conversationActivity.selectOperationLabel}
@@ -2476,7 +2478,7 @@ export default function ChatInterface() {
                           tabIndex={-1}
                           className="scroll-m-24 outline-none"
                         >
-                          <ChatMessage
+                          <ReceiptConversationTurn messageId={msg.id}><ChatMessage
                             message={msg}
                             onAction={handleAction}
                             onDirectEdit={handleDirectEditConfirmation}
@@ -2512,7 +2514,7 @@ export default function ChatInterface() {
                               msg.id === resumeDecisionMessageId ? resumeDecisionArtifactId : null
                             }
                             onDecisionResumeHandled={clearResumeDecision}
-                          />
+                          /></ReceiptConversationTurn>
                         </div>
                       );
                     })}
@@ -2546,13 +2548,13 @@ export default function ChatInterface() {
                         />
                       </div>
                     )}
-                    <ChatInput
+                    <ReceiptSelectionComposer><ChatInput
                       key={conversationId ?? "unowned-transcript"}
                       onSend={handleSend}
                       disabled={conversationComposerUnavailable}
                       placeholder={chatInputPlaceholder}
                       onToast={showToast}
-                    />
+                    /></ReceiptSelectionComposer>
                     <ChatLegalNotice
                       expiresAt={account?.guest?.expires_at}
                       isGuest={isGuest}
@@ -2591,6 +2593,6 @@ export default function ChatInterface() {
         />
       )}
       </div>
-    </ConversationActivityPresentationProvider>
+    </ConversationActivityPresentationProvider></ReceiptConversationProvider>
   );
 }

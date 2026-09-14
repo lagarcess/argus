@@ -1,0 +1,28 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/0968/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 417 items
+
+tests/test_public_excerpt_answer_receipts_postgres.py s                  [  0%]
+tests/test_public_excerpt_api.py ....................................... [  9%]
+.........                                                                [ 11%]
+tests/test_public_excerpt_calculation_receipts_postgres.py ssssss        [ 13%]
+tests/test_public_excerpt_calculation_turns.py ......                    [ 14%]
+tests/test_public_excerpt_language.py .................................. [ 22%]
+.....................................................................    [ 39%]
+tests/test_public_excerpt_owner_notes.py ............................... [ 46%]
+........                                                                 [ 48%]
+tests/test_public_excerpt_read_path.py .....                             [ 49%]
+tests/test_public_excerpt_receipts.py .................................. [ 58%]
+.......................................                                  [ 67%]
+tests/test_public_excerpt_selections_postgres.py ssssssssssssssssss      [ 71%]
+tests/test_public_excerpt_sharing_604.py ........................        [ 77%]
+tests/test_public_excerpt_snapshots_postgres.py sssssssssssssssssssss    [ 82%]
+tests/test_public_excerpt_turns.py ..................................... [ 91%]
+....................................                                     [100%]
+
+======================= 371 passed, 46 skipped in 3.53s ========================

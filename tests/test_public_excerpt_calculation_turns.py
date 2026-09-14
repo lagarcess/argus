@@ -17,7 +17,6 @@ from argus.api import state as api_state
 from argus.api.schemas import Message
 from argus.domain.computation_marker import computation_from_tool_card
 from argus.domain.public_excerpt_kinds import document_kind
-from argus.domain.public_excerpts import PublicExcerptSourceError
 
 from tests.domain.calculations import WORKED_ARGUMENTS
 from tests.domain.calculations.support import run_calculation
@@ -105,7 +104,7 @@ def preview(owner, messages, note=None):
     )
 
 
-def test_a_computed_answer_previews_as_a_calculation_with_only_public_inputs(owner):
+def test_a_computed_answer_previews_visible_user_inputs_and_public_sources(owner):
     answer, card = add_calculation(owner)
     result = preview(owner, [answer])
     assert result.payload.schema_version == 2
@@ -116,19 +115,17 @@ def test_a_computed_answer_previews_as_a_calculation_with_only_public_inputs(own
     (calculation,) = leaf.calculations
     assert calculation.title.locale_key == card.presentation.title.locale_key
     assert calculation.answer.value == card.presentation.answer.value
-    assert [fact.label.locale_key for fact in calculation.inputs] == [
-        "tools.calc.fields.price"
+    assert [fact.value for fact in calculation.inputs] == [
+        fact.value for fact in card.presentation.inputs if fact.value is not None
     ]
-    assert (
-        calculation.inputs[0].source.url
-        == "https://www.nasdaq.com/market-activity/stocks/aapl"
-    )
-    assert calculation.inputs[0].source.date == "2026-09-10"
+    cited = next(fact for fact in calculation.inputs if fact.source is not None)
+    assert cited.source.url == CITED_PRICE["sources"]["price"]["url"]
+    assert cited.source.date == CITED_PRICE["sources"]["price"]["date"]
     assert leaf.framing == "calculation_not_advice"
     document = json.dumps(result.payload.model_dump(mode="json"))
-    assert "6.25" not in document, "the per-share figure the user typed stays private"
+    assert "6.25" in document, "the owner can preview the input they wrote"
     assert "arguments" not in document
-    assert '"AAPL"' not in document
+    assert '"AAPL"' in document
     assert not api_state.store.public_excerpt_snapshots
 
 
@@ -148,10 +145,8 @@ def test_candidates_name_the_calculation_kind_and_readable_refusals(owner):
     by_id = {item.message_id: item for item in items}
     assert by_id[eligible.id].eligible and by_id[eligible.id].kind == "calculation"
     assert by_id[failed.id].reason == "not_completed"
-    assert by_id[ranked.id].reason == "private_inputs"
-    with pytest.raises(PublicExcerptSourceError) as error:
-        preview(owner, [eligible, ranked])
-    assert error.value.reason == "private_inputs"
+    assert by_id[ranked.id].eligible
+    assert len(preview(owner, [eligible, ranked]).payload.turns) == 2
 
 
 def test_a_calculation_and_a_research_answer_share_as_a_mixed_receipt(owner):
