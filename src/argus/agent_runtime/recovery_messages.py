@@ -48,13 +48,12 @@ RecoveryMessageCode = Literal[
 
 RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
     "interpreter_unavailable": (
-        "I saved your message, but I could not turn it into a reliable test setup. "
+        "I saved your message, but I could not reliably understand your question. "
         "Please retry in a moment."
     ),
     "interpreter_unavailable_not_retryable": (
-        "I saved your message, but I could not turn it into a reliable test setup. "
-        "Sending it again as written will hit the same problem, so try rewording "
-        "it, or tell me the asset and the period you want."
+        "I saved your message, but I could not reliably understand your question. "
+        "Try rewording it so I can help."
     ),
     "assumption_edit_unapplied": (
         "I saved your reply, but I could not safely apply that assumption change, "

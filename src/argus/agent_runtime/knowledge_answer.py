@@ -205,8 +205,9 @@ async def knowledge_answer_stage_result(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
-    if selected_thread_metadata.get("last_stage_outcome") == "await_user_reply":
-        # A reply to a pending question belongs to whoever asked it.
+    if interpretation.semantic_turn_act == "answer_pending_need":
+        # The current interpretation, not the previous question's existence,
+        # decides whether this turn answers that pending need.
         return None
     if getattr(interpretation, "asset_discovery", None) is not None:
         return None
