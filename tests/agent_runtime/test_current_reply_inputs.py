@@ -99,10 +99,10 @@ async def test_every_reply_kind_sends_only_current_decision_to_both_writers(
 
 @pytest.mark.asyncio
 async def test_supplied_date_to_capital_recovery_replay(monkeypatch):
-    """Replay the two supplied user messages and the intervening wrong reply.
+    """Replay all three supplied user messages against the reported stored blockers.
 
     This replays the reported stored blockers, not today's capital validation:
-    integration now accepts $100. The unspecified middle user turn is not invented.
+    integration now accepts $100. Assistant prose is scripted, not a transcript.
     """
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
@@ -116,6 +116,7 @@ async def test_supplied_date_to_capital_recovery_replay(monkeypatch):
     capital_question = "What starting capital amount in the supported range should I use?"
     prompts = [
         "Test $100 bucks on @mrna stock from August 16 to August 19 just a few days this year",
+        "That this year check again",
         "August 16, 2026 to August 19, 2026",
     ]
     requests = []
@@ -148,8 +149,12 @@ async def test_supplied_date_to_capital_recovery_replay(monkeypatch):
     for index, (prompt, category, requested) in enumerate(
         zip(
             prompts,
-            ["data_window_unavailable", "unsupported_starting_capital"],
-            ["date_range", "capital_amount"],
+            [
+                "data_window_unavailable",
+                "data_window_unavailable",
+                "unsupported_starting_capital",
+            ],
+            ["date_range", "date_range", "capital_amount"],
             strict=True,
         )
     ):
@@ -169,7 +174,7 @@ async def test_supplied_date_to_capital_recovery_replay(monkeypatch):
             capital_amount=100,
             date_range={
                 "start": "2026-08-16",
-                "end": "2026-12-31" if index == 0 else "2026-08-19",
+                "end": "2026-12-31" if index < 2 else "2026-08-19",
             },
         )
         state.optional_parameter_status = {"unsupported_constraints": [constraint]}
@@ -182,7 +187,7 @@ async def test_supplied_date_to_capital_recovery_replay(monkeypatch):
         patch = result.patch
         assert patch["clarification"]["reason_code"] == category
         assert patch["assistant_prompt"] == (
-            date_question if index == 0 else capital_question
+            date_question if requested == "date_range" else capital_question
         )
         assert patch["clarification"]["options"][0]["replacement_values"] == option["replacement_values"]
         assert (

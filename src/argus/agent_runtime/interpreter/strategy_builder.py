@@ -8,9 +8,6 @@ from typing import Any
 
 from argus.agent_runtime.artifacts.asset_edits import normalized_asset_universe_operation
 from argus.agent_runtime.asset_text_grounding import provider_ticker_mentions_from_text
-from argus.agent_runtime.interpreter.date_window_repair import (
-    validate_date_range_precision,
-)
 from argus.agent_runtime.interpreter.shared import (
     _TOTAL_CAPITAL_SOURCES,
     _capital_source,
@@ -63,7 +60,6 @@ def _strategy_from_llm(
     draft: LLMStrategyDraft,
     current_user_message: str | None = None,
 ) -> StrategySummary:
-    validate_date_range_precision(draft, current_user_message)
     payload = draft.model_dump(mode="python")
     validated_execution_cost_evidence = dict(draft._validated_execution_cost_evidence)
     field_provenance = payload.pop("field_provenance", {}) or {}

@@ -68,10 +68,12 @@ would correctly need future-window recovery instead.
 
 ## Replay limits
 
-The report supplies user turns 1 and 3, but not user turn 2. The scripted
-replay covers the two supplied messages and the intervening wrong date reply;
-the missing user message has been requested rather than invented. A complete
-three-user-turn replay remains pending that text.
+The scripted replay now includes all three supplied user turns, including
+turn 2, “That this year check again”. It retains the date blocker for the
+first two turns and switches to the reported capital blocker on turn 3.
+Assistant prose is scripted to expose history anchoring, not represented as
+an exact production transcript. The updated replay fails against the original
+integration source and passes on this lane.
 
 Integration's capital floor is now $10, so $100 no longer reproduces the
 historical capital blocker. The replay injects the reported stored blocker at
@@ -111,25 +113,22 @@ new fingerprint, finish exact-head CI and Codex review, then report without
 merging. If Codex raises a second finding on the same mechanism, stop and
 report instead of applying another fix.
 
-## First Codex review follow-up
+## Review decision and removal
 
-Codex reviewed `c2faeadc7769bc5cc7da87bdfd74e58fa2c8ab18` and raised one P1:
-if primary and focused extraction both label the finer range as a calendar
-year, declining weak parser evidence alone still lets that whole-year result
-become state. Eight scripted cases reproduced it (both languages, both year
-intent kinds, with and without the focused read).
+The first review led to a `validate_date_range_precision` check that re-parsed
+user words after interpretation. The next review found two P1s from that
+check: modal “May I” could be read as a date, and its rejection could escape
+the corrective re-ask path. Work stopped and the founder chose removal.
 
-The strategy-construction boundary now rejects that contradiction through the
-existing `InterpretationContractError` path before creating canonical state.
-The normal bounded corrective re-ask reuses `DATE_RANGE_PRECISION_GUIDANCE`,
-the same sentence already added to the schema above. There is no new wording.
-The rendered schema description was checked byte-for-byte against the first
-reviewed head. Rejected reads use existing contract-rejection telemetry; they
-cannot quietly persist a wider window.
+The check, its strategy-builder call, and its corrective-hint reuse are now
+removed. The shared schema sentence above is unchanged; the now-unneeded
+constant is inlined back into its sole owner. The model owns the reading,
+which remains pending live measurement. No replacement word parser or re-ask
+was added. The clarification input boundary and natural-time partial-year
+guard remain intact.
 
-The first head's CI completed with frontend and guest gates passing. Backend
-had **8521 passed, 604 skipped, and only the deliberately pending prompt-freeze
-failure**. The 22 local logic failures also reproduce on original source when
-loaded with the same local environment; they were absent in clean CI.
-
-A second finding on this date mechanism will stop the lane, as directed.
+The modal “May I … calendar year 2024?” regression fails at `cb7b4df8` and
+passes after removal. All 57 focused lane checks pass, including the updated
+three-turn replay, all reply kinds and both languages/writers, the partial-year
+guard, and the English/Spanish live fixture expectations. Full-suite and
+removal-only review results will be recorded at the final head.
