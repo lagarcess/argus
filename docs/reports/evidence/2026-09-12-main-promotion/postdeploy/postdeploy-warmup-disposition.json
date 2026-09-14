@@ -1,0 +1,11 @@
+{
+  "native_exit_code": 1,
+  "disposition": "accepted founder exception: manual deploy mode only",
+  "drift": [
+    "drift argus-api:autoDeployTrigger expected=checksPass actual=off",
+    "drift argus-app:autoDeployTrigger expected=checksPass actual=off",
+    "drift argus-backtests:autoDeployTrigger expected=checksPass actual=off"
+  ],
+  "other_errors": [],
+  "workflow_runtime_proof": "not reached because unchanged warmup exits on release-config drift"
+}

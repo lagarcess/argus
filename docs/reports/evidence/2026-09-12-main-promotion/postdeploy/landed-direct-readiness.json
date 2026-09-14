@@ -1,0 +1,44 @@
+{
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "started_at": "2026-09-13T22:47:16.524088+00:00",
+  "finished_at": "2026-09-13T22:47:17.725473+00:00",
+  "duration_seconds": 1.2012256250018254,
+  "http_status": 503,
+  "payload": {
+    "status": "degraded",
+    "checks": [
+      {
+        "name": "agent_runtime_workflow",
+        "status": "ready",
+        "duration_ms": 1199
+      },
+      {
+        "name": "supabase",
+        "status": "degraded",
+        "duration_ms": 0,
+        "reason": "gateway_unavailable"
+      },
+      {
+        "name": "asset_universe",
+        "status": "ready",
+        "duration_ms": 0,
+        "provider_mode": "synthetic_unit_fixture",
+        "alias_count": 47,
+        "required_symbols": [
+          "AAPL",
+          "MSFT",
+          "SPY"
+        ],
+        "resolved_symbols": [
+          "AAPL",
+          "MSFT",
+          "SPY"
+        ],
+        "missing_symbols": []
+      }
+    ]
+  },
+  "request_count": 1,
+  "same_smoke_configuration_function": true,
+  "timeouts_in_repository_unchanged": true
+}

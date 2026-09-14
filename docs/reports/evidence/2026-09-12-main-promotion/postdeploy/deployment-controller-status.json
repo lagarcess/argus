@@ -1,0 +1,242 @@
+{
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "state": "deployed_and_verified",
+  "migrations": [
+    {
+      "version": "20260908120000",
+      "file": "supabase/migrations/20260908120000_decision_notes_attach_to_computations.sql",
+      "name": "decision_notes_attach_to_computations",
+      "sha256": "85cf7c53c4296d9d2e9f4becaa76ec74873191a929fd76b373a4c5c4ff118a3a",
+      "statement_count": 7,
+      "statements_sha256": "e1f0df2685b02a8d287ab4638b6ed31b30a58f323cb32d13f76492a951314d84",
+      "started_at": "2026-09-13T22:51:40.746421+00:00",
+      "committed_at": "2026-09-13T22:51:41.322139+00:00",
+      "transaction": "committed",
+      "statement_rowcounts": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "ledger_readback": "exact name and statement array matched"
+    },
+    {
+      "version": "20260908205041",
+      "file": "supabase/migrations/20260908205041_add_refusal_observations.sql",
+      "name": "add_refusal_observations",
+      "sha256": "f46b4d48d5470a3c200febbdf0fdcfb4c3bfaaa7c82b0267867921fa58a68f27",
+      "statement_count": 16,
+      "statements_sha256": "ab343c0a485ac6174963674de4ca531e729b9baf8ba415918798178947c748a9",
+      "started_at": "2026-09-13T22:51:41.330519+00:00",
+      "committed_at": "2026-09-13T22:51:42.207142+00:00",
+      "transaction": "committed",
+      "statement_rowcounts": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "ledger_readback": "exact name and statement array matched"
+    },
+    {
+      "version": "20260909183646",
+      "file": "supabase/migrations/20260909183646_share_answer_receipt_selections.sql",
+      "name": "share_answer_receipt_selections",
+      "sha256": "151b8238f8c35c6c070d0f57778ed415379e366c1aefd60288f534a8fcff6b17",
+      "statement_count": 18,
+      "statements_sha256": "520f943d11718ea5d9c0680f4681aa32b64a9cd9103fa689defe62fff0463114",
+      "started_at": "2026-09-13T22:51:42.224100+00:00",
+      "committed_at": "2026-09-13T22:51:43.067204+00:00",
+      "transaction": "committed",
+      "statement_rowcounts": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "ledger_readback": "exact name and statement array matched"
+    },
+    {
+      "version": "20260909225701",
+      "file": "supabase/migrations/20260909225701_retire_research_rail_ledger_status.sql",
+      "name": "retire_research_rail_ledger_status",
+      "sha256": "91cab460561ae00927ffadf2c5d21083fdc909084cd569a78c4eb9bf3f4c6baa",
+      "statement_count": 2,
+      "statements_sha256": "7dbbe58d396a9f903ae49b059c5a1fec86290ba385fc771eff3a88f25a736813",
+      "started_at": "2026-09-13T22:51:43.068527+00:00",
+      "committed_at": "2026-09-13T22:51:43.678164+00:00",
+      "transaction": "committed",
+      "statement_rowcounts": [
+        -1,
+        -1
+      ],
+      "ledger_readback": "exact name and statement array matched"
+    },
+    {
+      "version": "20260910003000",
+      "file": "supabase/migrations/20260910003000_lift_receipt_selection_cap.sql",
+      "name": "lift_receipt_selection_cap",
+      "sha256": "107959d1a13eb8ac7642e62506e0b478ad355b3197d3dab68a5e3de359d6a1d4",
+      "statement_count": 1,
+      "statements_sha256": "f9ac68fb47400a44ed226b11ff75350c64a24ec123f684ebd0c71f7a8c9dd7e3",
+      "started_at": "2026-09-13T22:51:43.680166+00:00",
+      "committed_at": "2026-09-13T22:51:43.966212+00:00",
+      "transaction": "committed",
+      "statement_rowcounts": [
+        -1
+      ],
+      "ledger_readback": "exact name and statement array matched"
+    },
+    {
+      "version": "20260911120000",
+      "file": "supabase/migrations/20260911120000_add_profile_home_country.sql",
+      "name": "add_profile_home_country",
+      "sha256": "befaf9527649bf2e18320c212edb2422f600e793c06704b0a6f030ed6d115601",
+      "statement_count": 10,
+      "statements_sha256": "6afa774fd8349bd3ffc3a17dd2baba84e6d0d94ed0420439b33ad2bfdfe56b09",
+      "started_at": "2026-09-13T22:51:43.971191+00:00",
+      "committed_at": "2026-09-13T22:51:44.703175+00:00",
+      "transaction": "committed",
+      "statement_rowcounts": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "ledger_readback": "exact name and statement array matched"
+    },
+    {
+      "version": "20260911214608",
+      "file": "supabase/migrations/20260911214608_drop_profiles_theme.sql",
+      "name": "drop_profiles_theme",
+      "sha256": "1f55f28fd4061108d8e6ca06c4bd2f647ca9f1cc7c031caf06251bd02250afb9",
+      "statement_count": 1,
+      "statements_sha256": "91ad0eb6f221b6b896ea531c4d30e982e277a4e2b88b403e60bc4a216fa4ab72",
+      "started_at": "2026-09-13T22:51:44.704631+00:00",
+      "committed_at": "2026-09-13T22:51:44.994367+00:00",
+      "transaction": "committed",
+      "statement_rowcounts": [
+        -1
+      ],
+      "ledger_readback": "exact name and statement array matched"
+    }
+  ],
+  "deploys": [
+    {
+      "service": "argus-api",
+      "command": [
+        "render",
+        "deploys",
+        "create",
+        "srv-d78tanmuk2gs73e17nn0",
+        "--commit",
+        "3d98057c1e722317f0243fb96fb647771ddae484",
+        "--wait",
+        "--confirm",
+        "--output",
+        "json"
+      ],
+      "started_at": "2026-09-13T22:51:47.382854+00:00",
+      "target_sha": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "finished_at": "2026-09-13T22:53:36.969226+00:00",
+      "exit_code": 0
+    },
+    {
+      "service": "argus-app",
+      "command": [
+        "render",
+        "deploys",
+        "create",
+        "srv-d7ap6bmslomc73eqp8m0",
+        "--commit",
+        "3d98057c1e722317f0243fb96fb647771ddae484",
+        "--wait",
+        "--confirm",
+        "--output",
+        "json"
+      ],
+      "started_at": "2026-09-13T22:53:37.726752+00:00",
+      "target_sha": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "finished_at": "2026-09-13T22:55:31.936660+00:00",
+      "exit_code": 0
+    },
+    {
+      "service": "argus-backtests",
+      "command": [
+        ".github/render-env-sync.sh",
+        "workflow-release",
+        "3d98057c1e722317f0243fb96fb647771ddae484"
+      ],
+      "started_at": "2026-09-13T22:55:32.653800+00:00",
+      "target_sha": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "finished_at": "2026-09-13T22:57:29.301839+00:00",
+      "exit_code": 0
+    }
+  ],
+  "backup": "explicitly waived by founder",
+  "autodeploy_changes": false,
+  "sharing_changes": false,
+  "updated_at": "2026-09-13T22:57:31.273867+00:00",
+  "finished_at": "2026-09-13T22:57:31.273854+00:00",
+  "three_services": [
+    {
+      "service": "argus-api",
+      "id": "dep-dajii17qj5pc73dp04rg",
+      "status": "live",
+      "commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "created_at": "2026-09-13T22:51:48.937365Z",
+      "finished_at": "2026-09-13T22:53:32.883509Z"
+    },
+    {
+      "service": "argus-app",
+      "id": "dep-dajiisnqj5pc73dp2uc0",
+      "status": "live",
+      "commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "created_at": "2026-09-13T22:53:38.434856Z",
+      "finished_at": "2026-09-13T22:55:27.413133Z"
+    },
+    {
+      "service": "argus-backtests",
+      "id": "wfv-dajijpbm8hqs738ed7i0",
+      "status": "ready",
+      "commit": "3d98057",
+      "created_at": "2026-09-13T22:55:33.646241Z"
+    }
+  ],
+  "all_triggers_off": true
+}

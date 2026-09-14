@@ -2634,10 +2634,10 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(terms).toContain('kind="terms"');
-    expect(terms).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
+    expect(terms).toContain('from "@/lib/support-email"');
     expect(terms).not.toContain("TODO");
     expect(privacy).toContain('kind="privacy"');
-    expect(privacy).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
+    expect(privacy).toContain('from "@/lib/support-email"');
     expect(privacy).not.toContain("TODO");
 
     expect(legalPage).toContain('"use client"');
