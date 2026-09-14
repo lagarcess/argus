@@ -29,7 +29,7 @@ python -m pytest \
   -k 'not last_resort_repair_preserves_only_a_typed_test_read' -q --no-cov
 ```
 
-Observed: **13 failed, 2 deselected**. The two positive typed-repair controls
+Observed: **13 failed, 3 deselected**. The three positive typed-repair controls
 exercise the new internal argument and are intentionally outside the baseline
 run. Baseline failures are behavioral assertions, not dependency or collection
 errors:
@@ -50,11 +50,12 @@ enters the shared cache. Every owned thread is joined before the test exits.
 
 ## Candidate checks
 
-The three test files above, without the baseline exclusion, pass **15/15**.
+The three test files above, without the baseline exclusion, pass **16/16**.
 The required mocked eval harness passes **270/270**. The frontend suite passes
 **1,981/1,981**. Frontend lint has zero errors (eight existing warnings), and
-the production build passes. Backend lint, branch ownership check and modularity
-budget pass. The full backend suite passes **8,610 tests**, with **604 skips**
+the production build passes. Backend lint and modularity budget pass. The
+ownership tool reports no lane-specific policy. The full backend suite passes
+**8,614 tests**, with **604 skips**
 (disposable database/live gates and optional environments) and **89% coverage**.
 The initial sandbox run also exposed local socket/process restrictions; the
 provider-free rerun with those permissions passed. No provider credentials or
@@ -64,6 +65,28 @@ The old cost/fidelity and seven-call corridor fixtures now supply a typed test
 read before expecting strategy repair. Their money-role, fee, slippage and call
 budget assertions remain. Separate outage tests assert the safer unread-turn
 outcome for both default and explicitly selected interpreter models.
+
+## First review fixes
+
+Codex reviewed `407ce0186e75dac9a38719b3e843f3d0f0a5c967` and raised two
+distinct findings. Each was reproduced before its fix:
+
+- A typed `backtest_execution` / `retry_failed_action` with no reusable launch
+  payload was excluded by the new semantic guard even though the existing repair
+  predicate permits it. The guard now preserves that typed retry path. Its new
+  parameterized case failed before the one-line guard change.
+- The full Q2 path can consume all seven ordinary calls before research starts.
+  The test now enters `interpret_stage_async`, uses real OpenRouter admission
+  with scripted HTTP responses, and spends four asset-preflight attempts plus
+  three interpretation attempts. Before the fix, the slow lookup expired but
+  recovery voicing was skipped with `turn_call_allowance_exhausted`. The turn now
+  owns one observable, single-use voicing reservation scoped to the existing
+  no-lookup answer. It cannot extend the deadline or fund another task.
+
+The combined acceptance, focused-repair and execution-budget checks pass
+**73 tests**. The expanded Q2 test retains the real calculation follow-up and
+late-worker cleanup. The unchanged-integration red run remains **13 failures**.
+Final review disposition belongs to the terminal PR audit.
 
 ## Limits
 

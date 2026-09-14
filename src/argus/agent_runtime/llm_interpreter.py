@@ -4900,7 +4900,7 @@ async def _focused_strategy_repair_after_candidate_failures(
         semantic_turn_act=failed_response.semantic_turn_act,
     ) != "strategy":
         return None
-    if failed_response.semantic_turn_act not in (None, *STRATEGY_TURN_ACTS):
+    if failed_response.semantic_turn_act not in (None, "retry_failed_action", *STRATEGY_TURN_ACTS):
         return None
     if _request_has_active_strategy_context(
         request

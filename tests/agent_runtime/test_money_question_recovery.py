@@ -14,6 +14,7 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import (
+    ArtifactReference,
     RunState,
     StrategySummary,
     TaskSnapshot,
@@ -85,12 +86,16 @@ async def test_failed_candidates_never_seed_a_test_without_a_typed_test_request(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("act", ["new_idea", "educational_question"])
+@pytest.mark.parametrize(
+    "act", ["new_idea", "retry_failed_action", "educational_question"]
+)
 async def test_last_resort_repair_preserves_only_a_typed_test_read(
     monkeypatch: pytest.MonkeyPatch, user: UserState, act: str
 ) -> None:
     raw = li.LLMInterpretationResponse(
-        intent="strategy_drafting",
+        intent="backtest_execution"
+        if act == "retry_failed_action"
+        else "strategy_drafting",
         task_relation="new_task",
         user_goal_summary="Test SPY monthly buys",
         semantic_turn_act=act,
@@ -103,6 +108,20 @@ async def test_last_resort_repair_preserves_only_a_typed_test_read(
     )
     original = raw.model_dump()
     seen = []
+    request = InterpretationRequest(current_user_message=raw.user_goal_summary, user=user)
+    if act == "retry_failed_action":
+        request.latest_task_snapshot = TaskSnapshot(
+            latest_failed_action_reference=ArtifactReference(
+                artifact_kind="failed_action",
+                artifact_id=fake.uuid4(),
+                artifact_status="failed",
+                metadata={"action_type": "run_backtest", "retryable": True},
+            )
+        )
+        # A historical failure without its launch payload cannot be replayed;
+        # the existing extraction predicate explicitly permits its repair.
+        assert not li._structured_interpretation_has_required_shape(raw, request=request)
+        assert li._strategy_extraction_repair_is_allowed(raw, request=request)
 
     async def repair(**kwargs: Any):
         seen.append(kwargs["failed_response"])
@@ -110,13 +129,11 @@ async def test_last_resort_repair_preserves_only_a_typed_test_read(
 
     monkeypatch.setattr(li, "_repair_incomplete_strategy_extraction", repair)
     repaired = await li._focused_strategy_repair_after_candidate_failures(
-        request=InterpretationRequest(
-            current_user_message=raw.user_goal_summary, user=user
-        ),
+        request=request,
         preferred_model="stub",
         failed_response=raw,
     )
-    if act == "new_idea":
+    if act in {"new_idea", "retry_failed_action"}:
         assert repaired is not None
         assert repaired.candidate_strategy_draft == raw.candidate_strategy_draft
         assert repaired.semantic_turn_act == act

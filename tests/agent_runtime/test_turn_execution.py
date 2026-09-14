@@ -687,3 +687,47 @@ def test_call_allowance_override_can_lower_but_not_raise_policy(
     monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", "3")
     with turn_execution.turn_execution_scope(entry_state={}) as execution:
         assert execution.call_allowance == 3
+
+
+@pytest.mark.parametrize("allowance", [1, 7])
+def test_research_recovery_reserves_one_scoped_call_without_extending_deadline(
+    monkeypatch: pytest.MonkeyPatch, allowance: int
+) -> None:
+    from argus.agent_runtime import turn_execution
+
+    clock = _Clock()
+    monkeypatch.setattr(turn_execution, "_monotonic", clock)
+    monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", str(allowance))
+    monkeypatch.setenv("ARGUS_TURN_DEADLINE_SECONDS", "20")
+    with turn_execution.turn_execution_scope(entry_state={}) as execution:
+        for _ in range(allowance):
+            assert turn_execution.reserve_provider_call("interpretation") is not None
+        deadline = execution.deadline_monotonic
+        assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+        clock.advance(15)
+        with turn_execution.research_recovery_scope():
+            assert turn_execution.reserve_provider_call("interpretation") is None
+            permit = turn_execution.reserve_provider_call("knowledge_voicing", 18)
+            assert permit is not None and permit.timeout_seconds == pytest.approx(5)
+            assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+        with turn_execution.research_recovery_scope():
+            assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+        assert execution.calls_reserved == allowance
+        assert execution.deadline_monotonic == deadline
+        assert turn_execution.turn_execution_summary(())["research_recovery_reserved"]
+        assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+
+
+def test_research_recovery_cannot_reserve_after_the_turn_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import turn_execution
+
+    clock = _Clock()
+    monkeypatch.setattr(turn_execution, "_monotonic", clock)
+    with turn_execution.turn_execution_scope(entry_state={}) as execution:
+        clock.advance(execution.deadline_seconds)
+        with turn_execution.research_recovery_scope():
+            assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+        assert execution.deadline_exhausted
+        assert not execution.research_recovery_reserved

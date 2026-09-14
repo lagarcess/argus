@@ -537,7 +537,9 @@ block knowledge or arithmetic; the previous `await_user_reply` alone cannot.
 Inline research attempts share the active turn's remaining deadline. The lookup
 ladder reserves the normal knowledge-voicing timeout (at most half the remaining
 turn) for the existing answer-without-lookup path, and bounds both the provider
-transport and its async wait. A cancelled sync provider may still finish remotely,
+transport and its async wait. The turn also owns a single-use call reservation
+for that recovery answer, so interpreter retries cannot consume its last attempt.
+A cancelled sync provider may still finish remotely,
 so its admission charge is retained and its late result is never published or
 cached. Interpreter-unavailable copy names failed question understanding in both
 locales without assuming the user requested a test.

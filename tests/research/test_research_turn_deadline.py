@@ -3,21 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
 from typing import Any
 
+import httpx
 import pytest
 from argus.agent_runtime import (
     calculated_answer,
-    research_calculation,
+    llm_interpreter,
     research_grounded,
     turn_execution,
 )
+from argus.agent_runtime.capabilities.contract import build_default_capability_contract
 from argus.agent_runtime.research_query import ResearchQueryExtraction
+from argus.agent_runtime.stages.interpret import interpret_stage_async
 from argus.agent_runtime.state.models import RunState, UserState
 from argus.domain.calculations.answer_request import AnswerCalculation
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchPacket, ResearchUnavailableError
+from argus.llm import openrouter
 from argus.llm.openrouter import openrouter_task_timeout_seconds
 
 from tests.research.conftest import educational_interpretation
@@ -34,14 +39,22 @@ async def test_q2_slow_sync_lookup_answers_before_runtime_turn_deadline(
     fallback_remaining: list[float] = []
     cached: list[Any] = []
     admission = _Turn()
-    deadline_seconds = 2.0
+    deadline_seconds = 4.0
     monkeypatch.setenv("ARGUS_TURN_DEADLINE_SECONDS", str(deadline_seconds))
+    monkeypatch.delenv("ARGUS_TURN_CALL_ALLOWANCE", raising=False)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "stub")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "structured/primary")
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "structured/fallback")
+    interpreter_posts: list[tuple[str, str, bool]] = []
 
     class SlowProvider:
         def run_research(self, _prompt: str, spec: Any) -> ResearchPacket:
             received_timeouts.append(spec.timeout_seconds)
             try:
-                assert release.wait(timeout=5), "test did not release provider"
+                assert (
+                    len(interpreter_posts) == turn_execution.DEFAULT_TURN_CALL_ALLOWANCE
+                )
+                assert release.wait(timeout=10), "test did not release provider"
                 return ResearchPacket(answer_markdown="Late response")
             finally:
                 completed.set()
@@ -55,11 +68,11 @@ async def test_q2_slow_sync_lookup_answers_before_runtime_turn_deadline(
     ]
     seen_messages: list[list[dict[str, str]]] = []
 
-    def voice(**kwargs: Any):
+    def voice(payload: dict[str, Any]):
         execution = turn_execution.active_turn_execution()
         assert execution is not None
         fallback_remaining.append(execution.remaining_deadline_seconds())
-        seen_messages.append(kwargs["messages"])
+        seen_messages.append(payload["messages"])
         return calculated_answer.CalculatedVoicedAnswer(
             lead=(
                 "¿Qué pago mensual quieres comparar y qué porcentaje de tus ingresos representaría?"
@@ -84,14 +97,6 @@ async def test_q2_slow_sync_lookup_answers_before_runtime_turn_deadline(
     monkeypatch.setattr(
         research_grounded, "cache_put", lambda *args, **_: cached.append(args)
     )
-    monkeypatch.setattr(
-        research_calculation, "resolve_openrouter_api_key", lambda: "stub"
-    )
-    monkeypatch.setattr(calculated_answer, "resolve_openrouter_api_key", lambda: "stub")
-    monkeypatch.setattr(
-        calculated_answer, "openrouter_structured_model_candidates", lambda: ["stub"]
-    )
-    monkeypatch.setattr(calculated_answer, "invoke_openrouter_json_schema_sync", voice)
     query = ResearchQueryExtraction(
         question_kind="current_external", scenario_question=True
     )
@@ -99,20 +104,98 @@ async def test_q2_slow_sync_lookup_answers_before_runtime_turn_deadline(
         update={"research_query": query}
     )
 
+    raw_read = llm_interpreter.LLMInterpretationResponse(
+        intent="conversation_followup",
+        task_relation="new_task",
+        semantic_turn_act="educational_question",
+        user_goal_summary=question,
+        research_query=query,
+    )
+
+    def response(url: str, content: str) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": content}}]},
+            request=httpx.Request("POST", url),
+        )
+
+    class AsyncProvider:
+        def __init__(self, **_: Any):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_: Any):
+            return None
+
+        async def post(self, url: str, **kwargs: Any):
+            payload = kwargs["json"]
+            schema = payload["response_format"]["json_schema"]["name"]
+            model = payload["model"]
+            has_reasoning = "reasoning" in payload
+            interpreter_posts.append((schema, model, has_reasoning))
+            # Four preflight attempts, then three interpretation attempts:
+            # ordinary compatibility retries and model fallback consume all seven.
+            if has_reasoning and (
+                schema == "LLMAssetMentionExtraction" or model == "structured/primary"
+            ):
+                return httpx.Response(
+                    400,
+                    json={"error": {"message": "reasoning unsupported"}},
+                    request=httpx.Request("POST", url),
+                )
+            if model == "structured/primary":
+                return response(url, "{}")
+            if schema == "LLMAssetMentionExtraction":
+                return response(
+                    url,
+                    json.dumps(
+                        {"asset_mentions": [], "all_traded_asset_mentions_included": True}
+                    ),
+                )
+            assert schema == "LLMInterpretationResponse"
+            return response(url, raw_read.model_dump_json())
+
+    class SyncProvider:
+        def __init__(self, **_: Any):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_: Any):
+            return None
+
+        def post(self, url: str, **kwargs: Any):
+            payload = kwargs["json"]
+            assert (
+                payload["response_format"]["json_schema"]["name"]
+                == "CalculatedVoicedAnswer"
+            )
+            return response(url, voice(payload).model_dump_json())
+
+    monkeypatch.setattr(openrouter.httpx, "AsyncClient", AsyncProvider)
+    monkeypatch.setattr(openrouter.httpx, "Client", SyncProvider)
+    interpreter = llm_interpreter.OpenRouterStructuredInterpreter(
+        contract=build_default_capability_contract()
+    )
+
     async def runtime_events():
-        result = await research_grounded.grounded_result(
-            query=query,
-            subjects=[],
-            shape="balanced",
-            interpretation=interpretation,
+        result = await interpret_stage_async(
             state=RunState.new(current_user_message=question, recent_thread_history=[]),
             user=user,
+            latest_task_snapshot=None,
+            structured_interpreter=interpreter,
         )
         assert result is not None
         yield {"type": "final", "payload": result.stage_patch}
 
     try:
-        with admission.scope(), turn_execution.turn_execution_scope(entry_state={}):
+        with (
+            admission.scope(),
+            turn_execution.turn_execution_scope(entry_state={}) as execution,
+        ):
             events = [
                 event
                 async for event in turn_execution.runtime_events_with_keepalive(
@@ -122,6 +205,7 @@ async def test_q2_slow_sync_lookup_answers_before_runtime_turn_deadline(
                 )
                 if event is not None
             ]
+        assert execution.calls_reserved == turn_execution.DEFAULT_TURN_CALL_ALLOWANCE
         assert len(events) == 1
         patch = events[0]["payload"]
         assert patch["assistant_prompt"] == calculated_answer.missing_inputs_lead(
