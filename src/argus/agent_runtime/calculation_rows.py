@@ -157,7 +157,11 @@ def market_counterfactual_rows(
 
 
 def _money(amount: float, currency: str, *, grouped: bool) -> str:
-    figure = f"{amount:,.0f}" if grouped else f"{amount:.0f}"
+    """The amount to the cent, with no cents shown when it is whole, so the test
+    runs with the capital the calculation used."""
+    cents = round(amount, 2)
+    decimals = 0 if cents == round(cents) else 2
+    figure = f"{cents:,.{decimals}f}" if grouped else f"{cents:.{decimals}f}"
     return f"{figure} {currency}".strip()
 
 

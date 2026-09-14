@@ -102,7 +102,7 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
             )
     else:
         assert per_period is not None
-        if start >= end:
+        if tvm.target_already_met(start, contribution, end, per_period):
             # The balance already meets the target: no period is needed, and the
             # plan ends at the balance itself.
             count = 0.0

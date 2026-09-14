@@ -514,6 +514,8 @@ class ToolDeclaration:
             original = call.arguments
         else:
             original = arguments.model_dump(mode="json")
+            if TOOL_INPUT_SOURCES_FIELD in self.arguments_type.model_fields:
+                original = _with_default_sources(original, call.arguments)
             presentation = ToolCardPresentation.model_validate(
                 self.card.presenter(arguments, outcome)
             )
@@ -612,6 +614,23 @@ def _input_sources(arguments: Mapping[str, Any]) -> dict[str, ToolFactSource]:
         except ValidationError:
             continue
     return sources
+
+
+def _with_default_sources(
+    arguments: dict[str, Any], stated: Mapping[str, Any]
+) -> dict[str, Any]:
+    """The arguments with every input the call left to its default recorded as an
+    assumption, so a default never reads as a figure the reader stated."""
+    sources = dict(arguments.get(TOOL_INPUT_SOURCES_FIELD) or {})
+    for name, value in arguments.items():
+        if (
+            name != TOOL_INPUT_SOURCES_FIELD
+            and name not in stated
+            and name not in sources
+            and value is not None
+        ):
+            sources[name] = ToolFactSource(kind="assumption").model_dump(mode="json")
+    return {**arguments, TOOL_INPUT_SOURCES_FIELD: sources}
 
 
 def _require_finite_json(value: Any) -> None:

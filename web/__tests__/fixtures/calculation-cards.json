@@ -1190,7 +1190,11 @@
           "inflation_rate_pct": 4.0,
           "periods": 12,
           "periods_per_year": 12,
-          "sources": {},
+          "sources": {
+            "periods_per_year": {
+              "kind": "assumption"
+            }
+          },
           "start_value": 10000.0
         },
         "artifact_id": "artifact-growth_projection",
@@ -1352,7 +1356,7 @@
               },
               "name": "periods_per_year",
               "source": {
-                "kind": "user"
+                "kind": "assumption"
               },
               "unit": null,
               "unknown": false,
@@ -1474,7 +1478,11 @@
           "inflation_rate_pct": 4.0,
           "periods": 12,
           "periods_per_year": 12,
-          "sources": {},
+          "sources": {
+            "periods_per_year": {
+              "kind": "assumption"
+            }
+          },
           "start_value": 10000.0
         },
         "kind": "growth_projection"
@@ -1490,7 +1498,17 @@
           "inflation_rate_pct": 0.0,
           "periods": null,
           "periods_per_year": 12,
-          "sources": {},
+          "sources": {
+            "contribution": {
+              "kind": "assumption"
+            },
+            "inflation_rate_pct": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
+            }
+          },
           "start_value": 1000.0
         },
         "artifact_id": "artifact-growth_projection",
@@ -1545,7 +1563,7 @@
               },
               "name": "contribution",
               "source": {
-                "kind": "user"
+                "kind": "assumption"
               },
               "unit": {
                 "interpolation_args": {
@@ -1629,7 +1647,7 @@
               },
               "name": "periods_per_year",
               "source": {
-                "kind": "user"
+                "kind": "assumption"
               },
               "unit": null,
               "unknown": false,
@@ -1646,7 +1664,7 @@
               },
               "name": "inflation_rate_pct",
               "source": {
-                "kind": "user"
+                "kind": "assumption"
               },
               "unit": {
                 "interpolation_args": {},
@@ -1680,7 +1698,17 @@
           "inflation_rate_pct": 0.0,
           "periods": null,
           "periods_per_year": 12,
-          "sources": {},
+          "sources": {
+            "contribution": {
+              "kind": "assumption"
+            },
+            "inflation_rate_pct": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
+            }
+          },
           "start_value": 1000.0
         },
         "kind": "growth_projection"
@@ -2416,6 +2444,12 @@
               "kind": "page",
               "title": "Rate sheet",
               "url": "https://example.com/rates"
+            },
+            "payment_timing": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
             }
           },
           "start_date": "2026-09-11"
@@ -2960,7 +2994,7 @@
               },
               "name": "periods_per_year",
               "source": {
-                "kind": "user"
+                "kind": "assumption"
               },
               "unit": null,
               "unknown": false,
@@ -2977,7 +3011,7 @@
               },
               "name": "payment_timing",
               "source": {
-                "kind": "user"
+                "kind": "assumption"
               },
               "unit": null,
               "unknown": false,
@@ -4517,6 +4551,12 @@
               "kind": "page",
               "title": "Rate sheet",
               "url": "https://example.com/rates"
+            },
+            "payment_timing": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
             }
           },
           "start_date": "2026-09-11"
@@ -4536,7 +4576,14 @@
           "periods": null,
           "periods_per_year": 12,
           "present_value": 180000.0,
-          "sources": {},
+          "sources": {
+            "payment_timing": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
+            }
+          },
           "start_date": null
         },
         "artifact_id": "artifact-time_value",
@@ -4701,7 +4748,7 @@
               },
               "name": "periods_per_year",
               "source": {
-                "kind": "user"
+                "kind": "assumption"
               },
               "unit": null,
               "unknown": false,
@@ -4718,7 +4765,7 @@
               },
               "name": "payment_timing",
               "source": {
-                "kind": "user"
+                "kind": "assumption"
               },
               "unit": null,
               "unknown": false,
@@ -4751,7 +4798,14 @@
           "periods": null,
           "periods_per_year": 12,
           "present_value": 180000.0,
-          "sources": {},
+          "sources": {
+            "payment_timing": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
+            }
+          },
           "start_date": null
         },
         "kind": "time_value"

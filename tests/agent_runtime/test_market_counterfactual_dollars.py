@@ -84,11 +84,12 @@ def test_a_pair_quoted_as_dollars_first_is_inverted(monkeypatch) -> None:
     )
 
     assert row["label"] == (
-        "Test S&P 500 (SPY) buying 204 USD every month (30,000 JPY at 0.006803 USD "
+        "Test S&P 500 (SPY) buying 204.08 USD every month (30,000 JPY at 0.006803 USD "
         "per JPY on 2026-09-11) over the last 5 years"
     )
     assert (
-        row["send_text"] == "Test buying 204 USD of SPY every month over the last 5 years"
+        row["send_text"]
+        == "Test buying 204.08 USD of SPY every month over the last 5 years"
     )
     assert asked == ["JPYUSD", "USDJPY"]
 

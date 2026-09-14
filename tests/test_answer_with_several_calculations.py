@@ -413,7 +413,15 @@ def test_recomputing_an_assumed_input_the_prose_never_names_drops_it_from_the_li
     client.post("/api/v1/dev/reset")
     owner = client.get("/api/v1/me").json()["user"]["id"]
     conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
-    card = _card("time_value", {**LOAN, "sources": {"periods": {"kind": "assumption"}}})
+    card = _card(
+        "time_value",
+        {
+            **LOAN,
+            "periods_per_year": 12,
+            "payment_timing": "end",
+            "sources": {"periods": {"kind": "assumption"}},
+        },
+    )
     template = "The loan costs {{payment}} a month."
     listed = unstated_assumptions(template, {"loan": card})
     assert listed == [{"artifact_id": card.artifact_id, "name": "periods"}]
@@ -455,7 +463,6 @@ def test_recomputing_an_assumed_input_the_prose_never_names_drops_it_from_the_li
     )
 
 
-
 def test_two_recomputes_keep_every_other_fact_of_the_answer_and_its_prose_current(
     answer,
 ) -> None:
@@ -474,7 +481,11 @@ def test_two_recomputes_keep_every_other_fact_of_the_answer_and_its_prose_curren
             "version": "argus_next_steps/v1",
             "items": [{"type": "question", "text": "How do the totals compare?"}],
         },
-        "agent_runtime_turn": {"turn_id": "turn-1", "status": "completed", "terminal": True},
+        "agent_runtime_turn": {
+            "turn_id": "turn-1",
+            "status": "completed",
+            "terminal": True,
+        },
     }
     api_state.store.messages[conversation_id][-1] = seeded.model_copy(
         update={"metadata": {**seeded.metadata, **extras}}

@@ -120,7 +120,9 @@ def compute_time_value(arguments: TimeValueArguments) -> TimeValueResult:
             )
     elif unknown == "periods":
         assert per_period is not None
-        if arguments.direction == "save" and present >= future:
+        if arguments.direction == "save" and tvm.target_already_met(
+            present, payment, future, per_period, timing
+        ):
             # A savings balance already at or past its target needs no period, and
             # the plan ends at the balance itself.
             count = 0.0

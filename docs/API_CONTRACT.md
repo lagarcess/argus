@@ -3395,8 +3395,8 @@ as a tap; the backend computed it, the client never invents one. `visual.kind`
 also admits `value_path`, a computed path over dated periods such as a balance
 paid down. An argument model may carry its inputs' provenance under the one
 field `sources`, keyed by field name; the declaration projects it onto the
-card, the retained unknown reads as `computed`, and an edited input is marked
-`user` by the recompute path.
+card, the retained unknown reads as `computed`, an input the call left to its default is
+recorded as `assumption`, and an edited input is marked `user` by the recompute path.
 
 `tool_jobs` retains asynchronous work as
 `[{call_id, tool_name, artifact_id, job}]`. Existing job polling and result-message

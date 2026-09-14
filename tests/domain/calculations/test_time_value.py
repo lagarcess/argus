@@ -309,3 +309,21 @@ def test_a_savings_balance_already_past_its_target_takes_no_periods() -> None:
     assert answer_value(card) == pytest.approx(0.0)
     assert card.outcome.result["balances"] == []
     assert row_value(card, "total_growth") == pytest.approx(0.0)
+
+
+def test_a_declining_savings_balance_solves_its_periods() -> None:
+    card = run_calculation(
+        "time_value",
+        {
+            "direction": "save",
+            "currency": "USD",
+            "present_value": 1_000,
+            "payment": 0,
+            "future_value": 500,
+            "annual_rate_pct": -10,
+            "periods": None,
+            "periods_per_year": 1,
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    assert answer_value(card) == pytest.approx(6.6, abs=0.05)

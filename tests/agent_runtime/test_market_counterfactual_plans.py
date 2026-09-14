@@ -210,3 +210,23 @@ def test_the_market_test_names_the_cards_own_security() -> None:
     assert market["rows"][0]["send_text"] == (
         "Test buying and holding SPY with 1000 USD over the last year"
     )
+
+
+def test_a_stated_amount_keeps_its_cents_in_the_test() -> None:
+    rows = _rows(
+        "growth_projection",
+        {
+            "start_value": 10.5,
+            "contribution": 0,
+            "end_value": None,
+            "annual_rate_pct": 5,
+            "periods": 12,
+        },
+    )
+    assert rows is not None
+    assert rows["rows"][0]["label"] == (
+        "Test S&P 500 (SPY) with 10.50 USD over the last year"
+    )
+    assert rows["rows"][0]["send_text"] == (
+        "Test buying and holding SPY with 10.50 USD over the last year"
+    )

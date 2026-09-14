@@ -106,6 +106,14 @@ def periods(
     return count if count > 0 else 0.0
 
 
+def target_already_met(
+    balance: float, deposit: float, target: float, rate: float, timing: Timing = 0
+) -> bool:
+    """Whether a balance already meets a target at or below it and does not fall
+    from there; a declining balance still has periods left to reach it."""
+    return balance >= target and balance * rate + deposit * (1.0 + rate * timing) >= 0
+
+
 def rate(
     present_value_amount: float,
     payment_amount: float,

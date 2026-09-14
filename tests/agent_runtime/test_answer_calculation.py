@@ -222,7 +222,12 @@ def test_an_unknown_reference_hands_over_to_argus_lead_and_cited_digits_stand() 
 
 
 def test_an_assumption_the_prose_does_not_name_is_listed_and_the_prose_stands() -> None:
-    inputs = [*LOAN[:4], {"name": "future_value", "value": 0, "source": "assumption"}]
+    inputs = [
+        *LOAN[:4],
+        {"name": "periods_per_year", "value": 12, "source": "user"},
+        {"name": "payment_timing", "value": "end", "source": "user"},
+        {"name": "future_value", "value": 0, "source": "assumption"},
+    ]
     notes: list[str] = []
     unnamed = _published("It costs {{payment}} a month.", inputs=inputs, notes=notes)
     card = ac.card_in(unnamed.patch)
@@ -306,7 +311,8 @@ def test_every_unnamed_assumption_is_listed_and_only_a_driving_one_is_recorded()
     )
     detail = {"name": "periods_per_year", "value": 12, "source": "assumption"}
     quiet: list[str] = []
-    listed = _published(stated, inputs=[*LOAN, detail], notes=quiet)
+    timing = {"name": "payment_timing", "value": "end", "source": "user"}
+    listed = _published(stated, inputs=[*LOAN, detail, timing], notes=quiet)
     assert listed.template is not None
     assert [item["name"] for item in listed.assumptions] == ["periods_per_year"]
     assert ac.FIGURE_CHECK_REASON_CODE not in quiet
@@ -316,7 +322,8 @@ def test_every_unnamed_assumption_is_listed_and_only_a_driving_one_is_recorded()
     )
     loan = [item for item in LOAN if item["name"] != "annual_rate_pct"]
     recorded: list[str] = []
-    driving = _published(unstated, inputs=[*loan, rate], notes=recorded)
+    per_year = {"name": "periods_per_year", "value": 12, "source": "user"}
+    driving = _published(unstated, inputs=[*loan, rate, per_year, timing], notes=recorded)
     assert driving.template is not None, "the prose stands"
     assert [item["name"] for item in driving.assumptions] == ["annual_rate_pct"]
     assert ac.FIGURE_CHECK_REASON_CODE in recorded
