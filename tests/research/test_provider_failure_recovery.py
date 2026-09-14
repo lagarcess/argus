@@ -509,9 +509,12 @@ def test_a_stalled_host_lookup_cannot_hold_a_request_past_its_deadline(
     real_lookup = socket.getaddrinfo
 
     def lookup(host: Any, *args: Any, **kwargs: Any) -> Any:
-        if host == "provider.test":
-            release.wait(10)
-        return real_lookup(host, *args, **kwargs)
+        if host != "provider.test":
+            return real_lookup(host, *args, **kwargs)
+        # Never a real lookup: on macOS one leaves Network.framework state that
+        # crashes every later forked child in its atfork handler.
+        release.wait(10)
+        raise socket.gaierror(socket.EAI_NONAME, "stalled lookup released")
 
     monkeypatch.setattr(socket, "getaddrinfo", lookup)
     monkeypatch.setattr(
