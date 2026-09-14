@@ -1,12 +1,12 @@
 # Private Alpha Production Promotion, 2026-09-12
 
-Status: The founder merged PR #603 as `3d98057c1e722317f0243fb96fb647771ddae484`. All seven approved migrations are applied and all three services are deployed at that merge. Post-deploy acceptance stopped on an unexpected authenticated-canary failure: `Rendered profile hydration failed`. The current Step 8 record is at the end of this manifest. Earlier checkpoint records retain their original pre-merge state and evidence.
+Status: The founder merged PR #603 as `3d98057c1e722317f0243fb96fb647771ddae484`. All seven approved migrations are applied and all three services are deployed at that merge. The remaining production acceptance checks passed after the founder classified the canary failures as pre-existing. Issue #614 records the verified `/me` HTTP 401 and manual-mode drift; native canary failures remain unchanged. The current resumed acceptance record is at the end of this manifest. Earlier checkpoints retain their original state and evidence.
 
 ## Candidate
 
 - Candidate SHA: `4fd587bf24ce39b794c2228d61f94693826d0da2`
 - Candidate branch: `codex/production-promotion-20260912`
-- Validation status: Pre-merge acceptance and final review completed; founder merge and the approved deployment followed. Post-deploy acceptance is stopped, as recorded in the current Step 8 section. The measured product head and scorecards below remain unchanged.
+- Validation status: Pre-merge acceptance and final review completed; founder merge and the approved deployment followed. Remaining production acceptance checks passed, with the founder-accepted pre-existing canary failures recorded in #614. The measured product head and scorecards below remain unchanged.
 - Validation surface: separate local acceptance worktree, disposable Supabase, production web build, and deliberately constructed production-mode environment.
 - Promotion target: `main`
 - Release captain: Codex in the founder-supervised promotion task.
@@ -780,7 +780,7 @@ Authoritative new-head A/B documents, after all historical references above:
 - Deployed A/B document: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/targeted-ab-baseline.json`.
 - Candidate A/B document: `docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/targeted-ab-candidate.json`.
 
-## Current Step 8: Deployed, Acceptance Stopped, 2026-09-13
+## Step 8: Deployment and Initial Acceptance Stop, 2026-09-13
 
 The founder merged [PR #603](https://github.com/lagarcess/argus/pull/603) at 22:23:31Z as `3d98057c1e722317f0243fb96fb647771ddae484`. Its parents are main `17a07497abbb2ff9159b9694832a6668421e0e88` and reviewed promotion head `f1fa4f15e6e0f4604169d5d13a8811e43e8adbf6`; its tree matches that reviewed promotion. The [terminal audit](https://github.com/lagarcess/argus/pull/603#issuecomment-5656534529) records the final pre-merge checks. Codex performed no merge or integration reconciliation.
 
@@ -848,3 +848,34 @@ No live eval was rerun and this canary reached zero chat turns. Retained budgets
 The follow-up changes only `docs/`. It retains the native failed results, sanitized evidence and operator-script hashes; it changes no product, migration, release configuration or validator.
 
 Documentation verification passed all 283 checks in 14.74 seconds: both release-document test files and the complete mocked harness command from `tests/evals/README.md`. The secret-value and UUID privacy scans passed; every non-doc Git path still matches the deployed merge commit. Evidence: `docs-and-mocked-tests.log` and `docs-verification.json`. These free checks do not change the failed production acceptance result.
+
+
+## Current Step 8: Resumed Production Acceptance, 2026-09-14 UTC
+
+The founder reported that production works normally while signed in, that 97 of the last 100 Private Alpha Canary runs failed, and that every run since 2026-08-18 failed. Those historical counts are founder-provided, not independently recomputed here. The founder classified the canary failure as pre-existing and authorized the remaining acceptance checks. This section supersedes the initial acceptance stop above; it does not relabel either native canary result as passing.
+
+The requested narrow request-log readback found **`GET /api/v1/me` returned HTTP 401 at `2026-09-13T23:00:31.510440089Z`**, in the bounded window around the failed canary. Diagnosis stopped after that fact. [Issue #614](https://github.com/lagarcess/argus/issues/614) records the persistent canary failures, authenticated profile hydration stop and release-coherence drift against the founder's manual deploy mode. No cause beyond the observed response is asserted, and no fix or canary rerun was performed. Evidence: `docs/reports/evidence/2026-09-12-main-promotion/postdeploy/canary-me-request-status.json`. The known #605 receipt-check exception was not reached by that canary.
+
+Paths in the following table are relative to `docs/reports/evidence/2026-09-12-main-promotion/postdeploy/acceptance-resumption/`. `verification.json` is the structured resumption record; `artifact-index.json` binds the captures by hash. All browser actions used a newly created controlled test account on production, separate from the canary and the founder's session.
+
+| Check | What it should show | Visible text | Result and one-line reason | Evidence |
+| --- | --- | --- | --- | --- |
+| New signup, confirmation and login | An ordinary new account can confirm and sign in | Revisa tu correo; signed-in New chat, Search, Settings | PASS: Turnstile completed automatically, confirmation succeeded and ordinary password login worked | `browser/01-signup-confirmation.jpg`, `browser/02-new-account-signed-in.jpg`, `before.json` |
+| Profile save and home country | The first profile changes survive reload | Production Check; Country United States; Currency USD | PASS: saved name survived reload; readback confirms the name and country US | `browser/12-country-persisted.jpg`, `after-feedback.json` |
+| Spanish Usage | The four approved Spanish labels appear | Uso; Conversación; Búsquedas con fuentes; Simulaciones | PASS: all four matched the loaded production panel | `browser/06-es-usage.jpg` |
+| English Usage | The four approved English labels appear | Usage; Conversation; Searches with sources; Simulations | PASS: all four matched the loaded production panel | `browser/07-en-usage.jpg` |
+| Result for the feedback check | A confirmed DCA simulation completes and exposes the feedback ask | Simulation Complete; Quick take; How is Argus doing? | PASS with recovered submission warning: one workflow job and one result completed | `browser/09-backtest-confirmation.jpg`, `browser/10-simulation-complete.jpg`, `after-result.json` |
+| One feedback rating | One response saves and acknowledges the user | Thanks for telling us. | PASS: one Good click persisted one positive `feedback_ask` row | `browser/13-feedback-saved.jpg`, `rating-action.json`, `after-feedback.json` |
+| One support email | That rating sends exactly one support email | Provider delivery readback | PASS: one matching message to `support@get-argus.com` was delivered at `2026-09-14T00:11:31.061Z` | `feedback-email-proof.json` |
+| Reload after feedback | The result remains and the answered ask stays dismissed | Simulation Complete; no Good rating button | PASS: the result hydrated and the exact rating-button count was zero | `browser/14-result-after-reload.jpg`, `feedback-reload.json` |
+| Production sharing | Sharing remains disabled | Not applicable | NOT APPLICABLE: no production link was created | Prior `hosted-settings-post-deploy.json` |
+
+The synthetic signup address bounced. Confirmation used the sent confirmation message for that same controlled account, followed by the ordinary login flow. This proves signup, confirmation and login, not delivery to the synthetic inbox. It did not require an admin-minted identity, a canary identity change, a CAPTCHA bypass or a hosted setting change. The separate feedback support email was delivered; its sanitized proof verifies the source, positive rating and match to the test conversation without retaining the body or raw identifiers. No manual founder rating is needed. The controlled test session was signed out after the checks.
+
+The first conversation submission reported `Failed to start conversation before sending: Error: An unexpected error occurred. Please try again.` The draft remained visible, and a subsequent submission completed. Two conversation rows were recorded, followed by one confirmed DCA job and one completed backtest. This is retained as a recovered submission warning, not a silently discarded success-path error or a diagnosed cause. No product fix, extra backtest or redeploy was needed. Evidence: `submission-error.json`, `browser/08-conversation-start-blocked.jpg`, `after-submission.json` and `after-result.json`.
+
+A fresh joint Render readback at `2026-09-14T00:15:49.708995+00:00` still showed API and app live at the full merge SHA and the workflow ready with version-owned commit prefix `3d98057`. Evidence: `three-service-versions.json`. No migrations, hosted settings, autodeploy values or deployments changed during this resumption. This follow-up changes only `docs/`; no merge or integration reconciliation was performed.
+
+The resumed checks added $0.01801360 tracked cost. One ledger row was unpriced, so an additional $0.20 conservative reserve covers that row and readout accounting gaps instead of assuming zero cost. Browser totals are $1.35864663874 tracked plus $0.44 reserve, **$1.79864663874 against $3**. Eval remains $9.556433710664 tracked plus $1.64 reserve, **$11.196433710664 against $12.50**. Replay remains $1.70731696526 tracked plus $0.18 reserve, **$1.88731696526 against $4**. Reserves are not spend. No paid eval or replay was rerun.
+
+Resumption documentation verification passed all 283 checks in 15.12 seconds: the release-document tests and complete documented mocked harness. Evidence: `acceptance-resumption/docs-and-mocked-tests.txt` and `acceptance-resumption/docs-verification.json`. Privacy scans and artifact hashes passed, and all non-doc Git paths still match the deployed merge. These free checks do not relabel the native canary failures.

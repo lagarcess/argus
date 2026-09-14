@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-09-14T00:25:16.857063+00:00",
+  "pre_commit_head": "090d16676db8bb27c172f73814a201e418eb97fd",
+  "product_identity_reference": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "non_docs_byte_identical": true,
+  "diff_check": "pass",
+  "secret_value_scan": "pass",
+  "new_json_and_text_uuid_scan": "pass",
+  "new_capture_count": 11,
+  "tests": {
+    "passed": 283,
+    "failed": 0,
+    "seconds": "15.12",
+    "log": "docs-and-mocked-tests.txt"
+  },
+  "new_canary_fact_sha256": "7e9435770ab8f4c754b7262eca91e8f1d1cbf42deafae87c6f68de4c98cb4245",
+  "scope": "docs only; no live rerun"
+}

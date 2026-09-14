@@ -1,0 +1,17 @@
+{
+  "source": "argus-api application request logs",
+  "checked_at": "2026-09-13T23:46:09.699157+00:00",
+  "window_start": "2026-09-13T23:00:20Z",
+  "window_end": "2026-09-13T23:00:32Z",
+  "records": [
+    {
+      "timestamp": "2026-09-13T23:00:31.510440089Z",
+      "method": "GET",
+      "path": "/api/v1/me",
+      "status_code": 401
+    }
+  ],
+  "matching_log_rows": 3,
+  "diagnosis_scope": "status code only; no root-cause investigation",
+  "privacy": "client addresses, request IDs and headers discarded"
+}

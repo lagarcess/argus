@@ -1,0 +1,10 @@
+{
+  "errors": [
+    {
+      "level": "error",
+      "timestamp": "2026-09-14T00:00:48.671Z",
+      "message": "Failed to start conversation before sending: Error: An unexpected error occurred. Please try again."
+    }
+  ],
+  "scope": "current new-account acceptance submission only; no further canary diagnosis"
+}
