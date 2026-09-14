@@ -95,10 +95,13 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
         solved_value = count
     assert per_period is not None and periods is not None
     annual_rate = per_period * arguments.periods_per_year
+    # Inflation is yearly, so the periodic rate compounds to a year before the
+    # Fisher relation compares the two.
+    effective_annual = (1.0 + per_period) ** arguments.periods_per_year - 1.0
     years = periods / arguments.periods_per_year
     inflation = pct(arguments.inflation_rate_pct)
     real_end = growth.real_value(end, inflation, years)
-    real_annual = growth.real_rate(annual_rate, inflation)
+    real_annual = growth.real_rate(effective_annual, inflation)
     if isinstance(real_end, NoSolution) or isinstance(real_annual, NoSolution):
         raise no_solution(
             NoSolution(field="inflation_rate_pct", code="rate_out_of_range")

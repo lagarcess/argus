@@ -2096,7 +2096,8 @@
         "rate_never_reaches_target": "At this {{field}}, the target is never reached.",
         "discount_below_terminal_growth": "The {{field}} must be above the terminal growth rate.",
         "fees_exceed_amount": "The {{field}} exceed the amount received.",
-        "no_periods": "The {{field}} must be at least one."
+        "no_periods": "The {{field}} must be at least one.",
+        "periods_not_whole": "The {{field}} must end on a coupon date."
       },
       "title": "Result",
       "solved_value": "Solved value",

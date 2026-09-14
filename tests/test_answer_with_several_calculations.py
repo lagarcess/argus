@@ -453,3 +453,89 @@ def test_recomputing_an_assumed_input_the_prose_never_names_drops_it_from_the_li
         body["content"]
         == f"The loan costs {figure_text(revised.presentation.answer)} a month."
     )
+
+
+
+def test_two_recomputes_keep_every_other_fact_of_the_answer_and_its_prose_current(
+    answer,
+) -> None:
+    client, _, _, _ = answer
+    conversation_id = client.post("/api/v1/conversations", json={}).json()[
+        "conversation"
+    ]["id"]
+    cards = _cards()
+    seeded = _seed(client, conversation_id, cards)
+    extras = {
+        "research": {
+            "shape": "balanced",
+            "sources": [{"url": "https://example.com/rates", "title": "Rates"}],
+        },
+        "next_steps": {
+            "version": "argus_next_steps/v1",
+            "items": [{"type": "question", "text": "How do the totals compare?"}],
+        },
+        "agent_runtime_turn": {"turn_id": "turn-1", "status": "completed", "terminal": True},
+    }
+    api_state.store.messages[conversation_id][-1] = seeded.model_copy(
+        update={"metadata": {**seeded.metadata, **extras}}
+    )
+    url = (
+        f"/api/v1/conversations/{conversation_id}/tool-results/"
+        f"{cards[1].artifact_id}/recompute"
+    )
+    for revision, rate in ((0, 4), (1, 3)):
+        response = client.post(
+            url,
+            json={
+                "message_id": seeded.id,
+                "input_revision": revision,
+                "arguments": {"annual_rate_pct": rate},
+            },
+        )
+        assert response.status_code == 200, response.text
+    body = response.json()["message"]
+    for key, value in extras.items():
+        assert body["metadata"][key] == value
+    assert body["metadata"][ANSWER_TEMPLATE_KEY] == seeded.metadata[ANSWER_TEMPLATE_KEY]
+    stored = [
+        ToolResultCard.model_validate(card)
+        for card in body["metadata"]["tool_result_cards"]
+    ]
+    assert stored[1].arguments["annual_rate_pct"] == 3
+    assert body["content"] == _prose(stored)
+
+
+def test_continuing_an_answer_points_its_prose_at_the_copied_cards(answer) -> None:
+    client, conversation_id, message, _ = answer
+    response = client.post(
+        f"/api/v1/conversations/{conversation_id}/messages/{message.id}/continue"
+    )
+    assert response.status_code == 200, response.text
+    new_id = response.json()["conversation"]["id"]
+    continued = client.get(f"/api/v1/conversations/{new_id}/messages").json()["items"][0]
+    copies = [
+        ToolResultCard.model_validate(card)
+        for card in continued["metadata"]["tool_result_cards"]
+    ]
+    template = continued["metadata"][ANSWER_TEMPLATE_KEY]
+    assert template["cards"] == {
+        "first": copies[0].artifact_id,
+        "second": copies[1].artifact_id,
+    }
+    assert template["text"] == TEMPLATE
+    recomputed = client.post(
+        f"/api/v1/conversations/{new_id}/tool-results/{copies[1].artifact_id}/recompute",
+        json={
+            "message_id": continued["id"],
+            "input_revision": 0,
+            "arguments": {"annual_rate_pct": 4},
+        },
+    )
+    assert recomputed.status_code == 200, recomputed.text
+    body = recomputed.json()["message"]
+    stored = [
+        ToolResultCard.model_validate(card)
+        for card in body["metadata"]["tool_result_cards"]
+    ]
+    assert body["content"] == _prose(stored)
+    assert body["content"] != continued["content"]

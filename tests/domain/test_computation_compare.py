@@ -62,3 +62,37 @@ def test_a_card_that_did_not_solve_compares_its_inputs_only() -> None:
     assert failed.outcome.status != "succeeded"
     differences = card_differences(_multiple(150), failed)
     assert {item.section for item in differences} == {"input"}
+
+
+
+def _ranking(key_label: str = "Expense ratio", items: list[dict] | None = None):
+    return run_calculation(
+        "ranked_comparison",
+        {
+            "currency": "USD",
+            "key_label": key_label,
+            "key_kind": "percent",
+            "prefer": "lower",
+            "items": items
+            or [
+                {"label": "Fund A", "symbol": "AAAA", "value": 0.1},
+                {"label": "Fund B", "symbol": "BBBB", "value": 0.2},
+            ],
+        },
+    )
+
+
+def test_rankings_line_up_only_over_the_same_items_by_the_same_measure() -> None:
+    changed = [
+        {"label": "Fund A", "symbol": "AAAA", "value": 0.15},
+        {"label": "Fund B", "symbol": "BBBB", "value": 0.2},
+    ]
+    assert card_differences(_ranking(), _ranking(items=changed))
+    with pytest.raises(ComparisonKindMismatch):
+        card_differences(_ranking(), _ranking(key_label="Five-year return"))
+    other_items = [
+        {"label": "Fund C", "symbol": "CCCC", "value": 0.1},
+        {"label": "Fund B", "symbol": "BBBB", "value": 0.2},
+    ]
+    with pytest.raises(ComparisonKindMismatch):
+        card_differences(_ranking(), _ranking(items=other_items))

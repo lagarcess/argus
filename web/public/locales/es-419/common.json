@@ -2096,7 +2096,8 @@
         "rate_never_reaches_target": "Con esta {{field}}, la meta nunca se alcanza.",
         "discount_below_terminal_growth": "La {{field}} debe ser mayor que la tasa de crecimiento terminal.",
         "fees_exceed_amount": "Las {{field}} superan el monto recibido.",
-        "no_periods": "El dato {{field}} debe ser al menos uno."
+        "no_periods": "El dato {{field}} debe ser al menos uno.",
+        "periods_not_whole": "El dato {{field}} debe terminar en una fecha de cupón."
       },
       "title": "Resultado",
       "solved_value": "Valor calculado",

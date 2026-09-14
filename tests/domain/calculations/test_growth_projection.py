@@ -21,7 +21,30 @@ def test_compounding_with_contributions_and_what_inflation_leaves() -> None:
     assert answer_value(card) == pytest.approx(19_318.14, abs=0.01)
     assert row_value(card, "total_contributed") == pytest.approx(13_000.0)
     assert row_value(card, "real_end_value") < answer_value(card)
-    assert row_value(card, "real_annual_rate_pct") == pytest.approx(3.88, abs=0.01)
+    # 7% compounds monthly to 7.23% a year, which 3% inflation leaves at 4.11%.
+    assert row_value(card, "real_annual_rate_pct") == pytest.approx(4.11, abs=0.01)
+
+
+@pytest.mark.parametrize(
+    ("annual_rate_pct", "periods_per_year", "inflation_rate_pct", "real_rate_pct"),
+    [(12, 12, 0, 12.68), (7, 1, 3, 3.88)],
+)
+def test_the_rate_after_inflation_compounds_the_stated_rate_to_a_year_first(
+    annual_rate_pct, periods_per_year, inflation_rate_pct, real_rate_pct
+) -> None:
+    card = run_calculation(
+        "growth_projection",
+        {
+            "currency": "USD",
+            "start_value": 1_000,
+            "end_value": None,
+            "annual_rate_pct": annual_rate_pct,
+            "periods": periods_per_year,
+            "periods_per_year": periods_per_year,
+            "inflation_rate_pct": inflation_rate_pct,
+        },
+    )
+    assert row_value(card, "real_annual_rate_pct") == pytest.approx(real_rate_pct, abs=0.01)
 
 
 def test_the_savings_account_losing_money_shows_a_negative_real_rate() -> None:

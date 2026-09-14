@@ -58,3 +58,37 @@ def test_a_zero_price_cannot_yield() -> None:
     )
     assert card.outcome.status == "invalid"
     assert card.outcome.failure.fields == ["price"]
+
+
+
+BOND = {
+    "currency": "USD",
+    "face_value": 1_000,
+    "coupon_rate_pct": 5,
+    "coupons_per_year": 2,
+    "price": None,
+    "yield_to_maturity_pct": 6,
+}
+
+
+@pytest.mark.parametrize("solve", ["price", "yield"])
+def test_a_term_between_coupon_dates_has_no_price_rather_than_a_rounded_one(
+    solve,
+) -> None:
+    arguments = {**BOND, "years": 1.2}
+    if solve == "yield":
+        arguments = {**arguments, "price": 980, "yield_to_maturity_pct": None}
+    card = run_calculation("bond_value", arguments)
+    assert card.outcome.status != "succeeded"
+    assert card.outcome.failure is not None
+    assert card.outcome.failure.code == "periods_not_whole"
+    assert card.outcome.failure.fields == ["years"]
+
+
+def test_a_term_of_whole_coupon_periods_prices_with_coupons_over_the_same_schedule() -> (
+    None
+):
+    card = run_calculation("bond_value", {**BOND, "years": 1.5})
+    assert card.outcome.status == "succeeded"
+    assert row_value(card, "total_coupons") == pytest.approx(75.0)
+    assert answer_value(card) == pytest.approx(985.86, abs=0.01)

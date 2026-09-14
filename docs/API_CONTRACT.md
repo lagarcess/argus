@@ -5419,13 +5419,16 @@ message_id, asked, computed_at, card}`; each difference is `{section: "answer"
 exists only for a fact both cards state as a number in the same section and
 unit, so money in another currency has none. `difference` is right minus left,
 computed once in Python and rounded as the card rounds that unit; the client
-only formats it. The same answer twice, two kinds, or an answer with more than
+only formats it. The same answer twice, two kinds, two rankings of different items or by a
+different measure or preference, or an answer with more than
 one calculation answer `422 invalid_selection`; a missing or foreign answer answers `404 not_found`; a
 message with no computation answers `409 decision_attachment_unsupported`.
 
 Continue creates a conversation and one assistant message whose metadata
 carries every card under a new `artifact_id` at input revision 0, the
-`computation` derived from those copies, and `continued_from: {conversation_id, message_id}`. The source
+`computation` derived from those copies, the answer's `answer_text_template` and
+`answer_assumptions` pointed at those copies so a recompute there re-renders the
+prose, and `continued_from: {conversation_id, message_id}`. The source
 conversation is unchanged. It returns `{conversation, message_id}` and is for
 registered accounts only (`can_create_additional_conversation`); a guest
 answers `403 account_conversion_required`.

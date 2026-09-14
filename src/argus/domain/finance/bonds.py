@@ -19,9 +19,9 @@ def bond_price(
     if per_period <= -1:
         return NoSolution(field="yield_to_maturity", code="rate_out_of_range")
     coupon = face * coupon_rate / frequency
-    count = round(years * frequency)
-    if count <= 0:
-        return NoSolution(field="years", code="no_periods")
+    count = _coupon_periods(years, frequency)
+    if isinstance(count, NoSolution):
+        return count
     discount = 1.0 + per_period
     if per_period == 0:
         return coupon * count + face
@@ -36,6 +36,9 @@ def bond_yield(
         return NoSolution(field="price", code="growth_needs_positive_values")
     if frequency <= 0 or years <= 0:
         return NoSolution(field="years", code="no_periods")
+    periods = _coupon_periods(years, frequency)
+    if isinstance(periods, NoSolution):
+        return periods
 
     def difference(candidate: float) -> float:
         priced = bond_price(face, coupon_rate, candidate, years, frequency)
@@ -47,6 +50,18 @@ def bond_yield(
     if root is None:
         return NoSolution(field="price", code="no_rate_fits")
     return root
+
+
+def _coupon_periods(years: float, frequency: int) -> int | NoSolution:
+    """The whole coupon periods a term spans; a stub period is not modeled, so a
+    term that ends between coupon dates has no price rather than a rounded one."""
+    periods = years * frequency
+    count = round(periods)
+    if count <= 0:
+        return NoSolution(field="years", code="no_periods")
+    if abs(periods - count) > 1e-9:
+        return NoSolution(field="years", code="periods_not_whole")
+    return count
 
 
 def current_yield(face: float, coupon_rate: float, price: float) -> float | NoSolution:

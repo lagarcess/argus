@@ -234,6 +234,10 @@ def continue_computed_answer(
     computation = computation_from_tool_cards(cards)
     if computation is None:
         raise ComputationUnsupportedError("This answer carries no computation.")
+    renamed = {
+        source.artifact_id: copied.artifact_id
+        for source, copied in zip(answer.cards, cards, strict=True)
+    }
     conversation = _new_conversation(user)
     message = create_message(
         user_id=user.id,
@@ -247,9 +251,49 @@ def continue_computed_answer(
                 "conversation_id": conversation_id,
                 "message_id": message_id,
             },
+            **_rebound_prose(answer.message.metadata or {}, renamed),
         },
     )
     return conversation, message
+
+
+def _rebound_prose(metadata: dict[str, Any], renamed: dict[str, str]) -> dict[str, Any]:
+    """The source answer's prose template and assumed-input line pointed at the
+    copied cards, so a recompute in the new chat re-renders the prose too."""
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
+
+    template = metadata.get(ANSWER_TEMPLATE_KEY)
+    if not isinstance(template, dict):
+        return {}
+    named = template.get("cards")
+    if isinstance(named, dict):
+        if not named or any(artifact not in renamed for artifact in named.values()):
+            return {}
+        rebound_template = {
+            **template,
+            "cards": {name: renamed[artifact] for name, artifact in named.items()},
+        }
+    elif template.get("artifact_id") in renamed:
+        rebound_template = {**template, "artifact_id": renamed[template["artifact_id"]]}
+    else:
+        return {}
+    rebound: dict[str, Any] = {ANSWER_TEMPLATE_KEY: rebound_template}
+    assumptions = metadata.get(ANSWER_ASSUMPTIONS_KEY)
+    if isinstance(assumptions, list):
+        rebound[ANSWER_ASSUMPTIONS_KEY] = [
+            {
+                **item,
+                "artifact_id": renamed.get(
+                    item.get("artifact_id"), item.get("artifact_id")
+                ),
+            }
+            for item in assumptions
+            if isinstance(item, dict)
+        ]
+    return rebound
 
 
 def _new_conversation(user: User) -> Conversation:
