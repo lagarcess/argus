@@ -131,7 +131,6 @@ function confirmationCard(
     confirmation_id: CONFIRMATION_ID,
     confirmation_state: "active",
     title: `${assetSymbol} buy and hold`,
-    summary: `Buy and hold ${assetSymbol} with SPY as the comparison benchmark.`,
     status: "ready_to_run",
     statusLabel: "Ready to run",
     strategy_type: "buy_and_hold",

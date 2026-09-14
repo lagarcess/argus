@@ -580,7 +580,7 @@ def test_pending_strategy_metadata_fallback_carries_text_turn_context(
 
     assert response.status_code == 200
     final = _stream_payloads(response.text, "final")[0]
-    assert final["confirmation"]["summary"]
+    assert final["confirmation"]["strategy_type"] == "buy_and_hold"
     assert final["strategy_path_id"] == clarification_message.id
     assert captured["thread_id"] == conversation["id"]
     persisted = client.get(

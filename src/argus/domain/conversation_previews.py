@@ -6,6 +6,7 @@ from typing import Any
 from argus.api.chat.previews import is_degraded_clarification_compatibility_text
 from argus.api.schemas import ConversationPreview
 from argus.domain.artifact_presentation_kind import artifact_presentation_kind
+from argus.domain.confirmation_turn_facts import confirmation_turn_facts
 
 MAX_CONVERSATION_PREVIEWS = 100
 
@@ -35,11 +36,13 @@ def project_conversation_preview(
             )
             config = _mapping(facts.get("config_snapshot"))
             symbols = facts.get("symbols", card.get("symbols", []))
-            if kind == "confirmation":
-                payload = _mapping(metadata.get("confirmation_payload"))
-                strategy = _mapping(payload.get("strategy"))
-                symbols = strategy.get("asset_universe", [])
             template = config.get("template", card.get("strategy_type"))
+            card_facts = (
+                confirmation_turn_facts(metadata) if kind == "confirmation" else None
+            )
+            if card_facts is not None:
+                symbols = card_facts["symbols"]
+                template = card_facts["strategy_type"]
             return ConversationPreview(
                 kind=kind,
                 symbols=[symbol[:32] for symbol in symbols if isinstance(symbol, str)][:5]

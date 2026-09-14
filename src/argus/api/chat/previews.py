@@ -3,6 +3,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from argus.domain.confirmation_turn_facts import (
+    confirmation_turn_facts,
+    confirmation_turn_search_text,
+)
+
 try:
     from markdown_it import MarkdownIt
     from markdown_it.token import Token
@@ -49,6 +54,27 @@ def is_degraded_clarification_compatibility_text(
     if not isinstance(clarification, dict):
         return False
     return clarification.get("prompt_source") != "llm_generated"
+
+
+def stored_message_preview(
+    content: str,
+    max_length: int = 180,
+    *,
+    role: str = "assistant",
+    metadata: dict[str, Any] | None = None,
+) -> str | None:
+    """The stored `last_message_preview` every writer persists; search reads it.
+
+    Readers never get it: they get the typed preview projection. A card turn
+    stores its typed facts, so the index holds no language of the turn.
+    """
+
+    if is_degraded_clarification_compatibility_text(role=role, metadata=metadata):
+        return None
+    facts = confirmation_turn_facts(metadata) if role == "assistant" else None
+    if facts is not None:
+        return confirmation_turn_search_text(facts)[:max_length] or None
+    return plain_text_preview(content, max_length=max_length)
 
 
 def _preview_from_markdown(content: str) -> str:

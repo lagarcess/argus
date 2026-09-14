@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import Any, cast
 from uuid import UUID
 
-from argus.api.chat.previews import accepted_user_message_preview, plain_text_preview
+from argus.api.chat.previews import (
+    accepted_user_message_preview,
+    stored_message_preview,
+)
 from argus.api.schemas import Message
 from argus.domain.chat_turn_lifecycle import TransitionResult, TurnStatus
 from argus.domain.supabase_conversation_messages import _serialized_usage_limits
@@ -159,9 +162,10 @@ class ChatTurnLifecycleGatewayMixin:
                 "p_content": message.content,
                 "p_metadata": message.metadata or {},
                 "p_created_at": message.created_at.isoformat(),
-                "p_preview": plain_text_preview(
+                "p_preview": stored_message_preview(
                     message.content,
-                    max_length=180,
+                    role=message.role,
+                    metadata=message.metadata,
                 ),
                 "p_to_status": to_status,
                 "p_failure_code": failure_code,

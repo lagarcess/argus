@@ -239,7 +239,7 @@ def complete_retest_turn(
         "artifact_references": [reference],
     }
     assistant_message = lifecycle_hooks.complete(
-        content=str(card["summary"]),
+        content="",
         metadata=metadata,
         settle_usage=settle_usage,
     )
