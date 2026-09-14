@@ -279,6 +279,10 @@ class CapabilityContract(BaseModel):
 
 
 def build_default_capability_contract() -> CapabilityContract:
+    # Imported here so a general container import never loads the backtest
+    # catalog; the floor itself has one owner.
+    from argus.domain.backtesting.config import MIN_STARTING_CAPITAL
+
     return CapabilityContract(
         version="1.0",
         supported_intents=[
@@ -319,7 +323,7 @@ def build_default_capability_contract() -> CapabilityContract:
                     label="Initial capital",
                     description="Starting cash for the simulated backtest.",
                 ),
-                allowed_range=CapabilityRange(minimum=1000.0),
+                allowed_range=CapabilityRange(minimum=MIN_STARTING_CAPITAL),
             ),
             "timeframe": OptionalParameterSpec(
                 default_value="1D",

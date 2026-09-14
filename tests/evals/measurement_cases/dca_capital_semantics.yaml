@@ -122,8 +122,8 @@ cases:
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
 
   # A $0 seed with contributions is accepted, and the bankroll floor
-  # (MIN_STARTING_CAPITAL, $1,000) applies to neither role: the $50
-  # contribution is below it and the seed is zero, yet the plan is fundable.
+  # (MIN_STARTING_CAPITAL) applies to neither role: the seed is zero, yet
+  # the plan is fundable.
   # starting_capital is asserted as 0, so the fact must exist rather than be
   # absent.
   - id: dca_capital_semantics_zero_seed_small_contribution_executable_issue_455

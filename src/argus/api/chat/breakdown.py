@@ -28,6 +28,10 @@ from argus.domain.research.contracts import (
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.result_figures import shown_benchmark_gap
+from argus.domain.result_money import (
+    stored_currency_fraction_digits,
+    with_currency_fraction_digits,
+)
 from argus.domain.result_readout_content import (
     normalize_readout_language,
 )
@@ -81,7 +85,7 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "trades": run.trades or [],
     }
     config_snapshot = run.config_snapshot if isinstance(run.config_snapshot, dict) else {}
-    return {
+    context = {
         "run_id": run.id,
         "chart": run.chart,
         "title": card.get("title") if isinstance(card, dict) else None,
@@ -101,6 +105,7 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         else None,
         "language": config_snapshot.get("language"),
     }
+    return with_currency_fraction_digits(context, stored_currency_fraction_digits(card))
 
 
 def llm_result_breakdown_message(
@@ -133,6 +138,7 @@ def _llm_result_breakdown_with_metadata(
         benchmark_symbol=context.get("benchmark_symbol"),
         date_range=context.get("date_range"),
         chart=context.get("chart"),
+        currency_fraction_digits=stored_currency_fraction_digits(context),
     )
     messages = _result_breakdown_llm_messages(
         facts=facts,

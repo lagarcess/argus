@@ -47,7 +47,7 @@ export const inlineEditFieldClassName =
 /** Localized copy for the backend's typed refusals. Codes are the
  * envelope's own vocabulary; anything unknown falls back to the generic
  * failure line. */
-function directEditErrorText(
+export function directEditErrorText(
   code: string,
   t: TFunction,
   constraints: NonNullable<
@@ -84,18 +84,26 @@ function directEditErrorText(
     case "invalid_starting_capital":
       // The engine runs a recurring contribution through the same band, so
       // the refusal names whichever money role this card edits.
-      return isRecurring
-        ? t("chat.confirmation.direct_edit.errors.invalid_seed", {
-            defaultValue: "Starting capital must be between {{min}} and {{max}}.",
-            min: money(constraints?.starting_capital?.min, "$0"),
-            max: money(constraints?.starting_capital?.max, "$100,000,000"),
-          })
-        : t("chat.confirmation.direct_edit.errors.invalid_starting_capital", {
-            defaultValue:
-              "Starting capital must be between {{min}} and {{max}}.",
-            min: money(capitalMin, "$1,000"),
-            max: money(capitalMax, "$100,000,000"),
-          });
+      if (isRecurring) {
+        return t("chat.confirmation.direct_edit.errors.invalid_seed", {
+          defaultValue: "Starting capital must be between {{min}} and {{max}}.",
+          min: money(constraints?.starting_capital?.min, "$0"),
+          max: money(constraints?.starting_capital?.max, "$100,000,000"),
+        });
+      }
+      // The bounds are the engine's, carried on the card. A card without
+      // them gets the generic line, never a number restated here.
+      if (typeof capitalMin !== "number" || typeof capitalMax !== "number") {
+        return t(
+          "chat.confirmation.direct_edit.failed",
+          "That change did not go through. The card is unchanged.",
+        );
+      }
+      return t("chat.confirmation.direct_edit.errors.invalid_starting_capital", {
+        defaultValue: "Starting capital must be between {{min}} and {{max}}.",
+        min: money(capitalMin, ""),
+        max: money(capitalMax, ""),
+      });
     case "future_end_date":
       return t(
         "chat.confirmation.direct_edit.errors.future_end_date",

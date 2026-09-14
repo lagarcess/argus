@@ -13,11 +13,18 @@ from argus.domain.engine_launch.display import (
     format_date_range_label,
 )
 from argus.domain.result_figures import shown_benchmark_gap, shown_cost_drag
+from argus.domain.result_money import (
+    CURRENCY_FRACTION_DIGITS,
+    format_result_money,
+    run_currency_fraction_digits,
+    with_currency_fraction_digits,
+)
 
 
-def _format_money(value: float) -> str:
-    prefix = "-$" if value < 0 else "$"
-    return f"{prefix}{abs(value):,.0f}"
+def _format_money(
+    value: float, *, fraction_digits: int = CURRENCY_FRACTION_DIGITS
+) -> str:
+    return format_result_money(value, fraction_digits=fraction_digits)
 
 
 def build_result_card(
@@ -86,8 +93,16 @@ def build_result_card(
         ]
         if cost_assumption is not None:
             assumptions[2] = cost_assumption
+    # One precision for every amount on this card, decided from the run's own
+    # portfolio peak and stored with the card for every other reader.
+    fraction_digits = run_currency_fraction_digits(
+        (performance.get("portfolio_value_range") or {}).get("peak_value")
+    )
     if is_dca:
-        assumptions = _dca_assumptions(config, is_es=is_es) + assumptions
+        assumptions = (
+            _dca_assumptions(config, is_es=is_es, fraction_digits=fraction_digits)
+            + assumptions
+        )
 
     # The row states the gap between the two returns as shown.
     benchmark_comparison = benchmark_comparison_from_delta(
@@ -98,11 +113,13 @@ def build_result_card(
         )
     )
 
+    starting_money = _format_money(capital_basis, fraction_digits=fraction_digits)
+    ending_money = _format_money(ending_capital, fraction_digits=fraction_digits)
     rows = [
         {
             "key": "cash_value",
             "label": "Valor final" if is_es else "Ending value",
-            "value": f"{_format_money(capital_basis)} -> {_format_money(ending_capital)}",
+            "value": f"{starting_money} -> {ending_money}",
         },
         # A recurring plan's ratio is money-on-money over contributed cash,
         # not a time return on one bankroll, so it carries its own key and name.
@@ -186,7 +203,7 @@ def build_result_card(
     execution_costs = _execution_costs_payload(performance)
     if execution_costs is not None:
         card["execution_costs"] = execution_costs
-    return card
+    return with_currency_fraction_digits(card, fraction_digits)
 
 
 def _execution_costs_payload(performance: dict[str, Any]) -> dict[str, Any] | None:
@@ -268,22 +285,29 @@ def _format_bps(value: float) -> str:
     return f"{rounded:g}"
 
 
-def _dca_assumptions(config: dict[str, Any], *, is_es: bool) -> list[str]:
+def _dca_assumptions(
+    config: dict[str, Any],
+    *,
+    is_es: bool,
+    fraction_digits: int = CURRENCY_FRACTION_DIGITS,
+) -> list[str]:
     plan = dca_capital_plan_from_config(config)
     contribution = format_contribution_phrase(
         amount=plan.contribution,
         period=plan.period,
         is_es=is_es,
+        fraction_digits=fraction_digits,
     )
+    seed = _format_money(plan.starting_capital, fraction_digits=fraction_digits)
     if is_es:
         return [
             f"Aporte: {contribution}",
-            f"Capital inicial: {_format_money(plan.starting_capital)}",
+            f"Capital inicial: {seed}",
             "Fracciones de acciones, nada queda en efectivo",
         ]
     return [
         f"Contribution: {contribution}",
-        f"Starting capital: {_format_money(plan.starting_capital)}",
+        f"Starting capital: {seed}",
         "Fractional shares, nothing left as cash",
     ]
 
@@ -293,9 +317,11 @@ def format_contribution_phrase(
     amount: float,
     period: str,
     is_es: bool,
+    fraction_digits: int = CURRENCY_FRACTION_DIGITS,
 ) -> str:
     """One phrase, never a labelled amount beside a labelled period."""
-    return f"{_format_money(amount)} {_contribution_period_word(period, is_es=is_es)}"
+    money = _format_money(amount, fraction_digits=fraction_digits)
+    return f"{money} {_contribution_period_word(period, is_es=is_es)}"
 
 
 def _contribution_period_word(period: str, *, is_es: bool) -> str:

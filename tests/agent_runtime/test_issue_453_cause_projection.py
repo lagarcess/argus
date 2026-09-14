@@ -36,7 +36,7 @@ def test_issue_453_starting_capital_bounds_recover_without_confirmation_card(
         lambda strategy: strategy,
     )
     state = RunState.new(
-        current_user_message="Buy and hold NFLX with $500 starting capital in 2024.",
+        current_user_message="Buy and hold NFLX with $9.99 starting capital in 2024.",
         recent_thread_history=[],
     )
     state.candidate_strategy_draft = StrategySummary(
@@ -44,7 +44,7 @@ def test_issue_453_starting_capital_bounds_recover_without_confirmation_card(
         asset_universe=["NFLX"],
         asset_class="equity",
         date_range={"start": "2024-01-01", "end": "2024-12-31"},
-        capital_amount=500,
+        capital_amount=9.99,
     )
 
     confirmation = confirm_stage(
@@ -71,7 +71,7 @@ def test_issue_453_starting_capital_bounds_recover_without_confirmation_card(
         language="en",
     )
 
-    assert "$1,000" in clarification.patch["assistant_prompt"]
+    assert "between $10 and $100,000,000" in clarification.patch["assistant_prompt"]
     assert "unsupported" not in clarification.patch["assistant_prompt"].lower()
     sidecar_payload = clarification.patch["clarification"]["payload"]
     assert sidecar_payload["minimum"] == MIN_STARTING_CAPITAL
@@ -138,7 +138,7 @@ def test_issue_453_invalid_dca_contribution_uses_generic_amount_recovery(
     assert clarification.patch["clarification"]["reason_code"] == (
         "missing_sizing_amount"
     )
-    assert "$1,000" not in clarification.patch["assistant_prompt"]
+    assert "$10" not in clarification.patch["assistant_prompt"]
     assert "can't run" not in clarification.patch["assistant_prompt"]
 
 
@@ -152,7 +152,7 @@ def test_issue_453_starting_capital_bounds_use_canonical_backend_copy(
             "unsupported_constraints": [
                 {
                     "category": "unsupported_starting_capital",
-                    "raw_value": "$500",
+                    "raw_value": "$9.99",
                     "minimum": MIN_STARTING_CAPITAL,
                     "maximum": MAX_STARTING_CAPITAL,
                 }
@@ -172,10 +172,10 @@ def test_issue_453_starting_capital_bounds_use_canonical_backend_copy(
     )
 
     assert fallback == (
-        "Starting capital must be between $1,000 and $100,000,000. "
+        "Starting capital must be between $10 and $100,000,000. "
         "What amount in that range should I use?"
     )
-    assert "$500" not in fallback
+    assert "$9.99" not in fallback
 
 
 @pytest.mark.parametrize(
