@@ -64,6 +64,15 @@ def compute_expense_ratio(arguments: ExpenseRatioArguments) -> ExpenseRatioResul
         ratio = pct(arguments.ratio_pct)
         fee = arguments.assets * ratio
         solved_value = fee
+    if ratio > 1:
+        # A fee above the whole balance each year empties it; compounding the
+        # negative remainder would make the balance rebound.
+        raise no_solution(
+            NoSolution(
+                field="annual_fee" if unknown == "ratio_pct" else "ratio_pct",
+                code="fee_above_balance",
+            )
+        )
     cost = ratios.expense_cost(
         arguments.assets, ratio, pct(arguments.growth_rate_pct), arguments.years
     )

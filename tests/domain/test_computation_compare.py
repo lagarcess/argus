@@ -96,3 +96,13 @@ def test_rankings_line_up_only_over_the_same_items_by_the_same_measure() -> None
     ]
     with pytest.raises(ComparisonKindMismatch):
         card_differences(_ranking(), _ranking(items=other_items))
+
+
+def test_a_reordered_ranking_lines_each_item_up_with_itself() -> None:
+    reordered = [
+        {"label": "Fund A", "symbol": "AAAA", "value": 0.3},
+        {"label": "Fund B", "symbol": "BBBB", "value": 0.25},
+    ]
+    differences = card_differences(_ranking(), _ranking(items=reordered))
+    pairs = {(item.left, item.right) for item in differences}
+    assert pairs == {(0.1, 0.3), (0.2, 0.25)}

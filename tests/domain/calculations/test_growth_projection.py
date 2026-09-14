@@ -176,3 +176,24 @@ def test_contributions_that_already_cover_the_goal_end_where_they_take_the_balan
     assert [note.locale_key for note in card.presentation.notes] == [
         "tools.calc.notes.already_covered"
     ]
+
+
+def test_a_balance_already_past_the_goal_takes_no_periods() -> None:
+    card = run_calculation(
+        "growth_projection",
+        {
+            "currency": "USD",
+            "start_value": 1_200,
+            "contribution": 0,
+            "end_value": 1_000,
+            "annual_rate_pct": 12,
+            "periods": None,
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    assert answer_value(card) == pytest.approx(0.0)
+    assert card.outcome.result["end_value"] == pytest.approx(1_200.0)
+    assert row_value(card, "growth") == pytest.approx(0.0)
+    assert [note.locale_key for note in card.presentation.notes] == [
+        "tools.calc.notes.already_covered"
+    ]

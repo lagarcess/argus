@@ -4,8 +4,9 @@ The differences are computed here, once, from the cards' own typed facts: a
 fact on both cards in the same section, numeric on both and in the same unit,
 gives right minus left, rounded the way the card rounds that unit. Nothing is
 compared across kinds, and rankings compare only when they rank the same items
-by the same measure; a fact that is not numeric on both cards, or that is
-counted in another currency, has no difference.
+by the same measure, each item's figure lined up with that item's; a fact that
+is not numeric on both cards, or that is counted in another currency, has no
+difference.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from argus.domain.calculations._shared import (
     UNIT_CURRENCY_KEY,
     UNIT_PERCENT_KEY,
 )
+from argus.domain.calculations.ranked_comparison import RANK_FACT_PREFIX
 from argus.domain.tool_contracts import LocalizedText, ToolFact, ToolResultCard
 
 FactSection = Literal["answer", "row", "input"]
@@ -48,10 +50,14 @@ def card_differences(left: ToolResultCard, right: ToolResultCard) -> list[FactDi
         raise ComparisonKindMismatch(
             "Only rankings of the same items by the same measure can be compared."
         )
-    others = {(section, fact.name): fact for section, fact in _facts(right)}
+    ranked = _ranking(left) is not None
+    others = {
+        _fact_key(right, section, fact, ranked=ranked): fact
+        for section, fact in _facts(right)
+    }
     differences: list[FactDifference] = []
     for section, fact in _facts(left):
-        other = others.get((section, fact.name))
+        other = others.get(_fact_key(left, section, fact, ranked=ranked))
         if other is None or not _numeric(fact.value) or not _numeric(other.value):
             continue
         if _unit_identity(fact) != _unit_identity(other):
@@ -89,6 +95,28 @@ def _ranking(card: ToolResultCard) -> tuple[object, ...] | None:
         arguments.get("prefer"),
         tuple(identities),
     )
+
+
+def _fact_key(
+    card: ToolResultCard, section: FactSection, fact: ToolFact, *, ranked: bool
+) -> tuple[object, ...]:
+    """Where a fact lines up: a ranked figure by its item, wherever the item
+    ranks, and every other fact by its section and name."""
+    item = _ranked_item(card, fact.name) if ranked else None
+    return ("item", *item) if item is not None else (section, fact.name)
+
+
+def _ranked_item(card: ToolResultCard, name: str) -> tuple[str, str] | None:
+    """The label and symbol of the item a ranked figure belongs to."""
+    position = name.removeprefix(RANK_FACT_PREFIX)
+    if position == name or not position.isdigit():
+        return None
+    rows = (card.outcome.result or {}).get("rows") or []
+    index = int(position)
+    if index >= len(rows) or not isinstance(rows[index], dict):
+        return None
+    row = rows[index]
+    return str(row.get("label") or "").casefold(), str(row.get("symbol") or "").upper()
 
 
 def _facts(card: ToolResultCard) -> list[tuple[FactSection, ToolFact]]:

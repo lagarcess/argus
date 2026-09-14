@@ -114,16 +114,22 @@ def compute_time_value(arguments: TimeValueArguments) -> TimeValueResult:
         solved_value = per_period * arguments.periods_per_year * 100.0
     elif unknown == "periods":
         assert per_period is not None
-        count = tvm.periods(pv_s, pmt_s, fv_s, per_period, timing)
-        if isinstance(count, NoSolution):
-            raise no_solution(_periods_repair(count, pv_s, per_period, arguments))
-        if count > MAX_PERIODS:
-            raise no_solution(
-                NoSolution(
-                    field="payment" if payment else "annual_rate_pct",
-                    code="periods_beyond_limit",
+        if arguments.direction == "save" and present >= future:
+            # A savings balance already at or past its target needs no period, and
+            # the plan ends at the balance itself.
+            count = 0.0
+            future = present
+        else:
+            count = tvm.periods(pv_s, pmt_s, fv_s, per_period, timing)
+            if isinstance(count, NoSolution):
+                raise no_solution(_periods_repair(count, pv_s, per_period, arguments))
+            if count > MAX_PERIODS:
+                raise no_solution(
+                    NoSolution(
+                        field="payment" if payment else "annual_rate_pct",
+                        code="periods_beyond_limit",
+                    )
                 )
-            )
         if count == 0:
             # The balance already meets the target: no period is needed.
             notes.append("already_covered")

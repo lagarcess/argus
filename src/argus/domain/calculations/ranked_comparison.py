@@ -46,6 +46,10 @@ class RankedComparisonArguments(CalculationArguments):
     items: list[ComparisonItem] = Field(min_length=2, max_length=12)
 
 
+# Each ranked figure's fact name: the prefix and its position from the best item.
+RANK_FACT_PREFIX = "rank_"
+
+
 class RankedRow(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
@@ -109,7 +113,7 @@ def present_ranked_comparison(
     unit = _unit(arguments.key_kind, arguments.currency)
     facts = [
         ToolFact(
-            name=f"rank_{index}",
+            name=f"{RANK_FACT_PREFIX}{index}",
             label=text(
                 "tools.calc.ranked_comparison.row", rank=row.rank, label=row.label
             ),

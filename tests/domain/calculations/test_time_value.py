@@ -290,3 +290,22 @@ def test_a_solved_fractional_period_chart_ends_at_the_reported_balance() -> None
     assert len(balances) == 8
     assert balances[-1] == pytest.approx(200.0)
     assert card.presentation.visual.series[-1].value == pytest.approx(200.0)
+
+
+def test_a_savings_balance_already_past_its_target_takes_no_periods() -> None:
+    card = run_calculation(
+        "time_value",
+        {
+            "direction": "save",
+            "currency": "USD",
+            "present_value": 1_200,
+            "payment": 0,
+            "future_value": 1_000,
+            "annual_rate_pct": 12,
+            "periods": None,
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    assert answer_value(card) == pytest.approx(0.0)
+    assert card.outcome.result["balances"] == []
+    assert row_value(card, "total_growth") == pytest.approx(0.0)

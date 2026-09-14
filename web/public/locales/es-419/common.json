@@ -2099,7 +2099,8 @@
         "no_periods": "El dato {{field}} debe ser al menos uno.",
         "periods_not_whole": "El dato {{field}} debe terminar en una fecha de cupón.",
         "scenarios_out_of_order": "Los casos bajo, base y alto deben subir en orden; revisa el dato {{field}}.",
-        "periods_beyond_limit": "Con este dato {{field}}, el plan tomaría más de 1,200 periodos."
+        "periods_beyond_limit": "Con este dato {{field}}, el plan tomaría más de 1,200 periodos.",
+        "fee_above_balance": "El dato {{field}} se lleva más que todo el saldo cada año."
       },
       "title": "Resultado",
       "solved_value": "Valor calculado",

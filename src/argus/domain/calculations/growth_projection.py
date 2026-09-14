@@ -96,18 +96,25 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
         solved_value = per_period * arguments.periods_per_year * 100.0
     else:
         assert per_period is not None
-        count = tvm.periods(-start, -contribution, end, per_period)
-        if isinstance(count, NoSolution):
-            raise no_solution(
-                NoSolution(field="annual_rate_pct", code="rate_never_reaches_target")
-            )
-        if count > MAX_PERIODS:
-            raise no_solution(
-                NoSolution(
-                    field="contribution" if contribution else "annual_rate_pct",
-                    code="periods_beyond_limit",
+        if start >= end:
+            # The balance already meets the target: no period is needed, and the
+            # plan ends at the balance itself.
+            count = 0.0
+            end = start
+            notes.append("already_covered")
+        else:
+            count = tvm.periods(-start, -contribution, end, per_period)
+            if isinstance(count, NoSolution):
+                raise no_solution(
+                    NoSolution(field="annual_rate_pct", code="rate_never_reaches_target")
                 )
-            )
+            if count > MAX_PERIODS:
+                raise no_solution(
+                    NoSolution(
+                        field="contribution" if contribution else "annual_rate_pct",
+                        code="periods_beyond_limit",
+                    )
+                )
         periods = count
         solved_value = count
     assert per_period is not None and periods is not None
