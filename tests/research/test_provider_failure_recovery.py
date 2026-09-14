@@ -13,10 +13,13 @@ from __future__ import annotations
 
 import json
 import socket
+import ssl
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -390,10 +393,11 @@ class TricklingProvider:
     """A real socket server. Each connection plays the next step; a trickle
     sends one byte at a time, so no single connect, write or read timeout fires."""
 
-    def __init__(self, steps: list[str]) -> None:
+    def __init__(self, steps: list[str], *, tls: ssl.SSLContext | None = None) -> None:
         self.steps = list(steps)
         self.connections = 0
         self.closed_by_client_at: float | None = None
+        self._tls = tls
         self._stop = threading.Event()
         self._listener = socket.create_server(("127.0.0.1", 0))
         threading.Thread(target=self._serve, daemon=True).start()
@@ -410,6 +414,13 @@ class TricklingProvider:
         try:
             while self.steps and not self._stop.is_set():
                 conn, _ = self._listener.accept()
+                if self._tls is not None:
+                    try:
+                        conn = self._tls.wrap_socket(conn, server_side=True)
+                    except OSError:
+                        # A client that refused the certificate plays no step.
+                        conn.close()
+                        continue
                 self.connections += 1
                 with conn:
                     self._read_request(conn)
@@ -566,6 +577,115 @@ def test_a_refused_address_hands_the_time_left_to_the_next_one(
     finally:
         server.close()
 
+    assert packet.answer_markdown.startswith("Apple")
+    assert server.connections == 1
+
+
+def test_a_resolved_address_is_connected_without_a_second_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    server = TricklingProvider(["answer"])
+    real_lookup = socket.getaddrinfo
+    numeric_lookups: list[Any] = []
+
+    def lookup(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
+        if host == "provider.test":
+            return real_lookup("127.0.0.1", server.port, *args, **kwargs)
+        if host == "127.0.0.1":
+            # Looking up the address already resolved would stall here.
+            numeric_lookups.append(port)
+            time.sleep(10)
+        return real_lookup(host, port, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    monkeypatch.setattr(
+        perplexity_agent, "PERPLEXITY_AGENT_URL", "http://provider.test/v1/agent"
+    )
+    ceiling = 2.0
+    try:
+        started = time.monotonic()
+        packet = PerplexityAgentClient("k").run_research(
+            QUESTION, FAST.model_copy(update={"timeout_seconds": ceiling})
+        )
+        elapsed = time.monotonic() - started
+    finally:
+        server.close()
+
+    assert packet.answer_markdown.startswith("Apple")
+    assert numeric_lookups == []
+    assert elapsed < ceiling
+
+
+def self_signed_certificate(directory: Path, host: str) -> tuple[str, str]:
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, host)])
+    now = datetime.now(timezone.utc)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(hours=1))
+        .add_extension(x509.SubjectAlternativeName([x509.DNSName(host)]), critical=False)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    cert_path, key_path = directory / "cert.pem", directory / "key.pem"
+    cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    return str(cert_path), str(key_path)
+
+
+def test_a_tls_answer_travels_the_owned_socket_and_checks_the_host_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    cert, key = self_signed_certificate(tmp_path, "provider.test")
+    server_tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server_tls.load_cert_chain(cert, key)
+    server = TricklingProvider(["answer"], tls=server_tls)
+    real_lookup = socket.getaddrinfo
+
+    def lookup(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
+        if host in ("provider.test", "impostor.test"):
+            return real_lookup("127.0.0.1", server.port, *args, **kwargs)
+        return real_lookup(host, port, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    # The production transport trusts this certificate, and nothing else changes.
+    monkeypatch.setenv("SSL_CERT_FILE", cert)
+    try:
+        monkeypatch.setattr(
+            perplexity_agent, "PERPLEXITY_AGENT_URL", "https://impostor.test/v1/agent"
+        )
+        with pytest.raises(ResearchUnavailableError) as refused:
+            PerplexityAgentClient("k").run_research(
+                QUESTION, FAST.model_copy(update={"timeout_seconds": 1.5})
+            )
+        monkeypatch.setattr(
+            perplexity_agent, "PERPLEXITY_AGENT_URL", "https://provider.test/v1/agent"
+        )
+        packet = PerplexityAgentClient("k").run_research(
+            QUESTION, FAST.model_copy(update={"timeout_seconds": 5.0})
+        )
+    finally:
+        server.close()
+
+    # Same address, wrong name: the certificate check still refuses it.
+    assert refused.value.reason == "transport" and not refused.value.sent
+    assert "certificate verify failed" in (refused.value.detail or "").lower()
     assert packet.answer_markdown.startswith("Apple")
     assert server.connections == 1
 

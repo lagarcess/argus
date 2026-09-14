@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import json
 import re
+import select
 import socket
+import ssl
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -484,23 +486,21 @@ _RESOLVER = ThreadPoolExecutor(max_workers=4, thread_name_prefix="research-resol
 def _deadline_transport(
     deadline: float, clock: Callable[[], float]
 ) -> httpx.HTTPTransport:
-    """The default transport, with the host lookup and every connect, write and
-    read capped at the time left before the deadline, so neither a stalled
-    resolver nor a provider that trickles its answer holds the request open."""
+    """The default transport with its sockets owned by `_DeadlineBackend`: the
+    host lookup, each connect and TLS handshake, and every write and read end by
+    the deadline, so neither a stalled resolver nor a provider that trickles its
+    answer holds the request open."""
     transport = httpx.HTTPTransport()
     # httpx 0.28 has no public hook into its connection pool's sockets.
-    pool = transport._pool
-    pool._network_backend = _DeadlineBackend(pool._network_backend, deadline, clock)
+    transport._pool._network_backend = _DeadlineBackend(deadline, clock)
     return transport
 
 
 class _DeadlineBackend:
-    """Opens connections whose every wait ends by one deadline."""
+    """Opens its sockets itself, so no library call that can block, such as the
+    second lookup inside `socket.create_connection`, runs outside the deadline."""
 
-    def __init__(
-        self, backend: Any, deadline: float, clock: Callable[[], float]
-    ) -> None:
-        self._backend = backend
+    def __init__(self, deadline: float, clock: Callable[[], float]) -> None:
         self._deadline = deadline
         self._clock = clock
 
@@ -518,25 +518,29 @@ class _DeadlineBackend:
         local_address: str | None = None,
         socket_options: Any = None,
     ) -> _DeadlineStream:
-        # Resolved here, not in socket.create_connection: its lookup has no
-        # timeout, and it would give every address the full connect timeout.
-        failure: Exception = httpx.ConnectError(f"no address found for {host}")
-        for address, address_port in self._resolve(host, port, timeout):
+        failure: httpx.TransportError = httpx.ConnectError(
+            f"no address found for {host}"
+        )
+        for family, kind, proto, _, address in self._resolve(host, port, timeout):
             wait = self.left(timeout, httpx.ConnectTimeout)
+            sock = socket.socket(family, kind, proto)
             try:
-                stream = self._backend.connect_tcp(
-                    address, address_port, wait, local_address, socket_options
-                )
-            except Exception as exc:  # noqa: BLE001
+                sock.settimeout(wait)
+                for option in socket_options or ():
+                    sock.setsockopt(*option)
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                if local_address:
+                    sock.bind((local_address, 0))
+                sock.connect(address)
+            except OSError as exc:
                 # The next address gets whatever time is left.
-                failure = exc
+                sock.close()
+                failure = _connect_failure(exc)
                 continue
-            return _DeadlineStream(stream, self)
+            return _DeadlineStream(sock, self)
         raise failure
 
-    def _resolve(
-        self, host: str, port: int, timeout: float | None
-    ) -> list[tuple[str, int]]:
+    def _resolve(self, host: str, port: int, timeout: float | None) -> list[Any]:
         wait = self.left(timeout, httpx.ConnectTimeout)
         pending = _RESOLVER.submit(
             socket.getaddrinfo, host, port, 0, socket.SOCK_STREAM
@@ -550,49 +554,96 @@ class _DeadlineBackend:
             ) from None
         except OSError as exc:
             raise httpx.ConnectError(str(exc)) from exc
-        return list(dict.fromkeys((entry[4][0], entry[4][1]) for entry in found))
+        return list(dict.fromkeys(found))
 
     def connect_unix_socket(
         self, path: str, timeout: float | None = None, socket_options: Any = None
     ) -> _DeadlineStream:
-        stream = self._backend.connect_unix_socket(
-            path, self.left(timeout, httpx.ConnectTimeout), socket_options
-        )
-        return _DeadlineStream(stream, self)
+        wait = self.left(timeout, httpx.ConnectTimeout)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(wait)
+            for option in socket_options or ():
+                sock.setsockopt(*option)
+            sock.connect(path)
+        except OSError as exc:
+            sock.close()
+            raise _connect_failure(exc) from exc
+        return _DeadlineStream(sock, self)
 
     def sleep(self, seconds: float) -> None:
-        self._backend.sleep(seconds)
+        time.sleep(seconds)
+
+
+def _connect_failure(exc: OSError) -> httpx.TransportError:
+    if isinstance(exc, TimeoutError):
+        return httpx.ConnectTimeout(str(exc))
+    return httpx.ConnectError(str(exc))
 
 
 class _DeadlineStream:
-    def __init__(self, stream: Any, backend: _DeadlineBackend) -> None:
-        self._stream = stream
+    """One owned socket; every operation waits at most the time left."""
+
+    def __init__(self, sock: socket.socket, backend: _DeadlineBackend) -> None:
+        self._sock = sock
         self._backend = backend
 
     def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
-        return self._stream.read(
-            max_bytes, self._backend.left(timeout, httpx.ReadTimeout)
-        )
+        self._sock.settimeout(self._backend.left(timeout, httpx.ReadTimeout))
+        try:
+            return self._sock.recv(max_bytes)
+        except TimeoutError as exc:
+            raise httpx.ReadTimeout(str(exc)) from exc
+        except OSError as exc:
+            raise httpx.ReadError(str(exc)) from exc
 
     def write(self, buffer: bytes, timeout: float | None = None) -> None:
-        self._stream.write(buffer, self._backend.left(timeout, httpx.WriteTimeout))
+        if not buffer:
+            return
+        # A socket timeout bounds all of sendall, not each chunk it sends.
+        self._sock.settimeout(self._backend.left(timeout, httpx.WriteTimeout))
+        try:
+            self._sock.sendall(buffer)
+        except TimeoutError as exc:
+            raise httpx.WriteTimeout(str(exc)) from exc
+        except OSError as exc:
+            raise httpx.WriteError(str(exc)) from exc
 
     def close(self) -> None:
-        self._stream.close()
+        self._sock.close()
 
     def start_tls(
         self,
-        ssl_context: Any,
+        ssl_context: ssl.SSLContext,
         server_hostname: str | None = None,
         timeout: float | None = None,
     ) -> _DeadlineStream:
-        stream = self._stream.start_tls(
-            ssl_context, server_hostname, self._backend.left(timeout, httpx.ConnectTimeout)
-        )
-        return _DeadlineStream(stream, self._backend)
+        # The handshake verifies server_hostname, the request's own host, not the
+        # address connected to, and its socket timeout bounds the whole handshake.
+        try:
+            self._sock.settimeout(self._backend.left(timeout, httpx.ConnectTimeout))
+            tls = ssl_context.wrap_socket(self._sock, server_hostname=server_hostname)
+        except BaseException as exc:
+            self._sock.close()
+            if isinstance(exc, OSError):
+                raise _connect_failure(exc) from exc
+            raise
+        return _DeadlineStream(tls, self._backend)
 
     def get_extra_info(self, info: str) -> Any:
-        return self._stream.get_extra_info(info)
+        if info == "ssl_object":
+            return self._sock if isinstance(self._sock, ssl.SSLSocket) else None
+        if info == "client_addr":
+            return self._sock.getsockname()
+        if info == "server_addr":
+            return self._sock.getpeername()
+        if info == "socket":
+            return self._sock
+        if info == "is_readable":
+            return self._sock.fileno() < 0 or bool(
+                select.select([self._sock], [], [], 0)[0]
+            )
+        return None
 
 
 def _retry_after_seconds(value: str | None) -> float | None:
