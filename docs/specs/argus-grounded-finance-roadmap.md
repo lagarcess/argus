@@ -363,15 +363,16 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-13 at integration `e208d10a`, after production promotion
+**Updated 2026-09-14 at integration `7adaf073`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Any grounded math | Draft PR #607 at `23881e2b`, $13.80 spent. Merging integration first, then Spanish Q7 once, the probe re-record, the live measurement, the browser walk, the fingerprint refreeze and Codex review. Stops at $15.15 before the measurement and $16.65 in total. |
-| Research provider failures take the retryable notice | PR #612 for #609 at `182a7885`, CI green, a third Codex round pending. Merges after Any grounded math and composes with its answer without the lookup. |
-| Promotion acceptance | Production is `3d98057c`. The remaining post-deploy checks (a signup, a profile save, the Usage labels, one feedback email) and docs PR #613 are finishing. |
+| Any grounded math | PR #607 at `56687e48`. Measured 69 of 71 at `dc8608c8`, fingerprint refrozen, browser walk done; $16.69 recorded, about $17.64 to $18.56 with research estimates. Codex round 3 left two findings: the market test row stops offering loans and plans with both a starting amount and deposits, and binding page-cited inputs moves to a follow-up issue. No new measurement. Lands first. |
+| Research provider failures take the retryable notice | PR #612 for #609, ready at `b880ad75`. Holds until Any grounded math lands, then merges integration, composes its retry notice with the answer without the lookup (decision 5) and proposes a live check. |
+| A confirmation card turn carries no prose | PR #618, ready at `4e89d289`. A live check through the chat route is proposed; the live measurement cannot see this change because it builds each case's history itself. |
+| One provenance policy for promotion evidence | PR #616 for #608. Finishing: the eval env file guard refuses only tracked files, and model and flag identity moves to #619. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1443,10 +1444,10 @@ passing test suite told us this feature was correct for a full day.
 
 ## Where this board actually stands
 
-**Updated 2026-09-13. Production is `3d98057c`, promoted today in PR #603.** Every
+**Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `e208d10a`.
+shipped means live in production. Integration is `7adaf073`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1529,8 +1530,9 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Production promotion 2026-09-13 | its own promotion | **SHIPPED** `3d98057c`, PR #603. See the promotion paragraph above. |
 | Readout receipts admit every model tier | outside the releases | **LANDED** `6eb93d84`, PR #610, closing #605. `route_receipts` accepts the readout tier, and a test pins the check to the runtime's tier list. Its migration, classed destructive for its dropped and re-added check, ships at the next promotion. |
 | Stated money survives a timed-out interpretation | outside the releases | **LANDED** `b7c69b54`, PR #602, closing #600. Focused repair keeps a stated deposit, contribution, fees and slippage; 22 of 22 targeted live reruns passed. Ships at the next promotion. |
-| Research provider failures take the retryable notice | outside the releases | **In review**, PR #612 for #609. Transient provider errors retry with backoff, a failure that persists shows the existing retryable notice, and a guest gets the research question back. Merges after Any grounded math. |
+| Research provider failures take the retryable notice | outside the releases | **Ready** at `b880ad75`, PR #612 for #609, holding until Any grounded math lands. Transient provider errors retry with backoff, a failure that persists shows the existing retryable notice, and a guest gets the research question back. Merges after Any grounded math. |
 | One owner for the support address | outside the releases | **LANDED** `9630ffe2`, PR #615, closing #596. The API constant and the web fallback both read `web/argus_display_contract/support_contact.json`, and a test fails if any code types the address again. Ships at the next promotion. |
+| Canary core checks | outside the releases | **LANDED** `7adaf073`, PR #617, for #614. The canary checks that the three services run one commit, a signed-in account gets an ordinary chat answer, one backtest completes and one research answer has sources, plus the release config, signup denial and welcome email. It expects manual deploys (`autoDeployTrigger` off in `render.yaml` and the release profile). Proven twice against production `3d98057c` (runs 34796700214 and 34808072927). #614 stays open until the first scheduled run on main passes after the next promotion. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
@@ -1839,6 +1841,7 @@ Resolved:
   services run the same commit, a signed-in account loads the chat and gets one
   ordinary answer, one backtest completes, and one research question returns
   sources. It expects manual deploys. Feature checks belong to the promotion walk.
+  Landed on integration `7adaf073`, PR #617.
 
 - **No Dominican source list.** Dropped by the founder 2026-09-10; #593 removed
   `LOCAL_SOURCE_DOMAINS` and `local_sources`.
@@ -1862,8 +1865,11 @@ Resolved:
 - **Bugs are tracked as issues:** #598 a second tab never shows the reply, #599 the BTC forward research never publishes,
   #604 sharing refuses completed answers, #606 a result follow-up lists its next steps
   twice, #609 research provider failures skip the retryable notice (fix in review,
-  PR #612), and #614 the canary fails on nearly every run. #596, #600 and #605 are fixed
-  on integration and ship at the next promotion.
+  PR #612), and #614 the canary fails on nearly every run. #596, #600, #605 and #614
+  are fixed on integration and ship at the next promotion.
+- **The live measurement cannot see history building.** It gives each case its
+  history directly and never loads saved turns, so a change to how saved turns
+  become model history (PR #618) needs a live check through the chat route.
 - **The chat does not know who the person is.** Settings stores a preferred name,
   a country and a currency, but outside Settings the name reaches only the web
   greeting, and the country reaches only research as its search location. No answer
