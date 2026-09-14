@@ -91,7 +91,7 @@ def packet_answer(
         catalog=get_tool_catalog(),
         retrieved=retrieved,
         currency=user.currency,
-        subject_symbol=_first_symbol(subjects),
+        subject_symbol=_only_symbol(subjects),
         market_close=latest_market_close,
         notes=notes,
         evidence=evidence,
@@ -145,7 +145,7 @@ def offered_calculation(
                     catalog=get_tool_catalog(),
                     retrieved=retrieved,
                     currency=user.currency,
-                    subject_symbol=_first_symbol(subjects),
+                    subject_symbol=_only_symbol(subjects),
                     market_close=latest_market_close,
                     notes=notes,
                     evidence=evidence,
@@ -194,7 +194,7 @@ def answer_without_lookup(
         notes=notes,
         market_facts=facts,
         not_looked_up=not_looked_up,
-        subject_symbol=_first_symbol(subjects),
+        subject_symbol=_only_symbol(subjects),
         lookup_failed=True,
     )
     if answered is not None:
@@ -229,8 +229,12 @@ def cited_evidence(packet: ResearchPacket) -> list[RetrievedRow]:
     return [row for row in packet.rows if row.source_url is None]
 
 
-def _first_symbol(subjects: Sequence[dict[str, Any]]) -> str | None:
-    return next((str(s["symbol"]) for s in subjects if s.get("symbol")), None)
+def _only_symbol(subjects: Sequence[dict[str, Any]]) -> str | None:
+    """The subject a card that names no symbol borrows: only when the answer names
+    exactly one, since with several a borrowed price could be another asset's."""
+    symbols = [str(s["symbol"]) for s in subjects if s.get("symbol")]
+    distinct = {symbol.strip().upper() for symbol in symbols}
+    return symbols[0] if len(distinct) == 1 else None
 
 
 def _note(notes: list[str], code: str) -> None:

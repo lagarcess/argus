@@ -6,6 +6,7 @@ from pydantic import Field
 
 from argus.domain.calculations._shared import (
     MAX_PERIODS,
+    MIN_ANNUAL_RATE_PCT,
     CalculationArguments,
     CalculationResult,
     free_policy,
@@ -94,6 +95,11 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
             raise no_solution(NoSolution(field="annual_rate_pct", code=solved_rate.code))
         per_period = solved_rate
         solved_value = per_period * arguments.periods_per_year * 100.0
+        if solved_value <= MIN_ANNUAL_RATE_PCT:
+            # A periodic loss this steep annualizes past the rate the input accepts.
+            raise no_solution(
+                NoSolution(field="annual_rate_pct", code="rate_out_of_range")
+            )
     else:
         assert per_period is not None
         if start >= end:

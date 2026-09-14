@@ -87,4 +87,16 @@ def test_answers_in_deleted_conversations_do_not_crowd_out_older_live_ones() -> 
     assert [row["id"] for row in rows] == ["m3"]
     first, _, second, _ = client.queries
     assert ("range", (0, 1)) in first.calls
-    assert ("range", (2, 3)) in second.calls
+    assert ("range", (2, 5)) in second.calls
+
+
+def test_the_refill_reads_on_until_a_live_answer_or_the_end() -> None:
+    deleted = [
+        {"id": f"d{index}", "conversation_id": "deleted", "role": "assistant"}
+        for index in range(20)
+    ]
+    live = {"id": "m-live", "conversation_id": "live", "role": "assistant"}
+    client = _Client({"messages": [*deleted, live], "conversations": [{"id": "live"}]})
+    rows = _Reader(client).computed_answers_of_kind(user_id="owner", kind="k", limit=1)
+    assert [row["id"] for row in rows] == ["m-live"]
+    assert len([query for query in client.queries if query.table == "messages"]) == 5

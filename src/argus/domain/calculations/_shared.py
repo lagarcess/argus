@@ -40,6 +40,9 @@ UNIT_MULTIPLE_KEY = "tools.calc.units.multiple"
 NOTE_PREFIX = "tools.calc.notes"
 # The most periods a plan's arguments accept; a solved count past it is no plan.
 MAX_PERIODS = 1200
+# The lowest annual rate a plan's arguments accept, exclusive; a solved rate at
+# or below it is no plan.
+MIN_ANNUAL_RATE_PCT = -100.0
 REPAIR_PREFIX = "tools.calc.repairs"
 # The one argument name that identifies an asset a calculation is about.
 SYMBOL_FIELD = "symbol"

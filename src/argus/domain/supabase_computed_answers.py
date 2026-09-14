@@ -14,9 +14,9 @@ from supabase import Client
 
 _COMPUTED_ANSWER_LIMIT = 500
 _MESSAGE_SELECT = "id,conversation_id,role,content,metadata,created_at"
-# Pages a list reads past answers in soft-deleted conversations before it
-# stops short of its size.
-_LIVE_REFILL_PAGES = 4
+# The most rows one refill page reads past answers in soft-deleted
+# conversations; each further page doubles, up to it.
+_REFILL_PAGE_CAP = 200
 
 
 class SupabaseComputedAnswerReadMixin:
@@ -108,17 +108,19 @@ class SupabaseComputedAnswerReadMixin:
     def _live_newest(
         self, *, user_id: str, newest: Callable[[], Any], size: int
     ) -> list[dict[str, Any]]:
-        """Up to ``size`` newest rows in live conversations: a page whose rows sit
-        in soft-deleted conversations is refilled from the next, for a bounded
-        number of pages."""
+        """Up to ``size`` newest rows in live conversations, reading on past rows
+        whose conversation was soft-deleted until ``size`` are found or the rows
+        run out."""
         kept: list[dict[str, Any]] = []
-        for page in range(_LIVE_REFILL_PAGES if size > 0 else 0):
-            start = page * size
-            rows = newest().range(start, start + size - 1).execute()
+        start, page = 0, size
+        while size > 0:
+            rows = newest().range(start, start + page - 1).execute()
             found = [dict(row) for row in getattr(rows, "data", None) or []]
             kept.extend(self._in_live_conversations(user_id=user_id, rows=found))
-            if len(kept) >= size or len(found) < size:
+            if len(kept) >= size or len(found) < page:
                 break
+            start += page
+            page = min(page * 2, max(size, _REFILL_PAGE_CAP))
         return kept[:size]
 
     def _in_live_conversations(
