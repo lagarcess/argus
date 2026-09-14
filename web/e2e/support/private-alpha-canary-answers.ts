@@ -1,54 +1,56 @@
-import {
-  researchDegradedCodeFromMetadata,
-  researchSourcesFromMetadata,
-} from "../../lib/chat-discovery-sidecar";
-import { retryableAssistantRecoveryCode } from "../../lib/chat-recovery-display";
+import { hydrateMessagesFromApi } from "../../components/chat/chat-message-projection";
+import type { Message } from "../../components/chat/types";
+import type { ApiMessage } from "../../lib/argus-api";
+import { isRetryAction } from "../../lib/chat-retry-actions";
 
-// The canary judges a persisted answer with the projections the chat renders
-// from, so an answer the reader sees as a failure never passes a check.
+// The canary judges an answer by the message the chat renders from the saved
+// transcript, so it passes only what a reader sees as an ordinary answer.
 
-type JsonRecord = Record<string, unknown>;
-
-function record(value: unknown): JsonRecord | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : null;
-}
-
-/** The newest assistant message on a messages API page, or null. */
-export function latestAssistantMessage(payload: unknown): JsonRecord | null {
-  const items = record(payload)?.items;
-  const assistants = (Array.isArray(items) ? items : [])
-    .map(record)
-    .filter((item): item is JsonRecord => item?.role === "assistant");
-  assistants.sort((left, right) =>
-    String(left.created_at ?? "").localeCompare(String(right.created_at ?? "")),
+/** The newest assistant message as the chat projects a messages API page. */
+export function latestAssistantMessage(payload: unknown): Message | null {
+  const items =
+    payload && typeof payload === "object" && !Array.isArray(payload)
+      ? (payload as { items?: unknown }).items
+      : null;
+  if (!Array.isArray(items)) return null;
+  const answers = hydrateMessagesFromApi(items as ApiMessage[]).messages.filter(
+    (message) => message.role === "ai",
   );
-  return assistants[assistants.length - 1] ?? null;
+  return answers[answers.length - 1] ?? null;
 }
 
-/** Why a persisted assistant message is not an ordinary answer, or null. */
-export function ordinaryAnswerFailure(message: unknown): string | null {
-  const item = record(message);
-  if (item?.role !== "assistant") return "assistant_answer_missing";
-  const metadata = record(item.metadata) ?? {};
-  const recoveryCode = retryableAssistantRecoveryCode(metadata.recovery);
-  if (recoveryCode) return `assistant_answer_recovery_${recoveryCode}`;
-  if (metadata.retry_last_turn) return "assistant_answer_offered_retry";
-  if (typeof item.content !== "string" || !item.content.trim()) {
-    return "assistant_answer_empty";
+/**
+ * Why the chat would not render this message as an ordinary answer, or null.
+ * Only the plain answer bubble passes: a card, a failure notice, a recovery
+ * statement, or any other projected presentation is refused.
+ */
+export function ordinaryAnswerFailure(message: Message | null): string | null {
+  if (!message || message.role !== "ai") return "assistant_answer_missing";
+  if (message.kind !== "text") {
+    return `assistant_answer_rendered_as_${message.kind}`;
   }
+  if (message.assistantRecoveryCode) {
+    return `assistant_answer_recovery_${message.assistantRecoveryCode}`;
+  }
+  if (message.recoveryDisplay) {
+    return `assistant_answer_rendered_as_${message.recoveryDisplay.kind}`;
+  }
+  if (message.contentPresentation) {
+    return `assistant_answer_rendered_as_${message.contentPresentation}`;
+  }
+  if (message.actions?.some(isRetryAction)) {
+    return "assistant_answer_offered_retry";
+  }
+  if (!message.content?.trim()) return "assistant_answer_empty";
   return null;
 }
 
-/** Why a persisted research turn is not a published answer with sources, or null. */
-export function researchAnswerFailure(message: unknown): string | null {
+/** Why a research turn is not a published answer with sources, or null. */
+export function researchAnswerFailure(message: Message | null): string | null {
   const answerFailure = ordinaryAnswerFailure(message);
   if (answerFailure) return answerFailure;
-  const metadata = record(record(message)?.metadata) ?? {};
-  const degradedCode = researchDegradedCodeFromMetadata(metadata);
-  if (degradedCode) return `research_answer_degraded_${degradedCode}`;
-  return researchSourcesFromMetadata(metadata).length > 0
-    ? null
-    : "research_sources_missing";
+  if (message?.researchDegradedCode) {
+    return `research_answer_degraded_${message.researchDegradedCode}`;
+  }
+  return message?.researchSources?.length ? null : "research_sources_missing";
 }

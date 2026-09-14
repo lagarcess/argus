@@ -298,11 +298,11 @@ async function sendTurn(
   return conversationId;
 }
 
-/** The newest assistant message the API persisted, read by reopening the chat. */
+/** The newest persisted assistant message as the chat renders it, read by reopening the chat. */
 async function persistedAssistantMessage(
   page: Page,
   conversationId: string,
-): Promise<JsonRecord | null> {
+): Promise<ReturnType<typeof latestAssistantMessage>> {
   const messagesPath = `/api/v1/conversations/${conversationId}/messages`;
   const messages = page
     .waitForResponse(

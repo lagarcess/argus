@@ -279,12 +279,9 @@ def test_browser_checks_read_product_owned_signals() -> None:
     assert "ordinaryAnswerFailure(" in spec
     assert "researchAnswerFailure(" in spec
     support = _source("web/e2e/support/private-alpha-canary-answers.ts")
-    for projection in (
-        "retryableAssistantRecoveryCode",
-        "researchDegradedCodeFromMetadata",
-        "researchSourcesFromMetadata",
-    ):
-        assert projection in support
+    # Acceptance derives from the transcript projection, never from saved fields.
+    assert "hydrateMessagesFromApi" in support
+    assert "metadata" not in support
 
 
 def test_sign_in_retries_once_and_records_the_attempt_count() -> None:
