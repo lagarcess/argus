@@ -66,6 +66,7 @@ describe("declaration-generated calculation cards", () => {
     );
     expect(html).toContain('data-tool-outcome-code="payment_below_interest"');
     expect(html).toContain('data-tool-repair="set_inputs"');
+    expect(html).toMatch(/data-tool-repair="set_inputs"[^>]*class="max-w-full /);
     expect(html).toContain("Use a payment that clears the balance");
     expect(html).toContain('<input id="artifact-time_value-payment"');
     expect(html).not.toContain("data-tool-answer");

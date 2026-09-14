@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import {
+  quietNoticeBodyClass,
   quietNoticeContainerClass,
+  retryableNoticeBodyClass,
   retryableNoticeContainerClass,
+  retryableNoticeRetryPillClass,
 } from "../lib/failure-treatment";
 import {
   alreadyUpToDateText,
@@ -18,6 +21,17 @@ const failed = (status: ToolOutcome["status"], code: string, fields: string[] = 
 });
 
 describe("the one owner mapping tool outcomes onto the shared failure treatments", () => {
+  test("a notice in a narrow column wraps its action below the text instead of squeezing it", () => {
+    for (const container of [quietNoticeContainerClass, retryableNoticeContainerClass]) {
+      expect(container.split(" ")).toContain("flex-wrap");
+    }
+    for (const body of [quietNoticeBodyClass, retryableNoticeBodyClass]) {
+      expect(body.split(" ")).toContain("basis-[10rem]");
+      expect(body.split(" ")).not.toContain("flex-1");
+    }
+    expect(retryableNoticeRetryPillClass.split(" ")).toContain("max-w-full");
+  });
+
   test("an outage is the retryable amber notice; the inputs' failures are the quiet notice", async () => {
     const instance = await translate("en");
     const t = instance.t.bind(instance);

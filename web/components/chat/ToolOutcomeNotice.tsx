@@ -23,7 +23,7 @@ export default function ToolOutcomeNotice({ treatment, repairLabel, retryLabel, 
       <div className={treatment.classes.body}>{treatment.message}</div>
       {repair && onRepair && repairLabel ? (
         <button type="button" disabled={disabled} data-tool-repair={repair.kind} onClick={() => onRepair(repair.changes)}
-          className="shrink-0 self-center rounded-full border border-black/15 px-3 py-1.5 text-[13px] font-medium text-black/75 transition-colors hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/20 dark:text-white/75 dark:hover:bg-white/10">
+          className="max-w-full shrink-0 self-center rounded-full border border-black/15 px-3 py-1.5 text-[13px] font-medium text-black/75 transition-colors hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/20 dark:text-white/75 dark:hover:bg-white/10">
           {repairLabel}
         </button>
       ) : null}
