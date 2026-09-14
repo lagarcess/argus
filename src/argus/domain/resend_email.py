@@ -7,7 +7,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 SMTP_PASSWORD_ENV = "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD"
-# The API's one support address; the web build pins the same value in the release profile.
+# The API's one support address. The web fallback (web/lib/support-email.ts) and the
+# release profile hold copies; tests/test_support_email_agreement.py keeps them equal.
 SUPPORT_EMAIL_ADDRESS = "support@get-argus.com"
 
 _SMTP_HOST = "smtp.resend.com"
