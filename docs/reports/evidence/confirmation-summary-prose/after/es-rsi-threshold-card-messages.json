@@ -1,19 +1,19 @@
 {
   "items": [
     {
-      "id": "feff9517-e015-4cfd-8d37-4b71c4f2dccf",
+      "id": "c4fcb377-d703-46d1-96dc-84028ae89ce3",
       "conversation_id": "00000000-0000-4000-8000-000000009303",
       "role": "user",
       "content": "Compra TSLA cuando el RSI baje de 30 y vende arriba de 70",
-      "created_at": "2026-09-14T01:43:01.271492Z",
+      "created_at": "2026-09-14T02:08:02.515156Z",
       "metadata": {}
     },
     {
-      "id": "a41844f4-e99d-4ed3-bd5c-74b09c0a7f28",
+      "id": "d3f890ec-7943-44e4-ab2a-d2427eb651ad",
       "conversation_id": "00000000-0000-4000-8000-000000009303",
       "role": "assistant",
       "content": "",
-      "created_at": "2026-09-14T01:43:01.271872Z",
+      "created_at": "2026-09-14T02:08:02.515569Z",
       "metadata": {
         "conversation_mode": "confirm",
         "agent_runtime_stage_outcome": "await_approval",
