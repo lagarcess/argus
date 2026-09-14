@@ -53,9 +53,11 @@ REACHED_BY_THE_EVAL = {
 # None reaches the measurement, so evidence survives changing them.
 UNREACHED_BY_THE_EVAL = {
     "release-flags": ("render.yaml", ".github/private-alpha-release-profile.json"),
+    "environment-template": (".env.example",),
     "migration": ("supabase/migrations/20260913000000_example.sql",),
     "frontend": ("web/app/page.tsx",),
     "docs": ("docs/release-manifests/notes.md",),
+    "root-documentation": ("AGENTS.md",),
     "evidence-script": ("docs/reports/evidence/2026-09-13-promotion/run_pair.py",),
 }
 
@@ -94,6 +96,11 @@ STRUCTURAL_CHANGES_REACHED: dict[
         {},
         {".pytest.ini": "[pytest]\naddopts = -p no:cacheprovider\n"},
         (".pytest.ini",),
+    ),
+    "coverage-config-added-at-the-root": (
+        {},
+        {".coveragerc": "[run]\nbranch = True\n"},
+        (".coveragerc",),
     ),
     "module-a-pytest-config-names": (
         {
@@ -223,6 +230,8 @@ def _layout(case_ids: Iterable[str]) -> dict[str, str]:
         ),
         "poetry.lock": '[[package]]\nname = "pydantic"\nversion = "2.11.0"\n',
         ".python-version": f"{PYTHON_VERSION}\n",
+        ".env.example": "ARGUS_EXAMPLE=\n",
+        "AGENTS.md": "# Agents\n",
         "tests/__init__.py": "",
         "tests/conftest.py": "import pytest\n",
         "tests/evals/__init__.py": "",

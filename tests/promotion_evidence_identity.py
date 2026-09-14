@@ -6,11 +6,12 @@ targeted A/B. Evidence measured at commit A stands for build B when nothing the
 measurement can reach differs between them.
 
 Reach fails closed. Python loads code through imports, strings, plugins, warning
-filters and startup modules, more channels than a reader can list, so every
-Python file the eval process could import counts, with the data beside it, the
-pytest configuration it runs under, and its environment. Only files outside the
-import space change without a new measurement: deploy configuration, migrations,
-frontend code, docs and evidence.
+filters and startup modules, and the toolchain reads its configuration from the
+repository root, more channels than a reader can list. So every Python file the
+eval process could import counts, with the data beside it, the pytest
+configuration on its path, and every root file except the release contract's
+deploy files and documentation. Only files outside that change without a new
+measurement: deploy configuration, migrations, frontend code, docs and evidence.
 """
 
 from __future__ import annotations
@@ -39,12 +40,15 @@ _MODULE_SUFFIXES = tuple(
 )
 
 # pytest takes its settings from an ini, toml or cfg file in the test's folder or
-# above it, so every such file there can change the run.
+# above it; these are parsed for the pythonpath they declare.
 _CONFIG_SUFFIXES = frozenset({".ini", ".toml", ".cfg"})
 
-# Third-party code and the interpreter sit outside the tree, which reaches them
-# only through the files the environment is built from.
-_ENVIRONMENT_FILES = ("pyproject.toml", "poetry.lock", ".python-version")
+# The toolchain (pytest, coverage, Poetry, the interpreter pin) finds its
+# configuration at the root, so every root file counts except the Render
+# Blueprint and environment template the release contract owns, which the eval
+# never reads, and documentation.
+_ROOT_FILES_THE_EVAL_NEVER_READS = frozenset({"render.yaml", ".env.example"})
+_DOCUMENTATION_SUFFIX = ".md"
 
 # Recorded before this rule and not re-measurable: each baseline measured a commit
 # that differs from the deployed build only in these release-validator tests, and
@@ -143,18 +147,25 @@ def _reach_at_commit(repository_root: Path, sha: str) -> frozenset[str]:
 
 def reach_in_tree(tracked: frozenset[str], read: ReadFiles) -> frozenset[str]:
     """Every importable Python file, the data beside it, the pytest configuration
-    on the measurement's path, and the environment."""
+    on the measurement's path, and the toolchain configuration at the root."""
 
     assert MEASUREMENT_ENTRY in tracked, (
         f"{MEASUREMENT_ENTRY} is missing, so what the measurement reaches is unknown."
     )
     roots = import_roots(tracked, read)
     modules = frozenset(path for path in tracked if _importable(path, roots))
+    root_configuration = {
+        path
+        for path in tracked
+        if "/" not in path
+        and path not in _ROOT_FILES_THE_EVAL_NEVER_READS
+        and not path.endswith(_DOCUMENTATION_SUFFIX)
+    }
     return frozenset(
         modules
         | _data_beside(modules, tracked, roots)
         | set(pytest_settings(tracked, read))
-        | {path for path in _ENVIRONMENT_FILES if path in tracked}
+        | root_configuration
     )
 
 

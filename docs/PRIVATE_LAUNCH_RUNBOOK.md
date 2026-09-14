@@ -850,11 +850,14 @@ them.
   warning filters and startup modules, more channels than a reader can list.
   So every Python file the eval process could import counts, tests and scripts
   included. So do the data files beside that code, the pytest configuration on
-  the eval's path, and the environment it runs in: `pyproject.toml`,
-  `poetry.lock` and `.python-version`. Import roots come from the pytest and
-  Poetry configuration, never from a list of product paths.
-- **A change outside that keeps the evidence:** `render.yaml`, the release
-  profile, migrations, frontend code, docs and evidence scripts.
+  the eval's path, and every file at the repository root, where the toolchain
+  finds its configuration (`pyproject.toml`, `poetry.lock`, `.python-version`,
+  `.coveragerc` and the like). The root exceptions are `render.yaml` and
+  `.env.example`, which the release contract owns and the eval never reads, and
+  documentation. Import roots come from the pytest and Poetry configuration,
+  never from a list of product paths.
+- **A change outside that keeps the evidence:** `render.yaml`, `.env.example`,
+  the release profile, migrations, frontend code, docs and evidence scripts.
 - **A change inside it needs a new measurement.** The gate names the changed
   files.
 - **A model or provider change still needs a new run.** The eval reads its own
