@@ -1,0 +1,41 @@
+{
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "writes": [
+    {
+      "service": "argus-backtests",
+      "key": "ARGUS_READOUT_MODEL",
+      "value": "openai/gpt-5.6-luna",
+      "method": "PUT",
+      "http_status": 200,
+      "started_at": "2026-09-13T22:35:59.676418+00:00",
+      "completed_at": "2026-09-13T22:35:59.797105+00:00"
+    },
+    {
+      "service": "argus-backtests",
+      "key": "ARGUS_READOUT_FALLBACK_MODEL",
+      "value": "openai/gpt-5.6-luna",
+      "method": "PUT",
+      "http_status": 200,
+      "started_at": "2026-09-13T22:35:59.798025+00:00",
+      "completed_at": "2026-09-13T22:36:00.024188+00:00"
+    },
+    {
+      "service": "argus-api",
+      "key": "ARGUS_READOUT_MODEL",
+      "value": "openai/gpt-5.6-luna",
+      "method": "PUT",
+      "http_status": 200,
+      "started_at": "2026-09-13T22:36:00.025013+00:00",
+      "completed_at": "2026-09-13T22:36:00.152159+00:00"
+    },
+    {
+      "service": "argus-api",
+      "key": "ARGUS_READOUT_FALLBACK_MODEL",
+      "value": "openai/gpt-5.6-luna",
+      "method": "PUT",
+      "http_status": 200,
+      "started_at": "2026-09-13T22:36:00.152625+00:00",
+      "completed_at": "2026-09-13T22:36:00.288929+00:00"
+    }
+  ]
+}

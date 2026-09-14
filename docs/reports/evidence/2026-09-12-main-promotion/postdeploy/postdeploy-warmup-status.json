@@ -1,0 +1,14 @@
+{
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "command": [
+    ".github/warmup-render.sh",
+    "--expect-mode",
+    "real-workflow"
+  ],
+  "started_at": "2026-09-13T22:57:45.993860+00:00",
+  "finished_at": "2026-09-13T22:57:56.315608+00:00",
+  "exit_code": 1,
+  "root_env_source": "approved canonical root .env link",
+  "web_env_local_absent": true,
+  "script_unchanged": true
+}

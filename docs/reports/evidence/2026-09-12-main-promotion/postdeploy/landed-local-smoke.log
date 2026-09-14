@@ -1,0 +1,20 @@
+Private Alpha local smoke
+candidate_sha=3d98057c1e722317f0243fb96fb647771ddae484
+workflow_mode=proof-shadow
+runtime_mode={"ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED":"false","ARGUS_BACKTEST_JOBS_SHADOW_ENABLED":"true","ARGUS_BACKTEST_REAL_WORKFLOW_TASK":"argus-backtests/run_backtest_job","ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED":"false","ARGUS_BACKTEST_WORKFLOW_TASK":"argus-backtests/workflow_proof","ARGUS_CHECKPOINTER_MODE":"memory","ARGUS_DEV_MEMORY_FALLBACK":"true","ARGUS_MARKET_DATA_PROVIDER_MODE":"synthetic_unit_fixture","ARGUS_MOCK_AUTH":"true","ARGUS_PERSISTENCE_MODE":"memory"}
+feature_flags={"NEXT_PUBLIC_CHAT_EXPLORATORY_SUGGESTIONS_ENABLED":"false","NEXT_PUBLIC_ENABLE_SPANISH":"true","NEXT_PUBLIC_OMNISEARCH_ENABLED":"true"}
+env_fingerprint=38774ba6f5059f9fb5873f6b2b7028cc5bad1425ec0847410e7bce0c47b072ce
+workflow_probe=ready
+Starting local API on http://127.0.0.1:8126
+Starting local web on http://127.0.0.1:3126
+Checking api_health: http://127.0.0.1:8126/health
+curl: (7) Failed to connect to 127.0.0.1 port 8126 after 0 ms: Couldn't connect to server
+  waiting for api_health... attempt 1
+curl: (7) Failed to connect to 127.0.0.1 port 8126 after 0 ms: Couldn't connect to server
+  waiting for api_health... attempt 2
+curl: (7) Failed to connect to 127.0.0.1 port 8126 after 0 ms: Couldn't connect to server
+  waiting for api_health... attempt 3
+curl: (7) Failed to connect to 127.0.0.1 port 8126 after 0 ms: Couldn't connect to server
+  waiting for api_health... attempt 4
+api_health=ready
+curl: (28) Operation timed out after 20004 milliseconds with 0 bytes received
