@@ -1,14 +1,18 @@
-"""Research provider failures (#609): typed, retried inside the call's deadline,
-then ended on the recovery discovery already uses.
+"""Research provider failures (#609): typed, asked again inside the call's
+deadline only when no paid work can have started, then ended on the recovery
+discovery already uses.
 
-Every provider here is scripted, and so is time: a retry's wait is asserted,
-never slept. The failures are the five the issue names: a 500, a 429 with
-Retry-After, a timeout, a 400 and a missing key.
+Every provider here is scripted, and so is time, except one real socket server
+that trickles its answer: a retry's wait is asserted, never slept. The failures
+are the five the issue names (a 500, a 429 with Retry-After, a timeout, a 400
+and a missing key), plus a connection refused before the request was sent and
+one dropped mid-request, which the founder's paid-work rule tells apart.
 """
 
 from __future__ import annotations
 
 import json
+import socket
 import threading
 import time
 from collections.abc import Callable
@@ -30,7 +34,6 @@ from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.supabase_gateway import SupabaseGateway
-from loguru import logger
 
 from tests.research.conftest import (
     agent_response,
@@ -100,6 +103,13 @@ def budget(request: httpx.Request) -> float:
     return request.extensions["timeout"]["read"]
 
 
+def transport_error(error: type[httpx.TransportError]) -> Step:
+    def step(request: httpx.Request) -> httpx.Response:
+        raise error("scripted", request=request)
+
+    return step
+
+
 def scripted_client(
     clock: ScriptedClock, steps: list[Step], *, api_key: str = "k"
 ) -> tuple[PerplexityAgentClient, ScriptedProvider]:
@@ -119,6 +129,8 @@ class Failure:
     transient: bool
     attempts: int
     waits: tuple[float, ...]
+    # Attempts the provider may have billed without answering.
+    unanswered: int = 0
     api_key: str = "k"
 
     @property
@@ -163,6 +175,26 @@ FAILURES = [
         transient=True,
         attempts=1,
         waits=(),
+        unanswered=1,
+    ),
+    Failure(
+        "connection_refused",
+        lambda _clock: [transport_error(httpx.ConnectError)] * ATTEMPTS,
+        reason="transport",
+        status=None,
+        transient=True,
+        attempts=ATTEMPTS,
+        waits=(BACKOFF, 2 * BACKOFF),
+    ),
+    Failure(
+        "connection_dropped",
+        lambda _clock: [transport_error(httpx.RemoteProtocolError)],
+        reason="transport",
+        status=None,
+        transient=True,
+        attempts=1,
+        waits=(),
+        unanswered=1,
     ),
     Failure(
         "http_400",
@@ -186,13 +218,15 @@ FAILURES = [
 ]
 
 
-# --- The client: typed failures, retried only when asking again can help ----
+# --- The client: asked again only when no paid work can have started -------
 
 
 @pytest.mark.parametrize("failure", FAILURES, ids=lambda failure: failure.name)
-def test_each_failure_keeps_its_type_and_is_retried_only_when_transient(
-    failure: Failure,
+def test_each_failure_is_retried_only_when_no_paid_work_can_have_started(
+    monkeypatch: pytest.MonkeyPatch, failure: Failure
 ) -> None:
+    unpriced: list[Any] = []
+    monkeypatch.setattr(perplexity_agent, "record_unpriced_spend", unpriced.append)
     clock = ScriptedClock()
     client, provider = scripted_client(
         clock, failure.steps(clock), api_key=failure.api_key
@@ -211,6 +245,10 @@ def test_each_failure_keeps_its_type_and_is_retried_only_when_transient(
     assert clock.waits == list(failure.waits)
     assert clock.now <= FAST.timeout_seconds, "every attempt ends inside one deadline"
     assert len({request.content for request in provider.requests}) <= 1
+    # An attempt the provider may have billed without answering is on record.
+    assert [(spend.reason, spend.provider_response_id) for spend in unpriced] == [
+        ("unanswered_attempt", None)
+    ] * failure.unanswered
 
 
 def test_a_transient_failure_that_clears_answers_inside_the_same_deadline() -> None:
@@ -279,11 +317,37 @@ def test_a_poll_is_left_to_the_poller_and_not_retried_by_the_client() -> None:
     assert clock.waits == []
 
 
-def lost_answer(error: type[httpx.TransportError]) -> Step:
-    def step(request: httpx.Request) -> httpx.Response:
-        raise error("scripted", request=request)
+@pytest.mark.parametrize(
+    ("error", "retried"),
+    [
+        (httpx.ConnectError, True),
+        (httpx.ConnectTimeout, True),
+        (httpx.PoolTimeout, True),
+        (httpx.ReadTimeout, False),
+        (httpx.ReadError, False),
+        (httpx.WriteTimeout, False),
+        (httpx.WriteError, False),
+        (httpx.RemoteProtocolError, False),
+    ],
+    ids=lambda value: value.__name__ if isinstance(value, type) else str(value),
+)
+def test_a_transport_error_is_asked_again_only_when_the_request_never_left_argus(
+    monkeypatch: pytest.MonkeyPatch, error: type[httpx.TransportError], retried: bool
+) -> None:
+    unpriced: list[Any] = []
+    monkeypatch.setattr(perplexity_agent, "record_unpriced_spend", unpriced.append)
+    clock = ScriptedClock()
+    client, provider = scripted_client(clock, [transport_error(error), answer()])
 
-    return step
+    if retried:
+        assert client.run_research(QUESTION, FAST).answer_markdown.startswith("Apple")
+    else:
+        with pytest.raises(ResearchUnavailableError) as raised:
+            client.run_research(QUESTION, FAST)
+        assert raised.value.transient and raised.value.sent
+
+    assert len(provider.requests) == (2 if retried else 1)
+    assert len(unpriced) == (0 if retried else 1)
 
 
 def submitted() -> Step:
@@ -293,52 +357,115 @@ def submitted() -> Step:
 @pytest.mark.parametrize(
     ("first", "sent"),
     [
-        (status(500), 1),
-        (lost_answer(httpx.ReadTimeout), 1),
-        (lost_answer(httpx.RemoteProtocolError), 1),
+        (status(500), 2),
         (status(429, {"Retry-After": "1"}), 2),
+        (transport_error(httpx.ConnectError), 2),
+        (transport_error(httpx.ReadTimeout), 1),
+        (transport_error(httpx.RemoteProtocolError), 1),
     ],
-    ids=["http_500", "timeout", "lost_connection", "http_429"],
+    ids=["http_500", "http_429", "connection_refused", "read_timeout", "connection_dropped"],
 )
-def test_a_background_submission_that_may_have_started_a_run_is_not_sent_again(
-    first: Step, sent: int
+def test_a_background_submission_is_sent_again_only_when_no_run_can_have_started(
+    monkeypatch: pytest.MonkeyPatch, first: Step, sent: int
 ) -> None:
+    unpriced: list[Any] = []
+    monkeypatch.setattr(perplexity_agent, "record_unpriced_spend", unpriced.append)
     clock = ScriptedClock()
     client, provider = scripted_client(clock, [first, submitted()])
 
     if sent == 2:
         assert client.submit_background(QUESTION, FAST) == "resp_bg1"
+        assert unpriced == []
     else:
         with pytest.raises(ResearchUnavailableError) as raised:
             client.submit_background(QUESTION, FAST)
-        assert raised.value.transient
+        # The reader decides, and the attempt that may have started a run is on record.
+        assert raised.value.transient and not raised.value.paid_work_ruled_out
+        assert [spend.reason for spend in unpriced] == ["unanswered_attempt"]
 
     assert len(provider.requests) == sent
 
 
-def held(release: threading.Event) -> Step:
-    def step(_request: httpx.Request) -> httpx.Response:
-        # A provider that stalls where no single connect, write or read timeout fires.
-        release.wait(10)
-        return httpx.Response(200, json=agent_response())
+class TricklingProvider:
+    """A real socket server. Each connection plays the next step; a trickle
+    sends one byte at a time, so no single connect, write or read timeout fires."""
 
-    return step
+    def __init__(self, steps: list[str]) -> None:
+        self.steps = list(steps)
+        self.connections = 0
+        self.closed_by_client_at: float | None = None
+        self._stop = threading.Event()
+        self._listener = socket.create_server(("127.0.0.1", 0))
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    @property
+    def url(self) -> str:
+        return f"http://127.0.0.1:{self._listener.getsockname()[1]}/v1/agent"
+
+    def _serve(self) -> None:
+        try:
+            while self.steps and not self._stop.is_set():
+                conn, _ = self._listener.accept()
+                self.connections += 1
+                with conn:
+                    self._read_request(conn)
+                    self._play(conn, self.steps.pop(0))
+        except OSError:
+            return
+
+    @staticmethod
+    def _read_request(conn: socket.socket) -> None:
+        data = b""
+        while b"\r\n\r\n" not in data:
+            data += conn.recv(65536)
+        head, _, body = data.partition(b"\r\n\r\n")
+        length = next(
+            (
+                int(line.split(b":", 1)[1])
+                for line in head.split(b"\r\n")
+                if line.lower().startswith(b"content-length:")
+            ),
+            0,
+        )
+        while len(body) < length:
+            body += conn.recv(65536)
+
+    def _play(self, conn: socket.socket, step: str) -> None:
+        if step == "503":
+            conn.sendall(
+                b"HTTP/1.1 503 Service Unavailable\r\n"
+                b"Retry-After: 0\r\nContent-Length: 0\r\n\r\n"
+            )
+            return
+        conn.sendall(
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+            b"Content-Length: 100000\r\n\r\n"
+        )
+        started = time.monotonic()
+        try:
+            while time.monotonic() - started < 10 and not self._stop.is_set():
+                conn.sendall(b" ")
+                time.sleep(0.05)
+        except OSError:
+            self.closed_by_client_at = time.monotonic()
+
+    def close(self) -> None:
+        self._stop.set()
+        self._listener.close()
 
 
 @pytest.mark.parametrize(
-    "before",
-    [[], [status(503, {"Retry-After": "0"})]],
-    ids=["first_attempt", "retried_attempt"],
+    "steps", [["trickle"], ["503", "trickle"]], ids=["first_attempt", "retried_attempt"]
 )
-def test_a_stalled_provider_cannot_hold_the_call_past_its_deadline(
-    before: list[Step],
+def test_a_trickled_answer_ends_the_request_itself_at_the_deadline(
+    monkeypatch: pytest.MonkeyPatch, steps: list[str]
 ) -> None:
     ceiling = 0.5
-    release = threading.Event()
-    provider = ScriptedProvider([*before, held(release)])
-    client = PerplexityAgentClient("k", transport=provider)
-    lines: list[str] = []
-    sink = logger.add(lines.append, format="{message}")
+    server = TricklingProvider(steps)
+    monkeypatch.setattr(perplexity_agent, "PERPLEXITY_AGENT_URL", server.url)
+    unpriced: list[Any] = []
+    monkeypatch.setattr(perplexity_agent, "record_unpriced_spend", unpriced.append)
+    client = PerplexityAgentClient("k")
     try:
         started = time.monotonic()
         with pytest.raises(ResearchUnavailableError) as raised:
@@ -346,19 +473,20 @@ def test_a_stalled_provider_cannot_hold_the_call_past_its_deadline(
                 QUESTION, FAST.model_copy(update={"timeout_seconds": ceiling})
             )
         elapsed = time.monotonic() - started
-        release.set()
-        for _ in range(200):
-            if any("answered after the deadline" in line for line in lines):
+        for _ in range(100):
+            if server.closed_by_client_at is not None:
                 break
-            time.sleep(0.01)
+            time.sleep(0.02)
     finally:
-        release.set()
-        logger.remove(sink)
+        server.close()
 
-    assert raised.value.reason == "timeout"
-    assert elapsed < ceiling + 2.0, "the held attempt would have taken ten seconds"
-    assert len(provider.requests) == len(before) + 1
-    assert any("answered after the deadline" in line for line in lines)
+    assert raised.value.reason == "timeout" and raised.value.sent
+    assert elapsed < ceiling + 2.0, "a trickle holds the request for ten seconds"
+    # The request ended itself: no socket or worker is left open behind the call.
+    assert server.closed_by_client_at is not None
+    assert server.closed_by_client_at - started < ceiling + 2.0
+    assert server.connections == len(steps)
+    assert [spend.reason for spend in unpriced] == ["unanswered_attempt"]
 
 
 @pytest.mark.parametrize(
@@ -381,6 +509,27 @@ def test_transient_is_derived_from_the_status_or_the_reason(
     error: ResearchUnavailableError, transient: bool
 ) -> None:
     assert error.transient is transient
+
+
+@pytest.mark.parametrize(
+    ("error", "ruled_out"),
+    [
+        (ResearchUnavailableError("http_error", status=500), True),
+        (ResearchUnavailableError("http_error", status=503), True),
+        (ResearchUnavailableError("http_error", status=429), True),
+        (ResearchUnavailableError("transport", sent=False), True),
+        (ResearchUnavailableError("timeout", sent=False), True),
+        (ResearchUnavailableError("timeout"), False),
+        (ResearchUnavailableError("transport"), False),
+        (ResearchUnavailableError("http_error", status=400), False),
+        (ResearchUnavailableError("not_configured", sent=False), False),
+        (ResearchUnavailableError("malformed_response"), False),
+    ],
+)
+def test_paid_work_is_ruled_out_only_by_a_429_a_5xx_or_a_request_never_sent(
+    error: ResearchUnavailableError, ruled_out: bool
+) -> None:
+    assert error.paid_work_ruled_out is ruled_out
 
 
 # --- The turn: a recovery, never an answer, and the outage is recorded -------

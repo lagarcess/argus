@@ -1338,6 +1338,10 @@ Current write hooks:
   success is independent of invoice reconciliation. Anomaly rows have unknown
   billable quantity and no cost amount; existing capability-class turn metering
   remains unchanged. Both records retain null cost for an unpriced call.
+  An attempt the provider may have billed without answering, after a read
+  timeout or a connection dropped mid-request, appends the same anomaly row
+  with `usage_metadata.reason = "unanswered_attempt"`, null usage counts and a
+  null provider response id.
   Tool invocation counts inside `usage_metadata` are null when the invoice did
   not establish them; a null count is unknown, not zero.
 - API chat turns append OpenRouter cost rows from persisted route receipts.

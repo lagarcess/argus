@@ -4115,6 +4115,9 @@ Contract rules:
   replaced with zero or an estimated charge. Provider billing evidence stays
   server-side. Each unreconciled provider response records an anomaly ledger
   entry, including discarded retries, independently of the public sidecar.
+  An attempt the provider may have billed without answering, after a read
+  timeout or a connection dropped mid-request, records the same anomaly with
+  reason `unanswered_attempt` and a null provider response id.
   The existing turn ledger also receives null cost for an unpriced answer.
   Unpriced calls carry the reported invoice, expected range and discrepancy
   in ledger metadata and emit an ERROR alert. Transport, malformed answer,
@@ -4153,18 +4156,19 @@ Contract rules:
   lost connection are transient; any other 4xx, a missing or rejected key
   (`not_configured`, including HTTP 401 and 403) and an answer that cannot be
   read are not. The HTTP status travels as a typed field, never only inside a
-  log line. After a transient failure the client asks again, at most three
-  attempts in all, waiting what the response's `Retry-After` asks (seconds or
-  an HTTP date) or else a backoff that doubles from one second. Every attempt
-  shares the call's own timeout as one deadline, held on the wall clock: the
-  call returns by it however slowly the provider answers, and an answer that
-  arrives after it is logged as discarded. A retry starts only while at least
-  half of the deadline is left. A background submission is sent again only
-  after an HTTP 429, because after any other failure the provider may already
-  have started a run that nothing would poll or record. A background poll is
-  not retried by the client; the poller already asks again until its own
-  deadline. A call claims research capacity once, however many attempts it
-  takes.
+  log line. The client asks again automatically only when the provider cannot
+  have started paid work: an HTTP 429, an HTTP 5xx response, or a connection
+  that failed before the request was sent. It makes at most three attempts in
+  all, waiting what the response's `Retry-After` asks (seconds or an HTTP date)
+  or else a backoff that doubles from one second, and a retry starts only while
+  at least half of the deadline is left. After a read timeout or a connection
+  dropped mid-request it does not ask again: the turn ends on the retry notice
+  so the reader decides, and the attempt is recorded as an unpriced anomaly
+  with a null provider response id. Every attempt shares the call's own timeout
+  as one deadline that caps each connect, write and read, so a provider that
+  trickles its answer cannot hold the call past it. A background poll is not
+  retried by the client; the poller already asks again until its own deadline.
+  A call claims research capacity once, however many attempts it takes.
 - When no attempt answers, the turn publishes no answer, no rows and no
   `next_experiments`. A transient failure carries
   `recovery = {"code": "research_lookup_failed", "retryable": true}` and

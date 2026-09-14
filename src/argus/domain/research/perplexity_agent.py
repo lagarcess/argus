@@ -1,13 +1,15 @@
 """Perplexity Agent API client for finance_search research.
 
 One HTTP boundary with an injectable transport so tests stay hermetic. Every
-request returns by its deadline on the wall clock. A transient failure (5xx,
-429, a timeout, a lost connection) is asked again at that boundary, a bounded
-number of times inside the call's own deadline; a background submission only
-after a 429, because any other failure may already have started a run. The
-parser is deterministic: it walks the typed ``output`` items the Agent API
-documents, never user language. Provider identity is scrubbed at parse time
-because route receipts and the cost ledger own provenance, not prose.
+request ends by its deadline: each connect, write and read is capped at the
+time left. A failure after which the provider cannot have started paid work (a
+429, a 5xx, a connection that failed before the request was sent) is asked
+again at that boundary, a bounded number of times inside the call's own
+deadline. After a read timeout or a connection dropped mid-request the reader
+decides, and the attempt is recorded as unpriced. The parser is deterministic:
+it walks the typed ``output`` items the Agent API documents, never user
+language. Provider identity is scrubbed at parse time because route receipts
+and the cost ledger own provenance, not prose.
 
 Every request carries the retrieval parameters the spec derived for it: the
 model fallback chain, the strict typed-output schema, the response language,
@@ -23,13 +25,10 @@ import json
 import re
 import time
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from email.utils import parsedate_to_datetime
-from functools import partial
 from typing import Any
 from urllib.parse import urlparse
 
@@ -318,14 +317,14 @@ class PerplexityAgentClient:
         return body
 
     def _post(self, payload: dict[str, Any], *, timeout_seconds: float) -> dict[str, Any]:
-        """One request, asked again after a transient failure.
+        """One request, asked again only when the provider cannot have started
+        paid work on it.
 
-        Every attempt shares the call's ceiling as one wall-clock deadline, so a
-        retried call returns by the same deadline as one that was never retried."""
+        Every attempt shares the call's ceiling as one deadline that caps each
+        connect, write and read, so a retried call ends by the same deadline as
+        one that was never retried."""
         deadline = self._clock() + timeout_seconds
         remaining = timeout_seconds
-        # A submission whose answer was lost may already have started a run.
-        starts_run = payload.get("background") is True
         attempt = 1
         while True:
             try:
@@ -336,7 +335,6 @@ class PerplexityAgentClient:
                     attempt=attempt,
                     remaining=deadline - self._clock(),
                     ceiling=timeout_seconds,
-                    starts_run=starts_run,
                 )
                 if delay is None:
                     raise
@@ -355,6 +353,28 @@ class PerplexityAgentClient:
         # Not retried here: the poller asks again until its own deadline.
         return self._send("GET", url, None, timeout_seconds)
 
+    def _record_unanswered(
+        self, failure: ResearchUnavailableError, *, latency_ms: int
+    ) -> None:
+        """An attempt the provider may have billed without answering: no invoice
+        will arrive, and no response id came back to correlate one with."""
+        self._record_unpriced(
+            unpriced_spend(
+                document={},
+                usage=ResearchUsage(
+                    invocations=None,
+                    finance_search_invocations=None,
+                    web_search_invocations=None,
+                    fetch_url_invocations=None,
+                    latency_ms=latency_ms,
+                ),
+                error=ResearchPricingError(
+                    "unanswered_attempt",
+                    f"{failure.reason}: {failure.detail or ''}"[:500],
+                ),
+            )
+        )
+
     def _send(
         self,
         method: str,
@@ -362,45 +382,32 @@ class PerplexityAgentClient:
         payload: dict[str, Any] | None,
         timeout_seconds: float,
     ) -> dict[str, Any]:
-        """One request that returns within its timeout on the wall clock.
-
-        httpx times each connect, write and read on its own, so a provider that
-        answers slowly can hold a request past every one of them. The request
-        runs on a worker, still capped by those timeouts, that the caller stops
-        waiting for once the timeout has passed."""
         if not self._api_key:
             raise ResearchUnavailableError("not_configured")
-        worker = ThreadPoolExecutor(max_workers=1)
-        pending = worker.submit(self._request, method, url, payload, timeout_seconds)
-        worker.shutdown(wait=False)
-        try:
-            return pending.result(timeout=max(timeout_seconds, 0.0))
-        except FutureTimeoutError:
-            pending.add_done_callback(partial(_log_late_answer, method))
-            raise ResearchUnavailableError(
-                "timeout", "no answer inside the timeout"
-            ) from None
-
-    def _request(
-        self,
-        method: str,
-        url: str,
-        payload: dict[str, Any] | None,
-        timeout_seconds: float,
-    ) -> dict[str, Any]:
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
+        started = self._clock()
+        transport = (
+            self._transport
+            if self._transport is not None
+            else _deadline_transport(started + timeout_seconds, self._clock)
+        )
         try:
-            with httpx.Client(
-                transport=self._transport, timeout=timeout_seconds
-            ) as client:
+            with httpx.Client(transport=transport, timeout=timeout_seconds) as client:
                 response = client.request(method, url, headers=headers, json=payload)
-        except httpx.TimeoutException as exc:
-            raise ResearchUnavailableError("timeout", str(exc)) from exc
         except httpx.HTTPError as exc:
-            raise ResearchUnavailableError("transport", str(exc)) from exc
+            failure = ResearchUnavailableError(
+                "timeout" if isinstance(exc, httpx.TimeoutException) else "transport",
+                str(exc),
+                sent=not isinstance(exc, _UNSENT_ERRORS),
+            )
+            if method == "POST" and failure.sent:
+                self._record_unanswered(
+                    failure, latency_ms=int((self._clock() - started) * 1000)
+                )
+            raise failure from exc
         if response.status_code >= 400:
             # The deployed log sink drops structured extras; the status rides
             # in the message.
@@ -437,18 +444,15 @@ def _retry_delay(
     attempt: int,
     remaining: float,
     ceiling: float,
-    starts_run: bool,
 ) -> float | None:
     """How long to wait before asking again, or None when not to ask again.
 
-    A failure that is not transient fails the same way again, and a retry
-    starts only while at least half the call's ceiling is left to answer in. A
-    request that starts a background run is sent again only after a 429, the
-    one transient answer that says the provider did not take it: after any
-    other, a run that nothing would poll or record may already be going."""
-    if not failure.transient or attempt >= _MAX_ATTEMPTS:
-        return None
-    if starts_run and failure.status != 429:
+    Only a failure after which the provider cannot have started paid work is
+    asked again: a 429, a 5xx, or a connection that failed before the request
+    was sent. After a read timeout or a connection dropped mid-request, the
+    reader decides. A retry starts only while at least half the call's ceiling
+    is left to answer in."""
+    if not failure.paid_work_ruled_out or attempt >= _MAX_ATTEMPTS:
         return None
     delay = (
         failure.retry_after_seconds
@@ -458,21 +462,104 @@ def _retry_delay(
     return delay if remaining - delay >= ceiling / 2 else None
 
 
-def _log_late_answer(method: str, pending: Future[dict[str, Any]]) -> None:
-    """An answer the caller stopped waiting for may still have been billed, or
-    have started a run, so it is recorded rather than dropped unseen."""
-    if pending.cancelled() or pending.exception() is not None:
-        return
-    document = pending.result()
-    usage = document.get("usage")
-    cost = usage.get("cost") if isinstance(usage, dict) else None
-    total_cost = cost.get("total_cost") if isinstance(cost, dict) else None
-    # The deployed log sink drops structured extras; the facts ride the text.
-    logger.warning(
-        "Research provider answered after the deadline; the answer was discarded"
-        f" method={method} id={document.get('id')} status={document.get('status')}"
-        f" model={document.get('model')} total_cost={total_cost}"
-    )
+# The request provably never left Argus: no connection or proxy could be
+# opened, or none freed up in the pool. Every other transport failure may have
+# come after the provider started work.
+_UNSENT_ERRORS = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.PoolTimeout,
+    httpx.ProxyError,
+)
+
+
+def _deadline_transport(
+    deadline: float, clock: Callable[[], float]
+) -> httpx.HTTPTransport:
+    """The default transport, with every connect, write and read capped at the
+    time left before the deadline, so a provider that trickles its answer ends
+    the request at the deadline instead of holding it open."""
+    transport = httpx.HTTPTransport()
+    # httpx 0.28 has no public hook into its connection pool's sockets.
+    pool = transport._pool
+    pool._network_backend = _DeadlineBackend(pool._network_backend, deadline, clock)
+    return transport
+
+
+class _DeadlineBackend:
+    """Opens connections whose every wait ends by one deadline."""
+
+    def __init__(
+        self, backend: Any, deadline: float, clock: Callable[[], float]
+    ) -> None:
+        self._backend = backend
+        self._deadline = deadline
+        self._clock = clock
+
+    def left(self, timeout: float | None, error: type[httpx.TimeoutException]) -> float:
+        left = self._deadline - self._clock()
+        if left <= 0:
+            raise error("research request deadline passed")
+        return left if timeout is None else min(timeout, left)
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Any = None,
+    ) -> _DeadlineStream:
+        stream = self._backend.connect_tcp(
+            host,
+            port,
+            self.left(timeout, httpx.ConnectTimeout),
+            local_address,
+            socket_options,
+        )
+        return _DeadlineStream(stream, self)
+
+    def connect_unix_socket(
+        self, path: str, timeout: float | None = None, socket_options: Any = None
+    ) -> _DeadlineStream:
+        stream = self._backend.connect_unix_socket(
+            path, self.left(timeout, httpx.ConnectTimeout), socket_options
+        )
+        return _DeadlineStream(stream, self)
+
+    def sleep(self, seconds: float) -> None:
+        self._backend.sleep(seconds)
+
+
+class _DeadlineStream:
+    def __init__(self, stream: Any, backend: _DeadlineBackend) -> None:
+        self._stream = stream
+        self._backend = backend
+
+    def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
+        return self._stream.read(
+            max_bytes, self._backend.left(timeout, httpx.ReadTimeout)
+        )
+
+    def write(self, buffer: bytes, timeout: float | None = None) -> None:
+        self._stream.write(buffer, self._backend.left(timeout, httpx.WriteTimeout))
+
+    def close(self) -> None:
+        self._stream.close()
+
+    def start_tls(
+        self,
+        ssl_context: Any,
+        server_hostname: str | None = None,
+        timeout: float | None = None,
+    ) -> _DeadlineStream:
+        stream = self._stream.start_tls(
+            ssl_context, server_hostname, self._backend.left(timeout, httpx.ConnectTimeout)
+        )
+        return _DeadlineStream(stream, self._backend)
+
+    def get_extra_info(self, info: str) -> Any:
+        return self._stream.get_extra_info(info)
 
 
 def _retry_after_seconds(value: str | None) -> float | None:
