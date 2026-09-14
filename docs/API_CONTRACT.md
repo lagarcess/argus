@@ -4180,11 +4180,24 @@ Contract rules:
   persisted thorough-job replays do not claim capacity. An unreadable or
   unwritable
   claim fails closed into the existing honest capacity-exhausted response.
+  A failed provider attempt does not cost a guest a question: when the
+  provider work a claim admitted fails with no usable response (an outage that
+  outlasts the retries, a refused request, an unreadable answer, a failed
+  background submission or discovery search) and no earlier provider call in
+  the turn was served, the backend returns the guest's own claim through
+  `release_research_usage` for the day it charged. The shared ceiling keeps
+  counting the attempt. Only a confirmed release lets a later provider path in
+  the same turn claim again; a release that fails or matches no charge, like a
+  cancelled provider call, leaves the charge standing for the rest of the turn,
+  so one turn never costs a guest more than one question.
 - Pricing reconciliation does not gate a usable provider answer. Research
   `usage.cost_usd` is null when the invoice cannot be reconciled; it is never
   replaced with zero or an estimated charge. Provider billing evidence stays
   server-side. Each unreconciled provider response records an anomaly ledger
   entry, including discarded retries, independently of the public sidecar.
+  An attempt the provider may have billed without answering, after a read
+  timeout or a connection dropped mid-request, records the same anomaly with
+  reason `unanswered_attempt` and a null provider response id.
   The existing turn ledger also receives null cost for an unpriced answer.
   Unpriced calls carry the reported invoice, expected range and discrepancy
   in ledger metadata and emit an ERROR alert. Transport, malformed answer,
@@ -4213,10 +4226,63 @@ Contract rules:
   stamps `metadata.research_ledger_contract = "argus_research_ledger/v2"`.
   Unversioned historical rows retain their original values; they are not
   correctly scored successes. `degraded_code`, `cache_status`, and
-  `pricing_status` keep their existing meanings. Legacy discovery rows
+  `pricing_status` keep their existing meanings, and `degraded_status` carries
+  the sidecar's `degraded.status` when there is one. Legacy discovery rows
   (`feature_area = "discovery"`) retain status derived from `fallback_code`;
   other sources retain their existing status contract. This is ledger-only:
   no provider-read channel, sidecar field, reader projection, or backfill.
+- **A research provider failure reuses the retryable recovery** (#609). The
+  research client types every failure: HTTP 5xx, HTTP 429, a timeout and a
+  lost connection are transient; any other 4xx, a missing or rejected key
+  (`not_configured`, including HTTP 401 and 403) and an answer that cannot be
+  read are not. The HTTP status travels as a typed field, never only inside a
+  log line. The client asks again automatically only when the provider cannot
+  have started paid work: an HTTP 429, an HTTP 5xx response, or a connection
+  that failed before the request was sent. It makes at most three attempts in
+  all, waiting what the response's `Retry-After` asks (seconds or an HTTP date)
+  or else a backoff that doubles from one second, and a retry starts only while
+  at least half of the deadline is left. After a read timeout or a connection
+  dropped mid-request it does not ask again: the turn ends on the retry notice
+  so the reader decides, and the attempt is recorded as an unpriced anomaly
+  with a null provider response id. Each attempt's httpx connect, read, write
+  and pool timeouts are sized from what is left of the call's own timeout.
+  httpx applies each one to a single operation, so an attempt can run past the
+  limit: a stalled DNS lookup by as much as the system resolver's own timeout,
+  and a provider that keeps sending bytes slowly for as long as it keeps
+  sending. A background poll is not
+  retried by the client; the poller already asks again until its own deadline.
+  A call claims research capacity once, however many attempts it takes.
+- When no attempt answers, the no-search answer replies where it can run
+  (below, where a failed lookup never becomes the answer), and the lookup's
+  recovery sits under it: `content` is that answer, any rows and
+  `next_experiments` are its own, and the recovery adds `under_answer: true`.
+  Where it cannot run (no model key, a survey, or voicing that failed), the
+  recovery stands alone: the turn publishes no answer, no rows and no
+  `next_experiments`, and the persisted `content` is English compatibility
+  text. A no-search answer that asks for figures only the reader knows carries
+  no recovery, since its question waits for the reply. A transient failure
+  carries `recovery = {"code": "research_lookup_failed", "retryable": true}`
+  and finalizes its chat turn as `recoverable_failed` with a durable
+  `retry_last_turn` anchored to the persisted user request, the same
+  settlement a retryable discovery recovery takes, whether or not an answer
+  stands above it; the live final frame carries the message-shaped retry.
+  Clients render the amber retryable notice, and Retry sends the persisted
+  question again. Any other failure carries
+  `recovery = {"code": "research_lookup_unavailable", "retryable": false}`,
+  completes its turn with nothing to retry, and renders as the quiet failure
+  notice. Clients render the notice in place of the reply, or under it when
+  `under_answer` is true, in copy localized from the code. A thorough request
+  whose background submission fails ends on the same recovery, alone: the
+  no-search answer runs inside the turn, and a submission fails once the turn
+  has composed. After a read timeout or a connection dropped mid-request the
+  provider may already be running, and billing, that run, so that turn ends on
+  the quiet notice with no Retry and the attempt is recorded as unpriced.
+- That turn's `research` sidecar keeps `degraded.code =
+  "research_unavailable_<reason>"`, where the reason is `http_error`,
+  `timeout`, `transport`, `not_configured`, `malformed_response` or
+  `empty_answer`, and adds `degraded.status` with the HTTP status whenever the
+  provider answered with an error. Both reach the cost ledger, so research
+  outages can be counted by kind.
 - Retrieval evidence is independent of the invoice. The provider's returned
   output is the retrieval record: finance and web result items and the
   citations they carry. Survey grounding and the single survey retry read
@@ -5424,9 +5490,11 @@ returns a scenario without a calculation (`scenario_inputs_uncited`) or a
 calculation whose inputs were not found (`calculation_inputs_not_found`), the
 no-search answer replies from Argus market data for the named subjects and
 stated assumptions and says what could not be looked up; the degraded code stays
-on the `research` sidecar. An answer that only restates the question is never published
+on the `research` sidecar. When research is unavailable, the lookup's recovery
+sits under that answer (`under_answer`, #609 above). An answer that only restates the question is never published
 (`answer_restated_question`). Only when that answer cannot run does the honest
-note stand in, and no card with blank inputs ever renders. Thorough runs compute
+note stand in, or, when research is unavailable, the lookup's recovery alone,
+and no card with blank inputs ever renders. Thorough runs compute
 and attach the same card. The research contract is frozen by the recordings
 under `docs/reports/evidence/545/probes` and
 `docs/reports/evidence/grounded-math/probes/scenario_inputs_balanced.json`.

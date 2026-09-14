@@ -1,7 +1,13 @@
 """Perplexity Agent API client for finance_search research.
 
-One HTTP boundary with an injectable transport so tests stay hermetic. The
-parser is deterministic: it walks the typed ``output`` items the Agent API
+One HTTP boundary with an injectable transport so tests stay hermetic. Each
+attempt's httpx timeouts are sized from what is left of the call's own
+timeout. A failure after which the provider cannot have started paid work (a
+429, a 5xx, a connection that failed before the request was sent) is asked
+again at that boundary, a bounded number of times inside that timeout. After a
+read timeout or a connection dropped mid-request the attempt is recorded as
+unpriced, and a background submission is marked as possibly billing a run.
+The parser is deterministic: it walks the typed ``output`` items the Agent API
 documents, never user language. Provider identity is scrubbed at parse time
 because route receipts and the cost ledger own provenance, not prose.
 
@@ -20,7 +26,9 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from decimal import Decimal
+from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -115,9 +123,14 @@ class PerplexityAgentClient:
         api_key: str,
         *,
         transport: httpx.BaseTransport | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._api_key = api_key.strip()
         self._transport = transport
+        # A retry's deadline and its wait read these, so a test can script time.
+        self._clock = clock
+        self._sleep = sleep
         self._reported_unpriced_ids: set[str] = set()
 
     def run_structured(
@@ -235,7 +248,14 @@ class PerplexityAgentClient:
     def submit_background(self, prompt: str, spec: ResearchConfigSpec) -> str:
         payload = self._request_body(prompt, spec)
         payload["background"] = True
-        response = self._post(payload, timeout_seconds=spec.timeout_seconds)
+        try:
+            response = self._post(payload, timeout_seconds=spec.timeout_seconds)
+        except ResearchUnavailableError as exc:
+            if exc.transient and not exc.paid_work_ruled_out:
+                # The provider may already be running, and billing, this run; a
+                # Retry would start a second one, so the reader is not offered one.
+                exc.run_may_be_billing = True
+            raise
         background_id = str(response.get("id") or "").strip()
         if not background_id:
             raise ResearchUnavailableError("malformed_response", "missing id")
@@ -306,10 +326,62 @@ class PerplexityAgentClient:
         return body
 
     def _post(self, payload: dict[str, Any], *, timeout_seconds: float) -> dict[str, Any]:
-        return self._send("POST", PERPLEXITY_AGENT_URL, payload, timeout_seconds)
+        """One request, asked again only when the provider cannot have started
+        paid work on it.
+
+        Each attempt's httpx timeouts are sized from what is left of the call's
+        timeout, and a retry starts only while at least half of it is left."""
+        deadline = self._clock() + timeout_seconds
+        remaining = timeout_seconds
+        attempt = 1
+        while True:
+            try:
+                return self._send("POST", PERPLEXITY_AGENT_URL, payload, remaining)
+            except ResearchUnavailableError as exc:
+                delay = _retry_delay(
+                    exc,
+                    attempt=attempt,
+                    remaining=deadline - self._clock(),
+                    ceiling=timeout_seconds,
+                )
+                if delay is None:
+                    raise
+                # The deployed log sink drops structured extras, so what a count
+                # of retries needs is in the message.
+                logger.warning(
+                    "Research provider retried"
+                    f" reason={exc.reason} status={exc.status} attempt={attempt}"
+                    f" delay_seconds={delay:g}"
+                )
+                self._sleep(delay)
+                remaining = deadline - self._clock()
+                attempt += 1
 
     def _get(self, url: str, *, timeout_seconds: float) -> dict[str, Any]:
+        # Not retried here: the poller asks again until its own deadline.
         return self._send("GET", url, None, timeout_seconds)
+
+    def _record_unanswered(
+        self, failure: ResearchUnavailableError, *, latency_ms: int
+    ) -> None:
+        """An attempt the provider may have billed without answering: no invoice
+        will arrive, and no response id came back to correlate one with."""
+        self._record_unpriced(
+            unpriced_spend(
+                document={},
+                usage=ResearchUsage(
+                    invocations=None,
+                    finance_search_invocations=None,
+                    web_search_invocations=None,
+                    fetch_url_invocations=None,
+                    latency_ms=latency_ms,
+                ),
+                error=ResearchPricingError(
+                    "unanswered_attempt",
+                    f"{failure.reason}: {failure.detail or ''}"[:500],
+                ),
+            )
+        )
 
     def _send(
         self,
@@ -324,25 +396,42 @@ class PerplexityAgentClient:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
+        started = self._clock()
         try:
+            # httpx applies this timeout to each connect, read, write and pool
+            # wait on its own.
             with httpx.Client(
                 transport=self._transport, timeout=timeout_seconds
             ) as client:
                 response = client.request(method, url, headers=headers, json=payload)
-        except httpx.TimeoutException as exc:
-            raise ResearchUnavailableError("timeout", str(exc)) from exc
-        except httpx.HTTPError as exc:
-            raise ResearchUnavailableError("transport", str(exc)) from exc
-        if response.status_code in (401, 403):
-            raise ResearchUnavailableError(
-                "not_configured", f"http {response.status_code}"
+        except (httpx.HTTPError, OSError) as exc:
+            # An OSError httpx did not map fails closed, as sent.
+            timed_out = isinstance(exc, (httpx.TimeoutException, TimeoutError))
+            failure = ResearchUnavailableError(
+                "timeout" if timed_out else "transport",
+                str(exc),
+                sent=not isinstance(exc, _UNSENT_ERRORS),
             )
+            if method == "POST" and failure.sent:
+                self._record_unanswered(
+                    failure, latency_ms=int((self._clock() - started) * 1000)
+                )
+            raise failure from exc
         if response.status_code >= 400:
+            # The deployed log sink drops structured extras; the status rides
+            # in the message.
             logger.warning(
-                "Research provider returned an error status",
-                status=response.status_code,
+                "Research provider returned an error status"
+                f" status={response.status_code}"
             )
-            raise ResearchUnavailableError("http_error", f"http {response.status_code}")
+            raise ResearchUnavailableError(
+                "not_configured" if response.status_code in (401, 403) else "http_error",
+                f"http {response.status_code}",
+                status=response.status_code,
+                retry_after_seconds=_retry_after_seconds(
+                    response.headers.get("retry-after")
+                ),
+            )
         try:
             document = response.json()
         except ValueError as exc:
@@ -350,6 +439,62 @@ class PerplexityAgentClient:
         if not isinstance(document, dict):
             raise ResearchUnavailableError("malformed_response", "non-object body")
         return document
+
+
+# A transient failure is asked at most this many times in all. Each wait
+# doubles from the first backoff unless the provider names its own.
+_MAX_ATTEMPTS = 3
+_FIRST_BACKOFF_SECONDS = 1.0
+
+
+def _retry_delay(
+    failure: ResearchUnavailableError,
+    *,
+    attempt: int,
+    remaining: float,
+    ceiling: float,
+) -> float | None:
+    """How long to wait before asking again, or None when not to ask again.
+
+    Only a failure after which the provider cannot have started paid work is
+    asked again: a 429, a 5xx, or a connection that failed before the request
+    was sent. After a read timeout or a connection dropped mid-request, the
+    reader decides. A retry starts only while at least half the call's ceiling
+    is left to answer in."""
+    if not failure.paid_work_ruled_out or attempt >= _MAX_ATTEMPTS:
+        return None
+    delay = (
+        failure.retry_after_seconds
+        if failure.retry_after_seconds is not None
+        else _FIRST_BACKOFF_SECONDS * 2 ** (attempt - 1)
+    )
+    return delay if remaining - delay >= ceiling / 2 else None
+
+
+# The request provably never left Argus: no connection or proxy could be
+# opened, or none freed up in the pool. Every other transport failure may have
+# come after the provider started work.
+_UNSENT_ERRORS = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.PoolTimeout,
+    httpx.ProxyError,
+)
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    """The wait a response asks for, in either Retry-After form: whole seconds
+    or an HTTP date. Anything else is no instruction, and the backoff applies."""
+    text = (value or "").strip()
+    if text.isascii() and text.isdigit():
+        return float(text)
+    try:
+        when = parsedate_to_datetime(text)
+    except (TypeError, ValueError):
+        return None
+    if when.tzinfo is None:
+        return None
+    return max(0.0, (when - datetime.now(timezone.utc)).total_seconds())
 
 
 def _packet_from_response(

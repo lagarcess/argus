@@ -167,6 +167,12 @@ def _strict_schema(node: Any, definitions: dict[str, Any]) -> Any:
 class ResearchUnavailableError(Exception):
     """Raised when the research provider cannot serve a request.
 
+    ``status`` is the HTTP status of a response the provider refused, and
+    ``retry_after_seconds`` the wait that response asked for, when it gave one.
+    ``sent`` is False only when the request provably never reached the
+    provider, because the connection failed before it was sent.
+    ``run_may_be_billing`` marks a background submission that failed after it
+    was sent: the provider may already be running, and billing, that run.
     ``usage`` carries the invoice of a response that was read far enough to
     establish one before being rejected. Argus paid for that response, so the
     turn that discards it still records its spend.
@@ -177,12 +183,44 @@ class ResearchUnavailableError(Exception):
         reason: str,
         detail: str | None = None,
         *,
+        status: int | None = None,
+        retry_after_seconds: float | None = None,
+        sent: bool = True,
+        run_may_be_billing: bool = False,
         usage: ResearchUsage | None = None,
     ) -> None:
         super().__init__(reason)
         self.reason = reason
         self.detail = detail
+        self.status = status
+        self.retry_after_seconds = retry_after_seconds
+        self.sent = sent
+        self.run_may_be_billing = run_may_be_billing
         self.usage = usage
+
+    @property
+    def paid_work_ruled_out(self) -> bool:
+        """Whether the provider cannot have started paid work on this request:
+        it answered with a 429 or a 5xx, or the connection failed before the
+        request was sent. Only then is asking again automatically free of a
+        second charge; after a read timeout or a connection dropped mid-request,
+        the reader decides."""
+        if self.status is not None:
+            return self.status == 429 or self.status >= 500
+        return not self.sent and self.reason in ("timeout", "transport")
+
+    @property
+    def transient(self) -> bool:
+        """Whether the reader may usefully ask the same request again: the
+        provider failed on its side (5xx), rate limited it (429), or was too slow
+        or unreachable. A request it refused, a missing key and an answer that
+        could not be read fail the same way every time, and a background
+        submission whose run may already be billing would start a second run."""
+        if self.run_may_be_billing:
+            return False
+        if self.status is not None:
+            return self.status == 429 or self.status >= 500
+        return self.reason in ("timeout", "transport")
 
 
 class ResearchPricingError(Exception):

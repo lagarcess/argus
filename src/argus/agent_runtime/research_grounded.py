@@ -34,6 +34,11 @@ from loguru import logger
 from argus.agent_runtime.profile.response_profile import (
     resolve_effective_response_profile,
 )
+from argus.agent_runtime.recovery_messages import (
+    RecoveryMessageCode,
+    recovery_message,
+    recovery_state_stage_patch,
+)
 from argus.agent_runtime.research_rows import (
     honest_no_next_line,
     research_next_experiment_rows,
@@ -51,7 +56,10 @@ from argus.agent_runtime.state.models import (
 )
 from argus.agent_runtime.substage_events import emit_substage
 from argus.domain.market_data.new_york_clock import new_york_today
-from argus.domain.research.admission import claim_current_research_attempt
+from argus.domain.research.admission import (
+    admitted_provider_work,
+    claim_current_research_attempt,
+)
 from argus.domain.research.cache import (
     cache_get,
     cache_put,
@@ -184,7 +192,8 @@ class _TurnSpend:
         self, client: Any, prompt: str, spec: ResearchConfigSpec
     ) -> ResearchPacket:
         try:
-            packet = await asyncio.to_thread(client.run_research, prompt, spec)
+            with admitted_provider_work():
+                packet = await asyncio.to_thread(client.run_research, prompt, spec)
         except ResearchUnavailableError as exc:
             if exc.usage is not None:
                 self._usages.append(exc.usage)
@@ -275,14 +284,14 @@ async def grounded_result(
     else:
         client = _client()
         if client is None:
-            return unavailable_result(
+            return lookup_failure_result(
+                failure=ResearchUnavailableError("not_configured"),
                 query=query,
                 subjects=subjects,
                 interpretation=interpretation,
                 state=state,
                 user=user,
                 decision=decision,
-                reason="not_configured",
                 shape=shape,
                 survey=survey,
             )
@@ -307,16 +316,17 @@ async def grounded_result(
             # detail must live in the message itself to be diagnosable.
             logger.warning(
                 "Research provider unavailable"
-                f" reason={exc.reason} detail={exc.detail or ''} shape={shape}",
+                f" reason={exc.reason} status={exc.status} transient={exc.transient}"
+                f" detail={exc.detail or ''} shape={shape}",
             )
-            return unavailable_result(
+            return lookup_failure_result(
+                failure=exc,
                 query=query,
                 subjects=subjects,
                 interpretation=interpretation,
                 state=state,
                 user=user,
                 decision=decision,
-                reason=exc.reason,
                 usage=spend.total,
                 shape=shape,
                 survey=survey,
@@ -973,25 +983,27 @@ async def exhausted_result(
     )
 
 
-def unavailable_result(
+def lookup_failure_result(
     *,
+    failure: ResearchUnavailableError,
     query: ResearchQueryExtraction,
     subjects: list[dict[str, str]],
     interpretation: StructuredInterpretation,
     state: RunState,
     user: UserState,
-    reason: str,
     shape: QuestionShape,
     survey: bool,
     decision: InterpretDecision | None = None,
     usage: ResearchUsage | None = None,
-) -> StageResult | None:
-    """The honest note when no packet survived.
+) -> StageResult:
+    """The turn a lookup that produced no packet ends on.
 
-    ``usage`` is the spend of the responses the turn read and rejected. There
-    is no packet to compose from, so the note's own carries it instead: a turn
-    that reached the provider is a miss that cost what it cost, and only a
-    turn that never called one bypasses the meter."""
+    A failed lookup never becomes the answer: the no-search step answers from
+    Argus market data and stated assumptions and says what it could not look
+    up, with the lookup's recovery under it. Only when that cannot run does the
+    recovery stand alone. ``usage`` is the spend of the responses the turn read
+    and rejected: a turn that reached the provider is a miss that cost what it
+    cost, and only a turn that never called one bypasses the meter."""
     from argus.agent_runtime.answer_calculation import (
         ANSWER_ASSUMPTIONS_KEY,
         ANSWER_TEMPLATE_KEY,
@@ -1002,10 +1014,8 @@ def unavailable_result(
     )
     from argus.agent_runtime.research_calculation import answer_without_lookup
 
+    capability_class = capability_class_for_shape(shape, screening=survey)
     language = language_tag(user.language_preference)
-    # A failed lookup never becomes the answer: the no-search step answers from
-    # Argus market data and stated assumptions and says what it could not look
-    # up. Only when that cannot run does the honest note stand in.
     answered = (
         None
         if survey
@@ -1018,7 +1028,30 @@ def unavailable_result(
             notes=interpretation.reason_codes,
         )
     )
-    if answered is not None and answered.question_field is not None:
+    if answered is None:
+        return StageResult(
+            outcome="ready_to_respond",
+            decision=carried_decision(
+                decision,
+                interpretation=interpretation,
+                user=user,
+                reason_code=f"research_answer_{capability_class}",
+            ),
+            stage_patch=lookup_failure_patch(
+                failure,
+                capability_class=capability_class,
+                shape=shape,
+                subjects=subjects,
+                period_of_interest=query.period_of_interest,
+                usage=usage,
+            ),
+        )
+    spent = usage if usage is not None else ResearchUsage()
+    cache_status = "bypass" if usage is None else "miss"
+    degraded_code = f"research_unavailable_{failure.reason}"
+    if answered.question_field is not None:
+        # The question waits for figures only the reader knows, so no recovery
+        # speaks over it; its sidecar still records the failed lookup.
         question = question_stage_result(
             answered,
             decision=carried_decision(
@@ -1030,26 +1063,23 @@ def unavailable_result(
         )
         question.stage_patch["research"] = build_research_sidecar(
             **_packet_sidecar_fields(
-                ResearchPacket(
-                    answer_markdown=answered.answer_text,
-                    usage=usage if usage is not None else ResearchUsage(),
-                ),
-                capability_class=capability_class_for_shape(shape, screening=survey),
+                ResearchPacket(answer_markdown=answered.answer_text, usage=spent),
+                capability_class=capability_class,
                 shape=shape,
                 subjects=subjects,
                 peers=[],
-                cache_status="bypass" if usage is None else "miss",
-                degraded_code=f"research_unavailable_{reason}",
+                cache_status=cache_status,
+                degraded_code=degraded_code,
+                degraded_status=failure.status,
                 period_of_interest=query.period_of_interest,
             )
         )
         return question
-    note = answered.answer_text if answered is not None else _unavailable_note(language)
     rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
     suffix = f"\n\n{honest_no_next_line(language)}" if not rows and subjects else ""
-    note = f"{note}{suffix}"
+    note = f"{answered.answer_text}{suffix}"
     computed = None
-    if answered is not None and answered.patch:
+    if answered.patch:
         computed = dict(answered.patch)
         if answered.template is not None:
             computed[ANSWER_TEMPLATE_KEY] = {
@@ -1061,24 +1091,106 @@ def unavailable_result(
         rows = _with_market_counterfactual(
             computed, rows, subjects=subjects, language=language
         )
-    packet = ResearchPacket(
-        answer_markdown=note, usage=usage if usage is not None else ResearchUsage()
-    )
-    return research_stage_result(
+    result = research_stage_result(
         answer=note,
         interpretation=interpretation,
         user=user,
-        capability_class=capability_class_for_shape(shape, screening=survey),
+        capability_class=capability_class,
         shape=shape,
-        packet=packet,
+        packet=ResearchPacket(answer_markdown=note, usage=spent),
         peers=[],
         rows=rows,
         subjects=subjects,
-        cache_status="bypass" if usage is None else "miss",
-        degraded_code=f"research_unavailable_{reason}",
+        cache_status=cache_status,
+        degraded_code=degraded_code,
+        degraded_status=failure.status,
         period_of_interest=query.period_of_interest,
         decision=decision,
         computed=computed,
+    )
+    result.stage_patch.update(lookup_failure_recovery(failure, under_answer=True))
+    return result
+
+
+def research_lookup_failure_for_job(
+    job_request: dict[str, Any], *, failure: ResearchUnavailableError
+) -> dict[str, Any]:
+    """The same ending for a thorough request whose run never started. The
+    no-search step runs inside the turn, and a submission fails once the turn
+    has composed, so its recovery stands alone."""
+    return lookup_failure_patch(
+        failure,
+        capability_class=str(job_request.get("capability_class") or "thorough_research"),
+        shape="thorough",
+        subjects=[
+            subject
+            for subject in job_request.get("subjects") or []
+            if isinstance(subject, dict) and subject.get("symbol")
+        ],
+        period_of_interest=(
+            str(job_request["period_of_interest"])
+            if job_request.get("period_of_interest")
+            else None
+        ),
+        usage=failure.usage,
+    )
+
+
+def lookup_failure_patch(
+    failure: ResearchUnavailableError,
+    *,
+    capability_class: str,
+    shape: str,
+    subjects: list[dict[str, str]],
+    period_of_interest: str | None,
+    usage: ResearchUsage | None,
+) -> dict[str, Any]:
+    """A failed lookup with no answer to stand under ends on its recovery alone,
+    never next experiments.
+
+    The sidecar keeps the degraded code, the status the provider answered with
+    and what the rejected responses cost: a turn that reached the provider is a
+    miss, and only one that never called it bypasses the meter."""
+    recovery = lookup_failure_recovery(failure)
+    spent = usage if usage is not None else ResearchUsage()
+    return {
+        "assistant_response": recovery_message(
+            recovery["recovery"]["code"], retryable=failure.transient
+        ),
+        **recovery,
+        "research": build_research_sidecar(
+            capability_class=capability_class,
+            shape=shape,
+            sources=[],
+            retrieved_at=datetime.now(timezone.utc).isoformat(),
+            subjects=subjects,
+            peers=[],
+            usage={
+                "invocations": spent.invocations,
+                "latency_ms": spent.latency_ms,
+                "cost_usd": spent.cost_usd,
+                "cache_status": "bypass" if usage is None else "miss",
+            },
+            period_of_interest=period_of_interest,
+            degraded_code=f"research_unavailable_{failure.reason}",
+            degraded_status=failure.status,
+        ),
+    }
+
+
+def lookup_failure_recovery(
+    failure: ResearchUnavailableError, *, under_answer: bool = False
+) -> dict[str, dict[str, Any]]:
+    """The recovery a failed lookup ends on, alone or under the no-search answer.
+
+    A transient failure takes the retryable recovery, which the API settles
+    with a durable retry of the same question as it does for discovery; any
+    other reason takes the quiet one, with nothing to retry."""
+    code: RecoveryMessageCode = (
+        "research_lookup_failed" if failure.transient else "research_lookup_unavailable"
+    )
+    return recovery_state_stage_patch(
+        code, retryable=failure.transient, under_answer=under_answer
     )
 
 
@@ -1635,19 +1747,6 @@ def _survey_recovery_note(
             "and laggards."
         ),
     }.get(kind, "I found sources, but could not extract the requested assets.")
-
-
-def _unavailable_note(language: str) -> str:
-    if language == "es-419":
-        return (
-            "No pude completar la búsqueda de datos en este momento, así que "
-            "no voy a citar cifras en vivo. Probar una idea con datos "
-            "históricos sigue disponible."
-        )
-    return (
-        "I couldn't complete the data lookup just now, so I won't quote live "
-        "figures. Testing an idea against historical data is still available."
-    )
 
 
 def _missing_public_source_note(language: str) -> str:
@@ -2273,10 +2372,14 @@ def build_research_sidecar(
     period_of_interest: str | None,
     category: str | None = None,
     degraded_code: str | None = None,
+    degraded_status: int | None = None,
     retrieved_rows: list[dict[str, Any]] | None = None,
     follow_up_questions: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """Build the only supported research sidecar shape."""
+    """Build the only supported research sidecar shape.
+
+    ``degraded_status`` is the HTTP status a failed provider answered with,
+    kept beside the degraded code so outages can be counted by kind."""
     sidecar: dict[str, Any] = {
         "schema_version": RESEARCH_SCHEMA_VERSION,
         "capability_class": capability_class,
@@ -2300,6 +2403,8 @@ def build_research_sidecar(
     }
     if degraded_code:
         sidecar["degraded"] = {"code": degraded_code}
+        if degraded_status is not None:
+            sidecar["degraded"]["status"] = degraded_status
     assert set(sidecar) <= RESEARCH_SIDECAR_KEYS, "undocumented research sidecar key"
     return sidecar
 
@@ -2343,6 +2448,7 @@ def _packet_sidecar_fields(
     question_kind: str | None = None,
     period_start_date: date | str | None = None,
     question_as_of_date: date | str | None = None,
+    degraded_status: int | None = None,
 ) -> dict[str, Any]:
     """The shared builder's arguments for an inline packet. An answer and a
     question both carry its sidecar, so every packet a turn read reaches the ledger."""
@@ -2368,6 +2474,7 @@ def _packet_sidecar_fields(
         },
         period_of_interest=period_of_interest,
         degraded_code=degraded_code,
+        degraded_status=degraded_status,
     )
 
 
@@ -2390,6 +2497,7 @@ def research_stage_result(
     question_as_of_date: date | str | None = None,
     decision: InterpretDecision | None = None,
     computed: dict[str, Any] | None = None,
+    degraded_status: int | None = None,
 ) -> StageResult:
     decision = carried_decision(
         decision,
@@ -2413,6 +2521,7 @@ def research_stage_result(
                 question_kind=question_kind,
                 period_start_date=period_start_date,
                 question_as_of_date=question_as_of_date,
+                degraded_status=degraded_status,
             )
         ),
     }

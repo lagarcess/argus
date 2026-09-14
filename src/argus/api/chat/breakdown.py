@@ -18,7 +18,10 @@ from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
 )
-from argus.domain.research.admission import claim_current_research_attempt
+from argus.domain.research.admission import (
+    admitted_provider_work,
+    claim_current_research_attempt,
+)
 from argus.domain.research.config import ResearchConfigSpec
 from argus.domain.research.contracts import (
     ResearchSource,
@@ -152,14 +155,15 @@ def _llm_result_breakdown_with_metadata(
             return None, "llm_unavailable_or_contract_rejected", None, ()
         if not claim_current_research_attempt().available:
             return None, "research_capacity_exhausted", None, ()
-        response = active_client.run_structured(
-            messages[1]["content"],
-            result_breakdown_spec(resolved_language),
-            schema_model=result_breakdown_schema(headline_facts),
-            schema_name="ResultBreakdownDraft",
-            instructions=messages[0]["content"],
-            limits=RESULT_RESEARCH_LIMITS,
-        )
+        with admitted_provider_work():
+            response = active_client.run_structured(
+                messages[1]["content"],
+                result_breakdown_spec(resolved_language),
+                schema_model=result_breakdown_schema(headline_facts),
+                schema_name="ResultBreakdownDraft",
+                instructions=messages[0]["content"],
+                limits=RESULT_RESEARCH_LIMITS,
+            )
     except ResearchUnavailableError as exc:
         logger.warning("Result breakdown unavailable; using template", reason=exc.reason)
         return None, "llm_unavailable_or_contract_rejected", exc.usage, ()
