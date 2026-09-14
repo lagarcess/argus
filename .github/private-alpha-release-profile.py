@@ -15,6 +15,17 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
 LOCALES_DIR = ROOT / "web" / "public" / "locales"
 SURFACES = ("api", "web", "workflow")
+# Deploys are manual by founder decision. checksPass stays a valid target so the
+# decision can change in the profile alone, but only for all three services.
+AUTO_DEPLOY_TRIGGERS = ("off", "checksPass")
+# The canary's fixed checks, in run order. They never follow features.
+CANARY_CHECKS = (
+    "services_same_commit",
+    "signed_in_chat_answer",
+    "backtest_completes",
+    "research_answer_with_sources",
+)
+CANARY_PROMPTS = ("chat_prompt", "backtest_prompt", "research_prompt")
 FORBIDDEN_KEY_FRAGMENTS = (
     "candidate_sha",
     "deploy_id",
@@ -76,14 +87,17 @@ def validate_profile(profile: dict[str, Any]) -> None:
         "web": "argus-app",
         "workflow": "argus-backtests",
     }
+    triggers: set[object] = set()
     for surface, expected_name in expected_names.items():
         service = _require_mapping(services.get(surface), f"services.{surface}")
         if service.get("name") != expected_name:
             raise ProfileValidationError(f"services.{surface}.name must be {expected_name}")
-        if service.get("auto_deploy_trigger") != "checksPass":
+        if service.get("auto_deploy_trigger") not in AUTO_DEPLOY_TRIGGERS:
             raise ProfileValidationError(
-                f"services.{surface}.auto_deploy_trigger must be checksPass"
+                f"services.{surface}.auto_deploy_trigger must be one of "
+                f"{', '.join(AUTO_DEPLOY_TRIGGERS)}"
             )
+        triggers.add(service.get("auto_deploy_trigger"))
         env = _require_mapping(service.get("env"), f"services.{surface}.env")
         if not env or not all(isinstance(key, str) and isinstance(value, str) for key, value in env.items()):
             raise ProfileValidationError(f"services.{surface}.env must contain string pairs")
@@ -98,6 +112,10 @@ def validate_profile(profile: dict[str, Any]) -> None:
             raise ProfileValidationError(f"services.{surface}.optional must be a list of strings")
         if set(env).intersection(required_present) or set(env).intersection(optional) or set(required_present).intersection(optional):
             raise ProfileValidationError(f"services.{surface} repeats environment keys")
+    if len(triggers) != 1:
+        raise ProfileValidationError(
+            "api, web, and workflow must share one auto_deploy_trigger"
+        )
 
     workflow = _require_mapping(profile.get("workflow"), "workflow")
     if workflow.get("proof_task") != "argus-backtests/workflow_proof":
@@ -119,49 +137,24 @@ def validate_profile(profile: dict[str, Any]) -> None:
     if locales.get("supported") != ["en", "es-419"]:
         raise ProfileValidationError("locales.supported must be [en, es-419]")
     static_keys = _require_strings(locales.get("required_static_keys"), "locales.required_static_keys")
-    if "chat.history.pinned" not in static_keys:
-        raise ProfileValidationError("chat.history.pinned is required for the release canary")
+    if "chat.confirmation.actions.run_backtest" not in static_keys:
+        raise ProfileValidationError(
+            "chat.confirmation.actions.run_backtest is required for the release canary"
+        )
 
     canary = _require_mapping(profile.get("canary"), "canary")
-    if canary.get("language") != "es-419" or canary.get("locale") != "es-419":
-        raise ProfileValidationError("canary language and locale must be es-419")
-    if not isinstance(canary.get("prompt"), str) or not canary["prompt"].strip():
-        raise ProfileValidationError("canary.prompt must be a non-empty string")
-    if (
-        not isinstance(canary.get("decision_note"), str)
-        or not canary["decision_note"].strip()
-    ):
-        raise ProfileValidationError("canary.decision_note must be a non-empty string")
-    if (
-        not isinstance(canary.get("search_query"), str)
-        or not canary["search_query"].strip()
-    ):
-        raise ProfileValidationError("canary.search_query must be a non-empty string")
-    if canary.get("decision_state") not in {
-        "watching",
-        "promising",
-        "rejected",
-        "revisit_later",
-    }:
-        raise ProfileValidationError("canary decision_state is invalid")
+    if canary.get("language") not in locales["supported"]:
+        raise ProfileValidationError("canary.language must be a supported locale")
+    for field in CANARY_PROMPTS:
+        if not isinstance(canary.get(field), str) or not canary[field].strip():
+            raise ProfileValidationError(f"canary.{field} must be a non-empty string")
     required_steps = _require_strings(
         canary.get("required_steps"), "canary.required_steps"
     )
-    for required_step in (
-        "browser_owned_golden_path",
-        "single_run_admission",
-        "finalized_identity",
-        "decision_note",
-        "reload_hydration",
-        "omnisearch_source_identity",
-        "private_identity_handoff",
-        "deterministic_intercepted_recovery",
-        "clean_browser_console",
-    ):
-        if required_step not in required_steps:
-            raise ProfileValidationError(
-                f"canary.required_steps must include {required_step}"
-            )
+    if tuple(required_steps) != CANARY_CHECKS:
+        raise ProfileValidationError(
+            f"canary.required_steps must be exactly {', '.join(CANARY_CHECKS)}"
+        )
 
 
 def _walk_keys(value: object) -> list[str]:
@@ -246,6 +239,10 @@ def canary_value(profile: dict[str, Any], field: str) -> str:
     return str(value).lower() if isinstance(value, bool) else str(value)
 
 
+def canary_checks(profile: dict[str, Any]) -> list[str]:
+    return list(profile["canary"]["required_steps"])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -265,17 +262,8 @@ def main() -> int:
     static_parser = subparsers.add_parser("static-key-values")
     static_parser.add_argument("language")
     canary_parser = subparsers.add_parser("canary-value")
-    canary_parser.add_argument(
-        "field",
-        choices=(
-            "language",
-            "locale",
-            "prompt",
-            "decision_state",
-            "decision_note",
-            "search_query",
-        ),
-    )
+    canary_parser.add_argument("field", choices=("language", *CANARY_PROMPTS))
+    subparsers.add_parser("canary-checks")
     args = parser.parse_args()
 
     try:
@@ -299,6 +287,8 @@ def main() -> int:
             print(json.dumps(static_key_values(profile, args.language), sort_keys=True))
         elif args.command == "canary-value":
             print(canary_value(profile, args.field))
+        elif args.command == "canary-checks":
+            print("\n".join(canary_checks(profile)))
     except ProfileValidationError as exc:
         print(f"release profile error: {exc}", file=sys.stderr)
         return 1

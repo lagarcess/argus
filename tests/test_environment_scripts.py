@@ -143,6 +143,13 @@ esac
     )
     fake_curl.chmod(0o755)
 
+    profile = json.loads(_source(".github/private-alpha-release-profile.json"))
+    profile_triggers = {
+        surface: json.dumps(
+            {"autoDeployTrigger": profile["services"][surface]["auto_deploy_trigger"]}
+        )
+        for surface in ("api", "web", "workflow")
+    }
     env = os.environ.copy()
     env.update(
         {
@@ -155,12 +162,10 @@ esac
             "FAKE_API_ENV_JSON": api_env_json,
             "FAKE_WEB_ENV_JSON": web_env_json,
             "FAKE_WORKFLOW_ENV_JSON": workflow_env_json or _workflow_env_payload(),
-            "FAKE_API_SERVICE_JSON": api_service_json
-            or json.dumps({"autoDeployTrigger": "checksPass"}),
-            "FAKE_WEB_SERVICE_JSON": web_service_json
-            or json.dumps({"autoDeployTrigger": "checksPass"}),
+            "FAKE_API_SERVICE_JSON": api_service_json or profile_triggers["api"],
+            "FAKE_WEB_SERVICE_JSON": web_service_json or profile_triggers["web"],
             "FAKE_WORKFLOW_SERVICE_JSON": workflow_service_json
-            or json.dumps({"autoDeployTrigger": "checksPass"}),
+            or profile_triggers["workflow"],
             "FAKE_CURL_REQUEST_LOG": str(request_log),
         }
     )

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Authenticated browser proof for the Spanish private-alpha Golden Path.
+# Authenticated browser checks for the private-alpha canary.
 
 set -euo pipefail
 
@@ -13,7 +13,8 @@ argus_load_root_env >/dev/null || true
 
 RELEASE_PROFILE_TOOL="$SCRIPT_DIR/private-alpha-release-profile.py"
 APP_URL="${ARGUS_CANARY_APP_URL:-$ARGUS_PRIVATE_LAUNCH_APP_URL}"
-IDENTITY_HANDOFF="${ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF:-}"
+CHECKS_HANDOFF="${ARGUS_CANARY_BROWSER_CHECKS_HANDOFF:-}"
+BROWSER_CHECKS="${ARGUS_CANARY_BROWSER_CHECKS:-}"
 STORAGE_STATE="${ARGUS_CANARY_BROWSER_STORAGE_STATE:-}"
 USER_ID="${ARGUS_CANARY_BROWSER_USER_ID:-}"
 ARTIFACT_PROBE="${ARGUS_CANARY_BROWSER_ARTIFACT_PROBE:-none}"
@@ -27,12 +28,16 @@ if [ -z "$STORAGE_STATE" ] || [ ! -f "$STORAGE_STATE" ]; then
   echo "ERROR: private authenticated browser storage state is required."
   exit 1
 fi
-if [ -z "$IDENTITY_HANDOFF" ] || [ ! -f "$IDENTITY_HANDOFF" ]; then
-  echo "ERROR: private browser identity handoff file is required."
+if [ -z "$CHECKS_HANDOFF" ] || [ ! -f "$CHECKS_HANDOFF" ]; then
+  echo "ERROR: private browser check handoff file is required."
   exit 1
 fi
 if [ -z "$USER_ID" ]; then
   echo "ERROR: expected canary user identity is required."
+  exit 1
+fi
+if [ -z "$BROWSER_CHECKS" ]; then
+  echo "ERROR: the browser checks from the release profile are required."
   exit 1
 fi
 case "$ARTIFACT_PROBE" in
@@ -53,12 +58,11 @@ fi
 
 CANARY_LANGUAGE="$(python3 "$RELEASE_PROFILE_TOOL" canary-value language)"
 CANARY_STATIC_LABELS="$(python3 "$RELEASE_PROFILE_TOOL" static-key-values "$CANARY_LANGUAGE")"
-CANARY_PROMPT="$(python3 "$RELEASE_PROFILE_TOOL" canary-value prompt)"
-CANARY_DECISION_STATE="$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_state)"
-CANARY_DECISION_NOTE="$(python3 "$RELEASE_PROFILE_TOOL" canary-value decision_note)"
-CANARY_SEARCH_QUERY="$(python3 "$RELEASE_PROFILE_TOOL" canary-value search_query)"
+CANARY_CHAT_PROMPT="$(python3 "$RELEASE_PROFILE_TOOL" canary-value chat_prompt)"
+CANARY_BACKTEST_PROMPT="$(python3 "$RELEASE_PROFILE_TOOL" canary-value backtest_prompt)"
+CANARY_RESEARCH_PROMPT="$(python3 "$RELEASE_PROFILE_TOOL" canary-value research_prompt)"
 
-echo "Running stored-session Spanish release canary"
+echo "Running authenticated browser canary checks"
 cd web
 env -u ARGUS_OPS_TOKEN \
   -u ARGUS_WORKFLOW_DATABASE_URL \
@@ -67,13 +71,12 @@ env -u ARGUS_OPS_TOKEN \
   -u ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY \
   ARGUS_CANARY_BROWSER_STORAGE_STATE="$STORAGE_STATE" \
   ARGUS_CANARY_BROWSER_USER_ID="$USER_ID" \
-  ARGUS_CANARY_BROWSER_LANGUAGE="$CANARY_LANGUAGE" \
+  ARGUS_CANARY_BROWSER_CHECKS="$BROWSER_CHECKS" \
+  ARGUS_CANARY_BROWSER_CHECKS_HANDOFF="$CHECKS_HANDOFF" \
   ARGUS_CANARY_STATIC_LABELS_JSON="$CANARY_STATIC_LABELS" \
-  ARGUS_CANARY_BROWSER_PROMPT="$CANARY_PROMPT" \
-  ARGUS_CANARY_BROWSER_DECISION_STATE="$CANARY_DECISION_STATE" \
-  ARGUS_CANARY_BROWSER_DECISION_NOTE="$CANARY_DECISION_NOTE" \
-  ARGUS_CANARY_BROWSER_SEARCH_QUERY="$CANARY_SEARCH_QUERY" \
-  ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF="$IDENTITY_HANDOFF" \
+  ARGUS_CANARY_BROWSER_CHAT_PROMPT="$CANARY_CHAT_PROMPT" \
+  ARGUS_CANARY_BROWSER_BACKTEST_PROMPT="$CANARY_BACKTEST_PROMPT" \
+  ARGUS_CANARY_BROWSER_RESEARCH_PROMPT="$CANARY_RESEARCH_PROMPT" \
   ARGUS_CANARY_BROWSER_ARTIFACT_PROBE="$ARTIFACT_PROBE" \
   ARGUS_CANARY_BROWSER_REDACTION_PROBE_VALUE="$REDACTION_PROBE_VALUE" \
   PLAYWRIGHT_BASE_URL="$APP_URL" \

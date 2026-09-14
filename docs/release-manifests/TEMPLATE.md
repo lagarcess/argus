@@ -77,7 +77,7 @@ privacy-safe labels from canary evidence.
 - workflow_env_status:
 - autodeploy_fingerprint:
 - autodeploy_status:
-- all three services use `checksPass`:
+- all three services use the release profile's trigger, `off` (manual deploys):
 - workflow_runtime_provider_mode:
 - workflow_runtime_proof:
 - env_fingerprint script output:
@@ -86,7 +86,7 @@ privacy-safe labels from canary evidence.
 - Backtest service mode:
 - Workflow service proof:
   - `argus-backtests` latest deploy/status:
-  - workflow autodeploy verified: `checksPass`
+  - workflow autodeploy verified: `off`
   - workflow provider mode verified: `live_provider`
   - effective runtime provider mode verified: `live_provider`
   - effective runtime proof status:
@@ -119,13 +119,16 @@ privacy-safe labels from canary evidence.
 - Local smoke result:
 - Warmup command:
 - Warmup result:
-- Canary evidence artifact: `private-alpha-canary-evidence`
-- Authoritative Spanish release canary:
-  - JSON evidence:
+- Canary evidence artifacts: `private-alpha-release-coherence-evidence` and
+  `private-alpha-authenticated-browser-evidence`
+- Canary checks, each with its status from the evidence:
+  - `services_same_commit`:
+  - `signed_in_chat_answer`, with `sign_in_attempts`:
+  - `backtest_completes`, with the backtest job and run labels:
+  - `research_answer_with_sources`:
+  - Release guards (release config, disabled signup denial, welcome email):
   - Exact candidate SHA verified:
-  - Finalized evidence/result labels:
-  - Decision-note label and reload hydration:
-  - Omnisearch source identity:
+  - Failed check or guard and reason, if red:
 - Browser signup/login proof:
 - Guest exact-head browser evidence:
   - local candidate SHA:

@@ -26,8 +26,24 @@ type SessionHandoff = {
   email: string;
 };
 
+type AllowlistRow = {
+  email?: string | null;
+  role?: string | null;
+  disabled_at?: string | null;
+};
+
+type ProfileRow = {
+  id?: string | null;
+  is_admin?: boolean | null;
+};
+
 const CANARY_PROVISIONING_EMAIL =
   /^private-alpha-canary\+[a-f0-9]{32}@get-argus\.com$/;
+const LOOKUP_ATTEMPTS = 3;
+const LOOKUP_RETRY_DELAY_MS = 2_000;
+
+/** A read-only service lookup that failed in transport, not on a fact. */
+class LookupFailure extends Error {}
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
@@ -44,6 +60,36 @@ function serviceClient() {
       detectSessionInUrl: false,
       persistSession: false,
     },
+  });
+}
+
+/** Retries only lookup transport failures; identity and privilege facts never retry. */
+async function withLookupRetry<T>(
+  reason: string,
+  lookup: () => Promise<T>,
+): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await lookup();
+    } catch (error) {
+      if (!(error instanceof LookupFailure)) throw error;
+      if (attempt >= LOOKUP_ATTEMPTS) throw new Error(reason);
+      console.error(`canary_session_lookup_retry=${reason} attempt=${attempt}`);
+      await new Promise((resolve) =>
+        setTimeout(resolve, LOOKUP_RETRY_DELAY_MS * attempt),
+      );
+    }
+  }
+}
+
+async function allowlistRows(email: string): Promise<AllowlistRow[]> {
+  return withLookupRetry("canary_allowlist_lookup_failed", async () => {
+    const { data, error } = await serviceClient()
+      .from("private_alpha_allowlist")
+      .select("email,role,disabled_at")
+      .eq("email", email);
+    if (error) throw new LookupFailure();
+    return Array.isArray(data) ? (data as AllowlistRow[]) : [];
   });
 }
 
@@ -76,13 +122,7 @@ function assertLeastPrivilege(session: Session, expectedEmail: string): void {
 }
 
 async function assertAllowlistedUser(email: string): Promise<void> {
-  const client = serviceClient();
-  const { data, error } = await client
-    .from("private_alpha_allowlist")
-    .select("email,role,disabled_at")
-    .eq("email", email);
-  if (error) throw new Error("canary_allowlist_lookup_failed");
-  const rows = Array.isArray(data) ? data : [];
+  const rows = await allowlistRows(email);
   const row = rows[0];
   if (
     rows.length !== 1 ||
@@ -95,14 +135,19 @@ async function assertAllowlistedUser(email: string): Promise<void> {
 }
 
 async function nonAdminProfileExists(userId: string): Promise<boolean> {
-  const client = serviceClient();
-  const { data, error } = await client
-    .from("profiles")
-    .select("id,is_admin")
-    .eq("id", userId);
-  const rows = Array.isArray(data) ? data : [];
+  const rows = await withLookupRetry(
+    "canary_profile_lookup_failed",
+    async () => {
+      const { data, error } = await serviceClient()
+        .from("profiles")
+        .select("id,is_admin")
+        .eq("id", userId);
+      if (error) throw new LookupFailure();
+      return Array.isArray(data) ? (data as ProfileRow[]) : [];
+    },
+  );
   const row = rows[0];
-  if (error || rows.length > 1) {
+  if (rows.length > 1) {
     throw new Error("canary_profile_lookup_failed");
   }
   if (rows.length === 0) return false;
@@ -119,13 +164,8 @@ async function assertNonAdminProfile(userId: string): Promise<void> {
 }
 
 async function assertProvisionableAllowlist(email: string): Promise<void> {
-  const client = serviceClient();
-  const { data, error } = await client
-    .from("private_alpha_allowlist")
-    .select("email,role,disabled_at")
-    .eq("email", email);
-  const rows = Array.isArray(data) ? data : [];
-  if (error || rows.length > 1) {
+  const rows = await allowlistRows(email);
+  if (rows.length > 1) {
     throw new Error("canary_allowlist_lookup_failed");
   }
   if (rows[0] && rows[0].role !== "user") {
@@ -137,12 +177,17 @@ async function usersMatchingEmail(email: string): Promise<User[]> {
   const client = serviceClient();
   const matches: User[] = [];
   for (let page = 1; page <= 1000; page += 1) {
-    const { data, error } = await client.auth.admin.listUsers({
-      page,
-      perPage: 1000,
-    });
-    if (error) throw new Error("canary_identity_lookup_failed");
-    const users = data.users as User[];
+    const users = await withLookupRetry(
+      "canary_identity_lookup_failed",
+      async () => {
+        const { data, error } = await client.auth.admin.listUsers({
+          page,
+          perPage: 1000,
+        });
+        if (error) throw new LookupFailure();
+        return data.users as User[];
+      },
+    );
     matches.push(
       ...users.filter(
         (user) => user.email?.trim().toLocaleLowerCase() === email,
