@@ -19,16 +19,26 @@ from tests.promotion_evidence_identity import MEASUREMENT_ENTRY
 PYTHON_VERSION = "3.10.20"
 MEASUREMENT_CASES = "tests/evals/measurement_cases/messy_english.yaml"
 
+_ENGINE = (
+    "def execute(value):\n"
+    "    from .ledger import record\n\n"
+    "    return record(value)\n"
+)
+_LEDGER = "def record(value):\n    return value\n"
+
 # Each reaches the measurement, so changing it needs a new one.
 REACHED_BY_THE_EVAL = {
     "imported-module": "src/argus/stages.py",
     "lazily-imported-module": "src/argus/engine.py",
+    "relatively-imported-module": "src/argus/ledger.py",
     "package-named-by-a-string": "web/argus_display_contract/__init__.py",
     "data-beside-measured-code": "web/argus_display_contract/policy.json",
     "eval-harness": "tests/evals/measurement_eval_harness.py",
     "conftest": "tests/conftest.py",
     "eval-fixture": MEASUREMENT_CASES,
+    "import-roots-and-test-config": "pyproject.toml",
     "dependency-lock": "poetry.lock",
+    "interpreter-pin": ".python-version",
 }
 
 # None reaches the measurement, so evidence survives changing them.
@@ -41,6 +51,34 @@ UNREACHED_BY_THE_EVAL = {
     "test-the-eval-never-imports": ("tests/evals/test_unrelated.py",),
 }
 
+# Files added, deleted or moved: (committed before measuring, committed after,
+# the reached files that differ). None deletes a file.
+STRUCTURAL_CHANGES_REACHED: dict[
+    str,
+    tuple[Mapping[str, str | None], Mapping[str, str | None], tuple[str, ...]],
+] = {
+    "added-package-shadows-a-module": (
+        {},
+        {"src/argus/engine/__init__.py": _LEDGER},
+        ("src/argus/engine/__init__.py",),
+    ),
+    "deleted-module": ({}, {"src/argus/ledger.py": None}, ("src/argus/ledger.py",)),
+    "renamed-module": (
+        {},
+        {
+            "src/argus/ledger.py": None,
+            "src/argus/journal.py": _LEDGER,
+            "src/argus/engine.py": _ENGINE.replace(".ledger", ".journal"),
+        },
+        ("src/argus/engine.py", "src/argus/journal.py", "src/argus/ledger.py"),
+    ),
+    "fixture-beside-an-unimported-script": (
+        {"tests/evals/measurement_cases/generate.py": "CASES = []\n"},
+        {MEASUREMENT_CASES: json.dumps({"cases": [{"id": "case-c"}]})},
+        (MEASUREMENT_CASES,),
+    ),
+}
+
 
 def commit_measured_repository(
     repository_root: Path, *, case_ids: Iterable[str] = ("case-a", "case-b")
@@ -48,20 +86,37 @@ def commit_measured_repository(
     """Initialise a repository holding every kind of file, and commit it."""
 
     _git(repository_root, "init", "--quiet")
-    for relative, content in _layout(case_ids).items():
+    return commit_files(repository_root, _layout(case_ids), message="measured")
+
+
+def commit_files(
+    repository_root: Path,
+    writes: Mapping[str, str | None],
+    *,
+    message: str = "change",
+) -> str:
+    """Write each file, deleting it for None, and commit."""
+
+    for relative, content in writes.items():
         path = repository_root / relative
+        if content is None:
+            path.unlink()
+            continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
-    return _commit(repository_root, "measured")
+    return _commit(repository_root, message)
 
 
 def commit_changes(repository_root: Path, paths: Iterable[str]) -> str:
     """Change each file by a trailing newline, which keeps every format valid."""
 
-    for relative in paths:
-        path = repository_root / relative
-        path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-    return _commit(repository_root, "change")
+    return commit_files(
+        repository_root,
+        {
+            relative: (repository_root / relative).read_text(encoding="utf-8") + "\n"
+            for relative in paths
+        },
+    )
 
 
 def live_eval_scorecard(repository_root: Path, *, measured_sha: str) -> dict[str, object]:
@@ -152,7 +207,8 @@ def _layout(case_ids: Iterable[str]) -> dict[str, str]:
             "def interpret(case):\n"
             '    return files("argus_display_contract").joinpath("policy.json").read_text()\n'
         ),
-        "src/argus/engine.py": "def execute(value):\n    return value\n",
+        "src/argus/engine.py": _ENGINE,
+        "src/argus/ledger.py": _LEDGER,
         "src/argus/unmeasured.py": "VALUE = 1\n",
         "web/argus_display_contract/__init__.py": "",
         "web/argus_display_contract/policy.json": "{}\n",
@@ -176,6 +232,7 @@ def _commit(repository_root: Path, message: str) -> str:
         "commit.gpgsign=false",
         "commit",
         "--quiet",
+        "--allow-empty",
         "-m",
         message,
     )

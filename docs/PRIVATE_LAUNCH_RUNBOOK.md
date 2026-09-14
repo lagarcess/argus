@@ -855,6 +855,10 @@ them.
   eval never imports.
 - **A change the eval reaches needs a new measurement.** The gate names the
   changed files.
+- **A model or provider change still needs a new run.** The eval reads its own
+  environment, not `render.yaml`, so this rule cannot see a model swap there.
+  `tests/evals/README.md` requires a live run after any interpreter model or
+  provider change.
 - **The manifest names both commits.** Beside the candidate or rollback SHA,
   name the SHA each piece of evidence measured whenever the two differ.
 

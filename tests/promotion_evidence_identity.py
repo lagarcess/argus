@@ -170,7 +170,8 @@ def _imported_modules(
             return None
         for root in roots:
             stem = "/".join((root, *parts) if root else parts)
-            for path in (f"{stem}.py", f"{stem}/__init__.py"):
+            # A regular package shadows a same-named module beside it.
+            for path in (f"{stem}/__init__.py", f"{stem}.py"):
                 if path in tracked:
                     return path
         return None
@@ -228,28 +229,26 @@ def _absolute_module(node: ast.ImportFrom, package: str) -> str:
 def _data_beside(
     modules: frozenset[str], tracked: frozenset[str], roots: tuple[str, ...]
 ) -> frozenset[str]:
-    """Package data: non-Python files in a measured module's folder, or in a
-    data-only folder inside it, where importlib.resources and Path(__file__)
-    find them. An import root is not a package, so its loose files are not."""
+    """Package data, where importlib.resources and Path(__file__) find it: a
+    non-Python file in or below a measured module's folder, unless an unmeasured
+    package or an import root in between claims it first."""
 
     folders = {str(PurePosixPath(module).parent) for module in modules} - {".", *roots}
-    code_folders = {
-        str(folder)
+    packages = {
+        str(PurePosixPath(path).parent)
         for path in tracked
-        if path.endswith(".py")
-        for folder in PurePosixPath(path).parents
+        if PurePosixPath(path).name == "__init__.py"
     }
     data = set()
     for path in tracked:
         if path.endswith(".py"):
             continue
-        parts = path.split("/")
-        for depth in range(1, len(parts)):
-            if "/".join(parts[:depth]) in folders:
-                child = "/".join(parts[: depth + 1])
-                if child == path or child not in code_folders:
-                    data.add(path)
-                    break
+        for folder in map(str, PurePosixPath(path).parents):
+            if folder in folders:
+                data.add(path)
+                break
+            if folder in packages or folder in roots or folder == ".":
+                break
     return frozenset(data)
 
 

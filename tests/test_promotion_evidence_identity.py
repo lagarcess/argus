@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -19,8 +20,10 @@ from tests.promotion_evidence_identity import (
 )
 from tests.promotion_evidence_repository import (
     REACHED_BY_THE_EVAL,
+    STRUCTURAL_CHANGES_REACHED,
     UNREACHED_BY_THE_EVAL,
     commit_changes,
+    commit_files,
     commit_measured_repository,
 )
 
@@ -70,6 +73,26 @@ def test_change_the_measurement_reaches_needs_a_new_one(tmp_path: Path, path: st
     shipped = commit_changes(tmp_path, [path])
 
     assert reachable_changes(measured, shipped, repository_root=tmp_path) == (path,)
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "reached"),
+    [
+        pytest.param(before, after, reached, id=kind)
+        for kind, (before, after, reached) in STRUCTURAL_CHANGES_REACHED.items()
+    ],
+)
+def test_added_deleted_or_moved_reached_files_need_a_new_measurement(
+    tmp_path: Path,
+    before: Mapping[str, str | None],
+    after: Mapping[str, str | None],
+    reached: tuple[str, ...],
+) -> None:
+    commit_measured_repository(tmp_path)
+    measured = commit_files(tmp_path, before)
+    shipped = commit_files(tmp_path, after)
+
+    assert reachable_changes(measured, shipped, repository_root=tmp_path) == reached
 
 
 def test_2026_09_13_sharing_off_change_kept_its_measurement() -> None:
