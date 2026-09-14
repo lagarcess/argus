@@ -425,9 +425,10 @@ def completed_pending(
     voiced: Sequence[AnswerCalculation],
     notes: list[str],
 ) -> list[AnswerCalculation]:
-    """The pending question's own calculations, each blank it owed filled from the
-    reply when the reply states it; every figure it already held keeps its value
-    and source, whatever the voiced reply wrote."""
+    """The pending question's own calculations, each blank it owed (a null input,
+    or a requested field it never listed) filled from the reply when the reply
+    states it; every figure it already held keeps its value and source, whatever
+    the voiced reply wrote."""
     try:
         stored = [
             AnswerCalculation.model_validate(item) for item in pending_requests(pending)
@@ -437,6 +438,11 @@ def completed_pending(
     if not stored:
         return list(voiced)
     replied = {calculation.name: calculation for calculation in voiced}
+    requested = {
+        str(name)
+        for name in pending.get("requested_fields") or [pending.get("requested_field")]
+        if name
+    }
     changed = len(voiced) != len(stored)
     completed: list[AnswerCalculation] = []
     for request in stored:
@@ -460,6 +466,10 @@ def completed_pending(
             ):
                 changed = True
             inputs.append(item)
+        for name in [name for name in filled if name in requested]:
+            reply = filled.pop(name)
+            if reply.value is not None and reply.source != "assumption":
+                inputs.append(reply)
         changed = changed or bool(filled)
         completed.append(request.model_copy(update={"inputs": inputs}))
     if changed and PENDING_KEPT_REASON_CODE not in notes:

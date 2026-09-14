@@ -18,6 +18,7 @@ class _Table:
         self.filters: list[tuple[str, str, Any]] = []
         self.orders: list[tuple[str, bool]] = []
         self.limit_value: int | None = None
+        self.offset = 0
         self.negate = False
 
     def select(self, *_args: object) -> _Table:
@@ -53,6 +54,10 @@ class _Table:
         self.limit_value = value
         return self
 
+    def range(self, start: int, end: int) -> _Table:
+        self.offset, self.limit_value = start, end - start + 1
+        return self
+
     def execute(self) -> SimpleNamespace:
         self.client.queries.append(self)
         source = self.client.tables.get(self.table_name, [])
@@ -60,7 +65,7 @@ class _Table:
         for key, desc in reversed(self.orders):
             rows.sort(key=lambda row: str(row.get(key)), reverse=desc)
         if self.limit_value is not None:
-            rows = rows[: self.limit_value]
+            rows = rows[self.offset : self.offset + self.limit_value]
         return SimpleNamespace(data=[dict(row) for row in rows])
 
     def _matches(self, row: dict[str, Any]) -> bool:
@@ -208,3 +213,24 @@ def test_no_symbol_row_skips_the_conversation_read() -> None:
     client = _Client([])
     assert _Reader(client).computed_answer_rows_for_symbols(user_id="owner") == []
     assert [query.table_name for query in client.queries] == ["messages"]
+
+
+def test_symbol_rows_read_past_answers_in_deleted_conversations(monkeypatch) -> None:
+    from argus.domain import supabase_computed_answers as reads
+
+    monkeypatch.setattr(reads, "_COMPUTED_ANSWER_LIMIT", 2)
+    live, deleted = fake.uuid4(), fake.uuid4()
+    apple = {"kind": "price_multiple", "inputs": {}, "symbols": ["AAPL"]}
+    rows = [
+        _message(deleted, "assistant", "2026-09-10T12:00:00+00:00", computation=apple),
+        _message(deleted, "assistant", "2026-09-10T11:00:00+00:00", computation=apple),
+        _message(live, "assistant", "2026-09-10T10:00:00+00:00", computation=apple),
+    ]
+    conversations = [
+        _conversation(live),
+        _conversation(deleted, deleted_at="2026-09-11T00:00:00+00:00"),
+    ]
+    found = _Reader(_Client(rows, conversations)).computed_answer_rows_for_symbols(
+        user_id="owner"
+    )
+    assert [row["conversation_id"] for row in found] == [live]

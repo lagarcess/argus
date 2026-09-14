@@ -5362,7 +5362,7 @@ requested_fields, missing_inputs: [{name, label}], semantic_needs: [], payload:
 the app writes the question from them (`tools.calc.missing_inputs.ask`), so the
 question names exactly the figures only the user knows. `retrieved` keeps the
 pages the answer read and `evidence` the figures it cited from finance data, so
-the reply may still cite them (`calculation_pending_reply`). The stored calculations stand: the reply fills only the blanks they owed, with a figure that is not an assumption, and a voiced reply that changed a figure they held is recorded as `calculation_pending_reply_kept_stored`. That question belongs to the no-search
+the reply may still cite them (`calculation_pending_reply`). The stored calculations stand: the reply fills only the blanks they owed (a null input, or a requested field they never listed), with a figure that is not an assumption, and a voiced reply that changed a figure they held is recorded as `calculation_pending_reply_kept_stored`. That question belongs to the no-search
 answer; a research turn whose lookup failed and whose fallback asks keeps its
 `research` sidecar, so the packet it read reaches the ledger, and a background
 job in that case stores the same `clarification` and `requested_field` on its

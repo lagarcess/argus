@@ -22,7 +22,12 @@ class _Query:
 
     def execute(self) -> SimpleNamespace:
         self.client.queries.append(self)
-        return SimpleNamespace(data=self.client.data[self.table])
+        rows = self.client.data[self.table]
+        bounds = [args for name, args in self.calls if name == "range"]
+        if bounds:
+            start, end = bounds[-1]
+            rows = rows[start : end + 1]
+        return SimpleNamespace(data=rows)
 
 
 class _Client:
@@ -56,7 +61,7 @@ def test_the_kind_filter_reads_the_marker_and_drops_deleted_conversations() -> N
     messages, conversations = client.queries
     assert ("eq", ("metadata->computation->>kind", "price_multiple")) in messages.calls
     assert ("eq", ("user_id", "owner")) in messages.calls
-    assert ("limit", (11,)) in messages.calls
+    assert ("range", (0, 10)) in messages.calls
     assert ("is_", ("deleted_at", "null")) in conversations.calls
     assert ("in_", ("id", ["live", "deleted"])) in conversations.calls
 
@@ -65,3 +70,21 @@ def test_no_matching_message_skips_the_conversation_read() -> None:
     client = _Client({"messages": [], "conversations": []})
     assert _Reader(client).computed_answers_of_kind(user_id="o", kind="k", limit=3) == []
     assert len(client.queries) == 1
+
+
+def test_answers_in_deleted_conversations_do_not_crowd_out_older_live_ones() -> None:
+    client = _Client(
+        {
+            "messages": [
+                {"id": "m1", "conversation_id": "deleted", "role": "assistant"},
+                {"id": "m2", "conversation_id": "deleted", "role": "assistant"},
+                {"id": "m3", "conversation_id": "live", "role": "assistant"},
+            ],
+            "conversations": [{"id": "live"}],
+        }
+    )
+    rows = _Reader(client).computed_answers_of_kind(user_id="owner", kind="k", limit=2)
+    assert [row["id"] for row in rows] == ["m3"]
+    first, _, second, _ = client.queries
+    assert ("range", (0, 1)) in first.calls
+    assert ("range", (2, 3)) in second.calls

@@ -250,3 +250,22 @@ def test_payments_that_clear_a_loan_early_stop_there() -> None:
     assert row_value(flat, "total_interest") == pytest.approx(0.0)
     assert row_value(car, "total_payments") == pytest.approx(234_814.73, abs=0.01)
     assert min(car.outcome.result["balances"]) == 0.0
+
+
+def test_a_target_already_met_draws_no_schedule() -> None:
+    card = run_calculation(
+        "time_value",
+        {
+            "direction": "save",
+            "currency": "USD",
+            "present_value": 10_000,
+            "payment": 0,
+            "future_value": 10_000,
+            "annual_rate_pct": 5,
+            "periods": None,
+            "start_date": "2026-09-11",
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    assert card.outcome.result["balances"] == []
+    assert card.presentation.visual is None

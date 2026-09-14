@@ -7,13 +7,16 @@ these reads filter on.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 from supabase import Client
 
 _COMPUTED_ANSWER_LIMIT = 500
 _MESSAGE_SELECT = "id,conversation_id,role,content,metadata,created_at"
+# Pages a list reads past answers in soft-deleted conversations before it
+# stops short of its size.
+_LIVE_REFILL_PAGES = 4
 
 
 class SupabaseComputedAnswerReadMixin:
@@ -67,41 +70,56 @@ class SupabaseComputedAnswerReadMixin:
         self, *, user_id: str, conversation_id: str | None = None
     ) -> list[dict[str, Any]]:
         """Computed answers that name an asset, in live conversations, newest first."""
-        query = (
-            self.client.table("messages")
-            .select(_MESSAGE_SELECT)
-            .eq("user_id", user_id)
-            .eq("role", "assistant")
-            .not_.is_("metadata->computation->symbols", "null")
+
+        def newest() -> Any:
+            query = (
+                self.client.table("messages")
+                .select(_MESSAGE_SELECT)
+                .eq("user_id", user_id)
+                .eq("role", "assistant")
+                .not_.is_("metadata->computation->symbols", "null")
+            )
+            if conversation_id is not None:
+                query = query.eq("conversation_id", conversation_id)
+            return query.order("created_at", desc=True).order("id", desc=True)
+
+        return self._live_newest(
+            user_id=user_id, newest=newest, size=_COMPUTED_ANSWER_LIMIT
         )
-        if conversation_id is not None:
-            query = query.eq("conversation_id", conversation_id)
-        rows = (
-            query.order("created_at", desc=True)
-            .order("id", desc=True)
-            .limit(_COMPUTED_ANSWER_LIMIT)
-            .execute()
-        )
-        found = [dict(row) for row in getattr(rows, "data", None) or []]
-        return self._in_live_conversations(user_id=user_id, rows=found)
 
     def computed_answers_of_kind(
         self, *, user_id: str, kind: str, limit: int
     ) -> list[dict[str, Any]]:
         """The owner's newest computed answers of one kind, in live conversations."""
-        rows = (
-            self.client.table("messages")
-            .select(_MESSAGE_SELECT)
-            .eq("user_id", user_id)
-            .eq("role", "assistant")
-            .eq("metadata->computation->>kind", kind)
-            .order("created_at", desc=True)
-            .order("id", desc=True)
-            .limit(limit)
-            .execute()
-        )
-        found = [dict(row) for row in getattr(rows, "data", None) or []]
-        return self._in_live_conversations(user_id=user_id, rows=found)
+
+        def newest() -> Any:
+            return (
+                self.client.table("messages")
+                .select(_MESSAGE_SELECT)
+                .eq("user_id", user_id)
+                .eq("role", "assistant")
+                .eq("metadata->computation->>kind", kind)
+                .order("created_at", desc=True)
+                .order("id", desc=True)
+            )
+
+        return self._live_newest(user_id=user_id, newest=newest, size=limit)
+
+    def _live_newest(
+        self, *, user_id: str, newest: Callable[[], Any], size: int
+    ) -> list[dict[str, Any]]:
+        """Up to ``size`` newest rows in live conversations: a page whose rows sit
+        in soft-deleted conversations is refilled from the next, for a bounded
+        number of pages."""
+        kept: list[dict[str, Any]] = []
+        for page in range(_LIVE_REFILL_PAGES if size > 0 else 0):
+            start = page * size
+            rows = newest().range(start, start + size - 1).execute()
+            found = [dict(row) for row in getattr(rows, "data", None) or []]
+            kept.extend(self._in_live_conversations(user_id=user_id, rows=found))
+            if len(kept) >= size or len(found) < size:
+                break
+        return kept[:size]
 
     def _in_live_conversations(
         self, *, user_id: str, rows: list[dict[str, Any]]

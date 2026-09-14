@@ -161,7 +161,8 @@ def compute_time_value(arguments: TimeValueArguments) -> TimeValueResult:
             "future_value",
             tvm.future_value(start_s, payment_s, per_period, periods, timing),
         )
-    whole_periods = max(int(math.ceil(periods - 1e-9)), 1)
+    # A target already met needs no period, so its schedule is empty.
+    whole_periods = 0 if periods == 0 else max(int(math.ceil(periods - 1e-9)), 1)
     if arguments.direction == "borrow":
         balances = [
             max(row.balance, 0.0)
