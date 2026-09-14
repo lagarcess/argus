@@ -1,0 +1,117 @@
+{
+  "checked_at": "2026-09-14T00:17:58.868745+00:00",
+  "deployed_sha": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "status": "remaining_acceptance_checks_passed",
+  "canary_disposition": "native failures retained; founder accepted pre-existing canary failures, tracked in #614",
+  "canary_fact": {
+    "status_code": 401,
+    "timestamp": "2026-09-13T23:00:31.510440089Z",
+    "method": "GET",
+    "path": "/api/v1/me",
+    "diagnosis_stopped_after_fact": true
+  },
+  "founder_report": {
+    "failed_runs": 97,
+    "sample_size": 100,
+    "every_run_since": "2026-08-18",
+    "production_signed_in_app_works": true,
+    "history_independently_recomputed": false
+  },
+  "issue": "https://github.com/lagarcess/argus/issues/614",
+  "checks": [
+    {
+      "check": "new signup",
+      "result": "pass",
+      "expected": "Ordinary signup creates a confirmed account that can sign in.",
+      "visible_text": "Revisa tu correo; signed-in New chat, Search, Settings.",
+      "reason": "Turnstile completed automatically; account confirmed and ordinary login succeeded.",
+      "screenshots": [
+        "browser/01-signup-confirmation.jpg",
+        "browser/02-new-account-signed-in.jpg"
+      ]
+    },
+    {
+      "check": "profile save and reload",
+      "result": "pass",
+      "expected": "The new account can save profile values and retain them after reload.",
+      "visible_text": "Production Check; Country United States; Currency USD.",
+      "reason": "Name survived reload; database readback confirms display_name and country US.",
+      "screenshots": [
+        "browser/12-country-persisted.jpg"
+      ]
+    },
+    {
+      "check": "Spanish Usage",
+      "result": "pass",
+      "expected": "Use all four founder-approved Spanish labels.",
+      "visible_text": "Uso; Conversación; Búsquedas con fuentes; Simulaciones.",
+      "reason": "All four labels matched on the loaded production panel.",
+      "screenshots": [
+        "browser/06-es-usage.jpg"
+      ]
+    },
+    {
+      "check": "English Usage",
+      "result": "pass",
+      "expected": "Use all four founder-approved English labels.",
+      "visible_text": "Usage; Conversation; Searches with sources; Simulations.",
+      "reason": "All four labels matched on the loaded production panel.",
+      "screenshots": [
+        "browser/07-en-usage.jpg"
+      ]
+    },
+    {
+      "check": "historical result for feedback",
+      "result": "pass with recovered submission warning",
+      "expected": "One confirmed DCA simulation completes and exposes the feedback ask.",
+      "visible_text": "Simulation Complete; Quick take; How is Argus doing?",
+      "reason": "One workflow job and result completed; earlier browser creation error was followed by a completed pending submission.",
+      "screenshots": [
+        "browser/08-conversation-start-blocked.jpg",
+        "browser/09-backtest-confirmation.jpg",
+        "browser/10-simulation-complete.jpg"
+      ]
+    },
+    {
+      "check": "one feedback rating and support email",
+      "result": "pass",
+      "expected": "One feedback-ask rating persists and sends exactly one support email.",
+      "visible_text": "Thanks for telling us.",
+      "reason": "One positive feedback_ask row saved; one matching support email delivered.",
+      "screenshots": [
+        "browser/13-feedback-saved.jpg"
+      ]
+    },
+    {
+      "check": "feedback persistence after reload",
+      "result": "pass",
+      "expected": "The result reloads and the answered feedback ask does not reappear.",
+      "visible_text": "Simulation Complete; no Good rating button.",
+      "reason": "Hydrated result visible and exact rating button count is zero.",
+      "screenshots": [
+        "browser/14-result-after-reload.jpg"
+      ]
+    }
+  ],
+  "signup_email_limit": "The synthetic test address bounced. Verification used its sent confirmation message. This proves signup, confirmation and login, not delivery to that synthetic inbox. The separate support email was delivered.",
+  "submission_warning": "Initial UI submission reported an error. The pending submission later completed; no product fix, extra backtest or redeploy was needed. Two conversation rows and one completed run were recorded.",
+  "privacy": "Only the new controlled test account; no credentials, email body, raw user/conversation/run IDs or customer text are included. Unusable profile crops are excluded.",
+  "spend": {
+    "new_tracked_usd": "0.01801360",
+    "new_unpriced_ledger_rows": 1,
+    "additional_reserve_usd": "0.20",
+    "browser_total_tracked_usd": "1.35864663874",
+    "browser_total_reserve_usd": "0.44",
+    "browser_guard_total_usd": "1.79864663874",
+    "browser_cap_usd": "3.00",
+    "eval_guard_total_usd": "11.196433710664",
+    "eval_cap_usd": "12.50",
+    "replay_guard_total_usd": "1.88731696526",
+    "replay_cap_usd": "4.00",
+    "reserve_is_spend": false,
+    "reserve_note": "Additional conservative reserve for the unpriced row and readout accounting gaps; these are not treated as zero actual cost."
+  },
+  "mutations_this_resumption": "one ordinary test signup, profile preferences, normal conversation actions, one simulation, one rating; no config/migration/deploy/fix",
+  "human_manual_rating": "Not needed after recovery; fresh pre-rating email readback was zero and post-rating readback was exactly one.",
+  "session_cleanup": "Controlled test account signed out; guest Sign in control verified; owned browser tab closed."
+}

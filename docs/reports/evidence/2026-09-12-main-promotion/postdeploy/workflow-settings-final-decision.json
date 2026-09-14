@@ -1,0 +1,40 @@
+{
+  "recorded_at": "2026-09-14T00:27:35.847470+00:00",
+  "status": "founder_approved_and_applied",
+  "approver": "founder in this promotion task",
+  "approval_source": "Explicit founder message in this task, after the workflow-runtime stop and before the four per-key writes",
+  "approval_quote": "Approved: apply the two workflow values through Render's per-key env endpoint, exactly as prepared, not through workflow-runtime.",
+  "approval_timestamp": null,
+  "approval_timestamp_note": "The user-message timestamp is not retained in the release artifacts. Approval preceded the first write at the timestamp below; no exact approval time is invented.",
+  "approved_before_first_write_at": "2026-09-13T22:35:59.676418+00:00",
+  "execution_completed_at": "2026-09-13T22:36:00.288929+00:00",
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "approved_method": "Render per-key environment PUT endpoint",
+  "approved_services": [
+    "argus-backtests",
+    "argus-api"
+  ],
+  "approved_keys": {
+    "ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna",
+    "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna"
+  },
+  "approval_conditions": [
+    "Read all three autoDeployTrigger values before writes; all must be off",
+    "Write only the two keys on the workflow and the same two on argus-api",
+    "Read back all four values and all three autoDeployTrigger values; all triggers must remain off",
+    "Do not run Blueprint sync or workflow-runtime"
+  ],
+  "completed_write_count": 4,
+  "all_writes_http_200": true,
+  "historical_preapproval_stop": "workflow-settings-method-decision.json",
+  "execution_evidence": "hosted-settings-writes.json",
+  "before_evidence": [
+    "hosted-settings-before.json",
+    "hosted-settings-immediately-before-write.json"
+  ],
+  "after_evidence": [
+    "hosted-settings-after.json",
+    "hosted-settings-post-deploy.json"
+  ],
+  "review_finding": "PR #613 discussion_r4001218073: confirmed P2 documentation omission; no new production mutation"
+}
