@@ -1,0 +1,2440 @@
+{
+  "label": "registered-q4-es-419",
+  "phase": "registered",
+  "question": "q4",
+  "language": "es-419",
+  "country": "DO",
+  "account_kind": "registered",
+  "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+  "message": "¿DOP$1 millón en un bono del Banco Popular?",
+  "answer": {
+    "id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+    "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+    "role": "assistant",
+    "content": "Argus can't run that rule directly yet. Which supported direction should I use: Use a supported stock or crypto symbol?",
+    "created_at": "2026-09-14T17:05:16.924730Z",
+    "metadata": {
+      "clarification": {
+        "kind": "unsupported_recovery",
+        "options": [
+          {
+            "id": "option_0",
+            "replacement_values": {},
+            "compatibility_label": "Use a supported stock or crypto symbol"
+          }
+        ],
+        "payload": {
+          "strategy": {
+            "cadence": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "timeframe": null,
+            "date_range": null,
+            "entry_rule": null,
+            "exit_logic": null,
+            "risk_rules": [],
+            "asset_class": null,
+            "assumptions": [],
+            "entry_logic": null,
+            "sizing_mode": null,
+            "position_size": null,
+            "refinement_of": null,
+            "strategy_type": "buy_and_hold",
+            "asset_universe": [],
+            "capital_amount": 1000000,
+            "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+            "extra_parameters": {
+              "language": "es",
+              "evidence_spans": {
+                "asset_universe": "un bono del Banco Popular",
+                "capital_amount": "DOP$1 millón"
+              },
+              "field_provenance": {
+                "capital_amount": "starting_capital"
+              },
+              "raw_strategy_type": "buy_and_hold"
+            },
+            "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+            "comparison_baseline": null,
+            "resolution_provenance": [
+              {
+                "field": "asset_universe[0]",
+                "source": "llm_extraction",
+                "raw_text": "BANCO POPULAR BOND",
+                "confidence": "low",
+                "asset_class": null,
+                "validated_by": "provider_catalog",
+                "candidate_kind": "asset",
+                "canonical_symbol": null,
+                "resolution_status": "unsupported"
+              }
+            ],
+            "requested_strategy_template": null
+          },
+          "raw_value": "BANCO POPULAR BOND"
+        },
+        "reason_code": "unsupported_symbol",
+        "prompt_source": "degraded_fallback",
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "requested_field": "unsupported_constraints",
+        "requested_fields": [
+          "unsupported_constraints"
+        ]
+      },
+      "response_intent": {
+        "kind": "unsupported_recovery",
+        "facts": {
+          "language": "es-419",
+          "strategy": {
+            "cadence": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "timeframe": null,
+            "date_range": null,
+            "entry_rule": null,
+            "exit_logic": null,
+            "risk_rules": [],
+            "asset_class": null,
+            "assumptions": [],
+            "entry_logic": null,
+            "sizing_mode": null,
+            "position_size": null,
+            "refinement_of": null,
+            "strategy_type": "buy_and_hold",
+            "asset_universe": [],
+            "capital_amount": 1000000,
+            "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+            "extra_parameters": {
+              "language": "es",
+              "evidence_spans": {
+                "asset_universe": "un bono del Banco Popular",
+                "capital_amount": "DOP$1 millón"
+              },
+              "field_provenance": {
+                "capital_amount": "starting_capital"
+              },
+              "raw_strategy_type": "buy_and_hold"
+            },
+            "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+            "comparison_baseline": null,
+            "resolution_provenance": [
+              {
+                "field": "asset_universe[0]",
+                "source": "llm_extraction",
+                "raw_text": "BANCO POPULAR BOND",
+                "confidence": "low",
+                "asset_class": null,
+                "validated_by": "provider_catalog",
+                "candidate_kind": "asset",
+                "canonical_symbol": null,
+                "resolution_status": "unsupported"
+              }
+            ],
+            "requested_strategy_template": null
+          },
+          "current_user_message": "¿DOP$1 millón en un bono del Banco Popular?",
+          "unsupported_constraints": [
+            {
+              "category": "unsupported_symbol",
+              "raw_value": "BANCO POPULAR BOND",
+              "explanation": "I understood the symbol, but I could not verify it in the supported market data universe for this run.",
+              "simplification_options": [
+                {
+                  "label": "Use a supported stock or crypto symbol",
+                  "replacement_values": {}
+                }
+              ]
+            },
+            {
+              "category": "unsupported_asset",
+              "raw_value": "BANCO POPULAR BOND",
+              "explanation": "I understood the asset reference, but Argus Alpha cannot execute it as requested yet.",
+              "simplification_options": []
+            }
+          ],
+          "preserved_optional_parameter_status": {
+            "confidence": 0.8,
+            "ambiguous_fields": [],
+            "arbitration_mode": "structured_arbitration",
+            "optional_parameter_opportunity": [
+              "initial_capital",
+              "timeframe",
+              "fees",
+              "slippage",
+              "engine_options"
+            ],
+            "user_preference_overridden_for_turn": false
+          }
+        },
+        "options": [
+          {
+            "id": "option_0",
+            "label": "Use a supported stock or crypto symbol",
+            "replacement_values": {}
+          }
+        ],
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "requested_fields": []
+      },
+      "pending_strategy": {
+        "strategy": {
+          "cadence": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "timeframe": null,
+          "date_range": null,
+          "entry_rule": null,
+          "exit_logic": null,
+          "risk_rules": [],
+          "asset_class": null,
+          "assumptions": [],
+          "entry_logic": null,
+          "sizing_mode": null,
+          "position_size": null,
+          "refinement_of": null,
+          "strategy_type": "buy_and_hold",
+          "asset_universe": [],
+          "capital_amount": 1000000,
+          "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+          "extra_parameters": {
+            "language": "es",
+            "evidence_spans": {
+              "asset_universe": "un bono del Banco Popular",
+              "capital_amount": "DOP$1 millón"
+            },
+            "field_provenance": {
+              "capital_amount": "starting_capital"
+            },
+            "raw_strategy_type": "buy_and_hold"
+          },
+          "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+          "comparison_baseline": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "source": "llm_extraction",
+              "raw_text": "BANCO POPULAR BOND",
+              "confidence": "low",
+              "asset_class": null,
+              "validated_by": "provider_catalog",
+              "candidate_kind": "asset",
+              "canonical_symbol": null,
+              "resolution_status": "unsupported"
+            }
+          ],
+          "requested_strategy_template": null
+        },
+        "clarification": {
+          "kind": "unsupported_recovery",
+          "options": [
+            {
+              "id": "option_0",
+              "replacement_values": {},
+              "compatibility_label": "Use a supported stock or crypto symbol"
+            }
+          ],
+          "payload": {
+            "strategy": {
+              "cadence": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "timeframe": null,
+              "date_range": null,
+              "entry_rule": null,
+              "exit_logic": null,
+              "risk_rules": [],
+              "asset_class": null,
+              "assumptions": [],
+              "entry_logic": null,
+              "sizing_mode": null,
+              "position_size": null,
+              "refinement_of": null,
+              "strategy_type": "buy_and_hold",
+              "asset_universe": [],
+              "capital_amount": 1000000,
+              "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+              "extra_parameters": {
+                "language": "es",
+                "evidence_spans": {
+                  "asset_universe": "un bono del Banco Popular",
+                  "capital_amount": "DOP$1 millón"
+                },
+                "field_provenance": {
+                  "capital_amount": "starting_capital"
+                },
+                "raw_strategy_type": "buy_and_hold"
+              },
+              "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+              "comparison_baseline": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "source": "llm_extraction",
+                  "raw_text": "BANCO POPULAR BOND",
+                  "confidence": "low",
+                  "asset_class": null,
+                  "validated_by": "provider_catalog",
+                  "candidate_kind": "asset",
+                  "canonical_symbol": null,
+                  "resolution_status": "unsupported"
+                }
+              ],
+              "requested_strategy_template": null
+            },
+            "raw_value": "BANCO POPULAR BOND"
+          },
+          "reason_code": "unsupported_symbol",
+          "prompt_source": "degraded_fallback",
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "requested_field": "unsupported_constraints",
+          "requested_fields": [
+            "unsupported_constraints"
+          ]
+        },
+        "requested_field": null,
+        "response_intent": {
+          "kind": "unsupported_recovery",
+          "facts": {
+            "language": "es-419",
+            "strategy": {
+              "cadence": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "timeframe": null,
+              "date_range": null,
+              "entry_rule": null,
+              "exit_logic": null,
+              "risk_rules": [],
+              "asset_class": null,
+              "assumptions": [],
+              "entry_logic": null,
+              "sizing_mode": null,
+              "position_size": null,
+              "refinement_of": null,
+              "strategy_type": "buy_and_hold",
+              "asset_universe": [],
+              "capital_amount": 1000000,
+              "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+              "extra_parameters": {
+                "language": "es",
+                "evidence_spans": {
+                  "asset_universe": "un bono del Banco Popular",
+                  "capital_amount": "DOP$1 millón"
+                },
+                "field_provenance": {
+                  "capital_amount": "starting_capital"
+                },
+                "raw_strategy_type": "buy_and_hold"
+              },
+              "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+              "comparison_baseline": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "source": "llm_extraction",
+                  "raw_text": "BANCO POPULAR BOND",
+                  "confidence": "low",
+                  "asset_class": null,
+                  "validated_by": "provider_catalog",
+                  "candidate_kind": "asset",
+                  "canonical_symbol": null,
+                  "resolution_status": "unsupported"
+                }
+              ],
+              "requested_strategy_template": null
+            },
+            "current_user_message": "¿DOP$1 millón en un bono del Banco Popular?",
+            "unsupported_constraints": [
+              {
+                "category": "unsupported_symbol",
+                "raw_value": "BANCO POPULAR BOND",
+                "explanation": "I understood the symbol, but I could not verify it in the supported market data universe for this run.",
+                "simplification_options": [
+                  {
+                    "label": "Use a supported stock or crypto symbol",
+                    "replacement_values": {}
+                  }
+                ]
+              },
+              {
+                "category": "unsupported_asset",
+                "raw_value": "BANCO POPULAR BOND",
+                "explanation": "I understood the asset reference, but Argus Alpha cannot execute it as requested yet.",
+                "simplification_options": []
+              }
+            ],
+            "preserved_optional_parameter_status": {
+              "confidence": 0.8,
+              "ambiguous_fields": [],
+              "arbitration_mode": "structured_arbitration",
+              "optional_parameter_opportunity": [
+                "initial_capital",
+                "timeframe",
+                "fees",
+                "slippage",
+                "engine_options"
+              ],
+              "user_preference_overridden_for_turn": false
+            }
+          },
+          "options": [
+            {
+              "id": "option_0",
+              "label": "Use a supported stock or crypto symbol",
+              "replacement_values": {}
+            }
+          ],
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "requested_fields": []
+        },
+        "missing_required_fields": [
+          "asset_universe",
+          "date_range"
+        ]
+      },
+      "conversation_mode": "setup",
+      "agent_runtime_turn": {
+        "turn_id": "aa51da85-5aea-4d7c-945b-fc791bc57456",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "resolution_provenance": [
+        {
+          "field": "asset_universe[0]",
+          "source": "llm_extraction",
+          "raw_text": "BANCO POPULAR BOND",
+          "confidence": "low",
+          "asset_class": null,
+          "validated_by": "provider_catalog",
+          "candidate_kind": "asset",
+          "canonical_symbol": null,
+          "resolution_status": "unsupported"
+        }
+      ],
+      "agent_runtime_stage_outcome": "await_user_reply",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "needs_clarification"
+    },
+    {
+      "type": "stage_start",
+      "stage": "clarify"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "await_user_reply"
+    },
+    {
+      "type": "token",
+      "content": "Argus can't run that rule directly yet. Which supported direction should I use: Use a supported stock or crypto symbol?"
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "await_user_reply",
+        "assistant_prompt": "Argus can't run that rule directly yet. Which supported direction should I use: Use a supported stock or crypto symbol?",
+        "assistant_response": "Argus can't run that rule directly yet. Which supported direction should I use: Use a supported stock or crypto symbol?",
+        "clarification": {
+          "kind": "unsupported_recovery",
+          "reason_code": "unsupported_symbol",
+          "prompt_source": "degraded_fallback",
+          "requested_field": "unsupported_constraints",
+          "requested_fields": [
+            "unsupported_constraints"
+          ],
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "payload": {
+            "strategy": {
+              "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+              "requested_strategy_template": null,
+              "strategy_type": "buy_and_hold",
+              "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+              "asset_universe": [],
+              "asset_class": null,
+              "timeframe": null,
+              "cadence": null,
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": 1000000,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": null,
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "BANCO POPULAR BOND",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "unsupported",
+                  "canonical_symbol": null,
+                  "asset_class": null,
+                  "validated_by": "provider_catalog",
+                  "confidence": "low"
+                }
+              ],
+              "extra_parameters": {
+                "language": "es",
+                "evidence_spans": {
+                  "capital_amount": "DOP$1 millón",
+                  "asset_universe": "un bono del Banco Popular"
+                },
+                "field_provenance": {
+                  "capital_amount": "starting_capital"
+                },
+                "raw_strategy_type": "buy_and_hold"
+              }
+            },
+            "raw_value": "BANCO POPULAR BOND"
+          },
+          "options": [
+            {
+              "id": "option_0",
+              "replacement_values": {},
+              "compatibility_label": "Use a supported stock or crypto symbol"
+            }
+          ]
+        },
+        "response_intent": {
+          "kind": "unsupported_recovery",
+          "semantic_needs": [
+            "simplification_choice"
+          ],
+          "requested_fields": [],
+          "facts": {
+            "strategy": {
+              "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+              "requested_strategy_template": null,
+              "strategy_type": "buy_and_hold",
+              "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+              "asset_universe": [],
+              "asset_class": null,
+              "timeframe": null,
+              "cadence": null,
+              "entry_logic": null,
+              "exit_logic": null,
+              "date_range": null,
+              "sizing_mode": null,
+              "capital_amount": 1000000,
+              "position_size": null,
+              "risk_rules": [],
+              "assumptions": [],
+              "comparison_baseline": null,
+              "refinement_of": null,
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "raw_text": "BANCO POPULAR BOND",
+                  "source": "llm_extraction",
+                  "candidate_kind": "asset",
+                  "resolution_status": "unsupported",
+                  "canonical_symbol": null,
+                  "asset_class": null,
+                  "validated_by": "provider_catalog",
+                  "confidence": "low"
+                }
+              ],
+              "extra_parameters": {
+                "language": "es",
+                "evidence_spans": {
+                  "capital_amount": "DOP$1 millón",
+                  "asset_universe": "un bono del Banco Popular"
+                },
+                "field_provenance": {
+                  "capital_amount": "starting_capital"
+                },
+                "raw_strategy_type": "buy_and_hold"
+              }
+            },
+            "current_user_message": "¿DOP$1 millón en un bono del Banco Popular?",
+            "language": "es-419",
+            "unsupported_constraints": [
+              {
+                "category": "unsupported_symbol",
+                "raw_value": "BANCO POPULAR BOND",
+                "explanation": "I understood the symbol, but I could not verify it in the supported market data universe for this run.",
+                "simplification_options": [
+                  {
+                    "label": "Use a supported stock or crypto symbol",
+                    "replacement_values": {}
+                  }
+                ]
+              },
+              {
+                "category": "unsupported_asset",
+                "raw_value": "BANCO POPULAR BOND",
+                "explanation": "I understood the asset reference, but Argus Alpha cannot execute it as requested yet.",
+                "simplification_options": []
+              }
+            ],
+            "preserved_optional_parameter_status": {
+              "optional_parameter_opportunity": [
+                "initial_capital",
+                "timeframe",
+                "fees",
+                "slippage",
+                "engine_options"
+              ],
+              "user_preference_overridden_for_turn": false,
+              "confidence": 0.8,
+              "arbitration_mode": "structured_arbitration",
+              "ambiguous_fields": []
+            }
+          },
+          "options": [
+            {
+              "label": "Use a supported stock or crypto symbol",
+              "replacement_values": {},
+              "id": "option_0"
+            }
+          ]
+        },
+        "resolution_provenance": [
+          {
+            "field": "asset_universe[0]",
+            "raw_text": "BANCO POPULAR BOND",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "unsupported",
+            "canonical_symbol": null,
+            "asset_class": null,
+            "validated_by": "provider_catalog",
+            "confidence": "low"
+          }
+        ],
+        "pending_strategy": {
+          "strategy": {
+            "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+            "asset_universe": [],
+            "asset_class": null,
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": null,
+            "sizing_mode": null,
+            "capital_amount": 1000000,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [
+              {
+                "field": "asset_universe[0]",
+                "raw_text": "BANCO POPULAR BOND",
+                "source": "llm_extraction",
+                "candidate_kind": "asset",
+                "resolution_status": "unsupported",
+                "canonical_symbol": null,
+                "asset_class": null,
+                "validated_by": "provider_catalog",
+                "confidence": "low"
+              }
+            ],
+            "extra_parameters": {
+              "language": "es",
+              "evidence_spans": {
+                "capital_amount": "DOP$1 millón",
+                "asset_universe": "un bono del Banco Popular"
+              },
+              "field_provenance": {
+                "capital_amount": "starting_capital"
+              },
+              "raw_strategy_type": "buy_and_hold"
+            }
+          },
+          "requested_field": null,
+          "missing_required_fields": [
+            "asset_universe",
+            "date_range"
+          ],
+          "response_intent": {
+            "kind": "unsupported_recovery",
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "requested_fields": [],
+            "facts": {
+              "strategy": {
+                "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+                "requested_strategy_template": null,
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+                "asset_universe": [],
+                "asset_class": null,
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 1000000,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": null,
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "BANCO POPULAR BOND",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "unsupported",
+                    "canonical_symbol": null,
+                    "asset_class": null,
+                    "validated_by": "provider_catalog",
+                    "confidence": "low"
+                  }
+                ],
+                "extra_parameters": {
+                  "language": "es",
+                  "evidence_spans": {
+                    "capital_amount": "DOP$1 millón",
+                    "asset_universe": "un bono del Banco Popular"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "starting_capital"
+                  },
+                  "raw_strategy_type": "buy_and_hold"
+                }
+              },
+              "current_user_message": "¿DOP$1 millón en un bono del Banco Popular?",
+              "language": "es-419",
+              "unsupported_constraints": [
+                {
+                  "category": "unsupported_symbol",
+                  "raw_value": "BANCO POPULAR BOND",
+                  "explanation": "I understood the symbol, but I could not verify it in the supported market data universe for this run.",
+                  "simplification_options": [
+                    {
+                      "label": "Use a supported stock or crypto symbol",
+                      "replacement_values": {}
+                    }
+                  ]
+                },
+                {
+                  "category": "unsupported_asset",
+                  "raw_value": "BANCO POPULAR BOND",
+                  "explanation": "I understood the asset reference, but Argus Alpha cannot execute it as requested yet.",
+                  "simplification_options": []
+                }
+              ],
+              "preserved_optional_parameter_status": {
+                "optional_parameter_opportunity": [
+                  "initial_capital",
+                  "timeframe",
+                  "fees",
+                  "slippage",
+                  "engine_options"
+                ],
+                "user_preference_overridden_for_turn": false,
+                "confidence": 0.8,
+                "arbitration_mode": "structured_arbitration",
+                "ambiguous_fields": []
+              }
+            },
+            "options": [
+              {
+                "label": "Use a supported stock or crypto symbol",
+                "replacement_values": {},
+                "id": "option_0"
+              }
+            ]
+          },
+          "clarification": {
+            "kind": "unsupported_recovery",
+            "reason_code": "unsupported_symbol",
+            "prompt_source": "degraded_fallback",
+            "requested_field": "unsupported_constraints",
+            "requested_fields": [
+              "unsupported_constraints"
+            ],
+            "semantic_needs": [
+              "simplification_choice"
+            ],
+            "payload": {
+              "strategy": {
+                "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+                "requested_strategy_template": null,
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+                "asset_universe": [],
+                "asset_class": null,
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": null,
+                "sizing_mode": null,
+                "capital_amount": 1000000,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": null,
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "BANCO POPULAR BOND",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "unsupported",
+                    "canonical_symbol": null,
+                    "asset_class": null,
+                    "validated_by": "provider_catalog",
+                    "confidence": "low"
+                  }
+                ],
+                "extra_parameters": {
+                  "language": "es",
+                  "evidence_spans": {
+                    "capital_amount": "DOP$1 millón",
+                    "asset_universe": "un bono del Banco Popular"
+                  },
+                  "field_provenance": {
+                    "capital_amount": "starting_capital"
+                  },
+                  "raw_strategy_type": "buy_and_hold"
+                }
+              },
+              "raw_value": "BANCO POPULAR BOND"
+            },
+            "options": [
+              {
+                "id": "option_0",
+                "replacement_values": {},
+                "compatibility_label": "Use a supported stock or crypto symbol"
+              }
+            ]
+          }
+        },
+        "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 47.673,
+  "screenshot": {
+    "file": "screenshots/registered-q4-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Argus todavía no puede ejecutar esa regla directamente. ¿Qué camino quieres usar: Usar un símbolo de acción o cripto compatible?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "175bcbf2-d00d-459a-a111-5220078ba1b0",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 1019,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 835,
+        "cached_tokens": 128,
+        "prompt_tokens": 788,
+        "completion_tokens": 47,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:04:32.414506+00:00"
+    },
+    {
+      "id": "7af0cd6a-64ac-492a-943a-db5c0f66b7b8",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 20043,
+      "outcome": "failed",
+      "failure_mode": "TimeoutError",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:04:52.555683+00:00"
+    },
+    {
+      "id": "ff20c560-e590-4e06-9280-be70ef9fefd6",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "anthropic/claude-haiku-4.5",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 18261,
+      "outcome": "failed",
+      "failure_mode": "ConnectError",
+      "fallback_used": true,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:10.817248+00:00"
+    },
+    {
+      "id": "952a1f5b-e05c-4656-9ac4-9ed5e88eb96a",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedStrategyExtraction",
+      "latency_ms": 2448,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3742,
+        "cached_tokens": 128,
+        "prompt_tokens": 3471,
+        "completion_tokens": 271,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "repair_effect": {
+          "no_op_reason": null,
+          "changed_fields": [
+            "candidate_strategy_draft.asset_universe",
+            "candidate_strategy_draft.capital_amount",
+            "candidate_strategy_draft.field_provenance",
+            "candidate_strategy_draft.language",
+            "candidate_strategy_draft.strategy_type",
+            "missing_required_fields"
+          ],
+          "repair_applied": true,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "before_fingerprint": "b52ff49136c7b51cdc73acf2df57b8dca192353f7577dd437a2cb7d057e376bd",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:13.266503+00:00"
+    },
+    {
+      "id": "21218fcc-f65f-4832-aacd-e778689965d9",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedDateWindowExtraction",
+      "latency_ms": 1082,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 1971,
+        "cached_tokens": 128,
+        "prompt_tokens": 1937,
+        "completion_tokens": 34,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "repair_effect": {
+          "no_op_reason": "no_date_window",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "date_window_intent_uncertain",
+          "after_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "before_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:14.757887+00:00"
+    },
+    {
+      "id": "0c776504-2407-4f37-a5da-597ddbedacf3",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "field_fidelity",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "StatedRunFieldFidelityAudit",
+      "latency_ms": 988,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 2061,
+        "cached_tokens": 128,
+        "prompt_tokens": 2010,
+        "completion_tokens": 51,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:15.747101+00:00"
+    },
+    {
+      "id": "517c8f59-37b6-4128-823e-3b840b35453b",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedDateWindowExtraction",
+      "latency_ms": 907,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 1971,
+        "cached_tokens": 1920,
+        "prompt_tokens": 1937,
+        "completion_tokens": 34,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "repair_effect": {
+          "no_op_reason": "no_date_window",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "date_window_intent_uncertain",
+          "after_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "before_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:16.656455+00:00"
+    },
+    {
+      "id": "cd640ce4-e14b-49e8-95bb-6b6b7da105fc",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "clarification",
+      "tier": "chat",
+      "model": "deepseek/deepseek-v4-flash",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "ClarificationResponse",
+      "latency_ms": 0,
+      "outcome": "skipped",
+      "failure_mode": "turn_call_allowance_exhausted",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:16.900925+00:00"
+    },
+    {
+      "id": "6936590c-ed6e-42aa-b80f-f851f6114556",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "clarification",
+      "tier": "chat",
+      "model": "deepseek/deepseek-v4-flash",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "ClarificationResponse",
+      "latency_ms": 0,
+      "outcome": "failed",
+      "failure_mode": "contract_violation",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:16.901818+00:00"
+    },
+    {
+      "id": "0dc01bcc-6805-4e5c-a6d5-668de3cc7c7b",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "clarification",
+      "tier": "chat",
+      "model": "qwen/qwen3.5-9b",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "ClarificationResponse",
+      "latency_ms": 0,
+      "outcome": "skipped",
+      "failure_mode": "turn_call_allowance_exhausted",
+      "fallback_used": true,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:16.902172+00:00"
+    },
+    {
+      "id": "9fe275cc-e39b-44c6-8a1f-d2d9ca4b4538",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "clarification",
+      "tier": "chat",
+      "model": "qwen/qwen3.5-9b",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "ClarificationResponse",
+      "latency_ms": 0,
+      "outcome": "failed",
+      "failure_mode": "contract_violation",
+      "fallback_used": true,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 17:05:16.902370+00:00"
+    },
+    {
+      "id": "a3eeb180-d0df-4058-b650-654733c5a708",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "run_id": null,
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 591,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 103,
+        "cached_tokens": 0,
+        "prompt_tokens": 89,
+        "completion_tokens": 14,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:05:17.617089+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "1d74f13e-4008-470f-ba67-839aac29b225",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "175bcbf2-d00d-459a-a111-5220078ba1b0",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 835,
+        "cached_tokens": 128,
+        "prompt_tokens": 788,
+        "usage_cost_usd": 0.0009681,
+        "completion_tokens": 47,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 788,
+      "output_tokens": 47,
+      "total_tokens": 835,
+      "billable_unit": "token",
+      "billable_quantity": "835.000000",
+      "cost_amount": "0.00096810",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1019,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:04:32.414506+00:00",
+      "created_at": "2026-09-14 17:05:16.940937+00:00"
+    },
+    {
+      "id": "fdd554e2-ec67-44fe-a763-50784b8316c5",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "7af0cd6a-64ac-492a-943a-db5c0f66b7b8",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 20043,
+      "status": "failed",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": "TimeoutError",
+        "fallback_used": false,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:04:52.555683+00:00",
+      "created_at": "2026-09-14 17:05:16.948995+00:00"
+    },
+    {
+      "id": "1631342f-5a5d-4c45-82b0-de94a45aade7",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "anthropic/claude-haiku-4.5",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "ff20c560-e590-4e06-9280-be70ef9fefd6",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 18261,
+      "status": "failed",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": "ConnectError",
+        "fallback_used": true,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:10.817248+00:00",
+      "created_at": "2026-09-14 17:05:16.955936+00:00"
+    },
+    {
+      "id": "22936ca2-7805-4884-b7b5-d69686d5139d",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "952a1f5b-e05c-4656-9ac4-9ed5e88eb96a",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3742,
+        "cached_tokens": 128,
+        "prompt_tokens": 3471,
+        "usage_cost_usd": 0.00488185,
+        "completion_tokens": 271,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3471,
+      "output_tokens": 271,
+      "total_tokens": 3742,
+      "billable_unit": "token",
+      "billable_quantity": "3742.000000",
+      "cost_amount": "0.00488185",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 2448,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "FocusedStrategyExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": null,
+          "changed_fields": [
+            "candidate_strategy_draft.asset_universe",
+            "candidate_strategy_draft.capital_amount",
+            "candidate_strategy_draft.field_provenance",
+            "candidate_strategy_draft.language",
+            "candidate_strategy_draft.strategy_type",
+            "missing_required_fields"
+          ],
+          "repair_applied": true,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "before_fingerprint": "b52ff49136c7b51cdc73acf2df57b8dca192353f7577dd437a2cb7d057e376bd",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:13.266503+00:00",
+      "created_at": "2026-09-14 17:05:16.963443+00:00"
+    },
+    {
+      "id": "9f78cfa2-7eec-4cbe-a9f8-99a137bc14e0",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "21218fcc-f65f-4832-aacd-e778689965d9",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 1971,
+        "cached_tokens": 128,
+        "prompt_tokens": 1937,
+        "usage_cost_usd": 0.00237185,
+        "completion_tokens": 34,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 1937,
+      "output_tokens": 34,
+      "total_tokens": 1971,
+      "billable_unit": "token",
+      "billable_quantity": "1971.000000",
+      "cost_amount": "0.00237185",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1082,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "FocusedDateWindowExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": "no_date_window",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "date_window_intent_uncertain",
+          "after_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "before_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:14.757887+00:00",
+      "created_at": "2026-09-14 17:05:16.970096+00:00"
+    },
+    {
+      "id": "1ff3655c-944f-43e2-a407-c0a57c72b1f5",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "field_fidelity",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "0c776504-2407-4f37-a5da-597ddbedacf3",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 2061,
+        "cached_tokens": 128,
+        "prompt_tokens": 2010,
+        "usage_cost_usd": 0.0025056,
+        "completion_tokens": 51,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 2010,
+      "output_tokens": 51,
+      "total_tokens": 2061,
+      "billable_unit": "token",
+      "billable_quantity": "2061.000000",
+      "cost_amount": "0.00250560",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 988,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:15.747101+00:00",
+      "created_at": "2026-09-14 17:05:16.976102+00:00"
+    },
+    {
+      "id": "35abc42d-b2ed-45d9-ae7c-e855fd17a3f8",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "517c8f59-37b6-4128-823e-3b840b35453b",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 1971,
+        "cached_tokens": 1920,
+        "prompt_tokens": 1937,
+        "usage_cost_usd": 0.00049025,
+        "completion_tokens": 34,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 1937,
+      "output_tokens": 34,
+      "total_tokens": 1971,
+      "billable_unit": "token",
+      "billable_quantity": "1971.000000",
+      "cost_amount": "0.00049025",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 907,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "FocusedDateWindowExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": "no_date_window",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "date_window_intent_uncertain",
+          "after_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "before_fingerprint": "6c2f19d3f8ba2bbdf81f0a2aeb2ac978fec32564b3fca9c53fe223c79816d98c",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:16.656455+00:00",
+      "created_at": "2026-09-14 17:05:16.984868+00:00"
+    },
+    {
+      "id": "83b41bc4-d82c-456e-83d0-7877634d0c4d",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "feature_area": "chat_runtime",
+      "task": "clarification",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "cd640ce4-e14b-49e8-95bb-6b6b7da105fc",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "skipped",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "ClarificationResponse",
+        "failure_mode": "turn_call_allowance_exhausted",
+        "fallback_used": false,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:16.900925+00:00",
+      "created_at": "2026-09-14 17:05:16.991406+00:00"
+    },
+    {
+      "id": "4aa20a21-1eb5-48a9-bf58-a056a8ff9ec8",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "feature_area": "chat_runtime",
+      "task": "clarification",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "6936590c-ed6e-42aa-b80f-f851f6114556",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "failed",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "ClarificationResponse",
+        "failure_mode": "contract_violation",
+        "fallback_used": false,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:16.901818+00:00",
+      "created_at": "2026-09-14 17:05:16.997331+00:00"
+    },
+    {
+      "id": "cf58f472-aa76-48b6-9eff-7922a2b635f9",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "qwen/qwen3.5-9b",
+      "feature_area": "chat_runtime",
+      "task": "clarification",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "0dc01bcc-6805-4e5c-a6d5-668de3cc7c7b",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "skipped",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "ClarificationResponse",
+        "failure_mode": "turn_call_allowance_exhausted",
+        "fallback_used": true,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:16.902172+00:00",
+      "created_at": "2026-09-14 17:05:17.004582+00:00"
+    },
+    {
+      "id": "6d8353e4-c935-41e0-9f5a-3422235f1002",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "qwen/qwen3.5-9b",
+      "feature_area": "chat_runtime",
+      "task": "clarification",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "9fe275cc-e39b-44c6-8a1f-d2d9ca4b4538",
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+      "correlation_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "failed",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36",
+        "schema_name": "ClarificationResponse",
+        "failure_mode": "contract_violation",
+        "fallback_used": true,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 7,
+          "elapsed_seconds": 45.564,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 4,
+            "skipped": 2,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "1268a4a1d2ef4982680c6fb1a263cc2952c191288749c799ff72b8f1f0f69fba",
+          "provider_receipt_count": 11,
+          "call_allowance_exhausted": true,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:16.902370+00:00",
+      "created_at": "2026-09-14 17:05:17.010799+00:00"
+    },
+    {
+      "id": "ff860ec1-cb99-4464-9b1d-c2ef73d1a589",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a",
+      "message_id": "7dc9dd9f-b31a-4330-8e72-30c20189b251",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "a3eeb180-d0df-4058-b650-654733c5a708",
+      "request_id": null,
+      "correlation_id": "api_turn:3d6d00ce-cb87-4244-ac7e-55b0fbd9d57a:7dc9dd9f-b31a-4330-8e72-30c20189b251:a3eeb180-d0df-4058-b650-654733c5a708",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 103,
+        "cached_tokens": 0,
+        "prompt_tokens": 89,
+        "usage_cost_usd": 1.45e-05,
+        "completion_tokens": 14,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 89,
+      "output_tokens": 14,
+      "total_tokens": 103,
+      "billable_unit": "token",
+      "billable_quantity": "103.000000",
+      "cost_amount": "0.00001450",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 591,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:17.617089+00:00",
+      "created_at": "2026-09-14 17:05:17.636559+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 19,
+  "stored_failure_metadata": {
+    "clarification": {
+      "kind": "unsupported_recovery",
+      "options": [
+        {
+          "id": "option_0",
+          "replacement_values": {},
+          "compatibility_label": "Use a supported stock or crypto symbol"
+        }
+      ],
+      "payload": {
+        "strategy": {
+          "cadence": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "timeframe": null,
+          "date_range": null,
+          "entry_rule": null,
+          "exit_logic": null,
+          "risk_rules": [],
+          "asset_class": null,
+          "assumptions": [],
+          "entry_logic": null,
+          "sizing_mode": null,
+          "position_size": null,
+          "refinement_of": null,
+          "strategy_type": "buy_and_hold",
+          "asset_universe": [],
+          "capital_amount": 1000000.0,
+          "strategy_thesis": "Test performance of investing DOP$1 million in a Banco Popular bond",
+          "extra_parameters": {
+            "language": "es",
+            "evidence_spans": {
+              "asset_universe": "un bono del Banco Popular",
+              "capital_amount": "DOP$1 millón"
+            },
+            "field_provenance": {
+              "capital_amount": "starting_capital"
+            },
+            "raw_strategy_type": "buy_and_hold"
+          },
+          "raw_user_phrasing": "¿DOP$1 millón en un bono del Banco Popular?",
+          "comparison_baseline": null,
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "source": "llm_extraction",
+              "raw_text": "BANCO POPULAR BOND",
+              "confidence": "low",
+              "asset_class": null,
+              "validated_by": "provider_catalog",
+              "candidate_kind": "asset",
+              "canonical_symbol": null,
+              "resolution_status": "unsupported"
+            }
+          ],
+          "requested_strategy_template": null
+        },
+        "raw_value": "BANCO POPULAR BOND"
+      },
+      "reason_code": "unsupported_symbol",
+      "prompt_source": "degraded_fallback",
+      "semantic_needs": [
+        "simplification_choice"
+      ],
+      "requested_field": "unsupported_constraints",
+      "requested_fields": [
+        "unsupported_constraints"
+      ]
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "aa51da85-5aea-4d7c-945b-fc791bc57456",
+      "terminal": true,
+      "request_id": "80b04964-7e10-46c6-bc0a-ce6f6eae9c36"
+    },
+    "agent_runtime_stage_outcome": "await_user_reply"
+  }
+}

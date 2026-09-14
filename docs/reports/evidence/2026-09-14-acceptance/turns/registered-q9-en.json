@@ -1,0 +1,3142 @@
+{
+  "label": "registered-q9-en",
+  "phase": "registered",
+  "question": "q9",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+  "message": "Buy and hold Apple for the last year with $10,000.",
+  "answer": {
+    "id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+    "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+    "role": "assistant",
+    "content": "",
+    "created_at": "2026-09-14T16:57:07.273455Z",
+    "metadata": {
+      "pending_strategy": {
+        "strategy": {
+          "cadence": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "timeframe": null,
+          "date_range": {
+            "end": "2026-09-11",
+            "start": "2025-09-15"
+          },
+          "entry_rule": null,
+          "exit_logic": null,
+          "risk_rules": [],
+          "asset_class": "equity",
+          "assumptions": [],
+          "entry_logic": null,
+          "sizing_mode": null,
+          "position_size": null,
+          "refinement_of": null,
+          "strategy_type": "buy_and_hold",
+          "asset_universe": [
+            "AAPL"
+          ],
+          "capital_amount": 10000,
+          "strategy_thesis": "Buy and hold Apple for the last year with $10,000",
+          "extra_parameters": {
+            "language": "en",
+            "evidence_spans": {
+              "date_range": "last year",
+              "strategy_type": "Buy and hold",
+              "asset_universe": "Apple",
+              "capital_amount": "$10,000",
+              "date_range_raw_text": "last year"
+            },
+            "field_provenance": {
+              "date_range": "explicit_user",
+              "strategy_type": "explicit_user",
+              "asset_universe": "explicit_user",
+              "capital_amount": "starting_capital"
+            },
+            "date_range_intent": {
+              "end": null,
+              "kind": "rolling_window",
+              "unit": "year",
+              "year": null,
+              "count": 1,
+              "start": null,
+              "anchor": "today",
+              "endpoint": null,
+              "evidence": "last year",
+              "confidence": 0.9,
+              "day_offset": null
+            },
+            "raw_strategy_type": "buy_and_hold",
+            "date_range_raw_text": "last year",
+            "effective_date_range": {
+              "end": "2026-09-11",
+              "start": "2025-09-15"
+            },
+            "requested_date_range": {
+              "end": "2026-09-14",
+              "start": "2025-09-14"
+            },
+            "provider_resolved_assets": [
+              {
+                "name": "Apple Inc. Common Stock",
+                "symbol": "AAPL",
+                "exchange": "AssetExchange.NASDAQ",
+                "provider": "alpaca",
+                "raw_text": "Apple",
+                "raw_symbol": "AAPL",
+                "asset_class": "equity"
+              }
+            ],
+            "data_availability_adjustment": {
+              "kind": "latest_complete_daily_data",
+              "through": "2026-09-11",
+              "provider": "alpaca",
+              "timeframe": "1D",
+              "original_end": "2026-09-14"
+            }
+          },
+          "raw_user_phrasing": "Buy and hold Apple for the last year with $10,000.",
+          "comparison_baseline": "SPY",
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "source": "llm_extraction",
+              "raw_text": "Apple",
+              "confidence": "medium",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "candidate_kind": "asset",
+              "canonical_symbol": "AAPL",
+              "resolution_status": "resolved"
+            }
+          ],
+          "requested_strategy_template": null
+        },
+        "requested_field": null,
+        "missing_required_fields": []
+      },
+      "confirmation_card": {
+        "kind": "backtest",
+        "rows": [
+          {
+            "key": "strategy",
+            "label": "Strategy",
+            "value": "Buy and Hold",
+            "labelKey": "chat.confirmation.rows.strategy"
+          },
+          {
+            "key": "assets",
+            "label": "Assets",
+            "value": "AAPL",
+            "labelKey": "chat.confirmation.rows.assets"
+          },
+          {
+            "key": "period",
+            "label": "Period",
+            "value": "September 15, 2025 - September 11, 2026",
+            "labelKey": "chat.confirmation.rows.period"
+          },
+          {
+            "key": "starting_capital",
+            "label": "Starting capital",
+            "value": "$10,000",
+            "labelKey": "chat.confirmation.rows.starting_capital"
+          }
+        ],
+        "title": "AAPL buy and hold",
+        "status": "ready_to_run",
+        "actions": [
+          {
+            "id": "run-backtest",
+            "type": "run_backtest",
+            "label": "Run backtest",
+            "payload": {
+              "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+              "launch_payload_hash": "53b56c14c96685b6"
+            },
+            "labelKey": "chat.confirmation.actions.run_backtest",
+            "presentation": "confirmation"
+          },
+          {
+            "id": "adjust-assumptions",
+            "type": "adjust_assumptions",
+            "label": "Change assumptions",
+            "payload": {
+              "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+              "launch_payload_hash": "53b56c14c96685b6"
+            },
+            "labelKey": "chat.confirmation.actions.adjust_assumptions",
+            "presentation": "confirmation"
+          },
+          {
+            "id": "cancel-confirmation",
+            "type": "cancel_confirmation",
+            "label": "Cancel",
+            "payload": {
+              "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+              "launch_payload_hash": "53b56c14c96685b6"
+            },
+            "labelKey": "chat.confirmation.actions.cancel",
+            "presentation": "confirmation"
+          }
+        ],
+        "date_range": {
+          "end": "2026-09-11",
+          "start": "2025-09-15",
+          "display": "September 15, 2025 - September 11, 2026"
+        },
+        "asset_class": "equity",
+        "assumptions": [],
+        "statusLabel": "Ready to run",
+        "capabilities": {
+          "direct_edits": [
+            "capital",
+            "dates",
+            "costs"
+          ],
+          "edit_constraints": {
+            "fees": {
+              "max": 0.05,
+              "min": 0
+            },
+            "capital": {
+              "max": 100000000,
+              "min": 10
+            },
+            "slippage": {
+              "max": 0.05,
+              "min": 0
+            },
+            "date_window": {
+              "max_end": "2026-09-14",
+              "min_start": "2016-01-01"
+            }
+          },
+          "execution_costs_editable": true
+        },
+        "display_facts": {
+          "fees": 0,
+          "capital": 10000,
+          "slippage": 0,
+          "timeframe": "1D",
+          "data_through": "2026-09-11",
+          "benchmark_symbol": "SPY"
+        },
+        "strategy_type": "buy_and_hold",
+        "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+        "confirmation_state": "active",
+        "launch_payload_hash": "53b56c14c96685b6"
+      },
+      "conversation_mode": "confirm",
+      "agent_runtime_turn": {
+        "turn_id": "0c08a9dd-9306-4509-bee4-018e3cf36bfb",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "artifact_references": [
+        {
+          "metadata": {
+            "validation": {
+              "executable": true,
+              "failure_code": null
+            },
+            "artifact_type": "confirmation",
+            "strategy_hash": "0fd71e99ccb69f90",
+            "launch_payload": {
+              "symbol": "AAPL",
+              "cadence": null,
+              "symbols": [
+                "AAPL"
+              ],
+              "language": "en",
+              "exit_rule": null,
+              "rule_spec": null,
+              "timeframe": "1D",
+              "date_range": {
+                "end": "2026-09-11",
+                "start": "2025-09-15"
+              },
+              "entry_rule": null,
+              "parameters": {},
+              "risk_rules": [],
+              "asset_class": "equity",
+              "sizing_mode": "capital_amount",
+              "position_size": null,
+              "strategy_type": "buy_and_hold",
+              "capital_amount": 10000,
+              "benchmark_symbol": "SPY",
+              "starting_capital": null,
+              "coverage_preflight": {
+                "outcome": "adjusted_coverage",
+                "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53",
+                "schema_version": "market_data_coverage_v1",
+                "effective_date_range": {
+                  "end": "2026-09-11",
+                  "start": "2025-09-15"
+                },
+                "requested_date_range": {
+                  "end": "2026-09-14",
+                  "start": "2025-09-14"
+                },
+                "observations_by_symbol": {
+                  "SPY": 250,
+                  "AAPL": 250
+                }
+              },
+              "requested_date_range": {
+                "end": "2026-09-14",
+                "start": "2025-09-14"
+              },
+              "recurring_contribution": null
+            },
+            "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+            "confirmation_card": {
+              "kind": "backtest",
+              "rows": [
+                {
+                  "key": "strategy",
+                  "label": "Strategy",
+                  "value": "Buy and Hold",
+                  "labelKey": "chat.confirmation.rows.strategy"
+                },
+                {
+                  "key": "assets",
+                  "label": "Assets",
+                  "value": "AAPL",
+                  "labelKey": "chat.confirmation.rows.assets"
+                },
+                {
+                  "key": "period",
+                  "label": "Period",
+                  "value": "September 15, 2025 - September 11, 2026",
+                  "labelKey": "chat.confirmation.rows.period"
+                },
+                {
+                  "key": "starting_capital",
+                  "label": "Starting capital",
+                  "value": "$10,000",
+                  "labelKey": "chat.confirmation.rows.starting_capital"
+                }
+              ],
+              "title": "AAPL buy and hold",
+              "status": "ready_to_run",
+              "actions": [
+                {
+                  "id": "run-backtest",
+                  "type": "run_backtest",
+                  "label": "Run backtest",
+                  "payload": {
+                    "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+                    "launch_payload_hash": "53b56c14c96685b6"
+                  },
+                  "labelKey": "chat.confirmation.actions.run_backtest",
+                  "presentation": "confirmation"
+                },
+                {
+                  "id": "adjust-assumptions",
+                  "type": "adjust_assumptions",
+                  "label": "Change assumptions",
+                  "payload": {
+                    "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+                    "launch_payload_hash": "53b56c14c96685b6"
+                  },
+                  "labelKey": "chat.confirmation.actions.adjust_assumptions",
+                  "presentation": "confirmation"
+                },
+                {
+                  "id": "cancel-confirmation",
+                  "type": "cancel_confirmation",
+                  "label": "Cancel",
+                  "payload": {
+                    "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+                    "launch_payload_hash": "53b56c14c96685b6"
+                  },
+                  "labelKey": "chat.confirmation.actions.cancel",
+                  "presentation": "confirmation"
+                }
+              ],
+              "date_range": {
+                "end": "2026-09-11",
+                "start": "2025-09-15",
+                "display": "September 15, 2025 - September 11, 2026"
+              },
+              "asset_class": "equity",
+              "assumptions": [],
+              "statusLabel": "Ready to run",
+              "capabilities": {
+                "direct_edits": [
+                  "capital",
+                  "dates",
+                  "costs"
+                ],
+                "edit_constraints": {
+                  "fees": {
+                    "max": 0.05,
+                    "min": 0
+                  },
+                  "capital": {
+                    "max": 100000000,
+                    "min": 10
+                  },
+                  "slippage": {
+                    "max": 0.05,
+                    "min": 0
+                  },
+                  "date_window": {
+                    "max_end": "2026-09-14",
+                    "min_start": "2016-01-01"
+                  }
+                },
+                "execution_costs_editable": true
+              },
+              "display_facts": {
+                "fees": 0,
+                "capital": 10000,
+                "slippage": 0,
+                "timeframe": "1D",
+                "data_through": "2026-09-11",
+                "benchmark_symbol": "SPY"
+              },
+              "strategy_type": "buy_and_hold",
+              "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "confirmation_state": "active",
+              "launch_payload_hash": "53b56c14c96685b6"
+            },
+            "launch_payload_hash": "53b56c14c96685b6",
+            "confirmation_payload": {
+              "strategy": {
+                "cadence": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "timeframe": null,
+                "date_range": {
+                  "end": "2026-09-11",
+                  "start": "2025-09-15"
+                },
+                "entry_rule": null,
+                "exit_logic": null,
+                "risk_rules": [],
+                "asset_class": "equity",
+                "assumptions": [],
+                "entry_logic": null,
+                "sizing_mode": null,
+                "position_size": null,
+                "refinement_of": null,
+                "strategy_type": "buy_and_hold",
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "capital_amount": 10000,
+                "strategy_thesis": "Buy and hold Apple for the last year with $10,000",
+                "extra_parameters": {
+                  "language": "en",
+                  "evidence_spans": {
+                    "date_range": "last year",
+                    "strategy_type": "Buy and hold",
+                    "asset_universe": "Apple",
+                    "capital_amount": "$10,000",
+                    "date_range_raw_text": "last year"
+                  },
+                  "field_provenance": {
+                    "date_range": "explicit_user",
+                    "strategy_type": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "starting_capital"
+                  },
+                  "date_range_intent": {
+                    "end": null,
+                    "kind": "rolling_window",
+                    "unit": "year",
+                    "year": null,
+                    "count": 1,
+                    "start": null,
+                    "anchor": "today",
+                    "endpoint": null,
+                    "evidence": "last year",
+                    "confidence": 0.9,
+                    "day_offset": null
+                  },
+                  "raw_strategy_type": "buy_and_hold",
+                  "date_range_raw_text": "last year",
+                  "effective_date_range": {
+                    "end": "2026-09-11",
+                    "start": "2025-09-15"
+                  },
+                  "requested_date_range": {
+                    "end": "2026-09-14",
+                    "start": "2025-09-14"
+                  },
+                  "provider_resolved_assets": [
+                    {
+                      "name": "Apple Inc. Common Stock",
+                      "symbol": "AAPL",
+                      "exchange": "AssetExchange.NASDAQ",
+                      "provider": "alpaca",
+                      "raw_text": "Apple",
+                      "raw_symbol": "AAPL",
+                      "asset_class": "equity"
+                    }
+                  ],
+                  "data_availability_adjustment": {
+                    "kind": "latest_complete_daily_data",
+                    "through": "2026-09-11",
+                    "provider": "alpaca",
+                    "timeframe": "1D",
+                    "original_end": "2026-09-14"
+                  }
+                },
+                "raw_user_phrasing": "Buy and hold Apple for the last year with $10,000.",
+                "comparison_baseline": "SPY",
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "source": "llm_extraction",
+                    "raw_text": "Apple",
+                    "confidence": "medium",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "candidate_kind": "asset",
+                    "canonical_symbol": "AAPL",
+                    "resolution_status": "resolved"
+                  }
+                ],
+                "requested_strategy_template": null
+              },
+              "validation": {
+                "status": "ready_to_run",
+                "executable": true,
+                "date_adjusted": true
+              },
+              "launch_payload": {
+                "symbol": "AAPL",
+                "cadence": null,
+                "symbols": [
+                  "AAPL"
+                ],
+                "language": "en",
+                "exit_rule": null,
+                "rule_spec": null,
+                "timeframe": "1D",
+                "date_range": {
+                  "end": "2026-09-11",
+                  "start": "2025-09-15"
+                },
+                "entry_rule": null,
+                "parameters": {},
+                "risk_rules": [],
+                "asset_class": "equity",
+                "sizing_mode": "capital_amount",
+                "position_size": null,
+                "strategy_type": "buy_and_hold",
+                "capital_amount": 10000,
+                "benchmark_symbol": "SPY",
+                "starting_capital": null,
+                "coverage_preflight": {
+                  "outcome": "adjusted_coverage",
+                  "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53",
+                  "schema_version": "market_data_coverage_v1",
+                  "adjustment_reason": "calendar_alignment",
+                  "effective_date_range": {
+                    "end": "2026-09-11",
+                    "start": "2025-09-15"
+                  },
+                  "requested_date_range": {
+                    "end": "2026-09-14",
+                    "start": "2025-09-14"
+                  },
+                  "observations_by_symbol": {
+                    "SPY": 250,
+                    "AAPL": 250
+                  }
+                },
+                "requested_date_range": {
+                  "end": "2026-09-14",
+                  "start": "2025-09-14"
+                },
+                "recurring_contribution": null
+              },
+              "edit_disclosure": null,
+              "optional_parameters": {
+                "fees": {
+                  "label": "Fees",
+                  "value": 0,
+                  "source": "default",
+                  "description": "Per-trade fee assumption applied during execution."
+                },
+                "slippage": {
+                  "label": "Slippage",
+                  "value": 0,
+                  "source": "default",
+                  "description": "Execution slippage assumption expressed as a fraction."
+                },
+                "timeframe": {
+                  "label": "Timeframe",
+                  "value": "1D",
+                  "source": "default",
+                  "description": "Bar interval used for the simulation."
+                },
+                "engine_options": {
+                  "label": "Engine options",
+                  "value": {},
+                  "source": "default",
+                  "description": "Reserved execution knobs exposed by the runtime contract."
+                },
+                "initial_capital": {
+                  "label": "Initial capital",
+                  "value": 1000,
+                  "source": "default",
+                  "description": "Starting cash for the simulated backtest."
+                }
+              }
+            }
+          },
+          "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+          "artifact_kind": "confirmation",
+          "artifact_status": "active"
+        }
+      ],
+      "confirmation_payload": {
+        "strategy": {
+          "cadence": null,
+          "exit_rule": null,
+          "rule_spec": null,
+          "timeframe": null,
+          "date_range": {
+            "end": "2026-09-11",
+            "start": "2025-09-15"
+          },
+          "entry_rule": null,
+          "exit_logic": null,
+          "risk_rules": [],
+          "asset_class": "equity",
+          "assumptions": [],
+          "entry_logic": null,
+          "sizing_mode": null,
+          "position_size": null,
+          "refinement_of": null,
+          "strategy_type": "buy_and_hold",
+          "asset_universe": [
+            "AAPL"
+          ],
+          "capital_amount": 10000,
+          "strategy_thesis": "Buy and hold Apple for the last year with $10,000",
+          "extra_parameters": {
+            "language": "en",
+            "evidence_spans": {
+              "date_range": "last year",
+              "strategy_type": "Buy and hold",
+              "asset_universe": "Apple",
+              "capital_amount": "$10,000",
+              "date_range_raw_text": "last year"
+            },
+            "field_provenance": {
+              "date_range": "explicit_user",
+              "strategy_type": "explicit_user",
+              "asset_universe": "explicit_user",
+              "capital_amount": "starting_capital"
+            },
+            "date_range_intent": {
+              "end": null,
+              "kind": "rolling_window",
+              "unit": "year",
+              "year": null,
+              "count": 1,
+              "start": null,
+              "anchor": "today",
+              "endpoint": null,
+              "evidence": "last year",
+              "confidence": 0.9,
+              "day_offset": null
+            },
+            "raw_strategy_type": "buy_and_hold",
+            "date_range_raw_text": "last year",
+            "effective_date_range": {
+              "end": "2026-09-11",
+              "start": "2025-09-15"
+            },
+            "requested_date_range": {
+              "end": "2026-09-14",
+              "start": "2025-09-14"
+            },
+            "provider_resolved_assets": [
+              {
+                "name": "Apple Inc. Common Stock",
+                "symbol": "AAPL",
+                "exchange": "AssetExchange.NASDAQ",
+                "provider": "alpaca",
+                "raw_text": "Apple",
+                "raw_symbol": "AAPL",
+                "asset_class": "equity"
+              }
+            ],
+            "data_availability_adjustment": {
+              "kind": "latest_complete_daily_data",
+              "through": "2026-09-11",
+              "provider": "alpaca",
+              "timeframe": "1D",
+              "original_end": "2026-09-14"
+            }
+          },
+          "raw_user_phrasing": "Buy and hold Apple for the last year with $10,000.",
+          "comparison_baseline": "SPY",
+          "resolution_provenance": [
+            {
+              "field": "asset_universe[0]",
+              "source": "llm_extraction",
+              "raw_text": "Apple",
+              "confidence": "medium",
+              "asset_class": "equity",
+              "validated_by": "provider_catalog",
+              "candidate_kind": "asset",
+              "canonical_symbol": "AAPL",
+              "resolution_status": "resolved"
+            }
+          ],
+          "requested_strategy_template": null
+        },
+        "validation": {
+          "status": "ready_to_run",
+          "executable": true,
+          "date_adjusted": true
+        },
+        "launch_payload": {
+          "symbol": "AAPL",
+          "cadence": null,
+          "symbols": [
+            "AAPL"
+          ],
+          "language": "en",
+          "exit_rule": null,
+          "rule_spec": null,
+          "timeframe": "1D",
+          "date_range": {
+            "end": "2026-09-11",
+            "start": "2025-09-15"
+          },
+          "entry_rule": null,
+          "parameters": {},
+          "risk_rules": [],
+          "asset_class": "equity",
+          "sizing_mode": "capital_amount",
+          "position_size": null,
+          "strategy_type": "buy_and_hold",
+          "capital_amount": 10000,
+          "benchmark_symbol": "SPY",
+          "starting_capital": null,
+          "coverage_preflight": {
+            "outcome": "adjusted_coverage",
+            "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53",
+            "schema_version": "market_data_coverage_v1",
+            "adjustment_reason": "calendar_alignment",
+            "effective_date_range": {
+              "end": "2026-09-11",
+              "start": "2025-09-15"
+            },
+            "requested_date_range": {
+              "end": "2026-09-14",
+              "start": "2025-09-14"
+            },
+            "observations_by_symbol": {
+              "SPY": 250,
+              "AAPL": 250
+            }
+          },
+          "requested_date_range": {
+            "end": "2026-09-14",
+            "start": "2025-09-14"
+          },
+          "recurring_contribution": null
+        },
+        "edit_disclosure": null,
+        "optional_parameters": {
+          "fees": {
+            "label": "Fees",
+            "value": 0,
+            "source": "default",
+            "description": "Per-trade fee assumption applied during execution."
+          },
+          "slippage": {
+            "label": "Slippage",
+            "value": 0,
+            "source": "default",
+            "description": "Execution slippage assumption expressed as a fraction."
+          },
+          "timeframe": {
+            "label": "Timeframe",
+            "value": "1D",
+            "source": "default",
+            "description": "Bar interval used for the simulation."
+          },
+          "engine_options": {
+            "label": "Engine options",
+            "value": {},
+            "source": "default",
+            "description": "Reserved execution knobs exposed by the runtime contract."
+          },
+          "initial_capital": {
+            "label": "Initial capital",
+            "value": 1000,
+            "source": "default",
+            "description": "Starting cash for the simulated backtest."
+          }
+        }
+      },
+      "resolution_provenance": [
+        {
+          "field": "asset_universe[0]",
+          "source": "llm_extraction",
+          "raw_text": "Apple",
+          "confidence": "medium",
+          "asset_class": "equity",
+          "validated_by": "provider_catalog",
+          "candidate_kind": "asset",
+          "canonical_symbol": "AAPL",
+          "resolution_status": "resolved"
+        }
+      ],
+      "agent_runtime_stage_outcome": "await_approval",
+      "active_confirmation_reference": {
+        "metadata": {
+          "validation": {
+            "executable": true,
+            "failure_code": null
+          },
+          "artifact_type": "confirmation",
+          "strategy_hash": "0fd71e99ccb69f90",
+          "launch_payload": {
+            "symbol": "AAPL",
+            "cadence": null,
+            "symbols": [
+              "AAPL"
+            ],
+            "language": "en",
+            "exit_rule": null,
+            "rule_spec": null,
+            "timeframe": "1D",
+            "date_range": {
+              "end": "2026-09-11",
+              "start": "2025-09-15"
+            },
+            "entry_rule": null,
+            "parameters": {},
+            "risk_rules": [],
+            "asset_class": "equity",
+            "sizing_mode": "capital_amount",
+            "position_size": null,
+            "strategy_type": "buy_and_hold",
+            "capital_amount": 10000,
+            "benchmark_symbol": "SPY",
+            "starting_capital": null,
+            "coverage_preflight": {
+              "outcome": "adjusted_coverage",
+              "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53",
+              "schema_version": "market_data_coverage_v1",
+              "effective_date_range": {
+                "end": "2026-09-11",
+                "start": "2025-09-15"
+              },
+              "requested_date_range": {
+                "end": "2026-09-14",
+                "start": "2025-09-14"
+              },
+              "observations_by_symbol": {
+                "SPY": 250,
+                "AAPL": 250
+              }
+            },
+            "requested_date_range": {
+              "end": "2026-09-14",
+              "start": "2025-09-14"
+            },
+            "recurring_contribution": null
+          },
+          "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+          "confirmation_card": {
+            "kind": "backtest",
+            "rows": [
+              {
+                "key": "strategy",
+                "label": "Strategy",
+                "value": "Buy and Hold",
+                "labelKey": "chat.confirmation.rows.strategy"
+              },
+              {
+                "key": "assets",
+                "label": "Assets",
+                "value": "AAPL",
+                "labelKey": "chat.confirmation.rows.assets"
+              },
+              {
+                "key": "period",
+                "label": "Period",
+                "value": "September 15, 2025 - September 11, 2026",
+                "labelKey": "chat.confirmation.rows.period"
+              },
+              {
+                "key": "starting_capital",
+                "label": "Starting capital",
+                "value": "$10,000",
+                "labelKey": "chat.confirmation.rows.starting_capital"
+              }
+            ],
+            "title": "AAPL buy and hold",
+            "status": "ready_to_run",
+            "actions": [
+              {
+                "id": "run-backtest",
+                "type": "run_backtest",
+                "label": "Run backtest",
+                "payload": {
+                  "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                  "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                  "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+                  "launch_payload_hash": "53b56c14c96685b6"
+                },
+                "labelKey": "chat.confirmation.actions.run_backtest",
+                "presentation": "confirmation"
+              },
+              {
+                "id": "adjust-assumptions",
+                "type": "adjust_assumptions",
+                "label": "Change assumptions",
+                "payload": {
+                  "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                  "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                  "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+                  "launch_payload_hash": "53b56c14c96685b6"
+                },
+                "labelKey": "chat.confirmation.actions.adjust_assumptions",
+                "presentation": "confirmation"
+              },
+              {
+                "id": "cancel-confirmation",
+                "type": "cancel_confirmation",
+                "label": "Cancel",
+                "payload": {
+                  "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                  "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                  "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+                  "launch_payload_hash": "53b56c14c96685b6"
+                },
+                "labelKey": "chat.confirmation.actions.cancel",
+                "presentation": "confirmation"
+              }
+            ],
+            "date_range": {
+              "end": "2026-09-11",
+              "start": "2025-09-15",
+              "display": "September 15, 2025 - September 11, 2026"
+            },
+            "asset_class": "equity",
+            "assumptions": [],
+            "statusLabel": "Ready to run",
+            "capabilities": {
+              "direct_edits": [
+                "capital",
+                "dates",
+                "costs"
+              ],
+              "edit_constraints": {
+                "fees": {
+                  "max": 0.05,
+                  "min": 0
+                },
+                "capital": {
+                  "max": 100000000,
+                  "min": 10
+                },
+                "slippage": {
+                  "max": 0.05,
+                  "min": 0
+                },
+                "date_window": {
+                  "max_end": "2026-09-14",
+                  "min_start": "2016-01-01"
+                }
+              },
+              "execution_costs_editable": true
+            },
+            "display_facts": {
+              "fees": 0,
+              "capital": 10000,
+              "slippage": 0,
+              "timeframe": "1D",
+              "data_through": "2026-09-11",
+              "benchmark_symbol": "SPY"
+            },
+            "strategy_type": "buy_and_hold",
+            "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+            "confirmation_state": "active",
+            "launch_payload_hash": "53b56c14c96685b6"
+          },
+          "launch_payload_hash": "53b56c14c96685b6",
+          "confirmation_payload": {
+            "strategy": {
+              "cadence": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "timeframe": null,
+              "date_range": {
+                "end": "2026-09-11",
+                "start": "2025-09-15"
+              },
+              "entry_rule": null,
+              "exit_logic": null,
+              "risk_rules": [],
+              "asset_class": "equity",
+              "assumptions": [],
+              "entry_logic": null,
+              "sizing_mode": null,
+              "position_size": null,
+              "refinement_of": null,
+              "strategy_type": "buy_and_hold",
+              "asset_universe": [
+                "AAPL"
+              ],
+              "capital_amount": 10000,
+              "strategy_thesis": "Buy and hold Apple for the last year with $10,000",
+              "extra_parameters": {
+                "language": "en",
+                "evidence_spans": {
+                  "date_range": "last year",
+                  "strategy_type": "Buy and hold",
+                  "asset_universe": "Apple",
+                  "capital_amount": "$10,000",
+                  "date_range_raw_text": "last year"
+                },
+                "field_provenance": {
+                  "date_range": "explicit_user",
+                  "strategy_type": "explicit_user",
+                  "asset_universe": "explicit_user",
+                  "capital_amount": "starting_capital"
+                },
+                "date_range_intent": {
+                  "end": null,
+                  "kind": "rolling_window",
+                  "unit": "year",
+                  "year": null,
+                  "count": 1,
+                  "start": null,
+                  "anchor": "today",
+                  "endpoint": null,
+                  "evidence": "last year",
+                  "confidence": 0.9,
+                  "day_offset": null
+                },
+                "raw_strategy_type": "buy_and_hold",
+                "date_range_raw_text": "last year",
+                "effective_date_range": {
+                  "end": "2026-09-11",
+                  "start": "2025-09-15"
+                },
+                "requested_date_range": {
+                  "end": "2026-09-14",
+                  "start": "2025-09-14"
+                },
+                "provider_resolved_assets": [
+                  {
+                    "name": "Apple Inc. Common Stock",
+                    "symbol": "AAPL",
+                    "exchange": "AssetExchange.NASDAQ",
+                    "provider": "alpaca",
+                    "raw_text": "Apple",
+                    "raw_symbol": "AAPL",
+                    "asset_class": "equity"
+                  }
+                ],
+                "data_availability_adjustment": {
+                  "kind": "latest_complete_daily_data",
+                  "through": "2026-09-11",
+                  "provider": "alpaca",
+                  "timeframe": "1D",
+                  "original_end": "2026-09-14"
+                }
+              },
+              "raw_user_phrasing": "Buy and hold Apple for the last year with $10,000.",
+              "comparison_baseline": "SPY",
+              "resolution_provenance": [
+                {
+                  "field": "asset_universe[0]",
+                  "source": "llm_extraction",
+                  "raw_text": "Apple",
+                  "confidence": "medium",
+                  "asset_class": "equity",
+                  "validated_by": "provider_catalog",
+                  "candidate_kind": "asset",
+                  "canonical_symbol": "AAPL",
+                  "resolution_status": "resolved"
+                }
+              ],
+              "requested_strategy_template": null
+            },
+            "validation": {
+              "status": "ready_to_run",
+              "executable": true,
+              "date_adjusted": true
+            },
+            "launch_payload": {
+              "symbol": "AAPL",
+              "cadence": null,
+              "symbols": [
+                "AAPL"
+              ],
+              "language": "en",
+              "exit_rule": null,
+              "rule_spec": null,
+              "timeframe": "1D",
+              "date_range": {
+                "end": "2026-09-11",
+                "start": "2025-09-15"
+              },
+              "entry_rule": null,
+              "parameters": {},
+              "risk_rules": [],
+              "asset_class": "equity",
+              "sizing_mode": "capital_amount",
+              "position_size": null,
+              "strategy_type": "buy_and_hold",
+              "capital_amount": 10000,
+              "benchmark_symbol": "SPY",
+              "starting_capital": null,
+              "coverage_preflight": {
+                "outcome": "adjusted_coverage",
+                "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53",
+                "schema_version": "market_data_coverage_v1",
+                "adjustment_reason": "calendar_alignment",
+                "effective_date_range": {
+                  "end": "2026-09-11",
+                  "start": "2025-09-15"
+                },
+                "requested_date_range": {
+                  "end": "2026-09-14",
+                  "start": "2025-09-14"
+                },
+                "observations_by_symbol": {
+                  "SPY": 250,
+                  "AAPL": 250
+                }
+              },
+              "requested_date_range": {
+                "end": "2026-09-14",
+                "start": "2025-09-14"
+              },
+              "recurring_contribution": null
+            },
+            "edit_disclosure": null,
+            "optional_parameters": {
+              "fees": {
+                "label": "Fees",
+                "value": 0,
+                "source": "default",
+                "description": "Per-trade fee assumption applied during execution."
+              },
+              "slippage": {
+                "label": "Slippage",
+                "value": 0,
+                "source": "default",
+                "description": "Execution slippage assumption expressed as a fraction."
+              },
+              "timeframe": {
+                "label": "Timeframe",
+                "value": "1D",
+                "source": "default",
+                "description": "Bar interval used for the simulation."
+              },
+              "engine_options": {
+                "label": "Engine options",
+                "value": {},
+                "source": "default",
+                "description": "Reserved execution knobs exposed by the runtime contract."
+              },
+              "initial_capital": {
+                "label": "Initial capital",
+                "value": 1000,
+                "source": "default",
+                "description": "Starting cash for the simulated backtest."
+              }
+            }
+          }
+        },
+        "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+        "artifact_kind": "confirmation",
+        "artifact_status": "active"
+      },
+      "artifact_presentation_kind": "confirmation"
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_for_confirmation"
+    },
+    {
+      "type": "stage_start",
+      "stage": "confirm"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "await_approval"
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [
+          {
+            "artifact_kind": "confirmation",
+            "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+            "artifact_status": "active",
+            "metadata": {
+              "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "artifact_type": "confirmation",
+              "confirmation_payload": {
+                "strategy": {
+                  "raw_user_phrasing": "Buy and hold Apple for the last year with $10,000.",
+                  "requested_strategy_template": null,
+                  "strategy_type": "buy_and_hold",
+                  "strategy_thesis": "Buy and hold Apple for the last year with $10,000",
+                  "asset_universe": [
+                    "AAPL"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": null,
+                  "cadence": null,
+                  "entry_logic": null,
+                  "exit_logic": null,
+                  "date_range": {
+                    "start": "2025-09-15",
+                    "end": "2026-09-11"
+                  },
+                  "sizing_mode": null,
+                  "capital_amount": 10000,
+                  "position_size": null,
+                  "risk_rules": [],
+                  "assumptions": [],
+                  "comparison_baseline": "SPY",
+                  "refinement_of": null,
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "resolution_provenance": [
+                    {
+                      "field": "asset_universe[0]",
+                      "raw_text": "Apple",
+                      "source": "llm_extraction",
+                      "candidate_kind": "asset",
+                      "resolution_status": "resolved",
+                      "canonical_symbol": "AAPL",
+                      "asset_class": "equity",
+                      "validated_by": "provider_catalog",
+                      "confidence": "medium"
+                    }
+                  ],
+                  "extra_parameters": {
+                    "provider_resolved_assets": [
+                      {
+                        "raw_text": "Apple",
+                        "symbol": "AAPL",
+                        "asset_class": "equity",
+                        "name": "Apple Inc. Common Stock",
+                        "raw_symbol": "AAPL",
+                        "provider": "alpaca",
+                        "exchange": "AssetExchange.NASDAQ"
+                      }
+                    ],
+                    "language": "en",
+                    "date_range_raw_text": "last year",
+                    "date_range_intent": {
+                      "kind": "rolling_window",
+                      "start": null,
+                      "end": null,
+                      "day_offset": null,
+                      "count": 1,
+                      "unit": "year",
+                      "anchor": "today",
+                      "year": null,
+                      "endpoint": null,
+                      "confidence": 0.9,
+                      "evidence": "last year"
+                    },
+                    "evidence_spans": {
+                      "strategy_type": "Buy and hold",
+                      "asset_universe": "Apple",
+                      "capital_amount": "$10,000",
+                      "date_range": "last year",
+                      "date_range_raw_text": "last year"
+                    },
+                    "field_provenance": {
+                      "strategy_type": "explicit_user",
+                      "asset_universe": "explicit_user",
+                      "capital_amount": "starting_capital",
+                      "date_range": "explicit_user"
+                    },
+                    "raw_strategy_type": "buy_and_hold",
+                    "requested_date_range": {
+                      "start": "2025-09-14",
+                      "end": "2026-09-14"
+                    },
+                    "data_availability_adjustment": {
+                      "kind": "latest_complete_daily_data",
+                      "original_end": "2026-09-14",
+                      "provider": "alpaca",
+                      "through": "2026-09-11",
+                      "timeframe": "1D"
+                    },
+                    "effective_date_range": {
+                      "start": "2025-09-15",
+                      "end": "2026-09-11"
+                    }
+                  }
+                },
+                "optional_parameters": {
+                  "initial_capital": {
+                    "value": 1000,
+                    "source": "default",
+                    "label": "Initial capital",
+                    "description": "Starting cash for the simulated backtest."
+                  },
+                  "timeframe": {
+                    "value": "1D",
+                    "source": "default",
+                    "label": "Timeframe",
+                    "description": "Bar interval used for the simulation."
+                  },
+                  "fees": {
+                    "value": 0,
+                    "source": "default",
+                    "label": "Fees",
+                    "description": "Per-trade fee assumption applied during execution."
+                  },
+                  "slippage": {
+                    "value": 0,
+                    "source": "default",
+                    "label": "Slippage",
+                    "description": "Execution slippage assumption expressed as a fraction."
+                  },
+                  "engine_options": {
+                    "value": {},
+                    "source": "default",
+                    "label": "Engine options",
+                    "description": "Reserved execution knobs exposed by the runtime contract."
+                  }
+                },
+                "launch_payload": {
+                  "strategy_type": "buy_and_hold",
+                  "symbol": "AAPL",
+                  "symbols": [
+                    "AAPL"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": "1D",
+                  "date_range": {
+                    "start": "2025-09-15",
+                    "end": "2026-09-11"
+                  },
+                  "entry_rule": null,
+                  "exit_rule": null,
+                  "rule_spec": null,
+                  "sizing_mode": "capital_amount",
+                  "capital_amount": 10000,
+                  "starting_capital": null,
+                  "recurring_contribution": null,
+                  "position_size": null,
+                  "cadence": null,
+                  "parameters": {},
+                  "risk_rules": [],
+                  "benchmark_symbol": "SPY",
+                  "language": "en",
+                  "requested_date_range": {
+                    "start": "2025-09-14",
+                    "end": "2026-09-14"
+                  },
+                  "coverage_preflight": {
+                    "schema_version": "market_data_coverage_v1",
+                    "outcome": "adjusted_coverage",
+                    "requested_date_range": {
+                      "start": "2025-09-14",
+                      "end": "2026-09-14"
+                    },
+                    "effective_date_range": {
+                      "start": "2025-09-15",
+                      "end": "2026-09-11"
+                    },
+                    "observations_by_symbol": {
+                      "AAPL": 250,
+                      "SPY": 250
+                    },
+                    "adjustment_reason": "calendar_alignment",
+                    "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53"
+                  }
+                },
+                "validation": {
+                  "status": "ready_to_run",
+                  "executable": true,
+                  "date_adjusted": true
+                },
+                "edit_disclosure": null
+              },
+              "launch_payload_hash": "53b56c14c96685b6",
+              "strategy_hash": "0fd71e99ccb69f90",
+              "validation": {
+                "executable": true,
+                "failure_code": null
+              },
+              "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2025-09-15",
+                  "end": "2026-09-11"
+                },
+                "requested_date_range": {
+                  "start": "2025-09-14",
+                  "end": "2026-09-14"
+                },
+                "coverage_preflight": {
+                  "schema_version": "market_data_coverage_v1",
+                  "outcome": "adjusted_coverage",
+                  "requested_date_range": {
+                    "start": "2025-09-14",
+                    "end": "2026-09-14"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-15",
+                    "end": "2026-09-11"
+                  },
+                  "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53",
+                  "observations_by_symbol": {
+                    "AAPL": 250,
+                    "SPY": 250
+                  }
+                },
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "sizing_mode": "capital_amount",
+                "capital_amount": 10000,
+                "position_size": null,
+                "starting_capital": null,
+                "recurring_contribution": null,
+                "cadence": null,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "language": "en"
+              },
+              "confirmation_card": {
+                "kind": "backtest",
+                "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                "confirmation_state": "active",
+                "launch_payload_hash": "53b56c14c96685b6",
+                "title": "AAPL buy and hold",
+                "status": "ready_to_run",
+                "statusLabel": "Ready to run",
+                "strategy_type": "buy_and_hold",
+                "rows": [
+                  {
+                    "key": "strategy",
+                    "label": "Strategy",
+                    "labelKey": "chat.confirmation.rows.strategy",
+                    "value": "Buy and Hold"
+                  },
+                  {
+                    "key": "assets",
+                    "label": "Assets",
+                    "labelKey": "chat.confirmation.rows.assets",
+                    "value": "AAPL"
+                  },
+                  {
+                    "key": "period",
+                    "label": "Period",
+                    "labelKey": "chat.confirmation.rows.period",
+                    "value": "September 15, 2025 - September 11, 2026"
+                  },
+                  {
+                    "key": "starting_capital",
+                    "label": "Starting capital",
+                    "labelKey": "chat.confirmation.rows.starting_capital",
+                    "value": "$10,000"
+                  }
+                ],
+                "assumptions": [],
+                "actions": [
+                  {
+                    "id": "run-backtest",
+                    "type": "run_backtest",
+                    "label": "Run backtest",
+                    "labelKey": "chat.confirmation.actions.run_backtest",
+                    "presentation": "confirmation",
+                    "payload": {
+                      "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                      "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                      "launch_payload_hash": "53b56c14c96685b6",
+                      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+                    }
+                  },
+                  {
+                    "id": "adjust-assumptions",
+                    "type": "adjust_assumptions",
+                    "label": "Change assumptions",
+                    "labelKey": "chat.confirmation.actions.adjust_assumptions",
+                    "presentation": "confirmation",
+                    "payload": {
+                      "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                      "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                      "launch_payload_hash": "53b56c14c96685b6",
+                      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+                    }
+                  },
+                  {
+                    "id": "cancel-confirmation",
+                    "type": "cancel_confirmation",
+                    "label": "Cancel",
+                    "labelKey": "chat.confirmation.actions.cancel",
+                    "presentation": "confirmation",
+                    "payload": {
+                      "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                      "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                      "launch_payload_hash": "53b56c14c96685b6",
+                      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+                    }
+                  }
+                ],
+                "display_facts": {
+                  "capital": 10000,
+                  "timeframe": "1D",
+                  "data_through": "2026-09-11",
+                  "fees": 0,
+                  "slippage": 0,
+                  "benchmark_symbol": "SPY"
+                },
+                "capabilities": {
+                  "execution_costs_editable": true,
+                  "direct_edits": [
+                    "capital",
+                    "dates",
+                    "costs"
+                  ],
+                  "edit_constraints": {
+                    "capital": {
+                      "max": 100000000,
+                      "min": 10
+                    },
+                    "fees": {
+                      "min": 0,
+                      "max": 0.05
+                    },
+                    "slippage": {
+                      "min": 0,
+                      "max": 0.05
+                    },
+                    "date_window": {
+                      "max_end": "2026-09-14",
+                      "min_start": "2016-01-01"
+                    }
+                  }
+                },
+                "asset_class": "equity",
+                "date_range": {
+                  "start": "2025-09-15",
+                  "end": "2026-09-11",
+                  "display": "September 15, 2025 - September 11, 2026"
+                }
+              }
+            }
+          }
+        ],
+        "stage_outcome": "await_approval",
+        "confirmation_payload": {
+          "strategy": {
+            "raw_user_phrasing": "Buy and hold Apple for the last year with $10,000.",
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold Apple for the last year with $10,000",
+            "asset_universe": [
+              "AAPL"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2025-09-15",
+              "end": "2026-09-11"
+            },
+            "sizing_mode": null,
+            "capital_amount": 10000,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": "SPY",
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [
+              {
+                "field": "asset_universe[0]",
+                "raw_text": "Apple",
+                "source": "llm_extraction",
+                "candidate_kind": "asset",
+                "resolution_status": "resolved",
+                "canonical_symbol": "AAPL",
+                "asset_class": "equity",
+                "validated_by": "provider_catalog",
+                "confidence": "medium"
+              }
+            ],
+            "extra_parameters": {
+              "provider_resolved_assets": [
+                {
+                  "raw_text": "Apple",
+                  "symbol": "AAPL",
+                  "asset_class": "equity",
+                  "name": "Apple Inc. Common Stock",
+                  "raw_symbol": "AAPL",
+                  "provider": "alpaca",
+                  "exchange": "AssetExchange.NASDAQ"
+                }
+              ],
+              "language": "en",
+              "date_range_raw_text": "last year",
+              "date_range_intent": {
+                "kind": "rolling_window",
+                "start": null,
+                "end": null,
+                "day_offset": null,
+                "count": 1,
+                "unit": "year",
+                "anchor": "today",
+                "year": null,
+                "endpoint": null,
+                "confidence": 0.9,
+                "evidence": "last year"
+              },
+              "evidence_spans": {
+                "strategy_type": "Buy and hold",
+                "asset_universe": "Apple",
+                "capital_amount": "$10,000",
+                "date_range": "last year",
+                "date_range_raw_text": "last year"
+              },
+              "field_provenance": {
+                "strategy_type": "explicit_user",
+                "asset_universe": "explicit_user",
+                "capital_amount": "starting_capital",
+                "date_range": "explicit_user"
+              },
+              "raw_strategy_type": "buy_and_hold",
+              "requested_date_range": {
+                "start": "2025-09-14",
+                "end": "2026-09-14"
+              },
+              "data_availability_adjustment": {
+                "kind": "latest_complete_daily_data",
+                "original_end": "2026-09-14",
+                "provider": "alpaca",
+                "through": "2026-09-11",
+                "timeframe": "1D"
+              },
+              "effective_date_range": {
+                "start": "2025-09-15",
+                "end": "2026-09-11"
+              }
+            }
+          },
+          "optional_parameters": {
+            "initial_capital": {
+              "value": 1000,
+              "source": "default",
+              "label": "Initial capital",
+              "description": "Starting cash for the simulated backtest."
+            },
+            "timeframe": {
+              "value": "1D",
+              "source": "default",
+              "label": "Timeframe",
+              "description": "Bar interval used for the simulation."
+            },
+            "fees": {
+              "value": 0,
+              "source": "default",
+              "label": "Fees",
+              "description": "Per-trade fee assumption applied during execution."
+            },
+            "slippage": {
+              "value": 0,
+              "source": "default",
+              "label": "Slippage",
+              "description": "Execution slippage assumption expressed as a fraction."
+            },
+            "engine_options": {
+              "value": {},
+              "source": "default",
+              "label": "Engine options",
+              "description": "Reserved execution knobs exposed by the runtime contract."
+            }
+          },
+          "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "AAPL",
+            "symbols": [
+              "AAPL"
+            ],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {
+              "start": "2025-09-15",
+              "end": "2026-09-11"
+            },
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 10000,
+            "starting_capital": null,
+            "recurring_contribution": null,
+            "position_size": null,
+            "cadence": null,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "language": "en",
+            "requested_date_range": {
+              "start": "2025-09-14",
+              "end": "2026-09-14"
+            },
+            "coverage_preflight": {
+              "schema_version": "market_data_coverage_v1",
+              "outcome": "adjusted_coverage",
+              "requested_date_range": {
+                "start": "2025-09-14",
+                "end": "2026-09-14"
+              },
+              "effective_date_range": {
+                "start": "2025-09-15",
+                "end": "2026-09-11"
+              },
+              "observations_by_symbol": {
+                "AAPL": 250,
+                "SPY": 250
+              },
+              "adjustment_reason": "calendar_alignment",
+              "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53"
+            }
+          },
+          "validation": {
+            "status": "ready_to_run",
+            "executable": true,
+            "date_adjusted": true
+          },
+          "edit_disclosure": null
+        },
+        "resolution_provenance": [
+          {
+            "field": "asset_universe[0]",
+            "raw_text": "Apple",
+            "source": "llm_extraction",
+            "candidate_kind": "asset",
+            "resolution_status": "resolved",
+            "canonical_symbol": "AAPL",
+            "asset_class": "equity",
+            "validated_by": "provider_catalog",
+            "confidence": "medium"
+          }
+        ],
+        "pending_strategy": {
+          "strategy": {
+            "raw_user_phrasing": "Buy and hold Apple for the last year with $10,000.",
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": "Buy and hold Apple for the last year with $10,000",
+            "asset_universe": [
+              "AAPL"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2025-09-15",
+              "end": "2026-09-11"
+            },
+            "sizing_mode": null,
+            "capital_amount": 10000,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": "SPY",
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [
+              {
+                "field": "asset_universe[0]",
+                "raw_text": "Apple",
+                "source": "llm_extraction",
+                "candidate_kind": "asset",
+                "resolution_status": "resolved",
+                "canonical_symbol": "AAPL",
+                "asset_class": "equity",
+                "validated_by": "provider_catalog",
+                "confidence": "medium"
+              }
+            ],
+            "extra_parameters": {
+              "provider_resolved_assets": [
+                {
+                  "raw_text": "Apple",
+                  "symbol": "AAPL",
+                  "asset_class": "equity",
+                  "name": "Apple Inc. Common Stock",
+                  "raw_symbol": "AAPL",
+                  "provider": "alpaca",
+                  "exchange": "AssetExchange.NASDAQ"
+                }
+              ],
+              "language": "en",
+              "date_range_raw_text": "last year",
+              "date_range_intent": {
+                "kind": "rolling_window",
+                "start": null,
+                "end": null,
+                "day_offset": null,
+                "count": 1,
+                "unit": "year",
+                "anchor": "today",
+                "year": null,
+                "endpoint": null,
+                "confidence": 0.9,
+                "evidence": "last year"
+              },
+              "evidence_spans": {
+                "strategy_type": "Buy and hold",
+                "asset_universe": "Apple",
+                "capital_amount": "$10,000",
+                "date_range": "last year",
+                "date_range_raw_text": "last year"
+              },
+              "field_provenance": {
+                "strategy_type": "explicit_user",
+                "asset_universe": "explicit_user",
+                "capital_amount": "starting_capital",
+                "date_range": "explicit_user"
+              },
+              "raw_strategy_type": "buy_and_hold",
+              "requested_date_range": {
+                "start": "2025-09-14",
+                "end": "2026-09-14"
+              },
+              "data_availability_adjustment": {
+                "kind": "latest_complete_daily_data",
+                "original_end": "2026-09-14",
+                "provider": "alpaca",
+                "through": "2026-09-11",
+                "timeframe": "1D"
+              },
+              "effective_date_range": {
+                "start": "2025-09-15",
+                "end": "2026-09-11"
+              }
+            }
+          },
+          "requested_field": null,
+          "missing_required_fields": []
+        },
+        "active_confirmation_reference": {
+          "artifact_kind": "confirmation",
+          "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+          "artifact_status": "active",
+          "metadata": {
+            "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+            "artifact_type": "confirmation",
+            "confirmation_payload": {
+              "strategy": {
+                "raw_user_phrasing": "Buy and hold Apple for the last year with $10,000.",
+                "requested_strategy_template": null,
+                "strategy_type": "buy_and_hold",
+                "strategy_thesis": "Buy and hold Apple for the last year with $10,000",
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": null,
+                "cadence": null,
+                "entry_logic": null,
+                "exit_logic": null,
+                "date_range": {
+                  "start": "2025-09-15",
+                  "end": "2026-09-11"
+                },
+                "sizing_mode": null,
+                "capital_amount": 10000,
+                "position_size": null,
+                "risk_rules": [],
+                "assumptions": [],
+                "comparison_baseline": "SPY",
+                "refinement_of": null,
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "resolution_provenance": [
+                  {
+                    "field": "asset_universe[0]",
+                    "raw_text": "Apple",
+                    "source": "llm_extraction",
+                    "candidate_kind": "asset",
+                    "resolution_status": "resolved",
+                    "canonical_symbol": "AAPL",
+                    "asset_class": "equity",
+                    "validated_by": "provider_catalog",
+                    "confidence": "medium"
+                  }
+                ],
+                "extra_parameters": {
+                  "provider_resolved_assets": [
+                    {
+                      "raw_text": "Apple",
+                      "symbol": "AAPL",
+                      "asset_class": "equity",
+                      "name": "Apple Inc. Common Stock",
+                      "raw_symbol": "AAPL",
+                      "provider": "alpaca",
+                      "exchange": "AssetExchange.NASDAQ"
+                    }
+                  ],
+                  "language": "en",
+                  "date_range_raw_text": "last year",
+                  "date_range_intent": {
+                    "kind": "rolling_window",
+                    "start": null,
+                    "end": null,
+                    "day_offset": null,
+                    "count": 1,
+                    "unit": "year",
+                    "anchor": "today",
+                    "year": null,
+                    "endpoint": null,
+                    "confidence": 0.9,
+                    "evidence": "last year"
+                  },
+                  "evidence_spans": {
+                    "strategy_type": "Buy and hold",
+                    "asset_universe": "Apple",
+                    "capital_amount": "$10,000",
+                    "date_range": "last year",
+                    "date_range_raw_text": "last year"
+                  },
+                  "field_provenance": {
+                    "strategy_type": "explicit_user",
+                    "asset_universe": "explicit_user",
+                    "capital_amount": "starting_capital",
+                    "date_range": "explicit_user"
+                  },
+                  "raw_strategy_type": "buy_and_hold",
+                  "requested_date_range": {
+                    "start": "2025-09-14",
+                    "end": "2026-09-14"
+                  },
+                  "data_availability_adjustment": {
+                    "kind": "latest_complete_daily_data",
+                    "original_end": "2026-09-14",
+                    "provider": "alpaca",
+                    "through": "2026-09-11",
+                    "timeframe": "1D"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-15",
+                    "end": "2026-09-11"
+                  }
+                }
+              },
+              "optional_parameters": {
+                "initial_capital": {
+                  "value": 1000,
+                  "source": "default",
+                  "label": "Initial capital",
+                  "description": "Starting cash for the simulated backtest."
+                },
+                "timeframe": {
+                  "value": "1D",
+                  "source": "default",
+                  "label": "Timeframe",
+                  "description": "Bar interval used for the simulation."
+                },
+                "fees": {
+                  "value": 0,
+                  "source": "default",
+                  "label": "Fees",
+                  "description": "Per-trade fee assumption applied during execution."
+                },
+                "slippage": {
+                  "value": 0,
+                  "source": "default",
+                  "label": "Slippage",
+                  "description": "Execution slippage assumption expressed as a fraction."
+                },
+                "engine_options": {
+                  "value": {},
+                  "source": "default",
+                  "label": "Engine options",
+                  "description": "Reserved execution knobs exposed by the runtime contract."
+                }
+              },
+              "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2025-09-15",
+                  "end": "2026-09-11"
+                },
+                "entry_rule": null,
+                "exit_rule": null,
+                "rule_spec": null,
+                "sizing_mode": "capital_amount",
+                "capital_amount": 10000,
+                "starting_capital": null,
+                "recurring_contribution": null,
+                "position_size": null,
+                "cadence": null,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "language": "en",
+                "requested_date_range": {
+                  "start": "2025-09-14",
+                  "end": "2026-09-14"
+                },
+                "coverage_preflight": {
+                  "schema_version": "market_data_coverage_v1",
+                  "outcome": "adjusted_coverage",
+                  "requested_date_range": {
+                    "start": "2025-09-14",
+                    "end": "2026-09-14"
+                  },
+                  "effective_date_range": {
+                    "start": "2025-09-15",
+                    "end": "2026-09-11"
+                  },
+                  "observations_by_symbol": {
+                    "AAPL": 250,
+                    "SPY": 250
+                  },
+                  "adjustment_reason": "calendar_alignment",
+                  "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53"
+                }
+              },
+              "validation": {
+                "status": "ready_to_run",
+                "executable": true,
+                "date_adjusted": true
+              },
+              "edit_disclosure": null
+            },
+            "launch_payload_hash": "53b56c14c96685b6",
+            "strategy_hash": "0fd71e99ccb69f90",
+            "validation": {
+              "executable": true,
+              "failure_code": null
+            },
+            "launch_payload": {
+              "strategy_type": "buy_and_hold",
+              "symbol": "AAPL",
+              "symbols": [
+                "AAPL"
+              ],
+              "asset_class": "equity",
+              "timeframe": "1D",
+              "date_range": {
+                "start": "2025-09-15",
+                "end": "2026-09-11"
+              },
+              "requested_date_range": {
+                "start": "2025-09-14",
+                "end": "2026-09-14"
+              },
+              "coverage_preflight": {
+                "schema_version": "market_data_coverage_v1",
+                "outcome": "adjusted_coverage",
+                "requested_date_range": {
+                  "start": "2025-09-14",
+                  "end": "2026-09-14"
+                },
+                "effective_date_range": {
+                  "start": "2025-09-15",
+                  "end": "2026-09-11"
+                },
+                "preflight_id": "sha256:343e4ce940cd24c5acd8e3d02bf17b3e23d9e23d4470b91e25e4783df20dba53",
+                "observations_by_symbol": {
+                  "AAPL": 250,
+                  "SPY": 250
+                }
+              },
+              "entry_rule": null,
+              "exit_rule": null,
+              "rule_spec": null,
+              "sizing_mode": "capital_amount",
+              "capital_amount": 10000,
+              "position_size": null,
+              "starting_capital": null,
+              "recurring_contribution": null,
+              "cadence": null,
+              "parameters": {},
+              "risk_rules": [],
+              "benchmark_symbol": "SPY",
+              "language": "en"
+            },
+            "confirmation_card": {
+              "kind": "backtest",
+              "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+              "confirmation_state": "active",
+              "launch_payload_hash": "53b56c14c96685b6",
+              "title": "AAPL buy and hold",
+              "status": "ready_to_run",
+              "statusLabel": "Ready to run",
+              "strategy_type": "buy_and_hold",
+              "rows": [
+                {
+                  "key": "strategy",
+                  "label": "Strategy",
+                  "labelKey": "chat.confirmation.rows.strategy",
+                  "value": "Buy and Hold"
+                },
+                {
+                  "key": "assets",
+                  "label": "Assets",
+                  "labelKey": "chat.confirmation.rows.assets",
+                  "value": "AAPL"
+                },
+                {
+                  "key": "period",
+                  "label": "Period",
+                  "labelKey": "chat.confirmation.rows.period",
+                  "value": "September 15, 2025 - September 11, 2026"
+                },
+                {
+                  "key": "starting_capital",
+                  "label": "Starting capital",
+                  "labelKey": "chat.confirmation.rows.starting_capital",
+                  "value": "$10,000"
+                }
+              ],
+              "assumptions": [],
+              "actions": [
+                {
+                  "id": "run-backtest",
+                  "type": "run_backtest",
+                  "label": "Run backtest",
+                  "labelKey": "chat.confirmation.actions.run_backtest",
+                  "presentation": "confirmation",
+                  "payload": {
+                    "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "launch_payload_hash": "53b56c14c96685b6",
+                    "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+                  }
+                },
+                {
+                  "id": "adjust-assumptions",
+                  "type": "adjust_assumptions",
+                  "label": "Change assumptions",
+                  "labelKey": "chat.confirmation.actions.adjust_assumptions",
+                  "presentation": "confirmation",
+                  "payload": {
+                    "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "launch_payload_hash": "53b56c14c96685b6",
+                    "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+                  }
+                },
+                {
+                  "id": "cancel-confirmation",
+                  "type": "cancel_confirmation",
+                  "label": "Cancel",
+                  "labelKey": "chat.confirmation.actions.cancel",
+                  "presentation": "confirmation",
+                  "payload": {
+                    "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                    "launch_payload_hash": "53b56c14c96685b6",
+                    "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+                  }
+                }
+              ],
+              "display_facts": {
+                "capital": 10000,
+                "timeframe": "1D",
+                "data_through": "2026-09-11",
+                "fees": 0,
+                "slippage": 0,
+                "benchmark_symbol": "SPY"
+              },
+              "capabilities": {
+                "execution_costs_editable": true,
+                "direct_edits": [
+                  "capital",
+                  "dates",
+                  "costs"
+                ],
+                "edit_constraints": {
+                  "capital": {
+                    "max": 100000000,
+                    "min": 10
+                  },
+                  "fees": {
+                    "min": 0,
+                    "max": 0.05
+                  },
+                  "slippage": {
+                    "min": 0,
+                    "max": 0.05
+                  },
+                  "date_window": {
+                    "max_end": "2026-09-14",
+                    "min_start": "2016-01-01"
+                  }
+                }
+              },
+              "asset_class": "equity",
+              "date_range": {
+                "start": "2025-09-15",
+                "end": "2026-09-11",
+                "display": "September 15, 2025 - September 11, 2026"
+              }
+            }
+          }
+        },
+        "confirmation": {
+          "kind": "backtest",
+          "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+          "confirmation_state": "active",
+          "launch_payload_hash": "53b56c14c96685b6",
+          "title": "AAPL buy and hold",
+          "status": "ready_to_run",
+          "statusLabel": "Ready to run",
+          "strategy_type": "buy_and_hold",
+          "rows": [
+            {
+              "key": "strategy",
+              "label": "Strategy",
+              "labelKey": "chat.confirmation.rows.strategy",
+              "value": "Buy and Hold"
+            },
+            {
+              "key": "assets",
+              "label": "Assets",
+              "labelKey": "chat.confirmation.rows.assets",
+              "value": "AAPL"
+            },
+            {
+              "key": "period",
+              "label": "Period",
+              "labelKey": "chat.confirmation.rows.period",
+              "value": "September 15, 2025 - September 11, 2026"
+            },
+            {
+              "key": "starting_capital",
+              "label": "Starting capital",
+              "labelKey": "chat.confirmation.rows.starting_capital",
+              "value": "$10,000"
+            }
+          ],
+          "assumptions": [],
+          "actions": [
+            {
+              "id": "run-backtest",
+              "type": "run_backtest",
+              "label": "Run backtest",
+              "labelKey": "chat.confirmation.actions.run_backtest",
+              "presentation": "confirmation",
+              "payload": {
+                "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                "launch_payload_hash": "53b56c14c96685b6",
+                "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+              }
+            },
+            {
+              "id": "adjust-assumptions",
+              "type": "adjust_assumptions",
+              "label": "Change assumptions",
+              "labelKey": "chat.confirmation.actions.adjust_assumptions",
+              "presentation": "confirmation",
+              "payload": {
+                "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                "launch_payload_hash": "53b56c14c96685b6",
+                "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+              }
+            },
+            {
+              "id": "cancel-confirmation",
+              "type": "cancel_confirmation",
+              "label": "Cancel",
+              "labelKey": "chat.confirmation.actions.cancel",
+              "presentation": "confirmation",
+              "payload": {
+                "confirmation_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                "artifact_id": "confirmation-310d9984-fa6c-4cff-9623-a4ebe670a788",
+                "launch_payload_hash": "53b56c14c96685b6",
+                "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155"
+              }
+            }
+          ],
+          "display_facts": {
+            "capital": 10000,
+            "timeframe": "1D",
+            "data_through": "2026-09-11",
+            "fees": 0,
+            "slippage": 0,
+            "benchmark_symbol": "SPY"
+          },
+          "capabilities": {
+            "execution_costs_editable": true,
+            "direct_edits": [
+              "capital",
+              "dates",
+              "costs"
+            ],
+            "edit_constraints": {
+              "capital": {
+                "max": 100000000,
+                "min": 10
+              },
+              "fees": {
+                "min": 0,
+                "max": 0.05
+              },
+              "slippage": {
+                "min": 0,
+                "max": 0.05
+              },
+              "date_window": {
+                "max_end": "2026-09-14",
+                "min_start": "2016-01-01"
+              }
+            }
+          },
+          "asset_class": "equity",
+          "date_range": {
+            "start": "2025-09-15",
+            "end": "2026-09-11",
+            "display": "September 15, 2025 - September 11, 2026"
+          }
+        },
+        "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 32.013,
+  "screenshot": {
+    "file": "screenshots/registered-q9-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "AAPL\nBuy and Hold\nReady to run\nSTARTING CAPITAL\n$10,000\nPERIOD\nSep 15, 2025 → Sep 11, 2026\nStocks\nDaily data\nThrough Sep 11\nNo fees\nNo slippage\nBenchmark: SPY\nEdit capital\nEdit dates\nEdit costs\nRun backtest\nChange assumptions\nCancel"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "af65b930-bcf5-4120-a072-f5b6a95caeb3",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "run_id": null,
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 1052,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 826,
+        "cached_tokens": 128,
+        "prompt_tokens": 789,
+        "completion_tokens": 37,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "stage_outcome": "await_approval",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm"
+      },
+      "created_at": "2026-09-14 16:56:38.387919+00:00"
+    },
+    {
+      "id": "40533dbe-b487-4e08-af2a-f2578c690980",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "run_id": null,
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 11386,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12159,
+        "cached_tokens": 192,
+        "prompt_tokens": 10856,
+        "completion_tokens": 1303,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "stage_outcome": "await_approval",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm"
+      },
+      "created_at": "2026-09-14 16:56:49.874731+00:00"
+    },
+    {
+      "id": "37028829-d5a9-4ca7-bd6d-0aecac1dd6c8",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "run_id": null,
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedStrategyExtraction",
+      "latency_ms": 3174,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3831,
+        "cached_tokens": 128,
+        "prompt_tokens": 3472,
+        "completion_tokens": 359,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "repair_effect": {
+          "no_op_reason": null,
+          "changed_fields": [
+            "candidate_strategy_draft.date_range",
+            "candidate_strategy_draft.date_range_intent",
+            "candidate_strategy_draft.field_provenance",
+            "confidence",
+            "detected_user_language",
+            "intent"
+          ],
+          "repair_applied": true,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "951768635b6dc67fd6e15b82032c186011d8d976cb787f840cc0f877f65f7aca",
+          "before_fingerprint": "84cd821e07742c7d6b7746ebf976698c71581009967c0d0f2cdafce24a232044",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_approval",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm"
+      },
+      "created_at": "2026-09-14 16:56:57.616194+00:00"
+    },
+    {
+      "id": "3ec4c477-5ae6-463b-a57e-3f5b434e474d",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "run_id": null,
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "task": "field_fidelity",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "StatedRunFieldFidelityAudit",
+      "latency_ms": 898,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 2255,
+        "cached_tokens": 128,
+        "prompt_tokens": 2205,
+        "completion_tokens": 50,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "stage_outcome": "await_approval",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm"
+      },
+      "created_at": "2026-09-14 16:56:59.130626+00:00"
+    },
+    {
+      "id": "d6b7b5a4-9776-4d04-8935-f7bef255bf1d",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "run_id": null,
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "task": "field_fidelity",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "StatedRunFieldFidelityAudit",
+      "latency_ms": 917,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 2255,
+        "cached_tokens": 2176,
+        "prompt_tokens": 2205,
+        "completion_tokens": 50,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "stage_outcome": "await_approval",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm"
+      },
+      "created_at": "2026-09-14 16:57:06.428719+00:00"
+    },
+    {
+      "id": "a7b90037-f0cc-4f60-816e-f83cef88b514",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "run_id": null,
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 505,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 216,
+        "cached_tokens": 0,
+        "prompt_tokens": 201,
+        "completion_tokens": 15,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 16:57:07.839412+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "a03940a2-7687-413b-8000-4fc2d5485cbd",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "af65b930-bcf5-4120-a072-f5b6a95caeb3",
+      "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+      "correlation_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e:d9a1e247-630a-4638-96d2-a35724b47155:65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 826,
+        "cached_tokens": 128,
+        "prompt_tokens": 789,
+        "usage_cost_usd": 0.00094435,
+        "completion_tokens": 37,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 789,
+      "output_tokens": 37,
+      "total_tokens": 826,
+      "billable_unit": "token",
+      "billable_quantity": "826.000000",
+      "cost_amount": "0.00094435",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1052,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_approval",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:56:38.387919+00:00",
+      "created_at": "2026-09-14 16:57:07.288978+00:00"
+    },
+    {
+      "id": "7466137f-84b9-4836-9a1b-203c474aec64",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "40533dbe-b487-4e08-af2a-f2578c690980",
+      "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+      "correlation_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e:d9a1e247-630a-4638-96d2-a35724b47155:65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12159,
+        "cached_tokens": 192,
+        "prompt_tokens": 10856,
+        "usage_cost_usd": 0.0166259,
+        "completion_tokens": 1303,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10856,
+      "output_tokens": 1303,
+      "total_tokens": 12159,
+      "billable_unit": "token",
+      "billable_quantity": "12159.000000",
+      "cost_amount": "0.01662590",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 11386,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_approval",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:56:49.874731+00:00",
+      "created_at": "2026-09-14 16:57:07.294886+00:00"
+    },
+    {
+      "id": "5c711e1a-e863-4a3f-97d5-e7a9843aabdc",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "37028829-d5a9-4ca7-bd6d-0aecac1dd6c8",
+      "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+      "correlation_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e:d9a1e247-630a-4638-96d2-a35724b47155:65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3831,
+        "cached_tokens": 128,
+        "prompt_tokens": 3472,
+        "usage_cost_usd": 0.0051031,
+        "completion_tokens": 359,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3472,
+      "output_tokens": 359,
+      "total_tokens": 3831,
+      "billable_unit": "token",
+      "billable_quantity": "3831.000000",
+      "cost_amount": "0.00510310",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 3174,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "schema_name": "FocusedStrategyExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": null,
+          "changed_fields": [
+            "candidate_strategy_draft.date_range",
+            "candidate_strategy_draft.date_range_intent",
+            "candidate_strategy_draft.field_provenance",
+            "confidence",
+            "detected_user_language",
+            "intent"
+          ],
+          "repair_applied": true,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "951768635b6dc67fd6e15b82032c186011d8d976cb787f840cc0f877f65f7aca",
+          "before_fingerprint": "84cd821e07742c7d6b7746ebf976698c71581009967c0d0f2cdafce24a232044",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_approval",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:56:57.616194+00:00",
+      "created_at": "2026-09-14 16:57:07.301093+00:00"
+    },
+    {
+      "id": "90f698b0-312f-47cf-a3eb-3b26ceb301a4",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "field_fidelity",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "3ec4c477-5ae6-463b-a57e-3f5b434e474d",
+      "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+      "correlation_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e:d9a1e247-630a-4638-96d2-a35724b47155:65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 2255,
+        "cached_tokens": 128,
+        "prompt_tokens": 2205,
+        "usage_cost_usd": 0.00274685,
+        "completion_tokens": 50,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 2205,
+      "output_tokens": 50,
+      "total_tokens": 2255,
+      "billable_unit": "token",
+      "billable_quantity": "2255.000000",
+      "cost_amount": "0.00274685",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 898,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_approval",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:56:59.130626+00:00",
+      "created_at": "2026-09-14 16:57:07.307691+00:00"
+    },
+    {
+      "id": "386dbb9b-ffd2-4f3b-9d3a-05f3b5d046bf",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "field_fidelity",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "d6b7b5a4-9776-4d04-8935-f7bef255bf1d",
+      "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+      "correlation_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e:d9a1e247-630a-4638-96d2-a35724b47155:65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 2255,
+        "cached_tokens": 2176,
+        "prompt_tokens": 2205,
+        "usage_cost_usd": 0.00059645,
+        "completion_tokens": 50,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 2205,
+      "output_tokens": 50,
+      "total_tokens": 2255,
+      "billable_unit": "token",
+      "billable_quantity": "2255.000000",
+      "cost_amount": "0.00059645",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 917,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e",
+        "schema_name": "StatedRunFieldFidelityAudit",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_approval",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 5,
+          "elapsed_seconds": 29.976,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 5
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e735ccf4579b2a71ee8866f6f43f99551170628d62a8d7ac098d77f4e399301f",
+          "provider_receipt_count": 5,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "confirm",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:57:06.428719+00:00",
+      "created_at": "2026-09-14 16:57:07.314419+00:00"
+    },
+    {
+      "id": "30e3b647-79de-4f03-8968-724a3993cd45",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "d9a1e247-630a-4638-96d2-a35724b47155",
+      "message_id": "65314f6e-29c3-4f8d-8d90-c7e112f749c7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "a7b90037-f0cc-4f60-816e-f83cef88b514",
+      "request_id": null,
+      "correlation_id": "api_turn:d9a1e247-630a-4638-96d2-a35724b47155:65314f6e-29c3-4f8d-8d90-c7e112f749c7:a7b90037-f0cc-4f60-816e-f83cef88b514",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 216,
+        "cached_tokens": 0,
+        "prompt_tokens": 201,
+        "usage_cost_usd": 2.61e-05,
+        "completion_tokens": 15,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 201,
+      "output_tokens": 15,
+      "total_tokens": 216,
+      "billable_unit": "token",
+      "billable_quantity": "216.000000",
+      "cost_amount": "0.00002610",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 505,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:57:07.839412+00:00",
+      "created_at": "2026-09-14 16:57:07.864161+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 10,
+  "stored_failure_metadata": {
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "0c08a9dd-9306-4509-bee4-018e3cf36bfb",
+      "terminal": true,
+      "request_id": "a304b5cf-535e-4d6c-a572-805f9c6a261e"
+    },
+    "agent_runtime_stage_outcome": "await_approval"
+  }
+}

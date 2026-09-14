@@ -1,0 +1,394 @@
+{
+  "label": "registered-q2-es-419",
+  "phase": "registered",
+  "question": "q2",
+  "language": "es-419",
+  "country": "DO",
+  "account_kind": "registered",
+  "conversation_id": "eb93541b-121f-4737-98b6-198670c9f33a",
+  "message": "¿Cuánto necesito ganar para comprarme un Porsche?",
+  "answer": {
+    "id": "abc62449-124a-4e2e-9fd7-8eb0ebb39721",
+    "conversation_id": "eb93541b-121f-4737-98b6-198670c9f33a",
+    "role": "assistant",
+    "content": "Something went wrong. Your conversation is saved. Please try again.",
+    "created_at": "2026-09-14T17:03:55.230058Z",
+    "metadata": {
+      "recovery": {
+        "code": "runtime_failure",
+        "retryable": true
+      },
+      "retryable": true,
+      "failure_code": "agent_runtime_failure",
+      "retry_last_turn": {
+        "message": "¿Cuánto necesito ganar para comprarme un Porsche?",
+        "request_message_id": "877ae7d9-c739-4445-9669-f82066896fe4"
+      },
+      "conversation_mode": "recovery",
+      "agent_runtime_turn": {
+        "turn_id": "877ae7d9-c739-4445-9669-f82066896fe4",
+        "request_id": "97499e31-c42f-41f3-b143-c074fc104b10",
+        "status": "recoverable_failed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": "agent_runtime_failure",
+        "retryable": true
+      },
+      "agent_runtime_stage_outcome": "agent_runtime_failure",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "error",
+      "code": "agent_runtime_failure",
+      "message": "Something went wrong. Your conversation is saved. Please try again.",
+      "message_id": "abc62449-124a-4e2e-9fd7-8eb0ebb39721",
+      "recovery": {
+        "code": "runtime_failure",
+        "retryable": true
+      },
+      "retry_last_turn": {
+        "message": "¿Cuánto necesito ganar para comprarme un Porsche?",
+        "request_message_id": "877ae7d9-c739-4445-9669-f82066896fe4"
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 182.048,
+  "screenshot": {
+    "file": "screenshots/registered-q2-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Algo salió mal. Tu conversación está guardada. Intenta de nuevo.\n\nReintentar"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "c0489e54-17c7-4fb3-b0ae-e0c50de3b917",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "eb93541b-121f-4737-98b6-198670c9f33a",
+      "run_id": null,
+      "message_id": "abc62449-124a-4e2e-9fd7-8eb0ebb39721",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 12860,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 803,
+        "cached_tokens": 768,
+        "prompt_tokens": 786,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "97499e31-c42f-41f3-b143-c074fc104b10",
+        "stage_outcome": "agent_runtime_failure",
+        "turn_execution": {
+          "terminal": "recoverable_failed",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 180.029,
+          "terminal_reason": "turn_deadline_exhausted",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "recoverable_failed",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": true,
+          "output_fingerprint": null,
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "recovery",
+        "runtime_diagnostics": {
+          "code": "turn_deadline_exhausted",
+          "last_event": {
+            "type": "stage_start",
+            "stage": "research_search"
+          },
+          "event_count": 2,
+          "elapsed_seconds": 180.001,
+          "timeout_seconds": 180.0,
+          "keepalive_seconds": 15.0
+        }
+      },
+      "created_at": "2026-09-14 17:01:08.103788+00:00"
+    },
+    {
+      "id": "bd5fc579-0a01-4fe3-bae8-2f4c395de1ea",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "eb93541b-121f-4737-98b6-198670c9f33a",
+      "run_id": null,
+      "message_id": "abc62449-124a-4e2e-9fd7-8eb0ebb39721",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 17744,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12296,
+        "cached_tokens": 192,
+        "prompt_tokens": 10769,
+        "completion_tokens": 1527,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "97499e31-c42f-41f3-b143-c074fc104b10",
+        "stage_outcome": "agent_runtime_failure",
+        "turn_execution": {
+          "terminal": "recoverable_failed",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 180.029,
+          "terminal_reason": "turn_deadline_exhausted",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "recoverable_failed",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": true,
+          "output_fingerprint": null,
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "recovery",
+        "runtime_diagnostics": {
+          "code": "turn_deadline_exhausted",
+          "last_event": {
+            "type": "stage_start",
+            "stage": "research_search"
+          },
+          "event_count": 2,
+          "elapsed_seconds": 180.001,
+          "timeout_seconds": 180.0,
+          "keepalive_seconds": 15.0
+        }
+      },
+      "created_at": "2026-09-14 17:01:25.849044+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "d80e7963-3cca-4381-9547-ad97db2d27c5",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "eb93541b-121f-4737-98b6-198670c9f33a",
+      "message_id": "abc62449-124a-4e2e-9fd7-8eb0ebb39721",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "c0489e54-17c7-4fb3-b0ae-e0c50de3b917",
+      "request_id": "97499e31-c42f-41f3-b143-c074fc104b10",
+      "correlation_id": "97499e31-c42f-41f3-b143-c074fc104b10:eb93541b-121f-4737-98b6-198670c9f33a:abc62449-124a-4e2e-9fd7-8eb0ebb39721",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 803,
+        "cached_tokens": 768,
+        "prompt_tokens": 786,
+        "usage_cost_usd": 0.0002186,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 786,
+      "output_tokens": 17,
+      "total_tokens": 803,
+      "billable_unit": "token",
+      "billable_quantity": "803.000000",
+      "cost_amount": "0.00021860",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 12860,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "97499e31-c42f-41f3-b143-c074fc104b10",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "agent_runtime_failure",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "recoverable_failed",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 180.029,
+          "terminal_reason": "turn_deadline_exhausted",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "recoverable_failed",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": true,
+          "output_fingerprint": null,
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "recovery",
+        "runtime_diagnostics": {
+          "code": "turn_deadline_exhausted",
+          "last_event": {
+            "type": "stage_start",
+            "stage": "research_search"
+          },
+          "event_count": 2,
+          "elapsed_seconds": 180.001,
+          "timeout_seconds": 180.0,
+          "keepalive_seconds": 15.0
+        },
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:01:08.103788+00:00",
+      "created_at": "2026-09-14 17:03:55.246643+00:00"
+    },
+    {
+      "id": "12bd76e3-8f43-4a3a-a86e-d32ff1859301",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "eb93541b-121f-4737-98b6-198670c9f33a",
+      "message_id": "abc62449-124a-4e2e-9fd7-8eb0ebb39721",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "bd5fc579-0a01-4fe3-bae8-2f4c395de1ea",
+      "request_id": "97499e31-c42f-41f3-b143-c074fc104b10",
+      "correlation_id": "97499e31-c42f-41f3-b143-c074fc104b10:eb93541b-121f-4737-98b6-198670c9f33a:abc62449-124a-4e2e-9fd7-8eb0ebb39721",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12296,
+        "cached_tokens": 192,
+        "prompt_tokens": 10769,
+        "usage_cost_usd": 0.01707715,
+        "completion_tokens": 1527,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10769,
+      "output_tokens": 1527,
+      "total_tokens": 12296,
+      "billable_unit": "token",
+      "billable_quantity": "12296.000000",
+      "cost_amount": "0.01707715",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 17744,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "97499e31-c42f-41f3-b143-c074fc104b10",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "agent_runtime_failure",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "recoverable_failed",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 180.029,
+          "terminal_reason": "turn_deadline_exhausted",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "recoverable_failed",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": true,
+          "output_fingerprint": null,
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "recovery",
+        "runtime_diagnostics": {
+          "code": "turn_deadline_exhausted",
+          "last_event": {
+            "type": "stage_start",
+            "stage": "research_search"
+          },
+          "event_count": 2,
+          "elapsed_seconds": 180.001,
+          "timeout_seconds": 180.0,
+          "keepalive_seconds": 15.0
+        },
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:01:25.849044+00:00",
+      "created_at": "2026-09-14 17:03:55.254386+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 7,
+  "stored_failure_metadata": {
+    "agent_runtime_turn": {
+      "status": "recoverable_failed",
+      "turn_id": "877ae7d9-c739-4445-9669-f82066896fe4",
+      "terminal": true,
+      "retryable": true,
+      "request_id": "97499e31-c42f-41f3-b143-c074fc104b10",
+      "failure_code": "agent_runtime_failure"
+    },
+    "agent_runtime_stage_outcome": "agent_runtime_failure"
+  }
+}

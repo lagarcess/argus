@@ -1,0 +1,1562 @@
+{
+  "label": "followups-q6-en",
+  "phase": "followups",
+  "question": "q6",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+  "message": "Keep the USD 335.11 price from that calculation, but change only earnings per share to USD 9.50. What P/E does that imply? Use the existing figures, without a new lookup.",
+  "answer": {
+    "id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+    "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+    "role": "assistant",
+    "content": "At the USD **335.11** price and USD 9.50 earnings per share, the P/E is the price divided by earnings per share.",
+    "created_at": "2026-09-14T17:20:32.054097Z",
+    "metadata": {
+      "computation": {
+        "kind": "price_multiple",
+        "inputs": {
+          "price": 335.11,
+          "symbol": "AAPL",
+          "sources": {
+            "price": {
+              "kind": "user"
+            },
+            "per_share": {
+              "kind": "user"
+            }
+          },
+          "currency": "USD",
+          "multiple": null,
+          "per_share": 9.5
+        },
+        "symbols": [
+          "AAPL"
+        ]
+      },
+      "conversation_mode": "guide",
+      "tool_result_cards": [
+        {
+          "kind": "tool_result",
+          "call_id": "answer-e1bc21fa-8844-474d-b0d5-b4f68867ccdf",
+          "outcome": {
+            "result": {
+              "price": 335.11,
+              "multiple": 35.27473684210526,
+              "per_share": 9.5,
+              "solved_field": "multiple",
+              "solved_value": 35.27473684210526,
+              "earnings_yield_pct": 2.834890036107547
+            },
+            "status": "succeeded",
+            "failure": null
+          },
+          "arguments": {
+            "price": 335.11,
+            "symbol": "AAPL",
+            "sources": {
+              "price": {
+                "kind": "user"
+              },
+              "per_share": {
+                "kind": "user"
+              }
+            },
+            "currency": "USD",
+            "multiple": null,
+            "per_share": 9.5
+          },
+          "card_type": "price_multiple",
+          "tool_name": "price_multiple",
+          "artifact_id": "c1d0fd08-3bb6-4e65-836b-9ba506e1a49e",
+          "card_version": 1,
+          "presentation": {
+            "rows": [
+              {
+                "name": "earnings_yield_pct",
+                "unit": {
+                  "locale_key": "chat.tools.units.percent",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.earnings_yield_pct",
+                  "interpolation_args": {}
+                },
+                "value": 2.83,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              }
+            ],
+            "notes": [],
+            "title": {
+              "locale_key": "tools.calc.price_multiple.title",
+              "interpolation_args": {}
+            },
+            "answer": {
+              "name": "multiple",
+              "unit": {
+                "locale_key": "tools.calc.units.multiple",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.multiple",
+                "interpolation_args": {}
+              },
+              "value": 35.27,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            "inputs": [
+              {
+                "name": "symbol",
+                "unit": null,
+                "label": {
+                  "locale_key": "tools.calc.fields.symbol",
+                  "interpolation_args": {}
+                },
+                "value": "AAPL",
+                "source": {
+                  "kind": "user"
+                },
+                "driving": false,
+                "unknown": false,
+                "editable": false,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "price",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.price",
+                  "interpolation_args": {}
+                },
+                "value": 335.11,
+                "source": {
+                  "kind": "user"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "per_share",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.per_share",
+                  "interpolation_args": {}
+                },
+                "value": 9.5,
+                "source": {
+                  "kind": "user"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "multiple",
+                "unit": {
+                  "locale_key": "tools.calc.units.multiple",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.multiple",
+                  "interpolation_args": {}
+                },
+                "value": null,
+                "source": {
+                  "kind": "computed"
+                },
+                "driving": false,
+                "unknown": true,
+                "editable": false,
+                "value_text": null,
+                "visibility": "private"
+              }
+            ],
+            "visual": null,
+            "sources": [],
+            "narrative": null
+          },
+          "artifact_state": "active",
+          "input_revision": 0,
+          "schema_version": 1
+        }
+      ],
+      "agent_runtime_turn": {
+        "turn_id": "2bea3981-216b-4ed1-b89f-0472f164a171",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "answer_text_template": {
+        "text": "At the USD **335.11** price and USD 9.50 earnings per share, the P/E is the price divided by earnings per share.",
+        "cards": {
+          "pe": "c1d0fd08-3bb6-4e65-836b-9ba506e1a49e"
+        },
+        "language": "en"
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "At the USD **335.11** price and USD 9.50 earnings per share, the P/E is the price divided by earnings per share."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [
+          {
+            "artifact_kind": "tool_result",
+            "artifact_id": "c1d0fd08-3bb6-4e65-836b-9ba506e1a49e",
+            "artifact_status": "active",
+            "metadata": {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "price_multiple",
+              "call_id": "answer-e1bc21fa-8844-474d-b0d5-b4f68867ccdf",
+              "artifact_id": "c1d0fd08-3bb6-4e65-836b-9ba506e1a49e",
+              "input_revision": 0,
+              "card_type": "price_multiple",
+              "card_version": 1,
+              "arguments": {
+                "currency": "USD",
+                "sources": {
+                  "price": {
+                    "kind": "user"
+                  },
+                  "per_share": {
+                    "kind": "user"
+                  }
+                },
+                "symbol": "AAPL",
+                "price": 335.11,
+                "per_share": 9.5,
+                "multiple": null
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "multiple",
+                  "solved_value": 35.27473684210526,
+                  "price": 335.11,
+                  "per_share": 9.5,
+                  "multiple": 35.27473684210526,
+                  "earnings_yield_pct": 2.834890036107547
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.price_multiple.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "multiple",
+                  "label": {
+                    "locale_key": "tools.calc.fields.multiple",
+                    "interpolation_args": {}
+                  },
+                  "value": 35.27,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.multiple",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "earnings_yield_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.earnings_yield_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 2.83,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "symbol",
+                    "label": {
+                      "locale_key": "tools.calc.fields.symbol",
+                      "interpolation_args": {}
+                    },
+                    "value": "AAPL",
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "user"
+                    },
+                    "editable": false,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "price",
+                    "label": {
+                      "locale_key": "tools.calc.fields.price",
+                      "interpolation_args": {}
+                    },
+                    "value": 335.11,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "user"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "per_share",
+                    "label": {
+                      "locale_key": "tools.calc.fields.per_share",
+                      "interpolation_args": {}
+                    },
+                    "value": 9.5,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "user"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "multiple",
+                    "label": {
+                      "locale_key": "tools.calc.fields.multiple",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.multiple",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          }
+        ],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "At the USD **335.11** price and USD 9.50 earnings per share, the P/E is the price divided by earnings per share.",
+        "answer_text_template": {
+          "cards": {
+            "pe": "c1d0fd08-3bb6-4e65-836b-9ba506e1a49e"
+          },
+          "text": "At the USD **335.11** price and USD 9.50 earnings per share, the P/E is the price divided by earnings per share.",
+          "language": "en"
+        },
+        "final_response_payload": {
+          "tool_result_cards": [
+            {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "price_multiple",
+              "call_id": "answer-e1bc21fa-8844-474d-b0d5-b4f68867ccdf",
+              "artifact_id": "c1d0fd08-3bb6-4e65-836b-9ba506e1a49e",
+              "input_revision": 0,
+              "card_type": "price_multiple",
+              "card_version": 1,
+              "arguments": {
+                "currency": "USD",
+                "sources": {
+                  "price": {
+                    "kind": "user"
+                  },
+                  "per_share": {
+                    "kind": "user"
+                  }
+                },
+                "symbol": "AAPL",
+                "price": 335.11,
+                "per_share": 9.5,
+                "multiple": null
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "multiple",
+                  "solved_value": 35.27473684210526,
+                  "price": 335.11,
+                  "per_share": 9.5,
+                  "multiple": 35.27473684210526,
+                  "earnings_yield_pct": 2.834890036107547
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.price_multiple.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "multiple",
+                  "label": {
+                    "locale_key": "tools.calc.fields.multiple",
+                    "interpolation_args": {}
+                  },
+                  "value": 35.27,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.multiple",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "earnings_yield_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.earnings_yield_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 2.83,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "symbol",
+                    "label": {
+                      "locale_key": "tools.calc.fields.symbol",
+                      "interpolation_args": {}
+                    },
+                    "value": "AAPL",
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "user"
+                    },
+                    "editable": false,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "price",
+                    "label": {
+                      "locale_key": "tools.calc.fields.price",
+                      "interpolation_args": {}
+                    },
+                    "value": 335.11,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "user"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "per_share",
+                    "label": {
+                      "locale_key": "tools.calc.fields.per_share",
+                      "interpolation_args": {}
+                    },
+                    "value": 9.5,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "user"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "multiple",
+                    "label": {
+                      "locale_key": "tools.calc.fields.multiple",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.multiple",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          ],
+          "code": null,
+          "result": null,
+          "backtest_job": null,
+          "error": null,
+          "summary": null,
+          "result_card": null,
+          "explanation_context": null
+        },
+        "tool_result_cards": [
+          {
+            "kind": "tool_result",
+            "schema_version": 1,
+            "tool_name": "price_multiple",
+            "call_id": "answer-e1bc21fa-8844-474d-b0d5-b4f68867ccdf",
+            "artifact_id": "c1d0fd08-3bb6-4e65-836b-9ba506e1a49e",
+            "input_revision": 0,
+            "card_type": "price_multiple",
+            "card_version": 1,
+            "arguments": {
+              "currency": "USD",
+              "sources": {
+                "price": {
+                  "kind": "user"
+                },
+                "per_share": {
+                  "kind": "user"
+                }
+              },
+              "symbol": "AAPL",
+              "price": 335.11,
+              "per_share": 9.5,
+              "multiple": null
+            },
+            "outcome": {
+              "status": "succeeded",
+              "result": {
+                "solved_field": "multiple",
+                "solved_value": 35.27473684210526,
+                "price": 335.11,
+                "per_share": 9.5,
+                "multiple": 35.27473684210526,
+                "earnings_yield_pct": 2.834890036107547
+              },
+              "failure": null
+            },
+            "presentation": {
+              "title": {
+                "locale_key": "tools.calc.price_multiple.title",
+                "interpolation_args": {}
+              },
+              "answer": {
+                "name": "multiple",
+                "label": {
+                  "locale_key": "tools.calc.fields.multiple",
+                  "interpolation_args": {}
+                },
+                "value": 35.27,
+                "value_text": null,
+                "unit": {
+                  "locale_key": "tools.calc.units.multiple",
+                  "interpolation_args": {}
+                },
+                "source": {
+                  "kind": "computed"
+                }
+              },
+              "narrative": null,
+              "sources": [],
+              "visual": null,
+              "rows": [
+                {
+                  "name": "earnings_yield_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.earnings_yield_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 2.83,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                }
+              ],
+              "inputs": [
+                {
+                  "name": "symbol",
+                  "label": {
+                    "locale_key": "tools.calc.fields.symbol",
+                    "interpolation_args": {}
+                  },
+                  "value": "AAPL",
+                  "value_text": null,
+                  "unit": null,
+                  "source": {
+                    "kind": "user"
+                  },
+                  "editable": false,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "price",
+                  "label": {
+                    "locale_key": "tools.calc.fields.price",
+                    "interpolation_args": {}
+                  },
+                  "value": 335.11,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "user"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "per_share",
+                  "label": {
+                    "locale_key": "tools.calc.fields.per_share",
+                    "interpolation_args": {}
+                  },
+                  "value": 9.5,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "user"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "multiple",
+                  "label": {
+                    "locale_key": "tools.calc.fields.multiple",
+                    "interpolation_args": {}
+                  },
+                  "value": null,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.multiple",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  },
+                  "editable": false,
+                  "unknown": true,
+                  "driving": false,
+                  "visibility": "private"
+                }
+              ],
+              "notes": []
+            },
+            "artifact_state": "active"
+          }
+        ],
+        "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 16.168,
+  "screenshot": {
+    "file": "screenshots/followups-q6-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "At the USD 335.11 price and USD 9.50 earnings per share, the P/E is the price divided by earnings per share.\n\n35.27 x\nMultiple\nShow the numbers"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "b8859587-99a1-4c14-ac7b-44d0dfbb700a",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "run_id": null,
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 788,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 834,
+        "cached_tokens": 128,
+        "prompt_tokens": 817,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 14.118,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "2bea58589910b78c1b363f4bb77b1ce834f956f09706e669ee6426bcb4997712",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "17eb8c32c155cae5e56aed5c1d5d49a5fe9b25902bbc712dc26f86e8561d0ee5",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:20:18.761956+00:00"
+    },
+    {
+      "id": "9f0c3130-d265-4e6a-b337-ee0a5179fe04",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "run_id": null,
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 9107,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12192,
+        "cached_tokens": 192,
+        "prompt_tokens": 11152,
+        "completion_tokens": 1040,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 14.118,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "2bea58589910b78c1b363f4bb77b1ce834f956f09706e669ee6426bcb4997712",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "17eb8c32c155cae5e56aed5c1d5d49a5fe9b25902bbc712dc26f86e8561d0ee5",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:20:27.871530+00:00"
+    },
+    {
+      "id": "53c54f6c-44eb-4654-9efd-b6518fb50742",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "run_id": null,
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedStrategyExtraction",
+      "latency_ms": 1730,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3608,
+        "cached_tokens": 3456,
+        "prompt_tokens": 3500,
+        "completion_tokens": 108,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "d1622d58025b38f4fe7bdceb207b3f41b414987eba6f772304820953328ec738",
+          "before_fingerprint": "d1622d58025b38f4fe7bdceb207b3f41b414987eba6f772304820953328ec738",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 14.118,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "2bea58589910b78c1b363f4bb77b1ce834f956f09706e669ee6426bcb4997712",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "17eb8c32c155cae5e56aed5c1d5d49a5fe9b25902bbc712dc26f86e8561d0ee5",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:20:29.603803+00:00"
+    },
+    {
+      "id": "512ea93b-4408-498e-8289-d0caf0facc9e",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "run_id": null,
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "task": "knowledge_voicing",
+      "tier": "chat",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "CalculatedVoicedAnswer",
+      "latency_ms": 2268,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3632,
+        "cached_tokens": 128,
+        "prompt_tokens": 3436,
+        "completion_tokens": 196,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 14.118,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "2bea58589910b78c1b363f4bb77b1ce834f956f09706e669ee6426bcb4997712",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "17eb8c32c155cae5e56aed5c1d5d49a5fe9b25902bbc712dc26f86e8561d0ee5",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:20:31.914315+00:00"
+    },
+    {
+      "id": "1acccf9d-e4ab-48f5-91d2-86922c969cd4",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "run_id": null,
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 0,
+      "outcome": "skipped",
+      "failure_mode": "title_not_generated",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:20:32.102973+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "0b62b791-493b-474d-9475-cf262be3489e",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "b8859587-99a1-4c14-ac7b-44d0dfbb700a",
+      "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+      "correlation_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d:27272883-88f9-4a54-a4e2-8116035cf0db:8488da81-a737-4b25-a4ac-4fae09b80457",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 834,
+        "cached_tokens": 128,
+        "prompt_tokens": 817,
+        "usage_cost_usd": 0.00092935,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 817,
+      "output_tokens": 17,
+      "total_tokens": 834,
+      "billable_unit": "token",
+      "billable_quantity": "834.000000",
+      "cost_amount": "0.00092935",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 788,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 14.118,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "2bea58589910b78c1b363f4bb77b1ce834f956f09706e669ee6426bcb4997712",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "17eb8c32c155cae5e56aed5c1d5d49a5fe9b25902bbc712dc26f86e8561d0ee5",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:20:18.761956+00:00",
+      "created_at": "2026-09-14 17:20:32.071527+00:00"
+    },
+    {
+      "id": "591e9254-798d-4674-8787-abe6aff14a6e",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "9f0c3130-d265-4e6a-b337-ee0a5179fe04",
+      "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+      "correlation_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d:27272883-88f9-4a54-a4e2-8116035cf0db:8488da81-a737-4b25-a4ac-4fae09b80457",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12192,
+        "cached_tokens": 192,
+        "prompt_tokens": 11152,
+        "usage_cost_usd": 0.0163384,
+        "completion_tokens": 1040,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 11152,
+      "output_tokens": 1040,
+      "total_tokens": 12192,
+      "billable_unit": "token",
+      "billable_quantity": "12192.000000",
+      "cost_amount": "0.01633840",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 9107,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 14.118,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "2bea58589910b78c1b363f4bb77b1ce834f956f09706e669ee6426bcb4997712",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "17eb8c32c155cae5e56aed5c1d5d49a5fe9b25902bbc712dc26f86e8561d0ee5",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:20:27.871530+00:00",
+      "created_at": "2026-09-14 17:20:32.078993+00:00"
+    },
+    {
+      "id": "d3792b37-2773-4071-9473-e76f6dba6862",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "53c54f6c-44eb-4654-9efd-b6518fb50742",
+      "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+      "correlation_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d:27272883-88f9-4a54-a4e2-8116035cf0db:8488da81-a737-4b25-a4ac-4fae09b80457",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3608,
+        "cached_tokens": 3456,
+        "prompt_tokens": 3500,
+        "usage_cost_usd": 0.0010162,
+        "completion_tokens": 108,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3500,
+      "output_tokens": 108,
+      "total_tokens": 3608,
+      "billable_unit": "token",
+      "billable_quantity": "3608.000000",
+      "cost_amount": "0.00101620",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1730,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "schema_name": "FocusedStrategyExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "d1622d58025b38f4fe7bdceb207b3f41b414987eba6f772304820953328ec738",
+          "before_fingerprint": "d1622d58025b38f4fe7bdceb207b3f41b414987eba6f772304820953328ec738",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 14.118,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "2bea58589910b78c1b363f4bb77b1ce834f956f09706e669ee6426bcb4997712",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "17eb8c32c155cae5e56aed5c1d5d49a5fe9b25902bbc712dc26f86e8561d0ee5",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:20:29.603803+00:00",
+      "created_at": "2026-09-14 17:20:32.086640+00:00"
+    },
+    {
+      "id": "c4f26677-9bbf-41c1-b03e-0c5f38a8134d",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "knowledge_voicing",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "512ea93b-4408-498e-8289-d0caf0facc9e",
+      "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+      "correlation_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d:27272883-88f9-4a54-a4e2-8116035cf0db:8488da81-a737-4b25-a4ac-4fae09b80457",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3632,
+        "cached_tokens": 128,
+        "prompt_tokens": 3436,
+        "usage_cost_usd": 0.0046506,
+        "completion_tokens": 196,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3436,
+      "output_tokens": 196,
+      "total_tokens": 3632,
+      "billable_unit": "token",
+      "billable_quantity": "3632.000000",
+      "cost_amount": "0.00465060",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 2268,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d",
+        "schema_name": "CalculatedVoicedAnswer",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 14.118,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "2bea58589910b78c1b363f4bb77b1ce834f956f09706e669ee6426bcb4997712",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "17eb8c32c155cae5e56aed5c1d5d49a5fe9b25902bbc712dc26f86e8561d0ee5",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:20:31.914315+00:00",
+      "created_at": "2026-09-14 17:20:32.094735+00:00"
+    },
+    {
+      "id": "416cfdf6-52e7-4648-ba73-c962dd7c7d58",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "27272883-88f9-4a54-a4e2-8116035cf0db",
+      "message_id": "8488da81-a737-4b25-a4ac-4fae09b80457",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "1acccf9d-e4ab-48f5-91d2-86922c969cd4",
+      "request_id": null,
+      "correlation_id": "api_turn:27272883-88f9-4a54-a4e2-8116035cf0db:8488da81-a737-4b25-a4ac-4fae09b80457:1acccf9d-e4ab-48f5-91d2-86922c969cd4",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "skipped",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": "title_not_generated",
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:20:32.102973+00:00",
+      "created_at": "2026-09-14 17:20:32.108606+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 8,
+  "stored_failure_metadata": {
+    "tool_result_cards": [
+      {
+        "kind": "tool_result",
+        "call_id": "answer-e1bc21fa-8844-474d-b0d5-b4f68867ccdf",
+        "outcome": {
+          "result": {
+            "price": 335.11,
+            "multiple": 35.27473684210526,
+            "per_share": 9.5,
+            "solved_field": "multiple",
+            "solved_value": 35.27473684210526,
+            "earnings_yield_pct": 2.834890036107547
+          },
+          "status": "succeeded",
+          "failure": null
+        },
+        "arguments": {
+          "price": 335.11,
+          "symbol": "AAPL",
+          "sources": {
+            "price": {
+              "kind": "user"
+            },
+            "per_share": {
+              "kind": "user"
+            }
+          },
+          "currency": "USD",
+          "multiple": null,
+          "per_share": 9.5
+        },
+        "card_type": "price_multiple",
+        "tool_name": "price_multiple",
+        "artifact_id": "c1d0fd08-3bb6-4e65-836b-9ba506e1a49e",
+        "card_version": 1,
+        "presentation": {
+          "rows": [
+            {
+              "name": "earnings_yield_pct",
+              "unit": {
+                "locale_key": "chat.tools.units.percent",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.earnings_yield_pct",
+                "interpolation_args": {}
+              },
+              "value": 2.83,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            }
+          ],
+          "notes": [],
+          "title": {
+            "locale_key": "tools.calc.price_multiple.title",
+            "interpolation_args": {}
+          },
+          "answer": {
+            "name": "multiple",
+            "unit": {
+              "locale_key": "tools.calc.units.multiple",
+              "interpolation_args": {}
+            },
+            "label": {
+              "locale_key": "tools.calc.fields.multiple",
+              "interpolation_args": {}
+            },
+            "value": 35.27,
+            "source": {
+              "kind": "computed"
+            },
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "name": "symbol",
+              "unit": null,
+              "label": {
+                "locale_key": "tools.calc.fields.symbol",
+                "interpolation_args": {}
+              },
+              "value": "AAPL",
+              "source": {
+                "kind": "user"
+              },
+              "driving": false,
+              "unknown": false,
+              "editable": false,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "price",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.price",
+                "interpolation_args": {}
+              },
+              "value": 335.11,
+              "source": {
+                "kind": "user"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "per_share",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.per_share",
+                "interpolation_args": {}
+              },
+              "value": 9.5,
+              "source": {
+                "kind": "user"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "multiple",
+              "unit": {
+                "locale_key": "tools.calc.units.multiple",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.multiple",
+                "interpolation_args": {}
+              },
+              "value": null,
+              "source": {
+                "kind": "computed"
+              },
+              "driving": false,
+              "unknown": true,
+              "editable": false,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "visual": null,
+          "sources": [],
+          "narrative": null
+        },
+        "artifact_state": "active",
+        "input_revision": 0,
+        "schema_version": 1
+      }
+    ],
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "2bea3981-216b-4ed1-b89f-0472f164a171",
+      "terminal": true,
+      "request_id": "fff9e94b-7c56-42c9-adb4-4a25b2e3374d"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}
