@@ -1,0 +1,134 @@
+[
+  {
+    "scene": "no-solution",
+    "language": "en",
+    "width": 1280,
+    "screenshot": "failure-no-solution-already-repaired-1280-en.png",
+    "note": "The repair was already taken at the wider width in the same seeded conversation; the recomputed card renders.",
+    "ok": true,
+    "page_errors": [],
+    "expected": "A calculation with no solution shows its repair, and taking the repair recomputes the card.",
+    "pass": true
+  },
+  {
+    "scene": "no-solution",
+    "language": "en",
+    "width": 390,
+    "screenshot": "failure-no-solution-already-repaired-390-en.png",
+    "note": "The repair was already taken at the wider width in the same seeded conversation; the recomputed card renders.",
+    "ok": true,
+    "page_errors": [],
+    "expected": "A calculation with no solution shows its repair, and taking the repair recomputes the card.",
+    "pass": true
+  },
+  {
+    "scene": "no-solution",
+    "language": "es-419",
+    "width": 1280,
+    "screenshot": "failure-no-solution-already-repaired-1280-es-419.png",
+    "note": "The repair was already taken at the wider width in the same seeded conversation; the recomputed card renders.",
+    "ok": true,
+    "page_errors": [],
+    "expected": "A calculation with no solution shows its repair, and taking the repair recomputes the card.",
+    "pass": true
+  },
+  {
+    "scene": "no-solution",
+    "language": "es-419",
+    "width": 390,
+    "screenshot": "failure-no-solution-already-repaired-390-es-419.png",
+    "note": "The repair was already taken at the wider width in the same seeded conversation; the recomputed card renders.",
+    "ok": true,
+    "page_errors": [],
+    "expected": "A calculation with no solution shows its repair, and taking the repair recomputes the card.",
+    "pass": true
+  },
+  {
+    "scene": "search-dossier",
+    "language": "en",
+    "width": 1280,
+    "screenshot": "search-dossier-1280-en.png",
+    "turn": "q6",
+    "query": "expensive",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+    "pass": true
+  },
+  {
+    "scene": "search-dossier",
+    "language": "en",
+    "width": 390,
+    "screenshot": "search-dossier-390-en.png",
+    "turn": "q6",
+    "query": "expensive",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+    "pass": true
+  },
+  {
+    "scene": "search-dossier",
+    "language": "es-419",
+    "width": 1280,
+    "screenshot": "search-dossier-1280-es-419.png",
+    "turn": "q6",
+    "query": "Apple",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+    "pass": true
+  },
+  {
+    "scene": "search-dossier",
+    "language": "es-419",
+    "width": 390,
+    "screenshot": "search-dossier-390-es-419.png",
+    "turn": "q6",
+    "query": "Apple",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Searching a word from a computed answer's question opens its Search dossier with what was asked, the inputs and their sources, and the result.",
+    "pass": true
+  },
+  {
+    "scene": "ask-argus",
+    "language": "en",
+    "width": 1280,
+    "screenshot": "ask-argus-row-1280-en.png",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Typing a money question into Search offers the Ask Argus row.",
+    "pass": true
+  },
+  {
+    "scene": "ask-argus",
+    "language": "en",
+    "width": 390,
+    "screenshot": "ask-argus-row-390-en.png",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Typing a money question into Search offers the Ask Argus row.",
+    "pass": true
+  },
+  {
+    "scene": "ask-argus",
+    "language": "es-419",
+    "width": 1280,
+    "screenshot": "ask-argus-row-1280-es-419.png",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Typing a money question into Search offers the Ask Argus row.",
+    "pass": true
+  },
+  {
+    "scene": "ask-argus",
+    "language": "es-419",
+    "width": 390,
+    "screenshot": "ask-argus-row-390-es-419.png",
+    "ok": true,
+    "page_errors": [],
+    "expected": "Typing a money question into Search offers the Ask Argus row.",
+    "pass": true
+  }
+]

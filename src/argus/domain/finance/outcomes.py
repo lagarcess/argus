@@ -1,0 +1,29 @@
+"""Typed outcomes for inputs that have no answer."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import TypeVar
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class NoSolution:
+    """No value of ``field`` satisfies the inputs, for the typed ``code`` reason.
+
+    ``repair`` is an argument edit, computed from the other inputs, that would
+    make the question answerable; the card offers it as a tap.
+    """
+
+    field: str
+    code: str
+    repair: Mapping[str, float] = field(default_factory=dict)
+
+
+def solved(value: T | NoSolution) -> T:
+    """Unwrap a solved value in code that has already ruled out ``NoSolution``."""
+    if isinstance(value, NoSolution):
+        raise ValueError(f"{value.field}: {value.code}")
+    return value

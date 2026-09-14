@@ -19,11 +19,13 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptTurnsPayload,
 )
 from argus.api.schemas import Message, User
+from argus.domain.decision_attachment import computation_from_message_metadata
 from argus.domain.job_settlement import RESEARCH_OPERATION_SCOPE
 from argus.domain.public_excerpt_kinds import document_kind
 from argus.domain.public_excerpt_turns import (
     audit_text,
     project_backtest_turn,
+    project_calculation_turn,
     project_research_turn,
     refuse,
 )
@@ -175,7 +177,10 @@ def _project(
             job=job,
         ):
             refuse("not_completed")
-    elif not (terminal.get("terminal") is True and terminal.get("status") == "completed"):
+    elif not (
+        terminal.get("terminal") is True and terminal.get("status") == "completed"
+    ) and not metadata.get("continued_from"):
+        # A result continued in a new chat was completed in its source chat.
         refuse("not_completed")
     request = _question(context, message, job)
     if request is None:
@@ -193,6 +198,20 @@ def _project(
     audit_text(message.content, field="answer", private_ids=private_ids)
     audit_text(owner_note, field="owner_note", private_ids=private_ids)
     language = context.conversation.language
+    if computation_from_message_metadata(metadata) is not None:
+        # A computed answer is its own receipt kind, research-grounded or not:
+        # its card carries the figures and the pages its inputs came from.
+        return (
+            project_calculation_turn(
+                message=message,
+                question=request.content,
+                owner_note=owner_note,
+                language=language,
+                private_ids=private_ids,
+            ),
+            None,
+            None,
+        )
     if "research" in metadata:
         if job is not None and job.get("operation_scope") != RESEARCH_OPERATION_SCOPE:
             refuse("unsupported_turn")
@@ -349,11 +368,7 @@ def create_receipt_for_messages(
         refuse("preview_changed")
     if existing is not None:
         return existing, False
-    title = (
-        leaves[0].question
-        if leaves[0].kind == "research_answer"
-        else leaves[0].idea_title
-    )
+    title = leaves[0].idea_title if leaves[0].kind == "backtest" else leaves[0].question
     snapshot = PublicExcerptSnapshot(
         id=api_state.store.new_id(),
         public_id=new_public_excerpt_id(),

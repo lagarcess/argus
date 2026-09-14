@@ -80,6 +80,7 @@ def get_tool_catalog(*, include_unavailable: bool = False) -> ToolCatalog:
     """
     from argus.agent_runtime.research_tools import get_research_declarations
     from argus.agent_runtime.tools.registered_backtest import get_backtest_declaration
+    from argus.domain.calculations import get_calculation_declarations
     from argus.domain.research.config import research_rail_enabled
 
     research = (
@@ -87,4 +88,6 @@ def get_tool_catalog(*, include_unavailable: bool = False) -> ToolCatalog:
         if include_unavailable or research_rail_enabled()
         else ()
     )
-    return ToolCatalog((get_backtest_declaration(), *research))
+    return ToolCatalog(
+        (get_backtest_declaration(), *get_calculation_declarations(), *research)
+    )

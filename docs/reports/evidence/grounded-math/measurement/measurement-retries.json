@@ -1,0 +1,33 @@
+{
+  "reruns": [
+    {
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "category": "messy_spanish",
+      "reason": "The only regressed case failed on the run's only research provider HTTP 500; rerun alone once under the founder's provider-error rule.",
+      "commit": "dc8608c8a09252ff8c51ef077f32d449bb0b6e8b",
+      "status": "passed",
+      "failed_checks": [],
+      "structured_timeouts": [],
+      "receipt_failures": [],
+      "infrastructure_errors": [],
+      "research_degraded_code": null,
+      "prose_judge_failed_criteria": [],
+      "prose_judge_text": "No es posible saber cuánto tendrás: un cruce dorado es una señal basada en precios pasados, no una tasa de rendimiento que permita proyectar un saldo futuro. Presento escenarios ilustrativos para tu inversión de USD 10,000 durante 10, pero **no representan el rendimiento de una estrategia de cruce dorado**.\n\n### Por qué falta una respuesta única\n\nUn cruce dorado ocurre cuando una media móvil de corto plazo supera una de largo plazo. Las medias móviles no garantizan ganancias, y ninguna página consultada publica un rendimiento futuro verificable de NVDA basado en esa estrategia.\n\nAdemás, “estrategia de cruce dorado” no define por sí sola todas las reglas necesarias para simularla: habría que especificar las medias, el momento de ejecución, la señal de salida, el tratamiento del efectivo, los dividendos, los impuestos y los costos de transacción. Por ello, no se puede convertir la señal directamente en una cantidad futura.\n\n### Escenarios ilustrativos de valoración\n\nLa cotización utilizada es USD 218.17 por acción, con fecha 2026-09-11. Como referencia fundamental se usa un beneficio diluido por acción de USD 7.91, correspondiente al periodo terminado el 2026-07-26.\n\n| Entrada | Valor |\n|---|---:|\n| Inversión inicial | USD 10,000 |\n| Horizonte | 10 |\n| Precio actual de NVDA | USD 218.17 |\n| Beneficio diluido por acción | USD 7.91 |\n| Crecimiento bajo asumido | 0% |\n| Crecimiento base asumido | 10% |\n| Crecimiento alto asumido | 20% |\n\nPara aislar el efecto del crecimiento, el cálculo mantiene en cada escenario el múltiplo precio-beneficio implícito actual. Las tasas de crecimiento son supuestos ilustrativos, no pronósticos publicados ni resultados históricos de un cruce dorado.\n\n### Cómo se interpreta el cálculo\n\nEl cálculo obtiene primero el múltiplo actual:\n\n**Múltiplo actual = USD 218.17 ÷ USD 7.91**\n\nDespués proyecta el beneficio por acción bajo cada supuesto de crecimiento, aplica ese múltiplo y muestra el valor que alcanzaría la inversión inicial en cada escenario. Los resultados no incorporan las entradas y salidas que produciría una estrategia técnica, ni impuestos o costos de transacción; por eso no deben interpretarse como una predicción del saldo real.",
+      "stage_outcomes": [
+        "ready_to_respond"
+      ],
+      "provider_usage": {
+        "route_receipt_count": 3,
+        "reported_cost_receipt_count": 3,
+        "unreported_cost_receipt_count": 0,
+        "reported_cost_usd": 0.0090765924
+      }
+    }
+  ],
+  "provider_usage": {
+    "route_receipt_count": 3,
+    "reported_cost_receipt_count": 3,
+    "unreported_cost_receipt_count": 0,
+    "reported_cost_usd": 0.0090765924
+  }
+}

@@ -88,6 +88,8 @@ import {
   retainRecalledRecentItems,
 } from "@/lib/command-palette-recent-recall";
 import { AssetHistoryRollup } from "./command-palette/AssetHistoryRollup";
+import { AnswerDossierView } from "./command-palette/AnswerDossierView";
+import { AskArgusRow } from "./command-palette/AskArgusRow";
 import { useDossierDecisionResumeRefresh } from "./command-palette/useDossierDecisionResumeRefresh";
 import { useCommandPaletteKeys } from "./command-palette/useCommandPaletteKeys";
 import {
@@ -105,6 +107,8 @@ type ChatCommandPaletteProps = {
     openAtLeftOff?: boolean,
   ) => void;
   onRetest: (conversationId: string, sourceRunId: string) => Promise<void> | void;
+  /** Starts a new chat with the typed text when nothing matched. */
+  onAsk?: (text: string) => void;
   turnInFlight?: boolean;
   activeConversationId: string | null;
   isGuest?: boolean;
@@ -246,6 +250,7 @@ export default function ChatCommandPalette({
   onClose,
   onOpenConversation,
   onRetest,
+  onAsk,
   turnInFlight = false,
   activeConversationId,
   isGuest = false,
@@ -539,12 +544,12 @@ export default function ChatCommandPalette({
                   "command_palette.asset_rollup.scope_registered",
                   "Across your conversations",
                 ),
-            runsInvolving: (count, symbol) =>
-              t("command_palette.asset_rollup.runs_involving", {
+            resultsInvolving: (count, symbol) =>
+              t("command_palette.asset_rollup.results_involving", {
                 count,
                 symbol,
                 defaultValue: `${count} ${
-                  count === 1 ? "run" : "runs"
+                  count === 1 ? "result" : "results"
                 } involving ${symbol}`,
               }),
             decisionStateLabel: (state) =>
@@ -1077,7 +1082,10 @@ export default function ChatCommandPalette({
     [activateItem, isBelowDesktop, setPreviewItem],
   );
 
+  const askText = onAsk && isFiltering && !isWaitingForIndexableQuery && !isLedgerMode && !isSearching && !readError && displayItems.length === 0 && !assetRollupDisplay ? query.trim() : null;
   const onPaletteKeyDown = useCommandPaletteKeys({
+    askText,
+    onAsk,
     cancelRename,
     canManageConversation,
     dossierPaneState,
@@ -1125,7 +1133,7 @@ export default function ChatCommandPalette({
               selectedPreview ? (
                 <div
                   className="flex h-full flex-col"
-                  data-dossier-pane={selectedPreview.dossier ? "true" : undefined}
+                  data-dossier-pane={selectedPreview.dossier || selectedPreview.answerDossier ? "true" : undefined}
                 >
                   <div className="mb-6">
                     <div className="mb-3 flex flex-wrap gap-2">
@@ -1243,6 +1251,20 @@ export default function ChatCommandPalette({
                         onDecisionResumeHandled={onDecisionResumeHandled}
                       />
                     )
+                  ) : selectedPreview.answerDossier ? (
+                    // A computed answer's dossier beside the run dossier; the
+                    // run dossier keeps precedence when the conversation has one.
+                    <AnswerDossierView
+                      key={selectedPreview.answerDossier.message_id}
+                      dossier={selectedPreview.answerDossier}
+                      openConversationDisabled={!selectedPreview.conversationId || selectedNavigationDisabled}
+                      onOpenConversation={isBelowDesktop || !selectedPreview.conversationId ? undefined : () => {
+                        onOpenConversation(selectedPreview.conversationId!, selectedPreview.answerDossier!.message_id);
+                        onClose();
+                      }}
+                      onDecisionSaved={() => { onMutated?.(); void refreshAfterCanonicalMutation(); }}
+                      onOpenConversationById={(conversationId) => { onOpenConversation(conversationId); onClose(); }}
+                    />
                   ) : (
                     <>
                       <div
@@ -1506,6 +1528,7 @@ export default function ChatCommandPalette({
                     )}
                   </p>
                 )}
+                {askText && onAsk ? <div className="mt-6 w-full max-w-md px-3"><AskArgusRow text={askText} onAsk={onAsk} /></div> : null}
               </div>
             ) : (
               <div className="flex flex-col gap-3 p-3">

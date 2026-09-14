@@ -17,6 +17,7 @@ from argus.domain.computations import (
     kernel_for,
     register_kernel,
     registered_kinds,
+    rerun_calculation,
     rerun_computation,
     unregister_kernel,
 )
@@ -63,8 +64,10 @@ def test_registered_kind_computes_and_overrides_merge_over_stored_inputs(
         inputs={"monthly_amount": 5000, "months": 9, "target_amount": 60_000},
     )
 
-    stored = rerun_computation(computation, overrides=None, context=_context())
-    changed = rerun_computation(computation, overrides={"months": 3}, context=_context())
+    (stored,) = rerun_computation(computation, overrides=None, context=_context())
+    (changed,) = rerun_computation(
+        computation, overrides={"months": 3}, context=_context()
+    )
 
     assert stored.status == "computed"
     assert stored.result == {"saved_total": 45_000.0, "shortfall": 15_000.0}
@@ -72,7 +75,7 @@ def test_registered_kind_computes_and_overrides_merge_over_stored_inputs(
     assert changed.inputs["months"] == 3
     assert changed.result == {"saved_total": 15_000.0, "shortfall": 45_000.0}
     # The stored computation is a value; a re-run never mutates it.
-    assert computation.inputs["months"] == 9
+    assert computation.calculations[0].inputs["months"] == 9
 
 
 def test_invalid_merged_inputs_raise_with_the_kernel_errors(
@@ -90,7 +93,7 @@ def test_invalid_merged_inputs_raise_with_the_kernel_errors(
 def test_unknown_kind_is_a_typed_unavailable_state_never_a_crash() -> None:
     computation = DecisionComputation(kind="not_registered", inputs={"x": 1})
 
-    rerun = rerun_computation(computation, overrides={"x": 2}, context=_context())
+    (rerun,) = rerun_computation(computation, overrides={"x": 2}, context=_context())
 
     assert rerun.status == "unavailable"
     assert rerun.reason_code == "kernel_unavailable"
@@ -105,7 +108,7 @@ def test_backtest_kernel_offers_the_typed_retest_and_never_executes() -> None:
         kind=BACKTEST_COMPUTATION_KIND, inputs={"source_run_id": run_id}
     )
 
-    rerun = rerun_computation(computation, overrides=None, context=_context(run))
+    (rerun,) = rerun_computation(computation, overrides=None, context=_context(run))
 
     assert rerun.status == "confirmation_required"
     assert rerun.retest is not None
@@ -120,13 +123,13 @@ def test_backtest_inputs_are_not_editable_and_a_missing_run_is_unavailable() -> 
         kind=BACKTEST_COMPUTATION_KIND, inputs={"source_run_id": run_id}
     )
 
-    edited = rerun_computation(
+    (edited,) = rerun_computation(
         computation,
         overrides={"source_run_id": fake.uuid4()},
         context=_context(_completed_run(run_id)),
     )
-    missing = rerun_computation(computation, overrides=None, context=_context(None))
-    unfinalized = rerun_computation(
+    (missing,) = rerun_computation(computation, overrides=None, context=_context(None))
+    (unfinalized,) = rerun_computation(
         computation,
         overrides=None,
         context=_context({**_completed_run(run_id), "conversation_result_card": {}}),
@@ -144,7 +147,7 @@ def test_backtest_kernel_requires_a_source_run_id() -> None:
     computation = DecisionComputation(kind=BACKTEST_COMPUTATION_KIND, inputs={})
 
     with pytest.raises(InvalidComputationInputs):
-        rerun_computation(computation, overrides=None, context=_context())
+        rerun_calculation(computation.calculations[0], overrides=None, context=_context())
 
 
 def test_unregister_is_idempotent() -> None:
@@ -184,3 +187,14 @@ def _completed_run(run_id: str) -> dict[str, Any]:
             "idea_version_id": fake.uuid4(),
         },
     }
+
+
+def test_an_index_past_the_calculations_is_the_clients_error_even_with_no_edits(
+    harness_kernel: ComputationKernel,
+) -> None:
+    computation = DecisionComputation(kind=HARNESS_KIND, inputs={"monthly_amount": 5000})
+    for overrides in ({}, None):
+        with pytest.raises(InvalidComputationInputs):
+            rerun_computation(
+                computation, overrides=overrides, context=_context(), index=3
+            )

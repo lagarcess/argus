@@ -43,6 +43,7 @@ ALLOWED_RESEARCH_PATCH_KEYS = {
     "research",
     "research_job_request",
     "next_experiments",
+    "next_steps",
     "discovery",
     "discovery_usage",
     "recovery",

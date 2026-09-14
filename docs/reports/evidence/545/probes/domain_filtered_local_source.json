@@ -1,9 +1,9 @@
 {
   "probe": "domain_filtered_local_source",
   "purpose": "domain-filtered call citing a local source, DO location, es",
-  "candidate_sha": "ca517e45b7c5fa5270de6ba8fe4ddce0c9268dc4",
-  "captured_at": "2026-09-09T01:21:48.336431+00:00",
-  "elapsed_s": 14.71,
+  "candidate_sha": "e0a0d8ccd86e0ae370bc38a2c813f26c4bae7f9e",
+  "captured_at": "2026-09-13T23:57:59.434020+00:00",
+  "elapsed_s": 25.04,
   "request_overrides": {},
   "exchanges": [
     {
@@ -14,7 +14,7 @@
           "openai/gpt-5.6-sol",
           "anthropic/claude-opus-4-7"
         ],
-        "input": "¿Qué tasa de interés paga hoy el Banco Popular Dominicano por un certificado financiero a un año en pesos?\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nResponde en español latinoamericano (es-419).",
+        "input": "¿Qué tasa de interés paga hoy el Banco Popular Dominicano por un certificado financiero a un año en pesos?\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nLead with the direct answer, then go as deep as the question deserves. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment or product advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nResponde en español latinoamericano (es-419).",
         "tools": [
           {
             "type": "web_search",
@@ -42,26 +42,26 @@
           "effort": "low"
         },
         "language_preference": "es",
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. List in source_urls every retrieved page the answer relies on; the reader sees those pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. When a choice turns on a future figure nobody can cite, such as an exchange rate or a price, do not project it; show what the recent past did with cited figures, computed by Argus and labeled as history, not a forecast. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculations from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers them; never answer such a question with prose and follow-up questions alone. When a calculation needs a figure only the reader knows, leave that input null and write answer_markdown without that calculation's results: Argus offers the reader the calculation with that figure left to enter. When the reader leaves out a detail the math needs, such as how often interest compounds, assume the likeliest one, say plainly what you assumed, and fill a calculation for each option the reader weighs. When the answer turns on a figure only the reader knows, such as their own balance or rate, fill calculations anyway with that figure left null so Argus offers it, even when nothing else is computed. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculations and no follow-up questions. Fill calculations only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, how many years a sum takes to double, which option costs less or what a dividend yields at today's price, each with the one kind listed below that computes it. When the reader weighs options, fill one calculation for each option under its own short name, with the same kind when one kind computes them all, and never say which option to choose. Argus computes each one: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let a calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculations, write each figure a calculation uses or produces as {{name}}, with its input or result name, or as {{calculation_name.name}} when there is more than one calculation, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculations empty when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "response_format": {
           "type": "json_schema",
           "json_schema": {
-            "name": "argus_typed_retrieval",
+            "name": "argus_typed_answer_calculations",
             "strict": true,
             "schema": {
-              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, the retrieved pages it relies on, one calculation Argus computes for each option the reader weighs, and the questions the reader may ask next.",
               "properties": {
                 "answer_markdown": {
-                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "description": "The answer for the reader in markdown: the direct answer first, then sections, a table, the formula, a worked example or steps where they help. No links, no list of sources, no mention of tools, providers or models. Every figure a calculation uses or produces is written as its reference.",
                   "type": "string"
                 },
                 "rows": {
-                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "description": "Every figure answer_markdown states in digits, one row each, with the retrieved page it was read from.",
                   "items": {
                     "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
                       "subject": {
-                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "description": "The entity the figure describes, as the source names it: Microsoft, Santander, Netflix.",
                         "type": "string"
                       },
                       "symbol": {
@@ -84,7 +84,7 @@
                         "type": "number"
                       },
                       "kind": {
-                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as price to book, count for a number of units such as shares.",
                         "enum": [
                           "currency",
                           "percent",
@@ -94,7 +94,7 @@
                         "type": "string"
                       },
                       "unit": {
-                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                        "description": "The unit of value: only the ISO 4217 code of a money amount such as USD or DOP, with a per-share or per-unit figure saying so in its label; % for a percentage, x for a multiple, the thing counted for a count.",
                         "type": "string"
                       },
                       "as_of": {
@@ -134,11 +134,299 @@
                     "additionalProperties": false
                   },
                   "type": "array"
+                },
+                "source_urls": {
+                  "description": "The URL of every retrieved page answer_markdown relies on, most relied on first.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "calculations": {
+                  "description": "One calculation Argus computes for each option the reader weighs, with every input and its source; empty when the answer computes nothing.",
+                  "items": {
+                    "description": "One calculation Argus computes for this answer.",
+                    "properties": {
+                      "name": {
+                        "description": "A short lowercase name for this calculation, such as the option it computes; with more than one calculation, each figure reference starts with it.",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "description": "The listed calculation that computes the figure the answer turns on.",
+                        "enum": [
+                          "bond_value",
+                          "debt_to_income",
+                          "discounted_cash_flow",
+                          "effective_rate",
+                          "expense_ratio",
+                          "growth_projection",
+                          "income_yield",
+                          "price_multiple",
+                          "ranked_comparison",
+                          "time_value",
+                          "valuation_scenarios"
+                        ],
+                        "type": "string"
+                      },
+                      "solve_for": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "amount",
+                              "annual_fee",
+                              "annual_income",
+                              "annual_rate_pct",
+                              "assets",
+                              "cash_flow",
+                              "compounding_per_year",
+                              "contribution",
+                              "coupon_rate_pct",
+                              "coupons_per_year",
+                              "currency",
+                              "direction",
+                              "discount_rate_pct",
+                              "end_value",
+                              "face_value",
+                              "fees",
+                              "future_value",
+                              "growth_base_pct",
+                              "growth_high_pct",
+                              "growth_low_pct",
+                              "growth_rate_pct",
+                              "horizon_years",
+                              "inflation_rate_pct",
+                              "items",
+                              "key_kind",
+                              "key_label",
+                              "monthly_debt_payments",
+                              "monthly_income",
+                              "multiple",
+                              "multiple_base",
+                              "multiple_high",
+                              "multiple_low",
+                              "nominal_rate_pct",
+                              "payment",
+                              "payment_timing",
+                              "per_share",
+                              "periods",
+                              "periods_per_year",
+                              "prefer",
+                              "present_value",
+                              "price",
+                              "ratio_pct",
+                              "start_date",
+                              "start_value",
+                              "symbol",
+                              "terminal_growth_rate_pct",
+                              "value",
+                              "years",
+                              "yield_pct",
+                              "yield_to_maturity_pct"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "For a kind that lists blanks, the name of the one blank to solve, left out of inputs; null otherwise."
+                      },
+                      "inputs": {
+                        "description": "Every input the kind needs, one entry each, with its source.",
+                        "items": {
+                          "description": "One input the calculation uses, with where its value came from.",
+                          "properties": {
+                            "name": {
+                              "description": "The input's name, exactly as the calculation list writes it.",
+                              "enum": [
+                                "amount",
+                                "annual_fee",
+                                "annual_income",
+                                "annual_rate_pct",
+                                "assets",
+                                "cash_flow",
+                                "compounding_per_year",
+                                "contribution",
+                                "coupon_rate_pct",
+                                "coupons_per_year",
+                                "currency",
+                                "direction",
+                                "discount_rate_pct",
+                                "end_value",
+                                "face_value",
+                                "fees",
+                                "future_value",
+                                "growth_base_pct",
+                                "growth_high_pct",
+                                "growth_low_pct",
+                                "growth_rate_pct",
+                                "horizon_years",
+                                "inflation_rate_pct",
+                                "items",
+                                "key_kind",
+                                "key_label",
+                                "monthly_debt_payments",
+                                "monthly_income",
+                                "multiple",
+                                "multiple_base",
+                                "multiple_high",
+                                "multiple_low",
+                                "nominal_rate_pct",
+                                "payment",
+                                "payment_timing",
+                                "per_share",
+                                "periods",
+                                "periods_per_year",
+                                "prefer",
+                                "present_value",
+                                "price",
+                                "ratio_pct",
+                                "start_date",
+                                "start_value",
+                                "symbol",
+                                "terminal_growth_rate_pct",
+                                "value",
+                                "years",
+                                "yield_pct",
+                                "yield_to_maturity_pct"
+                              ],
+                              "type": "string"
+                            },
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "symbol": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "label",
+                                      "symbol",
+                                      "value"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "The value: a plain number (7 for 7 percent, 1250000 for 1.25 million), one of the listed options, a list of offers, or null for a figure only the user knows and has not said."
+                            },
+                            "source": {
+                              "description": "page: read from a page retrieved for this answer. market_data: the current price of the named asset, which Argus fills from its own market data. user: stated by the user. assumption: a figure you chose, which the answer states plainly as an assumption.",
+                              "enum": [
+                                "page",
+                                "market_data",
+                                "user",
+                                "assumption"
+                              ],
+                              "type": "string"
+                            },
+                            "source_url": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For page, the URL of the retrieved page the value was read from; otherwise null."
+                            },
+                            "as_of": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For page, the date the page gives for the value as YYYY-MM-DD; otherwise null."
+                            },
+                            "currency": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For a money amount, its ISO 4217 code; otherwise null."
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "value",
+                            "source",
+                            "source_url",
+                            "as_of",
+                            "currency"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "kind",
+                      "solve_for",
+                      "inputs"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "follow_up_questions": {
+                  "description": "Two to four short questions, in the reader's language, that this reader is likely to ask next.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "declined": {
+                  "description": "True when the request is not a money question, or asks Argus to place a trade, move money or act on an account; answer_markdown then says so plainly.",
+                  "type": "boolean"
                 }
               },
               "required": [
                 "answer_markdown",
-                "rows"
+                "rows",
+                "source_urls",
+                "calculations",
+                "follow_up_questions",
+                "declined"
               ],
               "type": "object",
               "additionalProperties": false
@@ -149,13 +437,13 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1788916893,
-        "created_at": 1788916893,
+        "completed_at": 1789343854,
+        "created_at": 1789343854,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_f899eefb-bcbf-4b17-9a26-2b9f233d78e9",
+        "id": "resp_8c07d7b5-55cd-41d8-afd0-8e316cdb9eb4",
         "incomplete_details": null,
-        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from.",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. List in source_urls every retrieved page the answer relies on; the reader sees those pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. When a choice turns on a future figure nobody can cite, such as an exchange rate or a price, do not project it; show what the recent past did with cited figures, computed by Argus and labeled as history, not a forecast. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculations from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers them; never answer such a question with prose and follow-up questions alone. When a calculation needs a figure only the reader knows, leave that input null and write answer_markdown without that calculation's results: Argus offers the reader the calculation with that figure left to enter. When the reader leaves out a detail the math needs, such as how often interest compounds, assume the likeliest one, say plainly what you assumed, and fill a calculation for each option the reader weighs. When the answer turns on a figure only the reader knows, such as their own balance or rate, fill calculations anyway with that figure left null so Argus offers it, even when nothing else is computed. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculations and no follow-up questions. Fill calculations only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, how many years a sum takes to double, which option costs less or what a dividend yields at today's price, each with the one kind listed below that computes it. When the reader weighs options, fill one calculation for each option under its own short name, with the same kind when one kind computes them all, and never say which option to choose. Argus computes each one: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let a calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculations, write each figure a calculation uses or produces as {{name}}, with its input or result name, or as {{calculation_name.name}} when there is more than one calculation, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculations empty when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "max_output_tokens": 2048,
         "max_tool_calls": null,
         "metadata": {},
@@ -168,196 +456,77 @@
           },
           {
             "queries": [
-              "site:popularenlinea.com certificado financiero tasa 1 año pesos",
-              "site:popularenlinea.com tasas certificados financieros pesos 360 días",
-              "Banco Popular Dominicano tarifario tasas pasivas certificado financiero"
+              "site:popularenlinea.com certificado financiero tasas 1 año pesos",
+              "Banco Popular Dominicano tarifario tasas pasivas certificado financiero pesos 360 días",
+              "site:popularenlinea.com tarifario certificado financiero tasa"
+            ],
+            "results": null,
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "Banco Popular Dominicano tasas certificados financieros septiembre 2026",
+              "Banco Popular Dominicano certificado financiero tasa 360 días",
+              "Popularenlinea tasas pasivas certificado financiero"
             ],
             "results": [
               {
-                "date": "2026-09-04",
+                "date": "2026-09-11",
                 "id": 1,
-                "last_updated": "2026-08-26",
-                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nPagos anticipados de Préstamos iguales o mayores al 20% del capital (a partir del 20 de julio): 2.5% 1 año, sobre el valor amortizado y 2.0% 1-2 años, sobre el valor amortizado.",
+                "last_updated": "2026-09-11",
+                "snippet": "Mantenimiento programado: Nuestros canales digitales estarán temporalmente fuera de servicio desde el sábado 11 de octubre a las 11:00 p.m. hasta el domingo 12 de octubre a las 5:00 a.m.",
                 "source": "web",
-                "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
-                "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
+                "title": "Banco Popular dona dos camiones de bomberos a La Guáyiga",
+                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-dona-dos-camiones-bomberos-Guayiga.aspx"
               },
               {
-                "date": "2026-09-04",
+                "date": "2026-09-10",
                 "id": 2,
-                "last_updated": "2026-09-07",
-                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
+                "last_updated": "2026-09-11",
+                "snippet": "Mantenimiento programado: Nuestros canales digitales estarán temporalmente fuera de servicio desde el sábado 11 de octubre a las 11:00 p.m. hasta el domingo 12 de octubre a las 5:00 a.m.",
                 "source": "web",
-                "title": "Retiro Comercial - Banco Popular Dominicano",
-                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx"
+                "title": "Banco Popular supera los RD$60,000 millones en facturación ...",
+                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-supera-RD60000-millones-en-facturacion-mediante-billeteras-digitales.aspx"
               },
               {
-                "date": "2026-09-04",
+                "date": "2026-09-07",
                 "id": 3,
-                "last_updated": "2026-08-27",
-                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
+                "last_updated": "2026-09-07",
+                "snippet": "La nueva alternativa de pago estará disponible para usuarios y conductores de inDrive en todo el territorio nacional y podrá utilizarse en las distintas categorías de servicios ofrecidas por la plataforma de movilidad, incluyendo viajes urbanos en automóvil, motocicleta, confort y ride+.",
                 "source": "web",
-                "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
-                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 4,
-                "last_updated": "2026-08-17",
-                "snippet": "### 1.\nEmpieza a planificar sin afectar tu presupuesto habitual\n...\nEl primer paso consiste en determinar con exactitud cuánto dinero se puede destinar al gasto escolar:\n- **Calcula tus ingresos disponibles:** Suma los recursos con los que cuentas para esta temporada.\n- **Resta los gastos fijos:** Asegura primero los compromisos de vivienda, alimentación, salud, transporte y servicios básicos.\n- **Establece un techo de gasto: ** El monto resultante será la referencia definitiva para fijar tu presupuesto escolar realista.\n...\n### 2.\nHaz un presupuesto detallado antes de salir de compras\nAntes de realizar cualquier gasto, revisa con atención la **lista de útiles escolares** proporcionada por el centro educativo.\nPara trabajar con mayor orden, agrupa los requerimientos por categorías estratégicas:\n- **Uniformes y calzado escolar **\n- **Libros de texto y cuadernos **\n- **Útiles de papelería y mochilas **\n- **Dispositivos de tecnología **\n- **Actividades extracurriculares **\n...\n### 3.\nLleva un control riguroso de cada gasto\n...\nPuedes apoyarte en diferentes herramientas según tu preferencia:\n- **Aplicaciones móviles** de finanzas personales o gestión familiar.\n- **Hojas de cálculo** digitales sincronizadas en tu teléfono.\n- **Una libreta de apuntes** exclusiva para el control del gasto escolar.\n...\n### 4.\nCompara precios en diferentes establecimientos\n...\n### 5.\nReutiliza todos los materiales que se encuentren en buen estado\nAntes de acudir a la papelería o a las tiendas por departamento, haz una auditoría en casa del material del año anterior.\n...\n### 6.\nConsidera la compra de libros de texto usados\n...\n### 7.\nEscalona tus compras en el tiempo\n...\n### 8. Aprovecha las ofertas y promociones de forma inteligente\n...\n### 9.\nEvalúa la opción de tecnología reacondicionada (refurbished)\n...\n### 10.\nOpta por libros y recursos educativos digitales\n...\nLa combinación más rentable consiste en planificar las compras con anticipación, definir un presupuesto cerrado por categorías, auditar en casa los materiales reutilizables de años anteriores y comparar precios entre comercios antes de comprar.",
-                "source": "web",
-                "title": "Como ahorrar en la vuelta a clases? 10 consejos para cuidar el ...",
-                "url": "https://popularenlinea.com/Personas/blog/Pages/Como-ahorrar-vuelta-clases-consejos-cuidar-presupuesto-familiar.aspx"
+                "title": "Toke e inDrive habilitan pagos digitales en viajes urbanos",
+                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Toke-e-inDrive-habilitan-pagos-digitales-en-viajes-urbanos.aspx"
               }
             ],
             "type": "search_results"
           },
           {
             "queries": [
-              "Banco Popular Dominicano certificado financiero pesos tasa de interés",
-              "Popular Dominicano certificado financiero 360 días tasa",
-              "site:popularenlinea.com Personas certificado financiero tasa interés"
+              "site:popularenlinea.com Personas certificados financieros Banco Popular",
+              "site:popularenlinea.com Certificado Financiero Popular RD$ tasa",
+              "site:popularenlinea.com inversiones certificado financiero"
             ],
-            "results": [
-              {
-                "date": "2026-09-04",
-                "id": 5,
-                "last_updated": "2026-08-26",
-                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nPagos anticipados de Préstamos iguales o mayores al 20% del capital (a partir del 20 de julio): 2.5% 1 año, sobre el valor amortizado y 2.0% 1-2 años, sobre el valor amortizado.\n...\nSegún las condiciones expresadas en este contrato, EL BANCO concede a EL CLIENTE un préstamo no reconductivo por la suma de ___________________________ PESOS DOMINICANOS CON 00/100 (RD$______.00) bajo la modalidad de Facilidad a Plazo contra pagaré a vencimiento\nde esta facilidad, generadora de intereses al ___________ por ciento (__.__%) anual, pagadero mediante ______ (__) cuotas mensuales, iguales y consecutivas, contentivas de capital e intereses por la suma de _________________________ PESOS DOMINICANOS CON __/100 (RD$__,____.__) cada una.\n...\nARTÍCULO CUARTO: Intereses.- EL CLIENTE pagará intereses sobre el crédito concedido, sin necesidad de requerimiento o formalidad previa, en el domicilio del EL BANCO, a razón de __________________ por ciento (__.__%) anual, sobre el saldo insoluto, cuyos intereses serán pagados mensualmente conjuntamente con la cuota de capital en la forma que se indica en el Artículo Primero (1º) del presente contrato, durante la vigencia del préstamo.",
-                "source": "web",
-                "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
-                "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 6,
-                "last_updated": "2026-08-27",
-                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
-                "source": "web",
-                "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
-                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 7,
-                "last_updated": "2026-09-07",
-                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
-                "source": "web",
-                "title": "Retiro Comercial - Banco Popular Dominicano",
-                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx"
-              }
-            ],
+            "results": null,
             "type": "search_results"
           },
           {
             "queries": [
-              "Banco Popular certificado financiero un año tasa septiembre 2026 República Dominicana",
-              "Banco Popular Dominicano tasas pasivas septiembre 2026 certificados",
-              "certificado financiero Banco Popular RD tasa anual hoy"
+              "certificado financiero Banco Popular Dominicano tasa interés",
+              "Banco Popular certificado plazo fijo República Dominicana tasa",
+              "tasa pasiva Banco Popular Dominicano certificado"
             ],
-            "results": [
-              {
-                "date": "2026-09-04",
-                "id": 8,
-                "last_updated": "2026-07-22",
-                "snippet": "De acuerdo con la Superintendencia de Bancos, el Popular registró una tasa de interés acumulada de 11.7% para el financiamiento a las mipymes a abril de 2026, ubicándose entre las entidades con las tasas más bajas para este segmento.\nSu cartera de mipymes presentó, además, un índice de morosidad de solo el 1.3%, según el informe.",
-                "source": "web",
-                "title": "Banco Popular destina el 41% de su cartera comercial al ...",
-                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-destina-cartera-comercial-financiamiento-mipymes.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 9,
-                "last_updated": "2026-04-01",
-                "snippet": "Mantenimiento programado: Nuestros canales digitales estarán temporalmente fuera de servicio desde el sábado 11 de octubre a las 11:00 p.m. hasta el domingo 12 de octubre a las 5:00 a.m.",
-                "source": "web",
-                "title": "Personas calculadora de prestamos hipotecarios",
-                "url": "https://popularenlinea.com/Personas/Paginas/prestamos/calculadora-de-prestamos-hipotecarios.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 10,
-                "last_updated": "2025-11-04",
-                "snippet": "Mantenimiento programado: Nuestros canales digitales estarán temporalmente fuera de servicio desde el sábado 11 de octubre a las 11:00 p.m. hasta el domingo 12 de octubre a las 5:00 a.m.",
-                "source": "web",
-                "title": "Sanar una Nación | Banco Popular Dominicano",
-                "url": "https://popularenlinea.com/Personas/Paginas/PROMOCIONES/sanar-una-nacion.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 11,
-                "last_updated": "2026-08-25",
-                "snippet": "El presidente ejecutivo destacó que el Banco Popular cerró 2025 con activos totales por valor de RD$929,748 millones, lo que representa un crecimiento de 9.4% respecto al año anterior.\n...\nEl señor Paniagua resaltó que el Popular logró mantener una de las tasas de morosidad más bajas del sistema, situándose en 1.55%, por debajo del promedio de la banca múltiple que fue de 1.72%, y del promedio regional latinoamericano estimado en 2.7%.\n...\nEn términos de solvencia, el índice del Popular se situó en 15.55%, superior en un 55% al requerimiento regulatorio de un 10%.",
-                "source": "web",
-                "title": "Banco Popular reafirma su liderazgo con excelentes resultados ...",
-                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-reafirma-su-liderazgo-con-excelentes-resultados-financieros-en-2025-.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 12,
-                "last_updated": "2026-08-26",
-                "snippet": "Hasta 15 años con garantía hipotecaria y 5 años sin garantía.\n13.25% con garantía y 15.25% sin garantía.\n...\nPagos anticipados de Préstamos iguales o mayores al 20% del capital (a partir del 20 de julio): 2.5% 1 año, sobre el valor amortizado y 2.0% 1-2 años, sobre el valor amortizado.\n...\nde esta facilidad, generadora de intereses al ___________ por ciento (__.__%) anual, pagadero mediante ______ (__) cuotas mensuales, iguales y consecutivas, contentivas de capital e intereses por la suma de _________________________ PESOS DOMINICANOS CON __/100 (RD$__,____.__) cada una.",
-                "source": "web",
-                "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
-                "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 13,
-                "last_updated": "2026-07-09",
-                "snippet": "Santo Domingo, D.N.– El Banco Popular Dominicano, S.A. – Banco Múltiple informó que la calificadora de riesgo Feller Rate ratificó en febrero de 2026 sus calificaciones crediticias en los niveles más altos, manteniendo la evaluación de AAA para solvencia, bonos y depósitos de largo plazo, así como AA+ para bonos subordinados y C-1+ para depósitos de corto plazo, todas con perspectiva estable.",
-                "source": "web",
-                "title": "Feller Rate ratifica calificaciones AAA del Banco Popular con ...",
-                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Feller-Rate-ratifica-calificaciones-AAA-del-Banco-Popular-perspectiva-estable-2026.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 14,
-                "last_updated": "2026-08-27",
-                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**",
-                "source": "web",
-                "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
-                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 15,
-                "last_updated": "2026-09-07",
-                "snippet": "Escríbenos a la dirección de correo electrónico:\n** pagosyrecaudos@bpd.com.do**\nBPD.Accessibility",
-                "source": "web",
-                "title": "Retiro Comercial - Banco Popular Dominicano",
-                "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 16,
-                "last_updated": "2026-09-04",
-                "snippet": "Al incorporar la cartera turística de Popular Bank, filial del Grupo Popular con sede en Panamá y licencia internacional, el financiamiento total asciende a RD$73,418 millones.",
-                "source": "web",
-                "title": "Banco Popular destaca sostenibilidad como factor de competitividad ...",
-                "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-destaca-sostenibilidad-como-factor-competitividad-turismo-dominicano.aspx"
-              },
-              {
-                "date": "2026-09-04",
-                "id": 17,
-                "last_updated": "2026-05-08",
-                "snippet": "Es un producto para guardar dinero de forma segura, con acceso cuando lo necesites y, en muchos casos, generación de intereses.",
-                "source": "web",
-                "title": "Cuenta de ahorros: qué es, para qué sirve y cuáles son sus beneficios",
-                "url": "https://popularenlinea.com/Personas/blog/Pages/cuenta-de-ahorros-que-es-para-que-sirve-y-beneficios.aspx"
-              }
-            ],
+            "results": null,
             "type": "search_results"
           },
           {
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"La tasa vigente no pudo verificarse en una página pública del Banco Popular Dominicano.\",\"rows\":[]}",
+                "text": "{\"answer_markdown\":\"No pude verificar en una página pública oficial o de un publicador confiable la tasa vigente que paga hoy el Banco Popular Dominicano por un certificado financiero en pesos a un año.\",\"calculations\":[],\"declined\":false,\"follow_up_questions\":[],\"rows\":[],\"source_urls\":[]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_99337244-03a5-4b44-b7ff-7dd6ebdba84b",
+            "id": "msg_4a4aead8-4526-4bd5-9256-27194c2f9139",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -408,34 +577,34 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.04595,
-            "cache_read_cost": 0.01049,
+            "cache_creation_cost": 0.05872,
+            "cache_read_cost": 0.01802,
             "currency": "USD",
-            "input_cost": 6e-05,
-            "output_cost": 0.00852,
-            "tool_calls_cost": 0.0075,
+            "input_cost": 0.00036,
+            "output_cost": 0.0114,
+            "tool_calls_cost": 0.01,
             "tool_calls_cost_details": {
-              "search_web": 0.0075
+              "search_web": 0.01
             },
-            "total_cost": 0.07252
+            "total_cost": 0.0985
           },
-          "input_tokens": 35434,
+          "input_tokens": 56895,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 9189,
-            "cache_read_input_tokens": 26230,
-            "cached_tokens": 26230
+            "cache_creation_input_tokens": 11743,
+            "cache_read_input_tokens": 45062,
+            "cached_tokens": 45062
           },
-          "output_tokens": 426,
+          "output_tokens": 570,
           "output_tokens_details": {
-            "reasoning_tokens": 112
+            "reasoning_tokens": 141
           },
           "tool_calls_details": {
             "search_web": {
-              "cost_usd": 0.0075,
-              "invocation": 3
+              "cost_usd": 0.01,
+              "invocation": 4
             }
           },
-          "total_tokens": 35860
+          "total_tokens": 57465
         },
         "user": null
       }
@@ -443,66 +612,27 @@
   ],
   "packet": {
     "typed_answer": true,
-    "uncited_rows": 0,
+    "unsourced_rows": [],
     "rows": [],
     "sources": [
       {
-        "url": "https://popularenlinea.com/pyme/paginas/prestamos/emprendimineto-popular.aspx",
-        "title": "Préstamo Emprendimiento Popular | Banco Popular Dominicano",
-        "source_date": "2026-09-04"
+        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-dona-dos-camiones-bomberos-Guayiga.aspx",
+        "title": "Banco Popular dona dos camiones de bomberos a La Guáyiga",
+        "source_date": "2026-09-11"
       },
       {
-        "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/retiro-comercial.aspx",
-        "title": "Retiro Comercial - Banco Popular Dominicano",
-        "source_date": "2026-09-04"
+        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-supera-RD60000-millones-en-facturacion-mediante-billeteras-digitales.aspx",
+        "title": "Banco Popular supera los RD$60,000 millones en facturación ...",
+        "source_date": "2026-09-10"
       },
       {
-        "url": "https://popularenlinea.com/empresarial/paginas/pagos-y-recaudos/pago-electronico-de-facturas.aspx",
-        "title": "Pago electrónico de facturas - Pagos y Recaudos - Banco Popular",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://popularenlinea.com/Personas/blog/Pages/Como-ahorrar-vuelta-clases-consejos-cuidar-presupuesto-familiar.aspx",
-        "title": "Como ahorrar en la vuelta a clases? 10 consejos para cuidar el ...",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-destina-cartera-comercial-financiamiento-mipymes.aspx",
-        "title": "Banco Popular destina el 41% de su cartera comercial al ...",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://popularenlinea.com/Personas/Paginas/prestamos/calculadora-de-prestamos-hipotecarios.aspx",
-        "title": "Personas calculadora de prestamos hipotecarios",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://popularenlinea.com/Personas/Paginas/PROMOCIONES/sanar-una-nacion.aspx",
-        "title": "Sanar una Nación | Banco Popular Dominicano",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-reafirma-su-liderazgo-con-excelentes-resultados-financieros-en-2025-.aspx",
-        "title": "Banco Popular reafirma su liderazgo con excelentes resultados ...",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Feller-Rate-ratifica-calificaciones-AAA-del-Banco-Popular-perspectiva-estable-2026.aspx",
-        "title": "Feller Rate ratifica calificaciones AAA del Banco Popular con ...",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Banco-Popular-destaca-sostenibilidad-como-factor-competitividad-turismo-dominicano.aspx",
-        "title": "Banco Popular destaca sostenibilidad como factor de competitividad ...",
-        "source_date": "2026-09-04"
-      },
-      {
-        "url": "https://popularenlinea.com/Personas/blog/Pages/cuenta-de-ahorros-que-es-para-que-sirve-y-beneficios.aspx",
-        "title": "Cuenta de ahorros: qué es, para qué sirve y cuáles son sus beneficios",
-        "source_date": "2026-09-04"
+        "url": "https://popularenlinea.com/Personas/sala-de-prensa/Pages/Toke-e-inDrive-habilitan-pagos-digitales-en-viajes-urbanos.aspx",
+        "title": "Toke e inDrive habilitan pagos digitales en viajes urbanos",
+        "source_date": "2026-09-07"
       }
     ],
     "tool_results": [
+      "search_results",
       "search_results",
       "search_results",
       "search_results"
@@ -511,17 +641,17 @@
     "usage": {
       "invocations": 0,
       "finance_search_invocations": 0,
-      "web_search_invocations": 3,
+      "web_search_invocations": 4,
       "fetch_url_invocations": 0,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 14707,
-      "cost_usd": null,
-      "input_tokens": 35434,
-      "output_tokens": 426,
-      "cache_creation_input_tokens": 9189,
-      "cache_read_input_tokens": 26230
+      "latency_ms": 25033,
+      "cost_usd": 0.0985,
+      "input_tokens": 56895,
+      "output_tokens": 570,
+      "cache_creation_input_tokens": 11743,
+      "cache_read_input_tokens": 45062
     },
-    "answer_markdown": "La tasa vigente no pudo verificarse en una página pública del Banco Popular Dominicano."
+    "answer_markdown": "No pude verificar en una página pública oficial o de un publicador confiable la tasa vigente que paga hoy el Banco Popular Dominicano por un certificado financiero en pesos a un año."
   },
   "error": null
 }

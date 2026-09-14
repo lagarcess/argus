@@ -1,13 +1,18 @@
 {
   "_comment": "Frozen text the interpretation model reads. See tests/test_interpreter_prompt_freeze.py.",
   "last_measured": {
-    "commit": "36086097c2608f5b51e14d9f7387be7738a75348",
-    "scorecard": "docs/reports/evidence/conversation-after-result/final-measurement/live-measurement.json",
-    "passed": 64,
-    "failed": 7,
+    "commit": "dc8608c8a09252ff8c51ef077f32d449bb0b6e8b",
+    "scorecard": "docs/reports/evidence/grounded-math/measurement/live-measurement.json",
+    "passed": 69,
+    "failed": 2,
     "infrastructure_error": 0
   },
   "surface": {
+    "src/argus/agent_runtime/calculated_answer.py": {
+      "entries": 1,
+      "chars": 1303,
+      "sha256": "24f30b7d66c9876b5458b187184c620e01b0bbf53e7fbee8fe8339dfb24027ad"
+    },
     "src/argus/agent_runtime/discovery/prompt_guidance.py": {
       "entries": 1,
       "chars": 2106,
@@ -45,8 +50,8 @@
     },
     "src/argus/agent_runtime/interpreter/unsupported_admission.py": {
       "entries": 2,
-      "chars": 2864,
-      "sha256": "837e28c3d3191b2f5ccd928d65c4d40caf717e9f466a999aaa506fad7743e33f"
+      "chars": 3510,
+      "sha256": "9257cd44f993a3f66ec08847428ead6addff986f290f656901f73e12cc2d73f4"
     },
     "src/argus/agent_runtime/llm_clarifier.py": {
       "entries": 6,
@@ -65,8 +70,8 @@
     },
     "src/argus/agent_runtime/research_grounded.py": {
       "entries": 3,
-      "chars": 2100,
-      "sha256": "cbd90276feb448c8fcb884e017362d344a2eeaece7321d7a01919b8f1a05789d"
+      "chars": 2392,
+      "sha256": "02f31814b574d8003a476b182cf7926203f70576fe15a849584a8e102c107cc9"
     },
     "src/argus/agent_runtime/research_query.py": {
       "entries": 11,
@@ -102,6 +107,11 @@
       "entries": 2,
       "chars": 284,
       "sha256": "5e0374f13476e43242d497971640227a4ccd99888fe641ef094c42fef873dea6"
+    },
+    "src/argus/domain/calculations/answer_request.py": {
+      "entries": 11,
+      "chars": 1192,
+      "sha256": "ad7c2c08c18dc3a55f93caf454a114a99868e770c81284a078eb9d263cb0565e"
     },
     "src/argus/domain/result_readout_fact_definitions.py": {
       "entries": 276,

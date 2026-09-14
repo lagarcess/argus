@@ -35,6 +35,10 @@ async def test_inline_declaration_publishes_the_shared_answer_and_optional_rows(
         update={
             "name_pairs": (ResearchNamePair(symbol="AAPL", name="Apple"),),
             "typed_answer": typed_answer,
+            # A typed answer names the page it relies on; prose names none.
+            "source_urls": tuple(source.url for source in packet.sources)
+            if typed_answer
+            else (),
             "rows": (),
             "unsourced_rows": (
                 (packet.rows[0].model_copy(update={"source_url": None}),)

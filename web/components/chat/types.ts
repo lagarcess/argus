@@ -97,7 +97,8 @@ export type ChatActionOption = {
     | "retry_last_turn"
     | "retry_load_conversation"
     | "retest_run"
-    | "add_confirmation_peer";
+    | "add_confirmation_peer"
+    | "calculation_offer";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;
@@ -325,6 +326,8 @@ export type Message = {
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
   toolResultCards?: import("@/lib/tool-result-card").ToolResultCard[];
+  /** Assumed inputs the backend says the prose never names, each on one of these cards. */
+  answerAssumptions?: import("@/lib/tool-result-card").AnswerAssumption[] | null;
   hasUnavailableToolResults?: boolean;
   toolJobs?: ToolJob[];
   resultReadoutFacts?: ResultReadoutFacts | null;
@@ -360,6 +363,8 @@ export type Message = {
   memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-declared computation behind a computed answer; it offers a decision. */
   computation?: import("@/lib/decision-contract").DecisionComputation | null;
+  /** A result continued from another chat; the source is linked and never changed. */
+  continuedFrom?: import("@/lib/computation-contract").ContinuedFrom | null;
   /** Current decision stamped on a computed answer by the backend. */
   decisionNoteId?: string | null;
   decisionState?: DecisionState | null;
