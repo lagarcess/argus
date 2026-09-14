@@ -1,6 +1,6 @@
 """Research provider failures (#609): typed, asked again inside the call's
 deadline only when no paid work can have started, then ended on the recovery
-discovery already uses.
+discovery already uses, under the no-search answer wherever that answer runs.
 
 Every provider here is scripted, and so is time: a retry's wait is asserted,
 never slept. The failures are the five the issue names (a 500, a 429 with
@@ -11,6 +11,7 @@ paid-work rule tells apart.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,7 +20,9 @@ from typing import Any
 import httpx
 import pytest
 from argus.agent_runtime import research_answer as ra
+from argus.agent_runtime import research_calculation
 from argus.agent_runtime import research_grounded as grounded
+from argus.agent_runtime.calculated_answer import CalculatedAnswer
 from argus.agent_runtime.recovery_messages import (
     DURABLE_RETRY_RECOVERY_CODES,
     RECOVERY_FALLBACK_MESSAGES,
@@ -132,7 +135,9 @@ class Failure:
 
     @property
     def recovery_code(self) -> str:
-        return "research_lookup_failed" if self.transient else "research_lookup_unavailable"
+        return (
+            "research_lookup_failed" if self.transient else "research_lookup_unavailable"
+        )
 
     @property
     def degraded(self) -> dict[str, Any]:
@@ -369,7 +374,9 @@ def test_an_unmapped_os_error_fails_closed_as_a_sent_attempt(
 
 
 def submitted() -> Step:
-    return lambda _request: httpx.Response(200, json={"id": "resp_bg1", "status": "queued"})
+    return lambda _request: httpx.Response(
+        200, json={"id": "resp_bg1", "status": "queued"}
+    )
 
 
 @pytest.mark.parametrize(
@@ -381,7 +388,13 @@ def submitted() -> Step:
         (transport_error(httpx.ReadTimeout), 1),
         (transport_error(httpx.RemoteProtocolError), 1),
     ],
-    ids=["http_500", "http_429", "connection_refused", "read_timeout", "connection_dropped"],
+    ids=[
+        "http_500",
+        "http_429",
+        "connection_refused",
+        "read_timeout",
+        "connection_dropped",
+    ],
 )
 def test_a_background_submission_is_sent_again_only_when_no_run_can_have_started(
     monkeypatch: pytest.MonkeyPatch, first: Step, sent: int
@@ -487,30 +500,61 @@ def test_paid_work_is_ruled_out_only_by_a_429_a_5xx_or_a_request_never_sent(
     assert error.paid_work_ruled_out is ruled_out
 
 
-# --- The turn: a recovery, never an answer, and the outage is recorded -------
+# --- The turn: the no-search answer with the recovery under it, or the recovery
+# alone, and the outage is recorded -------------------------------------------
+
+NO_LOOKUP_ANSWER = (
+    "From Argus market data, Apple last closed at $312.41 on 2026-08-06; "
+    "today's price could not be looked up."
+)
+ANSWERED = CalculatedAnswer(
+    answer_text=NO_LOOKUP_ANSWER,
+    patch={},
+    template=None,
+    question_field=None,
+    pending=None,
+)
 
 
-def _wire(monkeypatch: pytest.MonkeyPatch, failure: Failure) -> None:
+def _wire(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Failure,
+    *,
+    answered: CalculatedAnswer | None = None,
+) -> list[dict[str, Any]]:
+    """Script the provider's failure and the no-search answer, which cannot run
+    unless ``answered`` is given. Returns the calls the no-search answer took."""
     set_research_query(
         monkeypatch, globals(), question_kind="live_quote", symbols=["AAPL"]
     )
+    calls: list[dict[str, Any]] = []
+
+    def _answer_without_lookup(**kwargs: Any) -> CalculatedAnswer | None:
+        calls.append(kwargs)
+        return answered
+
+    monkeypatch.setattr(
+        research_calculation, "answer_without_lookup", _answer_without_lookup
+    )
     if not failure.api_key:
         monkeypatch.setattr(grounded, "_client", lambda: None)
-        return
+        return calls
     clock = ScriptedClock()
     client, _provider = scripted_client(clock, failure.steps(clock))
     monkeypatch.setattr(grounded, "_client", lambda: client)
+    return calls
 
 
 @pytest.mark.parametrize("failure", FAILURES, ids=lambda failure: failure.name)
-def test_a_failed_lookup_ends_the_turn_on_its_recovery(
+def test_a_failed_lookup_nothing_answers_ends_on_its_recovery_alone(
     monkeypatch: pytest.MonkeyPatch, failure: Failure
 ) -> None:
-    _wire(monkeypatch, failure)
+    calls = _wire(monkeypatch, failure)
 
     result = run_research_turn(QUESTION)
 
     assert result is not None
+    assert [call["message"] for call in calls] == [QUESTION]
     patch = result.stage_patch
     code = failure.recovery_code
     assert patch["recovery"] == {"code": code, "retryable": failure.transient}
@@ -523,6 +567,65 @@ def test_a_failed_lookup_ends_the_turn_on_its_recovery(
     assert sidecar["rows"] == []
     assert sidecar["sources"] == []
     assert sidecar["anchor_symbols"] == ["AAPL"]
+
+
+@pytest.mark.parametrize("failure", FAILURES, ids=lambda failure: failure.name)
+def test_the_no_search_answer_carries_the_failed_lookups_recovery_under_it(
+    monkeypatch: pytest.MonkeyPatch, failure: Failure
+) -> None:
+    calls = _wire(monkeypatch, failure, answered=ANSWERED)
+
+    result = run_research_turn(QUESTION)
+
+    assert result is not None and result.outcome == "ready_to_respond"
+    assert [call["message"] for call in calls] == [QUESTION]
+    assert [subject["symbol"] for subject in calls[0]["subjects"]] == ["AAPL"]
+    patch = result.stage_patch
+    assert patch["assistant_response"].startswith(NO_LOOKUP_ANSWER)
+    assert patch["recovery"] == {
+        "code": failure.recovery_code,
+        "retryable": failure.transient,
+        "under_answer": True,
+    }
+    # History and naming filters read the degraded flag, so the answer keeps it.
+    assert patch["research"]["degraded"] == failure.degraded
+
+
+@pytest.mark.parametrize(
+    "failure", [FAILURES[0], FAILURES[-1]], ids=lambda failure: failure.name
+)
+def test_a_no_search_question_for_the_readers_figures_carries_no_recovery(
+    monkeypatch: pytest.MonkeyPatch, failure: Failure
+) -> None:
+    asked = dataclasses.replace(ANSWERED, question_field="periods", pending={})
+    _wire(monkeypatch, failure, answered=asked)
+
+    result = run_research_turn(QUESTION)
+
+    assert result is not None and result.outcome == "await_user_reply"
+    assert result.stage_patch["requested_field"] == "periods"
+    assert "recovery" not in result.stage_patch
+    assert result.stage_patch["research"]["degraded"] == failure.degraded
+
+
+def test_a_failed_survey_ends_on_its_recovery_without_a_no_search_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
+
+    def _never(**_: Any) -> None:
+        raise AssertionError("a survey names no subject to answer without a lookup")
+
+    monkeypatch.setattr(research_calculation, "answer_without_lookup", _never)
+    monkeypatch.setattr(grounded, "_client", lambda: None)
+
+    result = run_research_turn("What's moving in the market?")
+
+    assert result is not None
+    assert result.stage_patch["recovery"] == {
+        "code": "research_lookup_unavailable",
+        "retryable": False,
+    }
 
 
 def test_a_turn_whose_retry_clears_publishes_the_answer(
@@ -724,6 +827,59 @@ def test_a_refused_request_ends_on_the_quiet_recovery_with_nothing_to_retry(
     assert "retry_last_turn" not in failure["metadata"]
     assert failure["metadata"]["recovery"] == live["recovery"]
     assert asked == [QUESTION]
+
+
+def test_an_answer_without_the_lookup_settles_with_its_notice_and_a_durable_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat.previews import research_lookup_failed
+    from argus.api.chat.title_finalization import artifact_naming_assistant_message
+
+    api, _provider, asked = _chat_over_the_rail(
+        monkeypatch, [*[status(500)] * ATTEMPTS, answer()]
+    )
+    monkeypatch.setattr(
+        research_calculation, "answer_without_lookup", lambda **_: ANSWERED
+    )
+    conversation_id = api.post("/api/v1/conversations", json={}).json()["conversation"][
+        "id"
+    ]
+
+    live = _ask(api, conversation_id)
+
+    assert live["assistant_response"].startswith(NO_LOOKUP_ANSWER)
+    assert live["recovery"] == {
+        "code": "research_lookup_failed",
+        "retryable": True,
+        "under_answer": True,
+    }
+    assert live["retry_last_turn"] == {"message": QUESTION}
+
+    request, answered = _messages(api, conversation_id)[-2:]
+    metadata = answered["metadata"]
+    assert answered["content"].startswith(NO_LOOKUP_ANSWER)
+    assert metadata["agent_runtime_turn"]["status"] == "recoverable_failed"
+    assert metadata["agent_runtime_turn"]["failure_code"] == "research_lookup_failed"
+    assert metadata["retry_last_turn"] == {
+        "request_message_id": request["id"],
+        "message": QUESTION,
+    }
+    assert metadata["recovery"] == live["recovery"]
+    # The degraded flag keeps the answer out of later model history and naming.
+    assert metadata["research"]["degraded"] == {
+        "code": "research_unavailable_http_error",
+        "status": 500,
+    }
+    assert research_lookup_failed(metadata)
+    assert (
+        artifact_naming_assistant_message(answered["content"], metadata=metadata) is None
+    )
+
+    retried = _ask(api, conversation_id)
+
+    assert "recovery" not in retried
+    assert retried["assistant_response"].startswith("Apple closed")
+    assert asked == [QUESTION, QUESTION]
 
 
 # --- A registered call: its recovery speaks for its turn only when it is alone -

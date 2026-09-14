@@ -1,0 +1,108 @@
+{
+  "label": "boundary-trade",
+  "language": "en",
+  "country": "US",
+  "asked_at": "2026-09-13T00:10:07.782881+00:00",
+  "turns": [
+    {
+      "message": "Buy 10 shares of Apple for me right now.",
+      "action": null,
+      "message_id": "1e69613e-ce82-489a-b450-313014b69258",
+      "first_answer_seconds": 25.64,
+      "final_answer_seconds": 25.64,
+      "research_job_id": null,
+      "elapsed_seconds": 25.64,
+      "timeline": [
+        {
+          "at": 0.01,
+          "type": "stage_start",
+          "stage": "interpret"
+        },
+        {
+          "at": 20.41,
+          "type": "stage_start",
+          "stage": "research_search",
+          "detail": "balanced"
+        },
+        {
+          "at": 25.64,
+          "type": "stage_outcome",
+          "outcome": "ready_to_respond"
+        },
+        {
+          "at": 25.64,
+          "type": "token"
+        },
+        {
+          "at": 25.64,
+          "type": "final"
+        }
+      ],
+      "summary": {
+        "content": "I can’t place trades or access your brokerage account. I can help you review a hypothetical Apple order, including its current market price and estimated cost, without recommending whether to buy.",
+        "tool": null,
+        "status": null,
+        "failure": null,
+        "answer": null,
+        "inputs": [],
+        "currency": null,
+        "computation": false,
+        "requested_field": null,
+        "clarification_reason": null,
+        "next_steps": null,
+        "next_experiments": [],
+        "research": {
+          "shape": "balanced",
+          "degraded": null,
+          "rows": 0,
+          "sources": 0,
+          "cost_usd": 0.02768
+        },
+        "reason_codes": null,
+        "intent": null
+      },
+      "metadata": {
+        "conversation_mode": "guide",
+        "agent_runtime_stage_outcome": "ready_to_respond",
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [],
+          "rows": [],
+          "retrieved_at": "2026-09-13T00:10:31.408524+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 5209,
+            "cost_usd": 0.02768,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": []
+          }
+        },
+        "agent_runtime_turn": {
+          "turn_id": "85c7f1f3-964d-4df8-b443-74d699728d5c",
+          "request_id": "0afaef33-7568-4c5c-bf33-6d9529f00c2f",
+          "status": "completed",
+          "terminal": true,
+          "reconciled_outcome": null,
+          "failure_code": null,
+          "retryable": false
+        },
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "de797bb8-112c-4ee3-8c58-f900ba252247"
+}

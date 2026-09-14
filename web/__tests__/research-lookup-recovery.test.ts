@@ -12,10 +12,12 @@ import type { Message } from "../components/chat/types";
 import type { ApiMessage } from "../lib/argus-api";
 import { researchDegradedCodeFromMetadata } from "../lib/chat-discovery-sidecar";
 import { mergeFinalTextMessage } from "../lib/chat-final-message";
+import { chatMessageCopyText } from "../lib/chat-message-copy-text";
 import {
   type RecoveryDisplay,
   recoveryDisplayFromMetadata,
   recoveryDisplayText,
+  recoveryNoticeUnderAnswer,
   retryableAssistantRecoveryCode,
   wearsQuietFailureNotice,
 } from "../lib/chat-recovery-display";
@@ -115,15 +117,28 @@ const request: ApiMessage = {
   },
 };
 
-// The persisted content is the backend's English compatibility text; readers
-// see copy localized from the typed code.
-function persistedFailure(transient: boolean): ApiMessage {
+// An answer given without the lookup: the reply's content, the notice under it.
+const NO_LOOKUP_ANSWER =
+  "From Argus market data, Apple last closed at $312.41 on 2026-08-06.";
+
+function recoveryState(transient: boolean, answered: boolean): Record<string, unknown> {
+  return {
+    code: transient ? TRANSIENT : QUIET,
+    retryable: transient,
+    ...(answered ? { under_answer: true } : {}),
+  };
+}
+
+// The persisted content is the backend's English compatibility text, or the
+// answer given without the lookup; readers see notice copy localized from the
+// typed code.
+function persistedFailure(transient: boolean, answered = false): ApiMessage {
   const code = transient ? TRANSIENT : QUIET;
   return {
     id: "assistant-1",
     conversation_id: "conversation-1",
     role: "assistant",
-    content: recoveryCopy("en", code),
+    content: answered ? NO_LOOKUP_ANSWER : recoveryCopy("en", code),
     created_at: "2026-09-13T12:00:01Z",
     metadata: {
       agent_runtime_turn: {
@@ -135,7 +150,7 @@ function persistedFailure(transient: boolean): ApiMessage {
         failure_code: transient ? code : null,
         retryable: transient,
       },
-      recovery: { code, retryable: transient },
+      recovery: recoveryState(transient, answered),
       ...(transient
         ? { retry_last_turn: { request_message_id: request.id, message: QUESTION } }
         : {}),
@@ -144,13 +159,13 @@ function persistedFailure(transient: boolean): ApiMessage {
   };
 }
 
-function liveFailure(transient: boolean): Message {
+function liveFailure(transient: boolean, answered = false): Message {
   const code = transient ? TRANSIENT : QUIET;
   const payload: Record<string, unknown> = {
     stage_outcome: "ready_to_respond",
-    assistant_response: recoveryCopy("en", code),
+    assistant_response: answered ? NO_LOOKUP_ANSWER : recoveryCopy("en", code),
     message_id: "assistant-live",
-    recovery: { code, retryable: transient },
+    recovery: recoveryState(transient, answered),
     ...(transient ? { retry_last_turn: { message: QUESTION } } : {}),
     research: researchSidecar(transient ? 500 : 400),
   };
@@ -170,8 +185,11 @@ function liveFailure(transient: boolean): Message {
   );
 }
 
-function hydratedFailure(transient: boolean): Message {
-  const { messages } = hydrateMessagesFromApi([request, persistedFailure(transient)]);
+function hydratedFailure(transient: boolean, answered = false): Message {
+  const { messages } = hydrateMessagesFromApi([
+    request,
+    persistedFailure(transient, answered),
+  ]);
   const assistant = messages.find((message) => message.id === "assistant-1");
   if (!assistant) throw new Error("the failure did not hydrate");
   return assistant;
@@ -261,5 +279,43 @@ describe("research lookup recovery (#609)", () => {
         i18nByLanguage["es-419"].t,
       ),
     ).toBe(recoveryCopy("es-419", TRANSIENT));
+  });
+
+  test("an answer given without the lookup keeps its content, with the notice under it", () => {
+    for (const transient of [true, false]) {
+      const code = transient ? TRANSIENT : QUIET;
+      for (const language of LANGUAGES) {
+        for (const message of [
+          liveFailure(transient, true),
+          hydratedFailure(transient, true),
+        ]) {
+          expect(recoveryNoticeUnderAnswer(message.recoveryDisplay)).toBe(true);
+          const markup = render(message, language);
+          const answerAt = markup.indexOf(inMarkup(NO_LOOKUP_ANSWER));
+          const noticeAt = markup.indexOf(inMarkup(recoveryCopy(language, code)));
+          expect(answerAt).toBeGreaterThanOrEqual(0);
+          expect(noticeAt).toBeGreaterThan(answerAt);
+          expect(markup).toContain("data-recovery-under-answer");
+          if (transient) {
+            expect(markup).toContain(retryableNoticeContainerClass);
+            expect(markup).toContain(`>${RETRY_LABEL[language]}</button>`);
+          } else {
+            expect(markup).toContain('data-testid="recovery-failure-notice"');
+            expect(markup).not.toContain(retryableNoticeContainerClass);
+            expect(markup).not.toContain(`>${RETRY_LABEL[language]}</button>`);
+          }
+        }
+      }
+    }
+  });
+
+  test("copying an answer given without the lookup copies the answer, then its notice", () => {
+    const t = i18nByLanguage["es-419"].t;
+    expect(chatMessageCopyText(hydratedFailure(true, true), t, "es-419")).toBe(
+      `${NO_LOOKUP_ANSWER}\n\n${recoveryCopy("es-419", TRANSIENT)}`,
+    );
+    expect(chatMessageCopyText(hydratedFailure(true), t, "es-419")).toBe(
+      recoveryCopy("es-419", TRANSIENT),
+    );
   });
 });

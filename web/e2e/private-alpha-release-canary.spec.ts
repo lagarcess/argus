@@ -6,26 +6,60 @@ import {
   type Request,
   type Response,
 } from "@playwright/test";
-import type { SearchConversationItem } from "../lib/search-contract";
-import type { SearchDecisionAction } from "../lib/run-dossier-contract";
+import {
+  ANNOUNCEMENT_SELECTOR,
+  latestAssistantMessage,
+  ordinaryAnswerFailure,
+  researchAnswerFailure,
+} from "./support/private-alpha-canary-answers";
+import handoff from "./support/private-alpha-canary-handoff.json";
+import { CheckFailure, reasonCode } from "./support/private-alpha-canary-reasons";
+
+// The canary's browser checks never follow features: each one reads an API
+// response or a product-owned test id, never result facts or feature copy.
 
 type JsonRecord = Record<string, unknown>;
-type StaticLabels = Record<string, string>;
+type CheckStatus = (typeof handoff.statuses)[keyof typeof handoff.statuses];
+type CheckResult = {
+  status: CheckStatus;
+  reason?: string;
+  sign_in_attempts?: number;
+  conversation_id?: string;
+  backtest_job_id?: string;
+  backtest_run_id?: string;
+};
+type CheckContext = {
+  page: Page;
+  result: CheckResult;
+  save: () => Promise<void>;
+};
+type JobSnapshot = { job: JsonRecord; run: JsonRecord | null };
 
 const expectedUserId = process.env.ARGUS_CANARY_BROWSER_USER_ID;
-const language = process.env.ARGUS_CANARY_BROWSER_LANGUAGE;
-const prompt = process.env.ARGUS_CANARY_BROWSER_PROMPT;
-const decisionState = process.env.ARGUS_CANARY_BROWSER_DECISION_STATE;
-const decisionNote = process.env.ARGUS_CANARY_BROWSER_DECISION_NOTE;
-const searchQuery = process.env.ARGUS_CANARY_BROWSER_SEARCH_QUERY;
-const identityHandoff = process.env.ARGUS_CANARY_BROWSER_IDENTITY_HANDOFF;
+const handoffPath = process.env.ARGUS_CANARY_BROWSER_CHECKS_HANDOFF;
+const checkIds = (process.env.ARGUS_CANARY_BROWSER_CHECKS ?? "")
+  .split("\n")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const chatPrompt = process.env.ARGUS_CANARY_BROWSER_CHAT_PROMPT;
+const backtestPrompt = process.env.ARGUS_CANARY_BROWSER_BACKTEST_PROMPT;
+const researchPrompt = process.env.ARGUS_CANARY_BROWSER_RESEARCH_PROMPT;
 const artifactProbe =
   process.env.ARGUS_CANARY_BROWSER_ARTIFACT_PROBE ?? "none";
 const redactionProbeValue =
   process.env.ARGUS_CANARY_BROWSER_REDACTION_PROBE_VALUE;
 const labels = JSON.parse(
   process.env.ARGUS_CANARY_STATIC_LABELS_JSON ?? "{}",
-) as StaticLabels;
+) as Record<string, string>;
+
+// A retried sign-in still reports its attempt count in the evidence.
+const SIGN_IN_ATTEMPTS = 2;
+const SIGN_IN_RETRY_DELAY_MS = 5_000;
+const COMPOSER_RELEASE_TIMEOUT_MS = 240_000;
+const PENDING_JOB_STATUSES = new Set(["queued", "running"]);
+
+/** Sign-in failed, so no later check can run. */
+class SignInFailure extends CheckFailure {}
 
 function label(key: string): string {
   const value = labels[key];
@@ -38,27 +72,15 @@ function requireConfig(value: string | undefined, name: string): string {
   return value;
 }
 
-function record(value: unknown, name: string): JsonRecord {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`Browser canary response omitted ${name}`);
-  }
-  return value as JsonRecord;
+function record(value: unknown): JsonRecord | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as JsonRecord)
+    : null;
 }
 
-function isSearchConversationItem(
-  value: unknown,
-): value is SearchConversationItem {
-  return (
-    Boolean(value) &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    (value as JsonRecord).type === "conversation"
-  );
-}
-
-function privateId(value: unknown, name: string): string {
+function privateId(value: unknown, reason: string): string {
   if (typeof value !== "string" || !value.trim()) {
-    throw new Error(`Browser canary could not capture ${name}`);
+    throw new CheckFailure(reason);
   }
   return value;
 }
@@ -75,556 +97,434 @@ async function writePrivateHandoff(
   await chmod(path, 0o600);
 }
 
+function apiPath(url: string): string | null {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return null;
+  }
+}
+
 function isApiResponse(
   response: Response,
   suffix: string,
   method: string,
 ): boolean {
-  try {
-    return (
-      new URL(response.url()).pathname.endsWith(`/api/v1${suffix}`) &&
-      response.request().method() === method
-    );
-  } catch {
-    return false;
-  }
+  return (
+    apiPath(response.url())?.endsWith(`/api/v1${suffix}`) === true &&
+    response.request().method() === method
+  );
+}
+
+function isChatStreamRequest(request: Request): boolean {
+  return (
+    request.method() === "POST" &&
+    apiPath(request.url())?.endsWith("/api/v1/chat/stream") === true
+  );
 }
 
 function isRunBacktestRequest(request: Request): boolean {
+  if (!isChatStreamRequest(request)) return false;
   try {
-    if (
-      request.method() !== "POST" ||
-      !new URL(request.url()).pathname.endsWith("/api/v1/chat/stream")
-    ) {
-      return false;
-    }
-    const body = request.postDataJSON() as JsonRecord;
-    const action = body.action;
-    return (
-      Boolean(action) &&
-      typeof action === "object" &&
-      !Array.isArray(action) &&
-      (action as JsonRecord).type === "run_backtest"
-    );
+    return record(record(request.postDataJSON())?.action)?.type === "run_backtest";
   } catch {
     return false;
   }
 }
 
-async function openAuthenticatedChat(page: Page): Promise<{ userId: string }> {
-  const canaryUserId = requireConfig(expectedUserId, "user identity");
-  const canaryLanguage = requireConfig(language, "language");
-
-  await page.addInitScript((nextLanguage) => {
-    window.localStorage.setItem("i18nextLng", nextLanguage);
-  }, canaryLanguage);
-  const profileResponsePromise = page.waitForResponse((response) =>
-    isApiResponse(response, "/me", "GET"),
-  );
-  await page.goto("/chat", { waitUntil: "domcontentloaded" });
-  await page.waitForURL(/\/chat(?:\?|$)/, { timeout: 30_000 });
-  await expect(page.locator("html")).toHaveAttribute("lang", canaryLanguage);
-  const profileResponse = await profileResponsePromise;
-  if (!profileResponse.ok())
-    throw new Error("Rendered profile hydration failed");
-  const profilePayload = record(
-    await profileResponse.json(),
-    "profile payload",
-  );
-  const profileUser = record(profilePayload.user, "hydrated profile");
-  if (
-    profileUser.id !== canaryUserId ||
-    profileUser.language !== canaryLanguage ||
-    profileUser.locale !== canaryLanguage
-  ) {
-    throw new Error(
-      "Rendered profile hydration did not preserve Spanish identity",
-    );
+async function problemCode(response: Response): Promise<string> {
+  try {
+    const code = record(await response.json())?.code;
+    return typeof code === "string" && code ? code : "no_code";
+  } catch {
+    return "unreadable_body";
   }
-  const storageState = await page.context().storageState();
+}
+
+/** The request once its body ends, null when it failed, undefined on timeout. */
+function settledRequest(
+  page: Page,
+  matches: (request: Request) => boolean,
+  timeout: number,
+): Promise<Request | null | undefined> {
+  const finished = page
+    .waitForEvent("requestfinished", { predicate: matches, timeout })
+    .then(
+      (request) => request,
+      () => undefined,
+    );
+  const failed = page
+    .waitForEvent("requestfailed", { predicate: matches, timeout })
+    .then(
+      () => null,
+      () => undefined,
+    );
+  return Promise.race([finished, failed]);
+}
+
+async function requireSettledOk(
+  settled: Request | null | undefined,
+  name: string,
+): Promise<void> {
+  if (settled === undefined) throw new CheckFailure(`${name}_timed_out`);
+  if (settled === null) throw new CheckFailure(`${name}_request_failed`);
+  const response = await settled.response();
+  if (!response?.ok()) {
+    throw new CheckFailure(reasonCode(name, "http", response?.status() ?? 0));
+  }
+}
+
+async function openSignedInChat(page: Page): Promise<number> {
+  const userId = requireConfig(expectedUserId, "user identity");
+  const { cookies } = await page.context().storageState();
   if (
-    !storageState.cookies.some((cookie) =>
+    !cookies.some((cookie) =>
       /^sb-[a-z0-9-]+-auth-token(?:\.\d+)?$/.test(cookie.name),
     )
   ) {
-    throw new Error("Browser canary did not start from authenticated storage state");
+    throw new SignInFailure("storage_state_has_no_session");
   }
-  await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 30_000 });
-  return { userId: canaryUserId };
-}
 
-function decisionStateLocator(page: Page, state: string) {
-  return page.getByText(label(`chat.result_card.decision_states.${state}`), {
-    exact: false,
-  });
-}
-
-function captureBrowserErrors(page: Page) {
-  const evidence = { consoleErrorCount: 0, pageErrorCount: 0 };
-  page.on("console", (message) => {
-    if (message.type() === "error") evidence.consoleErrorCount += 1;
-  });
-  page.on("pageerror", () => {
-    evidence.pageErrorCount += 1;
-  });
-  return evidence;
-}
-
-function successfulJobCapture(page: Page) {
-  const capture: { payload: JsonRecord | null } = { payload: null };
-  page.on("response", (response) => {
-    let pathname = "";
-    try {
-      pathname = new URL(response.url()).pathname;
-    } catch {
-      return;
+  let reason = "profile_not_requested";
+  for (let attempt = 1; attempt <= SIGN_IN_ATTEMPTS; attempt += 1) {
+    if (attempt > 1) await page.waitForTimeout(SIGN_IN_RETRY_DELAY_MS);
+    const profile = page
+      .waitForResponse((response) => isApiResponse(response, "/me", "GET"), {
+        timeout: 60_000,
+      })
+      .catch(() => null);
+    const navigated = await page
+      .goto("/chat", { waitUntil: "domcontentloaded" })
+      .then(
+        () => true,
+        () => false,
+      );
+    const response = await profile;
+    if (!navigated) {
+      reason = "chat_page_unreachable";
+      continue;
     }
+    if (!response) {
+      reason = "profile_not_requested";
+      continue;
+    }
+    if (!response.ok()) {
+      reason = reasonCode(
+        "profile_http",
+        response.status(),
+        await problemCode(response),
+      );
+      const status = response.status();
+      if (status === 401 || status === 429 || status >= 500) continue;
+      break;
+    }
+    const payload = record(await response.json().catch(() => null));
+    if (record(payload?.user)?.id !== userId) {
+      throw new SignInFailure("profile_identity_mismatch");
+    }
+    if (payload?.account_kind !== "registered") {
+      throw new SignInFailure("profile_not_registered");
+    }
+    await expect(page.getByTestId("chat-input"))
+      .toBeVisible({ timeout: 30_000 })
+      .catch(() => {
+        throw new SignInFailure("chat_input_not_visible");
+      });
+    return attempt;
+  }
+  throw new SignInFailure(reason);
+}
+
+async function sendTurn(
+  { page, result, save }: CheckContext,
+  prompt: string,
+  turnTimeout: number,
+): Promise<string> {
+  const created = page
+    .waitForResponse(
+      (response) => isApiResponse(response, "/conversations", "POST"),
+      { timeout: 60_000 },
+    )
+    .catch(() => null);
+  const turn = settledRequest(
+    page,
+    (request) => isChatStreamRequest(request) && !isRunBacktestRequest(request),
+    turnTimeout,
+  );
+  await page.getByTestId("chat-input").fill(prompt);
+  await page.getByTestId("chat-send").click();
+
+  const conversation = await created;
+  if (!conversation) throw new CheckFailure("conversation_not_created");
+  if (!conversation.ok()) {
+    throw new CheckFailure(
+      reasonCode("conversation_http", conversation.status()),
+    );
+  }
+  const conversationId = privateId(
+    record(record(await conversation.json().catch(() => null))?.conversation)
+      ?.id,
+    "conversation_id_missing",
+  );
+  result.conversation_id = conversationId;
+  await save();
+
+  await requireSettledOk(await turn, "chat_turn");
+  await expect(page.getByTestId("chat-input"))
+    .toHaveAttribute("contenteditable", "true", {
+      timeout: COMPOSER_RELEASE_TIMEOUT_MS,
+    })
+    .catch(() => {
+      throw new CheckFailure("chat_turn_kept_composer_locked");
+    });
+  const recoveryShown =
+    (await page.getByTestId("user-turn-recovery").count()) +
+    (await page.getByTestId("user-turn-retry").count());
+  if (recoveryShown > 0) throw new CheckFailure("chat_turn_offered_recovery");
+  return conversationId;
+}
+
+/**
+ * Why the newest persisted answer is not accepted, or null. Reopening the chat
+ * judges the turn through its projection, then the message it renders.
+ */
+async function persistedAnswerFailure(
+  page: Page,
+  conversationId: string,
+  judge: (message: ReturnType<typeof latestAssistantMessage>) => string | null,
+): Promise<string | null> {
+  const messagesPath = `/api/v1/conversations/${conversationId}/messages`;
+  const messages = page
+    .waitForResponse(
+      (response) =>
+        apiPath(response.url()) === messagesPath &&
+        response.request().method() === "GET",
+      { timeout: 60_000 },
+    )
+    .catch(() => null);
+  const navigated = await page
+    .goto(`/chat?conversation=${encodeURIComponent(conversationId)}`, {
+      waitUntil: "domcontentloaded",
+    })
+    .then(
+      () => true,
+      () => false,
+    );
+  const response = await messages;
+  if (!navigated || !response?.ok()) {
+    throw new CheckFailure(
+      reasonCode("messages_http", response?.status() ?? 0),
+    );
+  }
+  const message = latestAssistantMessage(
+    await response.json().catch(() => null),
+  );
+  const failure = judge(message);
+  if (failure || !message) return failure ?? "assistant_answer_missing";
+  const rendered = page.locator(`[data-message-id="${message.id}"]`);
+  await expect(rendered)
+    .toBeVisible({ timeout: 60_000 })
+    .catch(() => {
+      throw new CheckFailure("assistant_answer_not_rendered");
+    });
+  return (await rendered.locator(ANNOUNCEMENT_SELECTOR).count()) > 0
+    ? "assistant_answer_announced_notice"
+    : null;
+}
+
+function watchBacktestJobs(page: Page) {
+  let latest: JobSnapshot | null = null;
+  const isTerminal = (snapshot: JobSnapshot | null) =>
+    snapshot !== null && !PENDING_JOB_STATUSES.has(String(snapshot.job.status));
+  page.on("response", (response) => {
+    const path = apiPath(response.url());
     if (
       response.request().method() !== "GET" ||
-      !pathname.includes("/api/v1/backtest-jobs/") ||
+      !path ||
+      !/\/api\/v1\/backtest-jobs\/[^/]+$/.test(path) ||
       !response.ok()
     ) {
       return;
     }
-    void response
-      .json()
-      .then((value: unknown) => {
-        const payload = record(value, "backtest job payload");
-        const job = record(payload.job, "backtest job");
-        if (job.status === "succeeded" && payload.run)
-          capture.payload = payload;
-      })
-      .catch(() => undefined);
+    void response.json().then(
+      (value: unknown) => {
+        const payload = record(value);
+        const job = record(payload?.job);
+        if (job && !isTerminal(latest)) {
+          latest = { job, run: record(payload?.run) };
+        }
+      },
+      () => undefined,
+    );
   });
-  return capture;
+  return {
+    latest: () => latest,
+    terminal: () => (isTerminal(latest) ? latest : null),
+  };
 }
 
-test.describe.serial("private-alpha rendered release canary", () => {
-  test("deterministic/intercepted recovery is not deployed backend proof", async ({
+async function signedInChatAnswer(context: CheckContext): Promise<void> {
+  const { page, result, save } = context;
+  result.sign_in_attempts = await openSignedInChat(page);
+  await save();
+  const prompt = requireConfig(chatPrompt, "chat prompt");
+  const conversationId = await sendTurn(context, prompt, 180_000);
+  const messages = page.locator("[data-message-id]");
+  const answer =
+    (await messages.count()) >= 2
+      ? (await messages.last().innerText()).trim()
+      : "";
+  if (!answer || answer === prompt.trim()) {
+    throw new CheckFailure("assistant_answer_missing");
+  }
+  const failure = await persistedAnswerFailure(
     page,
-  }) => {
-    test.setTimeout(90_000);
-    const retryPrompt = "Provocar recuperación tipada sin ejecutar un backtest";
-    const fakeConversationId = "00000000-0000-4000-8000-000000000233";
-    const fakeAssistantId = "00000000-0000-4000-8000-000000000234";
-    let interceptedRunRequests = 0;
+    conversationId,
+    ordinaryAnswerFailure,
+  );
+  if (failure) throw new CheckFailure(reasonCode(failure));
+}
 
-    await openAuthenticatedChat(page);
-    if (artifactProbe !== "none") {
-      const probeValue = requireConfig(
-        redactionProbeValue,
-        "redaction probe value",
-      );
-      await page.getByTestId("chat-input").fill(probeValue);
-      await expect(page.getByTestId("forced-canary-failure")).toBeVisible();
-    }
-    const mockedCorsHeaders = {
-      "Access-Control-Allow-Credentials": "true",
-      "Access-Control-Allow-Headers":
-        "authorization, content-type, idempotency-key, x-request-id",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Origin": new URL(page.url()).origin,
-      Vary: "Origin",
-    };
-    await page.route("**/api/v1/conversations", async (route) => {
-      if (route.request().method() === "OPTIONS") {
-        await route.fulfill({ status: 204, headers: mockedCorsHeaders });
-        return;
-      }
-      if (route.request().method() !== "POST") {
-        await route.fallback();
-        return;
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        headers: mockedCorsHeaders,
-        body: JSON.stringify({
-          conversation: {
-            id: fakeConversationId,
-            title: "Recuperación determinista",
-            title_source: "default",
-            pinned: false,
-            archived: false,
-            created_at: "2026-07-16T00:00:00Z",
-            updated_at: "2026-07-16T00:00:00Z",
-            language: "es-419",
-          },
-        }),
-      });
-    });
-    await page.route("**/api/v1/chat/stream", async (route) => {
-      if (route.request().method() === "OPTIONS") {
-        await route.fulfill({ status: 204, headers: mockedCorsHeaders });
-        return;
-      }
-      const body = route.request().postDataJSON() as JsonRecord;
-      const action = body.action;
-      if (
-        action &&
-        record(action, "intercepted chat action").type === "run_backtest"
-      ) {
-        interceptedRunRequests += 1;
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: "text/event-stream",
-        headers: mockedCorsHeaders,
-        body: `data: ${JSON.stringify({
-          type: "error",
-          code: "deterministic_canary_error",
-          message: label("chat.error_backtest"),
-          message_id: fakeAssistantId,
-          recovery_action: "retry_last_turn",
-          retry_last_turn: { message: retryPrompt },
-          recovery: {
-            code: "runtime_failure",
-            retryable: true,
-            language: "es-419",
-          },
-        })}\n\n`,
-      });
-    });
+async function backtestCompletes(context: CheckContext): Promise<void> {
+  const { page, result, save } = context;
+  await openSignedInChat(page);
+  const jobs = watchBacktestJobs(page);
+  const conversationId = await sendTurn(
+    context,
+    requireConfig(backtestPrompt, "backtest prompt"),
+    240_000,
+  );
 
-    await page.getByTestId("chat-input").fill(retryPrompt);
-    await page.getByTestId("chat-send").click();
-    const retryButton = page.getByRole("button", {
-      name: label("common.retry"),
+  const runButton = page
+    .getByRole("button", {
+      name: label("chat.confirmation.actions.run_backtest"),
+    })
+    .last();
+  await expect(runButton)
+    .toBeVisible({ timeout: 30_000 })
+    .catch(() => {
+      throw new CheckFailure("confirmation_not_offered");
     });
-    await expect(retryButton).toBeVisible();
-    await expect(
-      page.getByRole("status").filter({ has: retryButton }),
-    ).toBeVisible();
-    expect(interceptedRunRequests).toBe(0);
-  });
+  const runAction = settledRequest(page, isRunBacktestRequest, 180_000);
+  await runButton.click();
+  await requireSettledOk(await runAction, "run_action");
 
-  test("browser owns the Spanish Golden Path and exports private identities", async ({
-    page,
-  }) => {
-    test.setTimeout(480_000);
-    const canaryPrompt = requireConfig(prompt, "prompt");
-    const canaryDecisionState = requireConfig(decisionState, "decision state");
-    const canaryDecisionNote = requireConfig(decisionNote, "decision note");
-    const canarySearchQuery = requireConfig(searchQuery, "search query");
-    const handoffPath = requireConfig(identityHandoff, "identity handoff");
-    const browserErrors = captureBrowserErrors(page);
-    const jobCapture = successfulJobCapture(page);
-    let runBacktestRequests = 0;
-
-    page.on("request", (request) => {
-      if (isRunBacktestRequest(request)) runBacktestRequests += 1;
-    });
-
-    const { userId } = await openAuthenticatedChat(page);
-    const conversationResponsePromise = page.waitForResponse((response) =>
-      isApiResponse(response, "/conversations", "POST"),
-    );
-    await page.getByTestId("chat-input").fill(canaryPrompt);
-    await page.getByTestId("chat-send").click();
-    const conversationResponse = await conversationResponsePromise;
-    if (!conversationResponse.ok())
-      throw new Error("Browser conversation creation failed");
-    const conversationPayload = record(
-      await conversationResponse.json(),
-      "conversation payload",
-    );
-    const conversationId = privateId(
-      record(conversationPayload.conversation, "conversation").id,
-      "conversation identity",
-    );
-    if (
-      new URL(page.url()).searchParams.get("conversation") !== conversationId
-    ) {
-      throw new Error(
-        "Rendered conversation route did not preserve browser identity",
-      );
-    }
-    await writePrivateHandoff(handoffPath, {
-      schema_version: 1,
-      source: "playwright",
-      status: "conversation_created",
-      user_id: userId,
-      conversation_id: conversationId,
-    });
-
-    await expect(
-      page.getByText(label("chat.confirmation.status.ready_to_run"), {
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 180_000 });
-    // The card can render one frame before the initial turn releases its lock.
-    // Composer editability is the product-owned signal that action admission is ready.
-    await expect(page.getByTestId("chat-input")).toHaveAttribute(
-      "contenteditable",
-      "true",
-      { timeout: 30_000 },
-    );
-    const runRequest = page.waitForRequest(isRunBacktestRequest, {
-      timeout: 30_000,
-    });
-    await page
-      .getByRole("button", {
-        name: label("chat.confirmation.actions.run_backtest"),
-      })
-      .click();
-    await runRequest;
+  try {
     await expect
-      .poll(() => runBacktestRequests, { timeout: 5_000 })
-      .toBe(1);
-
-    await expect(
-      page.getByText(label("chat.simulation_complete"), { exact: true }),
-    ).toHaveCount(1, { timeout: 360_000 });
-    await expect
-      .poll(() => jobCapture.payload !== null, { timeout: 30_000 })
-      .toBe(true);
-    expect(runBacktestRequests).toBe(1);
-    await expect(
-      page.getByText(label("chat.backtest_job.queued_title"), { exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByText(label("chat.backtest_job.running_title"), { exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByText(label("chat.backtest_job.failed_title"), { exact: true }),
-    ).toHaveCount(0);
-
-    const jobPayload = record(jobCapture.payload, "successful job capture");
-    const job = record(jobPayload.job, "successful job");
-    const run = record(jobPayload.run, "completed run");
-    const resultCard = record(run.conversation_result_card, "result card");
-    const backtestJobId = privateId(job.id, "backtest job identity");
-    const backtestRunId = privateId(run.id, "backtest run identity");
-    const evidenceArtifactId = privateId(
-      resultCard.evidence_artifact_id,
-      "evidence identity",
-    );
-    const ideaId = privateId(resultCard.idea_id, "idea identity");
-    const ideaVersionId = privateId(
-      resultCard.idea_version_id,
-      "idea version identity",
-    );
-    if (
-      job.conversation_id !== conversationId ||
-      job.result_run_id !== backtestRunId ||
-      run.conversation_id !== conversationId
-    ) {
-      throw new Error(
-        "Browser-captured job and run identities did not finalize together",
-      );
-    }
-    await writePrivateHandoff(handoffPath, {
-      schema_version: 1,
-      source: "playwright",
-      status: "result_captured",
-      user_id: userId,
-      conversation_id: conversationId,
-      backtest_job_id: backtestJobId,
-      backtest_run_id: backtestRunId,
-      evidence_artifact_id: evidenceArtifactId,
-      idea_id: ideaId,
-      idea_version_id: ideaVersionId,
-      decision_state: canaryDecisionState,
-      run_action_request_count: runBacktestRequests,
-      assertions: { result_rendered_once: true },
-    });
-
-    await page
-      .getByRole("button", { name: label("chat.result_card.add_decision") })
-      .click();
-    await page
-      .getByRole("button", {
-        name: label(`chat.result_card.decision_states.${canaryDecisionState}`),
-      })
-      .click();
-    await page
-      .getByPlaceholder(label("chat.result_card.decision_note_placeholder"))
-      .fill(canaryDecisionNote);
-    const decisionResponsePromise = page.waitForResponse((response) => {
-      let pathname = "";
-      try {
-        pathname = new URL(response.url()).pathname;
-      } catch {
-        return false;
-      }
-      return (
-        response.request().method() === "POST" &&
-        pathname.endsWith("/decision") &&
-        pathname.includes("/api/v1/evidence-artifacts/")
-      );
-    });
-    await page
-      .getByRole("button", { name: label("chat.result_card.save_decision") })
-      .click();
-    const decisionResponse = await decisionResponsePromise;
-    if (!decisionResponse.ok())
-      throw new Error("Rendered decision capture failed");
-    const decisionPayload = record(
-      await decisionResponse.json(),
-      "decision payload",
-    );
-    const decision = record(decisionPayload.decision, "decision");
-    const decidedArtifact = record(
-      decisionPayload.evidence_artifact,
-      "decided evidence artifact",
-    );
-    const decisionNoteId = privateId(decision.id, "decision identity");
-    if (
-      decision.evidence_artifact_id !== evidenceArtifactId ||
-      decision.idea_id !== ideaId ||
-      decision.idea_version_id !== ideaVersionId ||
-      decision.decision_state !== canaryDecisionState ||
-      decision.note !== canaryDecisionNote ||
-      decidedArtifact.id !== evidenceArtifactId ||
-      decidedArtifact.lifecycle !== "decided"
-    ) {
-      throw new Error(
-        "Rendered decision did not preserve canonical artifact identity",
-      );
-    }
-
-    await expect(
-      decisionStateLocator(page, canaryDecisionState),
-    ).toBeVisible();
-    await page.reload();
-    await expect(
-      page.getByText(label("chat.simulation_complete"), { exact: true }),
-    ).toHaveCount(1, { timeout: 60_000 });
-    await expect(
-      decisionStateLocator(page, canaryDecisionState),
-    ).toBeVisible();
-    await expect(
-      page.getByText(label("chat.error_backtest"), { exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole("button", { name: label("common.retry") }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByText(label("chat.backtest_job.queued_title"), { exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByText(label("chat.backtest_job.running_title"), { exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByText(label("chat.backtest_job.failed_title"), { exact: true }),
-    ).toHaveCount(0);
-
-    await page.getByRole("button", { name: label("chat.new_chat") }).click();
-    await expect
-      .poll(() => !new URL(page.url()).searchParams.has("conversation"), {
-        message: "New chat did not leave the source conversation",
-        timeout: 30_000,
+      .poll(() => jobs.terminal() !== null, {
+        timeout: 420_000,
+        intervals: [2_000],
       })
       .toBe(true);
-    await expect
-      .poll(
-        () =>
-          page
-            .getByText(label("chat.simulation_complete"), { exact: true })
-            .count(),
-        {
-          message: "Source result remained visible before Omnisearch reopening",
-          timeout: 30_000,
-        },
-      )
-      .toBe(0);
+  } catch {
+    const pending = jobs.latest();
+    if (typeof pending?.job.id === "string") {
+      result.backtest_job_id = pending.job.id;
+    }
+    throw new CheckFailure(
+      reasonCode(
+        "backtest_job_not_finished",
+        String(pending?.job.status ?? "never_polled"),
+      ),
+    );
+  }
 
-    await page.getByRole("button", { name: label("common.search") }).click();
-    const searchResponsePromise = page.waitForResponse((response) => {
-      try {
-        const url = new URL(response.url());
-        return (
-          response.request().method() === "GET" &&
-          url.pathname.endsWith("/api/v1/search") &&
-          url.searchParams.get("q") === canarySearchQuery
-        );
-      } catch {
-        return false;
-      }
+  const { job, run } = jobs.terminal() as JobSnapshot;
+  result.backtest_job_id = privateId(job.id, "backtest_job_id_missing");
+  await save();
+  if (job.status !== "succeeded") {
+    throw new CheckFailure(
+      reasonCode(
+        "backtest_job",
+        String(job.status),
+        String(job.failure_code ?? "no_code"),
+      ),
+    );
+  }
+  if (job.conversation_id !== conversationId) {
+    throw new CheckFailure("backtest_job_conversation_mismatch");
+  }
+  if (run?.status !== "completed" || run.id !== job.result_run_id) {
+    throw new CheckFailure("backtest_run_not_completed");
+  }
+  result.backtest_run_id = privateId(run.id, "backtest_run_id_missing");
+}
+
+async function researchAnswerWithSources(
+  context: CheckContext,
+): Promise<void> {
+  const { page } = context;
+  await openSignedInChat(page);
+  const conversationId = await sendTurn(
+    context,
+    requireConfig(researchPrompt, "research prompt"),
+    300_000,
+  );
+  await expect(page.getByTestId("research-sources-open").last())
+    .toBeVisible({ timeout: 240_000 })
+    .catch(() => {
+      throw new CheckFailure("research_sources_missing");
     });
-    await page
-      .getByPlaceholder(label("command_palette.search_placeholder"))
-      .fill(canarySearchQuery);
-    const searchResponse = await searchResponsePromise;
-    if (!searchResponse.ok())
-      throw new Error("Rendered Omnisearch request failed");
-    const searchPayload = record(
-      await searchResponse.json(),
-      "Omnisearch payload",
-    );
-    if (!Array.isArray(searchPayload.items)) {
-      throw new Error("Omnisearch payload omitted result items");
-    }
-    const conversationItems = searchPayload.items.filter(isSearchConversationItem);
-    const matchingConversationIndex = conversationItems.findIndex(
-      (item) => item.conversation_id === conversationId,
-    );
-    if (matchingConversationIndex < 0) {
-      throw new Error(
-        "Omnisearch did not return the browser-created source conversation",
-      );
-    }
-    const matchingConversation = conversationItems[matchingConversationIndex];
-    const dossier = matchingConversation.dossier;
-    const decisionAction = dossier?.actions.find(
-      (action): action is SearchDecisionAction =>
-        action.type === "decision" &&
-        action.evidence_artifact_id === evidenceArtifactId,
-    );
-    if (
-      !dossier ||
-      dossier.run_id !== backtestRunId ||
-      dossier.decision?.state !== canaryDecisionState ||
-      !decisionAction ||
-      decisionAction.decision_state !== canaryDecisionState
-    ) {
-      throw new Error(
-        "Omnisearch dossier did not preserve the browser-created evidence",
-      );
-    }
-    await page
-      .locator(`[data-palette-row-index="${matchingConversationIndex}"]`)
-      .click();
-    await expect(
-      page.getByText(label("chat.simulation_complete"), { exact: true }),
-    ).toHaveCount(1, { timeout: 60_000 });
-    if (
-      new URL(page.url()).searchParams.get("conversation") !== conversationId
-    ) {
-      throw new Error(
-        "Omnisearch did not reopen the canonical source conversation",
-      );
-    }
+  const failure = await persistedAnswerFailure(
+    page,
+    conversationId,
+    researchAnswerFailure,
+  );
+  if (failure) throw new CheckFailure(reasonCode(failure));
+}
 
-    const blockingOverlay = page.locator(
-      '[data-testid="blocking-overlay"], [role="alertdialog"], [aria-modal="true"][data-state="open"]',
-    );
-    await expect(blockingOverlay).toHaveCount(0);
-    expect(browserErrors.consoleErrorCount).toBe(0);
-    expect(browserErrors.pageErrorCount).toBe(0);
+const CHECKS = new Map<string, (context: CheckContext) => Promise<void>>([
+  ["signed_in_chat_answer", signedInChatAnswer],
+  ["backtest_completes", backtestCompletes],
+  ["research_answer_with_sources", researchAnswerWithSources],
+]);
 
-    await writePrivateHandoff(handoffPath, {
-      schema_version: 1,
-      source: "playwright",
-      status: "complete",
+test("private-alpha canary browser checks", async ({ page }) => {
+  test.setTimeout(1_800_000);
+  const path = requireConfig(handoffPath, "checks handoff");
+  const userId = requireConfig(expectedUserId, "user identity");
+  if (checkIds.length === 0 || checkIds.some((id) => !CHECKS.has(id))) {
+    throw new Error("Browser canary checks do not match the release profile");
+  }
+
+  const results: Record<string, CheckResult> = Object.fromEntries(
+    checkIds.map((id) => [id, { status: handoff.statuses.not_run }]),
+  );
+  const save = () =>
+    writePrivateHandoff(path, {
+      schema_version: handoff.schema_version,
+      source: handoff.source,
       user_id: userId,
-      conversation_id: conversationId,
-      backtest_job_id: backtestJobId,
-      backtest_run_id: backtestRunId,
-      evidence_artifact_id: evidenceArtifactId,
-      decision_note_id: decisionNoteId,
-      idea_id: ideaId,
-      idea_version_id: ideaVersionId,
-      decision_state: canaryDecisionState,
-      run_action_request_count: runBacktestRequests,
-      assertions: {
-        result_rendered_once: true,
-        reload_hydrated: true,
-        omnisearch_reopened_source: true,
-        console_error_count: browserErrors.consoleErrorCount,
-        page_error_count: browserErrors.pageErrorCount,
-        blocking_overlay_present: false,
-      },
+      checks: results,
     });
-  });
+  await save();
+
+  if (artifactProbe !== "none") {
+    await openSignedInChat(page);
+    await page
+      .getByTestId("chat-input")
+      .fill(requireConfig(redactionProbeValue, "redaction probe value"));
+    await expect(page.getByTestId("forced-canary-failure")).toBeVisible();
+  }
+
+  for (const id of checkIds) {
+    const result = results[id];
+    let signInFailed = false;
+    try {
+      await CHECKS.get(id)?.({ page, result, save });
+      result.status = handoff.statuses.passed;
+    } catch (error) {
+      result.status = handoff.statuses.failed;
+      result.reason =
+        error instanceof CheckFailure ? error.reason : "check_threw";
+      signInFailed = error instanceof SignInFailure;
+    }
+    await save();
+    if (signInFailed) break;
+  }
+
+  const failures = checkIds
+    .filter((id) => results[id].status !== handoff.statuses.passed)
+    .map((id) => `${id}: ${results[id].reason ?? handoff.statuses.not_run}`);
+  expect(failures, "every canary browser check must pass").toEqual([]);
 });

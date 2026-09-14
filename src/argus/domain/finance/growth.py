@@ -1,0 +1,54 @@
+"""Growth and compounding, including what inflation leaves."""
+
+from __future__ import annotations
+
+from argus.domain.finance.outcomes import NoSolution
+
+
+def compound(start: float, rate: float, periods: float) -> float:
+    return start * (1.0 + rate) ** periods
+
+
+def real_rate(nominal: float, inflation: float) -> float | NoSolution:
+    """The Fisher relation: what a nominal rate buys after inflation."""
+    if inflation <= -1:
+        return NoSolution(field="inflation_rate", code="rate_out_of_range")
+    return (1.0 + nominal) / (1.0 + inflation) - 1.0
+
+
+def real_value(
+    nominal_value: float, inflation: float, periods: float
+) -> float | NoSolution:
+    if inflation <= -1:
+        return NoSolution(field="inflation_rate", code="rate_out_of_range")
+    return nominal_value / (1.0 + inflation) ** periods
+
+
+def growth_rate(start: float, end: float, periods: float) -> float | NoSolution:
+    """The constant per-period rate that takes ``start`` to ``end``."""
+    if periods <= 0:
+        return NoSolution(field="periods", code="no_periods")
+    if start <= 0 or end <= 0:
+        return NoSolution(field="start_value", code="growth_needs_positive_values")
+    return (end / start) ** (1.0 / periods) - 1.0
+
+
+def growth_periods(start: float, end: float, rate: float) -> float | NoSolution:
+    """How many periods ``start`` needs at ``rate`` to reach ``end``."""
+    import math
+
+    if start <= 0 or end <= 0:
+        return NoSolution(field="start_value", code="growth_needs_positive_values")
+    if rate <= -1:
+        return NoSolution(field="rate", code="rate_out_of_range")
+    if end == start:
+        return 0.0
+    if rate == 0 or (end > start) != (rate > 0):
+        return NoSolution(field="rate", code="rate_never_reaches_target")
+    return math.log(end / start) / math.log(1.0 + rate)
+
+
+def start_for_target(end: float, rate: float, periods: float) -> float | NoSolution:
+    if rate <= -1:
+        return NoSolution(field="rate", code="rate_out_of_range")
+    return end / (1.0 + rate) ** periods

@@ -36,6 +36,10 @@ import httpx
 from loguru import logger
 from pydantic import ValidationError
 
+from argus.domain.research.answer_contract import (
+    TypedAnswer,
+    typed_answer_response_format,
+)
 from argus.domain.research.billing import (
     UnpricedResearchSpend,
     UnpricedSpendRecorder,
@@ -59,8 +63,6 @@ from argus.domain.research.contracts import (
     ResearchUnavailableError,
     ResearchUsage,
     RetrievedRow,
-    TypedRetrieval,
-    typed_response_format,
 )
 from argus.domain.research.pricing import validated_research_cost_usd
 
@@ -320,7 +322,7 @@ class PerplexityAgentClient:
             body["language_preference"] = spec.language
         if spec.typed_output:
             body["instructions"] = spec.instructions
-            body["response_format"] = typed_response_format()
+            body["response_format"] = typed_answer_response_format()
         return body
 
     def _post(self, payload: dict[str, Any], *, timeout_seconds: float) -> dict[str, Any]:
@@ -582,6 +584,16 @@ def _packet_from_priced_response(
         rows=tuple(rows),
         typed_answer=typed is not None,
         unsourced_rows=tuple(unsourced),
+        calculations=(
+            tuple(item.model_dump(mode="json") for item in typed.calculations)
+            if typed is not None
+            else ()
+        ),
+        source_urls=_public_urls(typed.source_urls) if typed is not None else (),
+        follow_up_questions=(
+            tuple(typed.follow_up_questions) if typed is not None else ()
+        ),
+        declined=bool(typed.declined) if typed is not None else False,
         tool_results=tuple(parsed.tool_results),
         usage=usage,
         background_id=str(document.get("id") or "") or None,
@@ -599,7 +611,7 @@ class _ParsedToolResults:
     tool_results: list[str] = field(default_factory=list)
 
 
-def _typed_retrieval(text: str) -> TypedRetrieval | None:
+def _typed_retrieval(text: str) -> TypedAnswer | None:
     """The answer in its requested typed shape, or None when it is prose.
 
     Machine format only: a JSON object, optionally inside a code fence. A
@@ -627,7 +639,7 @@ def _typed_retrieval(text: str) -> TypedRetrieval | None:
             "malformed_response", "typed answer is not the answer object"
         )
     try:
-        return TypedRetrieval.model_validate(parsed)
+        return TypedAnswer.model_validate(parsed)
     except ValidationError as exc:
         raise ResearchUnavailableError(
             "malformed_response",
@@ -1008,6 +1020,18 @@ def symbols_from_answer_tables(markdown: str) -> list[str]:
 
 def _is_provider_host(host: str) -> bool:
     return any(host == p or host.endswith(f".{p}") for p in PROVIDER_HOSTS)
+
+
+def _public_urls(urls: list[str]) -> tuple[str, ...]:
+    """The pages an answer names, held to the rule every public source meets."""
+    kept = [
+        url
+        for url in urls
+        if url.startswith("https://")
+        and len(url) <= MAX_URL_CHARS
+        and not _is_provider_host(urlparse(url).netloc.lower())
+    ]
+    return tuple(dict.fromkeys(kept))
 
 
 def _append_public_source(parsed: _ParsedToolResults, entry: Any) -> None:

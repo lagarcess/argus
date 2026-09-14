@@ -387,6 +387,9 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         "discovery",
         "next_experiments",
         "next_steps",
+        "answer_text_template",
+        "answer_assumptions",
+        "calculation_offer",
         "research",
         "research_job_request",
     }

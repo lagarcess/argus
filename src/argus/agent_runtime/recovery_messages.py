@@ -276,6 +276,7 @@ def recovery_state(
     *,
     language: str | None = None,
     retryable: bool,
+    under_answer: bool = False,
     **params: Any,
 ) -> dict[str, Any]:
     _ = language
@@ -283,6 +284,10 @@ def recovery_state(
         "code": code,
         "retryable": retryable,
     }
+    if under_answer:
+        # The persisted content is an answer and this recovery its notice,
+        # not compatibility text standing in for the reply.
+        state["under_answer"] = True
     cleaned_params = {
         key: value for key, value in params.items() if value is not None and value != ""
     }
@@ -296,6 +301,7 @@ def recovery_state_stage_patch(
     *,
     language: str | None = None,
     retryable: bool,
+    under_answer: bool = False,
     **params: Any,
 ) -> dict[str, dict[str, Any]]:
     return {
@@ -303,6 +309,7 @@ def recovery_state_stage_patch(
             code,
             language=language,
             retryable=retryable,
+            under_answer=under_answer,
             **params,
         )
     }

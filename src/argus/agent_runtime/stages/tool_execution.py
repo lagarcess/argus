@@ -15,8 +15,18 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.substage_events import emit_tool_progress
-from argus.domain.tool_contracts import MAX_TOOL_CALLS, ToolCall, ToolFailure, ToolOutcome
-from argus.domain.tool_declaration import ToolCatalog, ToolInvocationError
+from argus.domain.tool_contracts import (
+    MAX_TOOL_CALLS,
+    ToolCall,
+    ToolFailure,
+    ToolOutcome,
+    ToolResultCard,
+)
+from argus.domain.tool_declaration import (
+    ToolCatalog,
+    ToolDeclaration,
+    ToolInvocationError,
+)
 from pydantic import ValidationError
 
 
@@ -149,13 +159,7 @@ async def execute_tool_calls_async(
         ):
             raise ValueError("A durable replay cannot change the declared call")
         call = settled_call
-        record = {
-            "tool_name": call.tool_name,
-            "call_id": call.call_id,
-            "outcome": tool_outcome.status,
-            "tool_outcome": tool_outcome.model_dump(mode="json"),
-        }
-        patch["tool_call_records"].append(record)
+        patch["tool_call_records"].append(_call_record(call, tool_outcome))
         if context.stage_result is not None:
             side_patch = context.stage_result.patch
             patch["tool_effects"].append(
@@ -176,17 +180,49 @@ async def execute_tool_calls_async(
         card = declaration.result_card(
             call=call, outcome=tool_outcome, artifact_id=context.artifact_id
         )
-        card_payload = card.model_dump(mode="json")
-        cards.append(card_payload)
-        references.append(
-            ArtifactReference(
-                artifact_kind="tool_result",
-                artifact_id=card.artifact_id,
-                artifact_status=card.artifact_state,
-                metadata=card_payload,
-            ).model_dump(mode="json")
-        )
+        cards.append(card.model_dump(mode="json"))
+        references.append(_card_reference(card))
     return _with_cards(outcome, patch=patch, cards=cards, references=references)
+
+
+def local_tool_call_patch(
+    *, declaration: ToolDeclaration, call: ToolCall, artifact_id: str
+) -> dict[str, Any]:
+    """One free local call run outside the execute loop, in the loop's own patch shape.
+
+    A grounded answer that computes after retrieval publishes its card the way
+    an executed call does: the same record, the same reference, the same card.
+    """
+    if (
+        declaration.policy.execution != "local"
+        or declaration.policy.confirmation != "never"
+    ):
+        raise ValueError("Only a free local tool runs outside the execute loop")
+    outcome = declaration.invoke_sync(call.arguments)
+    card = declaration.result_card(call=call, outcome=outcome, artifact_id=artifact_id)
+    return {
+        "tool_call_records": [_call_record(call, outcome)],
+        "final_response_payload": {"tool_result_cards": [card.model_dump(mode="json")]},
+        "artifact_references": [_card_reference(card)],
+    }
+
+
+def _call_record(call: ToolCall, outcome: ToolOutcome) -> dict[str, Any]:
+    return {
+        "tool_name": call.tool_name,
+        "call_id": call.call_id,
+        "outcome": outcome.status,
+        "tool_outcome": outcome.model_dump(mode="json"),
+    }
+
+
+def _card_reference(card: ToolResultCard) -> dict[str, Any]:
+    return ArtifactReference(
+        artifact_kind="tool_result",
+        artifact_id=card.artifact_id,
+        artifact_status=card.artifact_state,
+        metadata=card.model_dump(mode="json"),
+    ).model_dump(mode="json")
 
 
 def _with_cards(

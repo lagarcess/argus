@@ -1,0 +1,794 @@
+{
+  "probe": "q5_credit_card_replay",
+  "purpose": "replay the smoke question 5 research request that returned HTTP 500 twice, to tell a provider fault from our request",
+  "candidate_sha": "0b9fa3e1a2bc04b20bb078ab7d06d4ef88e76247",
+  "captured_at": "2026-09-13T01:31:57.493789+00:00",
+  "question": "Which credit card should I get?",
+  "shape": "balanced",
+  "error": null,
+  "packet": {
+    "answer_markdown": "**There is no single credit card that fits everyone.** Based on currently published terms as of 2026-09-13, the most useful starting point is to compare a simple flat-rate cash-back card, a category-rewards card, and a premium travel card against how you spend and whether you always pay in full.\n\n### Representative options to compare\n\n| Card | Published structure | Annual fee | Main trade-off |\n|---|---|---|---|\n| Citi Double Cash | Unlimited 2% cash back: rewards are earned when purchases are made and paid | None | Straightforward rewards, but the issuer lists a foreign-purchase fee in its pricing details |\n| Chase Freedom Unlimited | 1.5% on general purchases, 3% on dining and drugstores, and 5% on travel booked through Chase Travel | None | Category bonuses can outperform a flat-rate card, but the highest travel rate requires the issuer’s portal |\n| Capital One Venture X | 2X miles on general purchases and higher portal-booking rates | $395 | Includes lounge access and no foreign-transaction fee, but its annual cost and travel-portal structure need to match actual travel habits |\n\nThese are representative examples, not recommendations. Current approval standards, account-specific rates and final terms may differ from the public offer pages.\n\n### The decision hinges on these questions\n\n- **Will you pay every statement balance in full?** The Consumer Financial Protection Bureau says a card with a grace period can avoid purchase interest when the balance is paid in full by the due date. Carrying a balance can remove that grace period, making the borrowing terms more consequential than rewards.\n- **Do you want simplicity or categories?** Citi publishes one uncapped cash-back structure without category enrollment. Chase publishes a lower general rate with higher rates in specified categories.\n- **Would you naturally use travel benefits?** Capital One limits its elevated flight, hotel and rental-car earning rates to bookings through Capital One Travel. Lounge access may require enrollment and remains subject to availability.\n- **Do you spend abroad?** Capital One publishes no foreign-transaction fee for Venture X, while Citi’s Double Cash pricing states that a foreign-purchase fee applies.\n- **Are you seeking to build credit?** Venture X is publicly listed for applicants with excellent credit. A secured or credit-building card would require a separate comparison because these examples are rewards cards.\n\n### What to check before applying\n\nReview the issuer’s final pricing disclosure for the purchase APR, balance-transfer terms, foreign-transaction fee, late-payment provisions, rewards exclusions and eligibility restrictions. Public promotional terms can change, and the terms shown during an application control the account offered to you.",
+    "sources": [
+      "https://www.capitalone.com/learn-grow/more-than-money/all-about-venture-x/",
+      "https://media.chase.com/news/chase-freedom-2026-q1-categories",
+      "https://www.capitalone.com/learn-grow/business-resources/ventureone-business/",
+      "https://www.chase.com/personal/credit-cards/mychaseloan",
+      "https://www.capitalone.com/bank/savings-accounts/online-performance-savings-account/features/",
+      "https://www.capitalone.com/bank/student250/",
+      "https://www.investor.capitalone.com/financial-results/sec-filings/?field_nir_sec_cik_target_id=0000927628&field_nir_sec_date_filed_value=&items_per_page=10&items_per_page_toggle=0&mobile=1&page=216&order=field_nir_sec_date_filed&sort=desc",
+      "https://www.capitalone.com/bank/disclosures/discover-checking/",
+      "https://www.chase.com/personal/credit-cards/education/rewards-benefits/onboard-cruise-credits",
+      "https://www.capitalone.com/updates/discover/money-market/",
+      "https://www.chase.com/personal/credit-cards/education/basics/getting-a-credit-card-at-seventeen",
+      "https://www.capitalone.com/about/capital-one-discover/?cmpgnid=dp-dbr-inet-match-sc-pi-tren-t-nt&iq_id=dp-dbr-inet-match-sc-pi-tren-t-nt",
+      "https://www.capitalone.com/bank/disclosures/savings-accounts/online-kids-savings-account/?v=1788198625579",
+      "https://www.capitalone.com/learn-grow/more-than-money/smart-traveler-enrollment-program/",
+      "https://www.capitalone.com/apply/credit-cards/preapprove/?external_id=WWW_XXXXX_ZZZ_ONL-SE_ZZZZZ_T_SEM2_ZZZZ_m_Zg__kenshoo_clickid__687052912503_777848&target_id=aud-1074200827882:kwd-849780182288&oC=CO5ed2SUs1",
+      "https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited",
+      "https://www.citi.com/credit-cards/citi-double-cash-credit-card",
+      "https://www.capitalone.com/credit-cards/venture-x/",
+      "https://www.consumerfinance.gov/about-us/contact-us/",
+      "https://www.consumerfinance.gov/ask-cfpb/what-should-i-look-for-when-shopping-for-a-credit-card-en-21/",
+      "https://www.consumerfinance.gov/ask-cfpb/what-is-a-grace-period-for-a-credit-card-en-47/"
+    ],
+    "declined": false,
+    "calculation": null,
+    "follow_up_questions": [
+      "Can you compare cards using my monthly spending by category?",
+      "Which cards have no annual fee and no foreign-transaction fee?",
+      "How should I compare a cash-back card with a travel card?",
+      "What type of card is available for my credit profile?"
+    ],
+    "usage": {
+      "invocations": 0,
+      "finance_search_invocations": 0,
+      "web_search_invocations": 2,
+      "fetch_url_invocations": 3,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 51667,
+      "cost_usd": 0.13296,
+      "input_tokens": 76629,
+      "output_tokens": 2031,
+      "cache_creation_input_tokens": 11986,
+      "cache_read_input_tokens": 64628
+    }
+  },
+  "elapsed_s": 51.67,
+  "exchanges": [
+    {
+      "method": "POST",
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "Which credit card should I get?\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nLead with the direct answer, then go as deep as the question deserves. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment or product advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "week"
+            },
+            "user_location": {
+              "country": "US"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "en",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculation from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers it; never answer such a question with prose and follow-up questions alone. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_answer",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, at most one calculation Argus computes, and the questions the reader may ask next.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: the direct answer first, then sections, a table, the formula, a worked example or steps where they help. No links, no list of sources, no mention of tools, providers or models. Every figure the calculation uses or produces is written as its {{name}} reference.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states in digits, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                    "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "label": {
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "description": "The unit of value: only the ISO 4217 code of a money amount such as USD or DOP, with a per-share or per-unit figure saying so in its label; % for a percentage, x for a multiple, the thing counted for a count.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "subject",
+                      "symbol",
+                      "label",
+                      "value",
+                      "kind",
+                      "unit",
+                      "as_of",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                },
+                "calculation": {
+                  "anyOf": [
+                    {
+                      "description": "The one calculation Argus computes for this answer.",
+                      "properties": {
+                        "kind": {
+                          "description": "The listed calculation that computes the figure the answer turns on.",
+                          "enum": [
+                            "bond_value",
+                            "debt_to_income",
+                            "discounted_cash_flow",
+                            "effective_rate",
+                            "expense_ratio",
+                            "growth_projection",
+                            "income_yield",
+                            "price_multiple",
+                            "ranked_comparison",
+                            "time_value",
+                            "valuation_scenarios"
+                          ],
+                          "type": "string"
+                        },
+                        "solve_for": {
+                          "anyOf": [
+                            {
+                              "enum": [
+                                "amount",
+                                "annual_fee",
+                                "annual_income",
+                                "annual_rate_pct",
+                                "assets",
+                                "cash_flow",
+                                "compounding_per_year",
+                                "contribution",
+                                "coupon_rate_pct",
+                                "coupons_per_year",
+                                "currency",
+                                "direction",
+                                "discount_rate_pct",
+                                "end_value",
+                                "face_value",
+                                "fees",
+                                "future_value",
+                                "growth_base_pct",
+                                "growth_high_pct",
+                                "growth_low_pct",
+                                "growth_rate_pct",
+                                "horizon_years",
+                                "inflation_rate_pct",
+                                "items",
+                                "key_kind",
+                                "key_label",
+                                "monthly_debt_payments",
+                                "monthly_income",
+                                "multiple",
+                                "multiple_base",
+                                "multiple_high",
+                                "multiple_low",
+                                "nominal_rate_pct",
+                                "payment",
+                                "payment_timing",
+                                "per_share",
+                                "periods",
+                                "periods_per_year",
+                                "prefer",
+                                "present_value",
+                                "price",
+                                "ratio_pct",
+                                "start_date",
+                                "start_value",
+                                "symbol",
+                                "terminal_growth_rate_pct",
+                                "value",
+                                "years",
+                                "yield_pct",
+                                "yield_to_maturity_pct"
+                              ],
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "For a kind that lists blanks, the name of the one blank to solve, left out of inputs; null otherwise."
+                        },
+                        "inputs": {
+                          "description": "Every input the kind needs, one entry each, with its source.",
+                          "items": {
+                            "description": "One input the calculation uses, with where its value came from.",
+                            "properties": {
+                              "name": {
+                                "description": "The input's name, exactly as the calculation list writes it.",
+                                "enum": [
+                                  "amount",
+                                  "annual_fee",
+                                  "annual_income",
+                                  "annual_rate_pct",
+                                  "assets",
+                                  "cash_flow",
+                                  "compounding_per_year",
+                                  "contribution",
+                                  "coupon_rate_pct",
+                                  "coupons_per_year",
+                                  "currency",
+                                  "direction",
+                                  "discount_rate_pct",
+                                  "end_value",
+                                  "face_value",
+                                  "fees",
+                                  "future_value",
+                                  "growth_base_pct",
+                                  "growth_high_pct",
+                                  "growth_low_pct",
+                                  "growth_rate_pct",
+                                  "horizon_years",
+                                  "inflation_rate_pct",
+                                  "items",
+                                  "key_kind",
+                                  "key_label",
+                                  "monthly_debt_payments",
+                                  "monthly_income",
+                                  "multiple",
+                                  "multiple_base",
+                                  "multiple_high",
+                                  "multiple_low",
+                                  "nominal_rate_pct",
+                                  "payment",
+                                  "payment_timing",
+                                  "per_share",
+                                  "periods",
+                                  "periods_per_year",
+                                  "prefer",
+                                  "present_value",
+                                  "price",
+                                  "ratio_pct",
+                                  "start_date",
+                                  "start_value",
+                                  "symbol",
+                                  "terminal_growth_rate_pct",
+                                  "value",
+                                  "years",
+                                  "yield_pct",
+                                  "yield_to_maturity_pct"
+                                ],
+                                "type": "string"
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "items": {
+                                      "additionalProperties": false,
+                                      "properties": {
+                                        "label": {
+                                          "type": "string"
+                                        },
+                                        "symbol": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "value": {
+                                          "type": "number"
+                                        }
+                                      },
+                                      "required": [
+                                        "label",
+                                        "symbol",
+                                        "value"
+                                      ],
+                                      "type": "object"
+                                    },
+                                    "type": "array"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "The value: a plain number (7 for 7 percent, 1250000 for 1.25 million), one of the listed options, a list of offers, or null for a figure only the user knows and has not said."
+                              },
+                              "source": {
+                                "description": "page: read from a page retrieved for this answer. market_data: the current price of the named asset, which Argus fills from its own market data. user: stated by the user. assumption: a figure you chose, which the answer states plainly as an assumption.",
+                                "enum": [
+                                  "page",
+                                  "market_data",
+                                  "user",
+                                  "assumption"
+                                ],
+                                "type": "string"
+                              },
+                              "source_url": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "For page, the URL of the retrieved page the value was read from; otherwise null."
+                              },
+                              "as_of": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "For page, the date the page gives for the value as YYYY-MM-DD; otherwise null."
+                              },
+                              "currency": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "For a money amount, its ISO 4217 code; otherwise null."
+                              }
+                            },
+                            "required": [
+                              "name",
+                              "value",
+                              "source",
+                              "source_url",
+                              "as_of",
+                              "currency"
+                            ],
+                            "type": "object",
+                            "additionalProperties": false
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "solve_for",
+                        "inputs"
+                      ],
+                      "type": "object",
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "The one calculation Argus computes for this answer, with every input and its source, or null when the answer computes nothing."
+                },
+                "follow_up_questions": {
+                  "description": "Two to four short questions, in the reader's language, that this reader is likely to ask next.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "declined": {
+                  "description": "True when the request is not a money question, or asks Argus to place a trade, move money or act on an account; answer_markdown then says so plainly.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows",
+                "calculation",
+                "follow_up_questions",
+                "declined"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "seconds": 51.67,
+      "response": {
+        "background": false,
+        "completed_at": 1789263117,
+        "created_at": 1789263117,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_5018b349-fbef-4350-9ed3-9e1bd584f411",
+        "incomplete_details": null,
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculation from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers it; never answer such a question with prose and follow-up questions alone. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "queries": [
+              "site:chase.com Freedom Unlimited official annual fee rewards",
+              "site:citi.com Double Cash official annual fee rewards",
+              "site:capitalone.com Venture X official annual fee rewards"
+            ],
+            "results": [
+              {
+                "date": "2026-09-08",
+                "id": 1,
+                "last_updated": "2026-03-31",
+                "snippet": "For a $395 annual fee, cardholders can earn unlimited miles and redeem them for travel bookings, gift cards, cash and more.",
+                "source": "web",
+                "title": "All about the Capital One Venture X credit card",
+                "url": "https://www.capitalone.com/learn-grow/more-than-money/all-about-venture-x/"
+              },
+              {
+                "date": "2026-09-10",
+                "id": 2,
+                "last_updated": "2026-08-06",
+                "snippet": "3% cash back on dining at restaurants (including takeout and eligible delivery services); 3% cash back on drugstore purchases; 1% cash back on all other ...",
+                "source": "web",
+                "title": "Chase Freedom® Introduces Q1 2026 Categories: Dining ...",
+                "url": "https://media.chase.com/news/chase-freedom-2026-q1-categories"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 3,
+                "last_updated": "2026-09-10",
+                "snippet": "With VentureOne Business, you earn 1.5X unlimited miles and enjoy elevated travel benefits—for no annual fee. Annual fee $0 Credit level",
+                "source": "web",
+                "title": "All About VentureOne Business From Capital One",
+                "url": "https://www.capitalone.com/learn-grow/business-resources/ventureone-business/"
+              },
+              {
+                "date": "2026-09-12",
+                "id": 4,
+                "last_updated": "2026-08-18",
+                "snippet": "You'll pay it back over a set period of time based on your loan amount with a fixed Annual Percentage Rate (APR) that's lower than your standard purchase APR.",
+                "source": "web",
+                "title": "My Chase Loan | Credit Card",
+                "url": "https://www.chase.com/personal/credit-cards/mychaseloan"
+              },
+              {
+                "date": "2026-09-12",
+                "id": 5,
+                "last_updated": "2026-03-31",
+                "snippet": "You'll get a high rate of 3.00% APY, no fees or minimums and a top-rated app. APY (Annual Percentage Yield) is variable and effective 9/11/2026.",
+                "source": "web",
+                "title": "360 Performance Savings Account Features & Benefits | Capital One",
+                "url": "https://www.capitalone.com/bank/savings-accounts/online-performance-savings-account/features/"
+              },
+              {
+                "date": "2026-09-11",
+                "id": 6,
+                "last_updated": "2026-09-12",
+                "snippet": "Correct!\nThere are no monthly fees or minimum balance requirements to open, keep and use 360 Checking.",
+                "source": "web",
+                "title": "Earn a $250 Student Bonus Offer with 360 Checking | Capital One",
+                "url": "https://www.capitalone.com/bank/student250/"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 7,
+                "last_updated": "2026-09-11",
+                "snippet": "## CAPITAL ONE FINANCIAL CORPORATION\n|Form|Filing date|Description|View|",
+                "source": "web",
+                "title": "SEC Filings | Capital One Financial Corp.",
+                "url": "https://www.investor.capitalone.com/financial-results/sec-filings/?field_nir_sec_cik_target_id=0000927628&field_nir_sec_date_filed_value=&items_per_page=10&items_per_page_toggle=0&mobile=1&page=216&order=field_nir_sec_date_filed&sort=desc"
+              },
+              {
+                "date": "2026-09-10",
+                "id": 8,
+                "last_updated": "2026-09-10",
+                "snippet": "**Minimum balance to obtain Annual Percentage Yield (APY):** There is no minimum balance required to obtain the disclosed APY.",
+                "source": "web",
+                "title": "360 Checking account disclosures - Capital One",
+                "url": "https://www.capitalone.com/bank/disclosures/discover-checking/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 9,
+                "last_updated": "2026-09-09",
+                "snippet": "They typically expire at the end of your sailing and can't be redeemed for cash.",
+                "source": "web",
+                "title": "How To Use Onboard Credits For Voyages by Chase Travel",
+                "url": "https://www.chase.com/personal/credit-cards/education/rewards-benefits/onboard-cruise-credits"
+              },
+              {
+                "date": "2026-09-10",
+                "id": 10,
+                "last_updated": "2026-09-12",
+                "snippet": "Never pay monthly maintenance fees—what you earn is what you keep.",
+                "source": "web",
+                "title": "Your Money Market account | Capital One",
+                "url": "https://www.capitalone.com/updates/discover/money-market/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 11,
+                "last_updated": "2026-08-21",
+                "snippet": "Freedom Rise has a low annual fee and offers cash back on everyday purchases ... Many of our cards offer rewards that can be redeemed for cash back or travel- ...",
+                "source": "web",
+                "title": "Can You Get a Credit Card At 17? - Chase Bank",
+                "url": "https://www.chase.com/personal/credit-cards/education/basics/getting-a-credit-card-at-seventeen"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 12,
+                "last_updated": "2026-09-09",
+                "snippet": "Danielle Dietz: danielle.dietz@capitalone.com",
+                "source": "web",
+                "title": "Discover® is now part of Capital One",
+                "url": "https://www.capitalone.com/about/capital-one-discover/?cmpgnid=dp-dbr-inet-match-sc-pi-tren-t-nt&iq_id=dp-dbr-inet-match-sc-pi-tren-t-nt"
+              },
+              {
+                "date": "2026-09-11",
+                "id": 13,
+                "last_updated": "2026-09-12",
+                "snippet": "- If you present us with a foreign check, we will not charge a fee, but the paying bank may deduct a fee from the proceeds.",
+                "source": "web",
+                "title": "Kids Savings account disclosures - Capital One",
+                "url": "https://www.capitalone.com/bank/disclosures/savings-accounts/online-kids-savings-account/?v=1788198625579"
+              },
+              {
+                "date": "2026-09-11",
+                "id": 14,
+                "last_updated": "2026-03-04",
+                "snippet": "The Smart Traveler Enrollment Program (STEP) is a free service for U.S. citizens. Unlock travel rewards Apply for a travel card and elevate your next trip. ...",
+                "source": "web",
+                "title": "Smart Traveler Enrollment Program (STEP) - Capital One",
+                "url": "https://www.capitalone.com/learn-grow/more-than-money/smart-traveler-enrollment-program/"
+              },
+              {
+                "date": "2026-09-10",
+                "id": 15,
+                "last_updated": "2026-09-12",
+                "snippet": "All you need to do is review Terms and accept your card, knowing you'll be approved.",
+                "source": "web",
+                "title": "Get Pre-Approved for a Capital One Credit Card",
+                "url": "https://www.capitalone.com/apply/credit-cards/preapprove/?external_id=WWW_XXXXX_ZZZ_ONL-SE_ZZZZZ_T_SEM2_ZZZZ_m_Zg__kenshoo_clickid__687052912503_777848&target_id=aud-1074200827882:kwd-849780182288&oC=CO5ed2SUs1"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "# Chase Freedom Unlimited ® Credit Card\n\n** **\n\n$200\n\nbonus*\n\n \n\n1.5%\n\nor more on all\n\n purchases*\n\n \n\n$0\n\nannual fee^†^\n\n## NEW CARDMEMBER OFFER\n\n### Earn a $200 bonus\n\nEarn a $200 bonus after you spend $500 on purchases in the first 3 months from account opening.*\n\n## AT A GLANCE\n\n### Unlimited 1.5% cash back is just the beginning\n\nEarn unlimited 1.5% cash back or more on all purchases, like 3% on dining and drugstores and 5% on travel purchased through Chase Travel^SM^.*\n\n## APR\n\n0% intro APR for 15 months from account opening on purchases and balance transfers.^†^ After the intro period, a variable APR of 18.24%–27.74%.^†^ Balance transfer fee applies, see pricing and terms for more details.^†^\n\n## ANNUAL FEE\n\n$0^†^\n\n^*^Offer Details Opens offer details overlay. ^†^Pricing & Terms Opens pricing and terms in new window.\n\n## Cash Back Rewards & Benefits\n\n### NEW CARDMEMBER OFFER\n\n#### Earn a $200 bonus\n\nEarn a $200 bonus after you spend $500 on purchases in the first 3 months from account opening.*Opens offer details overlay\n\nThis product is available to you if you do not have this card and have not received a new cardmember bonus for this card in the past 24 months.\n\n### EARN REWARDS\n\n#### Unlimited 1.5% cash back is just the beginning\n\nEarn 3% on dining at restaurants, including takeout and eligible delivery services.*Opens offer details overlay\n\nEarn 3% on drugstore purchases.*Opens offer details overlay\n\nEarn 5% on travel purchased through Chase Travel^SM^.*Opens offer details overlay\n\nEarn 1.5% on all other purchases.*Opens offer details overlay\n\n### INTRO OFFERS\n\n#### Low intro APR\n\n0% intro APR for 15 months from account opening on purchases and balance transfers.^†Opens pricing and terms in new window^ After the intro period, a variable APR of 18.24%–27.74%.^†Opens pricing and terms in new window^ Balance transfer fee applies, see pricing and terms for more details.^†Opens pricing and terms in new window^\n\n### ANNUAL FEE\n\n#### No annual fee\n\nYou won't have to pay an annual fee^†Opens pricing and terms in new window^ for all the great features that come with your Freedom Unlimited^®^ card.\n\n \n\n### NO EXPIRATION\n\n#### Cash Back rewards do not expire\n\nCash Back rewards do not expire as long as your account is open.*Opens offer details overlay And there is no minimum to redeem for cash back.\n\n \n\n## Explore Additional Card Rewards & Benefits\n\n###\n\n**Guide to BenefitsOpens in a new window** (see your purchase and travel protection benefit details)\n\n#### Zero Liability Protection\n\nMeans you won't be held responsible for unauthorized charges made with your card or account information.*Opens offer details overlay\n\n#### Purchase Protection\n\nCovers your eligible new purchases for 120 days from the date of purchase against damage or theft up to $500 per item.^Δ Same page link to disclaimer,ΔΔ Same page link to disclaimer^\n\n#### Extended Warranty Protection\n\nExtends the time period of the manufacturer's U.S. warranty by an additional year, on eligible warranties of three years or less, up to four years from the date of purchase.^Δ Same page link to disclaimer^\n\n#### Trip Cancellation and Interruption Insurance\n\nYou can be reimbursed up to $1,500 per covered traveler and $6,000 per trip for your pre-paid, non-refundable passenger fares, if your trip is canceled or cut short by sickness, severe weather or other covered situations.^Δ Same page link to disclaimer^\n\n#### 24/7 Fraud Monitoring\n\nWe help safeguard your credit card purchases using sophisticated fraud monitoring. We monitor for fraud 24/7 and can text, email or call you*Opens offer details overlay if there are unusual purchases on your credit card.\n\n#### Auto Rental Coverage\n\nDecline the rental company's collision insurance and charge the entire rental cost to your card. Coverage provides reimbursement for theft and collision damage for most rental vehicles. In the U.S., coverage is secondary to your personal insurance.^Δ Same page link to disclaimer^\n\n#### Travel and Emergency Assistance\n\nIf you run into a problem while traveling away from home, this benefit provides legal and medical referrals and access to other travel and emergency assistance services. (You will be responsible for the cost of any goods or services obtained.)^Δ Same page link to disclaimer^\n\n**^Δ Same page link to disclaimer reference ^Travel and Purchase Protection:** These benefits are available when you use your card. Restrictions, limitations and exclusions apply. Most benefits are provided by unaffiliated companies who are solely responsible for the administration and claims. There are specific time limits and documentation requirements. For full coverage details, cardmembers can refer to their Guide to Benefits, provided after account opening, or call the number on the back of their card for assistance.\n\n**^ΔΔ Same page link to disclaimer reference ^Specific limitations apply to New York residents: Purchase Protection **– coverage period is 90 days from the date of purchase.\n\n###\n\n#### Redeem for cash back\n\nThere is no minimum to redeem for cash back. You can use points to redeem for cash through an account statement credit or an electronic deposit into an eligible Chase account located in the United States.\n\n#### Shop with points at Amazon\n\nLink your Chase Freedom Unlimited card to your Amazon.com account and instantly redeem your Cash Back rewards to pay for all or part of your eligible Amazon.com orders at checkout, including tax and shipping.*Opens offer details overlay\n\n#### Gift cards\n\nRedeem for a variety of gift cards and certificates for shopping, dining and entertainment, and more.\n\n#### Travel\n\nBook your travel with Chase Travel^SM^ for competitive rates and flexible ways to pay.\n\n###\n\nEligible Chase credit card customers are targeted with cash back offers in the Chase Mobile app* or on chase.com. Customers can activate an offer on a card, shop at the merchant with the same card and receive a statement credit within 30 days.\n\nVisit our public landing pageOpens in a new window for more information on how it works.\n\n###\n\n#### The best of your neighborhood. $0 delivery fee.\n\nGet **6 months of complimentary access** to DashPass– a membership for both DoorDash and Caviar – which unlocks $0 delivery fees and lower service fees on eligible orders. *After that, you are automatically enrolled in DashPass at the current monthly rate.* Activate by** Dec 31, 2027**.*Opens offer details overlay\n\nPlus, DashPass members **get up to $10 off quarterly** on non-restaurant DoorDash orders through **Dec 31, 2027.** *\n\n#### 2% Cash Back Offer on Lyft Purchases:\n\nYou'll earn 2% cash back total on qualifying Lyft products and services purchased through the Lyft mobile application through 09/30/2027. That's 0.5% additional cash back on top of the 1.5% cash back earned on each purchase in the rewards program.*\n\n###\n\n#### Apply for a card, use it the same day\n\nReceive instant access to your card by adding it to a digital wallet, like Apple Pay^®^, Google Pay^™^ or Samsung Pay. Find out how at chase.com/digital/spend-instantlyopens in a new window.\n\n###\n\n**Keep tabs on your credit score for free**\nGet your credit score, customized score improvement plans provided by Experian™, and identity monitoring - all for free with Chase Credit Journey^®^Opens in a new window.\n\n###\n\nChase Pay Over Time*Opens offer details overlay lets eligible Chase customers break up credit card purchases into budget friendly payments. There are two potential ways to pay over time:\n\n**After purchase (formerly My Chase Plan^®^):** Pay off an eligible purchase you've already made of $100 or more*Opens offer details overlay in smaller, equal monthly payments. No interest - just a fixed monthly fee^†^ with plan durations that range from 3-24 months. Start a plan by selecting an eligible purchase with the \"Pay Over Time\" option next to the transaction amount in your credit card account activity.\n\n**At checkout:** Chase credit card members may have the option to create a payment plan at checkout on Amazon.com. Orders totaling $50 or more*Opens offer details overlay using your eligible Chase credit card at Amazon.com could be eligible for Chase Pay Over Time. You will be able to view Chase Pay Over Time plan options (including the fixed APR and durations) at checkout.\n\nKeep in mind: Even though you may have an eligible card, access to Chase Pay Over Time is not guaranteed. Your ability to create a Chase Pay Over Time plan is based on a variety of factors, such as your creditworthiness, credit limit and account behavior, and may change from time to time.\n\nFor more information on Chase Pay Over Time features, please visit chase.com/chasepayovertime opens in a new window.\n\n## Refer Friends if you already have a Chase Freedom Unlimited ® Card!\n\n**Earn up to $500 cash back per year.** You can earn $50 cash back for each friend who gets any participating Chase Freedom^®^ credit card. Click the button below to start referring.\n\n## Browse credit cards by category\nStart of carousel Browse credit cards by category Slide 1 of 3\n\nFeatured Opens Category Page in the same window\n\nAll Cards Opens Category Page in the same window\n\nCash Back Opens Category Page in the same window\n\nBalance Transfer Opens Category Page in the same window\n\nTravel Opens Category Page in the same window\n\nBusiness Opens Category Page in the same window\n\nRewards Opens Category Page in the same window\n\nAirline Opens Category Page in the same window\n\nHotel Opens Category Page in the same window\n\nCredit Building Opens Category Page in the same window\n\nNo Annual Fee Opens Category Page in the same window\n\nNo Foreign Transaction Fees Opens Category Page in the same window\n\nEnd of carousel",
+                "title": "Chase Freedom Unlimited Credit Card | Chase.com",
+                "url": "https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited"
+              },
+              {
+                "snippet": "citi.comto instantly block new charges while allowing recurring transactions to continue without disruption.\n\n# Citi Double Cash ® Card\n\n## Earn $ cash back bonus\n\n^®^Points are not available if you have received a new account bonus for a Citi Double Cash account in the past 48 months or if you converted another Citi credit card account on which you earned a new account bonus in the last 48 months into a Citi Double Cash account.\n\n### Unlimited 2% cash back on purchases\n\n### Low Intro APR on balance transfers for months\n\n^1^\n\n^1^\n\n^1^\n\n^1^\n\n^1^\n\n## Here's how it works\n\n### No caps and no category enrollment\n\nCiti Double Cash^®^ Card has no categories to enroll in. There are also no caps on the amount of cash back you earn.\n\n### Cash back is earned in the form of ThankYou ® Points\n\nThis means each billing cycle, you will earn 1 ThankYou^®^ Point per $1 spent on purchases and an additional ThankYou^®^ Point for every $1 paid on your purchase balance as long as there is a corresponding balance in your Purchase Tracker. Easily redeem your points for cash back as a statement credit, direct deposit or check via the Citi Mobile App or via citi.com. Or explore other ways to redeem points including for gift cards, travel and Shop with Points at Amazon.com.\n\n## Your points. Your way\n\n### Redeem as direct deposit\n\nRedeem ThankYou^®^ Points as a direct deposit with any checking or savings account.\n\n### Redeem as statement credit\n\nRedeem ThankYou^®^ Points for a statement credit in any denomination, which will be applied to your card account.\n\n### Redeem as check by mail\n\nRedeem ThankYou^®^ Points for a check made payable to you with minimum redemption amount of $5.\n\n### $0 liability on unauthorized charges\n\n### Extended warranty\n\n### Citi® Merchant Offers\n\n### Citi Entertainment®\n\nCiti Entertainment® is an entertainment access program available to eligible Citi® credit card and Citibank® Debit Card customers. Citi cardmembers get special access to purchase tickets to thousands of events, including presale tickets and exclusive experiences to the year's most anticipated concerts, sporting events, arts and culture experiences.\n\n### Access FICO® Score\n\nView your FICO® Score online anytime, without impacting your score — plus learn key factors affecting your score. It’s updated monthly and easy to find on the Citi Mobile® App and Citi® Online. Checking your score is always FREE.\n\n### Mastercard® ID Theft Protection\n\nThe ID Theft Protection program offered by Mastercard® helps reduce the worry of identity theft by monitoring the information you choose to protect and alerting you if suspicious activity is found. It takes just a few minutes to enroll for free, and as soon as you do, your monitoring begins. mastercardidps.idprotectiononline.com to learn more.\n\nVisit\n\n## FAQs\n\n## Unlimited 2% cash back on purchases\n\n## You may also like\n\n### Citi Strata ℠ Card\n\n### Citi ® Diamond Preferred ® Credit Card\n\n### Citi Simplicity ® Credit Card\n\n### 1 Citi Double Cash ® Card Pricing Details\n\nIntroductory rate of % for months from date of account opening for balance transfers completed within months of account opening. After the introductory period ends, a variable APR of % - %, based on your creditworthiness, applies to unpaid promotional balances and new balance transfers. The variable APR for purchases is % - %, based on your creditworthiness. For Citi Flex Plans subject to an APR, the variable APR is % - %, based on creditworthiness. For Citi Flex Pay Plans subject to a Plan Fee, a monthly fee of up to % will apply, based on the Citi Flex Plan duration, the APR that would otherwise apply to the Transaction, and other factors. Variable cash advance APR - %. Variable Penalty APR up to % and applies if you pay late or your payment is returned. Minimum interest charge – $. Annual Fee – None. Fee for foreign purchases – % of the U.S. dollar amount of each purchase. Cash advance fee – either $ or % of the amount of each cash advance, whichever is greater. Balance transfer fee – intro fee of % of each transfer ($ minimum) completed within the first months of account opening. After that, % of each transfer ($ minimum).\n\nNew cardmembers only. Subject to credit approval. Additional limitations, terms and conditions apply. You will be given further information when you apply.",
+                "title": "Citi Double Cash® Card",
+                "url": "https://www.citi.com/credit-cards/citi-double-cash-credit-card"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "### Annual Fee\n\n$395\n\n### Purchase Rate\n\n19.49% - 28.49% variable APR\n\n### Credit Level\n\nExcellent\n\nCheck My EligibilityApply Now\n\nView important rates and disclosures Rewards terms\n\nRewards for travel and beyond\n\nEarn double miles on every purchase & even more on every trip\n\n### 10X\n\nMiles on hotels & rental cars booked through Capital One Travel\n\n### 5X\n\nMiles on flights and vacation rentals booked through Capital One Travel\n\n### 2X\n\nMiles on all other purchases, every day\n\nA MODERN AIRPORT OASIS \n\n## Capital One Lounges\n\nVenture X primary cardholders can enjoy access to Capital One Lounge and Landing locations. ^1^\n\nExplore Lounges\n\nGLOBAL LOUNGE ACCESS\n\n## Priority Pass™ Lounges\n\nVenture X primary cardholders can enjoy access to 1,300+ participating lounges worldwide from Priority Pass. ^1^\n\nExplore Lounges\n\n## Venture X Industry Awards 6\n\n### NerdWallet\n\nBest Premium Travel Credit Card\n\n### The Points Guy\n\nFlexible Rewards Credit Card of the Year\n\n### Fortune\n\nBest Premium Travel Card\n\nACCESS THE BEST IN ENTERTAINMENT\n\n## Capital One Entertainment\n\nCardholders can experience events across music, sports and dining with exclusive access to pre-sales, tickets, and more. Plus earn 5X miles on Capital One Entertainment purchases. ^7^\n\nENHANCE YOUR NEXT ADVENTURE\n\nComplimentary PRIOR Subscription\n\nAccess extraordinary travel experiences, destination guides and more with a complimentary PRIOR Subscription (a $149 value).\n^8^\n\nDiscounted membership to The Cultivist\n\nUnlock the world of art. Get access to over 60 of the world’s best museums with 50% off the Enthusiast membership to The Cultivist for up to 2 years. ^8^\n\nAdditional Venture X Benefits \n\n### Additional Cardholders 9\n\nAdd cardholders to your account—they can enjoy benefits and you will earn rewards on every dollar they spend. \n\n### No Foreign Transaction Fees\n\nYou won’t pay a transaction fee when making purchases outside of the United States.\n\n### Miles Don’t Expire & No Blackout Dates\n\nYour miles won’t expire for the life of the account, so they’re always there when you need them. Plus, there are no blackout dates.\n\n### Cell Phone Protection\n\nProtect your cell phone every time you pay your bill with your Venture X card. If it’s stolen or damaged, you’ll get reimbursed up to $800. Certain terms, conditions and exclusions apply.\n\n### Miles Redemption\n\nUse your Venture X miles to easily cover travel expenses, including flights, hotels, vacation rentals, rental cars and more–plus transfer miles to your choice of 15+ travel loyalty programs. ^10^\n\n### Referrals Bonus\n\nRefer your friends and family to apply for a Venture X card and earn up to 100,000 bonus miles when they’re approved. Terms apply.\n\nNot the right card for you?\n\nWith Capital One Venture cards or the Venture X Business card, you can earn unlimited miles that never expire and travel anywhere, anytime, with no blackout dates.\n\nView Venture RewardsView Venture X Business\n\n### Good Travel Card But Expensive\nKLHM9428 - 5 days ago\n\nI like my Capital One - Venture X credit card for the travel features, but find the annual fee to be high for the benefits, especially now that the annual travel credit needs to be used through Capital One Travel (which ...\n\nYes, I recommend this product\n\n### Always reliable.\nDebbieO - 7 days ago\n\nI can depend on Venture X to be there when needed.\n\nYes, I recommend this product\n\nYes, I recommend this product\n\n### Secure and safe card protection\nMore25 - August 28, 2026\n\nIs a excellent card to use when you are outside of the country and\n\nYes, I recommend this product\n\nYes, I recommend this product\n\n### My best idea of the year\nGuyF - August 27, 2026\n\nThis card has paid for itself so many times over since I got it. I've been telling friends how is was my best and smartest investment of the year for me.\n\nYes, I recommend this product\n\nYes, I recommend this product\n\n### Great card, Travel website is terribe.\nSeaShores - August 27, 2026\n\nI cant stand the travel website. Prices are not competitive; I can typically find much better deals elsewhere, but thats not where the problem is. The search feature is absolutely terrible. I live about 2 hours away ...\n\nYes, I recommend this product\n\nYes, I recommend this product\n\n### Great intro card\nGab3 - August 27, 2026\n\nOverall amazing beginner card. I love that it doesn’t act as a coupon book when it comes to its perks. And with the annual fee being so low compared to its market. Amazing bang for your buck. However other competitors re...\n\nYes, I recommend this product\n\nYes, I recommend this product\n\n### Love the card , want adjustable apr for good clien\nAtat - August 27, 2026\n\nI love this card and it's benefits. However I recently tried to get my apr down from 27.9 % and was unable. Im a long time reliable client with payments with a credit score of over 800. Would love to see my good beha...\n\nYes, I recommend this product\n\nYes, I recommend this product\n\n### Gem of a card with perks!\nItaly2019 - August 27, 2026\n\nIf you travel and enjoy being pampered, then Venture X is 4U! VX is LOADED w/ relevent perks. - ie: aoʻnnual travel credit and access to probably 90% of the world's most fantastic Lounges\n\nYes, I recommend this product\n\n### Better than most but…..\nDro Dro - August 27, 2026\n\nGreat rewards and deals in shopping. Don’t get the card for the lounges though. Hard to get in and just not a true perk of having the card .\n\nYes, I recommend this product\n\n### Great all and all\nTravel_Like_Us - August 27, 2026\n\nAn excellent card for me as a traveler with many advantages.\n\nYes, I recommend this product\n\n1306 matching reviews found\n\n1. 1\n\n   Access to lounges includes access to Capital One Lounges and available participating Priority Pass™ lounges worldwide. To access Capital One Lounges, eligible cardholders must present their physical Venture X card or digital lounge pass, found within the Capital One Mobile app. Access is not guaranteed and is subject to space availability. In order to access Priority Pass lounges, eligible cardholders will need to enroll. To learn more about lounge access policies, please visit the applicable Terms and Conditions for additional details.\n2. 2\n\n   **Hotels:** Premier Collection hotel experience credit will be applied at checkout by hotel to qualifying charges up to $100 USD or the local currency equivalent. Lifestyle Collection hotel experience credit will be applied at checkout by hotel to qualifying charges up to $50 USD or the local currency equivalent. Qualifying charges vary by location, are subject to availability, and must be charged to your room during your eligible stay. Contact the hotel directly to confirm qualifying experiences - advance reservations recommended for certain experiences.\n\n   In addition to the experience credit, other benefits available to eligible cardholders for Premier Collection and Lifestyle Collection hotel bookings include: daily breakfast for two (for Premier Collection bookings only), complimentary Wi-Fi, and (when available) room upgrades, early check-in and late checkout. Benefits applied per room, per stay. Hotel terms and conditions apply; a minimum number of nights may be required by the hotel for booking.\n\n   **Vacation Rentals:** Premier Collection vacation rental experience credit will be applied at time of booking the experience by the host provider to qualifying experience charges up to $100 USD or the local currency equivalent. Experiences must be booked with a Capital One credit card. Qualifying experience credit options vary by location and are subject to availability; contact the host provider directly to confirm qualifying experiences. For certain properties, the experience credit will be provided in the form of a gift card. Advance reservations recommended for certain experiences.\n\n   In addition to the experience credit, other benefits available to eligible cardholders for Premier Collection and Lifestyle Collection vacation rental bookings include: complimentary Wi-Fi, and (when available) early check-in and late checkout. Benefits applied per stay. Back-to-back bookings of the same property within a 24-hour period will be considered one reservation and are not eligible for double benefits. Host provider terms and conditions apply; a minimum number of nights may be required by the host for booking.\n\n   **Both Hotel and Vacation Rentals:** Premier Collection or Lifestyle Collection booking must be made through Capital One Travel in the eligible cardholder’s name, with the cardholder as a member of party traveling, to qualify for benefits. Benefits cannot be redeemed for cash or combined with other offers unless specified. Participating properties and benefits are subject to change. Offer valid for customer use only unless otherwise permitted. We may disqualify any cardholder from participation and benefits at our sole discretion. Additional terms apply; see travel.capitalone.com/terms-of-service for details.\n3. 3\n\n   **Hotels:** Lifestyle Collection hotel experience credit will be applied at checkout by hotel to qualifying charges up to $50 USD or the local currency equivalent. Qualifying charges vary by location, are subject to availability, and must be charged to your room during your eligible stay; contact the hotel directly to confirm qualifying experiences. Advance reservations recommended for certain experiences.\n\n   In addition to the $50 experience credit, other benefits available to eligible cardholders for Lifestyle Collection hotel bookings include complimentary Wi-Fi, and (when available) room upgrades, early check-in and late checkout. Benefits applied per room, per stay. Hotel terms and conditions apply; a minimum number of nights may be required by the hotel for booking.\n\n   **Vacation Rentals:** Lifestyle Collection vacation rental experience credit will be applied at time of booking the experience by the host provider to qualifying experience charges up to $50 USD or the local currency equivalent. Experiences must be booked with a Capital One credit card. Qualifying experience credit options vary by location and are subject to availability; contact the host provider directly to confirm qualifying experiences. For certain properties, the experience credit will be provided in the form of a gift card. Advance reservations recommended for certain experiences.\n\n   In addition to the $50 experience credit, other benefits available to eligible cardholders for Lifestyle Collection vacation rental bookings include: complimentary Wi-Fi, and (when available) early check-in and late checkout. Benefits applied per stay. Back-to-back bookings of the same property within a 24-hour period will be considered one reservation and are not eligible for double benefits. Host provider terms and conditions apply; a minimum number of nights may be required by the host for booking.\n\n   **Both Hotel and Vacation Rentals:** Lifestyle Collection booking must be made through Capital One Travel in the eligible cardholder’s name, with the cardholder as a member of party traveling, to qualify for benefits. Benefits cannot be redeemed for cash or combined with other offers unless specified. Participating properties and benefits are subject to change. Offer valid for customer use only unless otherwise permitted. We may disqualify any cardholder from participation and benefits at our sole discretion. Additional terms apply; see travel.capitalone.com/terms-of-service for details.\n4. 4\n\n   Eligible cardholders must enroll in the Hertz® Gold+™ Rewards status upgrade through the unique Benefits Tab link found within the Capital One website or mobile app after logging in. This offer is subject to change. Hertz Gold Terms and Rental Qualifications and Requirements apply. Click here for more benefit and eligibility information.\n5. 5\n\n   Visa Infinite: Certain terms, conditions, and exclusions apply. See Visa Infinite Guide to Benefits for details.\n6. 6\n\n   Capital One has affiliate relationships with NerdWallet, The Points Guy and Fortune outside of these awards. Learn more about NerdWallet’s Best-Of Awards of 2026. ©2017-2026 and TM, NerdWallet, Inc. All Rights Reserved.\n\n   From Fortune. ©2024 Fortune Media IP Limited. All rights reserved. Used under license. Fortune and Fortune Media IP Limited are not affiliated with, and do not endorse the products or services of, Capital One.\n7. 7\n\n   Eligible Venture X cardholders will earn 5 miles per dollar spent on Capital One Entertainment purchases. \n\n   Qualifying purchases include tickets purchased on the Capital One Entertainment ticketing platform only, paid for with an eligible card. Tickets purchased through Capital One cardholder exclusive pre-sales and tickets purchased directly through the Capital One Hall or Capital One Arena ticketing services are excluded. Your account must be open and in good standing to earn rewards and rewards earned will post to your account within 1-2 billing cycles. Rewards earned will be reclaimed if you cancel or return an eligible purchase, and the offer is valid for consumer, non-commercial use only. Rewards are subject to the terms and conditions disclosed when you opened your account and any subsequent amendments.\n8. 8\n\n   Eligible Venture X cardholders who complete the required steps to enroll will receive a complimentary PRIOR Subscription. The discount cannot be applied to subscriptions purchased before 11/15/2022. This offer may not be combined with other offers or discounts. Your account must be open and in good standing to be eligible for this offer. If your account closes, or if you upgrade or change your account to another Capital One credit card, you may not be eligible for this offer. If your subscription terminates prior to the end of the subscription period, any discounts or other benefits made available though this offer will end. This offer is non-transferrable. We reserve the right to alter, change or terminate this offer at any time without notice, and we reserve the right to disqualify any account holder from this offer without notice in the event of fraud or suspected fraud, abuse of program privileges, or violation of these terms as determined at our discretion. Additional terms apply.\n\n   The Cultivist membership offer and experiences are subject to Terms and Conditions. Enrollment required. Your membership will auto-renew every year and your card on file will be charged, unless you cancel your membership prior to your membership renewal date. See auto-renewal terms in the Terms and Conditions for complete details.\n   By clicking on this link, you will be taken to a site maintained by The Cultivist. Cultivist is a registered trademark.\n9. 9\n\n   Primary account holder is responsible for all charges made by an account manager or authorized user.\n\n   Some benefits may require enrollment and/or online access. Benefits may differ by card role type and/or require additional fees. Prices and benefits are subject to change. Terms apply.\n\n   Authorized user must be at least 18 years old to be eligible for online access. Setting up an online account requires verification of the authorized user's Social Security number. Not all authorized users will be eligible.\n10. 10\n\n   Once transfers are final, the receiving loyalty program's terms apply.\n\n## You are now leaving the Capital One website\nYou're leaving the Capital one website and heading to an external site. It may have different privacy and security policies, so take a moment to check them out.",
+                "title": "Venture X Rewards | Capital One",
+                "url": "https://www.capitalone.com/credit-cards/venture-x/"
+              },
+              {
+                "snippet": "div\n\n# All about the Capital One Venture X credit card\n\nNovember 12, 2025|9 min read\n\nWhether it’s a two-month journey across the globe or a two-day return to your hometown, the Capital One Venture X card can reward you every step of the way. \n\nExplore how Venture X cardholders can elevate their travel. \n\n**What you’ll learn:**\n\n- New Venture X cardholders can earn a 75,000-mile bonus—plus enjoy elevated benefits, including a $300 annual Capital One Travel credit and a 10,000-mile anniversary bonus.\n- Venture X cardholders who book through Capital One Travel earn unlimited 10X miles on hotels and rental cars and 5X miles on flights and vacation rentals.\n- Venture X cardholders can access elevated hotel and vacation rentals through the Premier Collection and Lifestyle Collection from Capital One Travel.\n- Venture X primary cardholders can enjoy complimentary access to Capital One Lounges and 1,300+ lounges worldwide through their Priority Pass™ membership, after enrollment.\n\n## Venture X card overview\n\nVenture X is a travel credit card with elevated rewards to take you further. For a $395 annual fee, cardholders can earn unlimited miles and redeem them for travel bookings, gift cards, cash and more. View important rates and disclosures.\n\nMiles don’t expire for the life of the account. And cardholders can also access exclusive airport benefits and receive anniversary bonus miles.\n\n### Who is the Venture X card good for?\n\nIf you have excellent credit and are a frequent traveler, the Venture X card might be a good fit.\n\n## Venture X card benefits\n\nHere’s a look at Venture X benefits:\n\n### Bonus miles and rewards\n\nWith the Venture X card, you can earn bonuses and enjoy elevated rewards, including:\n\n- **New cardholder bonus: ** Earn 75,000 bonus miles when you spend $4,000 on purchases within three months of opening an account.\n- **Anniversary bonus:** 10,000 bonus miles every year, starting on your first anniversary.\n- **Travel credits: **$300 annual credit to use through Capital One Travel.\n\n### Premium stays\n\nVenture X cardholders have additional access to the luxury hotels, resorts and vacation rentals of the Premier Collection from Capital One.^2  ^That includes:\n\n- $100 experience credit to use on unique activities for each stay, dinner at hotel restaurants, fridge stocking at vacation rentals and much more.\n- 10X miles on hotels booked through Capital One Travel\n- 5X miles on vacation rentals booked through Capital One Travel\n- Daily complimentary breakfast for two at hotels\n- Hotel room upgrades, and early check-in and late checkout when available.\n\nVenture X cardholders also have access to the stylish hotels and vibrant vacation rentals of the Lifestyle Collection, which come with a $50 experience credit and other premium benefits on every stay.^3^\n\n### Elevated travel benefits\n\nThese exclusive travel benefits are also available for eligible Venture X cardholders:\n\n- **Airport lounge access:** Access to Capital One Lounge locations. Relax and recharge in luxurious wellness spaces and shower suites, and enjoy locally sourced food and beverages and other amenities. Plus, access more than 1,300 lounges worldwide with a Priority Pass™ membership.^4^\n- **No hidden fees: ** There are no foreign transaction fees when making purchases outside the United States. View important rates and disclosures.\n- **Global Entry or TSA PreCheck® reimbursement:** Up to a $120 statement credit on your application fee for TSA PreCheck® or Global Entry when you use your Venture X card.^5^\n- **Hertz President’s Circle® status: ** Complimentary Hertz® Gold+™ status upgrade, which offers expanded rental options, car upgrades and more.^6^\n\nWhat lounges can I access with a Venture X card?\n\nEligible Venture X cardholders can get access to 1,300+ lounges worldwide, including Capital One Lounges and participating Priority Pass lounges, after enrollment.\n\nCan Venture X addtional cardholders get lounge access?\n\nPrimary cardholders can pay an annual lounge access fee of $125 per additional cardholder to grant additional cardholders access to Capital One Lounges, Capital One Landings and participating Priority Pass lounges. To learn more about lounge access policies, please visit the Capital One Lounge and Landing and Priority PassTM Terms & Conditions.\n\nCan I bring guests to Capital One Lounge or Landing location?\n\nVenture X cardholders receive discounted pricing of $45 per visit per guest and $25 per visit per guest aged 17 and under. Children under two are free.\n\nPrimary cardholders and eligible additional cardholders who spend at least $75,000 total across their Venture X account per calendar year can bring up to two complimentary guests to Capital One Lounges and one complimentary guest to Capital One Landings per visit.\n\nCan I bring guests to a Priority Pass Lounge?\n\nVenture X primary cardholders and eligible additional cardholders can bring guests to participating Priority Pass lounges at a rate of $35 each per visit. Priority Pass enrollment is required.\n\n## Venture X card rewards: Unlimited miles, enhanced travel\n\nWith the Venture X card, you can earn unlimited double miles on every purchase, plus even more on every trip booked through Capital One Travel. You can redeem your miles however you want.^7^ And you’ll also get access to exclusive tools and benefits to help you elevate your travel.\n\n### Capital One Travel\n\nYou’ll earn elevated rewards when you use Capital One Travel to book flights, hotels, vacation rentals and rental cars. That means:\n\n- Unlimited 10X miles on hotels and rental cars\n- Unlimited 5X miles on flights and vacation rentals\n- Unlimited 2X miles on all other purchases every day\n\nFlight price prediction features can help you save an average of 15% by alerting you when it’s time to book.^8^ And if you book when Capital One Travel recommends and the price of your flight drops within 10 days, you’ll automatically get a travel credit of up to $50.\n\nPlus, if you book through Capital One Travel and find a better price on another site within 24 hours, you can get a travel credit for the difference.^9^\n\n### Flexible redemption options\n\nSo many ways to earn, and so many ways to redeem. Use miles to book via Capital One Travel, transfer miles to your choice of more than 15 travel loyalty programs, or redeem them for recent travel purchases, including vacation rentals, flights, hotels, campgrounds and cruises.^10^\n\n## Additional Venture X benefits from Visa Infinite®\n\nAs part of the Visa Infinite network, the Venture X card gives you extra coverage and access to a concierge for help with reservations and event tickets. Here’s a snapshot of some of the benefits that you enjoy as a Venture X cardholder.^11^\n\n### Cellphone protection\n\nProtect your cellphone every time you pay your bill with your Venture X card. If your phone is stolen or damaged, you could get reimbursed up to $800.\n\n### Trip cancellation\n\nYou’ll have peace of mind with trip cancellation and interruption coverage, which will reimburse eligible travel expenses if your plans are affected by a medical emergency such as the illness or death of an immediate family member.\n\n### Return protection\n\nKeep your options open with 90 days of return protection, which helps when you make a qualifying purchase with your Venture X card that the retailer won’t accept back.\n\n### Extended warranty protection\n\nYou can receive additional warranty protection at no charge on eligible items that are purchased with your Venture X card.\n\n### Travel accident insurance\n\nGet automatic insurance for a covered loss at no extra charge when you use your Venture X card to purchase your travel fare.\n\n### Auto rental collision damage waiver\n\nRent an eligible vehicle with your card and you could be covered for damages due to collision or theft.\n\n### Visa Infinite concierge\n\nWant a hand with dinner reservations? Looking for tickets to a show or sporting event? Need gift ideas or flower delivery? A Visa Infinite concierge can help with it all.\n\n## Exclusive access for Venture X cardholders\n\nYour card also gives you access to exclusive events and complimentary memberships to make your trip unforgettable.\n\n### Complimentary PRIOR subscription\n\nReceive a complimentary subscription to PRIOR, which includes early access to exclusive trips, editor-curated destination guides, weekly newsletters with up-to-the-minute travel trends and more.\n\n### The Cultivist partnership\n\nEligible cardholders can enroll online with The Cultivist to receive 50% off an Enthusiast membership for up to two years. The offer is worth up to $440, and it includes free entry for members and a guest to 60 of the world’s leading museums, including The Met and MoMA in New York.\n\n### Complimentary Vinous subscription\n\nEligible Capital One Venture X cardholders can sign up for a complimentary 6-month premium subscription to Vinous, a leading modern wine magazine with tools and resources to help subscribers enjoy wine to its fullest.\n\n### Capital One Entertainment\n\nUse Capital One Entertainment to get exclusive tickets, VIP event access and more. Whether you’re a sports fan or music lover, there are countless experiences to enjoy. Venture X cardholders earn 5X miles on Capital One Entertainment purchases, and they can also redeem miles to purchase tickets.^12^\n\n### Capital One Dining\n\nWith Capital One Dining, access prime-time tables at top-tier restaurants set aside for eligible customers and unlock insider access to extraordinary culinary experiences.\n\n## Venture X account management and security\n\nShop with confidence knowing your card is protected with these safety and security features:\n\n### Additional cardholders\n\nShare Venture X benefits with someone you trust and earn rewards on every dollar they spend by adding a cardholder to your account.^13^\n\n### $0 liability for unauthorized charges\n\nIf your card is lost or stolen and an unauthorized charge shows up on the account, Capital One is here to help. You won’t have to cover expenses from purchases you haven’t authorized.^14^\n\n### Security alerts and Eno, your Capital One assistant\n\nGet notified via text, email and phone if Capital One notices potentially suspicious activity on your account. Plus, your around-the-clock assistant, Eno, watches your account and reaches out if anything unusual shows up.^15^\n\n### Virtual card numbers\n\nShop online more securely with virtual card numbers. Virtual card numbers can disguise your actual card number and help protect you from potential fraud when shopping online.^16^\n\n## Venture X FAQ\n\nHere are some answers to commonly asked questions about Venture X from Capital One:\n\nWhat’s the difference between the VentureOne card and the Venture X card?\n\nVentureOne and Venture X are similar travel rewards cards. But they differ when it comes to things like rewards, bonuses and annual fees.\n\nVentureOne cardholders earn unlimited 1.25X miles on every purchase and 5X miles on hotels and rental cars booked through Capital One Travel. Venture X cardholders earn 2X miles on every purchase, 5X miles on flights and 10X miles on hotels and rental cars booked through Capital One Travel.\n\nVentureOne offers 20,000 bonus miles when you spend $500 on purchases within the first three months. With the Venture X card, you can earn 75,000 bonus miles when you spend $4,000 on purchases within the first three months.^1^\n\nThe Venture X card offers even more benefits, like access to the extraordinary hotels and vacation rentals from the Premier and Lifestyle Collections. Eligible cardholders can also access 1,300+ lounges worldwide, including Capital One Lounges and participating Priority Pass™ lounges, after enrollment.^2,3^\n\nThe Venture X card has an annual fee; the VentureOne card doesn’t. View important rates and disclosures.\n\nIs the Venture X card hard to get?\n\nThe Venture X card is for people with excellent credit. If that doesn’t sound like the right fit, you can see if you’re pre-approved for other rewards cards from Capital One. Checking if you’re pre-approved for card offers before you apply is easy, and it won’t impact your credit scores.\n\n## Key takeaways: Capital One Venture X\n\nStart exploring the world your way with premium travel benefits and unlimited miles. Plus, unlock access to exclusive experiences and events, VIP tickets and more, just for being a Venture X cardholder.\n\n## Other ways to maximize your travel benefits\n\nWho wouldn’t want to get the most out of their credit card? Here are some things to know about Capital One travel rewards credit cards: \n\n- Earn unlimited 2X rewards miles, plus 75,000 bonus miles, and enjoy flexible redemption and transfer options with the Venture card.\n- Earn unlimited 1.25X miles with no annual fee with the VentureOne card. View important rates and disclosures.\n- Explore travel rewards card options by comparing Capital One travel rewards cards.",
+                "title": "Additional Venture X...",
+                "url": "https://www.capitalone.com/learn-grow/more-than-money/all-about-venture-x/"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "queries": [
+              "site:consumerfinance.gov choose credit card pay balance interest rewards",
+              "site:consumerfinance.gov credit card application hard inquiry credit score",
+              "site:consumerfinance.gov credit card agreement compare fees APR"
+            ],
+            "results": [
+              {
+                "date": "2026-09-09",
+                "id": 16,
+                "last_updated": "2026-09-09",
+                "snippet": "Credit Cards Credit Reports & Scores (855) 411-2372. Call: (855) 444-3642. Credit card agreements & surveys To request information about general credit card ...",
+                "source": "web",
+                "title": "Contact us | Consumer Financial Protection Bureau",
+                "url": "https://www.consumerfinance.gov/about-us/contact-us/"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "[fetch_url: no content could be retrieved for https://www.consumerfinance.gov/ask-cfpb/what-should-i-look-for-when-shopping-for-a-credit-card-en-21/ — error parsing data for \"https://www.consumerfinance.gov/ask-cfpb/what-should-i-look-for-when-shopping-for-a-credit-card-en-21/\" in table 'crawler/v2/pages': crawler error http_code_client_error: http_code_client_error. Do not infer values for this source; try another source or state that the data could not be retrieved.]",
+                "title": "",
+                "url": "https://www.consumerfinance.gov/ask-cfpb/what-should-i-look-for-when-shopping-for-a-credit-card-en-21/"
+              },
+              {
+                "snippet": "# What is a grace period for a credit card?\n\nA grace period is the period between the end of a billing cycle and the date your payment is due. \n\nDuring this time, you may not be charged interest as long as you pay your balance in full by the due date. Credit card companies are not required to give a grace period. However, most credit cards provide a grace period on purchases.  \n\nIf your card gives a grace period and you are not carrying a balance, then you can avoid paying interest on new purchases if you pay your balance in full by the due date. If you lose your grace period by not paying your balance in full by the due date, you will be charged interest on the unpaid portion of the balance. You will also be charged interest on purchases in the new billing cycle starting on the date each purchase is made.\n\nCredit card companies must establish procedures to assure that their bills are mailed or delivered to you at least 21 days before the payment is due.\n\nWith credit cards, grace periods typically apply only to purchase transactions. If you use your card to get a cash advance or use a check you received from your card issuer, generally you must start paying interest as of the date of the transaction. \n\n**Tip:** To keep your grace period, make sure to pay your bill in full each month and on time. If you pay in full some months, and not in other months, you may lose your grace period for the month that you don’t pay in full and for the month after.\n\nPage last modified @",
+                "title": "What is a grace period for a credit card? | Consumer Financial Protection Bureau",
+                "url": "https://www.consumerfinance.gov/ask-cfpb/what-is-a-grace-period-for-a-credit-card-en-47/"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"**There is no single credit card that fits everyone.** Based on currently published terms as of 2026-09-13, the most useful starting point is to compare a simple flat-rate cash-back card, a category-rewards card, and a premium travel card against how you spend and whether you always pay in full.\\n\\n### Representative options to compare\\n\\n| Card | Published structure | Annual fee | Main trade-off |\\n|---|---|---|---|\\n| Citi Double Cash | Unlimited 2% cash back: rewards are earned when purchases are made and paid | None | Straightforward rewards, but the issuer lists a foreign-purchase fee in its pricing details |\\n| Chase Freedom Unlimited | 1.5% on general purchases, 3% on dining and drugstores, and 5% on travel booked through Chase Travel | None | Category bonuses can outperform a flat-rate card, but the highest travel rate requires the issuer’s portal |\\n| Capital One Venture X | 2X miles on general purchases and higher portal-booking rates | $395 | Includes lounge access and no foreign-transaction fee, but its annual cost and travel-portal structure need to match actual travel habits |\\n\\nThese are representative examples, not recommendations. Current approval standards, account-specific rates and final terms may differ from the public offer pages.\\n\\n### The decision hinges on these questions\\n\\n- **Will you pay every statement balance in full?** The Consumer Financial Protection Bureau says a card with a grace period can avoid purchase interest when the balance is paid in full by the due date. Carrying a balance can remove that grace period, making the borrowing terms more consequential than rewards.\\n- **Do you want simplicity or categories?** Citi publishes one uncapped cash-back structure without category enrollment. Chase publishes a lower general rate with higher rates in specified categories.\\n- **Would you naturally use travel benefits?** Capital One limits its elevated flight, hotel and rental-car earning rates to bookings through Capital One Travel. Lounge access may require enrollment and remains subject to availability.\\n- **Do you spend abroad?** Capital One publishes no foreign-transaction fee for Venture X, while Citi’s Double Cash pricing states that a foreign-purchase fee applies.\\n- **Are you seeking to build credit?** Venture X is publicly listed for applicants with excellent credit. A secured or credit-building card would require a separate comparison because these examples are rewards cards.\\n\\n### What to check before applying\\n\\nReview the issuer’s final pricing disclosure for the purchase APR, balance-transfer terms, foreign-transaction fee, late-payment provisions, rewards exclusions and eligibility restrictions. Public promotional terms can change, and the terms shown during an application control the account offered to you.\",\"calculation\":null,\"declined\":false,\"follow_up_questions\":[\"Can you compare cards using my monthly spending by category?\",\"Which cards have no annual fee and no foreign-transaction fee?\",\"How should I compare a cash-back card with a travel card?\",\"What type of card is available for my credit profile?\"],\"rows\":[{\"as_of\":null,\"kind\":\"percent\",\"label\":\"cash-back rate on purchases\",\"source_url\":\"https://www.citi.com/credit-cards/citi-double-cash-credit-card\",\"subject\":\"Citi Double Cash Card\",\"symbol\":null,\"unit\":\"%\",\"value\":2},{\"as_of\":null,\"kind\":\"percent\",\"label\":\"general-purchase cash-back rate\",\"source_url\":\"https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited\",\"subject\":\"Chase Freedom Unlimited Credit Card\",\"symbol\":null,\"unit\":\"%\",\"value\":1.5},{\"as_of\":null,\"kind\":\"percent\",\"label\":\"dining and drugstore cash-back rate\",\"source_url\":\"https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited\",\"subject\":\"Chase Freedom Unlimited Credit Card\",\"symbol\":null,\"unit\":\"%\",\"value\":3},{\"as_of\":null,\"kind\":\"percent\",\"label\":\"Chase Travel cash-back rate\",\"source_url\":\"https://creditcards.chase.com/cash-back-credit-cards/freedom/unlimited\",\"subject\":\"Chase Freedom Unlimited Credit Card\",\"symbol\":null,\"unit\":\"%\",\"value\":5},{\"as_of\":null,\"kind\":\"multiple\",\"label\":\"miles per dollar on general purchases\",\"source_url\":\"https://www.capitalone.com/credit-cards/venture-x/\",\"subject\":\"Capital One Venture X Rewards\",\"symbol\":null,\"unit\":\"x\",\"value\":2},{\"as_of\":null,\"kind\":\"currency\",\"label\":\"annual fee\",\"source_url\":\"https://www.capitalone.com/credit-cards/venture-x/\",\"subject\":\"Capital One Venture X Rewards\",\"symbol\":null,\"unit\":\"USD\",\"value\":395}]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_d28833d1-8cc8-43c5-ba21-dfc3a692583c",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "week"
+            },
+            "user_location": {
+              "country": "US"
+            }
+          },
+          {
+            "type": "finance_search"
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.05993,
+            "cache_read_cost": 0.02585,
+            "currency": "USD",
+            "input_cost": 6e-05,
+            "output_cost": 0.04062,
+            "tool_calls_cost": 0.0065,
+            "tool_calls_cost_details": {
+              "fetch_url": 0.0015,
+              "search_web": 0.005
+            },
+            "total_cost": 0.13296
+          },
+          "input_tokens": 76629,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 11986,
+            "cache_read_input_tokens": 64628,
+            "cached_tokens": 64628
+          },
+          "output_tokens": 2031,
+          "output_tokens_details": {
+            "reasoning_tokens": 669
+          },
+          "tool_calls_details": {
+            "fetch_url": {
+              "cost_usd": 0.0015,
+              "invocation": 3
+            },
+            "search_web": {
+              "cost_usd": 0.005,
+              "invocation": 2
+            }
+          },
+          "total_tokens": 78660
+        },
+        "user": null
+      }
+    }
+  ]
+}

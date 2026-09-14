@@ -389,6 +389,17 @@ async def interpret_stage_async(
     if structured_action_result is not None:
         return structured_action_result
     selected_metadata = dict(selected_thread_metadata or {})
+    from argus.agent_runtime.calculated_answer import (
+        calculated_answer_stage_result,
+        calculation_offer_stage_result,
+        pending_calculation_reply,
+    )
+
+    offer_result = await calculation_offer_stage_result(
+        state=state, user=user, selected_thread_metadata=selected_metadata
+    )
+    if offer_result is not None:
+        return offer_result
 
     async def _unavailable(*, retryable: bool = True) -> StageResult:
         return await _interpreter_unavailable_result(
@@ -428,6 +439,13 @@ async def interpret_stage_async(
     )
     if pending_response_option_interpretation is not None:
         interpretation = pending_response_option_interpretation
+    pending = pending_calculation_reply(interpretation, selected_metadata)
+    if pending is not None:
+        completed = await calculated_answer_stage_result(
+            interpretation=interpretation, state=state, user=user, pending=pending
+        )
+        if completed is not None:
+            return completed
     knowledge_result = await knowledge_answer_stage_result(
         interpretation=interpretation,
         state=state,

@@ -84,6 +84,14 @@ ARGUS_ASSET_PROVIDER_MODE=live_provider \
 poetry run pytest tests/evals/test_measurement_eval_live.py -q
 ```
 
+`ARGUS_EVAL_ENV_FILE` must name a file no tracked file feeds, such as the
+gitignored `.env`. The harness refuses the file when it, or any step on the way
+to it, is a tracked file or tracked symlink, whatever path or link reaches it, so
+`.env.example` is refused. Promotion evidence identity compares the tree, never
+the eval's environment, so settings fed from a tracked file could change without
+a new measurement. An untracked file that is not ignored already fails the
+clean-worktree check.
+
 Warning: this deliberately spends real LLM tokens. Use it when you want to
 measure the current real interpret path, not for routine local lint loops.
 Once `ARGUS_RUN_LIVE_EVALS=1` is set, missing provider credentials fail the
@@ -107,8 +115,9 @@ Run the mocked suite everywhere; it is free and safe.
 Run the live suite at exactly three moments:
 
 1. Once pre-merge on any PR that changes runtime behavior.
-2. On every `main` promotion candidate, as a full run on the exact SHA with no
-   unexpected failures.
+2. On every `main` promotion candidate, as a full run with no unexpected
+   failures, measured at the candidate or at a commit the measurement cannot
+   tell apart from it (`tests/promotion_evidence_identity.py`).
 3. After any interpreter model or provider change.
 
 Live results can vary. If one failure is surprising, rerun once, then

@@ -22,6 +22,11 @@ from argus.api.public_excerpt_fact_schemas import (
 )
 from argus.api.public_excerpt_schemas import (
     PublicExcerptBacktestTurn,
+    PublicExcerptCalculation,
+    PublicExcerptCalculationFact,
+    PublicExcerptCalculationSource,
+    PublicExcerptCalculationText,
+    PublicExcerptCalculationTurn,
     PublicExcerptOfferedNextStep,
     PublicExcerptResearchSource,
     PublicExcerptResearchTurn,
@@ -325,3 +330,110 @@ def project_backtest_turn(
         return payload
     except (ValidationError, PublicExcerptSanitizationError, PublicExcerptSourceError):
         refuse("unsupported_backtest")
+
+
+def project_calculation_turn(
+    *,
+    message: Message,
+    question: str,
+    owner_note: str | None,
+    language: str,
+    private_ids: tuple[str, ...],
+) -> PublicExcerptCalculationTurn:
+    """A computed answer as a frozen receipt: each card's typed facts, no recompute.
+
+    The question and, for each calculation, the title, the computed answer and
+    rows and the notes publish, with the inputs a public page stated and that
+    page. An input the user typed stays private; a declaration whose rows
+    restate its inputs publishes only when every input it holds was cited. One
+    card that cannot publish refuses the whole answer.
+    """
+    from argus.domain.answer_dossiers import computed_answer_cards
+    from argus.domain.capability_registry import get_tool_catalog
+
+    cards = computed_answer_cards(message.model_dump(mode="python"))
+    if not cards:
+        refuse("unsupported_turn")
+    assert cards is not None
+    catalog = get_tool_catalog(include_unavailable=True)
+    for card in cards:
+        _refuse_unpublishable(card, catalog)
+    asked = audit_text(question, field="question", private_ids=private_ids)
+    note = audit_text(owner_note, field="owner_note", private_ids=private_ids)
+    try:
+        payload = PublicExcerptCalculationTurn(
+            question=asked,
+            calculations=[_public_calculation(card) for card in cards],
+            computed_at=message.created_at,
+            owner_note=note,
+            content_language=language,
+        )
+        audit_public_excerpt_document(
+            payload.model_dump(mode="json"), private_ids=private_ids
+        )
+        return payload
+    except ValidationError:
+        refuse("unsupported_turn")
+    except PublicExcerptSanitizationError:
+        refuse("unsafe_text")
+
+
+def _refuse_unpublishable(card: Any, catalog: Any) -> None:
+    declaration = catalog.get(card.tool_name)
+    policy = declaration.policy.public_receipt if declaration is not None else "disabled"
+    if policy == "disabled":
+        refuse("unsupported_turn")
+    presentation = card.presentation
+    if card.outcome.status != "succeeded" or presentation.answer is None:
+        refuse("not_completed")
+    stated = [fact for fact in presentation.inputs if fact.value is not None]
+    if policy == "cited_facts" and not all(_publicly_sourced(fact) for fact in stated):
+        refuse("private_inputs")
+
+
+def _public_calculation(card: Any) -> PublicExcerptCalculation:
+    presentation = card.presentation
+    stated = [fact for fact in presentation.inputs if fact.value is not None]
+    return PublicExcerptCalculation(
+        title=_public_text(presentation.title),
+        answer=_public_fact(presentation.answer),
+        rows=[_public_fact(fact) for fact in presentation.rows],
+        inputs=[_public_fact(fact) for fact in stated if _publicly_sourced(fact)],
+        notes=[_public_text(item) for item in presentation.notes],
+    )
+
+
+def _publicly_sourced(fact: Any) -> bool:
+    source = fact.source
+    return fact.visibility == "public" or (source is not None and source.kind == "page")
+
+
+def _public_text(text: Any) -> PublicExcerptCalculationText:
+    return PublicExcerptCalculationText(
+        locale_key=text.locale_key, interpolation_args=dict(text.interpolation_args)
+    )
+
+
+def _public_fact(fact: Any) -> PublicExcerptCalculationFact:
+    source = fact.source
+    cited = None
+    if source is not None and source.kind == "page":
+        if source.url is not None:
+            parsed = urlsplit(source.url)
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.netloc
+                or parsed.username
+                or parsed.password
+            ):
+                refuse("invalid_source", "sources")
+        cited = PublicExcerptCalculationSource(
+            title=source.title, url=source.url, date=source.date
+        )
+    return PublicExcerptCalculationFact(
+        label=_public_text(fact.label),
+        value=fact.value,
+        value_text=_public_text(fact.value_text) if fact.value_text is not None else None,
+        unit=_public_text(fact.unit) if fact.unit is not None else None,
+        source=cited,
+    )

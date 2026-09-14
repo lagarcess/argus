@@ -11,6 +11,7 @@ from argus.api import state as api_state
 from argus.api.chat.previews import (
     is_degraded_clarification_compatibility_text,
     plain_text_preview,
+    research_lookup_failed,
 )
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import Conversation, Message, MessageRole
@@ -806,6 +807,7 @@ def load_runtime_thread_history(
     user_id: str,
     conversation_id: str,
     limit: int = 20,
+    drop_failed_lookups: bool = False,
 ) -> list[ConversationMessage]:
     messages: list[Message] = []
     if api_state.supabase_gateway is not None:
@@ -833,6 +835,8 @@ def load_runtime_thread_history(
             role=message.role,
             metadata=message.metadata,
         ):
+            continue
+        if drop_failed_lookups and research_lookup_failed(message.metadata):
             continue
         history.append(ConversationMessage(role=message.role, content=message.content))
     return history

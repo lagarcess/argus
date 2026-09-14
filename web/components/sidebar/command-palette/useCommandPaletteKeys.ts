@@ -23,6 +23,8 @@ import {
  * row is.
  */
 export function useCommandPaletteKeys<Item extends { canManageConversation?: boolean }>({
+  askText = null,
+  onAsk,
   cancelRename,
   canManageConversation,
   dossierPaneState,
@@ -41,6 +43,9 @@ export function useCommandPaletteKeys<Item extends { canManageConversation?: boo
   startRename,
   usesCommandKey,
 }: {
+  /** The typed query when nothing matched, offered as a new chat on Enter. */
+  askText?: string | null;
+  onAsk?: (text: string) => void;
   cancelRename: () => void;
   canManageConversation: boolean;
   dossierPaneState: DossierPaneState;
@@ -136,7 +141,13 @@ export function useCommandPaletteKeys<Item extends { canManageConversation?: boo
           ?.dataset.paletteRowIndex ?? -1,
       ),
       usesCommandKey,
+      canAsk: Boolean(askText && onAsk),
     });
+    if (action.type === "ask" && askText && onAsk) {
+      event.preventDefault();
+      onAsk(askText);
+      return;
+    }
     if (action.type === "focus_search") {
       event.preventDefault();
       inputRef.current?.focus();
@@ -177,6 +188,7 @@ export function useCommandPaletteKeys<Item extends { canManageConversation?: boo
     }
         },
     [
+      askText,
       cancelRename,
       canManageConversation,
       dossierPaneState,
@@ -185,6 +197,7 @@ export function useCommandPaletteKeys<Item extends { canManageConversation?: boo
       handleDelete,
       inputRef,
       keyboardItems,
+      onAsk,
       onClose,
       openRow,
       pendingDeleteItem,

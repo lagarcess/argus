@@ -6,6 +6,7 @@ import type {
   SearchLedgerGroup,
 } from "./argus-api";
 import type { SearchDossierAction } from "./run-dossier-contract";
+import type { AnswerDossier } from "./answer-dossier-contract";
 import type { ConversationPreview } from "./conversation-preview-display";
 import {
   commandPaletteRowActionForEvent,
@@ -26,6 +27,8 @@ export type CommandPaletteDisplayItem = {
   decisionState: DecisionState | null;
   decisionStates: DecisionState[];
   dossier: SearchConversationItem["dossier"] | null;
+  /** The conversation's latest computed answer, shown when no run dossier is. */
+  answerDossier?: AnswerDossier | null;
   totalRuns: number;
   decidedRuns: number;
   canManageConversation: boolean;
@@ -43,6 +46,8 @@ export type CommandPaletteAssetRollupCopy = {
   heading?: string;
   scope?: string;
   runsInvolving?: (count: number, symbol: string) => string;
+  /** Every result involving the asset: runs plus computed answers. */
+  resultsInvolving?: (count: number, symbol: string) => string;
   decisionStateLabel?: (state: DecisionState) => string;
   dateLabel?: (value: string) => string;
   lastTouched?: (date: string) => string;
@@ -119,9 +124,10 @@ export function commandPaletteItemsFromHistory(
       recall
         ? {
             ...recent,
-            decisionState: recall.dossier?.decision?.state ?? null,
+            decisionState: recall.dossier?.decision?.state ?? recall.answer_dossier?.decision?.state ?? null,
             decisionStates: recall.decision_states,
             dossier: recall.dossier,
+            answerDossier: recall.answer_dossier ?? null,
             totalRuns: recall.total_runs,
             decidedRuns: recall.decided_runs,
           }
@@ -146,9 +152,10 @@ export function commandPaletteItemFromSearch(
     matchMessageId: item.match.message_id ?? null,
     updatedAt: item.updated_at,
     source: "search",
-    decisionState: item.dossier?.decision?.state ?? null,
+    decisionState: item.dossier?.decision?.state ?? item.answer_dossier?.decision?.state ?? null,
     decisionStates: item.decision_states,
     dossier: item.dossier,
+    answerDossier: item.answer_dossier ?? null,
     totalRuns: item.total_runs,
     decidedRuns: item.decided_runs,
     canManageConversation: true,
@@ -166,11 +173,7 @@ export function commandPaletteAssetRollupFromSearch(
     heading: copy.heading ?? "Your Argus history",
     scope: copy.scope ?? "Across your conversations",
     symbol: item.symbol,
-    runs:
-      copy.runsInvolving?.(item.run_count, item.symbol) ??
-      `${item.run_count} ${
-        item.run_count === 1 ? "run" : "runs"
-      } involving ${item.symbol}`,
+    runs: commandPaletteAssetRollupCountText(item, copy),
     decisions: ASSET_ROLLUP_DECISION_ORDER.map((state) => {
       const count = item.decision_counts[state];
       const stateLabel =
@@ -184,6 +187,19 @@ export function commandPaletteAssetRollupFromSearch(
     }),
     lastTouched: copy.lastTouched?.(date) ?? `Last touched ${date}`,
   };
+}
+
+/** The row's count line: every result involving the asset, not only runs. */
+export function commandPaletteAssetRollupCountText(
+  item: SearchAssetRollupItem,
+  copy: CommandPaletteAssetRollupCopy = {},
+): string {
+  const results = item.result_count ?? item.run_count;
+  if (copy.resultsInvolving) return copy.resultsInvolving(results, item.symbol);
+  if (copy.runsInvolving && item.result_count === undefined) {
+    return copy.runsInvolving(item.run_count, item.symbol);
+  }
+  return `${results} ${results === 1 ? "result" : "results"} involving ${item.symbol}`;
 }
 
 export function commandPaletteSelectedPreview(
@@ -233,7 +249,8 @@ export type CommandPaletteKeyboardAction =
   | { type: "open"; openAtLeftOff: boolean }
   | { type: "rename" }
   | { type: "archive" }
-  | { type: "delete" };
+  | { type: "delete" }
+  | { type: "ask" };
 
 export function isEditableKeyboardTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -261,6 +278,7 @@ export function commandPaletteKeyboardAction({
   repeat = false,
   focusedRowIndex = -1,
   usesCommandKey = false,
+  canAsk = false,
 }: {
   key: string;
   itemCount: number;
@@ -277,6 +295,8 @@ export function commandPaletteKeyboardAction({
   repeat?: boolean;
   focusedRowIndex?: number;
   usesCommandKey?: boolean;
+  /** A typed query that matched nothing can start a new chat on Enter. */
+  canAsk?: boolean;
 }): CommandPaletteKeyboardAction {
   if (isEditing || (targetIsEditable && !targetIsSearchInput)) {
     return { type: "none" };
@@ -294,6 +314,9 @@ export function commandPaletteKeyboardAction({
     return focusedRowIndex === 0
       ? { type: "focus_search" }
       : { type: "select", index: focusedRowIndex - 1 };
+  }
+  if (key === "Enter" && !hasSelection && canAsk && targetIsSearchInput && !metaKey && !ctrlKey) {
+    return { type: "ask" };
   }
   if (key === "Enter" && hasSelection && focusedRowIndex < 0) {
     return { type: "open", openAtLeftOff: metaKey || ctrlKey };

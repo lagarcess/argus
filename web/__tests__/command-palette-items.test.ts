@@ -165,7 +165,7 @@ describe("command palette conversation dossier", () => {
       heading: "Your Argus history",
       scope: "Across your conversations",
       symbol: "TSLA",
-      runs: "2 runs involving TSLA",
+      runs: "2 results involving TSLA",
       decisions: [
         { state: "promising", count: 1, label: "Promising 1" },
         { state: "watching", count: 1, label: "Watching 1" },
@@ -181,8 +181,8 @@ describe("command palette conversation dossier", () => {
     const display = commandPaletteAssetRollupFromSearch(assetRollup, {
       heading: "Tu historial de Argus",
       scope: "En todas tus conversaciones",
-      runsInvolving: (count, symbol) =>
-        `${count} ejecuciones que incluyen ${symbol}`,
+      resultsInvolving: (count, symbol) =>
+        `${count} resultados que incluyen ${symbol}`,
       decisionStateLabel: (state) =>
         ({
           promising: "Prometedoras",
@@ -198,7 +198,7 @@ describe("command palette conversation dossier", () => {
       heading: "Tu historial de Argus",
       scope: "En todas tus conversaciones",
       symbol: "TSLA",
-      runs: "2 ejecuciones que incluyen TSLA",
+      runs: "2 resultados que incluyen TSLA",
       decisions: [
         { state: "promising", count: 1, label: "Prometedoras 1" },
         { state: "watching", count: 1, label: "En observación 1" },

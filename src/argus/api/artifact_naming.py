@@ -177,6 +177,7 @@ def _conversation_title_context_from_messages(
         user_id=user_id,
         conversation_id=conversation_id,
         limit=8,
+        drop_failed_lookups=True,
     )
     for message in recent:
         content = _clip(str(message.content), 360)

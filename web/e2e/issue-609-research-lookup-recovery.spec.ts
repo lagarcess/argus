@@ -1,8 +1,9 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 // Issue #609: a research provider failure reuses the retryable class. A
 // transient failure shows the amber notice whose Retry asks the same question
-// again, live and after a reload; any other failure shows the quiet notice.
+// again, live and after a reload; any other failure shows the quiet notice. An
+// answer given without the lookup keeps its content, with the notice under it.
 // Every API response is scripted in the browser; no provider is called.
 
 const CONVERSATION_ID = "issue-609-conversation";
@@ -27,6 +28,8 @@ type QaCase = {
   outcome: Outcome;
   theme: Theme;
   viewport: Viewport;
+  // The no-search answer ran: the reply is that answer, the notice under it.
+  answered?: boolean;
 };
 
 const RECOVERY_CODE: Record<Outcome, string> = {
@@ -47,6 +50,7 @@ const copy = {
     greetingAnswer: "Hi. Ask me about a stock, or describe an idea to test.",
     prompt: "What is Apple trading at right now?",
     answer: "Apple closed at $312.41 on 2026-08-06.",
+    noLookupAnswer: "From Argus market data, Apple last closed at $311.80 on 2026-08-05.",
     retry: "Retry",
     recovery: PERSISTED_TEXT,
   },
@@ -55,6 +59,8 @@ const copy = {
     greetingAnswer: "Hola. Pregúntame por una acción, o describe una idea para probar.",
     prompt: "¿A cuánto cotiza Apple ahora mismo?",
     answer: "Apple cerró en $312.41 el 2026-08-06.",
+    noLookupAnswer:
+      "Con datos de mercado de Argus, Apple cerró por última vez en $311.80 el 2026-08-05.",
     retry: "Reintentar",
     recovery: {
       transient: "No pude terminar de buscar eso en este momento. Intenta de nuevo en un momento.",
@@ -68,6 +74,8 @@ const cases: QaCase[] = [
   { locale: "es-419", outcome: "transient", theme: "dark", viewport: "mobile" },
   { locale: "en", outcome: "refused", theme: "dark", viewport: "desktop" },
   { locale: "es-419", outcome: "refused", theme: "light", viewport: "mobile" },
+  { locale: "en", outcome: "transient", theme: "dark", viewport: "mobile", answered: true },
+  { locale: "es-419", outcome: "refused", theme: "light", viewport: "desktop", answered: true },
 ];
 
 function json(route: Route, body: unknown, status = 200): Promise<void> {
@@ -122,10 +130,17 @@ function researchSidecar(outcome: Outcome): Record<string, unknown> {
 }
 
 async function installFixture(page: Page, qaCase: QaCase) {
-  const { locale, outcome, theme } = qaCase;
+  const { locale, outcome, theme, answered = false } = qaCase;
   const text = copy[locale];
   const code = RECOVERY_CODE[outcome];
   const transient = outcome === "transient";
+  // An answered reply persists the answer beside a recovery marked under it.
+  const failureContent = answered ? text.noLookupAnswer : PERSISTED_TEXT[outcome];
+  const recovery = {
+    code,
+    retryable: transient,
+    ...(answered ? { under_answer: true } : {}),
+  };
   const messages: ApiMessage[] = [
     message("greeting-request", "user", text.greeting, 0),
     message("greeting-answer", "assistant", text.greetingAnswer, 1),
@@ -201,7 +216,7 @@ async function installFixture(page: Page, qaCase: QaCase) {
       if (streamedMessages.length === 1) {
         messages.push(
           message("research-request", "user", text.prompt, 2),
-          message("research-failure", "assistant", PERSISTED_TEXT[outcome], 3, {
+          message("research-failure", "assistant", failureContent, 3, {
             agent_runtime_turn: {
               turn_id: "research-request",
               request_id: "correlation-609",
@@ -211,7 +226,7 @@ async function installFixture(page: Page, qaCase: QaCase) {
               failure_code: transient ? code : null,
               retryable: transient,
             },
-            recovery: { code, retryable: transient },
+            recovery,
             ...(transient
               ? {
                   retry_last_turn: {
@@ -225,9 +240,9 @@ async function installFixture(page: Page, qaCase: QaCase) {
         );
         return sseFinal(route, {
           stage_outcome: "ready_to_respond",
-          assistant_response: PERSISTED_TEXT[outcome],
+          assistant_response: failureContent,
           message_id: "research-failure",
-          recovery: { code, retryable: transient },
+          recovery,
           ...(transient ? { retry_last_turn: { message: text.prompt } } : {}),
           research: researchSidecar(outcome),
         });
@@ -239,7 +254,7 @@ async function installFixture(page: Page, qaCase: QaCase) {
         failure.metadata = {
           ...failure.metadata,
           agent_runtime_failure_superseded: true,
-          recovery: { code, retryable: false },
+          recovery: { ...recovery, retryable: false },
         };
         delete failure.metadata.retry_last_turn;
       }
@@ -280,7 +295,9 @@ async function screenshot(page: Page, name: string, outputPath: string) {
 }
 
 for (const qaCase of cases) {
-  const label = `${qaCase.locale}-${qaCase.viewport}-${qaCase.theme}-${qaCase.outcome}`;
+  const label = `${qaCase.locale}-${qaCase.viewport}-${qaCase.theme}-${qaCase.outcome}${
+    qaCase.answered ? "-answered" : ""
+  }`;
   test.describe(label, () => {
     test.use({
       colorScheme: qaCase.theme,
@@ -297,6 +314,21 @@ for (const qaCase of cases) {
       const text = copy[qaCase.locale];
       const recoveryText = text.recovery[qaCase.outcome];
       const transient = qaCase.outcome === "transient";
+      const noLookupAnswer = page.getByText(text.noLookupAnswer, { exact: true });
+      // An answer given without the lookup keeps its content, the notice under it.
+      const expectNoticePlacement = async (notice: Locator) => {
+        if (!qaCase.answered) {
+          await expect(noLookupAnswer).toHaveCount(0);
+          return;
+        }
+        await expect(noLookupAnswer).toBeVisible();
+        const answerBox = await noLookupAnswer.boundingBox();
+        const noticeBox = await notice.boundingBox();
+        expect(answerBox).not.toBeNull();
+        expect(noticeBox?.y ?? 0).toBeGreaterThan(
+          answerBox?.y ?? Number.POSITIVE_INFINITY,
+        );
+      };
 
       await page.goto(`/chat?conversation=${CONVERSATION_ID}`, {
         waitUntil: "networkidle",
@@ -312,6 +344,7 @@ for (const qaCase of cases) {
         : page.getByTestId("recovery-failure-notice");
       await expect(notice).toHaveCount(1);
       await expect(notice).toContainText(recoveryText);
+      await expectNoticePlacement(notice);
       const retry = notice.getByRole("button", { name: text.retry, exact: true });
       if (transient) {
         await expect(retry).toBeVisible();
@@ -330,6 +363,7 @@ for (const qaCase of cases) {
         : hydratedRow.getByTestId("recovery-failure-notice");
       await expect(hydrated).toHaveCount(1);
       await expect(hydrated).toContainText(recoveryText);
+      await expectNoticePlacement(hydrated);
       if (qaCase.locale === "es-419") {
         await expect(page.getByText(PERSISTED_TEXT[qaCase.outcome])).toHaveCount(0);
       }
@@ -351,10 +385,12 @@ for (const qaCase of cases) {
         await hydratedRetry.click();
 
         await expect(page.getByText(text.answer, { exact: true })).toBeVisible();
-        // Retry asked the same persisted question, and the failure it replaced
-        // is gone without duplicating the user's turn.
+        // Retry asked the same persisted question, and the failure it replaced,
+        // with any answer above its notice, is gone without duplicating the
+        // user's turn.
         expect(evidence.streamedMessages).toEqual([text.prompt, text.prompt]);
         await expect(page.getByText(recoveryText, { exact: true })).toHaveCount(0);
+        await expect(noLookupAnswer).toHaveCount(0);
         await expect(page.getByText(text.prompt, { exact: true })).toHaveCount(1);
         await screenshot(
           page,
@@ -366,6 +402,7 @@ for (const qaCase of cases) {
         await expect(page.getByText(text.answer, { exact: true })).toBeVisible();
         await expect(page.getByText(text.prompt, { exact: true })).toHaveCount(1);
         await expect(page.getByText(recoveryText, { exact: true })).toHaveCount(0);
+        await expect(noLookupAnswer).toHaveCount(0);
       }
 
       expect(evidence.unexpected).toEqual([]);

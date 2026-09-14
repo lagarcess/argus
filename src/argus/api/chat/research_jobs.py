@@ -30,6 +30,7 @@ from argus.api.chat.research_tool_results import (
     research_tool_card_for_completion,
     with_research_tool_binding,
 )
+from argus.domain.answer_dossiers import ANSWER_REQUEST_MESSAGE_KEY
 
 # Re-exported: the scope literal is owned by the settlement rule the SQL is
 # rendered from.
@@ -144,9 +145,12 @@ def apply_research_job_request(
         store_research_packet_for_job(job_request, sync_packet, composed)
         runtime_result["assistant_response"] = composed["answer"]
         runtime_result["research"] = composed["research"]
-        if composed.get("next_experiments") is not None:
-            runtime_result["next_experiments"] = composed["next_experiments"]
+        for key in ("next_experiments", "next_steps", "calculation_offer"):
+            if composed.get(key) is not None:
+                runtime_result[key] = composed[key]
         _attach_completed_tool_card(runtime_result, job_request)
+        _attach_computed_answer(runtime_result, composed.get("computed"))
+        _attach_pending_question(runtime_result, composed.get("question"))
         return None
     runtime_result["assistant_response"] = research_failure_note(
         str(job_request.get("language") or "en")
@@ -165,6 +169,42 @@ def _attach_completed_tool_card(
     )
     if card is not None:
         patch["tool_result_cards"] = [card]
+
+
+def _attach_computed_answer(patch: dict[str, Any], computed: Any) -> None:
+    """A thorough answer's computed calculation joins its research card, with
+    the prose template a recompute re-renders."""
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
+    from argus.api.chat.tool_results import computation_marker
+
+    if not isinstance(computed, dict):
+        return
+    payload = computed.get("final_response_payload") or {}
+    cards = list(payload.get("tool_result_cards") or [])
+    if not cards:
+        return
+    patch["tool_result_cards"] = [*(patch.get("tool_result_cards") or []), *cards]
+    marker = computation_marker(patch["tool_result_cards"])
+    if marker:
+        patch["computation"] = marker
+    if computed.get(ANSWER_TEMPLATE_KEY) is not None:
+        patch[ANSWER_TEMPLATE_KEY] = computed[ANSWER_TEMPLATE_KEY]
+    if computed.get(ANSWER_ASSUMPTIONS_KEY):
+        patch[ANSWER_ASSUMPTIONS_KEY] = computed[ANSWER_ASSUMPTIONS_KEY]
+
+
+def _attach_pending_question(patch: dict[str, Any], question: Any) -> None:
+    """A thorough answer that asks for a figure only the user knows waits for
+    the reply that completes its calculation."""
+    if not isinstance(question, dict):
+        return
+    for key in ("requested_field", "clarification"):
+        if question.get(key) is not None:
+            patch[key] = question[key]
+    patch["last_stage_outcome"] = "await_user_reply"
 
 
 def start_research_job(
@@ -266,6 +306,7 @@ def start_research_job(
         user_id=user_id,
         conversation_id=conversation_id,
         request_id=request_id,
+        request_message_id=request_message_id,
     )
     return public_backtest_job_payload(job), None
 
@@ -309,6 +350,7 @@ def _spawn_poller(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     retain_research_work(
         _poll_and_finalize(
@@ -318,6 +360,7 @@ def _spawn_poller(
             user_id=user_id,
             conversation_id=conversation_id,
             request_id=request_id,
+            request_message_id=request_message_id,
         ),
         name=f"research-job-{job_id}",
     )
@@ -331,6 +374,7 @@ async def _poll_and_finalize(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     from argus.agent_runtime.research_answer import retrieval_spec_for_job
 
@@ -377,6 +421,7 @@ async def _poll_and_finalize(
                         user_id=user_id,
                         conversation_id=conversation_id,
                         request_id=request_id,
+                        request_message_id=request_message_id,
                     )
                 else:
                     _fail_job(
@@ -432,6 +477,7 @@ async def _finalize_success(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     from argus.agent_runtime.research_answer import (
         compose_completed_research,
@@ -450,8 +496,15 @@ async def _finalize_success(
     )
     if card is not None:
         metadata["tool_result_cards"] = [card]
-    if composed.get("next_experiments") is not None:
-        metadata["next_experiments"] = composed["next_experiments"]
+    _attach_computed_answer(metadata, composed.get("computed"))
+    _attach_pending_question(metadata, composed.get("question"))
+    for key in ("next_experiments", "next_steps", "calculation_offer"):
+        if composed.get(key) is not None:
+            metadata[key] = composed[key]
+    if request_message_id:
+        # The answer can land after later turns, so it names the message that
+        # asked instead of leaving readers to infer it from time.
+        metadata[ANSWER_REQUEST_MESSAGE_KEY] = request_message_id
     message = await persist_research_job_answer(
         job_id=job_id,
         user_id=user_id,

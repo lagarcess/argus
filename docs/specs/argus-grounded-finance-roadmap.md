@@ -363,15 +363,15 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-13 at integration `e208d10a`, after production promotion
+**Updated 2026-09-14 at integration `8e9f40bc`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Any grounded math | Draft PR #607 at `23881e2b`, $13.80 spent. Merging integration first, then Spanish Q7 once, the probe re-record, the live measurement, the browser walk, the fingerprint refreeze and Codex review. Stops at $15.15 before the measurement and $16.65 in total. |
-| Research provider failures take the retryable notice | PR #612 for #609 at `182a7885`, CI green, a third Codex round pending. Merges after Any grounded math and composes with its answer without the lookup. |
-| Promotion acceptance | Production is `3d98057c`. The remaining post-deploy checks (a signup, a profile save, the Usage labels, one feedback email) and docs PR #613 are finishing. |
+| Research provider failures take the retryable notice | PR #612 for #609, ready at `b880ad75` before Any grounded math landed. It now merges integration, composes its retry notice with the answer without the lookup (decision 5) and proposes a live check. |
+| A confirmation card turn carries no prose | PR #618. The chat-route live check passed in English and Spanish for $0.16, and its evidence now states only computed totals. After its last scoped review it merges integration and keeps both sides where Any grounded math touched the same history and naming code. |
+| $10 minimum starting capital | PR #621 at `2b4152d4`, CI green. Stopped for the founder's call on how small results show cents. Capital in the stated currency is specced, not built: no exchange-rate history exists in Argus today. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1443,10 +1443,10 @@ passing test suite told us this feature was correct for a full day.
 
 ## Where this board actually stands
 
-**Updated 2026-09-13. Production is `3d98057c`, promoted today in PR #603.** Every
+**Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `e208d10a`.
+shipped means live in production. Integration is `8e9f40bc`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1524,13 +1524,15 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Let the AI answer forward and valuation questions | its own promotion | **LANDED** `4482aaa6`, PR #589, as decision 10. Forward and valuation questions get cited scenarios with shown math instead of the future-performance refusal. It also raised the balanced research timeout to 150 seconds for every question, a latency tradeoff the founder accepted. Its scorecard's three discovery failures were rerun on integration with live market data: two pass, because the lane's driver had kept the `.env`'s synthetic market data, and the third is the older dead end filed as #590. |
 | Home country per user | its own promotion | **LANDED** `65bc661b`, PR #593. A registered user picks a country in Settings, sees the currency it implies and can override it, in English and Spanish. Research sends that user's country on the inline path, thorough jobs and the research tool; a user with none sends no location. `ARGUS_RESEARCH_HOME_COUNTRY`, `home_location()`, `LOCAL_SOURCE_DOMAINS` and `local_sources` are gone. Its research-case live run sent no location on any call, matching the baseline. Apply `supabase/migrations/20260911120000_add_profile_home_country.sql` (additive) at promotion. A guest session pick is not built; the lane priced it at about a day. |
 | The conversation after a result | its own promotion | **LANDED** `f14c0dec`, PR #597, 2026-09-12. Questions after a result are answered by the model with one ordered list of next steps, runnable tests and questions together. One owner states the benchmark gap and cost drag as the difference of the shown returns. Runs record fee and slippage dollars, and a stored dollar cost is answered. A stated cost the audit cannot confirm is asked about, never shown at 0 bps, while a 0 only the model's read carries is dropped. New monthly-buy runs store the worst drop's dates; answers never invent a date, order or cause and carry no heading. A stored run fact is answered without research and the reply must state it, and an asset or benchmark reply must name each ticker. A moved start names the asset whose data sets it, from continuous history. Its live run was 64 passed and 7 failed against 67 and 4; the six new failures passed a rerun at the fix, and NVDA failed in both. The fingerprint is refrozen on that run. No migration. |
-| Any grounded math | The calculations | **In measurement**, draft PR #607 at `23881e2b`. English met the gate at 7 of 8 under founder rulings, with Q8 wrong; Spanish reached 6 of 8, with Q1 and Q4 lost to provider errors and Q7 right under the currency-choice bar set 2026-09-13. Remaining: merge integration, Q7 once, the re-record, the live measurement, the walk, the refreeze and Codex review. |
+| Any grounded math | The calculations | **LANDED** `8e9f40bc`, PR #607. Measured 69 of 71 at `dc8608c8` with the fingerprint refrozen and the browser walk done. Fourteen Codex rounds, then one final scoped review whose only finding is #622. #620 holds binding page-cited and finance-data inputs to their rows and the market test row for plans with a starting amount plus deposits. Its migration widens `public_excerpt_snapshots_kind_check` and is applied at the next promotion. |
 | Teach the method | Grounding | **Greetings LANDED** `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The welcome line is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math. |
 | Production promotion 2026-09-13 | its own promotion | **SHIPPED** `3d98057c`, PR #603. See the promotion paragraph above. |
 | Readout receipts admit every model tier | outside the releases | **LANDED** `6eb93d84`, PR #610, closing #605. `route_receipts` accepts the readout tier, and a test pins the check to the runtime's tier list. Its migration, classed destructive for its dropped and re-added check, ships at the next promotion. |
 | Stated money survives a timed-out interpretation | outside the releases | **LANDED** `b7c69b54`, PR #602, closing #600. Focused repair keeps a stated deposit, contribution, fees and slippage; 22 of 22 targeted live reruns passed. Ships at the next promotion. |
-| Research provider failures take the retryable notice | outside the releases | **In review**, PR #612 for #609. Transient provider errors retry with backoff, a failure that persists shows the existing retryable notice, and a guest gets the research question back. Merges after Any grounded math. |
+| Research provider failures take the retryable notice | outside the releases | **Composing**, PR #612 for #609, ready at `b880ad75` before Any grounded math landed. Transient provider errors retry with backoff, a failure that persists shows the existing retryable notice, and a guest gets the research question back. It now composes with the answer without the lookup. |
 | One owner for the support address | outside the releases | **LANDED** `9630ffe2`, PR #615, closing #596. The API constant and the web fallback both read `web/argus_display_contract/support_contact.json`, and a test fails if any code types the address again. Ships at the next promotion. |
+| Canary core checks | outside the releases | **LANDED** `7adaf073`, PR #617, for #614. The canary checks that the three services run one commit, a signed-in account gets an ordinary chat answer, one backtest completes and one research answer has sources, plus the release config, signup denial and welcome email. It expects manual deploys (`autoDeployTrigger` off in `render.yaml` and the release profile). Proven twice against production `3d98057c` (runs 34796700214 and 34808072927). #614 stays open until the first scheduled run on main passes after the next promotion. |
+| One provenance policy for promotion evidence | outside the releases | **LANDED** `1bd2f8cb`, PR #616, closing #608. `tests/promotion_evidence_identity.py` owns whether evidence still stands: every file the eval could import or read counts, while `render.yaml`, `.env.example`, docs and dated evidence scripts do not. The eval refuses a tracked file as its environment. Model and flag identity in scorecards is #619. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
@@ -1563,9 +1565,9 @@ and #612.
 
 The board does not wait for the vision to be complete. Each checkpoint is
 cohesive on its own, and cutting them small is cheaper as well as safer:
-`eval_measured_code_unchanged` in the promotion gate returns early when a change
-cannot reach the measured code, so a checkpoint that does not touch the
-interpreter promotes **without a $1.33 live eval run**.
+the promotion gate carries a scorecard forward across any change the eval cannot
+reach (`tests/promotion_evidence_identity.py`), so a checkpoint that touches
+nothing the eval reaches promotes **without a new $1.33 live eval run**.
 
 | Release | Ships | What a user sees | Live eval |
 | --- | --- | --- | --- |
@@ -1806,8 +1808,6 @@ you, never prescribe what they should do" still stands.
 
 - **The welcome line waits for a new direction.** Founder, 2026-09-11.
 - **The sharing redesign waits for the founder.** See Sharing on.
-- **One provenance policy for promotion evidence (#608).** A config-only change
-  forced a paid re-measurement because three checks answer identity differently.
 - **Decision 9's interpreter-tier A/B is still owed.** See decision 9.
 - **The answer blueprint is proposed, not decided.** A small set of answer types the
   model chooses, each an ordered set of sections; written freely first and structured
@@ -1824,6 +1824,10 @@ you, never prescribe what they should do" still stands.
 
 Resolved:
 
+- **The minimum starting capital is 10 in the stated currency.** Founder,
+  2026-09-14, for every way capital is set or edited. Capital has no currency today,
+  so the $10 floor ships first and capital in the stated currency is specced before
+  it is built.
 - **Held-out replay.** Approved by the founder 2026-09-12 and run on the promotion
   candidate: 15 guest conversations from 2026-08-12 by the New York or UTC day, and
   38 of 38 turns passed the refusal rule.
@@ -1839,6 +1843,7 @@ Resolved:
   services run the same commit, a signed-in account loads the chat and gets one
   ordinary answer, one backtest completes, and one research question returns
   sources. It expects manual deploys. Feature checks belong to the promotion walk.
+  Landed on integration `7adaf073`, PR #617.
 
 - **No Dominican source list.** Dropped by the founder 2026-09-10; #593 removed
   `LOCAL_SOURCE_DOMAINS` and `local_sources`.
@@ -1861,9 +1866,21 @@ Resolved:
   its fallback (`src/argus/domain/research/config.py`).
 - **Bugs are tracked as issues:** #598 a second tab never shows the reply, #599 the BTC forward research never publishes,
   #604 sharing refuses completed answers, #606 a result follow-up lists its next steps
-  twice, #609 research provider failures skip the retryable notice (fix in review,
-  PR #612), and #614 the canary fails on nearly every run. #596, #600 and #605 are fixed
-  on integration and ship at the next promotion.
+  twice, #609 research provider failures skip the retryable notice (fix ready,
+  PR #612), and #614 the canary fails on nearly every run. #596, #600, #605, #608 and
+  #614 are fixed on integration and ship at the next promotion.
+- **The live measurement cannot see history building.** It gives each case its
+  history directly and never loads saved turns, so a change to how saved turns
+  become model history (PR #618) needs a live check through the chat route.
+- **A recovery reply can repeat an earlier turn's reason.** Found on production
+  2026-09-14 as a guest. A refusal stored the real blocker ($100 under the $1,000
+  minimum) but the reply repeated the previous turn's date complaint, because the
+  reply writer reads the last six messages beside the stored reason. That earlier
+  refusal came from reading "from August 16 to August 19 just a few days this year"
+  as ending December 31.
+- **Menus turn into sheets at the wrong width.** The layout contract starts sheets
+  below 720px, but the chat header menu, guest settings and profile menu switch
+  below 1024px, so 720 to 1023px shows the desktop rail with phone sheets.
 - **The chat does not know who the person is.** Settings stores a preferred name,
   a country and a currency, but outside Settings the name reaches only the web
   greeting, and the country reaches only research as its search location. No answer

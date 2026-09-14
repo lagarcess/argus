@@ -221,6 +221,7 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
             user_id="u1",
             conversation_id="c1",
             request_id="r1",
+            request_message_id="m1",
         )
     )
 
@@ -232,6 +233,7 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
     message = created[0]
     assert message["role"] == "assistant"
     assert message["content"].startswith("Final research answer")
+    assert message["metadata"]["request_message_id"] == "m1"
     sidecar = message["metadata"]["research"]
     assert sidecar["capability_class"] == "thorough_research"
     # The sidecar names its subjects so later confirmation cards can find

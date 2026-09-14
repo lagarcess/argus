@@ -1715,6 +1715,7 @@ def test_asset_rollup_exact_prefix_multi_asset_and_guest_scope_use_run_lineage(
             "type": "asset_rollup",
             "symbol": "TSLA",
             "run_count": 2,
+            "result_count": 2,
             "decision_counts": {
                 "promising": 1,
                 "watching": 1,

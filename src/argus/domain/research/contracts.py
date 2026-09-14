@@ -68,7 +68,7 @@ class RetrievedRow(BaseModel):
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
     subject: str
-    """The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix."""
+    """The entity the figure describes, as the source names it: Microsoft, Santander, Netflix."""
     symbol: str | None
     """The exchange ticker of the security the figure describes, or null."""
     label: str
@@ -76,13 +76,26 @@ class RetrievedRow(BaseModel):
     value: float = Field(strict=True, allow_inf_nan=False)
     """The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000."""
     kind: RowKind
-    """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares."""
+    """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as price to book, count for a number of units such as shares."""
     unit: str
-    """The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count."""
+    """The unit of value: only the ISO 4217 code of a money amount such as USD or DOP, with a per-share or per-unit figure saying so in its label; % for a percentage, x for a multiple, the thing counted for a count."""
     as_of: str | None
     """The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."""
     source_url: str | None
     """The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _currency_code_before_its_qualifier(cls, data: Any) -> Any:
+        """A money unit written with a qualifier, such as USD per share, keeps its
+        code; the label already says what the amount is per."""
+        if isinstance(data, dict) and data.get("kind") == "currency":
+            unit = data.get("unit")
+            if isinstance(unit, str):
+                code = unit.strip().replace("/", " ").split(" ")[0]
+                if code in CURRENCY_CODES and code != unit.strip():
+                    return {**data, "unit": code}
+        return data
 
     @field_validator("unit")
     @classmethod
@@ -334,6 +347,20 @@ class ResearchPacket(BaseModel):
     # cited rows; the turn names them under the answer as figures it could
     # not tie to a source, from their own typed subject and label.
     unsourced_rows: tuple[RetrievedRow, ...] = ()
+    # The calculations the answer asks Argus to compute, one per option, as the
+    # provider wrote them under the typed answer schema; the answer step
+    # validates and computes them. JSON here because the calculation catalogue
+    # imports the tool contracts that import this module.
+    calculations: tuple[dict[str, Any], ...] = ()
+    # The retrieved pages the answer says it relies on, as the provider wrote
+    # them; source selection publishes only pages the answer cites.
+    source_urls: tuple[str, ...] = ()
+    # Questions the answer suggests the reader may ask next, as the provider
+    # wrote them; the next-steps list cleans and bounds them.
+    follow_up_questions: tuple[str, ...] = ()
+    # True when the answer declined a request that is not a money question or
+    # asks Argus to act; its plain reply is published as it stands.
+    declined: bool = False
     # Tool result items in the provider's output, by item type and in order.
     # This is the retrieval record; the invoice's tool counts are billing.
     tool_results: tuple[str, ...] = ()

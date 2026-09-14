@@ -203,6 +203,16 @@ def tool_cards_from_metadata(metadata: Mapping[str, Any]) -> list[ToolResultCard
     return cards
 
 
+def computation_marker(cards: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """``metadata.computation`` for a turn, derived from its cards by the one owner."""
+    from argus.domain.computation_marker import computation_from_tool_cards
+
+    computation = computation_from_tool_cards(
+        tool_cards_from_metadata({"tool_result_cards": cards})
+    )
+    return None if computation is None else computation.model_dump(mode="json")
+
+
 def runtime_tool_result_cards(runtime_result: dict[str, Any]) -> list[dict[str, Any]]:
     """Validate once, then use identical card facts for final delivery and storage."""
     final = runtime_result.get("final_response_payload")

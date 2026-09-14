@@ -13,6 +13,7 @@ verifies.
 
 from __future__ import annotations
 
+import copy
 import json
 import time
 from datetime import datetime, timezone
@@ -546,6 +547,7 @@ def test_a_survey_that_names_a_verified_ticker_publishes_whatever_its_rows(
         text=typed_answer_text(
             "NVIDIA (NVDA) led today's session, but I could not retrieve its figures.",
             [],
+            source_urls=[PUBLISHER],
         ),
         tickers=["NVDA"],
         sources=[PROVIDER_PAGE],
@@ -577,7 +579,9 @@ def test_a_survey_naming_a_ticker_the_packet_never_typed_stays_degraded(
     set_research_query(monkeypatch, globals(), question_kind="market_pulse", symbols=[])
     figureless = agent_response(
         text=typed_answer_text(
-            "I could not retrieve current figures for NVIDIA (NVDA).", []
+            "I could not retrieve current figures for NVIDIA (NVDA).",
+            [],
+            source_urls=[PUBLISHER],
         ),
         invocations=0,
         web_search_invocations=1,
@@ -645,8 +649,27 @@ def test_a_broken_typed_answer_never_reaches_the_reader(monkeypatch) -> None:
 
 RECORDED_LOCAL_PROBE = (
     Path(__file__).resolve().parents[2]
-    / "docs/reports/evidence/545/probes/domain_filtered_local_source.json"
+    / "docs/reports/evidence/545/probes/domain_filtered_local_source_568.json"
 )
+
+
+def _naming_the_pages_it_read(response: dict) -> dict:
+    """The recorded response with its typed answer naming the bank pages it read,
+    as the typed answer now does; it was recorded before the schema had the field."""
+    named = copy.deepcopy(response)
+    read = [
+        result["url"]
+        for item in named["output"]
+        if item.get("type") == "search_results"
+        for result in item.get("results") or []
+        if "popularenlinea.com" in str(result.get("url"))
+    ]
+    for item in named["output"]:
+        for chunk in item.get("content") or [] if item.get("type") == "message" else []:
+            typed = json.loads(chunk["text"])
+            typed["source_urls"] = read
+            chunk["text"] = json.dumps(typed)
+    return named
 
 
 def test_the_recorded_local_probe_publishes_what_it_found(monkeypatch) -> None:
@@ -657,7 +680,9 @@ def test_the_recorded_local_probe_publishes_what_it_found(monkeypatch) -> None:
     set_research_query(
         monkeypatch, globals(), question_kind="current_external", symbols=[]
     )
-    recorded = json.loads(RECORDED_LOCAL_PROBE.read_text())["exchanges"][-1]["response"]
+    recorded = _naming_the_pages_it_read(
+        json.loads(RECORDED_LOCAL_PROBE.read_text())["exchanges"][-1]["response"]
+    )
     transport = _wire(monkeypatch, [recorded])
     question = (
         "¿Qué tasa de interés paga hoy el Banco Popular Dominicano por un "

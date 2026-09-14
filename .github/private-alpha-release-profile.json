@@ -4,7 +4,7 @@
   "services": {
     "api": {
       "name": "argus-api",
-      "auto_deploy_trigger": "checksPass",
+      "auto_deploy_trigger": "off",
       "env": {
         "APP_ENV": "production",
         "POETRY_VERSION": "2.1.3",
@@ -80,7 +80,7 @@
     },
     "web": {
       "name": "argus-app",
-      "auto_deploy_trigger": "checksPass",
+      "auto_deploy_trigger": "off",
       "env": {
         "ARGUS_APP_ORIGIN": "https://arguschat.ai",
         "NEXT_PUBLIC_APP_ENV": "production",
@@ -101,7 +101,7 @@
     },
     "workflow": {
       "name": "argus-backtests",
-      "auto_deploy_trigger": "checksPass",
+      "auto_deploy_trigger": "off",
       "env": {
         "APP_ENV": "production",
         "ARGUS_RENDER_WORKFLOW_PROOF_TASK": "argus-backtests/workflow_proof",
@@ -150,50 +150,19 @@
   "locales": {
     "supported": ["en", "es-419"],
     "required_static_keys": [
-      "landing.sign_up_email",
-      "auth.signup.submit",
-      "auth.login.submit",
-      "common.retry",
-      "common.search",
-      "chat.history.pinned",
-      "chat.new_chat",
-      "chat.confirmation.status.ready_to_run",
-      "chat.confirmation.actions.run_backtest",
-      "chat.simulation_complete",
-      "chat.backtest_job.queued_title",
-      "chat.backtest_job.running_title",
-      "chat.backtest_job.failed_title",
-      "chat.result_card.add_decision",
-      "chat.result_card.save_decision",
-      "chat.result_card.decision_note_placeholder",
-      "chat.result_card.decision_states.promising",
-      "chat.error_backtest",
-      "command_palette.search_placeholder",
-      "command_palette.type.evidence",
-      "command_palette.ledger.decision_filters"
+      "chat.confirmation.actions.run_backtest"
     ]
   },
   "canary": {
     "language": "es-419",
-    "locale": "es-419",
-    "prompt": "Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares",
-    "decision_state": "promising",
-    "decision_note": "Canario de navegador 233: evidencia renderizada verificada.",
-    "search_query": "AAPL",
+    "chat_prompt": "Hola, ¿qué puedes hacer por mí?",
+    "backtest_prompt": "Prueba una estrategia de comprar y mantener AAPL y MSFT con pesos iguales desde el 1 de enero de 2025 hasta el 5 de junio de 2026 con 10000 dolares",
+    "research_prompt": "¿Cuáles fueron los ingresos de Apple en su último trimestre reportado?",
     "required_steps": [
-      "signup_login",
-      "profile_hydration",
-      "browser_owned_golden_path",
-      "real_workflow_backtest",
-      "single_run_admission",
-      "finalized_identity",
-      "decision_note",
-      "reload_hydration",
-      "omnisearch_source_identity",
-      "spanish_static_ui",
-      "private_identity_handoff",
-      "deterministic_intercepted_recovery",
-      "clean_browser_console"
+      "services_same_commit",
+      "signed_in_chat_answer",
+      "backtest_completes",
+      "research_answer_with_sources"
     ]
   }
 }

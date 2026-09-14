@@ -19,9 +19,12 @@ from __future__ import annotations
 
 from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.interpreter.research_routing import (
+    concept_research_query,
     primary_research_query,
     research_turn_has_conflicting_owner,
     scenario_is_typed,
+    unkinded_question_research_query,
+    unsupported_verdict_research_query,
 )
 
 # Re-exported composition surface: the job lifecycle and tests reach these
@@ -63,7 +66,12 @@ async def research_answer_stage_result(
     """
     if not research_rail_enabled():
         return None
-    query = primary_research_query(interpretation)
+    query = (
+        primary_research_query(interpretation)
+        or concept_research_query(interpretation)
+        or unsupported_verdict_research_query(interpretation)
+        or unkinded_question_research_query(interpretation)
+    )
     if query is None:
         return None
     return await _dispatch(
@@ -215,7 +223,7 @@ async def _dispatch(
             state=state,
             user=user,
         )
-    if query.question_kind in ("concept", "none") and not scenario:
+    if query.question_kind == "none" and not scenario:
         return None
     subjects = _resolved_subjects(query)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]
@@ -244,11 +252,11 @@ async def _dispatch(
             provider_finance=False,
         )
     shape = grounded.shape_for_query(query)
-    if scenario and query.question_kind != "cross_company":
-        # A computed scenario is never a quote and needs no background job:
-        # it runs on the balanced shape with public pages, whatever kind it
-        # was typed as. Only a named multi-company comparison keeps the
-        # thorough job it would take without the scenario.
+    if scenario:
+        # A computed scenario is never a quote and never a background job: it
+        # runs on the balanced shape with public pages, whatever kind it was
+        # typed as, because the valuation math computes the answer from the
+        # retrieved inputs on that path alone.
         shape = "balanced"
     if shape == "thorough":
         return grounded.thorough_job_result(

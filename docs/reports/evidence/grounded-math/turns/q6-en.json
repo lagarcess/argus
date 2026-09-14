@@ -1,0 +1,959 @@
+{
+  "label": "q6",
+  "language": "en",
+  "country": "US",
+  "asked_at": "2026-09-13T00:05:35.017220+00:00",
+  "turns": [
+    {
+      "message": "Is Apple expensive at this P/E?",
+      "action": null,
+      "message_id": "b9572937-f972-4ab3-90f6-7bb7276e6e0f",
+      "first_answer_seconds": 104.28,
+      "final_answer_seconds": 104.28,
+      "research_job_id": null,
+      "elapsed_seconds": 104.28,
+      "timeline": [
+        {
+          "at": 0.01,
+          "type": "stage_start",
+          "stage": "interpret"
+        },
+        {
+          "at": 14.98,
+          "type": "stage_start",
+          "stage": "research_search",
+          "detail": "balanced"
+        },
+        {
+          "at": 104.25,
+          "type": "stage_outcome",
+          "outcome": "ready_to_respond"
+        },
+        {
+          "at": 104.28,
+          "type": "token"
+        },
+        {
+          "at": 104.28,
+          "type": "final"
+        }
+      ],
+      "summary": {
+        "content": "**Yes, relative to Apple’s recent history, its valuation is expensive.** As of 2026-09-11, Apple’s trailing P/E was 38.27x, versus its five-year median of 30.72x; that means investors were paying a historically elevated price for each dollar of trailing earnings.\n\n### What the P/E says\n\n| Measure | Published figure | Interpretation |\n|---|---:|---|\n| Trailing P/E, 2026-09-11 | 38.27x | The market price represented more than thirty-eight times trailing earnings. |\n| Five-year median P/E | 30.72x | Apple’s current multiple was above its own recent historical midpoint. |\n| Trailing diluted EPS | $8.73 per share | The earnings base underlying the valuation analysis. |\n\nThis supports calling Apple expensive **relative to its own history**, not proving that the shares are absolutely overvalued. P/E does not determine intrinsic value by itself: a higher multiple can persist if future earnings growth justifies it, while slower-than-expected growth or a lower valuation multiple can reduce returns.\n\n### Scenario framework\n\nThe scenario calculation starts with Apple’s current market price of USD 332.25 and trailing diluted EPS of USD 8.73. It uses the published three-year growth rate of 4.7% as the base growth input and the published five-year median P/E of 30.72x as the low multiple.\n\nFor sensitivity, not forecasts, the other assumptions are:\n\n- Low earnings growth: 0%\n- High earnings growth: 10%\n- Base multiple: 38.27x\n- High multiple: 45x\n- Holding period: 5\n- Illustrative investment: USD 10,000\n\nThe calculation produces low, base and high implied future prices and annualized returns rather than presenting one outcome as Apple’s future. The key question is whether Apple can deliver enough earnings growth to support a P/E materially above its recent median.",
+        "tool": "valuation_scenarios",
+        "status": "succeeded",
+        "failure": null,
+        "answer": {
+          "label": "tools.calc.valuation_scenarios.value_at_horizon_base",
+          "value": 12651.66
+        },
+        "inputs": [
+          {
+            "name": "symbol",
+            "value": "AAPL",
+            "source": "user"
+          },
+          {
+            "name": "price",
+            "value": 332.245,
+            "source": "market_data"
+          },
+          {
+            "name": "per_share",
+            "value": 8.73,
+            "source": "page"
+          },
+          {
+            "name": "growth_low_pct",
+            "value": 0.0,
+            "source": "assumption"
+          },
+          {
+            "name": "growth_base_pct",
+            "value": 4.7,
+            "source": "page"
+          },
+          {
+            "name": "growth_high_pct",
+            "value": 10.0,
+            "source": "assumption"
+          },
+          {
+            "name": "multiple_low",
+            "value": 30.72,
+            "source": "page"
+          },
+          {
+            "name": "multiple_base",
+            "value": 38.27,
+            "source": "page"
+          },
+          {
+            "name": "multiple_high",
+            "value": 45.0,
+            "source": "assumption"
+          },
+          {
+            "name": "horizon_years",
+            "value": 5,
+            "source": "assumption"
+          },
+          {
+            "name": "amount",
+            "value": 10000.0,
+            "source": "assumption"
+          }
+        ],
+        "currency": "USD",
+        "computation": true,
+        "requested_field": null,
+        "clarification_reason": null,
+        "next_steps": [
+          {
+            "type": "test",
+            "kind": "calculation_market_counterfactual"
+          },
+          {
+            "type": "test",
+            "kind": "research_test_single"
+          },
+          {
+            "type": "question",
+            "text": "How much earnings growth would justify Apple’s current P/E?"
+          },
+          {
+            "type": "question",
+            "text": "How does Apple’s P/E compare with other large technology companies?"
+          },
+          {
+            "type": "question",
+            "text": "What happens if Apple’s P/E returns to its historical median?"
+          }
+        ],
+        "next_experiments": [
+          "Test Apple (AAPL) with 10,000 USD over the last 5 years",
+          "Test Apple (AAPL) over the last 3 years"
+        ],
+        "research": {
+          "shape": "balanced",
+          "degraded": null,
+          "rows": 3,
+          "sources": 5,
+          "cost_usd": 0.28532
+        },
+        "reason_codes": null,
+        "intent": null
+      },
+      "metadata": {
+        "conversation_mode": "guide",
+        "agent_runtime_stage_outcome": "ready_to_respond",
+        "next_experiments": {
+          "version": "argus_next_experiments/v1",
+          "rows": [
+            {
+              "kind": "calculation_market_counterfactual",
+              "label": "Test Apple (AAPL) with 10,000 USD over the last 5 years",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Test "
+                },
+                {
+                  "type": "text",
+                  "value": "Apple"
+                },
+                {
+                  "type": "ticker",
+                  "value": "AAPL"
+                },
+                {
+                  "type": "text",
+                  "value": " with 10,000 USD over the last 5 years"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Test buying and holding AAPL with 10000 USD over the last 5 years"
+            },
+            {
+              "kind": "research_test_single",
+              "label": "Test Apple (AAPL) over the last 3 years",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Test "
+                },
+                {
+                  "type": "text",
+                  "value": "Apple"
+                },
+                {
+                  "type": "ticker",
+                  "value": "AAPL"
+                },
+                {
+                  "type": "text",
+                  "value": " over the last 3 years"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Test buying and holding AAPL over the last three years"
+            }
+          ]
+        },
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "test",
+              "kind": "calculation_market_counterfactual"
+            },
+            {
+              "type": "test",
+              "kind": "research_test_single"
+            },
+            {
+              "type": "question",
+              "text": "How much earnings growth would justify Apple’s current P/E?"
+            },
+            {
+              "type": "question",
+              "text": "How does Apple’s P/E compare with other large technology companies?"
+            },
+            {
+              "type": "question",
+              "text": "What happens if Apple’s P/E returns to its historical median?"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "Apple Inc. R (APC8.DU) Q3 FY2026 earnings call transcript",
+              "domain": "finance.yahoo.com",
+              "url": "https://finance.yahoo.com/quote/APC8.DU/earnings/APC8.DU-Q3-2026-earnings_call-658553.html/",
+              "source_date": "2026-09-04"
+            },
+            {
+              "title": "Apple's Strongest June Quarter Ever: $109.4B Revenue ...",
+              "domain": "beancount.io",
+              "url": "https://beancount.io/blog/2026/08/22/apple-fy2026-q3-earnings-analysis",
+              "source_date": "2026-08-22"
+            },
+            {
+              "title": "Apple Q3 2026 Earnings: Record Quarter, Worst Reaction",
+              "domain": "www.money365.market",
+              "url": "https://www.money365.market/articles/apple-q2-2026-earnings-analysis",
+              "source_date": "2026-08-16"
+            },
+            {
+              "title": "Apple (AAPL) Financials — Revenue $109.4B in Q3 FY2026",
+              "domain": "www.thetrading.tools",
+              "url": "https://www.thetrading.tools/financials/aapl",
+              "source_date": "2026-08-14"
+            },
+            {
+              "title": "Apple (AAPL) Q3 Fiscal 2026 Earnings Recap",
+              "domain": "www.webull.com",
+              "url": "https://www.webull.com/blog/243-Apple-AAPL-Q3-Fiscal-2026-Earnings-Recap",
+              "source_date": "2026-08-24"
+            }
+          ],
+          "rows": [
+            {
+              "subject": "Apple",
+              "symbol": "AAPL",
+              "label": "trailing P/E",
+              "value": 38.27,
+              "kind": "multiple",
+              "unit": "x",
+              "as_of": "2026-09-11",
+              "source_url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists"
+            },
+            {
+              "subject": "Apple",
+              "symbol": "AAPL",
+              "label": "five-year median P/E",
+              "value": 30.72,
+              "kind": "multiple",
+              "unit": "x",
+              "as_of": "2026-09-11",
+              "source_url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists"
+            },
+            {
+              "subject": "Apple",
+              "symbol": "AAPL",
+              "label": "trailing diluted EPS per share",
+              "value": 8.73,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-08-21",
+              "source_url": "https://xzwc710572184.macroaxis.com/earnings-estimate/AAPL"
+            }
+          ],
+          "retrieved_at": "2026-09-13T00:07:18.900144+00:00",
+          "anchor_symbols": [
+            "AAPL"
+          ],
+          "peers": [],
+          "usage": {
+            "invocations": 2,
+            "latency_ms": 88855,
+            "cost_usd": 0.28532,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [
+              {
+                "symbol": "AAPL",
+                "name": "Apple Inc. Common Stock",
+                "asset_class": "equity"
+              }
+            ],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "How much earnings growth would justify Apple’s current P/E?",
+              "How does Apple’s P/E compare with other large technology companies?",
+              "What happens if Apple’s P/E returns to its historical median?"
+            ]
+          }
+        },
+        "tool_result_cards": [
+          {
+            "kind": "tool_result",
+            "schema_version": 1,
+            "tool_name": "valuation_scenarios",
+            "call_id": "answer-18bd41f9-d023-46f7-bad9-574feb1826a7",
+            "artifact_id": "b2370a5d-a936-4f94-8160-1922b0744db6",
+            "input_revision": 0,
+            "card_type": "valuation_scenarios",
+            "card_version": 1,
+            "arguments": {
+              "currency": "USD",
+              "sources": {
+                "price": {
+                  "kind": "market_data",
+                  "date": "2026-09-11"
+                },
+                "per_share": {
+                  "kind": "page",
+                  "title": "Apple (AAPL) Earnings Estimates & Surprises | Macroaxis",
+                  "url": "https://xzwc710572184.macroaxis.com/earnings-estimate/AAPL",
+                  "date": "2026-08-21"
+                },
+                "growth_low_pct": {
+                  "kind": "assumption"
+                },
+                "growth_base_pct": {
+                  "kind": "page",
+                  "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                  "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                  "date": "2026-09-11"
+                },
+                "growth_high_pct": {
+                  "kind": "assumption"
+                },
+                "multiple_low": {
+                  "kind": "page",
+                  "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                  "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                  "date": "2026-09-11"
+                },
+                "multiple_base": {
+                  "kind": "page",
+                  "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                  "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                  "date": "2026-09-11"
+                },
+                "multiple_high": {
+                  "kind": "assumption"
+                },
+                "horizon_years": {
+                  "kind": "assumption"
+                },
+                "amount": {
+                  "kind": "assumption"
+                }
+              },
+              "symbol": "AAPL",
+              "price": 332.245,
+              "per_share": 8.73,
+              "growth_low_pct": 0.0,
+              "growth_base_pct": 4.7,
+              "growth_high_pct": 10.0,
+              "multiple_low": 30.72,
+              "multiple_base": 38.27,
+              "multiple_high": 45.0,
+              "horizon_years": 5,
+              "amount": 10000.0
+            },
+            "outcome": {
+              "status": "succeeded",
+              "result": {
+                "current_multiple": 38.057846506300116,
+                "scenarios": [
+                  {
+                    "label": "low",
+                    "growth_pct": 0.0,
+                    "multiple": 30.72,
+                    "price_at_horizon": 268.1856,
+                    "annual_return_pct": -4.193406153839141,
+                    "value_at_horizon": 8071.922828033529
+                  },
+                  {
+                    "label": "base",
+                    "growth_pct": 4.7,
+                    "multiple": 38.27,
+                    "price_at_horizon": 420.3452211309898,
+                    "annual_return_pct": 4.816470628099956,
+                    "value_at_horizon": 12651.664317927727
+                  },
+                  {
+                    "label": "high",
+                    "growth_pct": 10.0,
+                    "multiple": 45.0,
+                    "price_at_horizon": 632.6888535000002,
+                    "annual_return_pct": 13.748674839725904,
+                    "value_at_horizon": 19042.84047916448
+                  }
+                ],
+                "assumptions": []
+              },
+              "failure": null
+            },
+            "presentation": {
+              "title": {
+                "locale_key": "tools.calc.valuation_scenarios.title",
+                "interpolation_args": {}
+              },
+              "answer": {
+                "name": "value_at_horizon_base",
+                "label": {
+                  "locale_key": "tools.calc.valuation_scenarios.value_at_horizon_base",
+                  "interpolation_args": {}
+                },
+                "value": 12651.66,
+                "value_text": null,
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "source": {
+                  "kind": "computed"
+                }
+              },
+              "narrative": null,
+              "sources": [],
+              "visual": null,
+              "rows": [
+                {
+                  "name": "current_multiple",
+                  "label": {
+                    "locale_key": "tools.calc.fields.multiple",
+                    "interpolation_args": {}
+                  },
+                  "value": 38.06,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.multiple",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "value_at_horizon_low",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.value_at_horizon_low",
+                    "interpolation_args": {}
+                  },
+                  "value": 8071.92,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "price_at_horizon_low",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.price_at_horizon_low",
+                    "interpolation_args": {}
+                  },
+                  "value": 268.19,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "annual_return_pct_low",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.annual_return_low",
+                    "interpolation_args": {}
+                  },
+                  "value": -4.19,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "value_at_horizon_base",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.value_at_horizon_base",
+                    "interpolation_args": {}
+                  },
+                  "value": 12651.66,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "price_at_horizon_base",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.price_at_horizon_base",
+                    "interpolation_args": {}
+                  },
+                  "value": 420.35,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "annual_return_pct_base",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.annual_return_base",
+                    "interpolation_args": {}
+                  },
+                  "value": 4.82,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "value_at_horizon_high",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.value_at_horizon_high",
+                    "interpolation_args": {}
+                  },
+                  "value": 19042.84,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "price_at_horizon_high",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.price_at_horizon_high",
+                    "interpolation_args": {}
+                  },
+                  "value": 632.69,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "annual_return_pct_high",
+                  "label": {
+                    "locale_key": "tools.calc.valuation_scenarios.annual_return_high",
+                    "interpolation_args": {}
+                  },
+                  "value": 13.75,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                }
+              ],
+              "inputs": [
+                {
+                  "name": "symbol",
+                  "label": {
+                    "locale_key": "tools.calc.fields.symbol",
+                    "interpolation_args": {}
+                  },
+                  "value": "AAPL",
+                  "value_text": null,
+                  "unit": null,
+                  "source": {
+                    "kind": "user"
+                  },
+                  "editable": false,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "price",
+                  "label": {
+                    "locale_key": "tools.calc.fields.price",
+                    "interpolation_args": {}
+                  },
+                  "value": 332.245,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "market_data",
+                    "date": "2026-09-11"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "per_share",
+                  "label": {
+                    "locale_key": "tools.calc.fields.per_share",
+                    "interpolation_args": {}
+                  },
+                  "value": 8.73,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "Apple (AAPL) Earnings Estimates & Surprises | Macroaxis",
+                    "url": "https://xzwc710572184.macroaxis.com/earnings-estimate/AAPL",
+                    "date": "2026-08-21"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "growth_low_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.growth_low_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 0.0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "growth_base_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.growth_base_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 4.7,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                    "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                    "date": "2026-09-11"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "growth_high_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.growth_high_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 10.0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "multiple_low",
+                  "label": {
+                    "locale_key": "tools.calc.fields.multiple_low",
+                    "interpolation_args": {}
+                  },
+                  "value": 30.72,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.multiple",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                    "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                    "date": "2026-09-11"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "multiple_base",
+                  "label": {
+                    "locale_key": "tools.calc.fields.multiple_base",
+                    "interpolation_args": {}
+                  },
+                  "value": 38.27,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.multiple",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                    "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                    "date": "2026-09-11"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "multiple_high",
+                  "label": {
+                    "locale_key": "tools.calc.fields.multiple_high",
+                    "interpolation_args": {}
+                  },
+                  "value": 45.0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.multiple",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "horizon_years",
+                  "label": {
+                    "locale_key": "tools.calc.fields.horizon_years",
+                    "interpolation_args": {}
+                  },
+                  "value": 5,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.years",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "amount",
+                  "label": {
+                    "locale_key": "tools.calc.fields.amount",
+                    "interpolation_args": {}
+                  },
+                  "value": 10000.0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                }
+              ],
+              "notes": [
+                {
+                  "locale_key": "tools.calc.notes.scenarios_not_forecasts",
+                  "interpolation_args": {}
+                }
+              ]
+            },
+            "artifact_state": "active"
+          }
+        ],
+        "computation": {
+          "kind": "valuation_scenarios",
+          "inputs": {
+            "currency": "USD",
+            "sources": {
+              "price": {
+                "kind": "market_data",
+                "date": "2026-09-11"
+              },
+              "per_share": {
+                "kind": "page",
+                "title": "Apple (AAPL) Earnings Estimates & Surprises | Macroaxis",
+                "url": "https://xzwc710572184.macroaxis.com/earnings-estimate/AAPL",
+                "date": "2026-08-21"
+              },
+              "growth_low_pct": {
+                "kind": "assumption"
+              },
+              "growth_base_pct": {
+                "kind": "page",
+                "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                "date": "2026-09-11"
+              },
+              "growth_high_pct": {
+                "kind": "assumption"
+              },
+              "multiple_low": {
+                "kind": "page",
+                "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                "date": "2026-09-11"
+              },
+              "multiple_base": {
+                "kind": "page",
+                "title": "AAPL Looks 17.1% Overvalued on GF Value™ as Insider Selling Pers",
+                "url": "https://www.gurufocus.com/news/9077828/aapl-looks-171-overvalued-on-gf-value-as-insider-selling-persists",
+                "date": "2026-09-11"
+              },
+              "multiple_high": {
+                "kind": "assumption"
+              },
+              "horizon_years": {
+                "kind": "assumption"
+              },
+              "amount": {
+                "kind": "assumption"
+              }
+            },
+            "symbol": "AAPL",
+            "price": 332.245,
+            "per_share": 8.73,
+            "growth_low_pct": 0.0,
+            "growth_base_pct": 4.7,
+            "growth_high_pct": 10.0,
+            "multiple_low": 30.72,
+            "multiple_base": 38.27,
+            "multiple_high": 45.0,
+            "horizon_years": 5,
+            "amount": 10000.0
+          },
+          "symbols": [
+            "AAPL"
+          ]
+        },
+        "agent_runtime_turn": {
+          "turn_id": "e7a3db13-4afa-486b-aa17-11daf061d7f6",
+          "request_id": "015ee9e2-dae5-4063-9743-dc8bfff78d30",
+          "status": "completed",
+          "terminal": true,
+          "reconciled_outcome": null,
+          "failure_code": null,
+          "retryable": false
+        },
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "conversation_id": "010e39e8-9507-423b-b408-4851f24192f0"
+}

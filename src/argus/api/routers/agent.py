@@ -115,6 +115,7 @@ from argus.api.chat.streaming import (
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.chat.tool_results import (
+    computation_marker,
     prepare_runtime_tool_publication,
     runtime_tool_result_cards,
 )
@@ -1067,6 +1068,9 @@ async def chat_stream(
                     "discovery",
                     "next_experiments",
                     "next_steps",
+                    "answer_text_template",
+                    "answer_assumptions",
+                    "calculation_offer",
                     "research",
                 ):
                     value = runtime_result.get(key)
@@ -1121,6 +1125,9 @@ async def chat_stream(
                     metadata["result_card"] = result_card
                 if tool_result_cards:
                     metadata["tool_result_cards"] = tool_result_cards
+                    computation = computation_marker(tool_result_cards)
+                    if computation is not None:
+                        metadata["computation"] = computation
                 if runtime_result.get("tool_jobs"):
                     metadata["tool_jobs"] = runtime_result["tool_jobs"]
                 if backtest_job is not None:

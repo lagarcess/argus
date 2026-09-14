@@ -220,6 +220,7 @@ describe("computed answer decisions", () => {
     expect(calls[3].init?.method).toBeUndefined();
     expect(JSON.parse(String(calls[4].init?.body))).toEqual({
       inputs: { months: 12 },
+      calculation: 0,
     });
   });
 });

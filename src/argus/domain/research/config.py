@@ -23,6 +23,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from argus.domain.calculations.answer_request import (
+    ANSWER_CALCULATION_INSTRUCTIONS,
+    calculation_kinds_clause,
+)
 from argus.domain.research.cache import DataClass, data_class_for
 from argus.domain.research.contracts import CapabilityClass, QuestionShape
 
@@ -47,35 +51,77 @@ THOROUGH_MODEL = "anthropic/claude-opus-4-7"
 # System-level contract for every typed retrieval call. This text steers
 # Perplexity, not the interpreter; it is frozen by the recorded probe in
 # tests/research, not by the interpreter fingerprint.
-RETRIEVAL_INSTRUCTIONS = (
-    "You are the retrieval service of a finance calculator. Every current "
-    "figure you state must come from a retrieval call made in this response; "
-    "never answer from memory, and if retrieval returns nothing, say only that "
-    "the figure could not be retrieved. Reply in the requested JSON shape. "
-    "answer_markdown is the prose for the reader: no links, no list of sources, "
-    "no mention of tools, providers or models. Every figure answer_markdown "
-    "states appears once in rows, with the URL of the retrieved page it was "
-    "read from."
+_ANSWER_OPENING = (
+    "Answer the reader's money question the way a trusted expert would, as fully "
+    "as the best search answer. Open answer_markdown with the direct answer in one "
+    "or two sentences. Then, where it helps the reader, add short sections under "
+    "### headings, a table when comparing options, the formula when math explains "
+    "the answer, one worked example, and steps the reader can check. Write for a "
+    "curious non-expert. Every factual claim comes from a page retrieved in this "
+    "response and every current figure is retrieved with its as-of date, never "
+    "answered from memory; when a figure cannot be found, say that it could not be "
+    "found and answer the rest. List in source_urls every retrieved page the "
+    "answer relies on; the reader sees those pages in the sources panel, so write "
+    "no links and no list of sources, and never mention tools, "
+    "providers or models. Reply in the requested JSON shape. Every figure "
+    "answer_markdown states in digits appears once in rows, with the URL of the "
+    "retrieved page it was read from. A figure a page publishes, such as a "
+    "product's price, a rate, a fee or local inflation, is retrieved and cited, "
+    "never asked of the reader; when the reader named no exact product, retrieve "
+    "typical examples and say which. Lay out the options with their math and "
+    "trade-offs and let the reader decide: never say which product to choose, what "
+    "to do or prefer, or a rule of thumb such as rebalancing once a year, and never "
+    "state a forecast as fact. "
 )
+# A choice that turns on a future figure nobody can cite is answered with the
+# recent past. Scenario answers never carry it: a forward-valuation question
+# keeps decision 10's computed scenarios.
+HISTORY_NOT_FORECAST_INSTRUCTION = (
+    "When a choice turns on a future figure nobody can cite, such as an exchange "
+    "rate or a price, do not project it; show what the recent past did with cited "
+    "figures, computed by Argus and labeled as history, not a forecast. "
+)
+_ANSWER_REST = (
+    "Write dates as dates, not in words. follow_up_questions "
+    "holds two to four short questions, in the reader's language, that this reader "
+    "is likely to ask next and Argus can answer. When the question asks for a "
+    "figure that arithmetic on specific figures answers, such as what a fund's fees cost "
+    "over ten years, fill calculations from the retrieved figures and assumptions "
+    "you state, or leave the figures only the reader knows null so Argus offers "
+    "them; never answer such a question with prose and follow-up questions alone. "
+    "When a calculation needs a "
+    "figure only the reader knows, leave that input null and write answer_markdown "
+    "without that calculation's results: Argus offers the reader the calculation "
+    "with that figure left to enter. When the reader leaves out a detail the math "
+    "needs, such as how often interest compounds, assume the likeliest one, say "
+    "plainly what you assumed, and fill a calculation for each option the reader "
+    "weighs. When the answer turns on a figure only the reader knows, such as their "
+    "own balance or rate, fill calculations anyway with that figure left null so "
+    "Argus offers it, even when nothing else is computed. When the request is not a "
+    "money question, or "
+    "asks Argus to place a trade, move money or act on an account, set declined to "
+    "true, retrieve nothing, and write answer_markdown as one or two plain sentences "
+    "saying Argus does not do that and what it can help with instead, with no "
+    "figures, no calculations and no follow-up questions. "
+    + ANSWER_CALCULATION_INSTRUCTIONS
+    + calculation_kinds_clause()
+)
+RETRIEVAL_INSTRUCTIONS = _ANSWER_OPENING + HISTORY_NOT_FORECAST_INSTRUCTION + _ANSWER_REST
 
-# The same contract for a question whose answer is computed (decision 10):
-# the inputs are the retrieved figures and are rowed; the scenario values are
-# the model's arithmetic and are never rowed. Frozen by its own recording
-# under docs/reports/evidence/decision-10/probes.
-SCENARIO_RETRIEVAL_INSTRUCTIONS = RETRIEVAL_INSTRUCTIONS + (
-    " This question asks what something will be worth, what it must grow "
-    "into, or what it is worth today, so the answer is a set of scenarios you "
-    "compute. The retrieved figures are the inputs: the current price, "
-    "published forecasts, analyst targets, growth rates and valuation "
-    "multiples, each rowed with the page it was read from. The scenario values "
-    "are your own arithmetic from those inputs, written out step by step in "
-    "answer_markdown and never rowed; no page needs to state them. Give the "
-    "result as labeled scenario ranges (for example bear, base and bull), each "
-    "written as low to high. When no published forecast covers the full "
-    "horizon, build the scenarios from the nearest published horizon and say "
-    "what you assumed. Say that a figure could not be retrieved only when no "
-    "input at all was retrieved. Never present one number as the future, and "
-    "never say what the reader should do."
+# The same contract, without the history line, for a question whose answer is
+# computed (decision 10): the answer returns its calculation with every input's
+# source, and Argus computes the scenario figures itself. Frozen by its own recording under
+# docs/reports/evidence/grounded-math/probes.
+SCENARIO_RETRIEVAL_INSTRUCTIONS = (
+    _ANSWER_OPENING
+    + _ANSWER_REST
+    + (
+        "This question is answered by a calculation: fill calculations with "
+        "valuation_scenarios unless another listed kind fits the question better, "
+        "with the current price from market_data and every other input from a page "
+        "or a stated assumption. Never compute the answer, scenario values, ranges "
+        "or future figures yourself, and never present one number as the future."
+    )
 )
 
 
@@ -212,6 +258,7 @@ RECENCY_BY_DATA_CLASS: dict[DataClass, RecencyFilter | None] = {
     "closed_ohlcv": None,
     "filings_transcripts": None,
 }
+
 
 def iso_language(language_tag: str | None) -> str:
     """ISO 639-1 code from a BCP 47 tag: es-419 to es, en to en."""

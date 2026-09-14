@@ -6,8 +6,11 @@ import type { ApiMessage } from "./argus-api";
 export type ToolScalar = string | number | boolean | null;
 export type LocalizedToolText = { locale_key: string; interpolation_args: Record<string, ToolScalar> };
 export type ToolProgress = LocalizedToolText & { call_id: string; tool_name: string };
-export type ToolFact = { name: string; label: LocalizedToolText; value: ToolScalar; unit: LocalizedToolText | null; value_text?: LocalizedToolText | null };
-export type ToolInputFact = ToolFact & { editable: boolean; unknown: boolean; visibility?: "public" | "private" };
+/** Where a fact came from; older cards carry none and stay readable. */
+export type ToolFactSource = { kind: "user" | "page" | "market_data" | "assumption" | "computed" | "not_found"; title?: string | null; url?: string | null; date?: string | null };
+export type ToolFact = { name: string; label: LocalizedToolText; value: ToolScalar; unit: LocalizedToolText | null; value_text?: LocalizedToolText | null; source?: ToolFactSource | null };
+/** `driving` marks one of the few inputs the backend says drive the result. */
+export type ToolInputFact = ToolFact & { editable: boolean; unknown: boolean; driving?: boolean; visibility?: "public" | "private" };
 export type ToolResearchSource = { url: string; title: string; source_date?: string | null };
 export type ToolCardPresentation = {
   title: LocalizedToolText; answer: ToolFact | null; rows: ToolFact[];
@@ -15,10 +18,13 @@ export type ToolCardPresentation = {
   narrative?: string | null; sources?: ToolResearchSource[];
   visual?: EvidenceVisual | null;
 };
+/** A typed fix the user can tap: an argument edit the recompute route accepts. */
+export type ToolRepair = { kind: "set_inputs"; label: LocalizedToolText; changes: Record<string, ToolScalar> };
+export type ToolFailure = { code: string; fields: string[]; repair?: ToolRepair | null };
 export type ToolOutcome = {
   status: "succeeded" | "invalid" | "ambiguous" | "bounded" | "unavailable";
   result: Record<string, unknown> | null;
-  failure: { code: string; fields: string[] } | null;
+  failure: ToolFailure | null;
 };
 export type ToolResultCard = {
   kind: "tool_result"; schema_version: 1; tool_name: string; call_id: string;
@@ -40,9 +46,19 @@ function localized(value: unknown): value is LocalizedToolText {
   return record(value) && text(value.locale_key) && record(value.interpolation_args) &&
     Object.values(value.interpolation_args).every(scalar);
 }
+const SOURCE_KINDS = new Set(["user", "page", "market_data", "assumption", "computed", "not_found"]);
+function source(value: unknown): value is ToolFactSource {
+  if (!record(value) || !SOURCE_KINDS.has(String(value.kind))) return false;
+  return ["title", "url", "date"].every((key) => value[key] == null || typeof value[key] === "string");
+}
+function repair(value: unknown): value is ToolRepair {
+  return record(value) && value.kind === "set_inputs" && localized(value.label) && record(value.changes) &&
+    Object.keys(value.changes).length > 0 && Object.values(value.changes).every(scalar);
+}
 function fact(value: unknown): value is ToolFact {
   return record(value) && text(value.name) && localized(value.label) && scalar(value.value) &&
-    (value.unit === null || localized(value.unit)) && (value.value_text == null || localized(value.value_text));
+    (value.unit === null || localized(value.unit)) && (value.value_text == null || localized(value.value_text)) &&
+    (value.source == null || source(value.source));
 }
 export function parseToolPresentation(value: unknown): ToolCardPresentation | null {
   if (!record(value) || !localized(value.title) || !(value.answer === null || fact(value.answer)) ||
@@ -52,6 +68,8 @@ export function parseToolPresentation(value: unknown): ToolCardPresentation | nu
       record(input) && typeof input.editable === "boolean" &&
       typeof input.unknown === "boolean" &&
       !(input.unknown && (input.value !== null || input.editable)) &&
+      (input.driving === undefined || typeof input.driving === "boolean") &&
+      !(input.driving === true && input.value === null) &&
       (input.visibility === undefined || input.visibility === "public" || input.visibility === "private") && fact(input))) return null;
   if (value.narrative != null && typeof value.narrative !== "string") return null;
   if (value.sources !== undefined && (!Array.isArray(value.sources) || researchSourcesFromFacts(value.sources).length !== value.sources.length)) return null;
@@ -77,7 +95,9 @@ export function parseToolResultCard(value: unknown): ToolResultCard | null {
     if (!record(outcome.result) || outcome.failure !== null) return null;
   } else if (!["invalid", "ambiguous", "bounded", "unavailable"].includes(String(outcome.status)) ||
     outcome.result !== null || !record(outcome.failure) || !text(outcome.failure.code) ||
-    !Array.isArray(outcome.failure.fields) || !outcome.failure.fields.every(text) || presentation.answer !== null || presentation.narrative != null || presentation.visual != null) return null;
+    !Array.isArray(outcome.failure.fields) || !outcome.failure.fields.every(text) ||
+    (outcome.failure.repair != null && !repair(outcome.failure.repair)) ||
+    presentation.answer !== null || presentation.narrative != null || presentation.visual != null) return null;
   return value as ToolResultCard;
 }
 
@@ -95,6 +115,30 @@ export function hasUnavailableToolCards(metadata: Record<string, unknown>): bool
   const nested = record(metadata.final_response_payload) ? metadata.final_response_payload : null;
   const value = metadata.tool_result_cards ?? nested?.tool_result_cards;
   return value != null && (!Array.isArray(value) || value.length > toolCardsFromMetadata(metadata).length);
+}
+
+/** An input fact of one of the message's cards that the answer's prose never names. */
+export type AnswerAssumption = { artifact_id: string; name: string };
+
+export function answerAssumptionsFromMetadata(metadata: Record<string, unknown>): AnswerAssumption[] | null {
+  const value = metadata.answer_assumptions;
+  if (!Array.isArray(value)) return null;
+  const items = value.flatMap((item): AnswerAssumption[] =>
+    record(item) && text(item.artifact_id) && text(item.name) ? [{ artifact_id: item.artifact_id, name: item.name }] : []);
+  return items.length > 0 ? items : null;
+}
+
+/** One line of the assumed inputs, each by its own card's label and value; empty
+ * when no item resolves to a card input that holds a value. */
+export function answerAssumptionsText(message: Pick<Message, "answerAssumptions" | "toolResultCards">, t: ToolTranslator, locale: string): string {
+  const inputs = (message.answerAssumptions ?? []).flatMap(({ artifact_id, name }) => {
+    const input = message.toolResultCards?.find((card) => card.artifact_id === artifact_id)?.presentation.inputs.find((fact) => fact.name === name);
+    if (!input || input.value === null) return [];
+    const label = localizedToolText(input.label, t);
+    return [`${label.charAt(0).toLocaleLowerCase(locale)}${label.slice(1)} ${toolFactValue(input, t, locale)}`];
+  });
+  if (inputs.length === 0) return "";
+  return t("tools.calc.assumed_inputs.line", { inputs: new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(inputs) });
 }
 
 export function toolCardCopyText(card: ToolResultCard, t: ToolTranslator, locale: string): string {
@@ -115,11 +159,55 @@ export function toolProgressText(value: ToolProgress | null, t: ToolTranslator):
   const rendered = t(value.locale_key, { ...value.interpolation_args, defaultValue: "" });
   return rendered && rendered !== value.locale_key ? rendered : t("chat.status.working");
 }
+const CURRENCY_UNIT_KEY = "tools.calc.units.currency";
+/** A money fact prints as currency in the workspace locale; the code is its unit. */
+function currencyText(value: ToolFact, locale: string): string | null {
+  const code = value.unit?.locale_key === CURRENCY_UNIT_KEY ? value.unit.interpolation_args.code : null;
+  if (typeof code !== "string" || typeof value.value !== "number") return null;
+  try { return new Intl.NumberFormat(locale, { style: "currency", currency: code, currencyDisplay: "code" }).format(value.value); }
+  catch { return null; }
+}
 export function toolFactValue(value: ToolFact, t: ToolTranslator, locale: string): string {
+  const currency = value.value_text ? null : currencyText(value, locale);
+  if (currency) return currency;
   const content = value.value_text ? localizedToolText(value.value_text, t) : value.value === null ? t("tools.card.unknown") :
     typeof value.value === "number" ? new Intl.NumberFormat(locale, { maximumFractionDigits: 20 }).format(value.value) :
     typeof value.value === "boolean" ? t(value.value ? "tools.card.yes" : "tools.card.no") : value.value;
   return value.unit ? `${content} ${localizedToolText(value.unit, t)}` : content;
+}
+
+/** The provenance line under an input: stated, cited with its date, read from
+ * Argus market data on its date, assumed in the answer, or computed. */
+export function toolFactSourceText(fact: ToolFact, t: ToolTranslator, locale: string): string | null {
+  const provenance = fact.source;
+  if (!provenance) return null;
+  const date = provenance.date ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${provenance.date}T00:00:00Z`)) : "";
+  if (provenance.kind === "page") {
+    const title = provenance.title?.trim() || (provenance.url ? safeHost(provenance.url) : "");
+    return title && date ? t("tools.card.source.page_dated", { title, date }) : t("tools.card.source.page", { title: title || date });
+  }
+  if (provenance.kind === "market_data" && date) return t("tools.card.source.market_data_dated", { date });
+  return t(`tools.card.source.${provenance.kind}`, { defaultValue: "" }) || null;
+}
+/** The inputs a card shows: the few the backend marks as driving the result,
+ * otherwise every input that carries a value. A blank is never shown. */
+export function shownToolInputs(presentation: ToolCardPresentation): ToolInputFact[] {
+  const driving = presentation.inputs.filter((input) => input.driving === true);
+  if (driving.length > 0) return driving;
+  return presentation.inputs.filter((input) => input.value !== null && !input.unknown);
+}
+/** A solved calculation starts collapsed under the prose; the backend marks one
+ * by naming its driving inputs. A failure stays open so its fix is visible. */
+export function toolCardStartsCollapsed(card: ToolResultCard): boolean {
+  return card.outcome.status === "succeeded" && card.presentation.answer !== null &&
+    card.presentation.inputs.some((input) => input.driving === true);
+}
+function safeHost(url: string): string {
+  try { return new URL(url).hostname; } catch { return ""; }
+}
+/** A blank the user can fill: an input no source supplied, never the retained unknown. */
+export function toolInputAwaitsValue(input: ToolInputFact): boolean {
+  return input.editable && !input.unknown && input.value === null;
 }
 
 /** Transport conversion only. Domain validation and every calculation stay in Python. */
@@ -127,7 +215,7 @@ export function toolInputChange(card: ToolResultCard, name: string, raw: string)
   const input = card.presentation.inputs.find((candidate) => candidate.name === name);
   if (card.artifact_state !== "active" || !input?.editable || input.unknown || raw.trim() === "") return null;
   let value: ToolScalar = raw;
-  if (typeof input.value === "number") {
+  if (typeof input.value === "number" || (input.value === null && Number.isFinite(Number(raw)) && raw.trim() !== "")) {
     value = Number(raw);
     if (!Number.isFinite(value)) return null;
   } else if (typeof input.value === "boolean") {
@@ -147,15 +235,28 @@ export function toolInputChanges(card: ToolResultCard, drafts: Record<string, st
   return changes;
 }
 
-/** Per-artifact monotonic revisions also protect sibling cards in a plural message. */
+/** Per-artifact monotonic revisions also protect sibling cards in a plural message;
+ * the assumed inputs follow only a response that advanced one of its cards. */
 export function applyToolResultMessage(messages: Message[], response: ApiMessage): Message[] {
   const updates = toolCardsFromMetadata(response.metadata ?? {});
   return messages.map((message) => {
     if (message.id !== response.id) return message;
-    return { ...message, toolResultCards: (message.toolResultCards ?? []).map((current) => {
+    let advanced = false;
+    const toolResultCards = (message.toolResultCards ?? []).map((current) => {
       const update = updates.find((candidate) => candidate.artifact_id === current.artifact_id &&
         candidate.call_id === current.call_id && candidate.tool_name === current.tool_name);
-      return update && update.input_revision > current.input_revision ? update : current;
-    }) };
+      if (!update || update.input_revision <= current.input_revision) return current;
+      advanced = true;
+      return update;
+    });
+    // A response that moved a card forward owns the prose the backend re-rendered from it.
+    return advanced
+      ? {
+        ...message,
+        toolResultCards,
+        ...(typeof response.content === "string" ? { content: response.content } : {}),
+        answerAssumptions: answerAssumptionsFromMetadata(response.metadata ?? {}),
+      }
+      : { ...message, toolResultCards };
   });
 }

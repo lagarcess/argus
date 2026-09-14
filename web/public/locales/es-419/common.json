@@ -637,6 +637,7 @@
     "rename_failed": "No se pudo renombrar este chat. Inténtalo de nuevo.",
     "simulation_complete": "Simulación completa",
     "activity_rail": {
+      "result": "Resultado",
       "aria_label": "Actividad de la conversación",
       "backtest_completed": "Backtest terminado",
       "needs_attention": "Necesitó atención",
@@ -913,6 +914,7 @@
       "section": "Qué probar después",
       "labels": {
         "research_dynamic": "{{defaultValue}}",
+        "calculation_offer": "Calcúlalo con tus propios números",
         "change_date_range": "Probar otro rango de fechas",
         "same_setup_peer_asset": "Probar el mismo enfoque en un activo similar",
         "same_rule_peer_asset": "Probar la misma regla en un activo similar",
@@ -1243,10 +1245,31 @@
     "empty": "Aún no hay chats recientes."
   },
   "command_palette": {
+    "ask_argus": {
+      "label": "Preguntarle a Argus",
+      "hint": "Presiona Enter para iniciar un chat nuevo con esto"
+    },
+    "answer_dossier": {
+      "type": "Cálculo",
+      "asked": "Preguntaste",
+      "stored": "Respuesta guardada",
+      "latest": "Con tus cambios",
+      "recompute_failed": "No se pudo recalcular. Inténtalo de nuevo.",
+      "decision_saved_on": "Decidido el {{date}}",
+      "refresh": "Volver a buscar los datos citados",
+      "refresh_note": "Esto vuelve a leer las páginas y cuenta para tu uso de investigación.",
+      "refreshing": "Buscando los datos...",
+      "refreshed": "Buscado de nuevo",
+      "refresh_not_found": "Ninguna página indica estos datos hoy, así que no se recalculó nada.",
+      "refresh_limit": "La investigación llegó a su límite por ahora. Inténtalo más tarde.",
+      "refresh_failed": "No se pudieron buscar los datos ahora. Inténtalo de nuevo."
+    },
     "add_decision": "Agregar decisión · {{run}}",
     "add_decision_short": "Agregar decisión",
     "archive_conversation": "Archivar conversación",
     "asset_rollup": {
+      "results_involving_one": "{{count}} resultado que incluye {{symbol}}",
+      "results_involving_other": "{{count}} resultados que incluyen {{symbol}}",
       "heading": "Tu historial de Argus",
       "scope_registered": "En todas tus conversaciones",
       "scope_guest": "En esta conversación temporal",
@@ -1622,6 +1645,13 @@
     }
   },
   "receipt": {
+    "calculation": {
+      "stamp": "Argus calculó esto el {{date}}",
+      "used": "Lo que usó Argus",
+      "framing": "Es aritmética sobre los datos que se muestran, congelada en esa fecha. No es un consejo ni un pronóstico, y no cambia si esos datos cambian.",
+      "short": "Aritmética sobre datos indicados. No es una recomendación.",
+      "headline": "Aritmética, no un consejo."
+    },
     "page_title": "Probado con Argus",
     "eyebrow": "Compartido contigo",
     "provenance": "Probado con Argus",
@@ -1795,6 +1825,7 @@
       "exit_threshold": "Vende en"
     },
     "kinds": {
+      "calculation": "Cálculo",
       "backtest": "Prueba histórica",
       "research_answer": "Respuesta investigada",
       "mixed": "Respuestas y pruebas"
@@ -1847,22 +1878,243 @@
         "invalid_selection": "Elige respuestas elegibles de esta conversación.",
         "preview_changed": "El contenido cambió. Revisa otra vista previa antes de crear el enlace.",
         "invalid_source": "El contenido original no está disponible o no se puede verificar.",
-        "unsupported_backtest": "Esta prueba no tiene todos los datos necesarios para compartirla."
+        "unsupported_backtest": "Esta prueba no tiene todos los datos necesarios para compartirla.",
+        "private_inputs": "Este resultado muestra cifras que escribiste, así que se queda privado."
       }
     }
   },
   "tools": {
+    "compute": {
+      "compare": "Comparar con otro resultado",
+      "compare_close": "Cerrar comparación",
+      "compare_loading": "Buscando tus otros resultados...",
+      "compare_empty": "Todavía no hay otro resultado de este tipo.",
+      "compare_pick": "Elige un resultado para comparar",
+      "compare_failed": "La comparación no cargó. Inténtalo de nuevo.",
+      "left": "Este resultado",
+      "right": "Resultado comparado",
+      "differences": "Diferencias",
+      "no_differences": "Estos resultados no comparten cifras para comparar.",
+      "from_to": "{{left}} a {{right}}",
+      "continue": "Continuar en un chat nuevo",
+      "continuing": "Iniciando un chat nuevo...",
+      "continue_failed": "El chat nuevo no se inició. Inténtalo de nuevo.",
+      "continued_from": "Continúa un resultado guardado. Abrir el chat original",
+      "computed_on": "Calculado el {{date}}"
+    },
+    "decision": {
+      "stored": "Resultado guardado",
+      "today": "Resultado de hoy",
+      "open": "Abrir decisión",
+      "close": "Cerrar decisión",
+      "loading": "Abriendo la decisión...",
+      "load_failed": "No se pudo abrir esta decisión. Inténtalo de nuevo.",
+      "reason": {
+        "kernel_unavailable": "Esta versión no puede volver a ejecutar este tipo de cálculo.",
+        "invalid_inputs": "Los datos guardados ya no encajan con este cálculo.",
+        "inputs_not_editable": "Estos datos no se pueden editar; hace falta una prueba nueva.",
+        "run_unavailable": "La ejecución guardada ya no está disponible.",
+        "retest_unavailable": "No hay una nueva prueba disponible para esta ejecución."
+      }
+    },
+    "calc": {
+      "missing_inputs": {
+        "ask": "Para calcularlo, dime {{inputs}}."
+      },
+      "assumed_inputs": {
+        "line": "Supuestos de este cálculo: {{inputs}}."
+      },
+      "units": {
+        "currency": "{{code}}",
+        "months": "meses",
+        "years": "años",
+        "multiple": "x"
+      },
+      "fields": {
+        "direction": "Plan",
+        "present_value": "Monto inicial",
+        "payment": "Pago por período",
+        "future_value": "Monto final",
+        "annual_rate_pct": "Tasa anual",
+        "periods": "Períodos",
+        "periods_per_year": "Períodos por año",
+        "payment_timing": "Momento del pago",
+        "total_payments": "Total aportado",
+        "total_interest": "Interés total",
+        "total_growth": "Crecimiento total",
+        "start_value": "Valor inicial",
+        "contribution": "Aporte por período",
+        "end_value": "Valor final",
+        "inflation_rate_pct": "Tasa de inflación",
+        "total_contributed": "Total aportado",
+        "growth": "Crecimiento",
+        "real_end_value": "Valor final en dinero de hoy",
+        "real_annual_rate_pct": "Tasa anual real",
+        "symbol": "Activo",
+        "face_value": "Valor nominal",
+        "coupon_rate_pct": "Tasa del cupón",
+        "years": "Años",
+        "coupons_per_year": "Cupones por año",
+        "price": "Precio",
+        "yield_to_maturity_pct": "Rendimiento al vencimiento",
+        "current_yield_pct": "Rendimiento corriente",
+        "annual_coupon": "Cupón anual",
+        "total_coupons": "Cupones totales",
+        "total_return": "Retorno total al vencimiento",
+        "cash_flow": "Flujo de caja",
+        "growth_rate_pct": "Tasa de crecimiento",
+        "discount_rate_pct": "Tasa de descuento",
+        "terminal_growth_rate_pct": "Tasa de crecimiento terminal",
+        "value": "Valor",
+        "cash_flow_at_horizon": "Flujo de caja en el horizonte",
+        "per_share": "Por acción",
+        "multiple": "Múltiplo",
+        "earnings_yield_pct": "Rendimiento por ganancias",
+        "annual_income": "Ingreso anual",
+        "yield_pct": "Rendimiento",
+        "monthly_income": "Ingreso mensual",
+        "nominal_rate_pct": "Tasa nominal",
+        "compounding_per_year": "Capitalizaciones por año",
+        "amount": "Monto",
+        "fees": "Comisiones",
+        "effective_rate_pct": "Tasa efectiva anual",
+        "total_paid": "Total pagado",
+        "total_cost": "Costo total",
+        "monthly_debt_payments": "Pagos mensuales de deuda",
+        "ratio_pct": "Proporción",
+        "income_after_debt": "Ingreso después de la deuda",
+        "assets": "Activos",
+        "annual_fee": "Comisión anual",
+        "cost_over_years": "Costo a lo largo de los años",
+        "ending_with_fee": "Valor final con la comisión",
+        "ending_without_fee": "Valor final sin la comisión",
+        "key_label": "Ordenado por",
+        "prefer": "Preferir",
+        "growth_low_pct": "Crecimiento, caso bajo",
+        "growth_base_pct": "Crecimiento, caso base",
+        "growth_high_pct": "Crecimiento, caso alto",
+        "multiple_low": "Múltiplo, caso bajo",
+        "multiple_base": "Múltiplo, caso base",
+        "multiple_high": "Múltiplo, caso alto",
+        "horizon_years": "Horizonte"
+      },
+      "notes": {
+        "already_covered": "Los otros datos ya cubren esto, así que no hace falta nada más.",
+        "single_growth_forecast": "Solo se dio un pronóstico de crecimiento, así que los casos bajo y alto también lo usan.",
+        "current_multiple_held": "No se dio un múltiplo, así que cada caso mantiene el múltiplo de hoy.",
+        "single_multiple": "Solo se dio un múltiplo, así que los casos bajo y alto también lo usan.",
+        "includes_fees": "La tasa efectiva incluye las comisiones.",
+        "ranked_not_recommended": "Ordenado solo por la cifra indicada. Nada aquí es una recomendación.",
+        "scenarios_not_forecasts": "Los escenarios son aritmética sobre los datos indicados, no pronósticos."
+      },
+      "repairs": {
+        "payment_below_interest": "Usar un pago que sí amortice el saldo"
+      },
+      "time_value": {
+        "title_save": "Plan de ahorro",
+        "title_borrow": "Préstamo",
+        "progress": "Calculando el plan"
+      },
+      "growth_projection": {
+        "title": "Proyección de crecimiento",
+        "progress": "Proyectando el crecimiento"
+      },
+      "bond_value": {
+        "title": "Valor del bono",
+        "progress": "Valuando el bono"
+      },
+      "discounted_cash_flow": {
+        "title": "Flujo de caja descontado",
+        "progress": "Descontando los flujos"
+      },
+      "price_multiple": {
+        "title": "Múltiplo de precio",
+        "progress": "Calculando el múltiplo"
+      },
+      "income_yield": {
+        "title": "Rendimiento del ingreso",
+        "progress": "Calculando el rendimiento"
+      },
+      "effective_rate": {
+        "title": "Tasa efectiva",
+        "progress": "Calculando la tasa efectiva"
+      },
+      "debt_to_income": {
+        "title": "Deuda sobre ingreso",
+        "progress": "Calculando deuda sobre ingreso"
+      },
+      "expense_ratio": {
+        "title": "Ratio de gastos",
+        "progress": "Calculando la comisión"
+      },
+      "ranked_comparison": {
+        "title": "Ordenado por {{key}}",
+        "progress": "Ordenando por {{key_label}}",
+        "row": "{{rank}}. {{label}}",
+        "gap": "{{label}}, diferencia con el mejor"
+      },
+      "valuation_scenarios": {
+        "title": "Escenarios de valuación",
+        "progress": "Armando los escenarios",
+        "price_at_horizon_low": "Precio en el horizonte, caso bajo",
+        "price_at_horizon_base": "Precio en el horizonte, caso base",
+        "price_at_horizon_high": "Precio en el horizonte, caso alto",
+        "annual_return_low": "Retorno anual, caso bajo",
+        "annual_return_base": "Retorno anual, caso base",
+        "value_at_horizon_low": "Valor del monto en el horizonte, caso bajo",
+        "value_at_horizon_base": "Valor del monto en el horizonte, caso base",
+        "value_at_horizon_high": "Valor del monto en el horizonte, caso alto",
+        "annual_return_high": "Retorno anual, caso alto"
+      }
+    },
     "progress": {
       "call": "Ejecutando {{tool_name}}",
       "value": "Revisando {{known}}"
     },
     "card": {
+      "retry": "Reintentar",
+      "source": {
+        "user": "Lo dijiste tú",
+        "page": "{{title}}",
+        "page_dated": "{{title}}, {{date}}",
+        "computed": "Calculado a partir de los otros datos",
+        "not_found": "No encontrado",
+        "market_data": "Datos de mercado de Argus",
+        "market_data_dated": "Datos de mercado de Argus, {{date}}",
+        "assumption": "Supuesto en la respuesta"
+      },
+      "failure": {
+        "exactly_one_unknown": "Deja exactamente un dato en blanco para calcularlo.",
+        "missing_input": "Ninguna fuente aportó {{field}}. Escríbelo para calcular.",
+        "unknown_argument": "Uno de estos datos no forma parte de este cálculo.",
+        "invalid_arguments": "Estos datos no pudieron producir un resultado.",
+        "tool_execution_failed": "Este resultado no está disponible por ahora.",
+        "no_solution": "Ningún valor de {{field}} encaja con estos datos.",
+        "payment_never_balances": "Con este {{field}}, ningún número de períodos cuadra el plan.",
+        "payment_below_interest": "El {{field}} es menor que el interés de cada período, así que el saldo nunca baja.",
+        "no_rate_fits": "Ninguna {{field}} encaja con estos datos.",
+        "rate_out_of_range": "La {{field}} está fuera de rango.",
+        "division_by_zero": "El dato {{field}} no puede ser cero aquí.",
+        "growth_needs_positive_values": "El dato {{field}} debe ser mayor que cero.",
+        "rate_never_reaches_target": "Con esta {{field}}, la meta nunca se alcanza.",
+        "discount_below_terminal_growth": "La {{field}} debe ser mayor que la tasa de crecimiento terminal.",
+        "fees_exceed_amount": "Las {{field}} superan el monto recibido.",
+        "no_periods": "El dato {{field}} debe ser al menos uno.",
+        "periods_not_whole": "El dato {{field}} debe terminar en una fecha de cupón.",
+        "scenarios_out_of_order": "Los casos bajo, base y alto deben subir en orden; revisa el dato {{field}}.",
+        "periods_beyond_limit": "Con este dato {{field}}, el plan tomaría más de 1,200 periodos.",
+        "fee_above_balance": "El dato {{field}} se lleva más que todo el saldo cada año.",
+        "fees_need_loan_terms": "Agrega el dato {{field}} para contar las comisiones en la tasa.",
+        "price_below_zero": "Con este dato {{field}}, el precio quedaría por debajo de cero."
+      },
       "title": "Resultado",
       "solved_value": "Valor calculado",
       "input": "Dato",
       "named_input": "Dato {{name}}",
       "inputs": "Datos usados",
       "unknown": "Por calcular",
+      "show_numbers": "Ver los números",
+      "hide_numbers": "Ocultar los números",
       "yes": "Sí",
       "no": "No",
       "unavailable": "Este resultado no está disponible.",

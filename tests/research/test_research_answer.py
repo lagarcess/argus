@@ -18,7 +18,12 @@ from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchUnavailableError
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 
-from tests.research.conftest import RecordingTransport, agent_response, set_research_query
+from tests.research.conftest import (
+    RecordingTransport,
+    agent_response,
+    set_research_query,
+    typed_answer_text,
+)
 
 USER = UserState(user_id="research-user", language_preference="en")
 SPANISH_USER = UserState(user_id="research-es", language_preference="es")
@@ -106,7 +111,11 @@ def test_fast_quote_shape_grounds_and_classifies(monkeypatch) -> None:
     assert sidecar["shape"] == "fast"
     assert sidecar["usage"]["cache_status"] == "miss"
     assert result.stage_patch["assistant_response"].startswith("Apple closed")
-    assert result.decision.reason_codes == ["research_answer_fast_quote"]
+    # The quote's prose states a figure with no typed row: recorded, never replaced.
+    assert result.decision.reason_codes == [
+        "answer_figures_unsourced",
+        "research_answer_fast_quote",
+    ]
     # Runnable rows ride along; the sidecar carries anchors and peers so the
     # persisted transcript can serve later confirmation cards.
     assert result.stage_patch["next_experiments"]["rows"]
@@ -519,9 +528,69 @@ def test_provider_failure_degrades_without_fabricating(monkeypatch) -> None:
     assert patch["research"]["degraded"]["code"] == "research_unavailable_timeout"
 
 
-def test_concept_and_none_fall_through(monkeypatch) -> None:
+def test_a_none_read_falls_through(monkeypatch) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="none", symbols=[])
+    assert _run("Thanks, that helps.") is None
+
+
+def test_a_concept_question_takes_the_grounded_balanced_path(monkeypatch) -> None:
+    from argus.agent_runtime.interpreter.research_routing import (
+        CONCEPT_QUESTION_REASON_CODE,
+    )
+
     set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
-    assert _run("What is a drawdown?") is None
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="A drawdown is the fall from a peak to the lowest point after it.",
+                sources=["https://www.investor.gov/introduction-investing/drawdown"],
+            )
+        ],
+    )
+
+    result = _run("What is a drawdown?")
+
+    assert result is not None
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["max_steps"] == RESEARCH_CONFIG_SPECS["balanced"].max_steps
+    assert CONCEPT_QUESTION_REASON_CODE in result.decision.reason_codes
+
+
+def test_an_out_of_scope_verdict_with_nothing_to_run_is_researched(monkeypatch) -> None:
+    from argus.agent_runtime.interpreter.research_routing import (
+        UNSUPPORTED_VERDICT_REASON_CODE,
+    )
+
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Cards differ most by annual fee, rewards rate and APR.",
+                sources=["https://www.consumerfinance.gov/consumer-tools/credit-cards/"],
+            )
+        ],
+    )
+
+    result = _run("Which credit card should I get?")
+
+    assert result is not None and transport.requests
+    assert UNSUPPORTED_VERDICT_REASON_CODE in result.decision.reason_codes
+
+
+def test_an_out_of_scope_verdict_that_asks_or_can_run_keeps_its_route(
+    monkeypatch,
+) -> None:
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(update={"requires_clarification": True}),
+    )
+    transport = _wire_client(monkeypatch, [agent_response()])
+
+    assert _run("Buy it when it starts rising.") is None
+    assert not transport.requests
 
 
 def test_spanish_turn_carries_the_language_into_the_prompt(monkeypatch) -> None:
@@ -598,3 +667,192 @@ def test_a_shared_outage_still_says_shared(monkeypatch, user, must_say) -> None:
 
     assert result is not None
     assert must_say in result.stage_patch["assistant_response"].lower()
+
+
+def test_a_research_answer_ends_with_the_questions_its_research_offered(
+    monkeypatch,
+) -> None:
+    set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
+    questions = ["How is a drawdown measured?", "What is a maximum drawdown?"]
+    _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    "A drawdown is the fall from a peak to the lowest point after it.",
+                    [],
+                    None,
+                    questions,
+                ),
+                sources=["https://www.investor.gov/introduction-investing/drawdown"],
+            )
+        ],
+    )
+
+    result = _run("What is a drawdown?")
+
+    assert result is not None
+    assert result.stage_patch["research"]["follow_up"]["questions"] == questions
+    assert result.stage_patch["next_steps"]["items"] == [
+        {"type": "question", "text": text} for text in questions
+    ]
+
+
+def test_a_declined_request_keeps_its_plain_reply_and_offers_nothing(monkeypatch) -> None:
+    from argus.agent_runtime.research_grounded import DECLINED_REASON_CODE
+
+    reply = "Argus does not place trades. It can test a trading idea on past data."
+    _wire_client(
+        monkeypatch,
+        [agent_response(text=typed_answer_text(reply, [], None, [], declined=True))],
+    )
+
+    result = _run("Buy 10 shares of Apple for me right now.")
+
+    assert result is not None
+    assert result.stage_patch["assistant_response"] == reply
+    assert "next_steps" not in result.stage_patch
+    assert "degraded" not in result.stage_patch["research"]
+    assert DECLINED_REASON_CODE in result.decision.reason_codes
+
+
+def test_an_answer_stating_a_figure_with_no_source_is_recorded_not_replaced(
+    monkeypatch,
+) -> None:
+    from argus.agent_runtime.answer_calculation import UNSOURCED_FIGURE_REASON_CODE
+
+    set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
+    prose = "Savings accounts often pay about 4% while prices rose 3.1% last year."
+    _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text=typed_answer_text(
+                    prose,
+                    [
+                        {
+                            "subject": "United States",
+                            "symbol": None,
+                            "label": "consumer price inflation 2025",
+                            "value": 3.1,
+                            "kind": "percent",
+                            "unit": "%",
+                            "as_of": "2026-01-15",
+                            "source_url": "https://www.bls.gov/cpi/",
+                        }
+                    ],
+                ),
+                sources=["https://www.bls.gov/cpi/"],
+            )
+        ],
+    )
+
+    result = _run("Is my savings account actually losing money?")
+
+    assert result is not None
+    assert result.stage_patch["assistant_response"].startswith(prose)
+    assert UNSOURCED_FIGURE_REASON_CODE in result.decision.reason_codes
+
+
+@pytest.mark.parametrize("intent", ["conversation_followup", "beginner_guidance"])
+def test_an_educational_question_left_with_no_kind_is_researched_for_the_readers_country(
+    monkeypatch, intent
+) -> None:
+    """A question the primary read typed no kind for is research's, not the
+    interpreter's own prose: the reader's country and currency reach the
+    prompt, so the answer never assumes another country or asks for it."""
+    from argus.agent_runtime.interpreter.research_routing import (
+        UNKINDED_QUESTION_REASON_CODE,
+    )
+
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(update={"intent": intent}),
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="Ahorrar en dólares protege de la devaluación; en pesos, la tasa es mayor.",
+                sources=["https://www.bancentral.gov.do/a/d/2532-tasas-de-interes"],
+            )
+        ],
+    )
+    reader = UserState(
+        user_id="research-do", language_preference="es", country="DO", currency="DOP"
+    )
+
+    result = _run("¿Ahorro en pesos o en dólares?", user=reader)
+
+    assert result is not None and len(transport.requests) == 1
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert body["max_steps"] == RESEARCH_CONFIG_SPECS["balanced"].max_steps
+    assert (
+        "The reader lives in Dominican Republic (DO) and counts money in DOP. "
+        "Answer for that country unless the question names another, and never ask "
+        "where the reader lives."
+    ) in body["input"]
+    assert UNKINDED_QUESTION_REASON_CODE in result.decision.reason_codes
+
+
+def test_a_reader_with_no_country_is_never_placed_in_one(monkeypatch) -> None:
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(update={"intent": "conversation_followup"}),
+    )
+    transport = _wire_client(
+        monkeypatch,
+        [
+            agent_response(
+                text="An emergency fund is money kept for sudden costs.",
+                sources=["https://www.consumerfinance.gov/an-essential-guide/"],
+            )
+        ],
+    )
+
+    assert _run("Should I put my emergency fund in crypto?") is not None
+
+    body = __import__("json").loads(transport.requests[0].content.decode())
+    assert "The reader lives in" not in body["input"]
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        {"capability_question_focus": "supported_indicators"},
+        {"requires_clarification": True},
+    ],
+)
+def test_an_unkinded_question_another_route_owns_keeps_that_route(
+    monkeypatch, update
+) -> None:
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(
+            update={"intent": "conversation_followup", **update}
+        ),
+    )
+    transport = _wire_client(monkeypatch, [agent_response()])
+
+    assert _run("Can I use Bollinger Bands in a rule?") is None
+    assert not transport.requests
+
+
+def test_a_read_typed_kind_none_keeps_the_interpreters_reply(monkeypatch) -> None:
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(update={"intent": "conversation_followup"}),
+    )
+    set_research_query(monkeypatch, globals(), question_kind="none", symbols=[])
+    transport = _wire_client(monkeypatch, [agent_response()])
+
+    assert _run("Thanks, that helps.") is None
+    assert not transport.requests
