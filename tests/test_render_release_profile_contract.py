@@ -67,18 +67,20 @@ def test_release_docs_name_three_live_services_without_a_cron_surface() -> None:
     assert "operator-run" in runbook
 
 
-def test_release_contract_enables_checks_passing_autodeploy_for_all_three() -> None:
+def test_release_contract_keeps_all_three_services_on_manual_deploys() -> None:
     profile = json.loads(_source(".github/private-alpha-release-profile.json"))
     render_config = yaml.safe_load(_source("render.yaml"))
     render_by_name = {service["name"]: service for service in render_config["services"]}
     runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
 
+    # Founder decision, 2026-09-13 (#614): a Blueprint sync must not enable
+    # autodeploy, so render.yaml carries the quoted string rather than YAML false.
     for surface in ("api", "web", "workflow"):
-        assert profile["services"][surface]["auto_deploy_trigger"] == "checksPass"
-    assert render_by_name["argus-api"]["autoDeployTrigger"] == "checksPass"
-    assert render_by_name["argus-app"]["autoDeployTrigger"] == "checksPass"
+        assert profile["services"][surface]["auto_deploy_trigger"] == "off"
+    assert render_by_name["argus-api"]["autoDeployTrigger"] == "off"
+    assert render_by_name["argus-app"]["autoDeployTrigger"] == "off"
     assert "argus-backtests" not in render_by_name
-    assert "checksPass" in runbook
+    assert "`autoDeployTrigger: off`" in runbook
     assert "argus-api" in runbook
     assert "argus-app" in runbook
     assert "argus-backtests" in runbook
@@ -134,25 +136,51 @@ def test_workflow_version_status_derives_proof_from_ready_version(
     assert "expected_workflow_version_id" not in result.stdout
 
 
-def test_render_env_sync_audit_fails_when_one_autodeploy_surface_is_off(
+def test_render_env_sync_audit_reports_a_service_that_leaves_manual_deploys(
     tmp_path: Path,
 ) -> None:
+    profile = json.loads(_source(".github/private-alpha-release-profile.json"))
+    expected = profile["services"]["workflow"]["auto_deploy_trigger"]
+
     result = _run_render_release_audit(
         tmp_path,
         expect_mode="real-workflow",
         api_env_json=_real_workflow_api_env_payload(),
         web_env_json=_render_env_payload("argus-app"),
         workflow_env_json=_workflow_env_payload(),
-        workflow_service_json=json.dumps({"autoDeployTrigger": "off"}),
+        workflow_service_json=json.dumps({"autoDeployTrigger": "checksPass"}),
     )
 
     assert result.returncode == 1
     assert (
         "drift argus-backtests:autoDeployTrigger "
-        "expected=checksPass actual=off" in result.stdout
+        f"expected={expected} actual=checksPass" in result.stdout
     )
     assert "autodeploy_status=drift" in result.stdout
     assert "status=drift" in result.stdout
+
+
+def test_render_env_sync_audit_accepts_manual_deploys_on_all_three(
+    tmp_path: Path,
+) -> None:
+    manual = json.dumps({"autoDeployTrigger": "off"})
+
+    result = _run_render_release_audit(
+        tmp_path,
+        expect_mode="real-workflow",
+        api_env_json=_real_workflow_api_env_payload(),
+        web_env_json=_render_env_payload("argus-app"),
+        workflow_env_json=_workflow_env_payload(),
+        api_service_json=manual,
+        web_service_json=manual,
+        workflow_service_json=manual,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    for service in ("argus-api", "argus-app", "argus-backtests"):
+        assert f"ok {service}:autoDeployTrigger=off" in result.stdout
+    assert "autodeploy_status=ready" in result.stdout
+    assert "status=ready" in result.stdout
 
 
 def test_render_env_sync_audit_compares_the_transition_cors_allowlist(

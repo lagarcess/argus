@@ -33,9 +33,10 @@ This runbook is for the first trusted-user internet tests on Render.
 
 The promotion target is `main`, but `codex/private-alpha-next` remains the
 integration staging branch until the founder approves promotion. Do not merge
-to `main` or open a release PR before that approval. Use the live Render deploy
-mode the founder deliberately approved. Manual deployment remains valid until
-the founder explicitly enables `checksPass` for all three services. Every
+to `main` or open a release PR before that approval. Deploys are manual. The
+release profile and `render.yaml` declare `autoDeployTrigger: off` for all three
+services (founder decision, 2026-09-13), so the release audit expects `off` and
+a Blueprint sync cannot turn autodeploy on. Every
 candidate still follows the gate below and needs a release manifest before
 testers are invited; start from
 `docs/release-manifests/TEMPLATE.md` and fill it with the exact candidate SHA,
@@ -183,19 +184,16 @@ the manifest evidence. When `checksPass` is already live, use only a landing
 method that preserves the pre-gated commit SHA; otherwise code can deploy before
 the landed tree is verified.
 
-> [!WARNING]
-> **A Blueprint sync enables autodeploy after #470.** The repository declares
-> `autoDeployTrigger: checksPass`, but live Render was returned to manual
-> (`off`) for `argus-api`, `argus-app`, and `argus-backtests` on 2026-08-12
-> while the active promotion completes. After #470 is promoted, a Blueprint
-> sync directly turns `checksPass` on for the API and app even if the operator
-> intended only to reconcile unrelated configuration. The companion Workflow
-> API sync reads the same target from the release profile and turns it on for
-> `argus-backtests`. The normal three-service configuration sync can therefore
-> enable autodeploy for all three as a side effect of syncing configuration,
-> not as the result of a fresh deployment decision. Before step 5, obtain an
-> explicit founder decision to enable autodeploy. Without that decision, keep
-> all three live triggers manual and deploy all three services explicitly.
+> [!NOTE]
+> **The deploy mode lives in the release profile.** The profile and
+> `render.yaml` declare `off` for `argus-api`, `argus-app`, and
+> `argus-backtests`, so a Blueprint sync and the companion Workflow API sync
+> (`.github/render-env-sync.sh workflow-runtime`) keep all three manual. Before
+> 2026-09-13 the repository declared `checksPass` while live Render stayed
+> manual, so any configuration sync could turn autodeploy on as a side effect
+> and every release audit reported drift. Enabling autodeploy is a founder
+> decision made by changing the profile and `render.yaml` together for all three
+> services, never by a sync.
 
 5. In Render, sync the Blueprint from `render.yaml` only when `argus-api` or
    `argus-app` config drift needs reconciliation. Render Blueprints cannot
@@ -299,18 +297,38 @@ pre-export opt-in).
 
 13. Run both authoritative canary surfaces with privacy-safe evidence. They are
 separate fail-red jobs, so one cannot hide or relabel a failure in the other.
+The canary is a small fixed check that never follows features (founder
+decision, 2026-09-13, #614). The release profile's `canary.required_steps`
+names its four checks:
 
-- **Release coherence** checks the exact deployed SHA across API, app, and
-  `argus-backtests`; runs the release-config audit, warmup, and live-provider
-  workflow proof; and keeps the direct API signup-denial probe plus the
-  access-approval welcome-email proof.
+- `services_same_commit`: `argus-api`, `argus-app`, and `argus-backtests` run
+  the same commit.
+- `signed_in_chat_answer`: the signed-in canary account loads the chat and gets
+  one ordinary answer.
+- `backtest_completes`: one backtest completes.
+- `research_answer_with_sources`: one research question returns an answer with
+  sources.
+
+Every failure names the check, release guard, or harness step that failed, as
+`ERROR: canary failed at <name>: <reason>` in the log and as `failed` in the
+evidence JSON. The evidence also records each check's status.
+
+- **Release coherence** proves `services_same_commit` and keeps three release
+  guards: `release_config` (the release-config audit, warmup, and live-provider
+  workflow proof), `disabled_signup_denial` (the direct API signup-denial
+  probe), and `welcome_email` (the access-approval welcome-email proof).
 - **Authenticated browser journey** starts from a private Playwright storage
-  state, loads the Spanish chat directly, completes one real backtest, records
-  the decision, reloads the result, and reopens it through Omnisearch. It never
-  visits the signup or login page. It rechecks three-service deployed-SHA
-  coherence immediately before minting the session and after the canonical
-  postconditions, so a rollout during the journey cannot inherit the earlier
-  release label.
+  state and runs the other three checks against the deployed app. It never
+  visits the signup or login page. It rechecks `services_same_commit`
+  immediately before minting the session and after the browser checks, so a
+  rollout during the checks cannot inherit the earlier release label. Sign-in
+  retries once when `GET /api/v1/me` returns 401, 429, or a server error, and
+  the evidence records `sign_in_attempts`, so a green run with two attempts is
+  still visible. A failed sign-in names the HTTP status and API problem code.
+
+Decision records, receipts, Search reopening, exact result facts, intercepted
+recovery, and console checks are not canary checks. The promotion walk covers
+features.
 
 The disabled-email denial check belongs only to release coherence. The runner
 creates a `user` allowlist row with `disabled_at` set, then
@@ -440,15 +458,17 @@ poetry run python scripts/ops/canary_capture_replay.py \
 ```
 
 If the failure happened before any final response existed, keep the capture as
-diagnostic evidence and inspect the hashed labels, failure stage, API logs, and
-route-receipt summary instead of forcing a replay or spending a second journey.
+diagnostic evidence and inspect the hashed labels, the failed check, and API
+logs instead of forcing a replay or spending a second journey.
 
-Read the job name, failure stage, and reason before treating a canary red as a
-product regression. `Release coherence` owns deployment, config, warmup,
-provider, and API signup-denial failures. `Authenticated browser journey` owns
-session creation, the rendered Golden Path, the real backtest, and browser/API
-postconditions. A browser job must never report a Turnstile challenge timeout,
-because it does not cross an auth form.
+Read the job name, the failed check, and its reason before treating a canary red
+as a product regression. `Release coherence` owns `services_same_commit` and the
+`release_config`, `disabled_signup_denial`, and `welcome_email` guards.
+`Authenticated browser journey` owns session creation and the
+`signed_in_chat_answer`, `backtest_completes`, and
+`research_answer_with_sources` checks. `canary_harness` means the canary itself
+could not run, not that the product failed. A browser job must never report a
+Turnstile challenge timeout, because it does not cross an auth form.
 
 If the exact candidate reaches the API but returns the normal interpreter
 recovery response, keep the failed capture and evidence. Record the safe HTTP
