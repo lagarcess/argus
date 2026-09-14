@@ -37,13 +37,19 @@ typed facts instead of prose; no live eval in this lane.
 - `43d971ea` removes the field from the web card type, fixtures and e2e mocks.
 - `0d57492a` updates `API_CONTRACT.md`, `DATA_MODEL.md` and
   `CONVERSATIONAL_RUNTIME.md`.
+- `d226ba1f` moves two existing tests off the retired sentence.
+- `196b9e84` reconciles integration `231184bb` one way (no overlapping files).
+- `57c34585` answers Codex round 1: each fact has one owner and no fallback.
+  The card owns `strategy_type` and dates, the payload owns only the symbol
+  list, and a legacy card missing a fact yields null.
 
-## After, at `0d57492a` with a clean tree
+## After, at `57c34585` with a clean tree
 
 Headless Chromium against a memory-mode replay (`replay_confirmation_api.py`,
 `capture_confirmation_evidence.mjs`), workspace `es-419`, zero provider calls,
 zero hosted database reads or writes, zero console errors
-(`after/capture-report.json`).
+(`after/capture-report.json`). The first capture ran at `0d57492a` and gave
+the same results.
 
 | Capture | What it shows |
 | :--- | :--- |
@@ -61,12 +67,14 @@ and the stored preview as, for example, `AAPL buy_and_hold 2024-01-02 2024-12-31
 
 ## Tests
 
-`tests/test_confirmation_turn_prose.py` has 36 cases: seven shapes (buy and
+`tests/test_confirmation_turn_prose.py` has 38 cases: seven shapes (buy and
 hold, recurring buys, RSI threshold, dip buying, indicator threshold, signal
 strategy, moving-average crossover) in `en` and `es-419` through the card
 builder and the chat route, plus the in-place edit, a legacy row, and the
-Supabase finalize and create preview writers in both languages. All 36 failed
-on `736dfd03` and pass at `07c14964`.
+Supabase finalize and create preview writers in both languages. The first 36
+failed on `736dfd03`. `test_card_turn_readers_only_see_facts_the_card_carries`
+fails on `01bcfed` (the legacy card got the payload's `dca_accumulation` and
+2024 dates) and passes at `57c34585`.
 
 ## Limits
 

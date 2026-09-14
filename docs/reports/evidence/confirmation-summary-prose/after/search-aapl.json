@@ -14,13 +14,13 @@
         ],
         "template": "buy_and_hold"
       },
-      "updated_at": "2026-09-14T01:29:35.479653Z",
+      "updated_at": "2026-09-14T01:43:01.272101Z",
       "conversation_id": "00000000-0000-4000-8000-000000009304",
       "match": {
         "layer": "message",
         "fragment": "Compra y mantén AAPL durante 2024 con 10000 dólares",
         "count": 1,
-        "message_id": "4badd696-1a2d-4f6a-bad0-f3b30780e168"
+        "message_id": "d812fce2-d68e-4a25-9cb2-bcbd2a23b4df"
       },
       "dossier": null,
       "total_runs": 0,
@@ -41,13 +41,13 @@
         ],
         "template": "dca_accumulation"
       },
-      "updated_at": "2026-09-14T01:29:35.478967Z",
+      "updated_at": "2026-09-14T01:43:01.271475Z",
       "conversation_id": "00000000-0000-4000-8000-000000009302",
       "match": {
         "layer": "message",
         "fragment": "Invierte 500 dólares cada mes en AAPL durante 2024",
         "count": 1,
-        "message_id": "c6247eb2-d594-409e-b1ee-31d93290e295"
+        "message_id": "9a40a3f5-5a1c-4fd0-8a6e-b01fe6a2d9f7"
       },
       "dossier": null,
       "total_runs": 0,
@@ -68,13 +68,13 @@
         ],
         "template": "buy_and_hold"
       },
-      "updated_at": "2026-09-14T01:29:35.340353Z",
+      "updated_at": "2026-09-14T01:43:01.142388Z",
       "conversation_id": "00000000-0000-4000-8000-000000009301",
       "match": {
         "layer": "message",
         "fragment": "Compra y mantén AAPL durante 2024 con 10000 dólares",
         "count": 1,
-        "message_id": "5500545e-f5e6-475f-b6df-543e94469360"
+        "message_id": "34d2ae7f-bda4-4e79-810b-bc5f9c2afa80"
       },
       "dossier": null,
       "total_runs": 0,
