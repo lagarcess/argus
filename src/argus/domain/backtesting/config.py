@@ -214,7 +214,11 @@ def normalize_backtest_config(
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
         "side": payload.get("side") or "long",
-        "starting_capital": payload.get("starting_capital") or 1000,
+        # A stated amount, zero included, reaches the capital gate; only an
+        # omitted one takes the default.
+        "starting_capital": 1000
+        if payload.get("starting_capital") is None
+        else payload["starting_capital"],
         "allocation_method": payload.get("allocation_method") or "equal_weight",
         "benchmark_symbol": benchmark_symbol,
         "parameters": payload.get("parameters") or {},

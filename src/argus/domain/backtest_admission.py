@@ -204,7 +204,9 @@ def normalize_direct_launch_payload(payload: dict[str, Any]) -> dict[str, Any]:
     normalized["template"] = normalized["template"] or "rsi_mean_reversion"
     normalized["side"] = normalized["side"] or "long"
     normalized["allocation_method"] = normalized["allocation_method"] or "equal_weight"
-    capital = normalized["starting_capital"] or 1000
+    capital = normalized["starting_capital"]
+    if capital is None:
+        capital = 1000
     if isinstance(capital, (int, float)) and not isinstance(capital, bool):
         capital = float(capital)
     normalized["starting_capital"] = capital

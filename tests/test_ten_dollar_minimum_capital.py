@@ -557,7 +557,7 @@ def test_a_ten_dollar_run_retests_at_ten_and_its_card_holds_the_floor(
         api_state.store.backtest_run_owners.pop(run.id, None)
 
 
-def test_the_backtest_endpoint_accepts_ten_and_names_the_floor() -> None:
+def test_the_backtest_endpoint_holds_the_floor_and_defaults_only_when_unstated() -> None:
     client = _client()
     conversation_id = _conversation_id(client, "en")
     body = {
@@ -567,13 +567,22 @@ def test_the_backtest_endpoint_accepts_ten_and_names_the_floor() -> None:
         "symbols": ["TSLA"],
     }
 
-    refused = client.post(
+    for key, stated in (("floor-refused", UNDER_THE_FLOOR), ("floor-zero", 0)):
+        refused = client.post(
+            "/api/v1/backtests/run",
+            headers={"Idempotency-Key": key},
+            json={**body, "starting_capital": stated},
+        )
+        assert refused.status_code == 422, (stated, refused.text)
+        assert "between 10 and 100,000,000" in refused.text
+
+    unstated = client.post(
         "/api/v1/backtests/run",
-        headers={"Idempotency-Key": "floor-refused"},
-        json={**body, "starting_capital": UNDER_THE_FLOOR},
+        headers={"Idempotency-Key": "floor-unstated"},
+        json=body,
     )
-    assert refused.status_code == 422, refused.text
-    assert "between 10 and 100,000,000" in refused.text
+    assert unstated.status_code == 200, unstated.text
+    assert unstated.json()["run"]["config_snapshot"]["starting_capital"] == 1000
 
     accepted = client.post(
         "/api/v1/backtests/run",
