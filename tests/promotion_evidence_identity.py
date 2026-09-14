@@ -14,11 +14,14 @@ from a list of product paths.
 from __future__ import annotations
 
 import ast
+import posixpath
 import re
 import subprocess
 from collections.abc import Callable, Iterable, Mapping
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
+
+import iniconfig
 
 try:
     import tomllib
@@ -27,6 +30,10 @@ except ModuleNotFoundError:  # Python 3.10
 
 # The live eval runs this module under pytest, and the targeted A/B imports it.
 MEASUREMENT_ENTRY = "tests/evals/test_measurement_eval_live.py"
+
+# pytest takes its settings from an ini, toml or cfg file in the test's folder or
+# above it, so every such file there can change the run.
+_CONFIG_SUFFIXES = frozenset({".ini", ".toml", ".cfg"})
 
 # Third-party code and the interpreter sit outside the tree, which reaches them
 # only through the files the environment is built from.
@@ -117,35 +124,62 @@ def _reach_at_commit(repository_root: Path, sha: str) -> frozenset[str]:
 
 
 def reach_in_tree(tracked: frozenset[str], read: ReadFiles) -> frozenset[str]:
-    """The measurement's modules, the data beside them, and its environment.
+    """The measurement's modules, the data beside them, its pytest configuration,
+    and its environment.
 
-    An import counts wherever it appears, inside a function or as a package
-    named by a string, because lazily imported code is measured all the same.
+    An import counts wherever it appears, inside a function, as a package named
+    by a string, or as a plugin a pytest config names, because code loaded late
+    is measured all the same.
     """
 
     assert MEASUREMENT_ENTRY in tracked, (
         f"{MEASUREMENT_ENTRY} is missing, so what the measurement reaches is unknown."
     )
-    roots = import_roots(read(["pyproject.toml"]).get("pyproject.toml"))
-    modules = _imported_modules(tracked, read, roots)
+    settings = pytest_settings(tracked, read)
+    roots = import_roots(tracked, read)
+    named = [word for values in settings.values() for words in values.values() for word in words]
+    modules = _imported_modules(tracked, read, roots, named)
     return frozenset(
         modules
         | _data_beside(modules, tracked, roots)
+        | set(settings)
         | {path for path in _ENVIRONMENT_FILES if path in tracked}
     )
 
 
-def import_roots(pyproject: bytes | None) -> tuple[str, ...]:
-    """Where the eval resolves imports: pytest's pythonpath, the repository root
-    (spelled ''), and each Poetry package source."""
+def pytest_settings(
+    tracked: frozenset[str], read: ReadFiles
+) -> dict[str, dict[str, list[str]]]:
+    """Each config file pytest could read for the measurement, with the pytest
+    settings in it as words."""
 
+    folders = {str(folder) for folder in PurePosixPath(MEASUREMENT_ENTRY).parents}
+    paths = sorted(
+        path
+        for path in tracked
+        if str(PurePosixPath(path).parent) in folders
+        and PurePosixPath(path).suffix in _CONFIG_SUFFIXES
+    )
+    return {path: _pytest_section(path, source) for path, source in read(paths).items()}
+
+
+def import_roots(tracked: frozenset[str], read: ReadFiles) -> tuple[str, ...]:
+    """Where the eval resolves imports: every pythonpath a pytest config declares,
+    relative to that config, the repository root (spelled ''), and each Poetry
+    package source."""
+
+    declared = [
+        posixpath.join(str(PurePosixPath(path).parent), entry)
+        for path, settings in pytest_settings(tracked, read).items()
+        for entry in settings.get("pythonpath", [])
+    ]
+    pyproject = read(["pyproject.toml"]).get("pyproject.toml")
     tool = tomllib.loads(pyproject.decode("utf-8")).get("tool", {}) if pyproject else {}
-    declared = (
-        *tool.get("pytest", {}).get("ini_options", {}).get("pythonpath", []),
+    declared += [
         ".",
         *(package.get("from", ".") for package in tool.get("poetry", {}).get("packages", [])),
-    )
-    normalized = (PurePosixPath(entry).as_posix() for entry in declared)
+    ]
+    normalized = (posixpath.normpath(entry) for entry in declared)
     return tuple(dict.fromkeys("" if entry == "." else entry for entry in normalized))
 
 
@@ -161,20 +195,47 @@ def entry_modules(tracked: frozenset[str], roots: tuple[str, ...]) -> tuple[str,
     return tuple(_module_name(path, roots) for path in paths if path in tracked)
 
 
+def _pytest_section(path: str, source: bytes) -> dict[str, list[str]]:
+    text = source.decode("utf-8")
+    if path.endswith(".toml"):
+        document = tomllib.loads(text)
+        table = document.get("tool", {}).get("pytest", {})
+        section = {**document.get("pytest", {}), **table, **table.get("ini_options", {})}
+    else:
+        config = iniconfig.IniConfig(path, data=text)
+        section = {
+            key: value
+            for name in ("pytest", "tool:pytest")
+            if name in config
+            for key, value in config[name].items()
+        }
+    return {
+        key: [str(item) for item in value] if isinstance(value, list) else str(value).split()
+        for key, value in section.items()
+        if not isinstance(value, dict)
+    }
+
+
 def _imported_modules(
-    tracked: frozenset[str], read: ReadFiles, roots: tuple[str, ...]
+    tracked: frozenset[str],
+    read: ReadFiles,
+    roots: tuple[str, ...],
+    named: Iterable[str],
 ) -> frozenset[str]:
-    def resolve(dotted: str) -> str | None:
+    def resolve(dotted: str) -> tuple[str, ...]:
         parts = dotted.split(".")
         if not all(part.isidentifier() for part in parts):
-            return None
+            return ()
+        matches = []
         for root in roots:
             stem = "/".join((root, *parts) if root else parts)
-            # A regular package shadows a same-named module beside it.
+            # A regular package shadows a same-named module beside it. Roots come
+            # from several configs, so a match under every root counts.
             for path in (f"{stem}/__init__.py", f"{stem}.py"):
                 if path in tracked:
-                    return path
-        return None
+                    matches.append(path)
+                    break
+        return tuple(matches)
 
     found: dict[str, str] = {}
     pending: dict[str, str] = {}
@@ -184,12 +245,16 @@ def _imported_modules(
         parts = dotted.split(".")
         for depth in range(1, len(parts) + 1):
             module = ".".join(parts[:depth])
-            path = resolve(module)
-            if path and path not in found:
-                pending.setdefault(path, module)
+            for path in resolve(module):
+                if path not in found:
+                    pending.setdefault(path, module)
 
     for module in entry_modules(tracked, roots):
         reach(module)
+    # A module a pytest config names, such as `-p plugin`, loads before the run.
+    for word in named:
+        if resolve(word.removeprefix("-p")):
+            reach(word.removeprefix("-p"))
     while pending:
         batch = dict(pending)
         pending.clear()

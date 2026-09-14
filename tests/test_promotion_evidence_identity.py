@@ -6,7 +6,7 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import pytest
@@ -177,13 +177,12 @@ def test_reach_covers_every_repository_module_the_measurement_loads() -> None:
         text=True,
     ).stdout
     tracked = frozenset(path for path in listed.split("\0") if path)
-    reach = reach_in_tree(
-        tracked,
-        lambda paths: {
-            path: (ROOT / path).read_bytes() for path in paths if (ROOT / path).is_file()
-        },
-    )
-    roots = import_roots((ROOT / "pyproject.toml").read_bytes())
+
+    def read(paths: Iterable[str]) -> dict[str, bytes]:
+        return {path: (ROOT / path).read_bytes() for path in paths if (ROOT / path).is_file()}
+
+    reach = reach_in_tree(tracked, read)
+    roots = import_roots(tracked, read)
     loaded = subprocess.run(
         [
             sys.executable,

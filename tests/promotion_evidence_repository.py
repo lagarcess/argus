@@ -25,6 +25,12 @@ _ENGINE = (
     "    return record(value)\n"
 )
 _LEDGER = "def record(value):\n    return value\n"
+_HARNESS = (
+    "from argus.stages import interpret\n\n\n"
+    "def run_eval_case(case):\n"
+    "    from argus.engine import execute\n\n"
+    "    return execute(interpret(case))\n"
+)
 
 # Each reaches the measurement, so changing it needs a new one.
 REACHED_BY_THE_EVAL = {
@@ -76,6 +82,28 @@ STRUCTURAL_CHANGES_REACHED: dict[
         {"tests/evals/measurement_cases/generate.py": "CASES = []\n"},
         {MEASUREMENT_CASES: json.dumps({"cases": [{"id": "case-c"}]})},
         (MEASUREMENT_CASES,),
+    ),
+    "pytest-config-added-at-the-root": (
+        {},
+        {".pytest.ini": "[pytest]\naddopts = -p no:cacheprovider\n"},
+        (".pytest.ini",),
+    ),
+    "module-a-pytest-config-names": (
+        {
+            "pytest.ini": "[pytest]\naddopts = -p tests.evals.plugin\n",
+            "tests/evals/plugin.py": "VALUE = 1\n",
+        },
+        {"tests/evals/plugin.py": "VALUE = 2\n"},
+        ("tests/evals/plugin.py",),
+    ),
+    "pythonpath-a-pytest-config-declares": (
+        {
+            "pytest.ini": "[pytest]\npythonpath = lib\n",
+            "lib/extras.py": "VALUE = 1\n",
+            "tests/evals/measurement_eval_harness.py": f"{_HARNESS}\n\nimport extras\n",
+        },
+        {"lib/extras.py": "VALUE = 2\n"},
+        ("lib/extras.py",),
     ),
 }
 
@@ -187,12 +215,7 @@ def _layout(case_ids: Iterable[str]) -> dict[str, str]:
         MEASUREMENT_ENTRY: (
             "from tests.evals.measurement_eval_harness import run_eval_case\n"
         ),
-        "tests/evals/measurement_eval_harness.py": (
-            "from argus.stages import interpret\n\n\n"
-            "def run_eval_case(case):\n"
-            "    from argus.engine import execute\n\n"
-            "    return execute(interpret(case))\n"
-        ),
+        "tests/evals/measurement_eval_harness.py": _HARNESS,
         "tests/evals/test_unrelated.py": "def test_unrelated():\n    assert True\n",
         MEASUREMENT_CASES: json.dumps(
             {
