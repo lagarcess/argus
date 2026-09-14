@@ -260,19 +260,19 @@ def resolve_calculation(
         name: ToolFactSource.model_validate(value)
         for name, value in (prior.get(TOOL_INPUT_SOURCES_FIELD) or {}).items()
     }
-    if CURRENCY_FIELD in declared and (
-        CURRENCY_FIELD not in prior or CURRENCY_FIELD in request.updated_fields
+    currency_input = _explicit_currency(request)
+    if (
+        CURRENCY_FIELD in declared
+        and (CURRENCY_FIELD not in prior or CURRENCY_FIELD in request.updated_fields)
+        and currency_input is None
     ):
-        currency_input = _explicit_currency(request)
-        sources[CURRENCY_FIELD] = ToolFactSource(
-            kind="user"
-            if currency_input is not None and currency_input.source == "user"
-            else "assumption"
-        )
+        sources[CURRENCY_FIELD] = ToolFactSource(kind="assumption")
     resolved = ResolvedCalculation(declaration=declaration, arguments=arguments)
     for item in request.inputs:
         name = item.name
-        if name in (CURRENCY_FIELD, SYMBOL_FIELD) or name == request.solve_for:
+        if name == SYMBOL_FIELD or name == request.solve_for:
+            continue
+        if name == CURRENCY_FIELD and item != currency_input:
             continue
         if name not in declared:
             _note(notes, INPUT_UNDECLARED_REASON_CODE, name=name)
@@ -328,6 +328,8 @@ def resolve_calculation(
                     else evidence_source(cited)
                 ),
             )
+    if CURRENCY_FIELD in declared:
+        arguments[CURRENCY_FIELD] = counted_in
     if request.solve_for in declared:
         arguments[request.solve_for] = None
     if sources:

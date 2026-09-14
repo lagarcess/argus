@@ -313,3 +313,23 @@ async def test_interpreter_observer_reads_actual_result_and_preserves_it():
     assert await observed.ainvoke("authored offline request") is result
     assert observed.research_need() is False
     assert requests == ["authored offline request"]
+
+
+@pytest.mark.asyncio
+async def test_interpreter_observer_preserves_delegate_failure_state():
+    from tests.evals.measurement_research_calls import ObservedInterpreter
+
+    class RejectedInterpreter:
+        last_failure_kind = None
+
+        async def ainvoke(self, request):
+            self.last_failure_kind = "response_contract_rejected"
+            return None
+
+    delegate = RejectedInterpreter()
+    observed = ObservedInterpreter(delegate)
+    assert await observed.ainvoke(object()) is None
+    assert observed.last_failure_kind == delegate.last_failure_kind
+    assert observed.research_need() is None
+    delegate.last_failure_kind = None
+    assert observed.last_failure_kind is None

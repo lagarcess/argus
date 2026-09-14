@@ -16,6 +16,9 @@ class ObservedInterpreter:
         self.delegate = delegate
         self.interpretation: Any = None
 
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.delegate, name)
+
     async def ainvoke(self, request: Any) -> Any:
         self.interpretation = await self.delegate.ainvoke(request)
         return self.interpretation

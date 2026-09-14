@@ -95,3 +95,14 @@ def test_the_provider_schema_carries_no_bound_a_strict_model_refuses() -> None:
         )
         == 16
     )
+
+
+def test_historical_catalogue_exposes_observed_window_reference_names():
+    line = next(
+        line
+        for line in calculation_kinds_clause().splitlines()
+        if line.startswith("- historical_drawdown:")
+    )
+    results = line.split("Results: ", 1)[1]
+    assert "observed_start_date" in results
+    assert "observed_end_date" in results

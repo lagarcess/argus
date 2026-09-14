@@ -10,6 +10,7 @@ name never fails the whole answer, and the runtime drops it on record.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated, Any, Literal, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema, field_validator
@@ -223,7 +224,8 @@ def _result_line(declaration: ToolDeclaration) -> str:
         for name, model_field in declaration.result_type.model_fields.items()
         if not name.startswith("solved_")
         and get_origin(model_field.annotation) is not list
-        and model_field.annotation in (float, int, float | None, int | None)
+        and model_field.annotation
+        in (float, int, date, float | None, int | None, date | None)
     ]
     return f" Results: {', '.join(names)}." if names else ""
 

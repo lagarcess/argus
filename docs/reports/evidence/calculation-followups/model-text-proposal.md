@@ -44,7 +44,7 @@ These exact generated catalogue lines are already implemented. No separate handw
 
 ```text
 - scaled_amount: Multiply or divide an amount by a stated percentage or multiple, without imposing a time period. Percent means rate / 100; multiple means the rate itself. For currency conversion, currency is the amount's currency and output_currency is the result's currency: multiply a quote in output currency per input currency, or divide a quote in input currency per output currency. Inputs: currency, amount, rate, rate_unit (percent or multiple), operation (multiply or divide), output_currency. Results: scaled_amount.
-- historical_drawdown: Measure an asset's worst historical peak-to-trough percentage decline from Argus market-data daily closes. Supply the symbol and optional start_date/end_date; omitted dates use five years ending yesterday. The result reports the actual observation window, not an all-time or intraday loss, and does not predict future losses. Inputs: symbol, start_date (ISO date), end_date (ISO date). Results: max_drawdown_pct, observations.
+- historical_drawdown: Measure an asset's worst historical peak-to-trough percentage decline from Argus market-data daily closes. Supply the symbol and optional start_date/end_date; omitted dates use five years ending yesterday. The result reports the actual observation window, not an all-time or intraday loss, and does not predict future losses. Inputs: symbol, start_date (ISO date), end_date (ISO date). Results: max_drawdown_pct, requested_start_date, requested_end_date, observed_start_date, observed_end_date, observations.
 ```
 
 ## Prose judge additions
