@@ -1812,6 +1812,17 @@ you, never prescribe what they should do" still stands.
   model chooses, each an ordered set of sections; written freely first and structured
   by a cheap model after; rendered the same way every time; graded by rubric.
   Proposed 2026-09-13 after comparing Q7 with Perplexity's answer.
+- **Memory and private chats need scoping and a final decision for the next
+  roadmap.** Founder, 2026-09-13. Today memory is shown only to admin and developer
+  accounts, and a saved decision recalled into a chat is an annotation the model
+  never reads. "Private chat" only stops that recall and the memory prompt for one
+  chat, is kept in the browser rather than on the conversation, and does not keep
+  the chat out of history, Search or the model providers. Decide what private means
+  and whether memory reaches every registered user before continuity and saved
+  living items build on it.
+- **The canary needs a decision: shrink it or retire it (#614).** Founder,
+  2026-09-13: it has never worked and becomes a moving target as Argus grows. It
+  failed 97 of its last 100 runs.
 
 Resolved:
 
