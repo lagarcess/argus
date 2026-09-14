@@ -1,0 +1,1174 @@
+[
+  {
+    "language": "en",
+    "turn": 1,
+    "prompt": "Test $100 bucks on @mrna stock from August 16 to August 19 just a few days this year",
+    "stored_constraint": {
+      "category": "data_window_unavailable",
+      "simplification_options": [
+        {
+          "id": "change_date_range",
+          "label": "Choose another value",
+          "replacement_values": {
+            "requested_field": "date_range"
+          }
+        }
+      ]
+    },
+    "patch": {
+      "assistant_prompt": "MRNA only has price history starting from late July 2020, so an August 2026 window is beyond what's available. Would you like to pick a different date range?",
+      "response_intent": {
+        "kind": "unsupported_recovery",
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "requested_fields": [
+          "date_range"
+        ],
+        "facts": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "current_user_message": "Test $100 bucks on @mrna stock from August 16 to August 19 just a few days this year",
+          "language": "en",
+          "unsupported_constraints": [
+            {
+              "category": "data_window_unavailable",
+              "simplification_options": [
+                {
+                  "id": "change_date_range",
+                  "label": "Choose another value",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  }
+                }
+              ]
+            }
+          ],
+          "preserved_optional_parameter_status": {}
+        },
+        "options": [
+          {
+            "id": "change_date_range",
+            "label": "Choose another value",
+            "replacement_values": {
+              "requested_field": "date_range"
+            }
+          }
+        ]
+      },
+      "requested_field": "date_range",
+      "missing_required_fields": [],
+      "unsupported_constraints": [
+        {
+          "category": "data_window_unavailable",
+          "simplification_options": [
+            {
+              "id": "change_date_range",
+              "label": "Choose another value",
+              "replacement_values": {
+                "requested_field": "date_range"
+              }
+            }
+          ]
+        }
+      ],
+      "simplification_options": [
+        {
+          "id": "change_date_range",
+          "label": "Choose another value",
+          "replacement_values": {
+            "requested_field": "date_range"
+          }
+        }
+      ],
+      "clarification": {
+        "kind": "unsupported_recovery",
+        "reason_code": "data_window_unavailable",
+        "prompt_source": "llm_generated",
+        "requested_field": "date_range",
+        "requested_fields": [
+          "date_range"
+        ],
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "payload": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "raw_value": null
+        },
+        "options": [
+          {
+            "id": "change_date_range",
+            "replacement_values": {
+              "requested_field": "date_range"
+            },
+            "compatibility_label": "Choose another value"
+          }
+        ]
+      }
+    },
+    "route_receipts": [
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 1451,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2052,
+          "completion_tokens": 102,
+          "total_tokens": 2154,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0002307,
+        "context_packet_ids": [],
+        "created_at": "2026-09-14T21:51:49.582296+00:00"
+      }
+    ]
+  },
+  {
+    "language": "en",
+    "turn": 2,
+    "prompt": "That this year check again",
+    "stored_constraint": {
+      "category": "data_window_unavailable",
+      "simplification_options": [
+        {
+          "id": "change_date_range",
+          "label": "Choose another value",
+          "replacement_values": {
+            "requested_field": "date_range"
+          }
+        }
+      ]
+    },
+    "patch": {
+      "assistant_prompt": "MRNA's price history starts from July 2020, so the available data doesn't cover the full window you mentioned. Would you like to choose a different date range?",
+      "response_intent": {
+        "kind": "unsupported_recovery",
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "requested_fields": [
+          "date_range"
+        ],
+        "facts": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "current_user_message": "That this year check again",
+          "language": "en",
+          "unsupported_constraints": [
+            {
+              "category": "data_window_unavailable",
+              "simplification_options": [
+                {
+                  "id": "change_date_range",
+                  "label": "Choose another value",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  }
+                }
+              ]
+            }
+          ],
+          "preserved_optional_parameter_status": {}
+        },
+        "options": [
+          {
+            "id": "change_date_range",
+            "label": "Choose another value",
+            "replacement_values": {
+              "requested_field": "date_range"
+            }
+          }
+        ]
+      },
+      "requested_field": "date_range",
+      "missing_required_fields": [],
+      "unsupported_constraints": [
+        {
+          "category": "data_window_unavailable",
+          "simplification_options": [
+            {
+              "id": "change_date_range",
+              "label": "Choose another value",
+              "replacement_values": {
+                "requested_field": "date_range"
+              }
+            }
+          ]
+        }
+      ],
+      "simplification_options": [
+        {
+          "id": "change_date_range",
+          "label": "Choose another value",
+          "replacement_values": {
+            "requested_field": "date_range"
+          }
+        }
+      ],
+      "clarification": {
+        "kind": "unsupported_recovery",
+        "reason_code": "data_window_unavailable",
+        "prompt_source": "llm_generated",
+        "requested_field": "date_range",
+        "requested_fields": [
+          "date_range"
+        ],
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "payload": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "raw_value": null
+        },
+        "options": [
+          {
+            "id": "change_date_range",
+            "replacement_values": {
+              "requested_field": "date_range"
+            },
+            "compatibility_label": "Choose another value"
+          }
+        ]
+      }
+    },
+    "route_receipts": [
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 1611,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 2519,
+          "completion_tokens": 97,
+          "total_tokens": 2616,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0002108001,
+        "context_packet_ids": [],
+        "created_at": "2026-09-14T21:51:51.194247+00:00"
+      }
+    ]
+  },
+  {
+    "language": "en",
+    "turn": 3,
+    "prompt": "August 16, 2026 to August 19, 2026",
+    "stored_constraint": {
+      "category": "unsupported_starting_capital",
+      "simplification_options": [
+        {
+          "id": "change_capital_amount",
+          "label": "Choose another value",
+          "replacement_values": {
+            "requested_field": "capital_amount"
+          }
+        }
+      ]
+    },
+    "patch": {
+      "assistant_prompt": "Got it \u2014 MRNA from Aug 16 to Aug 19, 2026. The starting capital you entered is outside the $500\u2013$1,000,000 range this test supports. Would you like to choose a different amount within that range?",
+      "response_intent": {
+        "kind": "unsupported_recovery",
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "requested_fields": [
+          "capital_amount"
+        ],
+        "facts": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-08-19"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "current_user_message": "August 16, 2026 to August 19, 2026",
+          "language": "en",
+          "unsupported_constraints": [
+            {
+              "category": "unsupported_starting_capital",
+              "simplification_options": [
+                {
+                  "id": "change_capital_amount",
+                  "label": "Choose another value",
+                  "replacement_values": {
+                    "requested_field": "capital_amount"
+                  }
+                }
+              ]
+            }
+          ],
+          "preserved_optional_parameter_status": {}
+        },
+        "options": [
+          {
+            "id": "change_capital_amount",
+            "label": "Choose another value",
+            "replacement_values": {
+              "requested_field": "capital_amount"
+            }
+          }
+        ]
+      },
+      "requested_field": "capital_amount",
+      "missing_required_fields": [],
+      "unsupported_constraints": [
+        {
+          "category": "unsupported_starting_capital",
+          "simplification_options": [
+            {
+              "id": "change_capital_amount",
+              "label": "Choose another value",
+              "replacement_values": {
+                "requested_field": "capital_amount"
+              }
+            }
+          ]
+        }
+      ],
+      "simplification_options": [
+        {
+          "id": "change_capital_amount",
+          "label": "Choose another value",
+          "replacement_values": {
+            "requested_field": "capital_amount"
+          }
+        }
+      ],
+      "clarification": {
+        "kind": "unsupported_recovery",
+        "reason_code": "unsupported_starting_capital",
+        "prompt_source": "llm_generated",
+        "requested_field": "capital_amount",
+        "requested_fields": [
+          "capital_amount"
+        ],
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "payload": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-08-19"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "raw_value": null
+        },
+        "options": [
+          {
+            "id": "change_capital_amount",
+            "replacement_values": {
+              "requested_field": "capital_amount"
+            },
+            "compatibility_label": "Choose another value"
+          }
+        ]
+      }
+    },
+    "route_receipts": [
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 3877,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1606,
+          "completion_tokens": 134,
+          "total_tokens": 1740,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.0001429862,
+        "context_packet_ids": [],
+        "created_at": "2026-09-14T21:51:55.072591+00:00"
+      }
+    ]
+  },
+  {
+    "language": "es-419",
+    "turn": 1,
+    "prompt": "Prueba $100 en acciones de @mrna del 16 de agosto al 19 de agosto solo unos d\u00edas este a\u00f1o",
+    "stored_constraint": {
+      "category": "data_window_unavailable",
+      "simplification_options": [
+        {
+          "id": "change_date_range",
+          "label": "Elegir otro valor",
+          "replacement_values": {
+            "requested_field": "date_range"
+          }
+        }
+      ]
+    },
+    "patch": {
+      "assistant_prompt": "Argus can't run that rule directly yet for MRNA. Which supported direction should I use: Elegir otro valor?",
+      "response_intent": {
+        "kind": "unsupported_recovery",
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "requested_fields": [
+          "date_range"
+        ],
+        "facts": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "current_user_message": "Prueba $100 en acciones de @mrna del 16 de agosto al 19 de agosto solo unos d\u00edas este a\u00f1o",
+          "language": "es-419",
+          "unsupported_constraints": [
+            {
+              "category": "data_window_unavailable",
+              "simplification_options": [
+                {
+                  "id": "change_date_range",
+                  "label": "Elegir otro valor",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  }
+                }
+              ]
+            }
+          ],
+          "preserved_optional_parameter_status": {}
+        },
+        "options": [
+          {
+            "id": "change_date_range",
+            "label": "Elegir otro valor",
+            "replacement_values": {
+              "requested_field": "date_range"
+            }
+          }
+        ]
+      },
+      "requested_field": "date_range",
+      "missing_required_fields": [],
+      "unsupported_constraints": [
+        {
+          "category": "data_window_unavailable",
+          "simplification_options": [
+            {
+              "id": "change_date_range",
+              "label": "Elegir otro valor",
+              "replacement_values": {
+                "requested_field": "date_range"
+              }
+            }
+          ]
+        }
+      ],
+      "simplification_options": [
+        {
+          "id": "change_date_range",
+          "label": "Elegir otro valor",
+          "replacement_values": {
+            "requested_field": "date_range"
+          }
+        }
+      ],
+      "clarification": {
+        "kind": "unsupported_recovery",
+        "reason_code": "data_window_unavailable",
+        "prompt_source": "degraded_fallback",
+        "requested_field": "date_range",
+        "requested_fields": [
+          "date_range"
+        ],
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "payload": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "raw_value": null
+        },
+        "options": [
+          {
+            "id": "change_date_range",
+            "replacement_values": {
+              "requested_field": "date_range"
+            },
+            "compatibility_label": "Elegir otro valor"
+          }
+        ]
+      }
+    },
+    "route_receipts": [
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 6511,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1187,
+          "completion_tokens": 88,
+          "total_tokens": 1275,
+          "cached_tokens": 1140,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 3.063e-05,
+        "context_packet_ids": [],
+        "created_at": "2026-09-14T21:52:01.584993+00:00"
+      },
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 0,
+        "outcome": "failed",
+        "failure_mode": "contract_violation",
+        "fallback_used": false,
+        "token_usage": null,
+        "usage_cost_usd": null,
+        "context_packet_ids": [],
+        "created_at": "2026-09-14T21:52:01.585110+00:00"
+      },
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "qwen/qwen3.5-9b",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 3745,
+        "outcome": "failed",
+        "failure_mode": "ValidationError",
+        "fallback_used": true,
+        "token_usage": null,
+        "usage_cost_usd": null,
+        "context_packet_ids": [],
+        "created_at": "2026-09-14T21:52:05.330371+00:00"
+      }
+    ]
+  },
+  {
+    "language": "es-419",
+    "turn": 2,
+    "prompt": "Eso, este a\u00f1o, rev\u00edsalo otra vez",
+    "stored_constraint": {
+      "category": "data_window_unavailable",
+      "simplification_options": [
+        {
+          "id": "change_date_range",
+          "label": "Elegir otro valor",
+          "replacement_values": {
+            "requested_field": "date_range"
+          }
+        }
+      ]
+    },
+    "patch": {
+      "assistant_prompt": "La historia de precios de MRNA comienza el 27 de julio de 2020, as\u00ed que no podemos probar desde agosto de 2026. \u00bfQuieres elegir otro valor o cambiar las fechas a un per\u00edodo disponible?",
+      "response_intent": {
+        "kind": "unsupported_recovery",
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "requested_fields": [
+          "date_range"
+        ],
+        "facts": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "current_user_message": "Eso, este a\u00f1o, rev\u00edsalo otra vez",
+          "language": "es-419",
+          "unsupported_constraints": [
+            {
+              "category": "data_window_unavailable",
+              "simplification_options": [
+                {
+                  "id": "change_date_range",
+                  "label": "Elegir otro valor",
+                  "replacement_values": {
+                    "requested_field": "date_range"
+                  }
+                }
+              ]
+            }
+          ],
+          "preserved_optional_parameter_status": {}
+        },
+        "options": [
+          {
+            "id": "change_date_range",
+            "label": "Elegir otro valor",
+            "replacement_values": {
+              "requested_field": "date_range"
+            }
+          }
+        ]
+      },
+      "requested_field": "date_range",
+      "missing_required_fields": [],
+      "unsupported_constraints": [
+        {
+          "category": "data_window_unavailable",
+          "simplification_options": [
+            {
+              "id": "change_date_range",
+              "label": "Elegir otro valor",
+              "replacement_values": {
+                "requested_field": "date_range"
+              }
+            }
+          ]
+        }
+      ],
+      "simplification_options": [
+        {
+          "id": "change_date_range",
+          "label": "Elegir otro valor",
+          "replacement_values": {
+            "requested_field": "date_range"
+          }
+        }
+      ],
+      "clarification": {
+        "kind": "unsupported_recovery",
+        "reason_code": "data_window_unavailable",
+        "prompt_source": "llm_generated",
+        "requested_field": "date_range",
+        "requested_fields": [
+          "date_range"
+        ],
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "payload": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-12-31"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "raw_value": null
+        },
+        "options": [
+          {
+            "id": "change_date_range",
+            "replacement_values": {
+              "requested_field": "date_range"
+            },
+            "compatibility_label": "Elegir otro valor"
+          }
+        ]
+      }
+    },
+    "route_receipts": [
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 4389,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1629,
+          "completion_tokens": 124,
+          "total_tokens": 1753,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.00016893,
+        "context_packet_ids": [],
+        "created_at": "2026-09-14T21:52:09.720675+00:00"
+      }
+    ]
+  },
+  {
+    "language": "es-419",
+    "turn": 3,
+    "prompt": "Del 16 de agosto de 2026 al 19 de agosto de 2026",
+    "stored_constraint": {
+      "category": "unsupported_starting_capital",
+      "simplification_options": [
+        {
+          "id": "change_capital_amount",
+          "label": "Elegir otro valor",
+          "replacement_values": {
+            "requested_field": "capital_amount"
+          }
+        }
+      ]
+    },
+    "patch": {
+      "assistant_prompt": "Gracias por las fechas. Para probar esta estrategia, el capital inicial debe estar entre $1,000 y $100,000,000 USD. \u00bfQu\u00e9 monto te gustar\u00eda usar?",
+      "response_intent": {
+        "kind": "unsupported_recovery",
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "requested_fields": [
+          "capital_amount"
+        ],
+        "facts": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-08-19"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "current_user_message": "Del 16 de agosto de 2026 al 19 de agosto de 2026",
+          "language": "es-419",
+          "unsupported_constraints": [
+            {
+              "category": "unsupported_starting_capital",
+              "simplification_options": [
+                {
+                  "id": "change_capital_amount",
+                  "label": "Elegir otro valor",
+                  "replacement_values": {
+                    "requested_field": "capital_amount"
+                  }
+                }
+              ]
+            }
+          ],
+          "preserved_optional_parameter_status": {}
+        },
+        "options": [
+          {
+            "id": "change_capital_amount",
+            "label": "Elegir otro valor",
+            "replacement_values": {
+              "requested_field": "capital_amount"
+            }
+          }
+        ]
+      },
+      "requested_field": "capital_amount",
+      "missing_required_fields": [],
+      "unsupported_constraints": [
+        {
+          "category": "unsupported_starting_capital",
+          "simplification_options": [
+            {
+              "id": "change_capital_amount",
+              "label": "Elegir otro valor",
+              "replacement_values": {
+                "requested_field": "capital_amount"
+              }
+            }
+          ]
+        }
+      ],
+      "simplification_options": [
+        {
+          "id": "change_capital_amount",
+          "label": "Elegir otro valor",
+          "replacement_values": {
+            "requested_field": "capital_amount"
+          }
+        }
+      ],
+      "clarification": {
+        "kind": "unsupported_recovery",
+        "reason_code": "unsupported_starting_capital",
+        "prompt_source": "llm_generated",
+        "requested_field": "capital_amount",
+        "requested_fields": [
+          "capital_amount"
+        ],
+        "semantic_needs": [
+          "simplification_choice"
+        ],
+        "payload": {
+          "strategy": {
+            "raw_user_phrasing": null,
+            "requested_strategy_template": null,
+            "strategy_type": "buy_and_hold",
+            "strategy_thesis": null,
+            "asset_universe": [
+              "MRNA"
+            ],
+            "asset_class": "equity",
+            "timeframe": null,
+            "cadence": null,
+            "entry_logic": null,
+            "exit_logic": null,
+            "date_range": {
+              "start": "2026-08-16",
+              "end": "2026-08-19"
+            },
+            "sizing_mode": null,
+            "capital_amount": 100.0,
+            "position_size": null,
+            "risk_rules": [],
+            "assumptions": [],
+            "comparison_baseline": null,
+            "refinement_of": null,
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "resolution_provenance": [],
+            "extra_parameters": {}
+          },
+          "raw_value": null
+        },
+        "options": [
+          {
+            "id": "change_capital_amount",
+            "replacement_values": {
+              "requested_field": "capital_amount"
+            },
+            "compatibility_label": "Elegir otro valor"
+          }
+        ]
+      }
+    },
+    "route_receipts": [
+      {
+        "task": "clarification",
+        "tier": "chat",
+        "model": "deepseek/deepseek-v4-flash",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "mode": "json_schema",
+        "schema_name": "ClarificationResponse",
+        "latency_ms": 2373,
+        "outcome": "succeeded",
+        "failure_mode": null,
+        "fallback_used": false,
+        "token_usage": {
+          "prompt_tokens": 1627,
+          "completion_tokens": 123,
+          "total_tokens": 1750,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0
+        },
+        "usage_cost_usd": 0.000250982,
+        "context_packet_ids": [],
+        "created_at": "2026-09-14T21:52:12.095458+00:00"
+      }
+    ]
+  }
+]

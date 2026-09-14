@@ -1,0 +1,22 @@
+{
+  "candidate_sha": "c861d95cf0e69003e99d935ffe57c16269e9172b",
+  "fixture_sha256": "84d4db6260e365fd1c1ea9dd3bfb62f06474d9ae5701ad6c34b6ef0065b73963",
+  "commit_during_measurement": false,
+  "diagnostic_retries": 1,
+  "files": {
+    "budget.json": "b058675fd211b88725d155dd9ed4e3f5256dff85a664e19727ec5687cc002946",
+    "comparison.json": "4ca2f33360bb944d3c302d732762a39a5ec77ba95c5ea646c84a30f0764832e9",
+    "comparison.md": "ecb926ea653f4c4a4344d7fadce7aa31ed46723c2a77c1531805f04a4af27c3b",
+    "diagnostic.json": "6c90999d919f9b595abbe980eb658b51d115b77d26611ea4dc810be6c7a00459",
+    "live-measurement.json": "bc38d65ffd4e7270e4f16dd4c1a5ddc57153a7d4a81a04cd83ef8dba81af6f40",
+    "method/comparison.py.txt": "406714bb9283315ef4330d2186607463fa21648cf954628a05c7e401d10ae917",
+    "method/continuation-budget.py.txt": "f04715ec85e5a2eaec5d4af7434e05b2c1f997ff5df7cc9b3d52fa21c4fe9d41",
+    "method/continuation-driver.py.txt": "ad645036982448b99c469903a8c0122774bb7d173dc0f88c791396cb90bdfec3",
+    "method/diagnostic-driver.py.txt": "8c6efa396efc113867445ac468ba8d9b9df26339a9e53b7b344175bf3913d91f",
+    "method/initial-budget.py.txt": "b3c21358707591b0730361c1bc76fe47150604dcc55397a18da60bd662cb1cbf",
+    "method/initial-driver.py.txt": "df803683df2326f3a8171bab4ac59352faaaa12f9921907ad5d047997ed5d427",
+    "method/openrouter-endpoint-prices.json": "76c9860c516370862dbc5ea009ab1a84a2788b10b1085ac3613b15cd253cbe7d",
+    "targeted-assessment.json": "ab1ad3b5760b2161ae9e73d2a568b3e77a5376fe5cd489475e4616512aa1283b",
+    "targeted-replies.json": "720799188d8d9bb41fb44b22dfe4376b22c595d038bcd90c06184e18e8cf4b90"
+  }
+}

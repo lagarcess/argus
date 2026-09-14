@@ -1,0 +1,57 @@
+"""Approved 73-case measurement and six live writer-boundary replay turns."""
+import os,sys,json,subprocess,asyncio,time
+from pathlib import Path
+from dataclasses import asdict
+sys.path.insert(0,str(Path.cwd()));sys.path.insert(0,str(Path.cwd()/'src'));sys.path.insert(0,'/tmp')
+from dotenv import dotenv_values
+from current_reason_budget import Budget,SpendStop
+
+ROOT=Path.cwd(); OUT=ROOT/'temp/current-reason-live';OUT.mkdir(exist_ok=True)
+START_SHA=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip()
+secrets=dotenv_values('.env')
+profile=json.loads((ROOT/'.github/private-alpha-release-profile.json').read_text())['services']['api']['env']
+env={k:v for k,v in profile.items() if k.endswith('_MODEL') or v in ('true','false')}
+for key in ('OPENROUTER_API_KEY','PERPLEXITY_API_KEY','ALPACA_API_KEY','ALPACA_SECRET_KEY'):
+    assert secrets.get(key), f'missing credential {key}'
+    env[key]=secrets[key]
+env.update(ARGUS_RUN_LIVE_EVALS='1',ARGUS_MARKET_DATA_PROVIDER_MODE='live_provider',ARGUS_ASSET_PROVIDER_MODE='live_provider',ARGUS_DISCOVERY_SEARCH_PROVIDER=profile['ARGUS_DISCOVERY_SEARCH_PROVIDER'])
+envpath=OUT/'measurement.env'
+envpath.touch(mode=0o600,exist_ok=True)
+envpath.write_text('\n'.join(k+'='+json.dumps(v) for k,v in env.items())+'\n')
+os.environ.update(env);os.environ['ARGUS_EVAL_ENV_FILE']=str(envpath)
+# Keep local product/database credentials out of the isolated measurement process.
+for key in ('SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_ANON_KEY','DATABASE_URL','ARGUS_WORKFLOW_DATABASE_URL'):
+    os.environ.pop(key,None)
+backup=Path('/tmp/current-reason-measurement-dotenv-link')
+assert not backup.exists() and not backup.is_symlink()
+(ROOT/'.env').rename(backup)
+guard=Budget(OUT/'budget.json',json.loads(Path('/tmp/current-reason-endpoint-prices.json').read_text()))
+try:
+    from loguru import logger
+    logger.remove();logger.add(str(OUT/'diagnostic-runtime.log'),level='INFO')
+    from tests.evals.measurement_eval_harness import load_eval_cases,run_eval_case
+    from tests.evals.measurement_eval_scorecard import build_scorecard_provenance,validated_provenance_payload
+    from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
+    saved=json.loads((OUT/'budget.json').read_text());guard.rows=saved['calls'];guard.blocked=saved['blocked']
+    guard.install()
+    captures=[]
+    original=OpenRouterStructuredInterpreter._to_runtime_interpretation
+    def capture(self,response,*args,**kwargs):
+        item={'response':response.model_dump(mode='json')};captures.append(item)
+        result=original(self,response,*args,**kwargs)
+        item['runtime_interpretation']=result.model_dump(mode='json')
+        return result
+    OpenRouterStructuredInterpreter._to_runtime_interpretation=capture
+    provenance=build_scorecard_provenance(evaluation_mode='live')
+    case=next(c for c in load_eval_cases() if c.id=='messy_english_explicit_end_survives_year_qualifier')
+    guard.label='diagnostic:'+case.id
+    assert not any(x['label'].startswith('diagnostic:') for x in guard.rows)
+    result=run_eval_case(case)
+    (OUT/'diagnostic.json').write_text(json.dumps({'diagnostic_retry_number':1,'provenance':validated_provenance_payload(provenance),'result':result,'captured_interpretations':captures},indent=2))
+    print('DIAGNOSTIC',result['status'],result['failed_checks'],flush=True)
+finally:
+    guard.save();backup.rename(ROOT/'.env')
+    assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==START_SHA
+    assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip()
+    print('CHECKOUT UNCHANGED; dotenv restored',flush=True)
