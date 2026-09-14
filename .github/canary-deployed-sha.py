@@ -75,7 +75,7 @@ def main() -> int:
             )
         )
     except ValueError as error:
-        print(str(error), file=sys.stderr)
+        print(f"ERROR: canary failed at services_same_commit: {error}", file=sys.stderr)
         return 1
     return 0
 

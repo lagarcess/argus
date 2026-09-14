@@ -1292,6 +1292,7 @@ def test_search_asset_rollup_is_first_and_does_not_consume_conversation_cursor()
         "type": "asset_rollup",
         "symbol": "TSLA",
         "run_count": 2,
+        "result_count": 2,
         "decision_counts": {
             "promising": 0,
             "watching": 0,
@@ -1496,6 +1497,7 @@ def test_search_asset_rollup_uses_owned_canonical_run_and_decision_lineage(
         "type": "asset_rollup",
         "symbol": "TSLA",
         "run_count": 2,
+        "result_count": 2,
         "decision_counts": {
             "promising": 1,
             "watching": 1,
@@ -1510,6 +1512,7 @@ def test_search_asset_rollup_uses_owned_canonical_run_and_decision_lineage(
         "type": "asset_rollup",
         "symbol": "AAPL",
         "run_count": 1,
+        "result_count": 1,
         "decision_counts": {
             "promising": 1,
             "watching": 0,
@@ -1676,6 +1679,7 @@ def test_search_memory_mode_symbol_only_query_returns_only_asset_rollup() -> Non
                 "type": "asset_rollup",
                 "symbol": "ẞ/EUR",
                 "run_count": 1,
+                "result_count": 1,
                 "decision_counts": {
                     "promising": 0,
                     "watching": 0,
@@ -1753,6 +1757,7 @@ def test_search_memory_mode_accepts_a_two_character_stored_symbol() -> None:
         "type": "asset_rollup",
         "symbol": "BA",
         "run_count": 4,
+        "result_count": 4,
         "decision_counts": {
             "promising": 0,
             "watching": 0,

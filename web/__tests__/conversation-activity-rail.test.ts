@@ -811,7 +811,7 @@ describe("conversation rail tick derivation", () => {
 
     const ticks = deriveConversationRailTicks(messages);
     expect(ticks.map((tick) => [tick.messageId, tick.kind])).toEqual([
-      ["a2", "backtest_completed"],
+      ["a2", "result"],
       ["a3", "decision_saved"],
       ["a4", "error_recovery"],
       ["a5", "error_recovery"],
@@ -1121,8 +1121,9 @@ describe("rail source discipline", () => {
 
   test("preview and aria carry run symbols for identity during a glide", () => {
     expect(componentSource).toContain("openTick.symbols.join(\" · \")");
+    // A run's identity is its strategy title; a computed answer's is its card title.
     expect(componentSource).toMatch(
-      /\[tick\.symbols\[0\], tick\.strategyTitle\]/,
+      /\[tick\.symbols\[0\], tickTitle\(tick\)\]/,
     );
   });
 
@@ -1164,6 +1165,7 @@ describe("rail localization", () => {
       "jump_hint",
       "needs_attention",
       "needs_attention_body",
+      "result",
     ]);
     expect(esKeys).toEqual(enKeys);
     for (const key of enKeys) {

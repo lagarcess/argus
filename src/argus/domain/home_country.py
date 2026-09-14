@@ -60,6 +60,14 @@ def currency_codes() -> frozenset[str]:
     return frozenset(code for country in country_codes() for code in _in_use(country))
 
 
+def country_name(country: str, locale: str = "en") -> str:
+    """A country's name from its ISO 3166-1 alpha-2 code, as CLDR writes it."""
+    from babel import Locale
+
+    code = country.strip().upper()
+    return Locale.parse(locale).territories.get(code, code)
+
+
 def resolved_currency(country: str | None, override: str | None) -> str | None:
     """The currency a profile counts in: the override, else the country's."""
     if override is not None:

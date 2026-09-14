@@ -274,6 +274,7 @@ StructuredActionType = Literal[
     "save_strategy",
     "retry_failed_action",
     "select_response_option",
+    "calculation_offer",
 ]
 
 
@@ -360,6 +361,8 @@ class UserState(BaseModel):
     # The profile's declared ISO 3166-1 alpha-2 country; research sends it as
     # the reader's location, and None sends no location.
     country: str | None = None
+    # ISO 4217, resolved by the profile; a calculation counts in it.
+    currency: str | None = None
     preferred_tone: ToneName = "friendly"
     expertise_level: ExpertiseMode = "beginner"
     response_verbosity: VerbosityName = "medium"

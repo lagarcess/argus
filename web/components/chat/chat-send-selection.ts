@@ -5,6 +5,8 @@ export type SendOptions = {
   renderUserMessage?: boolean;
   replacementAssistantId?: string;
   bypassGuestGate?: boolean;
+  /** Start a fresh conversation for this send, whatever the surface shows now. */
+  startNewConversation?: boolean;
 };
 
 export type SendSelection =

@@ -1,8 +1,8 @@
 import type { AssetClass } from "./argus-types";
 import type { PublicReceiptDateRange, PublicReceiptPayload, PublicReceiptVisual } from "./public-receipt-contract";
 
-export type ReceiptKind = "backtest" | "research_answer" | "mixed";
-export type ReceiptRefusalReason = "not_completed" | "unsupported_turn" | "unsupported_shape" | "missing_sources" | "degraded" | "memory_used" | "missing_question" | "text_too_long" | "unsafe_text" | "unlisted_url" | "invalid_selection" | "preview_changed" | "invalid_source" | "unsupported_backtest";
+export type ReceiptKind = "backtest" | "research_answer" | "calculation" | "mixed";
+export type ReceiptRefusalReason = "not_completed" | "unsupported_turn" | "unsupported_shape" | "missing_sources" | "degraded" | "memory_used" | "missing_question" | "text_too_long" | "unsafe_text" | "unlisted_url" | "invalid_selection" | "preview_changed" | "invalid_source" | "unsupported_backtest" | "private_inputs";
 export type ReceiptRefusalField = "question" | "answer" | "owner_note" | "sources";
 
 type ReceiptRuleSeries = {
@@ -53,7 +53,24 @@ export type BacktestReceiptTurn = ReceiptTurnBase & {
   kind: "backtest"; idea_title: string; fact_bank: PublicReceiptFactBank; visual?: PublicReceiptVisual | null;
   framing: "historical_simulation_not_advice";
 };
-export type PublicReceiptTurn = ResearchReceiptTurn | BacktestReceiptTurn;
+type ReceiptText = { locale_key: string; interpolation_args: Record<string, string | number | boolean | null> };
+export type CalculationReceiptFact = {
+  label: ReceiptText; value: string | number | boolean | null; value_text?: ReceiptText | null; unit?: ReceiptText | null;
+  source?: { title?: string | null; url?: string | null; date?: string | null } | null;
+};
+/** One calculation's frozen figures: its title, answer, rows, what Argus used and its notes. */
+export type CalculationReceiptFigures = {
+  title: ReceiptText; answer: CalculationReceiptFact; rows: CalculationReceiptFact[]; inputs: CalculationReceiptFact[]; notes: ReceiptText[];
+};
+/**
+ * A computed answer frozen as typed facts; a receipt never recomputes. One
+ * calculation keeps the flat shape frozen receipts carry; several arrive in
+ * order under `calculations`.
+ */
+export type CalculationReceiptTurn = ReceiptTurnBase & {
+  kind: "calculation"; question: string; computed_at: string; framing: "calculation_not_advice";
+} & (CalculationReceiptFigures | { calculations: CalculationReceiptFigures[] });
+export type PublicReceiptTurn = ResearchReceiptTurn | BacktestReceiptTurn | CalculationReceiptTurn;
 export type PublicReceiptDocument = PublicReceiptPayload | { schema_version: 2; kind: "turns"; turns: PublicReceiptTurn[] };
 
 export function receiptDocumentKind(payload: PublicReceiptDocument): ReceiptKind {
@@ -62,6 +79,10 @@ export function receiptDocumentKind(payload: PublicReceiptDocument): ReceiptKind
   return payload.turns.every((turn) => turn.kind === first) ? first : "mixed";
 }
 
+function calculationTurnSupported(turn: CalculationReceiptTurn): boolean {
+  return "calculations" in turn ? Array.isArray(turn.calculations) && turn.calculations.length > 0 : Boolean(turn.answer);
+}
+
 export function receiptDocumentSupported(payload: PublicReceiptDocument): boolean {
-  return payload.schema_version === 1 || (payload.schema_version === 2 && payload.kind === "turns" && Array.isArray(payload.turns) && payload.turns.length > 0 && payload.turns.every((turn) => turn.kind === "backtest" || turn.kind === "research_answer"));
+  return payload.schema_version === 1 || (payload.schema_version === 2 && payload.kind === "turns" && Array.isArray(payload.turns) && payload.turns.length > 0 && payload.turns.every((turn) => turn.kind === "backtest" || turn.kind === "research_answer" || (turn.kind === "calculation" && calculationTurnSupported(turn))));
 }

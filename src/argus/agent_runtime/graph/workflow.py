@@ -104,6 +104,9 @@ class WorkflowState(TypedDict, total=False):
     discovery_usage: dict[str, Any]
     next_experiments: dict[str, Any]
     next_steps: dict[str, Any]
+    answer_text_template: dict[str, Any]
+    answer_assumptions: list[dict[str, Any]]
+    calculation_offer: dict[str, Any]
     research: dict[str, Any]
     research_job_request: dict[str, Any]
     tool_effects: list[dict[str, Any]]
@@ -137,6 +140,9 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
         "discovery_usage",
         "next_experiments",
         "next_steps",
+        "answer_text_template",
+        "answer_assumptions",
+        "calculation_offer",
         "research",
         "research_job_request",
         "tool_effects",

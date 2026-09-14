@@ -91,6 +91,7 @@ def test_background_completion_persists_the_matching_typed_tool_card(
                     if row_mode == "unsourced"
                     else ()
                 ),
+                "source_urls": tuple(source.url for source in packet.sources),
             }
         )
     asyncio.run(

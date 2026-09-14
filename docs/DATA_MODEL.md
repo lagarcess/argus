@@ -515,6 +515,31 @@ Represents individual messages within a conversation.
   artifact identity; repeated calls remain independent through completion and
   reload. The message remains the durable owner after direct edits, rather than
   writing a competing checkpoint copy.
+- A computed answer is an artifact without a run. Its cards, one per
+  calculation, live in `metadata.tool_result_cards` and its one marker in
+  `metadata.computation`, which the chat turn, the recompute route and the
+  continue route all write from every card in order; nothing else is stored.
+  The marker is `{kind, inputs}` for one calculation and `{calculations: [{kind,
+  inputs}, ...]}` for an answer that weighs options; both read alike. A
+  research or no-search answer that computed its calculations carries the same
+  pair, beside its `research` sidecar when it retrieved, and
+  `metadata.answer_text_template` (`{cards: {<calculation name>: <artifact_id>},
+  text, language}`; one stored as `{artifact_id, text, language}` reads as its
+  one card), the prose with its figure references, which the recompute route
+  re-renders into `content` from the current cards. `metadata.answer_assumptions`
+  (`[{artifact_id, name}]`) names each assumed input that prose never names; the
+  app lists them under the answer, and the recompute route derives the list
+  again. A pending calculation
+  question keeps `{calculations, requested_field, requested_fields, evidence,
+  retrieved}` in its clarification payload until the reply completes it; a
+  payload stored with one `calculation` reads as a list of one. A research
+  answer whose calculations need figures only the reader knows stores the same
+  shape as `metadata.calculation_offer` instead; the typed `calculation_offer`
+  action turns it into that question.
+  `metadata.continued_from` (`{conversation_id, message_id}`) marks a result
+  continued in a new chat; the source message is never changed. Comparing,
+  refreshing and re-running a computed answer store nothing: the stored card
+  stays the durable truth and each read's result comes back beside it.
 - A confirmation card's liveness truth lives on its own row:
   `metadata.confirmation_card.confirmation_state` (`active`, `consumed`,
   `cancelled`, `superseded`). Run admission stamps `consumed` through the
@@ -1073,7 +1098,10 @@ computation owner and stores the current decision, not an append-only history:
 - A computed-answer decision attaches to the assistant message that carried
   the answer. `source_message_id` and `computation` are set; the three lineage
   columns are null. The computation is stored so the decision survives the
-  message and can be re-run when opened.
+  message and can be re-run when opened. An answer that weighs options still
+  takes one decision, which stores every calculation and re-runs each when
+  opened; the column has no shape check, so this needed no migration, and
+  `UNIQUE(user_id, source_message_id)` still holds.
 
 Fields:
 - `id`: `uuid` (Primary Key)
@@ -1083,7 +1111,8 @@ Fields:
 - `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
 - `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
 - `source_message_id`: `uuid` (Nullable, references `messages.id` ON DELETE SET NULL)
-- `computation`: `jsonb` (Nullable; `{"kind": <slug>, "inputs": <object>}`)
+- `computation`: `jsonb` (Nullable; `{"kind": <slug>, "inputs": <object>}`, or
+  `{"calculations": [{"kind", "inputs"}, ...]}` for an answer that weighs options)
 - `decision_state`: `text` (`watching`, `promising`, `rejected`, `revisit_later`)
 - `note`: `text` (Nullable)
 - `created_at`: `timestamptz`
@@ -1115,6 +1144,14 @@ Constraints:
 - The public decision write contract accepts at most 500 note characters. The
   durable column remains nullable `text` so previously accepted longer notes
   stay readable; no migration or destructive truncation is introduced.
+- A stored `computation` may carry `symbols`, at most five asset identities the
+  marker owner derives from the computation's typed `symbol` inputs; a
+  computation about no asset omits the key. Search counts a computed answer
+  under an asset from `messages.metadata->'computation'->'symbols'` on the
+  owner's assistant messages, bounded and owner-scoped, with no new table,
+  index or migration. The message marker itself is written from the answer's
+  tool result card by one owner (`argus.domain.computation_marker`), on the
+  chat turn and on the recompute route alike.
 
 ### Run dossier read projection
 
@@ -1397,8 +1434,10 @@ Fields:
   ON DELETE SET NULL)
 - `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
   ON DELETE SET NULL)
-- `kind`: `text` (`backtest`, `research_answer`, or `mixed`; existing rows default
-  to `backtest`)
+- `kind`: `text` (`backtest`, `research_answer`, `calculation`, or `mixed`;
+  existing rows default to `backtest`; migration
+  `20260912190000_share_calculation_receipts.sql` added `calculation` to the
+  check additively)
 - `source_message_ids`: `uuid[]` (Private selected assistant messages; one or more
   for new receipts, empty for legacy rows)
 - `source_run_ids`, `source_artifact_ids`: `uuid[]` (Private selected backtest
@@ -1434,6 +1473,20 @@ The backtest leaf freezes the card's closed typed fact bank, title, visual, note
 content language, framing and provenance. `public_excerpt_fact_schemas.py` closes
 every nested config, rule, figure and cost field. The public renderer reads the
 same result fact and display owners as the result card.
+
+The calculation leaf is `{kind: "calculation", question, title, answer, rows,
+inputs, notes, computed_at, owner_note, content_language, framing:
+"calculation_not_advice", provenance_mark}` for one calculation. For an answer
+that weighs options it carries `calculations: [{title, answer, rows, inputs,
+notes}, ...]` in place of those five fields, one per card in order; every card
+must pass its receipt policy or the answer is refused, and a leaf frozen in the
+first shape still renders. The title and every label, unit,
+`value_text` and note is `{locale_key, interpolation_args}`. A fact is `{label,
+value, value_text, unit, source}`, where `source` is `{title, url, date}` and
+exists only for a page. `inputs` holds only the inputs a public page stated or a
+declaration marked `public`; an input the user typed, the card's `arguments` and
+its visual never enter the payload. The receipt freezes those facts at creation
+and never recomputes.
 
 Every selected turn independently passes the shared eligibility and privacy audit
 at preview and creation. A refusal refuses the entire selection. The owner sees

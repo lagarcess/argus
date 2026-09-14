@@ -54,6 +54,7 @@ from argus.domain.postgres_search_reader import (
 )
 from argus.domain.store import utcnow
 from argus.domain.supabase_backtest_finalization import finalize_backtest
+from argus.domain.supabase_computed_answers import SupabaseComputedAnswerReadMixin
 from argus.domain.supabase_conversation_activity import (
     SupabaseConversationActivityMixin,
 )
@@ -145,6 +146,7 @@ class SupabaseGateway(
     ConversationMessagePersistenceMixin,
     UsageCounterReader,
     DecisionAttachmentPersistenceMixin,
+    SupabaseComputedAnswerReadMixin,
 ):
     client: Client
     auth_client: Client | None = None

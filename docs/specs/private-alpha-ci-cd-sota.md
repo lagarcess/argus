@@ -147,8 +147,9 @@ The stable target topology is three live services:
 Render Blueprints declare the API and web services, but do not support Workflow
 services. `argus-backtests` is therefore guaranteed by the explicit workflow
 runtime sync, release, and version-status checks in
-`docs/PRIVATE_LAUNCH_RUNBOOK.md`. All three Git-linked services use
-`checksPass` autodeploy. Enabling only API and web would increase workflow skew.
+`docs/PRIVATE_LAUNCH_RUNBOOK.md`. All three Git-linked services share one
+autodeploy trigger, `off`, because deploys are manual. Enabling autodeploy for
+only API and web would increase workflow skew.
 Workflow deploy proof comes from the ready Render version id and its Git commit
 prefix, not from mutable env markers that an automatic release cannot refresh.
 
@@ -551,24 +552,27 @@ Custom-agent examples:
 Objective:
 - Make the canary cover the real failure class, not just happy-path completion.
 
-Scope:
-- Include the profile-selected Spanish locale and deployed signup/login UI.
-- Include stream failure/reload/recovery behavior.
-- Include workflow mode verification.
-- Include workflow env parity verification: the canary evidence must carry
-  `workflow_env_fingerprint` and `workflow_env_status=ready`.
-- Include effective workflow runtime proof: warmup must run `workflow_proof` and
-  emit `workflow_runtime_provider_mode=live_provider` plus
-  `workflow_runtime_proof=ready`.
-- Include a real live-provider workflow backtest that catches workflow drift
-  before testers see a failed executable backtest.
-- Verify the finalized Job + Run + Idea + IdeaVersion + EvidenceArtifact tuple,
-  explicit decision capture, reload hydration, and Omnisearch source identity.
+Scope (narrowed by founder decision, 2026-09-13, #614: the canary keeps its
+purpose and never follows features):
+- Check exactly the four checks the release profile names in
+  `canary.required_steps`: the three services run the same commit
+  (`services_same_commit`), a signed-in canary account loads the chat and gets
+  one ordinary answer (`signed_in_chat_answer`), one backtest completes
+  (`backtest_completes`), and one research question returns an answer with
+  sources (`research_answer_with_sources`). Every failure names its check.
+- Keep the release-coherence guards: workflow env parity
+  (`workflow_env_fingerprint`, `workflow_env_status=ready`), effective workflow
+  runtime proof (`workflow_runtime_provider_mode=live_provider`,
+  `workflow_runtime_proof=ready`), the disabled-signup denial, and the welcome
+  email proof.
+- Feature postconditions (decision records, receipts, Search reopening, exact
+  result facts, intercepted recovery, console checks) belong to the promotion
+  walk, not the canary.
 - Keep canary output privacy-safe.
 - When a canary fails after warmup passes, write a sanitized failed-capture
   artifact and replay it locally before redeploying. The replay should exercise
-  canonical result rendering and route-receipt context, not LLM prose matching
-  or locale-specific phrase heuristics.
+  canonical result rendering, not LLM prose matching or locale-specific phrase
+  heuristics.
 
 Likely files:
 - `.github/canary-render.sh`
@@ -576,9 +580,9 @@ Likely files:
 - `tests/test_render_canary_script.py`
 
 Verification:
-- Canary fails when the environment contract drifts or when reload hydration
-  contradicts the runtime state.
-- Canary passes only when commit, env, and behavior all agree.
+- Canary fails when the environment contract drifts or when one of the four
+  checks fails, and the failure names the check.
+- Canary passes only when commit, env, and the four checks all agree.
 - Canary evidence should be stored with the release manifest so the same SHA
   and env fingerprint can be audited later.
 - Canary evidence should note whether the backtest service is in proof or real
@@ -693,8 +697,9 @@ own founder decision. A local Block 4 pass is not “public ready.”
 The current checkout and private-alpha deploy evidence show:
 
 - `codex/private-alpha-next` is the active integration lane.
-- Render services are configured with branch `main` and `checksPass`
-  autodeploy. The workflow is not Blueprint-managed, so its matching trigger is
+- Render services are configured with branch `main` and manual deploys
+  (`autoDeployTrigger: off`). The workflow is not Blueprint-managed, so its
+  matching trigger is
   enforced by the release profile, runtime sync, and live audit. Its ready
   version name supplies the deployed Git prefix used by the three-service SHA
   resolver for both automatic and manual releases.

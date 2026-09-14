@@ -14,15 +14,18 @@ from loguru import logger
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from argus.domain.tool_contracts import (
+    TOOL_INPUT_SOURCES_FIELD,
     LocalizedText,
     ToolCall,
     ToolCardPresentation,
     ToolFact,
+    ToolFactSource,
     ToolFailure,
     ToolFailureStatus,
     ToolInputFact,
     ToolOutcome,
     ToolProgress,
+    ToolRepair,
     ToolResultCard,
 )
 
@@ -31,10 +34,16 @@ class ToolInvocationError(ValueError):
     """A declared domain failure; no partial numerical answer crosses it."""
 
     def __init__(
-        self, status: ToolFailureStatus, *, code: str, fields: tuple[str, ...] = ()
+        self,
+        status: ToolFailureStatus,
+        *,
+        code: str,
+        fields: tuple[str, ...] = (),
+        repair: ToolRepair | None = None,
     ) -> None:
         self.outcome = ToolOutcome(
-            status=status, failure=ToolFailure(code=code, fields=list(fields))
+            status=status,
+            failure=ToolFailure(code=code, fields=list(fields), repair=repair),
         )
         super().__init__(code)
 
@@ -76,12 +85,18 @@ class ExactlyOneUnknown:
 PublicReceiptPolicy = Literal["disabled", "typed_facts", "cited_facts"]
 
 
+MAX_DRIVING_INPUTS = 5
+
+
 @dataclass(frozen=True)
 class ToolPolicy:
     execution: Literal["local", "workflow", "provider"] = "local"
     external_calls: int = 0
     confirmation: Literal["never", "required"] = "never"
     editable_fields: tuple[str, ...] = ()
+    # The inputs that drive the result, most telling first; a card shows at most
+    # MAX_DRIVING_INPUTS of them that carry a value.
+    driving_fields: tuple[str, ...] = ()
     retain_unknown: bool = True
     public_receipt: PublicReceiptPolicy = "disabled"
 
@@ -98,6 +113,8 @@ class ToolPolicy:
             self.execution != "local" or self.confirmation != "never"
         ):
             raise ValueError("Instant recompute is reserved for free local tools")
+        if set(self.driving_fields) - set(self.editable_fields):
+            raise ValueError("A driving input must be editable")
 
 
 @dataclass(frozen=True)
@@ -307,6 +324,13 @@ class ToolDeclaration:
         )
 
     def validate_arguments(self, arguments: Mapping[str, Any] | BaseModel) -> BaseModel:
+        validated = self._validated_model(arguments)
+        for rule in self.rules:
+            rule.validate(validated)
+        return validated
+
+    def _validated_model(self, arguments: Mapping[str, Any] | BaseModel) -> BaseModel:
+        """The typed model before cross-argument rules; a card can show it either way."""
         raw = (
             arguments.model_dump(mode="python")
             if isinstance(arguments, BaseModel)
@@ -320,8 +344,6 @@ class ToolDeclaration:
             )
         validated = self.call_arguments_type.model_validate(raw)
         _require_finite_json(validated.model_dump(mode="json"))
-        for rule in self.rules:
-            rule.validate(validated)
         return validated
 
     def tool_schema(self) -> dict[str, Any]:
@@ -375,31 +397,60 @@ class ToolDeclaration:
     async def invoke(
         self, arguments: Mapping[str, Any] | BaseModel, *, context: Any = None
     ) -> ToolOutcome:
-        try:
-            validated = self.validate_arguments(arguments)
-        except ToolInvocationError as exc:
-            return exc.outcome
-        except (ValidationError, ValueError, TypeError):
-            return ToolOutcome(
-                status="invalid", failure=ToolFailure(code="invalid_arguments")
-            )
+        validated, rejected = self._validated_or_rejected(arguments)
+        if rejected is not None:
+            return rejected
         try:
             result = self.handler(
                 validated, **({"context": context} if self._uses_context else {})
             )
             if inspect.isawaitable(result):
                 result = await result
-            returned = _validate_return(self.result_type, result).model_dump(mode="json")
-            return ToolOutcome(status="succeeded", result=returned)
+            return self._succeeded(result)
         except ToolInvocationError as exc:
             return exc.outcome
         except Exception:  # noqa: BLE001
-            logger.warning(
-                "Tool execution failed its declared contract", tool_name=self.name
+            return self._execution_failed()
+
+    def invoke_sync(self, arguments: Mapping[str, Any] | BaseModel) -> ToolOutcome:
+        """The same contract for a synchronous local callable; a re-run needs no loop."""
+        validated, rejected = self._validated_or_rejected(arguments)
+        if rejected is not None:
+            return rejected
+        try:
+            if self._uses_context:
+                raise TypeError("A synchronous re-run has no trusted context")
+            result = self.handler(validated)
+            if inspect.isawaitable(result):
+                result.close()
+                raise TypeError("A synchronous re-run cannot await a coroutine")
+            return self._succeeded(result)
+        except ToolInvocationError as exc:
+            return exc.outcome
+        except Exception:  # noqa: BLE001
+            return self._execution_failed()
+
+    def _validated_or_rejected(
+        self, arguments: Mapping[str, Any] | BaseModel
+    ) -> tuple[BaseModel | None, ToolOutcome | None]:
+        try:
+            return self.validate_arguments(arguments), None
+        except ToolInvocationError as exc:
+            return None, exc.outcome
+        except (ValidationError, ValueError, TypeError):
+            return None, ToolOutcome(
+                status="invalid", failure=ToolFailure(code="invalid_arguments")
             )
-            return ToolOutcome(
-                status="unavailable", failure=ToolFailure(code="tool_execution_failed")
-            )
+
+    def _succeeded(self, result: Any) -> ToolOutcome:
+        returned = _validate_return(self.result_type, result).model_dump(mode="json")
+        return ToolOutcome(status="succeeded", result=returned)
+
+    def _execution_failed(self) -> ToolOutcome:
+        logger.warning("Tool execution failed its declared contract", tool_name=self.name)
+        return ToolOutcome(
+            status="unavailable", failure=ToolFailure(code="tool_execution_failed")
+        )
 
     async def prepare_confirmation(
         self, arguments: Mapping[str, Any] | BaseModel, *, context: Any
@@ -427,6 +478,11 @@ class ToolDeclaration:
                 after = {name for name in rule.fields if revised[name] is None}
                 if before != after:
                     raise ValueError("Recompute must retain the selected unknown")
+        if TOOL_INPUT_SOURCES_FIELD in self.arguments_type.model_fields:
+            revised[TOOL_INPUT_SOURCES_FIELD] = {
+                **dict(previous.get(TOOL_INPUT_SOURCES_FIELD) or {}),
+                **{name: {"kind": "user"} for name in changes},
+            }
         return self.validate_arguments(revised)
 
     def result_card(
@@ -445,7 +501,10 @@ class ToolDeclaration:
                 update={"result": returned.model_dump(mode="json")}
             )
         try:
-            arguments = self.validate_arguments(call.arguments)
+            # A rule failure keeps the typed model, so its inputs stay typeable.
+            arguments = self._validated_model(call.arguments)
+            if outcome.status == "succeeded":
+                self.validate_arguments(arguments)
         except (ValueError, TypeError, ValidationError):
             if outcome.status == "succeeded":
                 raise
@@ -455,24 +514,33 @@ class ToolDeclaration:
             original = call.arguments
         else:
             original = arguments.model_dump(mode="json")
+            if TOOL_INPUT_SOURCES_FIELD in self.arguments_type.model_fields:
+                original = _with_default_sources(original, call.arguments)
             presentation = ToolCardPresentation.model_validate(
                 self.card.presenter(arguments, outcome)
             )
-            # Editability, unknown identity and units derive from the declaration,
-            # never from a second policy hand-maintained by each card presenter.
+            # Editability, unknown identity, units and provenance derive from the
+            # declaration, never from a second policy hand-maintained per presenter.
             input_units = {
                 unit.field: unit.unit for unit in self.units if unit.source == "argument"
             }
             result_units = {
                 unit.field: unit.unit for unit in self.units if unit.source == "result"
             }
+            input_sources = _input_sources(original)
+            driving = [
+                name
+                for name in self.policy.driving_fields
+                if original.get(name) is not None
+            ][:MAX_DRIVING_INPUTS]
             presentation = presentation.model_copy(
                 update={
-                    "answer": _with_unit(presentation.answer, result_units)
+                    "answer": _computed(_with_unit(presentation.answer, result_units))
                     if presentation.answer is not None
                     else None,
                     "rows": [
-                        _with_unit(fact, result_units) for fact in presentation.rows
+                        _computed(_with_unit(fact, result_units))
+                        for fact in presentation.rows
                     ],
                     "inputs": [
                         ToolInputFact.model_validate(
@@ -485,7 +553,14 @@ class ToolDeclaration:
                                 and original[fact.name] is None,
                                 "editable": fact.name in self.policy.editable_fields
                                 and original[fact.name] is not None,
+                                "driving": fact.name in driving,
                                 "unit": input_units.get(fact.name, fact.unit),
+                                "source": ToolFactSource(kind="computed")
+                                if any(fact.name in rule.fields for rule in self.rules)
+                                and original[fact.name] is None
+                                else fact.source
+                                or input_sources.get(fact.name)
+                                or ToolFactSource(kind="user"),
                             }
                         )
                         for fact in presentation.inputs
@@ -520,6 +595,42 @@ def _validate_return(model: type[BaseModel], result: Any) -> BaseModel:
 
 def _with_unit(fact: ToolFact, units: Mapping[str, LocalizedText]) -> ToolFact:
     return fact.model_copy(update={"unit": units.get(fact.name, fact.unit)})
+
+
+def _computed(fact: ToolFact) -> ToolFact:
+    if fact.source is not None:
+        return fact
+    return fact.model_copy(update={"source": ToolFactSource(kind="computed")})
+
+
+def _input_sources(arguments: Mapping[str, Any]) -> dict[str, ToolFactSource]:
+    raw = arguments.get(TOOL_INPUT_SOURCES_FIELD)
+    if not isinstance(raw, Mapping):
+        return {}
+    sources: dict[str, ToolFactSource] = {}
+    for name, value in raw.items():
+        try:
+            sources[str(name)] = ToolFactSource.model_validate(value)
+        except ValidationError:
+            continue
+    return sources
+
+
+def _with_default_sources(
+    arguments: dict[str, Any], stated: Mapping[str, Any]
+) -> dict[str, Any]:
+    """The arguments with every input the call left to its default recorded as an
+    assumption, so a default never reads as a figure the reader stated."""
+    sources = dict(arguments.get(TOOL_INPUT_SOURCES_FIELD) or {})
+    for name, value in arguments.items():
+        if (
+            name != TOOL_INPUT_SOURCES_FIELD
+            and name not in stated
+            and name not in sources
+            and value is not None
+        ):
+            sources[name] = ToolFactSource(kind="assumption").model_dump(mode="json")
+    return {**arguments, TOOL_INPUT_SOURCES_FIELD: sources}
 
 
 def _require_finite_json(value: Any) -> None:

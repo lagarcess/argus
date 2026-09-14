@@ -9,7 +9,10 @@ from argus.agent_runtime.turn_execution import detach_turn_execution
 from argus.api.artifact_naming import (
     maybe_generate_conversation_title,
 )
-from argus.api.chat.previews import is_degraded_clarification_compatibility_text
+from argus.api.chat.previews import (
+    is_degraded_clarification_compatibility_text,
+    research_lookup_failed,
+)
 from argus.api.chat.route_receipts import persist_route_receipts
 from argus.api.schemas import BacktestRun
 from argus.domain.confirmation_turn_facts import (
@@ -139,12 +142,13 @@ def artifact_naming_assistant_message(
     *,
     metadata: dict[str, object] | None,
 ) -> str | None:
-    """Keep fallback copy out of artifact naming; a card turn names from its facts."""
+    """Keep fallback copy, and any answer whose lookup failed, out of artifact
+    naming; a card turn names from its facts."""
 
     if is_degraded_clarification_compatibility_text(
         role="assistant",
         metadata=metadata,
-    ):
+    ) or research_lookup_failed(metadata):
         return None
     facts = confirmation_turn_facts(metadata)
     if facts is not None:

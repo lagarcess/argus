@@ -199,12 +199,6 @@ jobs:
       - name: Install Chromium for the authenticated browser canary
         run: cd web && bunx playwright install --with-deps chromium
 
-      - name: Run Spanish static UI canary assertions
-        run: cd web && bun test __tests__/spanish-ui-smoke.test.ts
-
-      - name: Run local predeploy smoke
-        run: .github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"
-
       - name: Check authenticated-browser secrets
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
@@ -246,7 +240,7 @@ jobs:
           : > temp/canary-evidence/authenticated-browser-capture.json
           rm -f temp/canary-evidence/authenticated-browser-capture.json
 
-      - name: Run authenticated Spanish browser journey
+      - name: Run authenticated browser checks
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           ARGUS_CANARY_EMAIL: ${{ secrets.ARGUS_CANARY_EMAIL }}

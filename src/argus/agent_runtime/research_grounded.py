@@ -75,6 +75,7 @@ from argus.domain.research.contracts import (
     combined_research_usage,
 )
 from argus.domain.research.source_selection import (
+    answer_sources,
     question_date,
     select_public_sources,
 )
@@ -110,12 +111,12 @@ SCENARIO_FROM_HORIZON_REASON_CODE = "scenario_contract_from_horizon"
 def scenario_contract_applies(
     query: ResearchQueryExtraction, interpretation: StructuredInterpretation
 ) -> bool:
-    """Whether this turn is a computed scenario (decision 10).
+    """Whether this turn is computed from published inputs (decision 10).
 
     Two independent typed facts say so and either is enough: the research
     query's ``scenario_question`` bit, or a ``future_window`` horizon the
-    interpreter typed on the draft. Neither reads the message; a read that
-    carries neither is an ordinary lookup and takes the recorded contract."""
+    interpreter typed on the draft. None reads the message; a read that carries none is an
+    ordinary lookup and takes the recorded contract."""
     from argus.agent_runtime.interpreter.draft_shape import (
         strategy_draft_future_horizon,
     )
@@ -150,7 +151,10 @@ def _cache_key_for(
     scenario: bool = False,
 ) -> str:
     """One key recipe for every shape, so a packet stored by the thorough job
-    finalizer serves the same question asked inline later."""
+    finalizer serves the same question asked inline later. Packets carry the
+    answer's calculations and the pages it cites, so a key never serves one
+    stored under an older contract without them."""
+    contract = ("scenario" if scenario else "retrieval") + ":answer_calculations:cited"
     return research_cache_key(
         capability_class=capability_class,
         shape=shape,
@@ -158,7 +162,7 @@ def _cache_key_for(
         period_key=(query.period_of_interest or "").strip().lower() or "current",
         question_fingerprint=" ".join(message.lower().split()),
         language=language,
-        contract="scenario" if scenario else "retrieval",
+        contract=contract,
         country=country,
     )
 
@@ -250,6 +254,8 @@ async def grounded_result(
         sector=getattr(query, "sector_of_interest", None),
         publisher_sources_required=publisher_sources_required,
         scenario=scenario,
+        country=user.country,
+        currency=user.currency,
     )
     key = _cache_key_for(
         query=query,
@@ -403,6 +409,7 @@ async def grounded_result(
             withheld_code="research_unavailable_missing_public_sources",
             scenario=scenario,
             survey=survey,
+            message=state.current_user_message,
         )
     result = _packet_stage_result(
         packet=packet.model_copy(update={"usage": spend.reported(packet.usage)}),
@@ -420,6 +427,7 @@ async def grounded_result(
         decision=decision,
         scenario=scenario,
         survey=survey,
+        message=state.current_user_message,
     )
     if cache_status == "miss":
         # The response's own packet is what is stored, not the turn-total copy
@@ -455,12 +463,15 @@ def _packet_stage_result(
     withheld_code: str | None = None,
     scenario: bool = False,
     survey: bool | None = None,
+    message: str = "",
 ) -> StageResult:
     """Grounded packet to finished turn: verified peers, runnable rows, typed
     sidecar. One composition whether the packet came from the provider or the
     shared cache, for any shape. ``survey`` is the caller's derived fact; a
     scenario typed as a survey kind passes False so the kind reclassifies
-    nothing here.
+    nothing here. The answer's calculation computes through the answer step,
+    and a failed lookup answers from Argus market data and stated assumptions
+    instead of a withheld note.
 
     A retrieved answer publishes. A packet that did not retrieve is withheld
     for that first, since it has no page to find a publisher on.
@@ -470,6 +481,29 @@ def _packet_stage_result(
     resolver verifies."""
     if survey is None:
         survey = is_market_survey(question_kind)
+    if packet.declined and packet.answer_markdown.strip():
+        # Not a money question, or a request that Argus act: the plain reply
+        # stands, with no figures, calculation or next steps.
+        _note_declined(interpretation)
+        return research_stage_result(
+            answer=packet.answer_markdown,
+            interpretation=interpretation,
+            user=user,
+            capability_class=capability_class,
+            shape=shape,
+            packet=packet.model_copy(
+                update={"rows": (), "unsourced_rows": (), "follow_up_questions": ()}
+            ),
+            peers=[],
+            rows=None,
+            subjects=[],
+            cache_status=cache_status,
+            period_of_interest=period_of_interest,
+            question_kind=freshness_kind(question_kind, survey=survey),
+            decision=decision,
+            period_start_date=period_start_date,
+            question_as_of_date=question_as_of_date,
+        )
     answer = published_answer(packet, language)
     degraded_code = (
         _not_grounded_code(packet, survey=survey)
@@ -517,12 +551,101 @@ def _packet_stage_result(
             peers = [p for p in peers if p["symbol"] in named_symbols]
         else:
             degraded_code = "survey_synthesis_incomplete"
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
+    from argus.agent_runtime.calculated_answer import (
+        CALCULATION_OFFER_KEY,
+        INPUT_MISSING_REASON_CODE,
+        question_stage_result,
+    )
+    from argus.agent_runtime.calculation_rows import with_calculation_offer
+    from argus.agent_runtime.research_calculation import (
+        CALCULATION_NOT_COMPUTED_CODE,
+        LOOKUP_FAILURE_CODES,
+        NotComputed,
+        answer_without_lookup,
+        offered_calculation,
+        packet_answer,
+    )
+
+    answered = None
+    offer: dict[str, Any] | None = None
+    not_found: tuple[str, ...] = ()
+    if degraded_code is None and not survey:
+        read = packet_answer(
+            packet,
+            subjects=subjects,
+            user=user,
+            language=language,
+            notes=interpretation.reason_codes,
+        )
+        if isinstance(read, NotComputed):
+            degraded_code, not_found = read.code, read.not_looked_up
+        elif read is not None and read.question_field is not None:
+            offered = offered_calculation(
+                published_answer(packet, language),
+                read.pending or {},
+                subjects=subjects,
+                user=user,
+                notes=interpretation.reason_codes,
+            )
+            if offered is None:
+                degraded_code = CALCULATION_NOT_COMPUTED_CODE
+            else:
+                answer, offer = offered
+        elif read is not None:
+            answered = read
+            answer = read.answer_text
     if degraded_code is not None:
         # The subjects the user named stay testable; a survey named none.
-        answer = _withheld_note(language, code=degraded_code, question_kind=question_kind)
+        answered = (
+            answer_without_lookup(
+                message=message,
+                language=language,
+                user=user,
+                subjects=subjects,
+                not_looked_up=not_found,
+                notes=interpretation.reason_codes,
+            )
+            if degraded_code in LOOKUP_FAILURE_CODES and not survey
+            else None
+        )
+        answer = (
+            answered.answer_text
+            if answered is not None
+            else _withheld_note(language, code=degraded_code, question_kind=question_kind)
+        )
         peers = []
         if survey:
             subjects = []
+    if answered is not None and answered.question_field is not None:
+        question = question_stage_result(
+            answered,
+            decision=carried_decision(
+                decision,
+                interpretation=interpretation,
+                user=user,
+                reason_code=INPUT_MISSING_REASON_CODE,
+            ),
+        )
+        question.stage_patch["research"] = build_research_sidecar(
+            **_packet_sidecar_fields(
+                packet,
+                capability_class=capability_class,
+                shape=shape,
+                subjects=subjects,
+                peers=[],
+                cache_status=cache_status,
+                degraded_code=degraded_code,
+                period_of_interest=period_of_interest,
+                question_kind=freshness_kind(question_kind, survey=survey),
+                period_start_date=period_start_date,
+                question_as_of_date=question_as_of_date,
+            )
+        )
+        return question
     if not subjects and peers:
         # A survey names no subject: what the provider found, once the
         # resolver verifies it, is what the user can test. Promoting the
@@ -535,8 +658,33 @@ def _packet_stage_result(
         language=language,
         entry_rule=getattr(interpretation.candidate_strategy_draft, "entry_rule", None),
     )
-    if not rows and subjects:
-        answer = f"{answer}\n\n{honest_no_next_line(language)}"
+    if offer is not None:
+        rows = with_calculation_offer(rows, language=language)
+    suffix = f"\n\n{honest_no_next_line(language)}" if not rows and subjects else ""
+    answer = f"{answer}{suffix}"
+    computed = {CALCULATION_OFFER_KEY: offer} if offer is not None else None
+    if answered is not None and answered.patch:
+        computed = dict(answered.patch)
+        if answered.template is not None:
+            computed[ANSWER_TEMPLATE_KEY] = {
+                **answered.template,
+                "text": answered.template["text"] + suffix,
+            }
+        if answered.assumptions:
+            computed[ANSWER_ASSUMPTIONS_KEY] = list(answered.assumptions)
+        rows = _with_market_counterfactual(
+            computed, rows, subjects=subjects, language=language
+        )
+    from argus.agent_runtime.answer_calculation import cards_in, record_unsourced_figures
+
+    record_unsourced_figures(
+        answer,
+        cited=[row.value for row in packet.rows],
+        names=[f"{row.subject} {row.label}" for row in packet.rows],
+        cards=cards_in(computed),
+        notes=interpretation.reason_codes,
+        message=message,
+    )
     return research_stage_result(
         answer=answer,
         interpretation=interpretation,
@@ -554,7 +702,49 @@ def _packet_stage_result(
         decision=decision,
         period_start_date=period_start_date,
         question_as_of_date=question_as_of_date,
+        computed=computed,
     )
+
+
+# Recorded when the research answer declined a request that is not a money
+# question or asks Argus to place a trade, move money or act on an account.
+DECLINED_REASON_CODE = "research_declined_not_a_money_request"
+
+
+def _note_declined(interpretation: StructuredInterpretation) -> None:
+    if DECLINED_REASON_CODE not in interpretation.reason_codes:
+        interpretation.reason_codes.append(DECLINED_REASON_CODE)
+    logger.info(
+        "Research declined a request that is not a money question intent={} act={}",
+        interpretation.intent,
+        interpretation.semantic_turn_act,
+        failure_classification=DECLINED_REASON_CODE,
+    )
+
+
+def _with_market_counterfactual(
+    computed: dict[str, Any],
+    rows: dict[str, Any] | None,
+    *,
+    subjects: list[dict[str, str]],
+    language: str,
+) -> dict[str, Any] | None:
+    """A computed scenario with the user's amount offers what that amount did
+    in the same asset over the same years, first among the rows; never run."""
+    from argus.agent_runtime.calculation_rows import market_counterfactual_rows
+    from argus.agent_runtime.next_experiments import NEXT_EXPERIMENTS_ROW_CAP
+
+    final = computed.get("final_response_payload") or {}
+    cards = final.get("tool_result_cards") or []
+    if not cards or cards[0]["outcome"]["status"] != "succeeded":
+        return rows
+    counterfactual = market_counterfactual_rows(
+        cards[0], language=language, subjects=subjects
+    )
+    if counterfactual is None:
+        return rows
+    offered = [*counterfactual["rows"], *((rows or {}).get("rows") or [])]
+    return {**(rows or counterfactual), "rows": offered[:NEXT_EXPERIMENTS_ROW_CAP]}
 
 
 def thorough_job_result(
@@ -603,6 +793,7 @@ def thorough_job_result(
             period_start_date=_coerce_date(query.period_start_date),
             question_as_of_date=question_date(),
             decision=decision,
+            message=message,
         )
     subject_labels = ", ".join(f"{s['name']} [{s['symbol']}]" for s in subjects[:3])
     if language == "es-419":
@@ -636,6 +827,7 @@ def thorough_job_result(
                 # when the job's request is rebuilt; None sends none.
                 "country": user.country,
                 "question": message,
+                "currency": user.currency,
                 "subjects": subjects,
                 "period_of_interest": query.period_of_interest,
                 "period_is_closed_window": query.period_is_closed_window,
@@ -800,14 +992,75 @@ def unavailable_result(
     is no packet to compose from, so the note's own carries it instead: a turn
     that reached the provider is a miss that cost what it cost, and only a
     turn that never called one bypasses the meter."""
-    del state
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
+    from argus.agent_runtime.calculated_answer import (
+        INPUT_MISSING_REASON_CODE,
+        question_stage_result,
+    )
+    from argus.agent_runtime.research_calculation import answer_without_lookup
+
     language = language_tag(user.language_preference)
-    # No reason reaching here has a note of its own: a claim withheld for want
-    # of a publisher has a real packet and composes through _packet_stage_result.
-    note = _unavailable_note(language)
+    # A failed lookup never becomes the answer: the no-search step answers from
+    # Argus market data and stated assumptions and says what it could not look
+    # up. Only when that cannot run does the honest note stand in.
+    answered = (
+        None
+        if survey
+        else answer_without_lookup(
+            message=state.current_user_message,
+            language=language,
+            user=user,
+            subjects=subjects,
+            not_looked_up=(),
+            notes=interpretation.reason_codes,
+        )
+    )
+    if answered is not None and answered.question_field is not None:
+        question = question_stage_result(
+            answered,
+            decision=carried_decision(
+                decision,
+                interpretation=interpretation,
+                user=user,
+                reason_code=INPUT_MISSING_REASON_CODE,
+            ),
+        )
+        question.stage_patch["research"] = build_research_sidecar(
+            **_packet_sidecar_fields(
+                ResearchPacket(
+                    answer_markdown=answered.answer_text,
+                    usage=usage if usage is not None else ResearchUsage(),
+                ),
+                capability_class=capability_class_for_shape(shape, screening=survey),
+                shape=shape,
+                subjects=subjects,
+                peers=[],
+                cache_status="bypass" if usage is None else "miss",
+                degraded_code=f"research_unavailable_{reason}",
+                period_of_interest=query.period_of_interest,
+            )
+        )
+        return question
+    note = answered.answer_text if answered is not None else _unavailable_note(language)
     rows = research_next_experiment_rows(subjects=subjects, peers=[], language=language)
-    if not rows and subjects:
-        note = f"{note}\n\n{honest_no_next_line(language)}"
+    suffix = f"\n\n{honest_no_next_line(language)}" if not rows and subjects else ""
+    note = f"{note}{suffix}"
+    computed = None
+    if answered is not None and answered.patch:
+        computed = dict(answered.patch)
+        if answered.template is not None:
+            computed[ANSWER_TEMPLATE_KEY] = {
+                **answered.template,
+                "text": answered.template["text"] + suffix,
+            }
+        if answered.assumptions:
+            computed[ANSWER_ASSUMPTIONS_KEY] = list(answered.assumptions)
+        rows = _with_market_counterfactual(
+            computed, rows, subjects=subjects, language=language
+        )
     packet = ResearchPacket(
         answer_markdown=note, usage=usage if usage is not None else ResearchUsage()
     )
@@ -825,6 +1078,7 @@ def unavailable_result(
         degraded_code=f"research_unavailable_{reason}",
         period_of_interest=query.period_of_interest,
         decision=decision,
+        computed=computed,
     )
 
 
@@ -835,6 +1089,7 @@ def shape_for_kind(kind: str) -> QuestionShape:
         "company_lookup",
         "etf_constituents",
         "current_external",
+        "concept",
     ) or is_market_survey(kind):
         return "balanced"
     return "thorough"
@@ -1078,21 +1333,14 @@ def _not_grounded_code(packet: ResearchPacket, *, survey: bool) -> str | None:
 
 
 def _scenario_inputs_code(packet: ResearchPacket, *, scenario: bool) -> str | None:
-    """A computed scenario publishes only on cited inputs (decision 10).
-
-    The provider's schema allows an answer with no rows, and a page in
-    ``sources`` proves retrieval, not that a forecast, target or multiple the
-    arithmetic used was read from it. At least one input row must cite a
-    public page; the current price alone, read from the provider's own
-    finance page, is not a forecast."""
-    if not scenario:
-        return None
-    if any(row.source_url for row in packet.rows):
+    """A computed scenario publishes only through the calculation its answer
+    returns (decision 10): without one, any figure it states is the provider's
+    own arithmetic."""
+    if not scenario or packet.calculations:
         return None
     logger.info(
-        "Scenario withheld: no input row cites a public page"
-        f" rows={len(packet.rows)} unsourced={len(packet.unsourced_rows)}"
-        f" sources={len(packet.sources)}"
+        "Scenario withheld: the answer returned no calculation"
+        f" rows={len(packet.rows)} sources={len(packet.sources)}"
     )
     return "scenario_inputs_uncited"
 
@@ -1105,10 +1353,26 @@ def _withheld_note(language: str, *, code: str, question_kind: str | None) -> st
         return _not_grounded_note(language)
     if code == "scenario_inputs_uncited":
         return _scenario_inputs_uncited_note(language)
+    if code == "calculation_inputs_not_found":
+        return _calculation_inputs_not_found_note(language)
     return _survey_recovery_note(
         language,
         question_kind=question_kind,
         retrieval_happened=code != "survey_not_grounded",
+    )
+
+
+def _calculation_inputs_not_found_note(language: str) -> str:
+    if language == "es-419":
+        return (
+            "No pude consultar todos los datos que necesita este cálculo, así que "
+            "no voy a calcularlo con cifras que no verifiqué. Puedes preguntar de "
+            "nuevo o darme los datos que tengas."
+        )
+    return (
+        "I couldn't look up every figure this calculation needs, so I won't "
+        "compute it from figures I didn't verify. You can ask again or give me "
+        "the figures you have."
     )
 
 
@@ -1121,7 +1385,7 @@ def _packet_has_public_sources(
 ) -> bool:
     return bool(
         select_public_sources(
-            packet.sources,
+            answer_sources(packet),
             question_kind=freshness_kind(query.question_kind, survey=survey),
             period_start=_coerce_date(query.period_start_date),
             question_as_of=question_as_of_date,
@@ -1152,13 +1416,27 @@ def _research_prompt(
     sector: str | None = None,
     publisher_sources_required: bool = False,
     scenario: bool = False,
+    lookup_inputs: Sequence[str] = (),
+    country: str | None = None,
+    currency: str | None = None,
 ) -> str:
     """Documented prompt guidance: business question first, then tickers and
-    the time window; state the desired outcome, let the tool pick fields."""
+    the time window; state the desired outcome, let the tool pick fields. A
+    refresh names the calculation inputs to look up again."""
     lines = [message.strip()]
     if subjects:
         lines.append(
             "Tickers: " + ", ".join(f"{s['name']} ({s['symbol']})" for s in subjects)
+        )
+    if country:
+        # The search location alone never tells the model where the reader is.
+        from argus.domain.home_country import country_name
+
+        counted = f" and counts money in {currency}" if currency else ""
+        lines.append(
+            f"The reader lives in {country_name(country)} ({country.upper()}){counted}. "
+            "Answer for that country unless the question names another, and never ask "
+            "where the reader lives."
         )
     if sector:
         lines.append(f"Sector or theme: {sector}")
@@ -1179,19 +1457,25 @@ def _research_prompt(
         )
     if scenario:
         lines.append(
-            "The answer is a set of scenarios you compute from published inputs, "
-            "as the instructions describe: inputs rowed with their pages, the "
-            "arithmetic written out, labeled ranges from low to high, no single "
-            "number as the future, no advice."
+            "Argus computes the answer from the calculation you return. Do not "
+            "compute the answer, scenario values, ranges or future figures; state "
+            "the inputs you found, their dates and their sources, and name any "
+            "input no page states. No advice."
+        )
+    if lookup_inputs:
+        lines.append(
+            "Look up the current published value of each of these calculation "
+            "inputs and return them in calculations, each with its page and date: "
+            + ", ".join(lookup_inputs)
+            + "."
         )
     lines.append(
-        "Answer the question directly for a curious non-expert, leading with "
-        "the answer. Use compact tables only where they genuinely help. State "
-        "the as-of date for any current figure. If a figure is unavailable, "
-        "say so plainly; never estimate a live number. No investment advice. "
-        "Do not write a sources or citations line and do not include links: "
-        "the interface lists sources beside your answer. Never name tools, "
-        "providers, models, or internal systems."
+        "Lead with the direct answer, then go as deep as the question deserves. "
+        "State the as-of date for any current figure. If a figure is "
+        "unavailable, say so plainly; never estimate a live number. No "
+        "investment or product advice. Do not write a sources or citations line "
+        "and do not include links: the interface lists sources beside your "
+        "answer. Never name tools, providers, models, or internal systems."
     )
     if language == "es-419":
         lines.append("Responde en español latinoamericano (es-419).")
@@ -1451,6 +1735,8 @@ def research_prompt_for_job(job_request: dict[str, Any]) -> str:
         question_kind=str(job_request.get("question_kind") or "cross_company"),
         publisher_sources_required=bool(job_request.get("requires_publisher_sources")),
         scenario=bool(job_request.get("scenario_question")),
+        country=job_request.get("country") or None,
+        currency=job_request.get("currency") or None,
     )
 
 
@@ -1515,6 +1801,27 @@ def compose_completed_research(
         period_start_date=job_request.get("period_start_date"),
         question_as_of_date=job_request.get("question_as_of_date"),
     )
+    if packet.declined and packet.answer_markdown.strip():
+        return {
+            "answer": packet.answer_markdown,
+            "research": build_research_sidecar(
+                **_job_sidecar_fields(
+                    job_request,
+                    packet.model_copy(
+                        update={
+                            "rows": (),
+                            "unsourced_rows": (),
+                            "follow_up_questions": (),
+                        }
+                    ),
+                    sources=sources,
+                    subjects=[],
+                    peers=[],
+                    degraded_code=None,
+                )
+            ),
+            "computed": None,
+        }
     degraded_code = (
         _not_grounded_code(
             packet, survey=is_market_survey(question_kind) and not scenario
@@ -1526,6 +1833,82 @@ def compose_completed_research(
         )
         or _scenario_inputs_code(packet, scenario=scenario)
     )
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
+    from argus.agent_runtime.calculated_answer import (
+        CALCULATION_OFFER_KEY,
+        question_stage_result,
+    )
+    from argus.agent_runtime.calculation_rows import with_calculation_offer
+    from argus.agent_runtime.research_calculation import (
+        CALCULATION_NOT_COMPUTED_CODE,
+        LOOKUP_FAILURE_CODES,
+        NotComputed,
+        answer_without_lookup,
+        offered_calculation,
+        packet_answer,
+    )
+    from argus.agent_runtime.state.models import UserState
+
+    survey = is_market_survey(question_kind) and not scenario
+    user = UserState(
+        user_id=str(job_request.get("user_id") or "research-job"),
+        language_preference=language,
+        currency=job_request.get("currency") or None,
+    )
+    notes: list[str] = []
+    answered = None
+    offer: dict[str, Any] | None = None
+    offer_text: str | None = None
+    not_found: tuple[str, ...] = ()
+    if degraded_code is None and not survey:
+        read = packet_answer(
+            packet, subjects=subjects, user=user, language=language, notes=notes
+        )
+        if isinstance(read, NotComputed):
+            degraded_code, not_found = read.code, read.not_looked_up
+        elif read is not None and read.question_field is not None:
+            offered = offered_calculation(
+                published_answer(packet, language),
+                read.pending or {},
+                subjects=subjects,
+                user=user,
+                notes=notes,
+            )
+            if offered is None:
+                degraded_code = CALCULATION_NOT_COMPUTED_CODE
+            else:
+                offer_text, offer = offered
+        elif read is not None:
+            answered = read
+    if degraded_code in LOOKUP_FAILURE_CODES and not survey:
+        answered = answer_without_lookup(
+            message=str(job_request.get("question") or ""),
+            language=language,
+            user=user,
+            subjects=subjects,
+            not_looked_up=not_found,
+            notes=notes,
+        )
+    if answered is not None and answered.question_field is not None:
+        return {
+            "answer": answered.answer_text,
+            "research": build_research_sidecar(
+                **_job_sidecar_fields(
+                    job_request,
+                    packet,
+                    sources=sources,
+                    subjects=subjects,
+                    peers=[],
+                    degraded_code=degraded_code,
+                )
+            ),
+            "next_experiments": None,
+            "computed": None,
+            "question": question_stage_result(answered, decision=None).stage_patch,
+        }
     peers = (
         []
         if degraded_code is not None
@@ -1540,41 +1923,98 @@ def compose_completed_research(
     rows = research_next_experiment_rows(
         subjects=subjects, peers=peers, language=language
     )
-    answer = (
-        _withheld_note(language, code=degraded_code, question_kind=question_kind)
-        if degraded_code is not None
-        else published_answer(packet, language)
+    if offer is not None:
+        rows = with_calculation_offer(rows, language=language)
+    if answered is not None:
+        answer = answered.answer_text
+    elif offer_text is not None:
+        answer = offer_text
+    elif degraded_code is not None:
+        answer = _withheld_note(language, code=degraded_code, question_kind=question_kind)
+    else:
+        answer = published_answer(packet, language)
+    suffix = f"\n\n{honest_no_next_line(language)}" if not rows and subjects else ""
+    answer = f"{answer}{suffix}"
+    computed = None
+    if answered is not None and answered.patch:
+        computed = dict(answered.patch)
+        if answered.template is not None:
+            computed[ANSWER_TEMPLATE_KEY] = {
+                **answered.template,
+                "text": answered.template["text"] + suffix,
+            }
+        if answered.assumptions:
+            computed[ANSWER_ASSUMPTIONS_KEY] = list(answered.assumptions)
+        rows = _with_market_counterfactual(
+            computed, rows, subjects=subjects, language=language
+        )
+    from argus.agent_runtime.answer_calculation import cards_in, record_unsourced_figures
+    from argus.agent_runtime.result_next_steps import research_next_steps
+
+    record_unsourced_figures(
+        answer,
+        cited=[row.value for row in packet.rows],
+        names=[f"{row.subject} {row.label}" for row in packet.rows],
+        cards=cards_in(computed),
+        notes=notes,
+        message=str(job_request.get("question") or ""),
     )
-    if not rows and subjects:
-        answer = f"{answer}\n\n{honest_no_next_line(language)}"
-    capability_class = str(job_request.get("capability_class") or "thorough_research")
-    return {
+    composed = {
         "answer": answer,
         "research": build_research_sidecar(
-            capability_class=capability_class,
-            shape="thorough",
-            sources=sources,
-            retrieved_rows=typed_rows(packet),
-            retrieved_at=packet.retrieved_at.isoformat(),
-            subjects=subjects,
-            peers=peers,
-            usage={
-                "invocations": packet.usage.invocations,
-                "latency_ms": packet.usage.latency_ms,
-                "cost_usd": packet.usage.cost_usd,
-                # Composition only ever runs on a packet a provider run produced;
-                # cache hits answer inline and never reach a job.
-                "cache_status": "miss",
-            },
-            period_of_interest=(
-                str(job_request.get("period_of_interest"))
-                if job_request.get("period_of_interest")
-                else None
-            ),
-            degraded_code=degraded_code,
+            **_job_sidecar_fields(
+                job_request,
+                packet,
+                sources=sources,
+                subjects=subjects,
+                peers=peers,
+                degraded_code=degraded_code,
+            )
         ),
-        "next_experiments": rows,
+        "computed": computed,
     }
+    offer_patch = {CALCULATION_OFFER_KEY: offer} if offer is not None else {}
+    return {
+        **composed,
+        **research_next_steps(composed["research"]["follow_up"], rows),
+        **offer_patch,
+    }
+
+
+def _job_sidecar_fields(
+    job_request: dict[str, Any],
+    packet: ResearchPacket,
+    *,
+    sources: list[dict[str, Any]],
+    subjects: list[dict[str, str]],
+    peers: list[dict[str, str]],
+    degraded_code: str | None,
+) -> dict[str, Any]:
+    """The shared builder's arguments for a finished background packet."""
+    return dict(
+        capability_class=str(job_request.get("capability_class") or "thorough_research"),
+        shape="thorough",
+        sources=sources,
+        retrieved_rows=typed_rows(packet),
+        follow_up_questions=packet.follow_up_questions,
+        retrieved_at=packet.retrieved_at.isoformat(),
+        subjects=subjects,
+        peers=peers,
+        usage={
+            "invocations": packet.usage.invocations,
+            "latency_ms": packet.usage.latency_ms,
+            "cost_usd": packet.usage.cost_usd,
+            # Composition only ever runs on a packet a provider run produced;
+            # cache hits answer inline and never reach a job.
+            "cache_status": "miss",
+        },
+        period_of_interest=(
+            str(job_request.get("period_of_interest"))
+            if job_request.get("period_of_interest")
+            else None
+        ),
+        degraded_code=degraded_code,
+    )
 
 
 def research_failure_note(language: str) -> str:
@@ -1730,12 +2170,12 @@ def typed_sources(
     Same fields grounded discovery already emits, so one surface serves every
     shape. The title is the publisher's domain because the packet carries no
     title, and inventing one would be the same defect as letting the model
-    write its own citation line. Only URLs the packet returned appear here.
+    write its own citation line. Only the pages the answer cites appear here.
     """
     from urllib.parse import urlparse
 
     selected = select_public_sources(
-        packet.sources,
+        answer_sources(packet),
         question_kind=question_kind,
         period_start=_coerce_date(period_start_date),
         question_as_of=_coerce_date(question_as_of_date),
@@ -1787,6 +2227,7 @@ def research_follow_up_block(
     shape: str,
     period_of_interest: str | None,
     category: str | None = None,
+    questions: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Typed producer seam for the memory program (spec sections 11 and 11b).
 
@@ -1814,6 +2255,9 @@ def research_follow_up_block(
         "comparison_set": ([s["symbol"] for s in subjects] if len(subjects) >= 2 else []),
         "peer_suggestions": [p["symbol"] for p in peers if p.get("symbol")],
         "open_thread": open_thread,
+        # The questions the answer suggested the reader may ask next; the one
+        # next-steps list is built from them.
+        "questions": list(questions),
     }
 
 
@@ -1830,6 +2274,7 @@ def build_research_sidecar(
     category: str | None = None,
     degraded_code: str | None = None,
     retrieved_rows: list[dict[str, Any]] | None = None,
+    follow_up_questions: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Build the only supported research sidecar shape."""
     sidecar: dict[str, Any] = {
@@ -1850,6 +2295,7 @@ def build_research_sidecar(
             shape=shape,
             period_of_interest=period_of_interest,
             category=category,
+            questions=() if degraded_code else follow_up_questions,
         ),
     }
     if degraded_code:
@@ -1884,6 +2330,47 @@ def returned_sources_research_sidecar(
     )
 
 
+def _packet_sidecar_fields(
+    packet: ResearchPacket,
+    *,
+    capability_class: str,
+    shape: str,
+    subjects: list[dict[str, str]],
+    peers: list[dict[str, str]],
+    cache_status: str,
+    degraded_code: str | None,
+    period_of_interest: str | None,
+    question_kind: str | None = None,
+    period_start_date: date | str | None = None,
+    question_as_of_date: date | str | None = None,
+) -> dict[str, Any]:
+    """The shared builder's arguments for an inline packet. An answer and a
+    question both carry its sidecar, so every packet a turn read reaches the ledger."""
+    return dict(
+        capability_class=capability_class,
+        shape=shape,
+        sources=typed_sources(
+            packet,
+            question_kind=question_kind,
+            period_start_date=period_start_date,
+            question_as_of_date=question_as_of_date,
+        ),
+        retrieved_rows=typed_rows(packet),
+        follow_up_questions=packet.follow_up_questions,
+        retrieved_at=packet.retrieved_at.isoformat(),
+        subjects=subjects,
+        peers=peers,
+        usage={
+            "invocations": packet.usage.invocations,
+            "latency_ms": packet.usage.latency_ms,
+            "cost_usd": packet.usage.cost_usd,
+            "cache_status": cache_status,
+        },
+        period_of_interest=period_of_interest,
+        degraded_code=degraded_code,
+    )
+
+
 def research_stage_result(
     *,
     answer: str,
@@ -1902,6 +2389,7 @@ def research_stage_result(
     period_start_date: date | str | None = None,
     question_as_of_date: date | str | None = None,
     decision: InterpretDecision | None = None,
+    computed: dict[str, Any] | None = None,
 ) -> StageResult:
     decision = carried_decision(
         decision,
@@ -1910,32 +2398,30 @@ def research_stage_result(
         reason_code=f"research_answer_{capability_class}",
     )
     stage_patch: dict[str, Any] = {
+        **(computed or {}),
         "assistant_response": answer,
         "research": build_research_sidecar(
-            capability_class=capability_class,
-            shape=shape,
-            sources=typed_sources(
+            **_packet_sidecar_fields(
                 packet,
+                capability_class=capability_class,
+                shape=shape,
+                subjects=subjects,
+                peers=peers,
+                cache_status=cache_status,
+                degraded_code=degraded_code,
+                period_of_interest=period_of_interest,
                 question_kind=question_kind,
                 period_start_date=period_start_date,
                 question_as_of_date=question_as_of_date,
-            ),
-            retrieved_rows=typed_rows(packet),
-            retrieved_at=packet.retrieved_at.isoformat(),
-            subjects=subjects,
-            peers=peers,
-            usage={
-                "invocations": packet.usage.invocations,
-                "latency_ms": packet.usage.latency_ms,
-                "cost_usd": packet.usage.cost_usd,
-                "cache_status": cache_status,
-            },
-            period_of_interest=period_of_interest,
-            degraded_code=degraded_code,
+            )
         ),
     }
-    if rows is not None:
-        stage_patch["next_experiments"] = rows
+    from argus.agent_runtime.result_next_steps import research_next_steps
+
+    stage_patch = {
+        **stage_patch,
+        **research_next_steps(stage_patch["research"]["follow_up"], rows),
+    }
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,

@@ -2,6 +2,13 @@ import type { Message } from "@/components/chat/types";
 import type { DecisionState } from "@/lib/argus-api";
 import type { RecoveryDisplay } from "@/lib/chat-recovery-display";
 import { isSettledStrategyResult } from "@/lib/chat-result-message";
+import { computationCalculations } from "@/lib/decision-contract";
+import type {
+  LocalizedToolText,
+  ToolFact,
+  ToolOutcome,
+  ToolResultCard,
+} from "@/lib/tool-result-card";
 
 /**
  * Conversation activity rail ("turn map") derivation and interaction gating.
@@ -11,10 +18,22 @@ import { isSettledStrategyResult } from "@/lib/chat-result-message";
  * docs/superpowers/specs/2026-07-31-conversation-activity-rail.md.
  */
 
+/**
+ * Founder decision 2026-09-11: "Backtest finished" widened to "result". A
+ * result is a settled backtest, or a message with a backend-declared
+ * computation and a succeeded card; never a guess from prose.
+ */
 export type ConversationRailTickKind =
-  | "backtest_completed"
+  | "result"
   | "decision_saved"
   | "error_recovery";
+
+/** One calculation's preview on a computed answer's tick: its card title and headline figure. */
+export type ConversationRailCalculation = {
+  kind: string;
+  title: LocalizedToolText;
+  headline: ToolFact | null;
+};
 
 export type ConversationRailMetric = { label: string; value: string };
 
@@ -32,6 +51,10 @@ export type ConversationRailTick = {
   decisionState: DecisionState | null;
   recovery: RecoveryDisplay | null;
   failedJobStatus: "failed" | "canceled" | "expired" | null;
+  /** Present on a computed answer's tick, one per calculation in marker order; the rail reads them, never prose. */
+  calculations?: ConversationRailCalculation[] | null;
+  /** The first unsuccessful outcome among a computed answer's cards, for the treatment owner. */
+  toolOutcome?: ToolOutcome | null;
 };
 
 /** The rail only earns space on longer conversations. */
@@ -357,6 +380,59 @@ function unresolvedClarification(
   );
 }
 
+/**
+ * The cards the backend-declared computation names, one per calculation in
+ * marker order: each calculation takes the next unmatched card whose
+ * tool_name is its kind. Null when any calculation has no card.
+ */
+export function computedAnswerCards(message: Message): ToolResultCard[] | null {
+  if (!message.computation) return null;
+  const cards = message.toolResultCards ?? [];
+  const taken = new Set<number>();
+  const matched: ToolResultCard[] = [];
+  for (const calculation of computationCalculations(message.computation)) {
+    const position = cards.findIndex(
+      (card, cardIndex) =>
+        !taken.has(cardIndex) && card.tool_name === calculation.kind,
+    );
+    if (position < 0) return null;
+    taken.add(position);
+    matched.push(cards[position]);
+  }
+  return matched;
+}
+
+function computedAnswerTick(
+  message: Message,
+  index: number,
+  cards: ToolResultCard[],
+): ConversationRailTick {
+  const base = {
+    messageId: message.id,
+    messageIndex: index,
+    strategyTitle: null,
+    symbols: message.computation?.symbols ?? [],
+    periodDisplay: null,
+    metrics: [],
+    decisionState: message.decisionState ?? null,
+    recovery: null,
+    failedJobStatus: null,
+  };
+  const unsuccessful = cards.find((card) => card.outcome.status !== "succeeded");
+  if (unsuccessful) {
+    return { ...base, kind: "error_recovery", decisionState: null, toolOutcome: unsuccessful.outcome };
+  }
+  return {
+    ...base,
+    kind: message.decisionState ? "decision_saved" : "result",
+    calculations: cards.map((card) => ({
+      kind: card.tool_name,
+      title: card.presentation.title,
+      headline: card.presentation.answer,
+    })),
+  };
+}
+
 export function deriveConversationRailTicks(
   messages: Message[],
 ): ConversationRailTick[] {
@@ -390,7 +466,7 @@ export function deriveConversationRailTicks(
       ticks.push({
         messageId: message.id,
         messageIndex: index,
-        kind: result.decisionState ? "decision_saved" : "backtest_completed",
+        kind: result.decisionState ? "decision_saved" : "result",
         strategyTitle: result.strategyLabel ?? result.strategyName ?? null,
         symbols: (result.symbols ?? []).slice(0, 5),
         periodDisplay: result.dateRange?.display ?? result.period ?? null,
@@ -399,6 +475,11 @@ export function deriveConversationRailTicks(
         recovery: null,
         failedJobStatus: null,
       });
+      return;
+    }
+    const computedCards = computedAnswerCards(message);
+    if (computedCards) {
+      ticks.push(computedAnswerTick(message, index, computedCards));
       return;
     }
     if (message.kind === "backtest_job" && message.backtestJob) {

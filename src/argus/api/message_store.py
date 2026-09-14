@@ -10,6 +10,7 @@ from argus.agent_runtime.state.models import ConversationMessage
 from argus.api import state as api_state
 from argus.api.chat.previews import (
     is_degraded_clarification_compatibility_text,
+    research_lookup_failed,
     stored_message_preview,
 )
 from argus.api.dependencies import dev_memory_fallback_enabled
@@ -798,6 +799,7 @@ def load_runtime_thread_history(
     user_id: str,
     conversation_id: str,
     limit: int = 20,
+    drop_failed_lookups: bool = False,
 ) -> list[ConversationMessage]:
     messages: list[Message] = []
     if api_state.supabase_gateway is not None:
@@ -825,6 +827,8 @@ def load_runtime_thread_history(
             role=message.role,
             metadata=message.metadata,
         ):
+            continue
+        if drop_failed_lookups and research_lookup_failed(message.metadata):
             continue
         # A card turn reaches the model as the card's typed facts, never prose.
         card_facts = (

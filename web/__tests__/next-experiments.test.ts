@@ -6,6 +6,7 @@ import { hydrateMessagesFromApi } from "@/components/chat/chat-message-projectio
 import type { ApiMessage } from "@/lib/argus-api";
 import {
   NEXT_EXPERIMENTS_VERSION,
+  CALCULATION_OFFER_KIND,
   nextExperimentAction,
   nextExperimentRowsFromMetadata,
   nextExperimentsSourceRunIdFromMetadata,
@@ -275,6 +276,30 @@ describe("what-next follow-up rows (issue #590)", () => {
     expect(action.payload).toEqual({
       run_id: "run-590",
       next_experiment_kind: "change_date_range",
+    });
+  });
+});
+
+describe("calculation offer row", () => {
+  test("sends a typed calculation offer action with its localized label", () => {
+    const action = nextExperimentAction(
+      {
+        kind: CALCULATION_OFFER_KIND,
+        label: "Work it out with your own figures",
+        labelKey: "chat.next_experiments.labels.calculation_offer",
+        labelShort: null,
+        labelShortKey: null,
+        labelParts: null,
+        detail: null,
+        sendText: null,
+        why: null,
+      },
+      "Calcúlalo con tus propios números",
+    );
+    expect(action).toEqual({
+      label: "Calcúlalo con tus propios números",
+      value: "Calcúlalo con tus propios números",
+      type: "calculation_offer",
     });
   });
 });

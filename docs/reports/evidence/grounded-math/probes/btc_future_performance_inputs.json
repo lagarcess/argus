@@ -1,0 +1,551 @@
+{
+  "probe": "btc_future_performance_inputs",
+  "issue": 599,
+  "candidate_sha": "12127de1bc7efef5319efd1972fb7cbec7d70f11",
+  "captured_at": "2026-09-12T19:28:06.630346+00:00",
+  "question": "If I invest $10,000 in Bitcoin and just hold it, what will it be worth in ten years?",
+  "calculation": {
+    "kind": "growth_projection",
+    "inputs": {
+      "currency": "USD",
+      "start_value": 10000,
+      "contribution": 0,
+      "end_value": null,
+      "periods": 10,
+      "periods_per_year": 1
+    },
+    "solve_for": null,
+    "retrieve": [
+      "annual_rate_pct"
+    ],
+    "follow_up_questions": []
+  },
+  "inputs": [
+    "annual_rate_pct"
+  ],
+  "tools": [
+    "web_search",
+    "fetch_url"
+  ],
+  "timeout_seconds": 150.0,
+  "packet": {
+    "answer_markdown": "The future value must be calculated from the retrieved forecast input; it is not a guaranteed outcome.\n\n**annual_rate_pct:** 30%, Michael Saylor’s published Bitcoin appreciation forecast, reported by The Motley Fool on August 24, 2026.",
+    "categories": [],
+    "tickers": [],
+    "sources": [
+      {
+        "url": "https://finance.yahoo.com/markets/crypto/articles/michael-saylor-predicted-bitcoin-return-172000739.html",
+        "title": "Michael Saylor Predicted Bitcoin Will Return 30% Annually for the ...",
+        "source_date": "2026-08-24"
+      },
+      {
+        "url": "https://cryptoslate.com/bitcoin-market-cap-16-trillion-2030-model-etf-reality-check-us/",
+        "title": "Bitcoin Market Cap: ARK's $16T 2030 Model Faces Reality Check",
+        "source_date": "2026-08-16"
+      },
+      {
+        "url": "https://www.fool.com/investing/2026/08/29/bitcoin-could-hit-300000-by-2030-says-coinbase-ceo/",
+        "title": "Bitcoin Could Hit $300000 by 2030, Says Coinbase CEO ...",
+        "source_date": "2026-08-29"
+      },
+      {
+        "url": "https://www.gate.com/zh/news/detail/bitcoin-58-cagr-over-decade-the-math-behind-50m-crypto-portfolios-23720942",
+        "title": "比特币十年复合年增长率达58%：$50M 的加密投资组合背后 ...",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://memeburn.com/michael-saylor-bitcoin-30-percent-annual-returns-prediction/",
+        "title": "Saylor Predicts 30% Annual Bitcoin Returns While Selling at a Loss",
+        "source_date": "2026-08-13"
+      },
+      {
+        "url": "https://x.com/coinbureau/status/2096615405414469719",
+        "title": "\"🔥BULLISH: Bitwise CIO Matt Hogan says Bitcoin will hit ...",
+        "source_date": "2026-09-06"
+      },
+      {
+        "url": "https://www.fool.com/investing/2026/08/24/michael-saylor-predicted-bitcoin-will-return/",
+        "title": "Michael Saylor Predicted Bitcoin Will Return 30% Annually for the ...",
+        "source_date": "2026-08-24"
+      },
+      {
+        "url": "https://blockonomi.com/bitcoin-btc-price-prediction-coinbases-armstrong-eyes-300k-by-2030/",
+        "title": "Bitcoin (BTC) Price Prediction: Coinbase's Armstrong Eyes $300K by 2030 - Blockonomi",
+        "source_date": "2026-08-31"
+      },
+      {
+        "url": "https://www.theglobeandmail.com/investing/markets/stocks/NVDA/pressreleases/4228699/michael-saylor-predicted-this-month-that-bitcoin-will-appreciate-30-annually-for-the-next-20-years-does-the-math-behind-that-call-hold-up-for-strategy-investors/",
+        "title": "Michael Saylor Predicted This Month That Bitcoin Will Appreciate 30% Annually for the Next 20 Years. Does the Math Behind That Call Hold Up for Strategy Investors?",
+        "source_date": "2026-08-27"
+      },
+      {
+        "url": "https://www.litefinance.org/blog/analysts-opinions/bitcoin-price-prediction-forecast/",
+        "title": "Bitcoin Price Forecast & Predictions for 2026, 2027, 2028–2030 and ...",
+        "source_date": "2026-09-06"
+      },
+      {
+        "url": "https://www.fool.com/investing/2026/09/06/1-unstoppable-cryptocurrency-to-buy-before-it-soar/",
+        "title": "Key Data Points",
+        "source_date": "2026-09-06"
+      },
+      {
+        "url": "https://coincodex.com/crypto/bitcoin/price-prediction/",
+        "title": "Bitcoin (BTC) Price Prediction 2026, 2027-2030 | CoinCodex",
+        "source_date": "2026-09-12"
+      },
+      {
+        "url": "https://www.calculadoracapital.pt/en/crypto/bitcoin-btc",
+        "title": "Bitcoin (BTC): return calculator - Calculadora Capital",
+        "source_date": "2026-09-10"
+      },
+      {
+        "url": "https://www.fool.com/investing/2026/09/07/investment-firm-bernstein-thinks-bitcoin-could-hit/",
+        "title": "Wall Street Investment Firm Bernstein Thinks Bitcoin Could Hit ...",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://www.morningstar.com/news/marketwatch/20260827137/why-these-analysts-say-bitcoin-will-double-by-next-year-and-could-reach-500000-by-the-end-of-the-decade",
+        "title": "Why these analysts say bitcoin will double by next year - Morningstar",
+        "source_date": "2026-08-27"
+      }
+    ],
+    "name_pairs": [],
+    "rows": [
+      {
+        "subject": "Bitcoin",
+        "symbol": "BTC-USD",
+        "label": "annual_rate_pct",
+        "value": 30.0,
+        "kind": "percent",
+        "unit": "%",
+        "as_of": "2026-08-24",
+        "source_url": "https://www.fool.com/investing/2026/08/24/michael-saylor-predicted-bitcoin-will-return/"
+      }
+    ],
+    "typed_answer": true,
+    "unsourced_rows": [],
+    "tool_results": [
+      "search_results",
+      "fetch_url_results",
+      "fetch_url_results"
+    ],
+    "usage": {
+      "invocations": 0,
+      "finance_search_invocations": 0,
+      "web_search_invocations": 1,
+      "fetch_url_invocations": 2,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 13050,
+      "cost_usd": 0.05008,
+      "input_tokens": 11607,
+      "output_tokens": 629,
+      "cache_creation_input_tokens": 6374,
+      "cache_read_input_tokens": 5224
+    },
+    "retrieved_at": "2026-09-12T19:28:19.683046Z",
+    "background_id": "resp_abf0fd06-8b91-4f20-a8b6-7d49fbb9b504"
+  },
+  "error": null,
+  "elapsed_s": 13.07,
+  "exchanges": [
+    {
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "If I invest $10,000 in Bitcoin and just hold it, what will it be worth in ten years?\nTickers: Bitcoin (BTC-USD)\nTime window: ten years\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nArgus computes the answer itself. Retrieve the inputs below, one row each, with label exactly the input name as written here, the value as a plain number, and the page it was read from with its date. Do not compute the answer, scenario values, ranges or future figures; state the inputs you found, their dates and their sources, and name any input no page states. No advice.\n- annual_rate_pct: a published forecast of yearly growth or return, as a percent\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "month"
+            }
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "en",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question is answered by a calculation Argus computes from typed inputs, such as what something will be worth, what a plan costs or what a price implies. Never compute the answer, scenario values, ranges or future figures yourself. The question names each input to retrieve: a price, a rate, a per-share figure, a published forecast or a multiple. Row every input you find, one row per input, with label exactly the input name as the question writes it, value as a plain number, and the page it was read from; the current price may come from finance data. In answer_markdown state the inputs found with their dates and sources, and name any input no page states. Never present one number as the future, and never say what the reader should do.",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                    "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "label": {
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "subject",
+                      "symbol",
+                      "label",
+                      "value",
+                      "kind",
+                      "unit",
+                      "as_of",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "elapsed_s": 13.05,
+      "response": {
+        "background": false,
+        "completed_at": 1789241287,
+        "created_at": 1789241287,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_abf0fd06-8b91-4f20-a8b6-7d49fbb9b504",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question is answered by a calculation Argus computes from typed inputs, such as what something will be worth, what a plan costs or what a price implies. Never compute the answer, scenario values, ranges or future figures yourself. The question names each input to retrieve: a price, a rate, a per-share figure, a published forecast or a multiple. Row every input you find, one row per input, with label exactly the input name as the question writes it, value as a plain number, and the page it was read from; the current price may come from finance data. In answer_markdown state the inputs found with their dates and sources, and name any input no page states. Never present one number as the future, and never say what the reader should do.",
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "queries": [
+              "Bitcoin forecast annual return percent 10 years",
+              "Bitcoin expected annual growth rate forecast",
+              "Bitcoin CAGR forecast 2035 percent"
+            ],
+            "results": [
+              {
+                "date": "2026-08-24",
+                "id": 1,
+                "last_updated": "2026-09-11",
+                "snippet": "Michael Saylor Predicted Bitcoin Will Return 30% Annually for the Next 20 Years. at 30% per year, your investment would be worth $1.9 million. 10%, you'd end ...",
+                "source": "web",
+                "title": "Michael Saylor Predicted Bitcoin Will Return 30% Annually for the ...",
+                "url": "https://finance.yahoo.com/markets/crypto/articles/michael-saylor-predicted-bitcoin-return-172000739.html"
+              },
+              {
+                "date": "2026-08-16",
+                "id": 2,
+                "last_updated": "2026-09-12",
+                "snippet": "ARK's Big Ideas 2026 report states that Bitcoin could compound about 63% annually during the five years to 2030, rising from nearly $2 trillion to roughly $16 trillion.",
+                "source": "web",
+                "title": "Bitcoin Market Cap: ARK's $16T 2030 Model Faces Reality Check",
+                "url": "https://cryptoslate.com/bitcoin-market-cap-16-trillion-2030-model-etf-reality-check-us/"
+              },
+              {
+                "date": "2026-08-29",
+                "id": 3,
+                "last_updated": "2026-09-12",
+                "snippet": "From there, Bitcoin would need to grow at a compound annual growth rate (CAGR) of 31.6% to triple in value to $300,000.\nAnd it would need to grow at a 41.4% CAGR to quadruple in value to $400,000.",
+                "source": "web",
+                "title": "Bitcoin Could Hit $300000 by 2030, Says Coinbase CEO ...",
+                "url": "https://www.fool.com/investing/2026/08/29/bitcoin-could-hit-300000-by-2030-says-coinbase-ceo/"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 4,
+                "last_updated": "2026-08-27",
+                "snippet": "根据 Henley & Partners《2025 年加密财富报告》，加密货币市场在 12 个月内创造了 69,000 名新的百万富翁。根据 BestBrokers 的研究，比特币 10 年期复合年增长率达到 58%，超过标普 500 指数 13% 的年化收益率。",
+                "source": "web",
+                "title": "比特币十年复合年增长率达58%：$50M 的加密投资组合背后 ...",
+                "url": "https://www.gate.com/zh/news/detail/bitcoin-58-cagr-over-decade-the-math-behind-50m-crypto-portfolios-23720942"
+              },
+              {
+                "date": "2026-08-13",
+                "id": 5,
+                "last_updated": "2026-08-13",
+                "snippet": "On The Diary of a CEO podcast, the Strategy executive chairman predicted that Bitcoin will compound at roughly 30% annually for the next 20 years.\n...\nSaylor's core argument is straightforward: Bitcoin has compounded at approximately 36.2% annually over the past six years, and he expects that trajectory to continue for another two decades before moderating toward 20%.\n...\nOn The Diary of a CEO podcast (August 6, 2026), Saylor predicted Bitcoin will appreciate at roughly 30% annually for the next 20 years before moderating to 20%, outperforming the S&P 500 by 1.5-2x.",
+                "source": "web",
+                "title": "Saylor Predicts 30% Annual Bitcoin Returns While Selling at a Loss",
+                "url": "https://memeburn.com/michael-saylor-bitcoin-30-percent-annual-returns-prediction/"
+              },
+              {
+                "date": "2026-09-06",
+                "id": 6,
+                "last_updated": "2026-09-12",
+                "snippet": "That’s about ~35% CAGR, which is very consistent with the previous 4-5 years.",
+                "source": "web",
+                "title": "\"🔥BULLISH: Bitwise CIO Matt Hogan says Bitcoin will hit ...",
+                "url": "https://x.com/coinbureau/status/2096615405414469719"
+              },
+              {
+                "date": "2026-08-24",
+                "id": 7,
+                "last_updated": "2026-09-12",
+                "snippet": "Michael Saylor, co-founder and executive chairman of **Strategy** (MSTR +1.88%), appeared on \"The Diary of a CEO\" on Aug. 6. While discussing Bitcoin, he said, \"I think it appreciates about 30% a year for the next 20 years.\"\nAfter that, he expects it to slow to about 20% per year.",
+                "source": "web",
+                "title": "Michael Saylor Predicted Bitcoin Will Return 30% Annually for the ...",
+                "url": "https://www.fool.com/investing/2026/08/24/michael-saylor-predicted-bitcoin-will-return/"
+              },
+              {
+                "date": "2026-08-31",
+                "id": 8,
+                "last_updated": "2026-08-31",
+                "snippet": "- Reaching $300,000 would require Bitcoin to maintain a 31.6% CAGR, just below its historical 33.6% growth rate\n...\nAchieving a Bitcoin price of $300,000 would require a compound annual growth rate of approximately 31.6% from today’s valuation.\nThe higher $400,000 target would demand a more aggressive 41.4% annual growth trajectory.",
+                "source": "web",
+                "title": "Bitcoin (BTC) Price Prediction: Coinbase's Armstrong Eyes $300K by 2030 - Blockonomi",
+                "url": "https://blockonomi.com/bitcoin-btc-price-prediction-coinbases-armstrong-eyes-300k-by-2030/"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 9,
+                "last_updated": "2026-08-27",
+                "snippet": "Key Points Strategy's executive chairman, Michael Saylor, recently said he expects Bitcoin's price to grow at a 30% compound annual growth rate over the next 20 years.",
+                "source": "web",
+                "title": "Michael Saylor Predicted This Month That Bitcoin Will Appreciate 30% Annually for the Next 20 Years. Does the Math Behind That Call Hold Up for Strategy Investors?",
+                "url": "https://www.theglobeandmail.com/investing/markets/stocks/NVDA/pressreleases/4228699/michael-saylor-predicted-this-month-that-bitcoin-will-appreciate-30-annually-for-the-next-20-years-does-the-math-behind-that-call-hold-up-for-strategy-investors/"
+              },
+              {
+                "date": "2026-09-06",
+                "id": 10,
+                "last_updated": "2026-09-12",
+                "snippet": "Over the next 10 years, Bitcoin's average price could reach $272,366.33–$229,013.89. If it maintains an annual growth rate of 30%, well below its historical ...",
+                "source": "web",
+                "title": "Bitcoin Price Forecast & Predictions for 2026, 2027, 2028–2030 and ...",
+                "url": "https://www.litefinance.org/blog/analysts-opinions/bitcoin-price-prediction-forecast/"
+              },
+              {
+                "date": "2026-09-06",
+                "id": 11,
+                "last_updated": "2026-09-11",
+                "snippet": "That implies a growth rate of approximately 38% over the next four years.",
+                "source": "web",
+                "title": "Key Data Points",
+                "url": "https://www.fool.com/investing/2026/09/06/1-unstoppable-cryptocurrency-to-buy-before-it-soar/"
+              },
+              {
+                "date": "2026-09-12",
+                "id": 12,
+                "last_updated": "2026-08-30",
+                "snippet": "Bitcoin is forecasted to hit $ 77,720 by the end of 2026 ( +0.31% compared to current rates), $ 251,544 by 2030 (+224.67%) , $ 1.19M by 2040 (+1,433.67%) , and ...",
+                "source": "web",
+                "title": "Bitcoin (BTC) Price Prediction 2026, 2027-2030 | CoinCodex",
+                "url": "https://coincodex.com/crypto/bitcoin/price-prediction/"
+              },
+              {
+                "date": "2026-09-10",
+                "id": 13,
+                "last_updated": "2026-09-10",
+                "snippet": "Annualised return\n+4.3%\n...\ninvested €2,500\n- If it repeats +4.3%/yr for 10 years\n€1,529\nprojection from €1,000 (hypothetical)",
+                "source": "web",
+                "title": "Bitcoin (BTC): return calculator - Calculadora Capital",
+                "url": "https://www.calculadoracapital.pt/en/crypto/bitcoin-btc"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 14,
+                "last_updated": "2026-09-10",
+                "snippet": "In the period from August 2017 to July 2026, Bitcoin grew at a compound annual growth rate (CAGR) of 33%.\nIf you assume that Bitcoin will get back to the $100,000 price level by the start of 2027, Bitcoin just needs to grow at a CAGR of 32% to hit a price of $300,000 by the end of 2030, and a CAGR of 44% to hit that price by the end of 2029.",
+                "source": "web",
+                "title": "Wall Street Investment Firm Bernstein Thinks Bitcoin Could Hit ...",
+                "url": "https://www.fool.com/investing/2026/09/07/investment-firm-bernstein-thinks-bitcoin-could-hit/"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 15,
+                "last_updated": "2026-09-12",
+                "snippet": "Key asset performance Last 5d 1m YTD 1y",
+                "source": "web",
+                "title": "Why these analysts say bitcoin will double by next year - Morningstar",
+                "url": "https://www.morningstar.com/news/marketwatch/20260827137/why-these-analysts-say-bitcoin-will-double-by-next-year-and-could-reach-500000-by-the-end-of-the-decade"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "Michael Saylor Predicted Bitcoin Will Return 30% Annually for the Next 20 Years. Here's What That Would Mean for a $10,000 Investment.\n\n### Trending Tickers\n\n- DELL\n  567.29\n\n  +11.98%)\n- O\n  OKLO\n  36.22\n\n  (-9.18%)\n- S\n  SMR\n  8.61\n\n  (-15.67%)\n- HPE\n  62.09\n\n  (+12.44%\n- S\n  SLS\n  11.54\n\n  -14.42%\n\n1. 1. Private companies 1. 52 week gainers\n   2. Recently funded\n   3. Most funded\n2. 1. 1. All Calculators\n   2. 50/30/20 Budget Calculator\n   3. Compound Interest Calculator\n   4. Savings Calculator\n   5. Savings Goal Calculator\n   6. Social Security Calculator\n3. 1. 1. Power Players\n   2. Trader Talk\n   3. Built Different\n   4. The Big Idea\n   2. ETF Report\n\nNetwork\n\n### U.S. markets closed\n\nCryptocurrencies\n\nRates\n\nCommodities\n\nCurrencies\n\nS&P 500 7,656.98+65.28+0.86%\n\nDow 30 52,573.29+509.19+0.98%\n\nNasdaq 26,333.04+251.31+0.96%\n\nRussell 2000 2,903.94+13.00+0.45%\n\nVIX 15.84-2.00-11.21%\n\nGold 4,390.00-17.30-0.39%\n\nBitcoin USD 77,131.83+595.28+0.78%\n\nCrude Oil Oct 26 99.99-2.49-2.43%\n\n# Michael Saylor Predicted Bitcoin Will Return 30% Annually for the Next 20 Years. Here's What That Would Mean for a $10,000 Investment.\n\nLyle Daly, The Motley Fool\n\nAugust 24, 20263 min read\n\n- BTC-USD\n  +0.78%\n- NVDA\n  -0.03%\n- +1.87%\n\n**Bitcoin **(CRYPTO: BTC) is well off the all-time high it set last year, but one of its biggest supporters remains bullish. Michael Saylor, co-founder and executive chairman of **Strategy** (NASDAQ: MSTR), appeared on \"The Diary of a CEO\" on Aug. 6. While discussing Bitcoin, he said, \"I think it appreciates about 30% a year for the next 20 years.\" After that, he expects it to slow to about 20% per year.\n\nThe stock market's average return is about 10% per year, so Bitcoin would grow your money much more if Saylor is correct. That's a big if, though.\n\n***Missed Nvidia in 2009? This Rare Signal Is Flashing Again.* ** * In 2009, a \"Double Down\" signal flashed for a little-known chipmaker called Nvidia. For the first time in years, that same \"Total Conviction\" signal is flashing for a company 1/100th the size of Nvidia. * ***Continue »* **\n\n## What 30% per year would mean for a $10,000 investment\n\nIf Saylor's forecast for Bitcoin is accurate, a $10,000 investment would be a millionaire-maker. After 20 years of growth at 30% per year, your investment would be worth $1.9 million.\n\nLet's compare that to a hypothetical investment in the stock market. If you invested $10,000 for 20 years and got an average annual return of 10%, you'd end up with $67,000.\n\nImage source: Getty Images.\nThe massive gap between the two results shows the value of compound growth. Since your investment is compounding each year, the difference in total returns gets wider and wider. There's a 3x difference in yearly returns between the two scenarios (30% versus 10%). Over 20 years of compounding, that stretches out to 28 times as much money.\n\n## The math isn't mathing\n\nAlthough Bitcoin has had stretches when it averaged well over 30% per year, it was a significantly smaller asset at the time. In early 2020, it had a market cap of less than $200 billion. That's now $1.5 trillion at the time of this writing (Aug. 20).\n\nFor Saylor's prediction to be correct, Bitcoin would need to grow to about $285 trillion. To put that into perspective, the global gold market is estimated at about $32 trillion, and the combined market cap of all public companies worldwide is estimated at $154 trillion. Combine those, add another $99 trillion, and you have Saylor's long-term forecast for Bitcoin.\n\nYou can't take Saylor's prediction entirely at face value, either, because he has a vested interest in Bitcoin's success. Strategy is the largest Bitcoin treasury company, with over 840,000 BTC on its balance sheet. Saylor and Strategy are both betting big on the leading cryptocurrency.\n\nBitcoin could perform well over the next two decades, likely following its pattern of explosive growth followed by lengthy downturns. For investors who want exposure to digital assets, Bitcoin is the most established and is worth considering, either through buying the cryptocurrency itself or via Bitcoin ETFs.\n\nStory Continues\nIt's important to go in with realistic expectations, though. Annual returns of 30% for the next 20 years are extremely optimistic and unlikely to happen now that Bitcoin's value is measured in the trillions.\n\n## Should you buy stock in Bitcoin right now?\n\nBefore you buy stock in Bitcoin, consider this:\n\nThe *Motley Fool Stock Advisor* analyst team just identified what they believe are the **10 best stocks** for investors to buy now… and Bitcoin wasn't one of them. The 10 stocks that made the cut could produce monster returns in the coming years.\n\nConsider when **Netflix** made this list on December 17, 2004... if you invested $1,000 at the time of our recommendation, **you'd have $429,223**!* Or when **Nvidia** made this list on April 15, 2005... if you invested $1,000 at the time of our recommendation, **you'd have $1,317,883**!*\n\nNow, it's worth noting *Stock Advisor's* total average return is 965% — a market-crushing outperformance compared to 212% for the S&P 500. Don't miss the latest top 10 list, available with *Stock Advisor*, and join an investing community built by individual investors for individual investors.\n\n**See the 10 stocks »**\n\n**Stock Advisor returns as of August 24, 2026.*\n\n*Lyle Daly* * has positions in Bitcoin. The Motley Fool has positions in and recommends Bitcoin. The Motley Fool has a * *disclosure policy* *.*\n\nMichael Saylor Predicted Bitcoin Will Return 30% Annually for the Next 20 Years. Here's What That Would Mean for a $10,000 Investment. was originally published by The Motley Fool\n\n### Trending Tickers\n\n- OKLO\n\n  Oklo Inc.\n- SMR\n\n  NuScale Power Corporation\n\n  EquityNYQ\n- HPE\n\n  Hewlett Packard Enterprise Company\n- SLS\n\n  SELLAS Life Sciences Group, Inc.\n- TRUG\n\n  TruGolf Holdings, Inc.",
+                "title": "Michael Saylor Predicted Bitcoin Will Return 30% Annually for the ...",
+                "url": "https://finance.yahoo.com/markets/crypto/articles/michael-saylor-predicted-bitcoin-return-172000739.html"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "div\n\n**Bitcoin **(BTC +0.54%) is well off the all-time high it set last year, but one of its biggest supporters remains bullish. Michael Saylor, co-founder and executive chairman of **Strategy** (MSTR +1.88%), appeared on \"The Diary of a CEO\" on Aug. 6. While discussing Bitcoin, he said, \"I think it appreciates about 30% a year for the next 20 years.\" After that, he expects it to slow to about 20% per year.\n\nThe stock market's average return is about 10% per year, so Bitcoin would grow your money much more if Saylor is correct. That's a big if, though.\n\n## What 30% per year would mean for a $10,000 investment\n\nIf Saylor's forecast for Bitcoin is accurate, a $10,000 investment would be a millionaire-maker. After 20 years of growth at 30% per year, your investment would be worth $1.9 million.\n\nLet's compare that to a hypothetical investment in the stock market. If you invested $10,000 for 20 years and got an average annual return of 10%, you'd end up with $67,000.\n\nImage source: Getty Images.\n\nThe massive gap between the two results shows the value of compound growth. Since your investment is compounding each year, the difference in total returns gets wider and wider. There's a 3x difference in yearly returns between the two scenarios (30% versus 10%). Over 20 years of compounding, that stretches out to 28 times as much money.\n\n## The math isn't mathing\n\nAlthough Bitcoin has had stretches when it averaged well over 30% per year, it was a significantly smaller asset at the time. In early 2020, it had a market cap of less than $200 billion. That's now $1.5 trillion at the time of this writing (Aug. 20).\n\nFor Saylor's prediction to be correct, Bitcoin would need to grow to about $285 trillion. To put that into perspective, the global gold market is estimated at about $32 trillion, and the combined market cap of all public companies worldwide is estimated at $154 trillion. Combine those, add another $99 trillion, and you have Saylor's long-term forecast for Bitcoin.\n\n## CRYPTO: BTC\n\nBitcoin\n\nToday's Change\n\n(0.54%) $412.13\n\nCurrent Price\n\n$77,291.00\n\n### Key Data Points\n\nMarket Cap\n\n$1.6TMarket cap calculated using publicly traded shares outstanding only. Does not include unlisted, private, or dual-class non-traded shares. Implied market cap may vary.\n\nDay's Range\n\n$76393.00 - $79607.00\n\n52wk Range\n\n$57945.16 - $126079.89\n\nVolume\n\n35B\n\nYou can't take Saylor's prediction entirely at face value, either, because he has a vested interest in Bitcoin's success. Strategy is the largest Bitcoin treasury company, with over 840,000 BTC on its balance sheet. Saylor and Strategy are both betting big on the leading cryptocurrency.\n\nBitcoin could perform well over the next two decades, likely following its pattern of explosive growth followed by lengthy downturns. For investors who want exposure to digital assets, Bitcoin is the most established and is worth considering, either through buying the cryptocurrency itself or via Bitcoin ETFs.\n\nIt's important to go in with realistic expectations, though. Annual returns of 30% for the next 20 years are extremely optimistic and unlikely to happen now that Bitcoin's value is measured in the trillions.",
+                "title": "Michael Saylor Predicted Bitcoin Will Return 30% Annually for the ...",
+                "url": "https://www.fool.com/investing/2026/08/24/michael-saylor-predicted-bitcoin-will-return/"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"The future value must be calculated from the retrieved forecast input; it is not a guaranteed outcome.\\n\\n**annual_rate_pct:** 30% — Michael Saylor’s published Bitcoin appreciation forecast, reported by The Motley Fool on August 24, 2026.\",\"rows\":[{\"as_of\":\"2026-08-24\",\"kind\":\"percent\",\"label\":\"annual_rate_pct\",\"source_url\":\"https://www.fool.com/investing/2026/08/24/michael-saylor-predicted-bitcoin-will-return/\",\"subject\":\"Bitcoin\",\"symbol\":\"BTC-USD\",\"unit\":\"%\",\"value\":30}]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_fd9c654e-6b14-4147-b171-0cf9335f6a20",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "month"
+            }
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.03187,
+            "cache_read_cost": 0.00209,
+            "currency": "USD",
+            "input_cost": 4e-05,
+            "output_cost": 0.01258,
+            "tool_calls_cost": 0.0035,
+            "tool_calls_cost_details": {
+              "fetch_url": 0.001,
+              "search_web": 0.0025
+            },
+            "total_cost": 0.05008
+          },
+          "input_tokens": 11607,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 6374,
+            "cache_read_input_tokens": 5224,
+            "cached_tokens": 5224
+          },
+          "output_tokens": 629,
+          "output_tokens_details": {
+            "reasoning_tokens": 306
+          },
+          "tool_calls_details": {
+            "fetch_url": {
+              "cost_usd": 0.001,
+              "invocation": 2
+            },
+            "search_web": {
+              "cost_usd": 0.0025,
+              "invocation": 1
+            }
+          },
+          "total_tokens": 12236
+        },
+        "user": null
+      }
+    }
+  ]
+}
