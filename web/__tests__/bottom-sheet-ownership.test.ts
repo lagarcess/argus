@@ -39,7 +39,6 @@ const DRAWER = "components/sidebar/SidebarDrawer.tsx";
  * Shrink this list; never add to it.
  */
 const UNMANAGED_MODAL_DEBT = new Set([
-  "components/SettingsMenu.tsx",
   "components/chat/DiscoverySourcesPanel.tsx",
   "components/guest/GuestConversionModal.tsx",
   "components/guest/GuestNewConversationDialog.tsx",
