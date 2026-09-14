@@ -2348,6 +2348,25 @@
           ],
           "rows": [
             {
+              "comparison_only": true,
+              "label": {
+                "interpolation_args": {
+                  "label": "Card B"
+                },
+                "locale_key": "tools.calc.ranked_comparison.gap"
+              },
+              "name": "gap_0",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 0.0,
+              "value_text": null
+            },
+            {
               "label": {
                 "interpolation_args": {
                   "label": "Card C",
@@ -5705,6 +5724,461 @@
     }
   },
   "generated_by": "scripts/dump_calculation_fixtures.py",
+  "ranked_comparison": {
+    "differences": [
+      {
+        "difference": 6.4,
+        "label": {
+          "interpolation_args": {
+            "label": "Card B",
+            "rank": 1
+          },
+          "locale_key": "tools.calc.ranked_comparison.row"
+        },
+        "left": 18.5,
+        "name": "rank_0",
+        "right": 24.9,
+        "section": "answer",
+        "unit": {
+          "interpolation_args": {},
+          "locale_key": "chat.tools.units.percent"
+        }
+      },
+      {
+        "difference": 6.4,
+        "label": {
+          "interpolation_args": {
+            "label": "Card B"
+          },
+          "locale_key": "tools.calc.ranked_comparison.gap"
+        },
+        "left": 0.0,
+        "name": "gap_0",
+        "right": 6.4,
+        "section": "row",
+        "unit": {
+          "interpolation_args": {},
+          "locale_key": "chat.tools.units.percent"
+        }
+      },
+      {
+        "difference": -6.4,
+        "label": {
+          "interpolation_args": {
+            "label": "Card A",
+            "rank": 2
+          },
+          "locale_key": "tools.calc.ranked_comparison.row"
+        },
+        "left": 24.9,
+        "name": "rank_1",
+        "right": 18.5,
+        "section": "row",
+        "unit": {
+          "interpolation_args": {},
+          "locale_key": "chat.tools.units.percent"
+        }
+      },
+      {
+        "difference": -6.4,
+        "label": {
+          "interpolation_args": {
+            "label": "Card A"
+          },
+          "locale_key": "tools.calc.ranked_comparison.gap"
+        },
+        "left": 6.4,
+        "name": "gap_1",
+        "right": 0.0,
+        "section": "row",
+        "unit": {
+          "interpolation_args": {},
+          "locale_key": "chat.tools.units.percent"
+        }
+      }
+    ],
+    "kind": "ranked_comparison",
+    "left": {
+      "asked": "Compare annual rates",
+      "card": {
+        "arguments": {
+          "currency": "DOP",
+          "items": [
+            {
+              "label": "Card A",
+              "symbol": null,
+              "value": 24.9
+            },
+            {
+              "label": "Card B",
+              "symbol": null,
+              "value": 18.5
+            }
+          ],
+          "key_kind": "percent",
+          "key_label": "Annual rate",
+          "prefer": "lower",
+          "sources": {}
+        },
+        "artifact_id": "artifact-ranked_comparison",
+        "artifact_state": "active",
+        "call_id": "call-ranked_comparison",
+        "card_type": "ranked_comparison",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "key_label": "Annual rate",
+            "prefer": "lower",
+            "rows": [
+              {
+                "gap_to_best": 0.0,
+                "label": "Card B",
+                "rank": 1,
+                "symbol": null,
+                "value": 18.5
+              },
+              {
+                "gap_to_best": 6.399999999999999,
+                "label": "Card A",
+                "rank": 2,
+                "symbol": null,
+                "value": 24.9
+              }
+            ]
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {
+                "label": "Card B",
+                "rank": 1
+              },
+              "locale_key": "tools.calc.ranked_comparison.row"
+            },
+            "name": "rank_0",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "chat.tools.units.percent"
+            },
+            "value": 18.5,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "driving": false,
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.key_label"
+              },
+              "name": "key_label",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "Annual rate",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "driving": false,
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.prefer"
+              },
+              "name": "prefer",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "lower",
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [
+            {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.notes.ranked_not_recommended"
+            }
+          ],
+          "rows": [
+            {
+              "comparison_only": true,
+              "label": {
+                "interpolation_args": {
+                  "label": "Card B"
+                },
+                "locale_key": "tools.calc.ranked_comparison.gap"
+              },
+              "name": "gap_0",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 0.0,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "label": "Card A",
+                  "rank": 2
+                },
+                "locale_key": "tools.calc.ranked_comparison.row"
+              },
+              "name": "rank_1",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 24.9,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "label": "Card A"
+                },
+                "locale_key": "tools.calc.ranked_comparison.gap"
+              },
+              "name": "gap_1",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 6.4,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {
+              "key": "Annual rate"
+            },
+            "locale_key": "tools.calc.ranked_comparison.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "ranked_comparison"
+      },
+      "computed_at": "2026-09-11T12:00:00Z",
+      "conversation_id": "c-left",
+      "message_id": "m-left"
+    },
+    "right": {
+      "asked": "Compare the updated annual rates",
+      "card": {
+        "arguments": {
+          "currency": "DOP",
+          "items": [
+            {
+              "label": "Card A",
+              "symbol": null,
+              "value": 18.5
+            },
+            {
+              "label": "Card B",
+              "symbol": null,
+              "value": 24.9
+            }
+          ],
+          "key_kind": "percent",
+          "key_label": "Annual rate",
+          "prefer": "lower",
+          "sources": {}
+        },
+        "artifact_id": "artifact-ranked_comparison",
+        "artifact_state": "active",
+        "call_id": "call-ranked_comparison",
+        "card_type": "ranked_comparison",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "key_label": "Annual rate",
+            "prefer": "lower",
+            "rows": [
+              {
+                "gap_to_best": 0.0,
+                "label": "Card A",
+                "rank": 1,
+                "symbol": null,
+                "value": 18.5
+              },
+              {
+                "gap_to_best": 6.399999999999999,
+                "label": "Card B",
+                "rank": 2,
+                "symbol": null,
+                "value": 24.9
+              }
+            ]
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {
+                "label": "Card A",
+                "rank": 1
+              },
+              "locale_key": "tools.calc.ranked_comparison.row"
+            },
+            "name": "rank_0",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {},
+              "locale_key": "chat.tools.units.percent"
+            },
+            "value": 18.5,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "driving": false,
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.key_label"
+              },
+              "name": "key_label",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "Annual rate",
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "driving": false,
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.prefer"
+              },
+              "name": "prefer",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": "lower",
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [
+            {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.notes.ranked_not_recommended"
+            }
+          ],
+          "rows": [
+            {
+              "comparison_only": true,
+              "label": {
+                "interpolation_args": {
+                  "label": "Card A"
+                },
+                "locale_key": "tools.calc.ranked_comparison.gap"
+              },
+              "name": "gap_0",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 0.0,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "label": "Card B",
+                  "rank": 2
+                },
+                "locale_key": "tools.calc.ranked_comparison.row"
+              },
+              "name": "rank_1",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 24.9,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "label": "Card B"
+                },
+                "locale_key": "tools.calc.ranked_comparison.gap"
+              },
+              "name": "gap_1",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 6.4,
+              "value_text": null
+            }
+          ],
+          "sources": [],
+          "title": {
+            "interpolation_args": {
+              "key": "Annual rate"
+            },
+            "locale_key": "tools.calc.ranked_comparison.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "ranked_comparison"
+      },
+      "computed_at": "2026-09-11T12:00:00Z",
+      "conversation_id": "c-right",
+      "message_id": "m-right"
+    }
+  },
   "receipt_turn": {
     "answer": {
       "label": {

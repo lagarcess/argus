@@ -8,7 +8,7 @@ export type LocalizedToolText = { locale_key: string; interpolation_args: Record
 export type ToolProgress = LocalizedToolText & { call_id: string; tool_name: string };
 /** Where a fact came from; older cards carry none and stay readable. */
 export type ToolFactSource = { kind: "user" | "page" | "market_data" | "assumption" | "computed" | "not_found"; title?: string | null; url?: string | null; date?: string | null };
-export type ToolFact = { name: string; label: LocalizedToolText; value: ToolScalar; unit: LocalizedToolText | null; value_text?: LocalizedToolText | null; source?: ToolFactSource | null };
+export type ToolFact = { name: string; label: LocalizedToolText; value: ToolScalar; unit: LocalizedToolText | null; value_text?: LocalizedToolText | null; source?: ToolFactSource | null; comparison_only?: boolean };
 /** `driving` marks one of the few inputs the backend says drive the result. */
 export type ToolInputFact = ToolFact & { editable: boolean; unknown: boolean; driving?: boolean; visibility?: "public" | "private" };
 export type ToolResearchSource = { url: string; title: string; source_date?: string | null };
@@ -58,7 +58,8 @@ function repair(value: unknown): value is ToolRepair {
 function fact(value: unknown): value is ToolFact {
   return record(value) && text(value.name) && localized(value.label) && scalar(value.value) &&
     (value.unit === null || localized(value.unit)) && (value.value_text == null || localized(value.value_text)) &&
-    (value.source == null || source(value.source));
+    (value.source == null || source(value.source)) &&
+    (value.comparison_only === undefined || typeof value.comparison_only === "boolean");
 }
 export function parseToolPresentation(value: unknown): ToolCardPresentation | null {
   if (!record(value) || !localized(value.title) || !(value.answer === null || fact(value.answer)) ||
@@ -143,11 +144,15 @@ export function answerAssumptionsText(message: Pick<Message, "answerAssumptions"
 
 export function toolCardCopyText(card: ToolResultCard, t: ToolTranslator, locale: string): string {
   const { presentation } = card;
-  const facts = [presentation.answer, ...presentation.rows, ...presentation.inputs].filter((value): value is ToolFact => value !== null);
+  const facts = [presentation.answer, ...shownToolRows(presentation), ...presentation.inputs].filter((value): value is ToolFact => value !== null);
   return [localizedToolText(presentation.title, t), presentation.narrative ?? "", ...facts.map((value) =>
     `${localizedToolText(value.label, t)}: ${toolFactValue(value, t, locale)}`),
   ...presentation.notes.map((note) => localizedToolText(note, t)),
   ...researchSourcesFromFacts(presentation.sources).map((source) => `${source.title || source.domain}: ${source.url}`)].filter(Boolean).join("\n");
+}
+
+export function shownToolRows(presentation: ToolCardPresentation): ToolFact[] {
+  return presentation.rows.filter((row) => row.comparison_only !== true);
 }
 
 export function localizedToolText(value: LocalizedToolText, t: ToolTranslator): string {
