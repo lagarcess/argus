@@ -39,4 +39,3 @@ def observe(frame, event, result):
         emit({'kind': 'cost', 'provider': 'perplexity_agent', 'cost_usd': result.cost_usd, 'outcome': 'served', 'model': result.model, 'usage': result.model_dump(mode='json')})
     elif name == 'search' and '/argus/domain/research/search/' in filename and result is not None:
         emit({'kind': 'cost', 'provider': result.provider_id, 'cost_usd': result.cost_usd, 'outcome': 'served'})
-

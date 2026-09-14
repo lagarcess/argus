@@ -104,7 +104,7 @@ try{
     try{screenshot=await capture(page,answer.id,label);}catch(e){await page.reload({waitUntil:'networkidle'});screenshot=await capture(page,answer.id,label);}
     const record={label,phase,question:question.id,language,country:me.user.country||null,account_kind:me.account_kind,conversation_id:conversation,message,answer,frames,http_status:response.status(),done:body.includes('[DONE]'),elapsed_seconds:(Date.now()-started)/1000,screenshot,page_errors:errors};
     save(OUT+'/turns/'+label+'.json',record);
-    writeFileSync(OUT+'/answers/'+label+'.md',`# ${label}\n\n${message}\n\n${answer.content}\n`);
+    writeFileSync(OUT+'/answers/'+label+'.md',`# ${label}\n\n${message}\n\n${answer.content||screenshot.rendered_text||''}`.trimEnd()+'\n');
     console.log(JSON.stringify({state:'recorded',label,seconds:record.elapsed_seconds}));
     await page.close();if(!shared)await context.close();
    }
