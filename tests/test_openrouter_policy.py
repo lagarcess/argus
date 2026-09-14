@@ -1512,7 +1512,7 @@ def test_default_interpreter_repairs_empty_unsupported_request_into_contract_rec
     ]
 
 
-def test_default_interpreter_uses_focused_repair_after_structured_candidate_failures(
+def test_default_interpreter_does_not_repair_without_a_typed_test_read(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter
@@ -1524,29 +1524,7 @@ def test_default_interpreter_uses_focused_repair_after_structured_candidate_fail
         schema_model = kwargs["schema_model"]
         if schema_model is LLMInterpretationResponse:
             raise ValueError("general schema failed")
-        if schema_model is StatedRunFieldFidelityAudit:
-            return StatedRunFieldFidelityAudit()
-        neutral_response = _neutral_repair_schema_response(schema_model)
-        if neutral_response is not None:
-            return neutral_response
-        assert schema_model is FocusedStrategyExtraction
-        return FocusedStrategyExtraction(
-            is_testable_strategy=True,
-            user_goal_summary="Backtest a TSLA 50/200 crossover.",
-            strategy_type="signal_strategy",
-            strategy_thesis="Backtest TSLA when the 50 SMA crosses the 200 SMA.",
-            asset_universe=["TSLA"],
-            date_range={"start": "2022-01-01", "end": "today"},
-            capital_amount=10000,
-            entry_rule={
-                "type": "moving_average_crossover",
-                "fast_indicator": "sma",
-                "fast_period": 50,
-                "slow_indicator": "sma",
-                "slow_period": 200,
-                "direction": "bullish",
-            },
-        )
+        raise AssertionError("Unread turns cannot enter strategy repair")
 
     monkeypatch.setattr(
         llm_interpreter,
@@ -1574,25 +1552,8 @@ def test_default_interpreter_uses_focused_repair_after_structured_candidate_fail
         )
     )
 
-    assert result is not None
-    assert seen_schema_names[:2] == [
-        "LLMInterpretationResponse",
-        "FocusedStrategyExtraction",
-    ]
-    assert "FocusedDateWindowExtraction" in seen_schema_names
-    assert "StatedRunFieldFidelityAudit" in seen_schema_names
-    draft = result.candidate_strategy_draft
-    assert draft.strategy_type == "signal_strategy"
-    assert draft.asset_universe == ["TSLA"]
-    assert "stated_run_field_fidelity_audit" not in result.reason_codes
-    assert draft.entry_rule == {
-        "type": "moving_average_crossover",
-        "fast_indicator": "sma",
-        "fast_period": 50,
-        "slow_indicator": "sma",
-        "slow_period": 200,
-        "direction": "bullish",
-    }
+    assert result is None
+    assert seen_schema_names == ["LLMInterpretationResponse"]
 
 
 def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
@@ -1606,7 +1567,18 @@ def test_default_interpreter_audits_stated_fields_after_focused_repair_defaults(
         seen_schema_names.append(kwargs["schema_name"])
         schema_model = kwargs["schema_model"]
         if schema_model is LLMInterpretationResponse:
-            raise ValueError("general schema failed")
+            return LLMInterpretationResponse(
+                intent="strategy_drafting",
+                task_relation="new_task",
+                requires_clarification=True,
+                semantic_turn_act="new_idea",
+                user_goal_summary="Test Tesla crossover",
+                candidate_strategy_draft=LLMStrategyDraft(
+                    raw_user_phrasing="buy when the 50 crosses the 200 for Tesla from January 2022 to today with 10k",
+                    strategy_thesis="Test Tesla crossover",
+                    asset_universe=["TSLA"],
+                ),
+            )
         if schema_model is FocusedStrategyExtraction:
             return FocusedStrategyExtraction(
                 is_testable_strategy=True,

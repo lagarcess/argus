@@ -182,21 +182,24 @@ def answer_without_lookup(
     """The no-search answer from Argus market data and stated assumptions."""
     if not message.strip() or not resolve_openrouter_api_key():
         return None
+    from argus.agent_runtime.turn_execution import research_recovery_scope
+
     facts: dict[str, str] = {}
     for subject in list(subjects)[:_MAX_MARKET_SUBJECTS]:
         close = latest_market_close(subject["symbol"])
         if close is not None:
             facts[f"{subject['symbol']} latest close"] = f"{close[0]:,.2f} on {close[1]}"
-    answered = calculated_answer(
-        message=message,
-        language=language,
-        user=user,
-        notes=notes,
-        market_facts=facts,
-        not_looked_up=not_looked_up,
-        subject_symbol=_only_symbol(subjects),
-        lookup_failed=True,
-    )
+    with research_recovery_scope():
+        answered = calculated_answer(
+            message=message,
+            language=language,
+            user=user,
+            notes=notes,
+            market_facts=facts,
+            not_looked_up=not_looked_up,
+            subject_symbol=_only_symbol(subjects),
+            lookup_failed=True,
+        )
     if answered is not None:
         logger.info(
             "Answered without the failed lookup",

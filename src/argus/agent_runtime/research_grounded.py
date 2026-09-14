@@ -55,6 +55,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.substage_events import emit_substage
+from argus.agent_runtime.turn_execution import active_turn_execution
 from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.research.admission import (
     admitted_provider_work,
@@ -187,13 +188,56 @@ class _TurnSpend:
 
     def __init__(self) -> None:
         self._usages: list[ResearchUsage] = []
+        self._execution = active_turn_execution()
+        self._answer_seconds = 0.0
+        if self._execution is not None:
+            from argus.llm.openrouter import openrouter_task_timeout_seconds
+
+            # One cutoff for the entire lookup ladder, including retries. Keep
+            # the answer task's normal allowance, or half a short turn, so the
+            # existing answer-without-lookup path can still run.
+            self._answer_seconds = min(
+                openrouter_task_timeout_seconds("knowledge_voicing"),
+                self._execution.remaining_deadline_seconds() / 2,
+            )
+
+    def _bounded_spec(self, spec: ResearchConfigSpec) -> ResearchConfigSpec:
+        if self._execution is None:
+            return spec
+        remaining = self._execution.remaining_deadline_seconds() - self._answer_seconds
+        if remaining <= 0:
+            raise ResearchUnavailableError("timeout", "research turn budget exhausted")
+        return spec.model_copy(
+            update={"timeout_seconds": min(spec.timeout_seconds, remaining)}
+        )
 
     async def run(
         self, client: Any, prompt: str, spec: ResearchConfigSpec
     ) -> ResearchPacket:
         try:
+            spec = self._bounded_spec(spec)
+        except ResearchUnavailableError:
+            # Admission may have consumed the remaining lookup time. No work
+            # started, so its normal failure settlement releases an unused claim.
             with admitted_provider_work():
-                packet = await asyncio.to_thread(client.run_research, prompt, spec)
+                raise
+
+        def invoke() -> ResearchPacket:
+            # A queued thread must recheck before starting paid work. The same
+            # clamped spec also bounds the provider's transport retry ladder.
+            return client.run_research(prompt, self._bounded_spec(spec))
+
+        async def admitted_call() -> ResearchPacket:
+            with admitted_provider_work():
+                return await asyncio.to_thread(invoke)
+
+        try:
+            # The async guard is absolute even when a sync transport keeps
+            # reading. Cancellation crosses admission before becoming TimeoutError,
+            # retaining the claim because that worker may still be billing.
+            packet = await asyncio.wait_for(admitted_call(), timeout=spec.timeout_seconds)
+        except asyncio.TimeoutError as exc:
+            raise ResearchUnavailableError("timeout", "research wait expired") from exc
         except ResearchUnavailableError as exc:
             if exc.usage is not None:
                 self._usages.append(exc.usage)

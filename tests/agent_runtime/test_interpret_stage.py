@@ -1761,7 +1761,7 @@ def test_unanchored_strategy_route_composer_failure_is_degraded_recovery(
     answer = result.patch["assistant_response"]
     assert result.outcome == "ready_to_respond"
     assert "saved your message" in answer.lower()
-    assert "reliable test setup" in answer.lower()
+    assert "understand your question" in answer.lower()
     assert "buy and hold" not in answer.lower()
     assert "recurring buys" not in answer.lower()
     assert "unanchored_strategy_route_suppressed" in result.decision.reason_codes
