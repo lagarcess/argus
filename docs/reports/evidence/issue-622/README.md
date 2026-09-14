@@ -37,6 +37,9 @@ node node_modules/@playwright/test/cli.js test \
   e2e/ranked-comparison-gap.spec.ts --workers=1
 ```
 
-Legacy stored cards keep their original facts and remain readable. This change
-does not backfill `gap_0` into historical cards; a new calculation or recompute
-produces the complete fact set.
+Production commit `3d98057c` does not contain
+`src/argus/domain/calculations/ranked_comparison.py`. The founder confirmed that
+ranked comparisons have never shipped and pre-change cards exist only in
+development data. The legacy-card review finding was therefore declined:
+no production backfill or compatibility normalization is needed for this lane.
+New calculations and recomputes produce the complete fact set.
