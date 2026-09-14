@@ -1,12 +1,12 @@
-// Canary reasons are published in logs and evidence, so a reason is built only
-// from lowercase words and HTTP statuses and can never carry an identifier.
+import handoff from "./private-alpha-canary-handoff.json";
 
-/** Words joined by underscores; the only numbers are HTTP statuses, 0 when none. */
-export const REASON_CODE_PATTERN = /^[a-z]+(?:_(?:[a-z]+|0|[1-5][0-9]{2}))*$/;
-export const REASON_CODE_MAX_LENGTH = 120;
-export const UNRECOGNIZED_REASON = "reason_unrecognized";
+// Canary reasons are published in logs and evidence. The handoff contract file
+// owns their grammar (lowercase words and HTTP statuses), and the shell importer
+// reads the same file.
 
-const CODE_WORDS = /^[a-z]+(?:_[a-z]+)*$/;
+export const REASON_CODE_PATTERN = new RegExp(handoff.reason.pattern);
+export const REASON_CODE_MAX_LENGTH = handoff.reason.max_length;
+export const UNRECOGNIZED_REASON = handoff.reason.unrecognized;
 
 export function isReasonCode(value: unknown): value is string {
   return (
@@ -17,21 +17,20 @@ export function isReasonCode(value: unknown): value is string {
 }
 
 function reasonPart(part: string | number): string {
-  if (typeof part === "number") {
-    const httpStatus =
-      Number.isInteger(part) && (part === 0 || (part >= 100 && part <= 599));
-    return httpStatus ? String(part) : "unrecognized";
-  }
-  return CODE_WORDS.test(part) ? part : "unrecognized";
+  const accepted =
+    typeof part === "number"
+      ? Number.isInteger(part) && isReasonCode(`http_${part}`)
+      : isReasonCode(part);
+  return accepted ? String(part) : "unrecognized";
 }
 
-/** A reason from literal and backend parts; any part that is not a code or HTTP status is unrecognized, never rewritten. */
+/** A reason from literal and backend parts; a part the contract would refuse is unrecognized, never rewritten. */
 export function reasonCode(...parts: Array<string | number>): string {
   const code = parts.map(reasonPart).join("_");
   return isReasonCode(code) ? code : UNRECOGNIZED_REASON;
 }
 
-/** A check failure whose reason is safe to publish in canary evidence. */
+/** A failure the canary's own code raised; only these reasons are ever published. */
 export class CheckFailure extends Error {
   readonly reason: string;
 

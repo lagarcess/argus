@@ -12,13 +12,14 @@ import {
   ordinaryAnswerFailure,
   researchAnswerFailure,
 } from "./support/private-alpha-canary-answers";
+import handoff from "./support/private-alpha-canary-handoff.json";
 import { CheckFailure, reasonCode } from "./support/private-alpha-canary-reasons";
 
 // The canary's browser checks never follow features: each one reads an API
 // response or a product-owned test id, never result facts or feature copy.
 
 type JsonRecord = Record<string, unknown>;
-type CheckStatus = "passed" | "failed" | "not_run";
+type CheckStatus = (typeof handoff.statuses)[keyof typeof handoff.statuses];
 type CheckResult = {
   status: CheckStatus;
   reason?: string;
@@ -487,12 +488,12 @@ test("private-alpha canary browser checks", async ({ page }) => {
   }
 
   const results: Record<string, CheckResult> = Object.fromEntries(
-    checkIds.map((id) => [id, { status: "not_run" }]),
+    checkIds.map((id) => [id, { status: handoff.statuses.not_run }]),
   );
   const save = () =>
     writePrivateHandoff(path, {
-      schema_version: 2,
-      source: "playwright",
+      schema_version: handoff.schema_version,
+      source: handoff.source,
       user_id: userId,
       checks: results,
     });
@@ -511,9 +512,9 @@ test("private-alpha canary browser checks", async ({ page }) => {
     let signInFailed = false;
     try {
       await CHECKS.get(id)?.({ page, result, save });
-      result.status = "passed";
+      result.status = handoff.statuses.passed;
     } catch (error) {
-      result.status = "failed";
+      result.status = handoff.statuses.failed;
       result.reason =
         error instanceof CheckFailure ? error.reason : "check_threw";
       signInFailed = error instanceof SignInFailure;
@@ -523,7 +524,7 @@ test("private-alpha canary browser checks", async ({ page }) => {
   }
 
   const failures = checkIds
-    .filter((id) => results[id].status !== "passed")
-    .map((id) => `${id}: ${results[id].reason ?? "not_run"}`);
+    .filter((id) => results[id].status !== handoff.statuses.passed)
+    .map((id) => `${id}: ${results[id].reason ?? handoff.statuses.not_run}`);
   expect(failures, "every canary browser check must pass").toEqual([]);
 });

@@ -326,8 +326,13 @@ def test_browser_writes_a_private_check_handoff_the_shell_deletes() -> None:
     assert 'ARGUS_CANARY_BROWSER_CHECKS_HANDOFF="$BROWSER_CHECKS_HANDOFF"' in source
     assert "ARGUS_CANARY_BROWSER_CHECKS_HANDOFF" in runner_source
     assert "mode: 0o600" in spec
-    assert 'source: "playwright"' in spec
-    assert "schema_version: 2" in spec
+    # The browser and the importer read one handoff contract file.
+    assert 'import handoff from "./support/private-alpha-canary-handoff.json";' in spec
+    assert "schema_version: handoff.schema_version," in spec
+    assert (
+        'CANARY_HANDOFF_CONTRACT="$ROOT_DIR/web/e2e/support/private-alpha-canary-handoff.json"'
+        in source
+    )
     assert "access_token" not in spec
     assert "BROWSER_CHECKS_HANDOFF" not in workflow
 

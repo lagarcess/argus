@@ -34,20 +34,32 @@ def _heredoc_env(source: str, name: str, **values: str) -> dict[str, str]:
     return env
 
 
+HANDOFF_CONTRACT = ROOT / "web/e2e/support/private-alpha-canary-handoff.json"
+CONTRACT = json.loads(HANDOFF_CONTRACT.read_text(encoding="utf-8"))
+
+
 def _passing_handoff(faker: Faker, user_id: str) -> dict[str, Any]:
     return {
-        "schema_version": 2,
-        "source": "playwright",
+        "schema_version": CONTRACT["schema_version"],
+        "source": CONTRACT["source"],
         "user_id": user_id,
         "checks": {
-            name: {"status": "passed", "conversation_id": faker.uuid4()}
+            name: {
+                "status": CONTRACT["statuses"]["passed"],
+                "conversation_id": faker.uuid4(),
+            }
             for name in _browser_checks()
         },
     }
 
 
 def _run_import(
-    tmp_path: Path, handoff: object, *, user_id: str, mode: int = 0o600
+    tmp_path: Path,
+    handoff: object,
+    *,
+    user_id: str,
+    mode: int = 0o600,
+    contract: Path = HANDOFF_CONTRACT,
 ) -> tuple[subprocess.CompletedProcess[str], Path, Path]:
     source = _source(RENDER_RUNNER)
     handoff_path = tmp_path / "handoff.json"
@@ -71,6 +83,7 @@ def _run_import(
             CANARY_SESSION_USER_ID=user_id,
             CANARY_REQUIRED_CHECKS="\n".join(_required_checks()),
             CANARY_SAME_COMMIT_CHECK=_shell_assignment(source, "SAME_COMMIT_CHECK"),
+            CANARY_HANDOFF_CONTRACT=str(contract),
         ),
         capture_output=True,
         text=True,
@@ -361,14 +374,43 @@ def test_browser_artifact_redaction_masks_every_rendered_identifier(
     assert (tmp_path / "playwright-results" / ".redacted").is_file()
 
 
-def test_browser_reasons_share_one_identifier_free_contract() -> None:
-    # The importer accepts exactly the reasons the browser's one builder produces.
-    contract = "[a-z]+(?:_(?:[a-z]+|0|[1-5][0-9]{2}))*"
-    assert f're.compile(r"{contract}")' in _source(RENDER_RUNNER)
-    reasons = _source("web/e2e/support/private-alpha-canary-reasons.ts")
-    assert f"REASON_CODE_PATTERN = /^{contract}$/;" in reasons
-    spec = _source("web/e2e/private-alpha-release-canary.spec.ts")
-    assert "function reasonCode" not in spec
-    assert "class CheckFailure extends Error" not in spec
+def test_browser_check_import_reads_the_one_handoff_contract(
+    tmp_path: Path, faker: Faker
+) -> None:
+    user_id = faker.uuid4()
+    handoff = _passing_handoff(faker, user_id)
+    next(iter(handoff["checks"].values())).update(
+        status=CONTRACT["statuses"]["failed"], reason="profile_http_401_unauthorized"
+    )
+    stricter = tmp_path / "stricter-contract.json"
+    stricter.write_text(
+        json.dumps({**CONTRACT, "reason": {**CONTRACT["reason"], "pattern": "^[a-z]+$"}}),
+        encoding="utf-8",
+    )
+    renamed = tmp_path / "renamed-contract.json"
+    renamed.write_text(json.dumps({**CONTRACT, "source": "another_producer"}), encoding="utf-8")
+
+    accepted, _, _ = _run_import(tmp_path, handoff, user_id=user_id)
+    refused, _, _ = _run_import(tmp_path, handoff, user_id=user_id, contract=stricter)
+    foreign, _, _ = _run_import(tmp_path, handoff, user_id=user_id, contract=renamed)
+
+    assert accepted.returncode == 0, accepted.stderr
+    assert "browser check handoff has an unsafe failure reason" in refused.stderr
+    assert "browser check handoff contract is invalid" in foreign.stderr
+
+
+def test_session_tool_names_only_the_failures_it_raised() -> None:
     session = _source("web/e2e/support/private-alpha-canary-session.ts")
-    assert "isReasonCode(error.message)" in session
+    assert "new Error(" not in session
+    assert 'error instanceof CheckFailure ? error.reason : "unknown_failure"' in session
+
+    result = subprocess.run(
+        ["bun", "e2e/support/private-alpha-canary-session.ts", "not_a_mode"],
+        cwd=ROOT / "web",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "canary_session_state=failed reason=canary_session_mode_invalid" in result.stderr

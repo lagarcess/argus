@@ -768,6 +768,7 @@ import_browser_check_results() {
     CANARY_SESSION_USER_ID="$USER_ID" \
     CANARY_REQUIRED_CHECKS="$REQUIRED_CHECKS" \
     CANARY_SAME_COMMIT_CHECK="$SAME_COMMIT_CHECK" \
+    CANARY_HANDOFF_CONTRACT="$ROOT_DIR/web/e2e/support/private-alpha-canary-handoff.json" \
     python3 - "$BROWSER_CHECKS_HANDOFF" "$BROWSER_CHECK_EVIDENCE" "$BROWSER_RAW_IDS" <<'PY'
 import hashlib
 import json
@@ -786,7 +787,16 @@ try:
     payload = json.loads(handoff_path.read_text(encoding="utf-8"))
 except json.JSONDecodeError as exc:
     raise SystemExit("browser check handoff is invalid") from exc
-if payload.get("schema_version") != 2 or payload.get("source") != "playwright":
+# The browser's handoff contract file owns what the browser may report.
+contract = json.loads(
+    pathlib.Path(os.environ["CANARY_HANDOFF_CONTRACT"]).read_text(encoding="utf-8")
+)
+statuses = contract["statuses"]
+reason_contract = contract["reason"]
+if (
+    payload.get("schema_version") != contract["schema_version"]
+    or payload.get("source") != contract["source"]
+):
     raise SystemExit("browser check handoff contract is invalid")
 if payload.get("user_id") != os.environ["CANARY_SESSION_USER_ID"]:
     raise SystemExit("browser check handoff belongs to another identity")
@@ -797,20 +807,23 @@ checks = payload.get("checks")
 if not isinstance(checks, dict) or list(checks) != browser_checks:
     raise SystemExit("browser check handoff does not report the profile's browser checks")
 
-# Words and HTTP statuses only, the contract web/e2e/support/private-alpha-canary-reasons.ts builds.
-reason_pattern = re.compile(r"[a-z]+(?:_(?:[a-z]+|0|[1-5][0-9]{2}))*")
+reason_pattern = re.compile(reason_contract["pattern"])
 id_pattern = re.compile(r"[0-9A-Za-z_-]{1,64}")
 evidence: dict[str, dict[str, object]] = {}
 raw_ids: list[str] = []
 failed: tuple[str, str, dict] | None = None
 for name in browser_checks:
     entry = checks[name]
-    if not isinstance(entry, dict) or entry.get("status") not in {"passed", "failed", "not_run"}:
+    if not isinstance(entry, dict) or entry.get("status") not in set(statuses.values()):
         raise SystemExit("browser check handoff has an invalid check status")
     summary: dict[str, object] = {"status": entry["status"]}
     reason = entry.get("reason")
     if reason is not None:
-        if not isinstance(reason, str) or len(reason) > 120 or not reason_pattern.fullmatch(reason):
+        if (
+            not isinstance(reason, str)
+            or len(reason) > reason_contract["max_length"]
+            or not reason_pattern.fullmatch(reason)
+        ):
             raise SystemExit("browser check handoff has an unsafe failure reason")
         summary["reason"] = reason
     attempts = entry.get("sign_in_attempts")

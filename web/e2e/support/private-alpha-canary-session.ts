@@ -2,7 +2,7 @@ import { chmod, readFile, writeFile } from "node:fs/promises";
 
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type Session, type User } from "@supabase/supabase-js";
-import { isReasonCode } from "./private-alpha-canary-reasons";
+import { CheckFailure } from "./private-alpha-canary-reasons";
 
 type CookieOptions = {
   httpOnly?: boolean;
@@ -48,7 +48,7 @@ class LookupFailure extends Error {}
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
-  if (!value) throw new Error(`missing_${name.toLowerCase()}`);
+  if (!value) throw new CheckFailure(`missing_${name.toLowerCase()}`);
   return value;
 }
 
@@ -74,7 +74,7 @@ async function withLookupRetry<T>(
       return await lookup();
     } catch (error) {
       if (!(error instanceof LookupFailure)) throw error;
-      if (attempt >= LOOKUP_ATTEMPTS) throw new Error(reason);
+      if (attempt >= LOOKUP_ATTEMPTS) throw new CheckFailure(reason);
       console.error(`canary_session_lookup_retry=${reason} attempt=${attempt}`);
       await new Promise((resolve) =>
         setTimeout(resolve, LOOKUP_RETRY_DELAY_MS * attempt),
@@ -114,7 +114,7 @@ function assertLeastPrivilegeUser(user: User, expectedEmail: string): void {
     user.is_anonymous === true ||
     ["admin", "developer", "service_role"].includes(metadataRole)
   ) {
-    throw new Error("canary_identity_is_not_least_privilege");
+    throw new CheckFailure("canary_identity_is_not_least_privilege");
   }
 }
 
@@ -131,7 +131,7 @@ async function assertAllowlistedUser(email: string): Promise<void> {
     row.role !== "user" ||
     row.disabled_at !== null
   ) {
-    throw new Error("canary_identity_is_not_allowlisted_user");
+    throw new CheckFailure("canary_identity_is_not_allowlisted_user");
   }
 }
 
@@ -149,28 +149,28 @@ async function nonAdminProfileExists(userId: string): Promise<boolean> {
   );
   const row = rows[0];
   if (rows.length > 1) {
-    throw new Error("canary_profile_lookup_failed");
+    throw new CheckFailure("canary_profile_lookup_failed");
   }
   if (rows.length === 0) return false;
   if (row?.id !== userId || row.is_admin !== false) {
-    throw new Error("canary_identity_profile_is_not_least_privilege");
+    throw new CheckFailure("canary_identity_profile_is_not_least_privilege");
   }
   return true;
 }
 
 async function assertNonAdminProfile(userId: string): Promise<void> {
   if (!(await nonAdminProfileExists(userId))) {
-    throw new Error("canary_identity_profile_is_not_least_privilege");
+    throw new CheckFailure("canary_identity_profile_is_not_least_privilege");
   }
 }
 
 async function assertProvisionableAllowlist(email: string): Promise<void> {
   const rows = await allowlistRows(email);
   if (rows.length > 1) {
-    throw new Error("canary_allowlist_lookup_failed");
+    throw new CheckFailure("canary_allowlist_lookup_failed");
   }
   if (rows[0] && rows[0].role !== "user") {
-    throw new Error("canary_existing_allowlist_is_not_least_privilege");
+    throw new CheckFailure("canary_existing_allowlist_is_not_least_privilege");
   }
 }
 
@@ -196,7 +196,7 @@ async function usersMatchingEmail(email: string): Promise<User[]> {
     );
     if (users.length < 1000) return matches;
   }
-  throw new Error("canary_identity_lookup_unbounded");
+  throw new CheckFailure("canary_identity_lookup_unbounded");
 }
 
 function assertDedicatedUser(user: User | undefined, count: number): void {
@@ -208,7 +208,7 @@ function assertDedicatedUser(user: User | undefined, count: number): void {
     source !== "private-alpha-canary" ||
     user?.is_anonymous === true
   ) {
-    throw new Error("canary_identity_is_not_dedicated");
+    throw new CheckFailure("canary_identity_is_not_dedicated");
   }
 }
 
@@ -216,7 +216,7 @@ async function assertDedicatedCanaryIdentity(email: string): Promise<User> {
   const matches = await usersMatchingEmail(email);
   const user = matches[0];
   assertDedicatedUser(user, matches.length);
-  if (!user) throw new Error("canary_identity_is_not_dedicated");
+  if (!user) throw new CheckFailure("canary_identity_is_not_dedicated");
   return user;
 }
 
@@ -227,7 +227,7 @@ async function mintDedicatedSession(email: string): Promise<Session> {
   const tokenHash = linkData?.properties?.hashed_token?.trim();
   const verificationType = linkData?.properties?.verification_type;
   if (linkError || !tokenHash || verificationType !== "magiclink") {
-    throw new Error("canary_session_link_failed");
+    throw new CheckFailure("canary_session_link_failed");
   }
 
   const verifier = serviceClient();
@@ -235,7 +235,7 @@ async function mintDedicatedSession(email: string): Promise<Session> {
     token_hash: tokenHash,
     type: "magiclink",
   });
-  if (error || !data.session) throw new Error("canary_session_mint_failed");
+  if (error || !data.session) throw new CheckFailure("canary_session_mint_failed");
   return data.session;
 }
 
@@ -244,7 +244,7 @@ function profileBootstrapUrl(): string {
   try {
     apiUrl = new URL(requiredEnv("ARGUS_CANARY_API_URL"));
   } catch {
-    throw new Error("canary_api_url_invalid");
+    throw new CheckFailure("canary_api_url_invalid");
   }
   const localHost = ["127.0.0.1", "localhost", "::1"].includes(apiUrl.hostname);
   if (
@@ -255,7 +255,7 @@ function profileBootstrapUrl(): string {
     apiUrl.search ||
     apiUrl.hash
   ) {
-    throw new Error("canary_api_url_invalid");
+    throw new CheckFailure("canary_api_url_invalid");
   }
   return `${apiUrl.href.replace(/\/$/, "")}/api/v1/me`;
 }
@@ -266,7 +266,7 @@ async function bootstrapProfile(email: string, userId: string): Promise<void> {
   try {
     assertLeastPrivilege(session, email);
     if (session.user.id !== userId) {
-      throw new Error("canary_profile_bootstrap_identity_mismatch");
+      throw new CheckFailure("canary_profile_bootstrap_identity_mismatch");
     }
     const response = await fetch(profileBootstrapUrl(), {
       redirect: "error",
@@ -275,12 +275,12 @@ async function bootstrapProfile(email: string, userId: string): Promise<void> {
         Authorization: `Bearer ${session.access_token}`,
       },
     });
-    if (!response.ok) throw new Error("canary_profile_bootstrap_failed");
+    if (!response.ok) throw new CheckFailure("canary_profile_bootstrap_failed");
     const payload = (await response.json().catch(() => null)) as {
       user?: { id?: unknown };
     } | null;
     if (payload?.user?.id !== userId) {
-      throw new Error("canary_profile_bootstrap_identity_mismatch");
+      throw new CheckFailure("canary_profile_bootstrap_identity_mismatch");
     }
   } catch (error) {
     bootstrapError = error;
@@ -289,7 +289,7 @@ async function bootstrapProfile(email: string, userId: string): Promise<void> {
   try {
     await revokeTokens(session.access_token);
   } catch {
-    throw new Error("canary_profile_bootstrap_revocation_failed");
+    throw new CheckFailure("canary_profile_bootstrap_revocation_failed");
   }
   if (bootstrapError) throw bootstrapError;
 }
@@ -297,13 +297,13 @@ async function bootstrapProfile(email: string, userId: string): Promise<void> {
 async function provision(): Promise<void> {
   const email = requiredEnv("ARGUS_CANARY_EMAIL").toLocaleLowerCase();
   if (!CANARY_PROVISIONING_EMAIL.test(email)) {
-    throw new Error("canary_provisioning_email_is_not_safe");
+    throw new CheckFailure("canary_provisioning_email_is_not_safe");
   }
 
   await assertProvisionableAllowlist(email);
   const admin = serviceClient();
   const matches = await usersMatchingEmail(email);
-  if (matches.length > 1) throw new Error("canary_identity_is_not_unique");
+  if (matches.length > 1) throw new CheckFailure("canary_identity_is_not_unique");
   let user = matches[0];
   let created = false;
   if (!user) {
@@ -314,7 +314,7 @@ async function provision(): Promise<void> {
       user_metadata: { language: "es-419" },
     });
     if (error || !data.user) {
-      throw new Error("canary_identity_provision_failed");
+      throw new CheckFailure("canary_identity_provision_failed");
     }
     user = data.user;
     created = true;
@@ -345,7 +345,7 @@ async function provision(): Promise<void> {
       rows[0]?.role !== "user" ||
       rows[0]?.disabled_at !== null
     ) {
-      throw new Error("canary_allowlist_provision_failed");
+      throw new CheckFailure("canary_allowlist_provision_failed");
     }
     if (!profileExists) await bootstrapProfile(email, user.id);
     await assertNonAdminProfile(user.id);
@@ -355,7 +355,7 @@ async function provision(): Promise<void> {
         user.id,
       );
       if (rollbackError)
-        throw new Error("canary_identity_provision_rollback_failed");
+        throw new CheckFailure("canary_identity_provision_rollback_failed");
     }
     throw error;
   }
@@ -388,7 +388,7 @@ async function storageStateCookies(session: Session): Promise<PendingCookie[]> {
     refresh_token: session.refresh_token,
   });
   if (error || data.user?.id !== session.user.id || pending.size === 0) {
-    throw new Error("canary_storage_state_serialization_failed");
+    throw new CheckFailure("canary_storage_state_serialization_failed");
   }
   return [...pending.values()].filter((cookie) => cookie.value);
 }
@@ -404,7 +404,7 @@ async function revokeTokens(accessToken: string): Promise<void> {
       },
     },
   );
-  if (!response.ok) throw new Error("canary_session_revocation_failed");
+  if (!response.ok) throw new CheckFailure("canary_session_revocation_failed");
 }
 
 function handoffForSession(session: Session, email: string): SessionHandoff {
@@ -486,7 +486,7 @@ async function mint(): Promise<void> {
           () => undefined,
         );
       }
-      throw new Error("canary_session_revocation_failed");
+      throw new CheckFailure("canary_session_revocation_failed");
     }
     if (handoffReady) await clearPrivateSessionHandoff(sessionPath);
     throw error;
@@ -503,7 +503,7 @@ function sessionHandoff(value: unknown): SessionHandoff {
     typeof handoff.user_id !== "string" ||
     typeof handoff.email !== "string"
   ) {
-    throw new Error("canary_session_handoff_invalid");
+    throw new CheckFailure("canary_session_handoff_invalid");
   }
   return handoff as SessionHandoff;
 }
@@ -531,15 +531,13 @@ async function main(): Promise<void> {
     await revoke();
     return;
   }
-  throw new Error("canary_session_mode_invalid");
+  throw new CheckFailure("canary_session_mode_invalid");
 }
 
 main().catch((error: unknown) => {
-  // Client and network errors carry backend text; only this tool's codes are printed.
+  // Only failures this tool raised name a reason; anything else may carry backend text.
   const reason =
-    error instanceof Error && isReasonCode(error.message)
-      ? error.message
-      : "unknown_failure";
+    error instanceof CheckFailure ? error.reason : "unknown_failure";
   console.error(`canary_session_state=failed reason=${reason}`);
   process.exitCode = 1;
 });
