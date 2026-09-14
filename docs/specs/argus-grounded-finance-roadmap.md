@@ -363,15 +363,16 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-14 at integration `7701c980`, after production promotion
+**Updated 2026-09-14 at integration `25f82c3a`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Recovery replies state the current reason, and a stated date range survives "this year" | Building. Found on production 2026-09-14. Stops before its paid measurement. |
+| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, stopped on two Codex P1s that both come from a deterministic date check it added ("May I backtest" read as May, and a correction loop). Next: remove that check, keep the reply grounding and the date instruction, then its paid measurement. |
+| Sharing on | Built on the existing receipts in a local worktree and stopped before its PR on a one-word bug in its own footer fix (`research` instead of `research_answer`). Next: fix it, commit, open the PR, CI, one review. Migration `20260914120000_share_plain_answer_receipts.sql` pending. |
+| Ranked comparison leader gap (#622) | PR #627, stopped on a finding about cards stored before the change. Ranked comparisons have never shipped, so no production card has that shape. Next: decline with that and mark ready. |
 | Acceptance dry run | Running on `03918912`: the ten smoke questions in English and Spanish with follow-ups and a guest subset ($9 hard stop), then the August 12 transcript replay ($4 hard stop, founder approved). Fixes nothing; reports failures by cause. |
-| Menus and settings follow docs/BREAKPOINTS.md | Redirected 2026-09-14. Settings and menus are sheets below 1024px and anchored menus from 1024px, as `docs/BREAKPOINTS.md` sets and the code already does; 720px is where the rails arrive. The lane audits every surface against that and fixes only real mismatches. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1451,7 +1452,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `7701c980`.
+shipped means live in production. Integration is `25f82c3a`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1540,6 +1541,9 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | One provenance policy for promotion evidence | outside the releases | **LANDED** `1bd2f8cb`, PR #616, closing #608. `tests/promotion_evidence_identity.py` owns whether evidence still stands: every file the eval could import or read counts, while `render.yaml`, `.env.example`, docs and dated evidence scripts do not. The eval refuses a tracked file as its environment. Model and flag identity in scorecards is #619. |
 | A confirmation card turn carries no prose | outside the releases | **LANDED** `14d4a870`, PR #618. A confirmation card no longer stores an English summary sentence. Card turns reach the model's history, naming and search as typed facts, and old rows are scrubbed on read. The chat-route live check passed in English and Spanish for $0.16. |
 | $10 minimum starting capital | outside the releases | **LANDED** `2cd359c8`, PR #621. One owner sets the minimum at $10 for every way capital is set or edited, and the recovery offers the minimum. A run under $1,000 shows cents, with decimals decided once per run and rounded half up. Capital in a stated currency, converted to dollars, is #623; a gain that subtracts rounded values is #624. |
+| Menus and settings follow docs/BREAKPOINTS.md | outside the releases | **LANDED** `22387583`, PR #630. Menus and settings keep the 1024px switch the design sets. The audit fixed auth settings, hidden account-deletion dialogs and undersized phone sheet controls. |
+| Promotion evidence records models and flags | outside the releases | **LANDED** `c2c08c99`, PR #629, closing #619. Scorecards record the model names and on/off flags the eval ran with, and the promotion gate compares them with the candidate's release contract. |
+| Result card gain from the run | outside the releases | **LANDED** `25f82c3a`, PR #628, closing #624. The card's gain is the run's own profit, rounded once, so the card and the readout agree. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
@@ -1874,9 +1878,8 @@ Resolved:
   its fallback (`src/argus/domain/research/config.py`).
 - **Bugs are tracked as issues:** #598 a second tab never shows the reply, #599 the BTC forward research never publishes,
   #604 sharing refuses completed answers, #606 a result follow-up lists its next steps
-  twice, #609 research provider failures skip the retryable notice (fix ready,
-  PR #612), and #614 the canary fails on nearly every run. #596, #600, #605, #608 and
-  #614 are fixed on integration and ship at the next promotion.
+  twice, and #614 the canary fails on nearly every run. #596, #600, #605, #608, #609,
+  #614, #619 and #624 are fixed on integration and ship at the next promotion.
 - **The live measurement cannot see history building.** It gives each case its
   history directly and never loads saved turns, so a change to how saved turns
   become model history (PR #618) needs a live check through the chat route.
@@ -1886,9 +1889,6 @@ Resolved:
   reply writer reads the last six messages beside the stored reason. That earlier
   refusal came from reading "from August 16 to August 19 just a few days this year"
   as ending December 31.
-- **Menu and settings consistency across widths is being audited.** The founder saw
-  an inconsistency on 2026-09-14 without a screenshot. The switch at 1024px is
-  correct per `docs/BREAKPOINTS.md`; the audit looks for surfaces that break it.
 - **The chat does not know who the person is.** Settings stores a preferred name,
   a country and a currency, but outside Settings the name reaches only the web
   greeting, and the country reaches only research as its search location. No answer
