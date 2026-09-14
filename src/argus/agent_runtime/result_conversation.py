@@ -37,7 +37,10 @@ from argus.agent_runtime.result_next_steps import (
     NextStep,
     accepted_next_steps,
 )
-from argus.domain.research.admission import claim_current_research_attempt
+from argus.domain.research.admission import (
+    admitted_provider_work,
+    claim_current_research_attempt,
+)
 from argus.domain.research.contracts import (
     ResearchSource,
     ResearchUnavailableError,
@@ -441,17 +444,18 @@ async def _research_answer(
             text=None, failure_mode="research_capacity_exhausted"
         )
     try:
-        response = await asyncio.to_thread(
-            active_client.run_structured,
-            prompt,
-            result_research_spec(language, timeout_seconds=RESEARCH_TIMEOUT_SECONDS),
-            schema_model=schema,
-            schema_name="ResultConversationDraft",
-            instructions=result_conversation_instructions(
-                language=language, can_search=True
-            ),
-            limits=RESULT_RESEARCH_LIMITS,
-        )
+        with admitted_provider_work():
+            response = await asyncio.to_thread(
+                active_client.run_structured,
+                prompt,
+                result_research_spec(language, timeout_seconds=RESEARCH_TIMEOUT_SECONDS),
+                schema_model=schema,
+                schema_name="ResultConversationDraft",
+                instructions=result_conversation_instructions(
+                    language=language, can_search=True
+                ),
+                limits=RESULT_RESEARCH_LIMITS,
+            )
     except ResearchUnavailableError as exc:
         # The deployed log sink drops structured extras; the reason rides the text.
         logger.warning(f"Result follow-up research unavailable reason={exc.reason}")

@@ -36,7 +36,11 @@ import { chatMessageCopyText } from "@/lib/chat-message-copy-text";
 import { resultMessageReadoutText } from "@/lib/result-readout-display";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
-import { recoveryDisplayText } from "@/lib/chat-recovery-display";
+import {
+  recoveryDisplayText,
+  recoveryNoticeUnderAnswer,
+  wearsQuietFailureNotice,
+} from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import FailureNotice from "./FailureNotice";
@@ -199,6 +203,8 @@ export default function ChatMessage({
     );
   };
 
+  // An answer with a recovery keeps its content; the notice renders under it.
+  const noticeUnderAnswer = !isUser && recoveryNoticeUnderAnswer(message.recoveryDisplay);
   const getDisplayContent = () => {
     if (!isUser && isStreaming && message.contentPresentation === "result_breakdown") {
       return t("chat.status.working");
@@ -206,7 +212,7 @@ export default function ChatMessage({
     const readout = resultMessageReadoutText(message, t, locale);
     if (readout !== null) return readout;
     const content = message.content ?? "";
-    if (!isUser && message.recoveryDisplay) {
+    if (!isUser && message.recoveryDisplay && !noticeUnderAnswer) {
       const recovered = recoveryDisplayText(message.recoveryDisplay, t, locale);
       if (recovered.trim()) {
         return recovered;
@@ -244,6 +250,28 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
+  // The amber notice: in place of a failed reply, or under an answer given
+  // without a lookup that failed.
+  const retryableNotice = (text: string) => (
+    <div
+      role="status"
+      className={`${retryableNoticeContainerClass} max-w-[min(100%,660px)]`}
+    >
+      <MessageSquareWarning className={retryableNoticeIconClass} aria-hidden="true" />
+      <div className={retryableNoticeBodyClass}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      </div>
+      {retryAction ? (
+        <button
+          type="button"
+          onClick={() => onAction?.(retryAction)}
+          className={retryableNoticeRetryPillClass}
+        >
+          {actionLabel(retryAction)}
+        </button>
+      ) : null}
+    </div>
+  );
   const assumedInputsLine = answerAssumptionsText(message, t, locale);
   const researchSourcesOpen = researchSourcesDisplay(Boolean(message.researchDegradedCode));
   // Chips carry domains and the drawer owns the list; zero sources is the
@@ -409,39 +437,21 @@ export default function ChatMessage({
               label={t("chat.result_breakdown.label", "Breakdown")}
               isWorking={Boolean(isStreaming)}
             />
-          ) : !isUser && message.assistantRecoveryCode ? (
+          ) : !isUser && message.assistantRecoveryCode && !noticeUnderAnswer ? (
             // Infrastructure failure is visibly a failure: no result chrome,
             // no normal-answer bubble (issue #249).
-            <div
-              role="status"
-              className={`${retryableNoticeContainerClass} max-w-[min(100%,660px)]`}
-            >
-              <MessageSquareWarning
-                className={retryableNoticeIconClass}
-                aria-hidden="true"
-              />
-              <div className={retryableNoticeBodyClass}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {displayContent}
-                </ReactMarkdown>
-              </div>
-              {retryAction ? (
-                <button
-                  type="button"
-                  onClick={() => onAction?.(retryAction)}
-                  className={retryableNoticeRetryPillClass}
-                >
-                  {actionLabel(retryAction)}
-                </button>
-              ) : null}
-            </div>
-          ) : !isUser &&
-            message.recoveryDisplay?.kind === "artifact_action_recovery" ? (
-            // A rejected/inactive action is still a failure statement; it
-            // must not read as an ordinary answer, only quieter than amber.
+            retryableNotice(displayContent)
+          ) : !isUser && !noticeUnderAnswer && wearsQuietFailureNotice(message.recoveryDisplay) ? (
+            // A rejected action or a lookup that cannot be retried is still a
+            // failure statement; it must not read as an ordinary answer, only
+            // quieter than amber.
             <FailureNotice
               className="max-w-[min(100%,660px)]"
-              testId="artifact-action-failure-notice"
+              testId={
+                message.recoveryDisplay?.kind === "artifact_action_recovery"
+                  ? "artifact-action-failure-notice"
+                  : "recovery-failure-notice"
+              }
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {displayContent}
@@ -474,6 +484,19 @@ export default function ChatMessage({
               <ToolResultCard card={card} onRecompute={onToolRecompute} disabled={!toolRecomputeEligible(message.id, latestMessageId, turnInFlight || Boolean(isStreaming))} />
             </div>
           ))}
+          {noticeUnderAnswer ? (
+            <div data-recovery-under-answer className="mt-3 w-full max-w-[min(100%,660px)]">
+              {message.assistantRecoveryCode ? (
+                retryableNotice(recoveryDisplayText(message.recoveryDisplay, t, locale))
+              ) : (
+                <FailureNotice testId="recovery-failure-notice">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {recoveryDisplayText(message.recoveryDisplay, t, locale)}
+                  </ReactMarkdown>
+                </FailureNotice>
+              )}
+            </div>
+          ) : null}
 
           {!isUser && !isStreaming && message.memoryRecalls?.length ? (
             <MemoryRecallNote recalls={message.memoryRecalls} />

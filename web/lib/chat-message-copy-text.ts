@@ -5,7 +5,7 @@ import { confirmationCardCopyText, resultCardCopyText } from "./chat-card-copy-t
 import { confirmationCardViewModel } from "./confirmation-card-view-model";
 import { resultCardViewModel } from "./result-card-view-model";
 import { resultMessageReadoutText } from "./result-readout-display";
-import { recoveryDisplayCopyText } from "./chat-recovery-display";
+import { recoveryDisplayCopyText, recoveryNoticeUnderAnswer } from "./chat-recovery-display";
 import { pendingArtifactCardFromPayload } from "./pending-artifact-card";
 import { toolCardCopyText } from "./tool-result-card";
 
@@ -16,7 +16,8 @@ export function chatMessageCopyText(message: Message, t: TFunction, locale: stri
   }
   const readout = resultMessageReadoutText(message, t, locale);
   if (readout !== null) return readout;
-  if (message.role !== "user") {
+  const underAnswer = message.role !== "user" && recoveryNoticeUnderAnswer(message.recoveryDisplay);
+  if (message.role !== "user" && !underAnswer) {
     const recovery = recoveryDisplayCopyText(message.recoveryDisplay, t, locale);
     if (recovery) return normalizeAssistantDisplayText(recovery);
   }
@@ -24,6 +25,7 @@ export function chatMessageCopyText(message: Message, t: TFunction, locale: stri
   if (message.kind === "strategy_confirmation" && confirmation?.kind === "backtest") {
     return normalizeAssistantDisplayText(confirmationCardCopyText(confirmationCardViewModel(confirmation, t, locale), t, locale));
   }
-  const text = [message.content ?? "", ...(message.toolResultCards ?? []).map((card) => toolCardCopyText(card, t, locale))].filter(Boolean).join("\n\n");
+  const notice = underAnswer ? recoveryDisplayCopyText(message.recoveryDisplay, t, locale) : null;
+  const text = [message.content ?? "", ...(message.toolResultCards ?? []).map((card) => toolCardCopyText(card, t, locale)), notice ?? ""].filter(Boolean).join("\n\n");
   return message.role === "user" ? text : normalizeAssistantDisplayText(text);
 }

@@ -27,7 +27,10 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.substage_events import emit_substage
 from argus.domain.market_data import resolve_asset
-from argus.domain.research.admission import ResearchAttemptAdmission
+from argus.domain.research.admission import (
+    ResearchAttemptAdmission,
+    admitted_provider_work,
+)
 from argus.domain.research.search import (
     SearchResultPacket,
     SearchUnavailableError,
@@ -177,12 +180,13 @@ async def discovery_operation_result(
             emit_substage("discovery_search", detail=_search_subject(request))
             # Sync provider client: off the loop, or one search stalls every
             # stream.
-            packet = await asyncio.to_thread(
-                provider.search,
-                query,
-                max_results=5,
-                timeout_seconds=config.timeout_seconds,
-            )
+            with admitted_provider_work():
+                packet = await asyncio.to_thread(
+                    provider.search,
+                    query,
+                    max_results=5,
+                    timeout_seconds=config.timeout_seconds,
+                )
         except SearchUnavailableError as exc:
             if exc.reason == "not_configured":
                 usage["search_attempted"] = False
