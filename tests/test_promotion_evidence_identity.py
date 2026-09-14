@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.promotion_evidence_configuration import release_configuration_at_commit
 from tests.promotion_evidence_identity import (
     _RECORDS_BEFORE_THIS_RULE,
     assert_measurement_stands_for,
@@ -69,7 +70,9 @@ def test_change_the_measurement_cannot_reach_keeps_the_evidence(
     "path",
     [pytest.param(path, id=kind) for kind, path in REACHED_BY_THE_EVAL.items()],
 )
-def test_change_the_measurement_reaches_needs_a_new_one(tmp_path: Path, path: str) -> None:
+def test_change_the_measurement_reaches_needs_a_new_one(
+    tmp_path: Path, path: str
+) -> None:
     measured = commit_measured_repository(tmp_path)
     shipped = commit_changes(tmp_path, [path])
 
@@ -119,6 +122,9 @@ def test_manifest_names_the_commit_its_evidence_measured(tmp_path: Path) -> None
         "evidence": "the live eval scorecard",
         "measured_sha": measured,
         "shipped_sha": shipped,
+        "release_configuration": release_configuration_at_commit(
+            measured, repository_root=tmp_path
+        ),
         "repository_root": tmp_path,
     }
 
@@ -146,13 +152,18 @@ def test_rejection_names_the_reached_files_that_changed(tmp_path: Path) -> None:
             tmp_path / "2026-09-13-main-production-promotion.md",
             evidence="the live eval scorecard",
             measured_sha=measured,
+            release_configuration=release_configuration_at_commit(
+                shipped, repository_root=tmp_path
+            ),
             shipped_sha=shipped,
             repository_root=tmp_path,
         )
 
 
 @pytest.mark.parametrize("measured", ["", "0" * 40], ids=["unrecorded", "unknown"])
-def test_evidence_binds_a_commit_in_this_repository(tmp_path: Path, measured: str) -> None:
+def test_evidence_binds_a_commit_in_this_repository(
+    tmp_path: Path, measured: str
+) -> None:
     shipped = commit_measured_repository(tmp_path)
 
     with pytest.raises(AssertionError, match="not a commit in this repository"):
@@ -161,6 +172,9 @@ def test_evidence_binds_a_commit_in_this_repository(tmp_path: Path, measured: st
             tmp_path / "2026-09-13-main-production-promotion.md",
             evidence="the live eval scorecard",
             measured_sha=measured,
+            release_configuration=release_configuration_at_commit(
+                shipped, repository_root=tmp_path
+            ),
             shipped_sha=shipped,
             repository_root=tmp_path,
         )
@@ -175,6 +189,9 @@ def test_record_before_this_rule_allows_only_its_known_difference(
     measured = commit_measured_repository(tmp_path)
     binding = {
         "evidence": "the baseline eval scorecard",
+        "release_configuration": release_configuration_at_commit(
+            measured, repository_root=tmp_path
+        ),
         "measured_sha": measured,
         "repository_root": tmp_path,
     }
@@ -201,7 +218,9 @@ def test_reach_covers_every_repository_module_the_measurement_loads() -> None:
     tracked = frozenset(path for path in listed.split("\0") if path)
 
     def read(paths: Iterable[str]) -> dict[str, bytes]:
-        return {path: (ROOT / path).read_bytes() for path in paths if (ROOT / path).is_file()}
+        return {
+            path: (ROOT / path).read_bytes() for path in paths if (ROOT / path).is_file()
+        }
 
     reach = reach_in_tree(tracked, read)
     roots = import_roots(tracked, read)

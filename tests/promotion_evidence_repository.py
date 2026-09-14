@@ -14,6 +14,7 @@ from pathlib import Path
 from tests.evals.measurement_eval_scorecard import (
     measurement_fixture_identity_at_git_sha,
 )
+from tests.promotion_evidence_configuration import release_configuration_at_commit
 from tests.promotion_evidence_identity import MEASUREMENT_ENTRY
 
 PYTHON_VERSION = "3.10.20"
@@ -175,7 +176,7 @@ def live_eval_scorecard(repository_root: Path, *, measured_sha: str) -> dict[str
         candidate_sha=measured_sha, repository_root=repository_root
     )
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "provenance": {
             "evaluation_mode": "live",
             "market_data_provider_mode": "live_provider",
@@ -185,6 +186,9 @@ def live_eval_scorecard(repository_root: Path, *, measured_sha: str) -> dict[str
             "fixture_sha256": identity.sha256,
             "fixture_case_ids": list(identity.case_ids),
             "worktree_clean": True,
+            "release_configuration": release_configuration_at_commit(
+                measured_sha, repository_root=repository_root
+            ),
             "live_market_data_probe": {
                 "requested_date_range": {"start": "2024-01-01", "end": "2024-01-10"},
                 "effective_date_range": {"start": "2024-01-02", "end": "2024-01-10"},
@@ -260,7 +264,10 @@ def _layout(case_ids: Iterable[str]) -> dict[str, str]:
         "web/argus_display_contract/policy.json": "{}\n",
         "web/app/page.tsx": "export default function Page() {\n  return null;\n}\n",
         "render.yaml": "services: []\n",
-        ".github/private-alpha-release-profile.json": "{}\n",
+        ".github/private-alpha-release-profile.json": (
+            Path(__file__).resolve().parents[1]
+            / ".github/private-alpha-release-profile.json"
+        ).read_text(encoding="utf-8"),
         "supabase/migrations/20260913000000_example.sql": "select 1;\n",
         "docs/release-manifests/notes.md": "# Notes\n",
         "docs/reports/evidence/2026-09-13-promotion/run_pair.py": "import subprocess\n",

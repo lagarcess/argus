@@ -206,8 +206,8 @@ describe("Spanish UI Smoke Harness", () => {
 
   test("Source referencing verified keys", () => {
     // Basic checks to ensure source files still reference keys that exist in Spanish bundle
-    const languageSource = fs.readFileSync(path.join(webRoot, "components/SettingsMenu.tsx"), "utf-8");
-    expect(languageSource).toContain("settings.languages.");
+    const languageSource = fs.readFileSync(path.join(webRoot, "components/settings/LanguageModal.tsx"), "utf-8");
+    expect(languageSource).toContain("settings.search_language");
 
     const chatSource = fs.readFileSync(path.join(webRoot, "components/chat/ChatInput.tsx"), "utf-8");
     expect(chatSource).toContain("chat.message_empty");

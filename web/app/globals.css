@@ -315,6 +315,18 @@ body {
   font-size: max(1rem, var(--argus-sheet-input-font-size, 1rem));
 }
 
+/* BREAKPOINTS.md: sheet controls below the rail stop have 44px hit areas.
+ * Own the floor here so each settings view cannot silently shrink its buttons
+ * or text fields. Checkboxes/radios keep compact glyphs in clickable labels. */
+.argus-sheet :is(
+  button,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+  select,
+  textarea
+) {
+  @apply max-tablet:min-h-11 max-tablet:min-w-11;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .argus-sheet-enter,
   .argus-sheet-scrim,

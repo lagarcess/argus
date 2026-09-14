@@ -1,0 +1,1170 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/8b65/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 20 items
+
+tests/test_result_card_gain.py FFFFFFFFFFFFFFFFFFFF                      [100%]
+
+=================================== FAILURES ===================================
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0.5-1-en-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'en', start = 1000.5, profit = 0.5
+expected = 1
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+>           assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+E           AssertionError: $0 change · 0.0% total return
+E           assert False
+E            +  where False = <built-in method startswith of str object at 0x1119e0650>('+$1 gain ·')
+E            +    where <built-in method startswith of str object at 0x1119e0650> = '$0 change · 0.0% total return'.startswith
+
+tests/test_result_card_gain.py:59: AssertionError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0.5-1-en-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'en', start = 1000.5, profit = 0.5
+expected = 1
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+>           assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+E           AssertionError: $0 change · 0.0% return on contributions
+E           assert False
+E            +  where False = <built-in method startswith of str object at 0x110f59db0>('+$1 gain ·')
+E            +    where <built-in method startswith of str object at 0x110f59db0> = '$0 change · 0.0% return on contributions'.startswith
+
+tests/test_result_card_gain.py:59: AssertionError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0.5-1-es-419-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'es-419', start = 1000.5, profit = 0.5
+expected = 1
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+>           assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+E           AssertionError: $0 change · 0.0% total return
+E           assert False
+E            +  where False = <built-in method startswith of str object at 0x111b85680>('+$1 gain ·')
+E            +    where <built-in method startswith of str object at 0x111b85680> = '$0 change · 0.0% total return'.startswith
+
+tests/test_result_card_gain.py:59: AssertionError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0.5-1-es-419-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'es-419', start = 1000.5, profit = 0.5
+expected = 1
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+>           assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+E           AssertionError: $0 change · 0.0% return on contributions
+E           assert False
+E            +  where False = <built-in method startswith of str object at 0x111b948b0>('+$1 gain ·')
+E            +    where <built-in method startswith of str object at 0x111b948b0> = '$0 change · 0.0% return on contributions'.startswith
+
+tests/test_result_card_gain.py:59: AssertionError
+_ test_run_profit_reaches_live_and_reloaded_web_card[10.005-0.005-0.01-en-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'en', start = 10.005, profit = 0.005
+expected = 0.01
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+>           assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+E           AssertionError: $0.00 change · 0.0% total return
+E           assert False
+E            +  where False = <built-in method startswith of str object at 0x111b86800>('+$0.01 gain ·')
+E            +    where <built-in method startswith of str object at 0x111b86800> = '$0.00 change · 0.0% total return'.startswith
+
+tests/test_result_card_gain.py:59: AssertionError
+_ test_run_profit_reaches_live_and_reloaded_web_card[10.005-0.005-0.01-en-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'en', start = 10.005, profit = 0.005
+expected = 0.01
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+>           assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+E           AssertionError: $0.00 change · 0.0% return on contributions
+E           assert False
+E            +  where False = <built-in method startswith of str object at 0x111b958b0>('+$0.01 gain ·')
+E            +    where <built-in method startswith of str object at 0x111b958b0> = '$0.00 change · 0.0% return on contributions'.startswith
+
+tests/test_result_card_gain.py:59: AssertionError
+_ test_run_profit_reaches_live_and_reloaded_web_card[10.005-0.005-0.01-es-419-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'es-419', start = 10.005, profit = 0.005
+expected = 0.01
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+>           assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+E           AssertionError: $0.00 change · 0.0% total return
+E           assert False
+E            +  where False = <built-in method startswith of str object at 0x111aa4260>('+$0.01 gain ·')
+E            +    where <built-in method startswith of str object at 0x111aa4260> = '$0.00 change · 0.0% total return'.startswith
+
+tests/test_result_card_gain.py:59: AssertionError
+_ test_run_profit_reaches_live_and_reloaded_web_card[10.005-0.005-0.01-es-419-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'es-419', start = 10.005
+profit = 0.005, expected = 0.01
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+>           assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+E           AssertionError: $0.00 change · 0.0% return on contributions
+E           assert False
+E            +  where False = <built-in method startswith of str object at 0x111b96630>('+$0.01 gain ·')
+E            +    where <built-in method startswith of str object at 0x111b96630> = '$0.00 change · 0.0% return on contributions'.startswith
+
+tests/test_result_card_gain.py:59: AssertionError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5--0.5--1-en-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'en', start = 1000.5, profit = -0.5
+expected = -1
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5--0.5--1-en-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'en', start = 1000.5, profit = -0.5
+expected = -1
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5--0.5--1-es-419-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'es-419', start = 1000.5, profit = -0.5
+expected = -1
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5--0.5--1-es-419-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'es-419', start = 1000.5
+profit = -0.5, expected = -1
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[10.005--0.005--0.01-en-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'en', start = 10.005, profit = -0.005
+expected = -0.01
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[10.005--0.005--0.01-en-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'en', start = 10.005, profit = -0.005
+expected = -0.01
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[10.005--0.005--0.01-es-419-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'es-419', start = 10.005, profit = -0.005
+expected = -0.01
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[10.005--0.005--0.01-es-419-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'es-419', start = 10.005
+profit = -0.005, expected = -0.01
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0-0-en-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'en', start = 1000.5, profit = 0
+expected = 0
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0-0-en-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'en', start = 1000.5, profit = 0
+expected = 0
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0-0-es-419-buy_and_hold] _
+
+template = 'buy_and_hold', language = 'es-419', start = 1000.5, profit = 0
+expected = 0
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+_ test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0-0-es-419-dca_accumulation] _
+
+template = 'dca_accumulation', language = 'es-419', start = 1000.5, profit = 0
+expected = 0
+
+    @pytest.mark.parametrize("template", ["buy_and_hold", "dca_accumulation"])
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize(
+        "start,profit,expected",
+        [(1000.50, 0.50, 1), (10.005, 0.005, 0.01),
+         (1000.50, -0.50, -1), (10.005, -0.005, -0.01), (1000.50, 0, 0)],
+    )
+    def test_run_profit_reaches_live_and_reloaded_web_card(template, language, start, profit, expected):
+        config = {
+            "template": template, "symbols": ["AAPL"], "asset_class": "equity",
+            "benchmark_symbol": "SPY", "start_date": "2024-01-02",
+            "end_date": "2024-01-05", "starting_capital": start,
+            "recurring_contribution": 10, "parameters": {"dca_cadence": "monthly"},
+        }
+        performance = {
+            "profit": profit, "total_return_pct": 0,
+            "delta_vs_benchmark_pct": 0,
+            "portfolio_value_range": {"peak_value": start + 10 + abs(profit)},
+        }
+        card = build_result_card(config, {
+            "aggregate": {"performance": performance, "risk": {"max_drawdown_pct": 0},
+                          "efficiency": {"total_trades": 1}},
+        }, language=language)
+        display = readout_display_value(
+            {"value": profit, "unit": "currency"}, language=language,
+            currency_fraction_digits=card["currency_fraction_digits"],
+        )
+        # Exercise the real web mapper and hero with serialized backend output.
+        script = """
+          import { resultCardFromConversationCard, resultCardFromRun } from './lib/argus-api';
+          import { heroDeltaEvidenceView } from './lib/result-card-display';
+          const {card, language} = await Bun.stdin.json();
+          const live = resultCardFromConversationCard(card);
+          const reloaded = resultCardFromRun({conversation_result_card: card, config_snapshot: {}});
+          console.log(JSON.stringify([live, reloaded].map(result =>
+            heroDeltaEvidenceView(result, {locale: language}).hero.detail)));
+        """
+        output = subprocess.run(
+            [shutil.which("bun") or "bun", "-e", script],
+            cwd=Path(__file__).resolve().parents[1] / "web",
+            input=json.dumps({"card": card, "language": language}),
+            text=True, capture_output=True, check=True, timeout=30,
+        )
+        noun = "gain" if profit > 0 else "loss" if profit < 0 else "change"
+        prefix = "+" if profit > 0 else ""
+        for detail in json.loads(output.stdout):
+            assert detail.startswith(f"{prefix}{display['text']} {noun} ·"), detail
+>       assert card["profit"] == display["value"] == expected
+E       KeyError: 'profit'
+
+tests/test_result_card_gain.py:60: KeyError
+=========================== short test summary info ============================
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0.5-1-en-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0.5-1-en-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0.5-1-es-419-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0.5-1-es-419-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[10.005-0.005-0.01-en-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[10.005-0.005-0.01-en-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[10.005-0.005-0.01-es-419-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[10.005-0.005-0.01-es-419-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5--0.5--1-en-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5--0.5--1-en-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5--0.5--1-es-419-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5--0.5--1-es-419-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[10.005--0.005--0.01-en-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[10.005--0.005--0.01-en-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[10.005--0.005--0.01-es-419-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[10.005--0.005--0.01-es-419-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0-0-en-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0-0-en-dca_accumulation]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0-0-es-419-buy_and_hold]
+FAILED tests/test_result_card_gain.py::test_run_profit_reaches_live_and_reloaded_web_card[1000.5-0-0-es-419-dca_accumulation]
+============================== 20 failed in 1.81s ==============================

@@ -2097,7 +2097,11 @@ The canonical backtest config used by the engine for execution and reproducibili
   readout facts all read that stored value and round half up
   (`currency_rounding_mode: halfExpand`), with or without a chart, so a $10 run
   reads `$10.00 -> $12.05`. A card stored before the field existed reads whole
-  dollars.
+  dollars. New cards also carry numeric `profit`, taken directly from the run's
+  `metrics.aggregate.performance.profit` and rounded half up at the card's
+  stored precision. The web renders this gain or loss; it never subtracts
+  rounded start/end row text. Older cards without `profit` show the return
+  percentage alone in the hero detail.
 - > [!NOTE]
   > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance. The global default is `$1,000` for runnable drafts. DCA/recurring-buy contribution amounts are strategy-specific user inputs and remain separate from default starting capital.
 
