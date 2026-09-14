@@ -504,7 +504,7 @@ export default function FeedbackDialog({
               )}
 
               {hasConversationContext && (
-                <div className="mt-1 flex items-start gap-3">
+                <label className="mt-1 flex cursor-pointer items-start gap-3 max-tablet:min-h-11 max-tablet:items-center">
                   <input
                     id="include-conversation-context"
                     type="checkbox"
@@ -514,16 +514,15 @@ export default function FeedbackDialog({
                     }
                     className="mt-0.5 h-4 w-4 accent-[#4f55f1]"
                   />
-                  <label
-                    htmlFor="include-conversation-context"
-                    className="cursor-pointer select-none text-[13px] leading-snug text-black/60 dark:text-white/60"
+                  <span
+                    className="select-none text-[13px] leading-snug text-black/60 dark:text-white/60"
                   >
                     {t(
                       "feedback.include_conversation_context",
                       "Include approved context from this conversation",
                     )}
-                  </label>
-                </div>
+                  </span>
+                </label>
               )}
 
               {error && (

@@ -157,6 +157,8 @@ export type StrategyResultPayload = {
   executionCosts?: ExecutionCostEvidence | null;
   /** Money precision the backend stored on the result card. */
   currencyFractionDigits?: number;
+  /** Run profit rounded by the backend at the card's stored precision. */
+  profit?: number;
 };
 
 export type ExecutionCostEvidence = {

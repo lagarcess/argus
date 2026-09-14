@@ -1,9 +1,10 @@
 /**
- * Width-based layout thresholds for the mobile shell (spec section 1).
+ * Width-based layout thresholds from docs/BREAKPOINTS.md, built on DESIGN.md §8.
  *
- * Two thresholds, never device sniffing: below 1024px the run dossier becomes
- * an overlay sheet, below 720px the full mobile treatment applies. Values match
- * the Tailwind stops in globals.css so CSS and behavior cannot drift.
+ * At 720px the rails arrive. Settings remain sheets through the tablet band;
+ * at 1024px settings become anchored menus and the dossier becomes a pane.
+ * Values match the Tailwind stops in globals.css; consumers use width rather
+ * than device sniffing. The documented visual baselines own rendered truth.
  */
 
 export const TABLET_MIN_WIDTH_PX = 720;
@@ -13,9 +14,9 @@ export const BELOW_TABLET_QUERY = `(max-width: ${TABLET_MIN_WIDTH_PX - 0.02}px)`
 export const BELOW_DESKTOP_QUERY = `(max-width: ${DESKTOP_MIN_WIDTH_PX - 0.02}px)`;
 
 export type ResponsiveLayout = {
-  /** Below 720px: drawer, sheets, collapsed Omnisearch, no activity rail. */
+  /** Below 720px: navigation drawer and no activity rail. */
   isBelowTablet: boolean;
-  /** Below 1024px: the run dossier is an overlay rather than a third pane. */
+  /** Below 1024px: settings sheets and dossier overlays, including tablet. */
   isBelowDesktop: boolean;
 };
 

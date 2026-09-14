@@ -285,6 +285,13 @@ def _as_decimal(value: Any) -> Decimal | None:
     return parsed if parsed >= 0 else None
 
 
+def resolve_memory_embedding_model() -> str:
+    """Resolve the model identically for the embedder and eval provenance."""
+    return os.getenv(
+        "ARGUS_MEMORY_EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL
+    ).strip() or DEFAULT_EMBEDDING_MODEL
+
+
 def perplexity_embedder_from_env(
     *,
     transport: httpx.BaseTransport | None = None,
@@ -296,11 +303,7 @@ def perplexity_embedder_from_env(
         return None
     return PerplexityMemoryEmbedder(
         api_key=api_key,
-        model=os.getenv(
-            "ARGUS_MEMORY_EMBEDDING_MODEL",
-            DEFAULT_EMBEDDING_MODEL,
-        ).strip()
-        or DEFAULT_EMBEDDING_MODEL,
+        model=resolve_memory_embedding_model(),
         dimensions=_env_int(
             "ARGUS_MEMORY_EMBEDDING_DIMENSIONS",
             DEFAULT_EMBEDDING_DIMENSIONS,
