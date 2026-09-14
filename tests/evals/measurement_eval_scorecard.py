@@ -507,6 +507,91 @@ def _worktree_is_clean(repository_root: Path) -> bool:
     return not completed.stdout.strip()
 
 
+def assert_eval_env_file_untracked(
+    env_file: Path, *, repository_root: Path = REPOSITORY_ROOT
+) -> None:
+    """Refuse an environment file that a tracked file feeds.
+
+    Promotion evidence identity compares the repository's tree, never the eval's
+    environment, so no tracked file may feed that environment. The file is
+    refused when it, or any step on the way to it, is a tracked file or tracked
+    symlink, compared by identity so whatever path or link reaches it counts. A
+    gitignored file stays allowed, and an untracked file that is not ignored
+    already fails the clean-worktree check. The guard catches an operator
+    mistake, not a deliberate bypass.
+    """
+
+    root = repository_root.resolve()
+    # The walk ends on the real file, so the visited steps cover every link on the
+    # way and the target.
+    identities = set()
+    for path in _paths_opened(env_file):
+        try:
+            status = path.lstat()
+        except OSError:
+            continue
+        identities.add((status.st_dev, status.st_ino))
+    if identities & _tracked_file_identities(root):
+        raise RuntimeError("scorecard_provenance:eval_env_file_tracked")
+
+
+def _tracked_file_identities(root: Path) -> frozenset[tuple[int, int]]:
+    """The device and inode of every file the repository tracks."""
+
+    try:
+        listed = subprocess.run(
+            ["git", "--no-replace-objects", "ls-files", "-z"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            timeout=10,
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            "scorecard_provenance:eval_env_file_identity_unavailable"
+        ) from exc
+    identities = set()
+    for name in listed.decode("utf-8", "surrogateescape").split("\0"):
+        if not name:
+            continue
+        try:
+            status = (root / name).lstat()
+        except OSError:
+            continue
+        identities.add((status.st_dev, status.st_ino))
+    return frozenset(identities)
+
+
+# The limit the kernel applies before it reports a symlink loop.
+_MAX_SYMLINK_HOPS = 40
+
+
+def _paths_opened(path: Path) -> list[Path]:
+    """Every absolute path visited to open `path`, expanding each symlink where
+    it is met, as the operating system resolves it."""
+
+    pending = list(path.absolute().parts)
+    current = Path(pending.pop(0))
+    visited = [current]
+    hops = 0
+    while pending:
+        part = pending.pop(0)
+        if part == ".":
+            continue
+        # Every symlink is expanded when met, so the parent here is physical.
+        current = current.parent if part == ".." else current / part
+        visited.append(current)
+        if current.is_symlink():
+            hops += 1
+            if hops > _MAX_SYMLINK_HOPS:
+                raise RuntimeError("scorecard_provenance:eval_env_file_link_loop")
+            target = Path(os.readlink(current))
+            base = target if target.is_absolute() else current.parent / target
+            pending = [*base.parts, *pending]
+            current = Path(pending.pop(0))
+    return visited
+
+
 def _provider_usage(results: list[dict[str, Any]]) -> dict[str, Any]:
     route_receipts: list[Any] = []
     for result in results:

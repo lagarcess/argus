@@ -857,6 +857,49 @@ SHA**, with identical provider modes, and the two are compared:
   Do not promote.
 - **Candidate passes what production fails** → an improvement, record it.
 
+#### What a measurement stands for
+
+**Enforced by `tests/promotion_evidence_identity.py` ([#608](https://github.com/lagarcess/argus/issues/608)).**
+One rule decides whether evidence measured at one commit stands for another, and
+every check asks it: the live eval scorecard for the candidate, the baseline for
+the deployed build, and each side of a targeted A/B. Evidence measured at commit
+A stands for commit B when nothing the measurement can reach differs between
+them.
+
+- **Reach fails closed.** Python loads code through imports, strings, plugins,
+  warning filters and startup modules, more channels than a reader can list.
+  So every Python file the eval process could import counts, tests and scripts
+  included. So do the data files beside that code, the pytest configuration on
+  the eval's path, and every file at the repository root, where the toolchain
+  finds its configuration (`pyproject.toml`, `poetry.lock`, `.python-version`,
+  `.coveragerc` and the like). The root exceptions are `render.yaml` and
+  `.env.example`, which the release contract owns and the eval never reads (the
+  harness refuses an `ARGUS_EVAL_ENV_FILE` that is, or passes through, a tracked
+  file or tracked symlink), and documentation. Import roots come from the pytest and Poetry configuration,
+  never from a list of product paths.
+- **A change outside that keeps the evidence:** `render.yaml`, `.env.example`,
+  the release profile, migrations, frontend code, docs and evidence scripts.
+- **A change inside it needs a new measurement.** The gate names the changed
+  files.
+- **A model or provider change still needs a new run.** The eval reads its own
+  environment, not `render.yaml`, so this rule cannot see a model swap there.
+  `tests/evals/README.md` requires a live run after any interpreter model or
+  provider change.
+- **The manifest names both commits.** Beside the candidate or rollback SHA,
+  name the SHA each piece of evidence measured whenever the two differ.
+
+On 2026-09-13 a promotion turned sharing off after its full run. Between the
+measured head `df7aee12` and the candidate `4fd587bf` only `render.yaml`, the
+release profile and docs changed, yet the checks disagreed and forced a paid
+re-measurement of unchanged eval code. Under this rule the retained scorecard
+stands for the candidate:
+
+```text
+- Candidate SHA: `4fd587bf24ce39b794c2228d61f94693826d0da2`
+- Live eval scorecard: `docs/reports/evidence/2026-09-12-main-promotion/candidate-eval-scorecard-df7aee12.json`
+- Live eval measured SHA: `df7aee12955f667e31057464d62c72287fb12247`
+```
+
 #### A candidate-only PROSE failure is not a regression until both sides are measured
 
 **Enforced 2026-09-03 by `tests/release_promotion_evidence_support.py`.** Voiced
