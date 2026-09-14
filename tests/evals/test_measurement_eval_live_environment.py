@@ -13,6 +13,50 @@ import pytest
 from tests.evals import measurement_eval_scorecard as scorecards
 
 
+def test_eval_env_file_may_not_be_a_tracked_repository_file(tmp_path: Path) -> None:
+    """A tracked file would feed the measurement settings that evidence identity
+    does not compare, so the eval refuses it as its environment source."""
+
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+    settings = "ARGUS_TURN_CALL_ALLOWANCE=3\n"
+    tracked = repository / ".env.example"
+    tracked.write_text(settings, encoding="utf-8")
+    subprocess.run(["git", "add", ".env.example"], cwd=repository, check=True)
+    untracked = repository / ".env"
+    untracked.write_text(settings, encoding="utf-8")
+    outside = tmp_path / "live-eval.env"
+    outside.write_text(settings, encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="scorecard_provenance:eval_env_file_tracked"):
+        scorecards.assert_eval_env_file_untracked(tracked, repository_root=repository)
+    scorecards.assert_eval_env_file_untracked(untracked, repository_root=repository)
+    scorecards.assert_eval_env_file_untracked(outside, repository_root=repository)
+
+
+def test_live_eval_refuses_a_tracked_file_before_loading_it() -> None:
+    process_env = os.environ.copy()
+    process_env.update(
+        {
+            "ARGUS_EVAL_ENV_FILE": str(scorecards.REPOSITORY_ROOT / ".env.example"),
+            "PYTHONDONTWRITEBYTECODE": "1",
+        }
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", "import tests.evals.test_measurement_eval_live"],
+        cwd=scorecards.REPOSITORY_ROOT,
+        env=process_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode != 0
+    assert "scorecard_provenance:eval_env_file_tracked" in completed.stderr
+
+
 def test_live_eval_env_preloads_calendar_aware_confirmation(
     tmp_path: Path,
 ) -> None:

@@ -84,6 +84,11 @@ ARGUS_ASSET_PROVIDER_MODE=live_provider \
 poetry run pytest tests/evals/test_measurement_eval_live.py -q
 ```
 
+`ARGUS_EVAL_ENV_FILE` must name a file the repository does not track, such as
+the untracked `.env`. The harness refuses a tracked file like `.env.example`:
+promotion evidence identity never compares that template, so settings fed from
+it could change without a new measurement.
+
 Warning: this deliberately spends real LLM tokens. Use it when you want to
 measure the current real interpret path, not for routine local lint loops.
 Once `ARGUS_RUN_LIVE_EVALS=1` is set, missing provider credentials fail the

@@ -45,8 +45,9 @@ _CONFIG_SUFFIXES = frozenset({".ini", ".toml", ".cfg"})
 
 # The toolchain (pytest, coverage, Poetry, the interpreter pin) finds its
 # configuration at the root, so every root file counts except the Render
-# Blueprint and environment template the release contract owns, which the eval
-# never reads, and documentation.
+# Blueprint and environment template the release contract owns, and
+# documentation. The eval never reads either: it refuses any tracked file as
+# its environment source (assert_eval_env_file_untracked).
 _ROOT_FILES_THE_EVAL_NEVER_READS = frozenset({"render.yaml", ".env.example"})
 _DOCUMENTATION_SUFFIX = ".md"
 

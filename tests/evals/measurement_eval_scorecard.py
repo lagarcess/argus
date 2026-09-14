@@ -507,6 +507,43 @@ def _worktree_is_clean(repository_root: Path) -> bool:
     return not completed.stdout.strip()
 
 
+def assert_eval_env_file_untracked(
+    env_file: Path, *, repository_root: Path = REPOSITORY_ROOT
+) -> None:
+    """Refuse a tracked file as the eval's environment source.
+
+    Promotion evidence identity never compares the release templates, so a
+    setting fed from a tracked file could change without a new measurement.
+    """
+
+    root = repository_root.resolve()
+    try:
+        relative = env_file.resolve().relative_to(root)
+    except ValueError:
+        return
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "--no-replace-objects",
+                "--literal-pathspecs",
+                "ls-files",
+                "-z",
+                "--",
+                relative.as_posix(),
+            ],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("scorecard_provenance:eval_env_file_status_unavailable") from exc
+    if completed.stdout:
+        raise RuntimeError("scorecard_provenance:eval_env_file_tracked")
+
+
 def _provider_usage(results: list[dict[str, Any]]) -> dict[str, Any]:
     route_receipts: list[Any] = []
     for result in results:

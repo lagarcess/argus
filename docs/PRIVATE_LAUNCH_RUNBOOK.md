@@ -853,8 +853,8 @@ them.
   the eval's path, and every file at the repository root, where the toolchain
   finds its configuration (`pyproject.toml`, `poetry.lock`, `.python-version`,
   `.coveragerc` and the like). The root exceptions are `render.yaml` and
-  `.env.example`, which the release contract owns and the eval never reads, and
-  documentation. Import roots come from the pytest and Poetry configuration,
+  `.env.example`, which the release contract owns and the eval never reads (the
+  harness refuses any tracked file as `ARGUS_EVAL_ENV_FILE`), and documentation. Import roots come from the pytest and Poetry configuration,
   never from a list of product paths.
 - **A change outside that keeps the evidence:** `render.yaml`, `.env.example`,
   the release profile, migrations, frontend code, docs and evidence scripts.

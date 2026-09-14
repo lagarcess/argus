@@ -7,10 +7,19 @@ from pathlib import Path
 from dotenv import load_dotenv
 import pytest
 
+# Imports no Argus code, so it may load before the environment does.
+from tests.evals.measurement_eval_scorecard import (
+    assert_eval_env_file_untracked,
+    build_scorecard_provenance,
+    write_scorecard,
+)
+
 _EVAL_ENV_FILE = os.getenv("ARGUS_EVAL_ENV_FILE")
 if _EVAL_ENV_FILE:
     # Argus imports load the shared project environment. Preload the explicit
     # live-eval environment so override=False preserves this suite's provider.
+    # A tracked file is refused, because evidence identity never compares it.
+    assert_eval_env_file_untracked(Path(_EVAL_ENV_FILE))
     load_dotenv(Path(_EVAL_ENV_FILE), override=False)
 
 from argus.domain.market_data.assets import clear_asset_cache
@@ -19,10 +28,6 @@ from tests.evals.measurement_eval_harness import (
     expected_fail_issue_for_result,
     load_eval_cases,
     run_eval_case,
-)
-from tests.evals.measurement_eval_scorecard import (
-    build_scorecard_provenance,
-    write_scorecard,
 )
 
 
