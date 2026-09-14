@@ -47,6 +47,7 @@ def build_fixture() -> dict[str, object]:
         "cards": cards,
         "receipt_turn": _receipt_turn(),
         "comparison": _comparison(),
+        "ranked_comparison": _comparison(ranked=True),
     }
 
 
@@ -101,8 +102,8 @@ def _receipt_turn() -> dict[str, object]:
     return turn.model_dump(mode="json")
 
 
-def _comparison() -> dict[str, object]:
-    """Two worked price multiples through the backend's own differences owner."""
+def _comparison(*, ranked: bool = False) -> dict[str, object]:
+    """Worked answers through the backend's own differences owner."""
     from dataclasses import asdict
     from datetime import datetime
 
@@ -113,25 +114,42 @@ def _comparison() -> dict[str, object]:
     )
     from argus.domain.computation_compare import card_differences
 
+    from tests.domain.calculations import WORKED_ARGUMENTS
     from tests.domain.calculations.support import run_calculation
 
     base = {key: value for key, value in _RECEIPT_ARGUMENTS.items() if key != "sources"}
     left = run_calculation("price_multiple", {**base, "price": 150})
     right = run_calculation("price_multiple", {**base, "price": 180})
+    questions = ("Apple at 150?", "Apple at 180?")
+    if ranked:
+        base = WORKED_ARGUMENTS["ranked_comparison"]
+        items = base["items"][:2]
+        left = run_calculation("ranked_comparison", {**base, "items": items})
+        right = run_calculation(
+            "ranked_comparison",
+            {
+                **base,
+                "items": [
+                    {**item, "value": other["value"]}
+                    for item, other in zip(items, reversed(items), strict=True)
+                ],
+            },
+        )
+        questions = ("Compare annual rates", "Compare the updated annual rates")
     stamp = datetime.fromisoformat(_STAMP)
     comparison = ComputationComparison(
-        kind="price_multiple",
+        kind=left.tool_name,
         left=ComparedAnswer(
             conversation_id="c-left",
             message_id="m-left",
-            asked="Apple at 150?",
+            asked=questions[0],
             computed_at=stamp,
             card=left.model_dump(mode="json"),
         ),
         right=ComparedAnswer(
             conversation_id="c-right",
             message_id="m-right",
-            asked="Apple at 180?",
+            asked=questions[1],
             computed_at=stamp,
             card=right.model_dump(mode="json"),
         ),
