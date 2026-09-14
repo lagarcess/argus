@@ -348,6 +348,27 @@ def test_a_transport_error_is_asked_again_only_when_the_request_never_left_argus
     assert len(unpriced) == (0 if retried else 1)
 
 
+def test_an_unmapped_os_error_fails_closed_as_a_sent_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unpriced: list[Any] = []
+    monkeypatch.setattr(perplexity_agent, "record_unpriced_spend", unpriced.append)
+
+    def step(_request: httpx.Request) -> httpx.Response:
+        raise OSError("scripted socket failure")
+
+    clock = ScriptedClock()
+    client, provider = scripted_client(clock, [step, answer()])
+
+    with pytest.raises(ResearchUnavailableError) as raised:
+        client.run_research(QUESTION, FAST)
+
+    error = raised.value
+    assert (error.reason, error.transient, error.sent) == ("transport", True, True)
+    assert len(provider.requests) == 1
+    assert [spend.reason for spend in unpriced] == ["unanswered_attempt"]
+
+
 def submitted() -> Step:
     return lambda _request: httpx.Response(200, json={"id": "resp_bg1", "status": "queued"})
 

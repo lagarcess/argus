@@ -402,9 +402,11 @@ class PerplexityAgentClient:
         try:
             with httpx.Client(transport=transport, timeout=timeout_seconds) as client:
                 response = client.request(method, url, headers=headers, json=payload)
-        except httpx.HTTPError as exc:
+        except (httpx.HTTPError, OSError) as exc:
+            # An OSError the socket layer did not map fails closed, as sent.
+            timed_out = isinstance(exc, (httpx.TimeoutException, TimeoutError))
             failure = ResearchUnavailableError(
-                "timeout" if isinstance(exc, httpx.TimeoutException) else "transport",
+                "timeout" if timed_out else "transport",
                 str(exc),
                 sent=not isinstance(exc, _UNSENT_ERRORS),
             )
@@ -523,8 +525,11 @@ class _DeadlineBackend:
         )
         for family, kind, proto, _, address in self._resolve(host, port, timeout):
             wait = self.left(timeout, httpx.ConnectTimeout)
-            sock = socket.socket(family, kind, proto)
+            sock: socket.socket | None = None
             try:
+                # Creating the socket can fail too: no descriptors left, or a
+                # family this host cannot open.
+                sock = socket.socket(family, kind, proto)
                 sock.settimeout(wait)
                 for option in socket_options or ():
                     sock.setsockopt(*option)
@@ -534,7 +539,8 @@ class _DeadlineBackend:
                 sock.connect(address)
             except OSError as exc:
                 # The next address gets whatever time is left.
-                sock.close()
+                if sock is not None:
+                    sock.close()
                 failure = _connect_failure(exc)
                 continue
             return _DeadlineStream(sock, self)
@@ -560,14 +566,16 @@ class _DeadlineBackend:
         self, path: str, timeout: float | None = None, socket_options: Any = None
     ) -> _DeadlineStream:
         wait = self.left(timeout, httpx.ConnectTimeout)
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock: socket.socket | None = None
         try:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(wait)
             for option in socket_options or ():
                 sock.setsockopt(*option)
             sock.connect(path)
         except OSError as exc:
-            sock.close()
+            if sock is not None:
+                sock.close()
             raise _connect_failure(exc) from exc
         return _DeadlineStream(sock, self)
 
@@ -581,6 +589,19 @@ def _connect_failure(exc: OSError) -> httpx.TransportError:
     return httpx.ConnectError(str(exc))
 
 
+def _readable(sock: socket.socket) -> bool:
+    """Whether an idle connection has data waiting or was closed by its peer.
+    poll where the platform has it: select rejects a descriptor past
+    FD_SETSIZE, which a busy process reaches."""
+    if sock.fileno() < 0:
+        return True
+    if hasattr(select, "poll"):
+        poller = select.poll()
+        poller.register(sock, select.POLLIN)
+        return bool(poller.poll(0))
+    return bool(select.select([sock], [], [], 0)[0])
+
+
 class _DeadlineStream:
     """One owned socket; every operation waits at most the time left."""
 
@@ -589,8 +610,9 @@ class _DeadlineStream:
         self._backend = backend
 
     def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
-        self._sock.settimeout(self._backend.left(timeout, httpx.ReadTimeout))
+        wait = self._backend.left(timeout, httpx.ReadTimeout)
         try:
+            self._sock.settimeout(wait)
             return self._sock.recv(max_bytes)
         except TimeoutError as exc:
             raise httpx.ReadTimeout(str(exc)) from exc
@@ -600,9 +622,10 @@ class _DeadlineStream:
     def write(self, buffer: bytes, timeout: float | None = None) -> None:
         if not buffer:
             return
-        # A socket timeout bounds all of sendall, not each chunk it sends.
-        self._sock.settimeout(self._backend.left(timeout, httpx.WriteTimeout))
+        wait = self._backend.left(timeout, httpx.WriteTimeout)
         try:
+            # A socket timeout bounds all of sendall, not each chunk it sends.
+            self._sock.settimeout(wait)
             self._sock.sendall(buffer)
         except TimeoutError as exc:
             raise httpx.WriteTimeout(str(exc)) from exc
@@ -640,9 +663,7 @@ class _DeadlineStream:
         if info == "socket":
             return self._sock
         if info == "is_readable":
-            return self._sock.fileno() < 0 or bool(
-                select.select([self._sock], [], [], 0)[0]
-            )
+            return _readable(self._sock)
         return None
 
 

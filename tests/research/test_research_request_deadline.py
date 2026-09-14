@@ -7,7 +7,9 @@ real DNS.
 
 from __future__ import annotations
 
+import errno
 import json
+import select
 import socket
 import ssl
 import threading
@@ -16,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from argus.domain.research import perplexity_agent
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
@@ -327,3 +330,72 @@ def test_a_tls_answer_travels_the_owned_socket_and_checks_the_host_name(
     assert "certificate verify failed" in (refused.value.detail or "").lower()
     assert packet.answer_markdown.startswith("Apple")
     assert server.connections == 1
+
+
+class _NoSockets:
+    """The socket module, except that no new socket can be created."""
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(socket, name)
+
+    @staticmethod
+    def socket(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError(errno.EMFILE, "Too many open files")
+
+
+def test_a_socket_that_cannot_be_created_ends_on_a_typed_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(perplexity_agent, "socket", _NoSockets())
+    monkeypatch.setattr(
+        perplexity_agent, "PERPLEXITY_AGENT_URL", "http://127.0.0.1:9/v1/agent"
+    )
+    unpriced: list[Any] = []
+    monkeypatch.setattr(perplexity_agent, "record_unpriced_spend", unpriced.append)
+
+    with pytest.raises(ResearchUnavailableError) as raised:
+        PerplexityAgentClient("k").run_research(
+            QUESTION, FAST.model_copy(update={"timeout_seconds": 1.0})
+        )
+
+    assert raised.value.reason == "transport" and not raised.value.sent
+    assert "Too many open files" in (raised.value.detail or "")
+    assert unpriced == []
+
+
+def test_a_closed_socket_fails_as_a_typed_read_and_write_error() -> None:
+    backend = perplexity_agent._DeadlineBackend(time.monotonic() + 5.0, time.monotonic)
+    left, right = socket.socketpair()
+    right.close()
+    left.close()
+    stream = perplexity_agent._DeadlineStream(left, backend)
+
+    with pytest.raises(httpx.ReadError):
+        stream.read(1024)
+    with pytest.raises(httpx.WriteError):
+        stream.write(b"request")
+
+
+def test_readability_is_checked_without_select_where_poll_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    if not hasattr(select, "poll"):
+        pytest.skip("this platform has no poll")
+
+    def no_select(*_args: Any) -> Any:
+        raise ValueError("filedescriptor out of range in select()")
+
+    monkeypatch.setattr(select, "select", no_select)
+    backend = perplexity_agent._DeadlineBackend(time.monotonic() + 5.0, time.monotonic)
+    left, right = socket.socketpair()
+    stream = perplexity_agent._DeadlineStream(left, backend)
+    try:
+        assert stream.get_extra_info("is_readable") is False
+        right.sendall(b"x")
+        assert stream.get_extra_info("is_readable") is True
+        left.recv(1)
+        right.close()
+        assert stream.get_extra_info("is_readable") is True
+    finally:
+        left.close()
+        right.close()
