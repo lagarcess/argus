@@ -199,6 +199,19 @@ def local_tool_call_patch(
     ):
         raise ValueError("Only a free local tool runs outside the execute loop")
     outcome = declaration.invoke_sync(call.arguments)
+    return tool_outcome_patch(
+        declaration=declaration, call=call, outcome=outcome, artifact_id=artifact_id
+    )
+
+
+def tool_outcome_patch(
+    *,
+    declaration: ToolDeclaration,
+    call: ToolCall,
+    outcome: ToolOutcome,
+    artifact_id: str,
+) -> dict[str, Any]:
+    """Publish one already executed call through the canonical card envelope."""
     card = declaration.result_card(call=call, outcome=outcome, artifact_id=artifact_id)
     return {
         "tool_call_records": [_call_record(call, outcome)],

@@ -25,6 +25,17 @@ artifact boundary and the Split-Brain Rule make the stored card the owner.
    window and cannot accept research/model price arrays as market history.
 6. Build and test deterministic work first. Present exact proposed model-facing
    strings and stop for founder go before any live measurement.
+7. A follow-up needing no new facts never calls research, including a changed
+   input and explaining an earlier answer. `ResearchQueryExtraction` owns
+   `requires_new_facts`; an asset name alone does not override false. Its new
+   description is measured with the rest of the lane's model-facing text.
+
+Implementation clarification: the ratio family gains one `scaled_amount`
+calculation for multiplying/dividing by a percentage or quoted ratio without an
+invented annual time basis. It covers cash-back and currency conversion with
+honest units. Historical drawdown is a provider tool, read-only, with no automatic
+decision rerun; its default five-year window is explicitly labeled. It measures
+the provider's asset prices, not a return translated to the profile currency.
 
 ## 3. Reserved scope
 

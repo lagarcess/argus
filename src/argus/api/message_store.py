@@ -15,6 +15,10 @@ from argus.api.chat.previews import (
 )
 from argus.api.dependencies import dev_memory_fallback_enabled
 from argus.api.schemas import Conversation, Message, MessageRole
+from argus.domain.calculation_turn_facts import (
+    calculation_turn_facts,
+    calculation_turn_history_text,
+)
 from argus.domain.chat_turn_lifecycle import (
     MemoryChatTurnLifecycleGateway,
     TransitionResult,
@@ -828,7 +832,16 @@ def load_runtime_thread_history(
             metadata=message.metadata,
         ):
             continue
-        if drop_failed_lookups and research_lookup_failed(message.metadata):
+        calculation_facts = (
+            calculation_turn_facts(message.metadata)
+            if message.role == "assistant"
+            else []
+        )
+        if (
+            drop_failed_lookups
+            and research_lookup_failed(message.metadata)
+            and not calculation_facts
+        ):
             continue
         # A card turn reaches the model as the card's typed facts, never prose.
         card_facts = (
@@ -841,6 +854,8 @@ def load_runtime_thread_history(
             if card_facts is not None
             else message.content
         )
+        if calculation_facts:
+            content = calculation_turn_history_text(calculation_facts, content)
         history.append(ConversationMessage(role=message.role, content=content))
     return history
 

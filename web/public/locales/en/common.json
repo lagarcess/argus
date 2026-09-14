@@ -1928,9 +1928,14 @@
         "currency": "{{code}}",
         "months": "months",
         "years": "years",
-        "multiple": "x"
+        "multiple": "x",
+        "currency_ratio": "{{numerator}}/{{denominator}}"
       },
       "fields": {
+        "currency": "Currency",
+        "rate": "Rate",
+        "output_currency": "Result currency",
+        "scaled_amount": "Resulting amount",
         "direction": "Plan",
         "present_value": "Starting amount",
         "payment": "Payment per period",
@@ -1996,19 +2001,35 @@
         "multiple_low": "Multiple, low case",
         "multiple_base": "Multiple, base case",
         "multiple_high": "Multiple, high case",
-        "horizon_years": "Horizon"
+        "horizon_years": "Horizon",
+        "start_date": "Start date",
+        "end_date": "End date",
+        "max_drawdown_pct": "Largest historical drop",
+        "observed_start_date": "First observed close",
+        "observed_end_date": "Last observed close",
+        "observations": "Daily closes",
+        "peak_date": "Peak before the drop",
+        "trough_date": "Lowest point of the drop"
       },
       "notes": {
+        "scaled_multiply": "Amount multiplied by the rate.",
+        "scaled_divide": "Amount divided by the rate.",
         "already_covered": "The other inputs already cover this, so nothing more is needed.",
         "single_growth_forecast": "Only one growth forecast was given, so the low and high cases use it too.",
         "current_multiple_held": "No multiple was given, so every case holds today's multiple.",
         "single_multiple": "Only one multiple was given, so the low and high cases use it too.",
         "includes_fees": "The effective rate includes the fees.",
         "ranked_not_recommended": "Ranked by the stated figure only. Nothing here is a recommendation.",
-        "scenarios_not_forecasts": "Scenarios are arithmetic on the stated inputs, not forecasts."
+        "scenarios_not_forecasts": "Scenarios are arithmetic on the stated inputs, not forecasts.",
+        "historical_daily_closes": "Measured from daily closing prices over the observed period. Intraday losses may be larger. History does not set a limit on future losses.",
+        "historical_default_window": "Assumed history window: {{start}} to {{end}}."
       },
       "repairs": {
         "payment_below_interest": "Use a payment that clears the balance"
+      },
+      "scaled_amount": {
+        "title": "Scaled amount",
+        "progress": "Working out the amount"
       },
       "time_value": {
         "title_save": "Savings plan",
@@ -2065,6 +2086,10 @@
         "value_at_horizon_base": "Value of the amount at the horizon, base case",
         "value_at_horizon_high": "Value of the amount at the horizon, high case",
         "annual_return_high": "Annual return, high case"
+      },
+      "historical_drawdown": {
+        "title": "Historical drawdown",
+        "progress": "Measuring the historical drop"
       }
     },
     "progress": {

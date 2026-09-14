@@ -99,6 +99,7 @@ class ToolPolicy:
     driving_fields: tuple[str, ...] = ()
     retain_unknown: bool = True
     public_receipt: PublicReceiptPolicy = "disabled"
+    ends_answer: bool = False
 
     def __post_init__(self) -> None:
         if self.execution not in {"local", "workflow", "provider"}:
@@ -528,6 +529,23 @@ class ToolDeclaration:
                 unit.field: unit.unit for unit in self.units if unit.source == "result"
             }
             input_sources = _input_sources(original)
+            if "currency" in input_sources and not any(
+                fact.name == "currency" for fact in presentation.inputs
+            ):
+                presentation = presentation.model_copy(
+                    update={
+                        "inputs": [
+                            *presentation.inputs,
+                            ToolInputFact(
+                                name="currency",
+                                value=original.get("currency"),
+                                label=LocalizedText(
+                                    locale_key="tools.calc.fields.currency"
+                                ),
+                            ),
+                        ]
+                    }
+                )
             driving = [
                 name
                 for name in self.policy.driving_fields

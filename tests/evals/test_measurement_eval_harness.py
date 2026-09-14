@@ -24,6 +24,7 @@ EXPECTED_LOCKED_CATEGORIES = {
     "asset_discovery_routing",
     "dca_capital_semantics",
     "ordinary_conversation",
+    "calculation_followups",
 }
 
 PHRASE_ASSERTION_KEYS = {
@@ -1131,7 +1132,7 @@ def test_prose_judge_route_receipt_is_included_in_case_cost_evidence(
             intent="conversation_followup",
             capability_verdict="answer_only",
         ),
-        prose_judge_criteria=("plain_language",),
+        prose_judge_criteria=("honesty",),
     )
     active_receipts: list[SimpleNamespace] | None = None
 

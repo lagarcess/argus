@@ -86,6 +86,12 @@ def scenario_is_typed(query: Any, interpretation: Any) -> bool:
     )
 
 
+def primary_read_needs_no_new_facts(interpretation: Any) -> bool:
+    """The current typed question is answerable from the conversation alone."""
+    query = getattr(interpretation, "research_query", None)
+    return query is not None and not query.requires_new_facts
+
+
 def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
     """The primary read typed the message as a finance fact question.
 
@@ -96,7 +102,7 @@ def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
     no-search answer, and a typed horizon alone never admits, so a test asked
     over a future window keeps its recovery."""
     query = getattr(interpretation, "research_query", None)
-    if query is None:
+    if query is None or primary_read_needs_no_new_facts(interpretation):
         return False
     if scenario_is_typed(query, interpretation) and not query.symbols:
         # A scenario with no subject is research only when its bit names a
@@ -114,15 +120,22 @@ def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
 
 
 def primary_read_is_arithmetic(interpretation: Any) -> bool:
-    """The primary read typed a computed answer on the user's own numbers: the
-    scenario bit, no subject, kind none, and no other owner. A concept question
-    is research's to answer."""
+    """Admit an answer using existing facts, or legacy subject-free arithmetic.
+
+    A named asset and a concept label do not themselves require a lookup.
+    Execution and existing artifact owners still take precedence.
+    """
     query = getattr(interpretation, "research_query", None)
     return bool(
         query is not None
-        and getattr(query, "scenario_question", False)
-        and not query.symbols
-        and query.question_kind == "none"
+        and (
+            primary_read_needs_no_new_facts(interpretation)
+            or (
+                query.scenario_question
+                and not query.symbols
+                and query.question_kind == "none"
+            )
+        )
         and not research_turn_has_conflicting_owner(interpretation)
     )
 
@@ -143,6 +156,7 @@ def concept_research_query(interpretation: Any) -> ResearchQueryExtraction | Non
     query = getattr(interpretation, "research_query", None)
     if (
         query is None
+        or primary_read_needs_no_new_facts(interpretation)
         or query.question_kind != "concept"
         or research_turn_has_conflicting_owner(interpretation)
     ):

@@ -242,5 +242,6 @@ def test_the_savings_answer_shape_keeps_its_prose_and_lists_the_defaults_it_neve
     assert result.stage_patch[ac.ANSWER_ASSUMPTIONS_KEY] == [
         {"artifact_id": card["artifact_id"], "name": "contribution"},
         {"artifact_id": card["artifact_id"], "name": "periods_per_year"},
+        {"artifact_id": card["artifact_id"], "name": "currency"},
     ]
     assert ac.FIGURE_CHECK_REASON_CODE in interpretation.reason_codes

@@ -2481,6 +2481,143 @@
         "kind": "ranked_comparison"
       }
     },
+    "scaled_amount": {
+      "card": {
+        "arguments": {
+          "amount": 1000.0,
+          "currency": "USD",
+          "operation": "multiply",
+          "output_currency": null,
+          "rate": 2.0,
+          "rate_unit": "percent",
+          "sources": {}
+        },
+        "artifact_id": "artifact-scaled_amount",
+        "artifact_state": "active",
+        "call_id": "call-scaled_amount",
+        "card_type": "scaled_amount",
+        "card_version": 1,
+        "input_revision": 0,
+        "kind": "tool_result",
+        "outcome": {
+          "failure": null,
+          "result": {
+            "output_currency": "USD",
+            "scaled_amount": 20.0
+          },
+          "status": "succeeded"
+        },
+        "presentation": {
+          "answer": {
+            "label": {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.fields.scaled_amount"
+            },
+            "name": "scaled_amount",
+            "source": {
+              "kind": "computed"
+            },
+            "unit": {
+              "interpolation_args": {
+                "code": "USD"
+              },
+              "locale_key": "tools.calc.units.currency"
+            },
+            "value": 20.0,
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "driving": true,
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.amount"
+              },
+              "name": "amount",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {
+                  "code": "USD"
+                },
+                "locale_key": "tools.calc.units.currency"
+              },
+              "unknown": false,
+              "value": 1000.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "driving": true,
+              "editable": true,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.rate"
+              },
+              "name": "rate",
+              "source": {
+                "kind": "user"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "unknown": false,
+              "value": 2.0,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "driving": false,
+              "editable": false,
+              "label": {
+                "interpolation_args": {},
+                "locale_key": "tools.calc.fields.output_currency"
+              },
+              "name": "output_currency",
+              "source": {
+                "kind": "user"
+              },
+              "unit": null,
+              "unknown": false,
+              "value": null,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "narrative": null,
+          "notes": [
+            {
+              "interpolation_args": {},
+              "locale_key": "tools.calc.notes.scaled_multiply"
+            }
+          ],
+          "rows": [],
+          "sources": [],
+          "title": {
+            "interpolation_args": {},
+            "locale_key": "tools.calc.scaled_amount.title"
+          },
+          "visual": null
+        },
+        "schema_version": 1,
+        "tool_name": "scaled_amount"
+      },
+      "computation": {
+        "inputs": {
+          "amount": 1000.0,
+          "currency": "USD",
+          "operation": "multiply",
+          "output_currency": null,
+          "rate": 2.0,
+          "rate_unit": "percent",
+          "sources": {}
+        },
+        "kind": "scaled_amount"
+      }
+    },
     "time_value": {
       "card": {
         "arguments": {

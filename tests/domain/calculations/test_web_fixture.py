@@ -28,11 +28,18 @@ def test_committed_calculation_fixture_matches_the_declarations() -> None:
     )
 
 
-def test_fixture_covers_every_declared_calculation_and_a_typed_failure() -> None:
-    from argus.domain.calculations import get_calculation_declarations
+def test_fixture_covers_every_free_calculation_and_a_typed_failure() -> None:
+    from argus.domain.calculations import (
+        get_calculation_declarations,
+        is_free_calculation,
+    )
 
     fixture = _script().build_fixture()
-    names = {declaration.name for declaration in get_calculation_declarations()}
+    names = {
+        declaration.name
+        for declaration in get_calculation_declarations()
+        if is_free_calculation(declaration)
+    }
     assert names <= set(fixture["cards"])
     failing = fixture["cards"]["time_value_payment_below_interest"]["card"]
     assert failing["outcome"]["status"] == "invalid"

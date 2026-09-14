@@ -75,3 +75,51 @@ def _date_boundary(value: Any) -> date | None:
         return date.fromisoformat(text[:10])
     except ValueError:
         return None
+
+
+def _compare_asset_discovery(
+    expected: dict[str, Any],
+    actual: Any,
+    failures: list[str],
+) -> None:
+    if not isinstance(actual, dict):
+        failures.append(f"asset_discovery: expected payload {expected!r}, got {actual!r}")
+        return
+    _compare(
+        "asset_discovery.relationship",
+        expected.get("relationship"),
+        actual.get("relationship"),
+        failures,
+    )
+    _compare(
+        "asset_discovery.asset_class_hint",
+        expected.get("asset_class_hint"),
+        actual.get("asset_class_hint"),
+        failures,
+    )
+    if "needs_current_facts" in expected:
+        _compare(
+            "asset_discovery.needs_current_facts",
+            expected["needs_current_facts"],
+            actual.get("needs_current_facts"),
+            failures,
+        )
+    expected_anchors = expected.get("anchor_symbols")
+    if expected_anchors is not None:
+        actual_anchors = sorted(
+            str(symbol).upper() for symbol in (actual.get("anchor_symbols") or [])
+        )
+        _compare(
+            "asset_discovery.anchor_symbols",
+            sorted(str(symbol).upper() for symbol in expected_anchors),
+            actual_anchors,
+            failures,
+        )
+    include_terms = expected.get("category_description_includes_any")
+    if include_terms:
+        description = str(actual.get("category_description") or "").lower()
+        if not any(str(term).lower() in description for term in include_terms):
+            failures.append(
+                "asset_discovery.category_description: expected any of "
+                f"{list(include_terms)!r} in {description!r}"
+            )

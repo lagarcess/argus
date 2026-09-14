@@ -116,6 +116,9 @@ class AnswerCalculation(BaseModel):
 
     model_config = ConfigDict(frozen=True, json_schema_extra=all_properties_required)
 
+    prior_artifact_id: str | None = None
+    updated_fields: list[str] = Field(default_factory=list)
+
     name: str = Field(
         default="",
         description=(

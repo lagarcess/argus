@@ -18,13 +18,16 @@ sys.path.insert(0, str(REPO_ROOT))
 
 
 def build_fixture() -> dict[str, object]:
+    from argus.domain.calculations import is_free_calculation
     from argus.domain.computation_marker import computation_from_tool_card
 
     from tests.domain.calculations import FAILING_ARGUMENTS, WORKED_ARGUMENTS
-    from tests.domain.calculations.support import run_calculation
+    from tests.domain.calculations.support import declaration, run_calculation
 
     cards: dict[str, object] = {}
     for name, arguments in WORKED_ARGUMENTS.items():
+        if not is_free_calculation(declaration(name)):
+            continue
         card = run_calculation(name, arguments)
         computation = computation_from_tool_card(card)
         cards[name] = {

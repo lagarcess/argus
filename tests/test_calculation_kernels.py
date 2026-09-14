@@ -6,7 +6,7 @@ from datetime import date
 
 import pytest
 from argus.api.decision_contract import DecisionComputation
-from argus.domain.calculations import get_calculation_declarations
+from argus.domain.calculations import get_calculation_declarations, is_free_calculation
 from argus.domain.computations import (
     BACKTEST_COMPUTATION_KIND,
     InvalidComputationInputs,
@@ -23,8 +23,12 @@ from tests.domain.calculations.support import run_calculation
 _CONTEXT = RerunContext(load_run=lambda _run_id: None, today=date(2026, 9, 11))
 
 
-def test_every_declared_calculation_is_a_registered_kind() -> None:
-    names = {declaration.name for declaration in get_calculation_declarations()}
+def test_every_free_calculation_is_a_registered_kind() -> None:
+    names = {
+        declaration.name
+        for declaration in get_calculation_declarations()
+        if is_free_calculation(declaration)
+    }
     assert names <= set(registered_kinds())
     assert BACKTEST_COMPUTATION_KIND in registered_kinds()
     for name in names:
@@ -33,7 +37,9 @@ def test_every_declared_calculation_is_a_registered_kind() -> None:
 
 
 @pytest.mark.parametrize(
-    "declaration", get_calculation_declarations(), ids=lambda d: d.name
+    "declaration",
+    [d for d in get_calculation_declarations() if is_free_calculation(d)],
+    ids=lambda d: d.name,
 )
 def test_a_kernel_re_run_is_the_same_card_the_chat_turn_produced(declaration) -> None:
     from tests.domain.calculations import worked_arguments

@@ -33,6 +33,7 @@ poetry run pytest tests/evals/test_measurement_eval_harness.py \
   tests/evals/test_measurement_delivery.py \
   tests/evals/test_measurement_outcome.py \
   tests/evals/test_prose_evidence.py \
+  tests/evals/test_measurement_calculations.py \
   -q
 ```
 
@@ -377,3 +378,27 @@ fragment of the secret survives rather than that a marker appears.
 Live scorecards land in gitignored `temp/`, but they are routinely promoted into
 `docs/reports/evidence/` as durable acceptance evidence. Treat the bound and the
 redaction pass as requirements of that committed path, not as local hygiene.
+
+### Calculation follow-ups and money-answer goalpost
+
+`calculation_followups.yaml` adds 22 bilingual cases from the PR #631 failures:
+stored-card recall, 48-payment completion, profile currency assumptions, changed
+bond principal, rewards and conversion arithmetic, personal comparison bounds,
+changed spending-goal risk, and historical drawdown (named asset and generic
+crypto). It also covers the `requires_new_facts` boundary with earlier-answer
+explanation and positive fresh-fact controls.
+
+The normal live runner executes these cases. Each is a new turn with authored
+prior context, not a claim that a preceding live turn was persisted. Calculation
+seeds are produced by registered declarations and passed through the production
+history loader; pending inputs use the stored clarification contract. Typed
+checks read actual delivered cards, including arguments, sources, result and
+presentation. Drawdown checks require Argus market-data provenance and the
+observed window on the displayed card. Provider calls are observed at the actual
+Perplexity client send method; absent citations are not proof of no lookup.
+
+Substantive prose criteria remain proposed in
+`calculation_followup_rubric_proposal.md`. A case refuses unsupported criteria
+before invoking a model. Only the founder-approved rubric and sanctioned live
+measurement can establish prose quality; free tests establish fixture and
+assertion behavior. No extra paid driver or automatic rerun is introduced.

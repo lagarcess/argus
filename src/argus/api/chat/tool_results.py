@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -28,6 +29,13 @@ class ToolPublication:
     result_card: dict[str, Any] | None
     backtest_job: dict[str, Any] | None
     assistant_text: str | None
+
+
+async def prepare_runtime_tool_publication_async(
+    *args: Any, **kwargs: Any
+) -> ToolPublication:
+    """Provider-backed composition must not block the chat event loop."""
+    return await asyncio.to_thread(prepare_runtime_tool_publication, *args, **kwargs)
 
 
 def prepare_runtime_tool_publication(
