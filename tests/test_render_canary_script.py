@@ -274,6 +274,17 @@ def test_browser_checks_read_product_owned_signals() -> None:
     assert 'page.getByTestId("user-turn-recovery")' in spec
     assert '"[data-message-id]"' in spec
     assert 'label("chat.confirmation.actions.run_backtest")' in spec
+    # Answer checks judge the persisted message with the chat's own projections.
+    assert "persistedAssistantMessage(page, conversationId)" in spec
+    assert "ordinaryAnswerFailure(" in spec
+    assert "researchAnswerFailure(" in spec
+    support = _source("web/e2e/support/private-alpha-canary-answers.ts")
+    for projection in (
+        "retryableAssistantRecoveryCode",
+        "researchDegradedCodeFromMetadata",
+        "researchSourcesFromMetadata",
+    ):
+        assert projection in support
 
 
 def test_sign_in_retries_once_and_records_the_attempt_count() -> None:

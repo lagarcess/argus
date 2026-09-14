@@ -6,6 +6,11 @@ import {
   type Request,
   type Response,
 } from "@playwright/test";
+import {
+  latestAssistantMessage,
+  ordinaryAnswerFailure,
+  researchAnswerFailure,
+} from "./support/private-alpha-canary-answers";
 
 // The canary's browser checks never follow features: each one reads an API
 // response or a product-owned test id, never result facts or feature copy.
@@ -293,6 +298,37 @@ async function sendTurn(
   return conversationId;
 }
 
+/** The newest assistant message the API persisted, read by reopening the chat. */
+async function persistedAssistantMessage(
+  page: Page,
+  conversationId: string,
+): Promise<JsonRecord | null> {
+  const messagesPath = `/api/v1/conversations/${conversationId}/messages`;
+  const messages = page
+    .waitForResponse(
+      (response) =>
+        apiPath(response.url()) === messagesPath &&
+        response.request().method() === "GET",
+      { timeout: 60_000 },
+    )
+    .catch(() => null);
+  const navigated = await page
+    .goto(`/chat?conversation=${encodeURIComponent(conversationId)}`, {
+      waitUntil: "domcontentloaded",
+    })
+    .then(
+      () => true,
+      () => false,
+    );
+  const response = await messages;
+  if (!navigated || !response?.ok()) {
+    throw new CheckFailure(
+      reasonCode("messages_http", response?.status() ?? 0),
+    );
+  }
+  return latestAssistantMessage(await response.json().catch(() => null));
+}
+
 function watchBacktestJobs(page: Page) {
   let latest: JobSnapshot | null = null;
   const isTerminal = (snapshot: JobSnapshot | null) =>
@@ -329,7 +365,7 @@ async function signedInChatAnswer(context: CheckContext): Promise<void> {
   result.sign_in_attempts = await openSignedInChat(page);
   await save();
   const prompt = requireConfig(chatPrompt, "chat prompt");
-  await sendTurn(context, prompt, 180_000);
+  const conversationId = await sendTurn(context, prompt, 180_000);
   const messages = page.locator("[data-message-id]");
   const answer =
     (await messages.count()) >= 2
@@ -338,6 +374,10 @@ async function signedInChatAnswer(context: CheckContext): Promise<void> {
   if (!answer || answer === prompt.trim()) {
     throw new CheckFailure("assistant_answer_missing");
   }
+  const failure = ordinaryAnswerFailure(
+    await persistedAssistantMessage(page, conversationId),
+  );
+  if (failure) throw new CheckFailure(reasonCode(failure));
 }
 
 async function backtestCompletes(context: CheckContext): Promise<void> {
@@ -410,7 +450,7 @@ async function researchAnswerWithSources(
 ): Promise<void> {
   const { page } = context;
   await openSignedInChat(page);
-  await sendTurn(
+  const conversationId = await sendTurn(
     context,
     requireConfig(researchPrompt, "research prompt"),
     300_000,
@@ -420,6 +460,10 @@ async function researchAnswerWithSources(
     .catch(() => {
       throw new CheckFailure("research_sources_missing");
     });
+  const failure = researchAnswerFailure(
+    await persistedAssistantMessage(page, conversationId),
+  );
+  if (failure) throw new CheckFailure(reasonCode(failure));
 }
 
 const CHECKS = new Map<string, (context: CheckContext) => Promise<void>>([

@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILE_PATH = ROOT / ".github" / "private-alpha-release-profile.json"
 LOCALES_DIR = ROOT / "web" / "public" / "locales"
 SURFACES = ("api", "web", "workflow")
-# Deploys are manual by founder decision. checksPass stays a valid target so the
-# decision can change in the profile alone, but only for all three services.
+# Deploys are manual by founder decision; all three services share one trigger.
+# render.yaml mirrors it for the API and app, held to this profile by its contract test.
 AUTO_DEPLOY_TRIGGERS = ("off", "checksPass")
 # The canary's fixed checks, in run order. They never follow features.
 CANARY_CHECKS = (

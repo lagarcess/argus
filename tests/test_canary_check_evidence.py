@@ -297,6 +297,11 @@ def test_evidence_artifact_refuses_a_raw_private_identifier(
     assert "raw private identifier" in leaked.stderr
     assert not destination.exists()
 
+    unlisted = write({"checks": {"backtest": {"note": faker.uuid4()}}})
+    assert unlisted.returncode != 0
+    assert "raw private identifier" in unlisted.stderr
+    assert not destination.exists()
+
     label = f"conversation_{hashlib.sha256(raw_id.encode()).hexdigest()[:12]}"
     written = write({"checks": {"backtest": {"conversation_label": label}}})
     assert written.returncode == 0, written.stderr
@@ -306,32 +311,28 @@ def test_evidence_artifact_refuses_a_raw_private_identifier(
     assert stat.S_IMODE(destination.stat().st_mode) == 0o600
 
 
-def test_browser_artifact_redaction_masks_the_ids_the_checks_created(
+def test_browser_artifact_redaction_masks_every_rendered_identifier(
     tmp_path: Path, faker: Faker
 ) -> None:
     source = _source(RENDER_RUNNER)
     python_source = _function_heredoc(source, "redact_browser_artifacts")
     results = tmp_path / "playwright-results" / "case"
     results.mkdir(parents=True)
-    user_id = faker.uuid4()
-    handoff = _passing_handoff(faker, user_id)
-    conversation_ids = [check["conversation_id"] for check in handoff["checks"].values()]
-    handoff_path = tmp_path / "handoff.json"
-    handoff_path.write_text(json.dumps(handoff), encoding="utf-8")
+    # This run's ids and older canary conversations listed in Recents alike.
+    identifiers = [faker.uuid4() for _ in range(4)]
     context_path = results / "error-context.md"
     context_path.write_text(
         "".join(
-            f'- link "Chat":\n  - /url: /chat?conversation={conversation_id}\n'
-            for conversation_id in conversation_ids
+            f'- link "Chat":\n  - /url: /chat?conversation={identifier}\n'
+            for identifier in identifiers
         )
-        + f"profile {user_id}\n",
+        + f"profile {identifiers[0].upper()}\n",
         encoding="utf-8",
     )
     env = os.environ.copy()
     env.update(
         {
             "CANARY_REDACT_DIR": str(tmp_path / "playwright-results"),
-            "CANARY_REDACT_CHECKS_HANDOFF_PATH": str(handoff_path),
             "CANARY_REDACT_SIMULATE_FAILURE": "false",
         }
     )
@@ -347,7 +348,7 @@ def test_browser_artifact_redaction_masks_the_ids_the_checks_created(
 
     assert result.returncode == 0, result.stderr
     redacted = context_path.read_text(encoding="utf-8")
-    for private_id in (user_id, *conversation_ids):
-        assert private_id not in redacted
-    assert redacted.count("<redacted>") == len(conversation_ids) + 1
+    for identifier in identifiers:
+        assert identifier not in redacted.lower()
+    assert redacted.count("<redacted>") == len(identifiers) + 1
     assert (tmp_path / "playwright-results" / ".redacted").is_file()

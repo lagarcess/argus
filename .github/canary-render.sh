@@ -328,6 +328,8 @@ import json
 import os
 import pathlib
 
+from scripts.ops.canary_capture_sanitizer import UUID_PATTERN
+
 payload = json.loads(os.environ["CANARY_EVIDENCE_JSON"])
 payload["artifact_kind"] = os.environ["CANARY_ARTIFACT_KIND"]
 encoded = json.dumps(payload, indent=2, sort_keys=True) + "\n"
@@ -335,9 +337,10 @@ raw_ids = {os.environ["CANARY_USER_ID"]}
 raw_ids_file = pathlib.Path(os.environ["CANARY_RAW_IDS_FILE"])
 if raw_ids_file.is_file():
     raw_ids.update(raw_ids_file.read_text(encoding="utf-8").splitlines())
-for raw_id in raw_ids:
-    if raw_id and raw_id in encoded:
-        raise SystemExit("privacy-safe canary artifact contained a raw private identifier")
+if UUID_PATTERN.search(encoded) or any(
+    raw_id and raw_id in encoded for raw_id in raw_ids
+):
+    raise SystemExit("privacy-safe canary artifact contained a raw private identifier")
 path = pathlib.Path(os.environ["CANARY_DESTINATION"])
 path.write_text(encoded, encoding="utf-8")
 path.chmod(0o600)
@@ -886,13 +889,14 @@ redact_browser_artifacts() {
   CANARY_REDACT_EMAIL="$EMAIL" \
   CANARY_REDACT_SESSION_PATH="$BROWSER_SESSION_HANDOFF" \
   CANARY_REDACT_STORAGE_STATE_PATH="$BROWSER_STORAGE_STATE" \
-  CANARY_REDACT_CHECKS_HANDOFF_PATH="$BROWSER_CHECKS_HANDOFF" \
   CANARY_REDACT_PROBE_VALUE="$REDACTION_PROBE_VALUE" \
   CANARY_REDACT_SIMULATE_FAILURE="$SIMULATE_REDACTION_FAILURE" \
     python3 - <<'PY'
 import json
 import os
 import pathlib
+
+from scripts.ops.canary_capture_sanitizer import UUID_PATTERN
 
 # Playwright's failure context embeds every rendered input value, including the
 # canary credential probe, so no browser artifact leaves this job unmasked.
@@ -901,27 +905,6 @@ if os.environ.get("CANARY_REDACT_SIMULATE_FAILURE") == "true":
     raise SystemExit("simulated browser artifact redaction failure")
 
 session_values = []
-
-
-def private_ids(value, key=""):
-    if isinstance(value, dict):
-        for child_key, child in value.items():
-            yield from private_ids(child, str(child_key))
-    elif isinstance(value, str) and value and key.endswith("_id"):
-        yield value
-
-
-# Rendered conversation links carry the ids the checks created.
-handoff_path_value = os.environ.get("CANARY_REDACT_CHECKS_HANDOFF_PATH", "").strip()
-if handoff_path_value:
-    handoff_path = pathlib.Path(handoff_path_value)
-    if handoff_path.is_file() and handoff_path.stat().st_size:
-        try:
-            session_values.extend(
-                private_ids(json.loads(handoff_path.read_text(encoding="utf-8")))
-            )
-        except json.JSONDecodeError:
-            pass
 session_path_value = os.environ.get("CANARY_REDACT_SESSION_PATH", "").strip()
 if session_path_value:
     session_path = pathlib.Path(session_path_value)
@@ -968,6 +951,8 @@ for path in sorted(directory.rglob("*")):
     redacted = text
     for value in masked_values:
         redacted = redacted.replace(value, "<redacted>")
+    # Every rendered id is private, including ids from earlier canary runs.
+    redacted = UUID_PATTERN.sub("<redacted>", redacted)
     if redacted != text:
         path.write_text(redacted, encoding="utf-8")
     path.chmod(0o600)
