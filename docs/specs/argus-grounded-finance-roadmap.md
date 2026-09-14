@@ -363,16 +363,16 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-14 at integration `25f82c3a`, after production promotion
+**Updated 2026-09-14 at integration `6be3d58c`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, stopped on two Codex P1s that both come from a deterministic date check it added ("May I backtest" read as May, and a correction loop). Next: remove that check, keep the reply grounding and the date instruction, then its paid measurement. |
-| Sharing on | Built on the existing receipts in a local worktree and stopped before its PR on a one-word bug in its own footer fix (`research` instead of `research_answer`). Next: fix it, commit, open the PR, CI, one review. Migration `20260914120000_share_plain_answer_receipts.sql` pending. |
-| Ranked comparison leader gap (#622) | PR #627, stopped on a finding about cards stored before the change. Ranked comparisons have never shipped, so no production card has that shape. Next: decline with that and mark ready. |
-| Acceptance dry run | Running on `03918912`: the ten smoke questions in English and Spanish with follow-ups and a guest subset ($9 hard stop), then the August 12 transcript replay ($4 hard stop, founder approved). Fixes nothing; reports failures by cause. |
+| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, measured: no measured regression, both date phrases keep August 16 to 19, and the reply moves to the real reason. Fixing the English case that asks for an asset already resolved, an English fallback in Spanish and its own Spanish fixture, then a full rerun with the six research cases bounded, refreeze and merge. |
+| Sharing on | PR #632 reconciled with integration, CI green, merge review clean. Waiting on the founder's call on the declined internal-metadata finding. Migration `20260914120000_share_plain_answer_receipts.sql` runs at promotion; flags stay off. |
+| Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Stopped on one catalogue finding; its 93-case measurement runs after the recovery replies lane lands. |
+| Acceptance dry run | Done on `03918912`: 30 of 46 smoke answers passed (guests 6 of 6), replay 14 of 14 with 24 turns left for the final run. Its failures drove the failure paths and calculation follow-ups lanes. The final acceptance reruns everything on the candidate. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1452,7 +1452,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `25f82c3a`.
+shipped means live in production. Integration is `6be3d58c`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1544,6 +1544,9 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Menus and settings follow docs/BREAKPOINTS.md | outside the releases | **LANDED** `22387583`, PR #630. Menus and settings keep the 1024px switch the design sets. The audit fixed auth settings, hidden account-deletion dialogs and undersized phone sheet controls. |
 | Promotion evidence records models and flags | outside the releases | **LANDED** `c2c08c99`, PR #629, closing #619. Scorecards record the model names and on/off flags the eval ran with, and the promotion gate compares them with the candidate's release contract. |
 | Result card gain from the run | outside the releases | **LANDED** `25f82c3a`, PR #628, closing #624. The card's gain is the run's own profit, rounded once, so the card and the readout agree. |
+| Ranked comparison leader gap | outside the releases | **LANDED** `0893c27e`, PR #627, closing #622. A ranked comparison's leader carries its gap, so a changed leader compares; the card hides the redundant row and shared receipts drop it. |
+| Acceptance dry run evidence | outside the releases | **LANDED** `6ec36797`, PR #631. Drivers, phone screenshots, findings and replay verdicts from the 03918912 run, with no customer text. |
+| Failure paths keep the money question | outside the releases | **LANDED** `6be3d58c`, PR #633. A failed interpreter no longer turns a money question into a test, a pending card no longer captures an unrelated follow-up, research gets only the turn's remaining time and falls back to the answer without the lookup, and recovery copy names what failed. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
