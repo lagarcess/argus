@@ -5,18 +5,23 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from argus.domain.result_money import series_peak_value
 from argus.domain.result_readout_display_values import readout_display_value
 
 
-def _prompt_row(row: dict[str, Any], language: str) -> dict[str, Any]:
+def _prompt_row(
+    row: dict[str, Any], language: str, portfolio_peak: float | None
+) -> dict[str, Any]:
     result = {
         key: deepcopy(row[key])
         for key in ("value", "unit", "currency", "meaning")
         if key in row
     }
-    display = readout_display_value(row, language=language)
+    display = readout_display_value(row, language=language, portfolio_peak=portfolio_peak)
     if display is not None:
-        result.update(value=display["value"], display=display["text"], unit=display["unit"])
+        result.update(
+            value=display["value"], display=display["text"], unit=display["unit"]
+        )
     return result
 
 
@@ -26,8 +31,11 @@ def readout_prompt_facts(sheet: dict[str, Any], *, language: str) -> dict[str, A
         key: deepcopy(sheet.get(key))
         for key in ("symbols", "benchmark_symbol", "benchmark_comparison_claim")
     }
+    portfolio_peak = series_peak_value(
+        ((sheet.get("series") or {}).get("portfolio_equity") or {}).get("points")
+    )
     result["facts"] = {
-        key: _prompt_row(row, language)
+        key: _prompt_row(row, language, portfolio_peak)
         for key, row in (sheet.get("facts") or {}).items()
         if row.get("basis") != "starting_capital_illustration"
     }
@@ -43,6 +51,7 @@ def readout_prompt_facts(sheet: dict[str, Any], *, language: str) -> dict[str, A
                         "currency": series.get("currency"),
                     },
                     language=language,
+                    portfolio_peak=portfolio_peak,
                 )
                 if display is not None:
                     point["value"] = display["value"]

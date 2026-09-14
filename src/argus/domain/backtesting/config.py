@@ -27,10 +27,10 @@ STABLECOINS = {"USDC", "USDT", "DAI", "BUSD", "TUSD"}
 
 # The accepted-value envelope for a runnable configuration. Every layer that
 # admits a value the engine will execute reads these names: the run-time
-# validator below, the edit resolver's cost gate, the confirm preflight, and
-# the card's advertised edit constraints. A card may never promise a run
-# these bounds refuse.
-MIN_STARTING_CAPITAL = 1000.0
+# validator below, the edit resolver's cost gate, the confirm preflight, the
+# card's advertised edit constraints, and the capability contract's capital
+# range. A card may never promise a run these bounds refuse.
+MIN_STARTING_CAPITAL = 10.0
 MAX_STARTING_CAPITAL = 100_000_000.0
 # Slippage above five percent per trade stops modeling anything real; fees
 # ride the same ceiling until the founder retunes it.

@@ -27,6 +27,7 @@ import {
   type ResultChartRangeOption,
   type ResultChartSelection,
 } from "@/lib/result-chart-range";
+import { resultChartPeakValue, resultMoneyFractionDigits } from "@/lib/result-money";
 import ResultChartExploration from "./ResultChartExploration";
 import { type ResultChartMarker, type ResultChartPayload } from "./types";
 
@@ -163,9 +164,10 @@ export default function ResultEquityChart({
     }),
     [t],
   );
+  const portfolioPeak = useMemo(() => resultChartPeakValue(chart), [chart]);
   const currencyFormatter = useMemo(
-    () => chartCurrencyFormatter(chart.currency, chartLocale),
-    [chart.currency, chartLocale],
+    () => chartCurrencyFormatter(chart.currency, chartLocale, portfolioPeak),
+    [chart.currency, chartLocale, portfolioPeak],
   );
   const data = useMemo<BaselineData<Time>[]>(
     () =>
@@ -648,6 +650,7 @@ export default function ResultEquityChart({
         selection={selection}
         summary={visibleSummary}
         currency={chart.currency}
+        portfolioPeak={portfolioPeak}
         locale={i18n.language}
         showTimes={intradayTimes}
         detailsOpen={detailsOpen}
@@ -800,21 +803,37 @@ function resolveChartLocale(locale?: string | null) {
   return normalized;
 }
 
-function chartCurrencyFormatter(currency: string | undefined, locale: string) {
-  return new Intl.NumberFormat(resolveChartLocale(locale), {
-    style: "currency",
-    currency: currency ?? "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
+function chartCurrencyFormatter(
+  currency: string | undefined,
+  locale: string,
+  portfolioPeak?: number,
+) {
+  const byDigits = new Map<number, Intl.NumberFormat>();
+  return {
+    format(value: number) {
+      const digits = resultMoneyFractionDigits(value, portfolioPeak);
+      let formatter = byDigits.get(digits);
+      if (!formatter) {
+        formatter = new Intl.NumberFormat(resolveChartLocale(locale), {
+          style: "currency",
+          currency: currency ?? "USD",
+          minimumFractionDigits: digits,
+          maximumFractionDigits: digits,
+        });
+        byDigits.set(digits, formatter);
+      }
+      return formatter.format(value);
+    },
+  };
 }
 
 export function formatChartCurrency(
   value: number,
   currency = "USD",
   locale = "en-US",
+  portfolioPeak?: number,
 ) {
-  return chartCurrencyFormatter(currency, locale).format(value);
+  return chartCurrencyFormatter(currency, locale, portfolioPeak).format(value);
 }
 
 export function formatChartDateLabel(

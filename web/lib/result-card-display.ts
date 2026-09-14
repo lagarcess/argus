@@ -5,6 +5,7 @@ import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { contributionPhrase } from "@/lib/contribution-period-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { benchmarkComparisonView, signedPercentText } from "@/lib/result-figures";
+import { resultChartPeakValue, resultMoneyFractionDigits } from "@/lib/result-money";
 
 type MetricLike = {
   key?: string;
@@ -257,7 +258,9 @@ export function heroDeltaEvidenceView(
   const endingValue = findMetric(result, ["cash_value", "final_value", "ending_value"]);
   const totalReturn = findMetric(result, ["total_return_pct", "contribution_return_pct"]);
   const worstDrop = findMetric(result, ["max_drawdown_pct", "max_drawdown"]);
-  const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
+  // Every amount of this run reads at the precision its portfolio peak sets.
+  const portfolioPeak = resultChartPeakValue(result.chart);
+  const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale, portfolioPeak);
   const typedFacts = result.readoutFacts;
   const costs = typedFacts?.costs ?? result.executionCosts;
   const locale = options?.locale ?? "en";
@@ -267,7 +270,7 @@ export function heroDeltaEvidenceView(
   const isContributionReturn =
     totalReturn?.key === "contribution_return_pct" || typedFacts?.strategyType === "dca_accumulation";
   const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
-  const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
+  const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale, portfolioPeak);
   const benchmarkSymbol = facts.benchmark;
   const delta = typedFacts?.benchmarkDeltaPct;
   const claim = typedFacts?.benchmarkClaim;
@@ -289,6 +292,7 @@ export function heroDeltaEvidenceView(
         copy,
         options?.locale,
         isContributionReturn ? copy.contributionReturnSuffix : undefined,
+        portfolioPeak,
       ),
       tone,
       // Unavailable values must read as absent, never as a healthy metric.
@@ -336,6 +340,7 @@ function executionFacts(
   parsedStartingCapital: number | undefined,
   copy: ResultCardDisplayCopy,
   locale?: string,
+  portfolioPeak?: number,
 ) {
   const config = result.configSnapshot;
   // Completed runs wrap the actual launch config; older direct runs store it
@@ -365,11 +370,11 @@ function executionFacts(
   )
     ? copy.totalContributedLabel
     : copy.startingCapitalLabel;
-  const valueSummaryDetails = portfolioValueSummaryDetails(result, copy, locale);
+  const valueSummaryDetails = portfolioValueSummaryDetails(result, copy, locale, portfolioPeak);
   const details: EvidenceMetric[] = [
     startingCapital == null
       ? undefined
-      : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale) },
+      : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale, "USD", portfolioPeak) },
     ...valueSummaryDetails,
     { label: copy.dateRangeLabel, value: dateRangeDisplay },
     timeframe ? { label: copy.timeframeLabel, value: formatTimeframeForDisplay(timeframe, copy) ?? copy.unavailable } : undefined,
@@ -461,6 +466,7 @@ function portfolioValueSummaryDetails(
   result: StrategyResultPayload,
   copy: ResultCardDisplayCopy,
   locale?: string,
+  portfolioPeak?: number,
 ) {
   const summary = recordValue(result.chart?.value_summary);
   if (!summary) {
@@ -471,11 +477,11 @@ function portfolioValueSummaryDetails(
     return [
       {
         label: copy.peakValueLabel,
-        value: formatCurrency(legacyExtrema.peak, locale, legacyExtrema.currency),
+        value: formatCurrency(legacyExtrema.peak, locale, legacyExtrema.currency, portfolioPeak),
       },
       {
         label: copy.lowestValueLabel,
-        value: formatCurrency(legacyExtrema.lowest, locale, legacyExtrema.currency),
+        value: formatCurrency(legacyExtrema.lowest, locale, legacyExtrema.currency, portfolioPeak),
       },
     ];
   }
@@ -488,10 +494,10 @@ function portfolioValueSummaryDetails(
   return [
     peakValue == null
       ? undefined
-      : { label: copy.peakValueLabel, value: formatCurrency(peakValue, locale) },
+      : { label: copy.peakValueLabel, value: formatCurrency(peakValue, locale, "USD", portfolioPeak) },
     lowestValue == null
       ? undefined
-      : { label: copy.lowestValueLabel, value: formatCurrency(lowestValue, locale) },
+      : { label: copy.lowestValueLabel, value: formatCurrency(lowestValue, locale, "USD", portfolioPeak) },
   ].filter((detail): detail is EvidenceMetric => Boolean(detail));
 }
 
@@ -592,7 +598,7 @@ function timeframeUnitLabel(unit: string) {
   return "period";
 }
 
-function parseEndingValue(value?: string, locale?: string) {
+function parseEndingValue(value?: string, locale?: string, portfolioPeak?: number) {
   const matches = value?.match(CURRENCY_VALUE_PATTERN) ?? [];
   if (matches.length === 0) return undefined;
 
@@ -606,7 +612,7 @@ function parseEndingValue(value?: string, locale?: string) {
     start,
     ending,
     change: start == null ? undefined : ending - start,
-    endingDisplay: formatCurrency(ending, locale),
+    endingDisplay: formatCurrency(ending, locale, "USD", portfolioPeak),
   };
 }
 
@@ -637,16 +643,18 @@ function heroDetail(
   copy: ResultCardDisplayCopy,
   locale?: string,
   returnSuffix?: string,
+  portfolioPeak?: number,
 ) {
   const suffix = returnSuffix ?? copy.totalReturnSuffix;
   const returnLabel = totalReturn ?? copy.returnUnavailable;
   if (change == null) return returnLabel;
-  if (Math.abs(change) < 0.5) {
+  // A change reads as none only when it rounds to zero at this run's precision.
+  if (Math.abs(change) < 0.5 / 10 ** resultMoneyFractionDigits(change, portfolioPeak)) {
     return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${suffix}`;
   }
   const sign = change > 0 ? "+" : "-";
   const noun = change > 0 ? copy.gainNoun : copy.lossNoun;
-  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${suffix}`;
+  return `${sign}${formatCurrency(Math.abs(change), locale, "USD", portfolioPeak)} ${noun} · ${returnLabel} ${suffix}`;
 }
 
 function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
@@ -657,13 +665,19 @@ function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
   return basis > 0 ? "positive" : "negative";
 }
 
-export function formatCurrency(value: number, locale = "en-US", currency = "USD") {
+export function formatCurrency(
+  value: number,
+  locale = "en-US",
+  currency = "USD",
+  portfolioPeak?: number,
+) {
+  const digits = resultMoneyFractionDigits(value, portfolioPeak);
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     currencyDisplay: "narrowSymbol",
-    minimumFractionDigits: displayPolicy.currency_fraction_digits,
-    maximumFractionDigits: displayPolicy.currency_fraction_digits,
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
     roundingMode: displayPolicy.currency_rounding_mode as "halfExpand",
   }).format(value);
 }

@@ -90,10 +90,18 @@ def headline_request_lines(sheet: dict[str, Any], *, language: str = "en") -> li
         f"Benchmark: {sheet.get('benchmark_symbol') or 'not available'}",
     ]
     facts = sheet["facts"]
+    peak = (facts.get(_HEADLINES["portfolio.peak_equity"]) or {}).get("value")
+    portfolio_peak = (
+        float(peak)
+        if isinstance(peak, int | float) and not isinstance(peak, bool)
+        else None
+    )
 
     def line(label: str) -> str:
         row = facts[label]
-        display = readout_display_value(row, language=language)
+        display = readout_display_value(
+            row, language=language, portfolio_peak=portfolio_peak
+        )
         return f"{label}: {display['text'] if display else row['value']}"
 
     events = []

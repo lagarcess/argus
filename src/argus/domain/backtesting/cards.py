@@ -13,11 +13,17 @@ from argus.domain.engine_launch.display import (
     format_date_range_label,
 )
 from argus.domain.result_figures import shown_benchmark_gap, shown_cost_drag
+from argus.domain.result_money import (
+    CURRENCY_FRACTION_DIGITS,
+    result_money_fraction_digits,
+)
 
 
-def _format_money(value: float) -> str:
+def _format_money(
+    value: float, *, fraction_digits: int = CURRENCY_FRACTION_DIGITS
+) -> str:
     prefix = "-$" if value < 0 else "$"
-    return f"{prefix}{abs(value):,.0f}"
+    return f"{prefix}{abs(value):,.{fraction_digits}f}"
 
 
 def build_result_card(
@@ -98,11 +104,19 @@ def build_result_card(
         )
     )
 
+    peak_value = (performance.get("portfolio_value_range") or {}).get("peak_value")
+
+    def result_money(value: float) -> str:
+        return _format_money(
+            value,
+            fraction_digits=result_money_fraction_digits(value, peak_value=peak_value),
+        )
+
     rows = [
         {
             "key": "cash_value",
             "label": "Valor final" if is_es else "Ending value",
-            "value": f"{_format_money(capital_basis)} -> {_format_money(ending_capital)}",
+            "value": f"{result_money(capital_basis)} -> {result_money(ending_capital)}",
         },
         # A recurring plan's ratio is money-on-money over contributed cash,
         # not a time return on one bankroll, so it carries its own key and name.

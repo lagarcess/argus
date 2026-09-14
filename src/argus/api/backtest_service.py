@@ -10,6 +10,7 @@ from argus.api import state as api_state
 from argus.api.dependencies import problem
 from argus.api.schemas import BacktestRun, User
 from argus.domain import engine as domain_engine
+from argus.domain.backtesting.config import MAX_STARTING_CAPITAL, MIN_STARTING_CAPITAL
 from argus.domain.backtesting.coverage import (
     PreparedMarketData,
     apply_coverage_to_config,
@@ -99,7 +100,8 @@ def raise_backtest_problem(
         "invalid_starting_capital": (
             422,
             "Invalid Starting Capital",
-            "starting_capital must be between 1,000 and 100,000,000.",
+            f"starting_capital must be between {MIN_STARTING_CAPITAL:,.0f} and "
+            f"{MAX_STARTING_CAPITAL:,.0f}.",
         ),
         "invalid_date_range": (
             422,

@@ -150,6 +150,16 @@ def _launch_validation_failure(
                 "optional_parameter_status": status,
             }
 
+        # The offer is the nearest amount the engine accepts, so an amount
+        # under the floor is offered the floor and one over the ceiling the
+        # ceiling.
+        offered = (
+            MAX_STARTING_CAPITAL
+            if isinstance(raw_value, int | float)
+            and not isinstance(raw_value, bool)
+            and raw_value > MAX_STARTING_CAPITAL
+            else MIN_STARTING_CAPITAL
+        )
         return {
             "outcome": "needs_clarification",
             "missing_required_fields": ["capital_amount"],
@@ -170,8 +180,8 @@ def _launch_validation_failure(
                     ),
                     "simplification_options": [
                         {
-                            "label": "Use $10,000",
-                            "replacement_values": {"capital_amount": 10000},
+                            "label": f"Use ${offered:,.0f}",
+                            "replacement_values": {"capital_amount": offered},
                         },
                         {"label": "Choose a different amount"},
                     ],

@@ -2050,8 +2050,24 @@ The canonical backtest config used by the engine for execution and reproducibili
 
 ### Starting Capital
 - **Default:** 1000
-- **Allowed Range:** 1,000 to 100,000,000
+- **Allowed Range:** 10 to 100,000,000 (`MIN_STARTING_CAPITAL` and
+  `MAX_STARTING_CAPITAL` in `argus.domain.backtesting.config`)
 - *Return 422 for values outside range.*
+- The floor is the same for every strategy type except a recurring plan (below)
+  and for every way capital is set or edited: chat, a card edit turn, the
+  in-place `direct-edit` endpoint, and a retest card. Every layer reads the two
+  constants: the run-time validator, the confirm-stage launch envelope, the
+  card's `capabilities.edit_constraints.capital`, the capability contract's
+  `initial_capital` range, and this endpoint's 422 detail. The web editor shows
+  only the bounds the card carries.
+- The `unsupported_starting_capital` recovery offers the nearest accepted
+  amount: the minimum for an amount under it, the maximum for one over it.
+- **Result money precision:** a result whose portfolio peak value is under
+  `currency_cents_below` (`web/argus_display_contract/result_display_policy.json`,
+  1,000) shows cents on any amount that is not a whole dollar; every other
+  result shows whole dollars (`currency_fraction_digits`). The result card
+  rows, hero, details, equity chart, and readout values all apply this one rule
+  to the run's peak, so a $10 run reads `$10 -> $12.05`, not `$10 -> $12`.
 - > [!NOTE]
   > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance. The global default is `$1,000` for runnable drafts. DCA/recurring-buy contribution amounts are strategy-specific user inputs and remain separate from default starting capital.
 
@@ -4646,7 +4662,7 @@ After every queued and running ceiling passes, a conforming direct job starts in
 - all symbols must share same `asset_class`
 - mixed asset requests rejected with **422**
 - unsupported templates/timeframes rejected with **422**
-- `starting_capital` outside range [1000, 100000000] rejected with **422**
+- `starting_capital` outside range [10, 100000000] rejected with **422**
 - A non-consuming quota exhaustion check runs before provider-backed coverage
   preflight. Coverage rejection consumes no backtest allowance; the definitive
   admission check and increment run only after coverage succeeds.
