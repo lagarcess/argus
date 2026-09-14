@@ -507,23 +507,23 @@ def _worktree_is_clean(repository_root: Path) -> bool:
     return not completed.stdout.strip()
 
 
-def assert_eval_env_file_outside_repository(
+def assert_eval_env_file_untracked(
     env_file: Path, *, repository_root: Path = REPOSITORY_ROOT
 ) -> None:
-    """Refuse an environment file the measured repository owns.
+    """Refuse an environment file that a tracked file feeds.
 
     Promotion evidence identity compares the repository's tree, never the eval's
-    environment, so nothing the tree owns may feed that environment. Every step
-    of opening the file is compared by identity, never by spelling, so case,
-    Unicode, mount and link aliases all count. A step that is the repository root
-    means the path lies in the repository or passes through it. A step that is
-    a tracked file or symlink means another name for one, as with a hard link.
+    environment, so no tracked file may feed that environment. The file is
+    refused when it, or any step on the way to it, is a tracked file or tracked
+    symlink, compared by identity so whatever path or link reaches it counts. A
+    gitignored file stays allowed, and an untracked file that is not ignored
+    already fails the clean-worktree check. The guard catches an operator
+    mistake, not a deliberate bypass.
     """
 
     root = repository_root.resolve()
-    root_status = root.lstat()
-    # The walk visits every prefix and ends on the real file, so identities of the
-    # visited steps cover the root, every link on the way, and the target.
+    # The walk ends on the real file, so the visited steps cover every link on the
+    # way and the target.
     identities = set()
     for path in _paths_opened(env_file):
         try:
@@ -531,9 +531,8 @@ def assert_eval_env_file_outside_repository(
         except OSError:
             continue
         identities.add((status.st_dev, status.st_ino))
-    owned = _tracked_file_identities(root) | {(root_status.st_dev, root_status.st_ino)}
-    if identities & owned:
-        raise RuntimeError("scorecard_provenance:eval_env_file_inside_repository")
+    if identities & _tracked_file_identities(root):
+        raise RuntimeError("scorecard_provenance:eval_env_file_tracked")
 
 
 def _tracked_file_identities(root: Path) -> frozenset[tuple[int, int]]:

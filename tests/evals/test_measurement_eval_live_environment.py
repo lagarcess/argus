@@ -15,9 +15,9 @@ from tests.evals import measurement_eval_scorecard as scorecards
 
 
 def _environment_sources(tmp_path: Path) -> Path:
-    """A repository tracking a template and a symlink out of it, holding a plain
-    file, with links from outside that reach into it, pass through it, or hard
-    link its tracked template or its tracked symlink."""
+    """A checkout tracking a template, a symlink out of it and a folder symlink,
+    with a gitignored .env, and outside links and hard links that reach tracked
+    entries."""
 
     repository = tmp_path / "repository"
     repository.mkdir()
@@ -26,22 +26,25 @@ def _environment_sources(tmp_path: Path) -> Path:
     outside = tmp_path / "live-eval.env"
     outside.write_text(settings, encoding="utf-8")
     (tmp_path / "outside-link.env").symlink_to(outside)
+    (tmp_path / "envdir").mkdir()
+    (tmp_path / "envdir" / "live.env").write_text(settings, encoding="utf-8")
+    (repository / ".gitignore").write_text(".env\n", encoding="utf-8")
     (repository / ".env.example").write_text(settings, encoding="utf-8")
     (repository / ".env.link").symlink_to(outside)
+    (repository / "envs").symlink_to(tmp_path / "envdir")
     subprocess.run(
-        ["git", "add", ".env.example", ".env.link"], cwd=repository, check=True
+        ["git", "add", ".gitignore", ".env.example", ".env.link", "envs"],
+        cwd=repository,
+        check=True,
     )
+    (repository / ".env").write_text(settings, encoding="utf-8")
     os.link(repository / ".env.example", tmp_path / "hard-link.env")
     os.link(
         repository / ".env.link",
         tmp_path / "symlink-hard-link.env",
         follow_symlinks=False,
     )
-    (repository / ".env").write_text(settings, encoding="utf-8")
     (tmp_path / "via").symlink_to(repository)
-    (tmp_path / "envdir").mkdir()
-    (tmp_path / "envdir" / "live.env").write_text(settings, encoding="utf-8")
-    (repository / "envs").symlink_to(tmp_path / "envdir")
     (tmp_path / "hop").symlink_to(repository / "envs")
     return repository
 
@@ -49,62 +52,42 @@ def _environment_sources(tmp_path: Path) -> Path:
 @pytest.mark.parametrize(
     ("env_file", "refused"),
     [
-        pytest.param("repository/.env.example", True, id="template-in-the-repository"),
-        pytest.param("repository/.env.link", True, id="symlink-in-the-repository"),
-        pytest.param("repository/.env", True, id="untracked-file-in-the-repository"),
-        pytest.param("repository/envs/live.env", True, id="folder-link-in-the-repository"),
-        pytest.param("via/.env.example", True, id="link-into-the-repository"),
-        pytest.param("hop/live.env", True, id="link-chain-through-the-repository"),
+        pytest.param("repository/.env.example", True, id="tracked-template"),
+        pytest.param("repository/.env.link", True, id="tracked-symlink"),
+        pytest.param(
+            "repository/envs/live.env", True, id="tracked-folder-symlink-on-the-way"
+        ),
+        pytest.param("via/.env.example", True, id="link-to-a-tracked-file"),
+        pytest.param("hop/live.env", True, id="link-through-a-tracked-symlink"),
         pytest.param("hard-link.env", True, id="hard-link-to-a-tracked-file"),
         pytest.param(
             "symlink-hard-link.env", True, id="hard-link-to-a-tracked-symlink"
         ),
-        pytest.param("live-eval.env", False, id="file-outside-the-repository"),
-        pytest.param("outside-link.env", False, id="link-outside-the-repository"),
+        pytest.param("repository/.env", False, id="gitignored-file-in-the-checkout"),
+        pytest.param("live-eval.env", False, id="file-outside-the-checkout"),
+        pytest.param("outside-link.env", False, id="link-to-an-untracked-file"),
     ],
 )
-def test_eval_env_file_must_live_outside_the_repository(
+def test_eval_env_file_may_not_be_fed_by_a_tracked_file(
     tmp_path: Path, env_file: str, refused: bool
 ) -> None:
-    """Evidence identity compares the tree, never the eval's environment, so
-    nothing the tree owns may feed that environment, whatever path or name
-    reaches it."""
+    """Evidence identity compares the tree, never the eval's environment, so no
+    tracked file may feed that environment, whatever path or link reaches it."""
 
     repository = _environment_sources(tmp_path)
     outcome = (
-        pytest.raises(
-            RuntimeError, match="scorecard_provenance:eval_env_file_inside_repository"
-        )
+        pytest.raises(RuntimeError, match="scorecard_provenance:eval_env_file_tracked")
         if refused
         else nullcontext()
     )
 
     with outcome:
-        scorecards.assert_eval_env_file_outside_repository(
+        scorecards.assert_eval_env_file_untracked(
             tmp_path / env_file, repository_root=repository
         )
 
 
-def test_eval_env_file_is_in_the_repository_however_the_checkout_is_spelled(
-    tmp_path: Path,
-) -> None:
-    """On a case-insensitive filesystem another spelling opens the same checkout,
-    so containment is decided by the root's identity, not by its name."""
-
-    repository = _environment_sources(tmp_path)
-    respelled = tmp_path / repository.name.upper() / ".env"
-    if not respelled.exists():
-        pytest.skip("this filesystem is case-sensitive, so no spelling alias exists")
-
-    with pytest.raises(
-        RuntimeError, match="scorecard_provenance:eval_env_file_inside_repository"
-    ):
-        scorecards.assert_eval_env_file_outside_repository(
-            respelled, repository_root=repository
-        )
-
-
-def test_live_eval_refuses_an_env_file_in_the_repository_before_loading_it() -> None:
+def test_live_eval_refuses_a_tracked_env_file_before_loading_it() -> None:
     process_env = os.environ.copy()
     process_env.update(
         {
@@ -123,7 +106,7 @@ def test_live_eval_refuses_an_env_file_in_the_repository_before_loading_it() -> 
     )
 
     assert completed.returncode != 0
-    assert "scorecard_provenance:eval_env_file_inside_repository" in completed.stderr
+    assert "scorecard_provenance:eval_env_file_tracked" in completed.stderr
 
 
 def test_live_eval_env_preloads_calendar_aware_confirmation(
