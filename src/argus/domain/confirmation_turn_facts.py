@@ -19,19 +19,18 @@ def confirmation_turn_facts(metadata: Mapping[str, Any] | None) -> dict[str, Any
     card = metadata.get("confirmation_card")
     if not isinstance(card, Mapping):
         return None
+    # One owner per fact, never a fallback: the card owns what it rendered, and
+    # the symbol list lives only in the payload the card was built from.
+    strategy_type = card.get("strategy_type")
     payload = metadata.get("confirmation_payload")
     strategy = payload.get("strategy") if isinstance(payload, Mapping) else None
-    if not isinstance(strategy, Mapping):
-        strategy = {}
-    symbols = strategy.get("asset_universe")
-    strategy_type = card.get("strategy_type") or strategy.get("strategy_type")
+    symbols = strategy.get("asset_universe") if isinstance(strategy, Mapping) else None
     return {
         "strategy_type": strategy_type if isinstance(strategy_type, str) else None,
         "symbols": [symbol for symbol in symbols if isinstance(symbol, str) and symbol]
         if isinstance(symbols, list)
         else [],
-        "date_range": _date_range(card.get("date_range"))
-        or _date_range(strategy.get("date_range")),
+        "date_range": _date_range(card.get("date_range")),
     }
 
 

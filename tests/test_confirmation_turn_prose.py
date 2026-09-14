@@ -404,3 +404,75 @@ def test_supabase_message_creation_indexes_the_card_facts(language: str) -> None
     )
 
     assert captured["preview"] == _search_text("dip_buying")
+
+
+def _card_without_facts(card: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in card.items()
+        if key not in {"strategy_type", "date_range"}
+    }
+
+
+def _card_disagreeing_with_payload(card: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **card,
+        "strategy_type": "buy_and_hold",
+        "date_range": {
+            "start": "2023-01-03",
+            "end": "2023-12-29",
+            "display": "3 de enero de 2023 al 29 de diciembre de 2023",
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ("reshape_card", "expected_facts", "expected_search_text"),
+    [
+        (
+            _card_without_facts,
+            {"strategy_type": None, "symbols": ["AAPL"], "date_range": None},
+            "AAPL",
+        ),
+        (
+            _card_disagreeing_with_payload,
+            {
+                "strategy_type": "buy_and_hold",
+                "symbols": ["AAPL"],
+                "date_range": {"start": "2023-01-03", "end": "2023-12-29"},
+            },
+            "AAPL buy_and_hold 2023-01-03 2023-12-29",
+        ),
+    ],
+    ids=["legacy_card_missing_facts", "card_disagrees_with_payload"],
+)
+def test_card_turn_readers_only_see_facts_the_card_carries(
+    reshape_card: Any,
+    expected_facts: dict[str, Any],
+    expected_search_text: str,
+) -> None:
+    # The payload is a recurring plan over 2024, so any fallback to it shows.
+    client, user_id = _client("es-419")
+    conversation_id = _conversation_id(client)
+    metadata = {
+        "conversation_mode": "confirm",
+        "confirmation_card": reshape_card(
+            _card("recurring_buys", "es-419", conversation_id=conversation_id)
+        ),
+        "confirmation_payload": _payload(
+            "recurring_buys", confirmation_id=CONFIRMATION_ID
+        ),
+    }
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        role="assistant",
+        content="",
+        metadata=metadata,
+    )
+
+    facts = {"confirmation_card": expected_facts}
+    assert _history_card_turn(user_id, conversation_id) == facts
+    assert _parsed(artifact_naming_assistant_message("", metadata=metadata)) == facts
+    conversation = api_state.store.conversations[conversation_id]
+    assert conversation.last_message_preview == expected_search_text
