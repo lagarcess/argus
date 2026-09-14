@@ -47,9 +47,7 @@ describe("strategy display labels", () => {
       status: "ready_to_run",
       statusLabel: "Ready to run",
       title: "ETH buy and hold",
-      strategy_type: "buy_and_hold",
-      summary: "Ready to test buy-and-hold for ETH.",
-      rows: [
+      strategy_type: "buy_and_hold",      rows: [
         {
           key: "strategy",
           label: "Strategy",

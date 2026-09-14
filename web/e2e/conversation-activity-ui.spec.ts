@@ -307,9 +307,7 @@ function recoveredClarificationRailTranscript(
       confirmation_card: {
         confirmation_state: "active",
         title: "AAPL buy and hold",
-        statusLabel: "Ready to run",
-        summary: "AAPL with the supplied dates.",
-        rows: [{ label: "Assets", value: "AAPL" }],
+        statusLabel: "Ready to run",        rows: [{ label: "Assets", value: "AAPL" }],
       },
       confirmation_payload: {
         strategy: {

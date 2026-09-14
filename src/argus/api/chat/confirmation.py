@@ -198,13 +198,6 @@ def runtime_confirmation_card(
         optional_parameters=optional_parameters,
         launch_payload=launch_payload,
     )
-    summary_period = _confirmation_period_without_parentheses(date_range)
-    summary = _confirmation_summary(
-        assets=assets,
-        strategy=strategy,
-        strategy_label=strategy_label,
-        period=summary_period,
-    )
     active_confirmation_id = confirmation_id_from_payload(
         payload,
         fallback=confirmation_id or f"confirmation-{uuid4()}",
@@ -271,7 +264,6 @@ def runtime_confirmation_card(
         "status": "ready_to_run" if is_ready_to_run else "needs_change",
         "statusLabel": _confirmation_status_label(is_ready_to_run=is_ready_to_run),
         "strategy_type": canonical_strategy_type,
-        "summary": summary,
         "rows": rows,
         "assumptions": [],
         "actions": actions,
@@ -616,35 +608,6 @@ def _confirmation_date_range_payload(
     }
 
 
-def _confirmation_summary(
-    *,
-    assets: str,
-    strategy: dict[str, Any],
-    strategy_label: str,
-    period: str,
-) -> str:
-    strategy_type = executable_strategy_type(strategy)
-    if strategy_type == "buy_and_hold":
-        return f"Ready to test buy-and-hold for {assets} over {period}."
-    if _strategy_type_uses_cadence(strategy_type):
-        return f"Ready to test recurring buys for {assets} over {period}."
-    return (
-        f"Ready to test {assets} with "
-        f"{_summary_strategy_phrase(strategy_label)} over {period}."
-    )
-
-
-def _summary_strategy_phrase(strategy_label: str) -> str:
-    phrases = {
-        "RSI Threshold": "an RSI threshold",
-        "Dip Buying": "a dip-buying rule",
-        "Indicator Threshold": "an indicator threshold",
-        "Signal Strategy": "a signal strategy",
-        "Moving Average Crossover": "a moving-average crossover",
-    }
-    return phrases.get(strategy_label, strategy_label.strip().lower())
-
-
 def _format_confirmation_value(value: Any) -> str:
     if isinstance(value, dict):
         start = value.get("start") or value.get("from")
@@ -676,13 +639,6 @@ def _format_confirmation_rule_value(
 def _format_confirmation_period(value: Any, *, language: str = "en") -> str:
     resolved = resolve_date_range(value, today=_confirmation_today())
     return format_date_range_label(resolved.start, resolved.end, language=language)
-
-
-def _confirmation_period_without_parentheses(value: str) -> str:
-    if "(" not in value or not value.endswith(")"):
-        return value
-    label, _, dates = value.partition("(")
-    return f"{label.strip()}, {dates[:-1].strip()}"
 
 
 def _article_for(value: str) -> str:

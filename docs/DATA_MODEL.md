@@ -633,6 +633,13 @@ Represents individual messages within a conversation.
   it is not projected into later model history or `last_message_preview`, so
   Recents and conversation search do not expose the fallback language. Exact
   `llm_generated` prose remains eligible for those continuity surfaces.
+  A confirmation card turn stores empty `content` and a card without
+  `summary`. Its `last_message_preview` holds the card's typed facts as
+  search text (symbols, strategy type, start and end dates), and later model
+  history reads the same facts instead of prose. Rows written before this
+  keep their stored English sentence and preview until the conversation's
+  next message; readers never receive the sentence and model history derives
+  from the stored card instead.
 - User-message `metadata.mentions` may additionally preserve a selected asset
   or indicator's optional `message_range: { start, end }`. This is a UTF-16
   display span into immutable `content`, stored only when it exactly matches

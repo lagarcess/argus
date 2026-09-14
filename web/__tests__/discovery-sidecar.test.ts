@@ -167,9 +167,7 @@ describe("hydrateMessagesFromApi discovery attach", () => {
           confirmation_card: {
             confirmation_id: "c-stale",
             confirmation_state: "active",
-            title: "AAPL buy and hold",
-            summary: "Ready.",
-            rows: [],
+            title: "AAPL buy and hold",            rows: [],
             actions: [],
           },
         },

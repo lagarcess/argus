@@ -1,0 +1,649 @@
+{
+  "items": [
+    {
+      "id": "72abca7d-348c-45f8-9c0c-12a138b7b84c",
+      "conversation_id": "00000000-0000-4000-8000-000000009304",
+      "role": "user",
+      "content": "Compra y mantén AAPL durante 2024 con 10000 dólares",
+      "created_at": "2026-09-14T02:08:02.515587Z",
+      "metadata": {}
+    },
+    {
+      "id": "2f0562cf-4783-4a6b-95fb-1fa659a84614",
+      "conversation_id": "00000000-0000-4000-8000-000000009304",
+      "role": "assistant",
+      "content": "",
+      "created_at": "2026-09-14T02:08:02.515809Z",
+      "metadata": {
+        "conversation_mode": "confirm",
+        "agent_runtime_stage_outcome": "await_approval",
+        "confirmation_card": {
+          "kind": "backtest",
+          "confirmation_id": "00000000-0000-4000-8000-000000009314",
+          "confirmation_state": "active",
+          "launch_payload_hash": "ae319fbfcfcf045c",
+          "title": "AAPL buy and hold",
+          "status": "ready_to_run",
+          "statusLabel": "Ready to run",
+          "strategy_type": "buy_and_hold",
+          "rows": [
+            {
+              "key": "strategy",
+              "label": "Strategy",
+              "labelKey": "chat.confirmation.rows.strategy",
+              "value": "Buy and Hold"
+            },
+            {
+              "key": "assets",
+              "label": "Assets",
+              "labelKey": "chat.confirmation.rows.assets",
+              "value": "AAPL"
+            },
+            {
+              "key": "period",
+              "label": "Period",
+              "labelKey": "chat.confirmation.rows.period",
+              "value": "2 de enero de 2024 al 31 de diciembre de 2024"
+            },
+            {
+              "key": "starting_capital",
+              "label": "Starting capital",
+              "labelKey": "chat.confirmation.rows.starting_capital",
+              "value": "$10,000"
+            }
+          ],
+          "assumptions": [],
+          "actions": [
+            {
+              "id": "run-backtest",
+              "type": "run_backtest",
+              "label": "Run backtest",
+              "labelKey": "chat.confirmation.actions.run_backtest",
+              "presentation": "confirmation",
+              "payload": {
+                "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                "artifact_id": "00000000-0000-4000-8000-000000009314",
+                "launch_payload_hash": "ae319fbfcfcf045c",
+                "conversation_id": "00000000-0000-4000-8000-000000009304"
+              }
+            },
+            {
+              "id": "adjust-assumptions",
+              "type": "adjust_assumptions",
+              "label": "Change assumptions",
+              "labelKey": "chat.confirmation.actions.adjust_assumptions",
+              "presentation": "confirmation",
+              "payload": {
+                "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                "artifact_id": "00000000-0000-4000-8000-000000009314",
+                "launch_payload_hash": "ae319fbfcfcf045c",
+                "conversation_id": "00000000-0000-4000-8000-000000009304"
+              }
+            },
+            {
+              "id": "cancel-confirmation",
+              "type": "cancel_confirmation",
+              "label": "Cancel",
+              "labelKey": "chat.confirmation.actions.cancel",
+              "presentation": "confirmation",
+              "payload": {
+                "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                "artifact_id": "00000000-0000-4000-8000-000000009314",
+                "launch_payload_hash": "ae319fbfcfcf045c",
+                "conversation_id": "00000000-0000-4000-8000-000000009304"
+              }
+            }
+          ],
+          "display_facts": {
+            "capital": 10000,
+            "timeframe": "1D",
+            "benchmark_symbol": "SPY"
+          },
+          "capabilities": {
+            "execution_costs_editable": true,
+            "direct_edits": [
+              "capital",
+              "dates",
+              "costs"
+            ],
+            "edit_constraints": {
+              "capital": {
+                "max": 100000000,
+                "min": 1000
+              },
+              "fees": {
+                "min": 0,
+                "max": 0.05
+              },
+              "slippage": {
+                "min": 0,
+                "max": 0.05
+              },
+              "date_window": {
+                "max_end": "2026-09-13",
+                "min_start": "2016-01-01"
+              }
+            }
+          },
+          "asset_class": "equity",
+          "date_range": {
+            "start": "2024-01-02",
+            "end": "2024-12-31",
+            "display": "2 de enero de 2024 al 31 de diciembre de 2024"
+          }
+        },
+        "confirmation_payload": {
+          "confirmation_id": "00000000-0000-4000-8000-000000009314",
+          "artifact_id": "00000000-0000-4000-8000-000000009314",
+          "strategy": {
+            "asset_universe": [
+              "AAPL"
+            ],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {
+              "start": "2024-01-02",
+              "end": "2024-12-31"
+            },
+            "sizing_mode": "capital_amount",
+            "comparison_baseline": "SPY",
+            "strategy_type": "buy_and_hold",
+            "capital_amount": 10000
+          },
+          "optional_parameters": {},
+          "launch_payload": {
+            "symbol": "AAPL",
+            "symbols": [
+              "AAPL"
+            ],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {
+              "start": "2024-01-02",
+              "end": "2024-12-31"
+            },
+            "requested_date_range": {
+              "start": "2024-01-02",
+              "end": "2024-12-31"
+            },
+            "coverage_preflight": {
+              "outcome": "full_coverage",
+              "requested_date_range": {
+                "start": "2024-01-02",
+                "end": "2024-12-31"
+              },
+              "effective_date_range": {
+                "start": "2024-01-02",
+                "end": "2024-12-31"
+              },
+              "preflight_id": "sha256:replay-coverage"
+            },
+            "sizing_mode": "capital_amount",
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "SPY",
+            "language": "es-419",
+            "strategy_type": "buy_and_hold",
+            "capital_amount": 10000
+          },
+          "validation": {
+            "status": "ready_to_run",
+            "executable": true
+          }
+        },
+        "active_confirmation_reference": {
+          "artifact_kind": "confirmation",
+          "artifact_id": "00000000-0000-4000-8000-000000009314",
+          "artifact_status": "active",
+          "metadata": {
+            "confirmation_id": "00000000-0000-4000-8000-000000009314",
+            "artifact_type": "confirmation",
+            "confirmation_payload": {
+              "confirmation_id": "00000000-0000-4000-8000-000000009314",
+              "artifact_id": "00000000-0000-4000-8000-000000009314",
+              "strategy": {
+                "asset_universe": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2024-01-02",
+                  "end": "2024-12-31"
+                },
+                "sizing_mode": "capital_amount",
+                "comparison_baseline": "SPY",
+                "strategy_type": "buy_and_hold",
+                "capital_amount": 10000
+              },
+              "optional_parameters": {},
+              "launch_payload": {
+                "symbol": "AAPL",
+                "symbols": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2024-01-02",
+                  "end": "2024-12-31"
+                },
+                "requested_date_range": {
+                  "start": "2024-01-02",
+                  "end": "2024-12-31"
+                },
+                "coverage_preflight": {
+                  "outcome": "full_coverage",
+                  "requested_date_range": {
+                    "start": "2024-01-02",
+                    "end": "2024-12-31"
+                  },
+                  "effective_date_range": {
+                    "start": "2024-01-02",
+                    "end": "2024-12-31"
+                  },
+                  "preflight_id": "sha256:replay-coverage"
+                },
+                "sizing_mode": "capital_amount",
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "language": "es-419",
+                "strategy_type": "buy_and_hold",
+                "capital_amount": 10000
+              },
+              "validation": {
+                "status": "ready_to_run",
+                "executable": true
+              }
+            },
+            "launch_payload_hash": "ae319fbfcfcf045c",
+            "strategy_hash": "3d8b889aa095afbb",
+            "validation": {
+              "executable": true,
+              "failure_code": null
+            },
+            "launch_payload": {
+              "strategy_type": "buy_and_hold",
+              "symbol": "AAPL",
+              "symbols": [
+                "AAPL"
+              ],
+              "asset_class": "equity",
+              "timeframe": "1D",
+              "date_range": {
+                "start": "2024-01-02",
+                "end": "2024-12-31"
+              },
+              "requested_date_range": {
+                "start": "2024-01-02",
+                "end": "2024-12-31"
+              },
+              "coverage_preflight": {
+                "outcome": "full_coverage",
+                "requested_date_range": {
+                  "start": "2024-01-02",
+                  "end": "2024-12-31"
+                },
+                "effective_date_range": {
+                  "start": "2024-01-02",
+                  "end": "2024-12-31"
+                },
+                "preflight_id": "sha256:replay-coverage"
+              },
+              "sizing_mode": "capital_amount",
+              "capital_amount": 10000,
+              "parameters": {},
+              "risk_rules": [],
+              "benchmark_symbol": "SPY",
+              "language": "es-419"
+            },
+            "confirmation_card": {
+              "kind": "backtest",
+              "confirmation_id": "00000000-0000-4000-8000-000000009314",
+              "confirmation_state": "active",
+              "launch_payload_hash": "ae319fbfcfcf045c",
+              "title": "AAPL buy and hold",
+              "status": "ready_to_run",
+              "statusLabel": "Ready to run",
+              "strategy_type": "buy_and_hold",
+              "rows": [
+                {
+                  "key": "strategy",
+                  "label": "Strategy",
+                  "labelKey": "chat.confirmation.rows.strategy",
+                  "value": "Buy and Hold"
+                },
+                {
+                  "key": "assets",
+                  "label": "Assets",
+                  "labelKey": "chat.confirmation.rows.assets",
+                  "value": "AAPL"
+                },
+                {
+                  "key": "period",
+                  "label": "Period",
+                  "labelKey": "chat.confirmation.rows.period",
+                  "value": "2 de enero de 2024 al 31 de diciembre de 2024"
+                },
+                {
+                  "key": "starting_capital",
+                  "label": "Starting capital",
+                  "labelKey": "chat.confirmation.rows.starting_capital",
+                  "value": "$10,000"
+                }
+              ],
+              "assumptions": [],
+              "actions": [
+                {
+                  "id": "run-backtest",
+                  "type": "run_backtest",
+                  "label": "Run backtest",
+                  "labelKey": "chat.confirmation.actions.run_backtest",
+                  "presentation": "confirmation",
+                  "payload": {
+                    "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                    "artifact_id": "00000000-0000-4000-8000-000000009314",
+                    "launch_payload_hash": "ae319fbfcfcf045c",
+                    "conversation_id": "00000000-0000-4000-8000-000000009304"
+                  }
+                },
+                {
+                  "id": "adjust-assumptions",
+                  "type": "adjust_assumptions",
+                  "label": "Change assumptions",
+                  "labelKey": "chat.confirmation.actions.adjust_assumptions",
+                  "presentation": "confirmation",
+                  "payload": {
+                    "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                    "artifact_id": "00000000-0000-4000-8000-000000009314",
+                    "launch_payload_hash": "ae319fbfcfcf045c",
+                    "conversation_id": "00000000-0000-4000-8000-000000009304"
+                  }
+                },
+                {
+                  "id": "cancel-confirmation",
+                  "type": "cancel_confirmation",
+                  "label": "Cancel",
+                  "labelKey": "chat.confirmation.actions.cancel",
+                  "presentation": "confirmation",
+                  "payload": {
+                    "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                    "artifact_id": "00000000-0000-4000-8000-000000009314",
+                    "launch_payload_hash": "ae319fbfcfcf045c",
+                    "conversation_id": "00000000-0000-4000-8000-000000009304"
+                  }
+                }
+              ],
+              "display_facts": {
+                "capital": 10000,
+                "timeframe": "1D",
+                "benchmark_symbol": "SPY"
+              },
+              "capabilities": {
+                "execution_costs_editable": true,
+                "direct_edits": [
+                  "capital",
+                  "dates",
+                  "costs"
+                ],
+                "edit_constraints": {
+                  "capital": {
+                    "max": 100000000,
+                    "min": 1000
+                  },
+                  "fees": {
+                    "min": 0,
+                    "max": 0.05
+                  },
+                  "slippage": {
+                    "min": 0,
+                    "max": 0.05
+                  },
+                  "date_window": {
+                    "max_end": "2026-09-13",
+                    "min_start": "2016-01-01"
+                  }
+                }
+              },
+              "asset_class": "equity",
+              "date_range": {
+                "start": "2024-01-02",
+                "end": "2024-12-31",
+                "display": "2 de enero de 2024 al 31 de diciembre de 2024"
+              }
+            }
+          }
+        },
+        "artifact_references": [
+          {
+            "artifact_kind": "confirmation",
+            "artifact_id": "00000000-0000-4000-8000-000000009314",
+            "artifact_status": "active",
+            "metadata": {
+              "confirmation_id": "00000000-0000-4000-8000-000000009314",
+              "artifact_type": "confirmation",
+              "confirmation_payload": {
+                "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                "artifact_id": "00000000-0000-4000-8000-000000009314",
+                "strategy": {
+                  "asset_universe": [
+                    "AAPL"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": "1D",
+                  "date_range": {
+                    "start": "2024-01-02",
+                    "end": "2024-12-31"
+                  },
+                  "sizing_mode": "capital_amount",
+                  "comparison_baseline": "SPY",
+                  "strategy_type": "buy_and_hold",
+                  "capital_amount": 10000
+                },
+                "optional_parameters": {},
+                "launch_payload": {
+                  "symbol": "AAPL",
+                  "symbols": [
+                    "AAPL"
+                  ],
+                  "asset_class": "equity",
+                  "timeframe": "1D",
+                  "date_range": {
+                    "start": "2024-01-02",
+                    "end": "2024-12-31"
+                  },
+                  "requested_date_range": {
+                    "start": "2024-01-02",
+                    "end": "2024-12-31"
+                  },
+                  "coverage_preflight": {
+                    "outcome": "full_coverage",
+                    "requested_date_range": {
+                      "start": "2024-01-02",
+                      "end": "2024-12-31"
+                    },
+                    "effective_date_range": {
+                      "start": "2024-01-02",
+                      "end": "2024-12-31"
+                    },
+                    "preflight_id": "sha256:replay-coverage"
+                  },
+                  "sizing_mode": "capital_amount",
+                  "parameters": {},
+                  "risk_rules": [],
+                  "benchmark_symbol": "SPY",
+                  "language": "es-419",
+                  "strategy_type": "buy_and_hold",
+                  "capital_amount": 10000
+                },
+                "validation": {
+                  "status": "ready_to_run",
+                  "executable": true
+                }
+              },
+              "launch_payload_hash": "ae319fbfcfcf045c",
+              "strategy_hash": "3d8b889aa095afbb",
+              "validation": {
+                "executable": true,
+                "failure_code": null
+              },
+              "launch_payload": {
+                "strategy_type": "buy_and_hold",
+                "symbol": "AAPL",
+                "symbols": [
+                  "AAPL"
+                ],
+                "asset_class": "equity",
+                "timeframe": "1D",
+                "date_range": {
+                  "start": "2024-01-02",
+                  "end": "2024-12-31"
+                },
+                "requested_date_range": {
+                  "start": "2024-01-02",
+                  "end": "2024-12-31"
+                },
+                "coverage_preflight": {
+                  "outcome": "full_coverage",
+                  "requested_date_range": {
+                    "start": "2024-01-02",
+                    "end": "2024-12-31"
+                  },
+                  "effective_date_range": {
+                    "start": "2024-01-02",
+                    "end": "2024-12-31"
+                  },
+                  "preflight_id": "sha256:replay-coverage"
+                },
+                "sizing_mode": "capital_amount",
+                "capital_amount": 10000,
+                "parameters": {},
+                "risk_rules": [],
+                "benchmark_symbol": "SPY",
+                "language": "es-419"
+              },
+              "confirmation_card": {
+                "kind": "backtest",
+                "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                "confirmation_state": "active",
+                "launch_payload_hash": "ae319fbfcfcf045c",
+                "title": "AAPL buy and hold",
+                "status": "ready_to_run",
+                "statusLabel": "Ready to run",
+                "strategy_type": "buy_and_hold",
+                "rows": [
+                  {
+                    "key": "strategy",
+                    "label": "Strategy",
+                    "labelKey": "chat.confirmation.rows.strategy",
+                    "value": "Buy and Hold"
+                  },
+                  {
+                    "key": "assets",
+                    "label": "Assets",
+                    "labelKey": "chat.confirmation.rows.assets",
+                    "value": "AAPL"
+                  },
+                  {
+                    "key": "period",
+                    "label": "Period",
+                    "labelKey": "chat.confirmation.rows.period",
+                    "value": "2 de enero de 2024 al 31 de diciembre de 2024"
+                  },
+                  {
+                    "key": "starting_capital",
+                    "label": "Starting capital",
+                    "labelKey": "chat.confirmation.rows.starting_capital",
+                    "value": "$10,000"
+                  }
+                ],
+                "assumptions": [],
+                "actions": [
+                  {
+                    "id": "run-backtest",
+                    "type": "run_backtest",
+                    "label": "Run backtest",
+                    "labelKey": "chat.confirmation.actions.run_backtest",
+                    "presentation": "confirmation",
+                    "payload": {
+                      "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                      "artifact_id": "00000000-0000-4000-8000-000000009314",
+                      "launch_payload_hash": "ae319fbfcfcf045c",
+                      "conversation_id": "00000000-0000-4000-8000-000000009304"
+                    }
+                  },
+                  {
+                    "id": "adjust-assumptions",
+                    "type": "adjust_assumptions",
+                    "label": "Change assumptions",
+                    "labelKey": "chat.confirmation.actions.adjust_assumptions",
+                    "presentation": "confirmation",
+                    "payload": {
+                      "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                      "artifact_id": "00000000-0000-4000-8000-000000009314",
+                      "launch_payload_hash": "ae319fbfcfcf045c",
+                      "conversation_id": "00000000-0000-4000-8000-000000009304"
+                    }
+                  },
+                  {
+                    "id": "cancel-confirmation",
+                    "type": "cancel_confirmation",
+                    "label": "Cancel",
+                    "labelKey": "chat.confirmation.actions.cancel",
+                    "presentation": "confirmation",
+                    "payload": {
+                      "confirmation_id": "00000000-0000-4000-8000-000000009314",
+                      "artifact_id": "00000000-0000-4000-8000-000000009314",
+                      "launch_payload_hash": "ae319fbfcfcf045c",
+                      "conversation_id": "00000000-0000-4000-8000-000000009304"
+                    }
+                  }
+                ],
+                "display_facts": {
+                  "capital": 10000,
+                  "timeframe": "1D",
+                  "benchmark_symbol": "SPY"
+                },
+                "capabilities": {
+                  "execution_costs_editable": true,
+                  "direct_edits": [
+                    "capital",
+                    "dates",
+                    "costs"
+                  ],
+                  "edit_constraints": {
+                    "capital": {
+                      "max": 100000000,
+                      "min": 1000
+                    },
+                    "fees": {
+                      "min": 0,
+                      "max": 0.05
+                    },
+                    "slippage": {
+                      "min": 0,
+                      "max": 0.05
+                    },
+                    "date_window": {
+                      "max_end": "2026-09-13",
+                      "min_start": "2016-01-01"
+                    }
+                  }
+                },
+                "asset_class": "equity",
+                "date_range": {
+                  "start": "2024-01-02",
+                  "end": "2024-12-31",
+                  "display": "2 de enero de 2024 al 31 de diciembre de 2024"
+                }
+              }
+            }
+          }
+        ],
+        "artifact_presentation_kind": "confirmation"
+      }
+    }
+  ],
+  "next_cursor": null
+}

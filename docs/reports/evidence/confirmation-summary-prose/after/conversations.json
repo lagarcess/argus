@@ -1,0 +1,129 @@
+{
+  "items": [
+    {
+      "id": "00000000-0000-4000-8000-000000009304",
+      "title": "Replay legacy_buy_and_hold",
+      "title_source": "ai_generated",
+      "pinned": false,
+      "archived": false,
+      "deleted_at": null,
+      "created_at": "2026-09-14T02:01:02.367731Z",
+      "updated_at": "2026-09-14T02:08:02.515815Z",
+      "last_message_preview": null,
+      "preview": {
+        "kind": "confirmation",
+        "text": null,
+        "symbols": [
+          "AAPL"
+        ],
+        "template": "buy_and_hold"
+      },
+      "language": "es-419",
+      "activity": {
+        "operation": {
+          "status": "idle",
+          "kind": null,
+          "updated_at": null
+        },
+        "attention": {
+          "status": "none",
+          "cursor": null
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000009303",
+      "title": "Replay rsi_threshold",
+      "title_source": "ai_generated",
+      "pinned": false,
+      "archived": false,
+      "deleted_at": null,
+      "created_at": "2026-09-14T02:00:02.367731Z",
+      "updated_at": "2026-09-14T02:08:02.515576Z",
+      "last_message_preview": null,
+      "preview": {
+        "kind": "confirmation",
+        "text": null,
+        "symbols": [
+          "TSLA"
+        ],
+        "template": "indicator_threshold"
+      },
+      "language": "es-419",
+      "activity": {
+        "operation": {
+          "status": "idle",
+          "kind": null,
+          "updated_at": null
+        },
+        "attention": {
+          "status": "none",
+          "cursor": null
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000009302",
+      "title": "Replay recurring_buys",
+      "title_source": "ai_generated",
+      "pinned": false,
+      "archived": false,
+      "deleted_at": null,
+      "created_at": "2026-09-14T01:59:02.367731Z",
+      "updated_at": "2026-09-14T02:08:02.515139Z",
+      "last_message_preview": null,
+      "preview": {
+        "kind": "confirmation",
+        "text": null,
+        "symbols": [
+          "AAPL"
+        ],
+        "template": "dca_accumulation"
+      },
+      "language": "es-419",
+      "activity": {
+        "operation": {
+          "status": "idle",
+          "kind": null,
+          "updated_at": null
+        },
+        "attention": {
+          "status": "none",
+          "cursor": null
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000009301",
+      "title": "Replay buy_and_hold",
+      "title_source": "ai_generated",
+      "pinned": false,
+      "archived": false,
+      "deleted_at": null,
+      "created_at": "2026-09-14T01:58:02.367731Z",
+      "updated_at": "2026-09-14T02:08:02.399914Z",
+      "last_message_preview": null,
+      "preview": {
+        "kind": "confirmation",
+        "text": null,
+        "symbols": [
+          "AAPL"
+        ],
+        "template": "buy_and_hold"
+      },
+      "language": "es-419",
+      "activity": {
+        "operation": {
+          "status": "idle",
+          "kind": null,
+          "updated_at": null
+        },
+        "attention": {
+          "status": "none",
+          "cursor": null
+        }
+      }
+    }
+  ],
+  "next_cursor": null
+}
