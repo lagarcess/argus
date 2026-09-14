@@ -55,3 +55,20 @@ The first complete clean-checkout backend attempt found 15 sandbox permission
 failures (loopback servers and process inspection) and one fixture scope literal.
 The fixture now imports CHAT_RUN_SCOPE. A full unsandboxed local-only rerun is
 required; no application guard or test expectation was weakened for permissions.
+
+## Full clean-checkout verification
+
+At `b73f4749db96ae5d36fe332863f277c1a8f95d35`, the full backend command
+`PYTHONPATH=src:.:web .venv/bin/python -m pytest tests -q --no-cov` passed:
+**8,584 passed, 605 skipped, five warnings**, in 193.79 seconds. The separate
+checkout was `/private/tmp/argus-604-clean`, with no `.env`, no tracked changes,
+and dependencies reused by local symlinks. Python imported Argus from that clean
+checkout. Local test-server ports and process probes were allowed for this run;
+no paid/provider execution was enabled. Full output: `backend-clean-green.txt`.
+
+The final browser assertion measures offsetHeight (integer CSS layout pixels)
+so a translating sheet cannot report a 44px target as 43.99994px. This changes
+only measurement, not the 44px requirement or product styling. The complete
+five-cell receipt-service matrix passed again. No production code changed after
+the reconciled screenshots. A further exact-head revalidation and terminal CI /
+Codex review audit will be posted on the PR without changing the reviewed head.

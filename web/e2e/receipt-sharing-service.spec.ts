@@ -75,7 +75,8 @@ for (const cell of cells) {
     const sharedLinks = page.getByRole("dialog", { name: copy.list.title, exact: true });
     for (const control of [sharedLinks.getByRole("button", { name: copy.list.copy, exact: true }), sharedLinks.getByRole("link", { name: copy.list.open, exact: true }), sharedLinks.getByRole("button", { name: copy.list.revoke, exact: true })]) {
       await expect(control).toBeVisible();
-      expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      // Measure CSS layout pixels; sheet translation can round a 44px DOMRect to 43.99994.
+      expect(await control.evaluate((node) => (node as HTMLElement).offsetHeight)).toBeGreaterThanOrEqual(44);
     }
     await page.screenshot({ animations: "disabled", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-shared-links.png`) });
     const publicResponse = await request.get(`${api}/api/v1/public/receipts/${receipt.public_id}`);
