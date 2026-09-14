@@ -17,7 +17,12 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
+# The repository root, wherever this script lives inside it.
+ROOT = next(
+    parent
+    for parent in Path(__file__).resolve().parents
+    if (parent / "pyproject.toml").is_file() and (parent / "src" / "argus").is_dir()
+)
 sys.path.insert(0, str(ROOT / "src"))
 
 API_PORT = int(os.getenv("REPLAY_API_PORT", "8593"))

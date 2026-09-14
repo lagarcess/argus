@@ -308,13 +308,24 @@ def test_an_in_place_card_edit_rebuilds_the_card_without_prose(
 
 @pytest.mark.parametrize("language", LANGUAGES)
 def test_a_legacy_card_turn_sentence_reaches_no_reader(language: str) -> None:
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+    )
+
     client, user_id = _client(language)
     conversation_id = _conversation_id(client)
     sentence = LEGACY_SENTENCES[language]
+    payload = _payload("buy_and_hold", confirmation_id=CONFIRMATION_ID)
     legacy_card = {
         **_card("buy_and_hold", language, conversation_id=conversation_id),
         "summary": sentence,
     }
+    # Legacy persistence nested a full card copy inside each reference.
+    reference = confirmation_artifact_reference(
+        confirmation_id=CONFIRMATION_ID,
+        confirmation_payload=payload,
+        confirmation_card=legacy_card,
+    ).model_dump(mode="python")
     create_message(
         user_id=user_id,
         conversation_id=conversation_id,
@@ -322,18 +333,38 @@ def test_a_legacy_card_turn_sentence_reaches_no_reader(language: str) -> None:
         content=sentence,
         metadata={
             "conversation_mode": "confirm",
+            "agent_runtime_stage_outcome": "await_approval",
             "confirmation_card": legacy_card,
-            "confirmation_payload": _payload(
-                "buy_and_hold", confirmation_id=CONFIRMATION_ID
-            ),
+            "confirmation_payload": payload,
+            "active_confirmation_reference": reference,
+            "artifact_references": [reference],
         },
     )
+    # A later turn of any kind can carry the same card copy forward.
+    later_text = "The card is ready when you are."
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        role="assistant",
+        content=later_text,
+        metadata={"artifact_references": [reference]},
+    )
 
-    card_turn = _card_turn(client, conversation_id)
+    items = client.get(f"/api/v1/conversations/{conversation_id}/messages").json()[
+        "items"
+    ]
+    card_turn = next(item for item in items if "confirmation_card" in item["metadata"])
+    history = load_runtime_thread_history(
+        user_id=user_id, conversation_id=conversation_id
+    )
 
+    assert any(item["content"] == later_text for item in items)
+    assert sentence not in json.dumps(items, ensure_ascii=False)
     assert card_turn["content"] == ""
-    assert "summary" not in card_turn["metadata"]["confirmation_card"]
-    assert _history_card_turn(user_id, conversation_id) == _facts("buy_and_hold")
+    assert sentence not in [item.content for item in history]
+    assert _facts("buy_and_hold") in [
+        _parsed(item.content) for item in history if item.role == "assistant"
+    ]
     assert _parsed(
         artifact_naming_assistant_message(sentence, metadata=card_turn["metadata"])
     ) == _facts("buy_and_hold")
@@ -476,3 +507,51 @@ def test_card_turn_readers_only_see_facts_the_card_carries(
     assert _parsed(artifact_naming_assistant_message("", metadata=metadata)) == facts
     conversation = api_state.store.conversations[conversation_id]
     assert conversation.last_message_preview == expected_search_text
+
+
+@pytest.mark.parametrize("language", LANGUAGES)
+def test_an_in_place_edit_of_a_legacy_card_returns_no_retired_sentence(
+    monkeypatch: pytest.MonkeyPatch, language: str
+) -> None:
+    from argus.agent_runtime.confirmation_artifacts import (
+        confirmation_artifact_reference,
+    )
+
+    monkeypatch.setenv("ARGUS_IN_PLACE_CARD_EDITS_ENABLED", "true")
+    client, user_id = _client(language)
+    conversation_id = _conversation_id(client)
+    sentence = LEGACY_SENTENCES[language]
+    payload = _payload("buy_and_hold", confirmation_id=CONFIRMATION_ID)
+    legacy_card = {
+        **_card("buy_and_hold", language, conversation_id=conversation_id),
+        "summary": sentence,
+    }
+    reference = confirmation_artifact_reference(
+        confirmation_id=CONFIRMATION_ID,
+        confirmation_payload=payload,
+        confirmation_card=legacy_card,
+    ).model_dump(mode="python")
+    create_message(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        role="assistant",
+        content=sentence,
+        metadata={
+            "conversation_mode": "confirm",
+            "confirmation_card": legacy_card,
+            "confirmation_payload": payload,
+            "active_confirmation_reference": reference,
+            "artifact_references": [reference],
+        },
+    )
+
+    response = client.post(
+        f"/api/v1/conversations/{conversation_id}/confirmations/"
+        f"{CONFIRMATION_ID}/direct-edit",
+        json={"capital": 25000},
+    )
+
+    assert response.status_code == 200, response.text
+    assert sentence not in json.dumps(response.json(), ensure_ascii=False)
+    stored = api_state.store.messages[conversation_id][-1]
+    assert sentence not in json.dumps(stored.model_dump(mode="json"), ensure_ascii=False)

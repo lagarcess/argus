@@ -1,10 +1,17 @@
 // Headless capture of the Spanish confirmation replay: screenshots, visible
-// text and the reader transport. Run from the repository root with node.
+// text and the reader transport.
 import { createRequire } from "node:module";
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = process.cwd();
+// The repository root, wherever this script lives inside it.
+let root = path.dirname(fileURLToPath(import.meta.url));
+while (!(existsSync(path.join(root, "pyproject.toml")) && existsSync(path.join(root, "src/argus")))) {
+  const parent = path.dirname(root);
+  if (parent === root) throw new Error("repository root not found");
+  root = parent;
+}
 const require = createRequire(path.join(root, "web/package.json"));
 const { chromium } = require("@playwright/test");
 
@@ -24,6 +31,21 @@ async function api(pathname, init) {
 
 function cardTurn(items) {
   return items.find((item) => item.role === "assistant" && item.metadata?.confirmation_card);
+}
+
+// Every card copy that still carries `summary`, nested references included.
+function cardSummaryPaths(value, at = "") {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => cardSummaryPaths(item, `${at}[${index}]`));
+  }
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([key, item]) => [
+    ...(["confirmation_card", "confirmation"].includes(key) &&
+    item && typeof item === "object" && "summary" in item
+      ? [`${at}.${key}.summary`]
+      : []),
+    ...cardSummaryPaths(item, `${at}.${key}`),
+  ]);
 }
 
 const browser = await chromium.launch();
@@ -54,7 +76,9 @@ async function capture(shape, label) {
     html_lang: await page.evaluate(() => document.documentElement.lang),
     dom_contains_ready_to_test: html.includes("Ready to test"),
     transport_card_turn_content: turn?.content ?? null,
-    transport_card_has_summary: Boolean(turn && "summary" in turn.metadata.confirmation_card),
+    // The whole transport, nested card copies included, not one field.
+    transport_contains_ready_to_test: JSON.stringify(messages.body).includes("Ready to test"),
+    transport_card_summary_paths: cardSummaryPaths(messages.body),
     visible_text: visibleText,
   };
   report.captures.push(record);
@@ -76,7 +100,9 @@ const edit = await api(
 report.direct_edit = {
   status: edit.status,
   response_content: edit.body?.message?.content ?? null,
-  response_card_has_summary: Boolean(edit.body?.message && "summary" in edit.body.message.metadata.confirmation_card),
+  // The whole response, nested card copies included, not one field.
+  response_contains_ready_to_test: JSON.stringify(edit.body).includes("Ready to test"),
+  response_card_summary_paths: cardSummaryPaths(edit.body),
 };
 await capture("buy_and_hold", "es-buy-and-hold-card-after-in-place-edit");
 
