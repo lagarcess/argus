@@ -5343,9 +5343,10 @@ stored message carries `tool_result_cards`, the `metadata.computation` derived
 from them and `metadata.answer_text_template = {cards: {<calculation name>:
 <artifact_id>}, text, language}` (a template stored as `{artifact_id, text,
 language}` reads as its one card), the prose with its references, which the
-recompute route re-renders into `content` from the current cards. When the inputs state an amount and a whole-year horizon,
+recompute route re-renders into `content` from the current cards. When the inputs state the reader's own starting amount or monthly deposit and a whole-year horizon,
 `next_experiments` offers one `calculation_market_counterfactual` row that runs
-only when tapped, and `next_steps` lists it. The test runs in dollars: an amount
+only when tapped, and `next_steps` lists it. A loan offers no row, and neither
+does a plan with both a starting amount and deposits, stated or solved. The test runs in dollars: an amount
 in another currency is converted at Argus's own latest close for its pair with
 the dollar, and the label states the amount as asked, the rate and its date. A
 currency with no such close offers no row, and

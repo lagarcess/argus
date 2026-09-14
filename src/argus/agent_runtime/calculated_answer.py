@@ -302,9 +302,7 @@ async def calculated_answer_stage_result(
         patch[ANSWER_ASSUMPTIONS_KEY] = list(answered.assumptions)
     cards = (answered.patch.get("final_response_payload") or {}).get("tool_result_cards")
     if cards and cards[0].get("outcome", {}).get("status") == "succeeded":
-        rows = market_counterfactual_rows(
-            cards[0].get("arguments") or {}, language=user.language_preference
-        )
+        rows = market_counterfactual_rows(cards[0], language=user.language_preference)
         patch.update(next_steps_patch(rows, offered_test_steps(rows)))
     return StageResult(
         outcome="ready_to_respond",

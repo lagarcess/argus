@@ -9,9 +9,11 @@ A plan computed at a stated rate invites one honest comparison: what the same
 amount did in the market over the same number of years. The row carries the
 user's own amount and horizon into a runnable test of the calculation's asset,
 or the S&P 500 proxy when it names none, in the shape every Try next row has,
-and runs only when tapped. A backtest runs in dollars, so an amount in another
-currency is converted at Argus's own latest close for the pair, and the label
-states the rate and its date.
+and runs only when tapped. A loan is not money the reader could have invested,
+and a plan that starts with an amount and also adds deposits is neither one lump
+sum nor one monthly buy, so neither offers a row. A backtest runs in dollars, so
+an amount in another currency is converted at Argus's own latest close for the
+pair, and the label states the rate and its date.
 """
 
 from __future__ import annotations
@@ -37,8 +39,15 @@ _OFFER_LABELS = {
 MARKET_PROXY = {"symbol": "SPY", "name": "S&P 500", "asset_class": "equity"}
 # A label_key the catalogs deliberately lack, so the backend label renders.
 _DYNAMIC_LABEL_KEY = "chat.next_experiments.labels.research_dynamic"
-# Argument names that carry the amount the user starts with, by kind.
-_AMOUNT_FIELDS = ("present_value", "start_value", "amount", "assets")
+# The reader's own money, by calculation kind: the argument holding the amount
+# they start with, and the one holding what they add each period, if any. A kind
+# not listed, such as a loan's effective rate, offers no test.
+_READER_MONEY: dict[str, tuple[str, str | None]] = {
+    "expense_ratio": ("assets", None),
+    "growth_projection": ("start_value", "contribution"),
+    "time_value": ("present_value", "payment"),
+    "valuation_scenarios": ("amount", None),
+}
 MAX_COUNTERFACTUAL_YEARS = 30
 # Logged when a calculation's currency has no close against the dollar, so the
 # backtest handoff is withheld rather than run in the wrong currency.
@@ -46,21 +55,39 @@ NO_DOLLAR_RATE_REASON_CODE = "market_counterfactual_no_dollar_rate"
 
 
 def market_counterfactual_rows(
-    arguments: Mapping[str, Any],
+    card: Mapping[str, Any],
     *,
     language: str,
     subject: Mapping[str, str] | None = None,
 ) -> dict[str, Any] | None:
-    """One row when the calculation states an amount and a horizon in whole years.
+    """One row when a computed card states the reader's own amount and a horizon
+    in whole years.
 
-    A starting amount becomes a buy-and-hold test; a periodic payment with
-    no starting amount becomes a monthly-buy test of the same payment. The
-    asset is the calculation's own subject when it has one, else the market.
-    The test runs in dollars: another currency is converted at the pair's
-    latest close, and with no close against the dollar there is no row."""
+    A starting amount becomes a buy-and-hold test; a monthly payment with no
+    starting amount becomes a monthly-buy test of the same payment. A loan offers
+    no row, and neither does a plan with both a starting amount and deposits,
+    stated or solved. The asset is the calculation's own subject when it has one,
+    else the market. The test runs in dollars: another currency is converted at
+    the pair's latest close, and with no close against the dollar there is no row."""
+    arguments = card.get("arguments") or {}
+    money = _READER_MONEY.get(str(card.get("tool_name") or ""))
+    if money is None or arguments.get("direction") == "borrow":
+        return None
+    start, deposit = money
+    solved = (card.get("outcome") or {}).get("result") or {}
+    amount = _positive(arguments.get(start))
+    starts = amount is not None or _positive(solved.get(start)) is not None
+    if (
+        starts
+        and deposit is not None
+        and (
+            _positive(arguments.get(deposit)) is not None
+            or _positive(solved.get(deposit)) is not None
+        )
+    ):
+        return None
     years = _years(arguments)
-    amount = _amount(arguments)
-    payment = _monthly_payment(arguments)
+    payment = _monthly_payment(arguments, deposit)
     if years is None or (amount is None and payment is None):
         return None
     currency = str(arguments.get("currency") or "USD").strip().upper()
@@ -169,21 +196,15 @@ def _last_years(years: int, *, spanish: bool) -> str:
     return "over the last year" if years == 1 else f"over the last {years} years"
 
 
-def _monthly_payment(arguments: Mapping[str, Any]) -> float | None:
-    if arguments.get("periods_per_year", 12) != 12:
+def _monthly_payment(arguments: Mapping[str, Any], field: str | None) -> float | None:
+    if field is None or arguments.get("periods_per_year", 12) != 12:
         return None
-    for name in ("payment", "contribution"):
-        value = arguments.get(name)
-        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
-            return float(value)
-    return None
+    return _positive(arguments.get(field))
 
 
-def _amount(arguments: Mapping[str, Any]) -> float | None:
-    for name in _AMOUNT_FIELDS:
-        value = arguments.get(name)
-        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
-            return float(value)
+def _positive(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+        return float(value)
     return None
 
 

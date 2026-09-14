@@ -6,8 +6,16 @@ from argus.agent_runtime import answer_calculation
 from argus.agent_runtime.calculation_rows import market_counterfactual_rows
 
 
+def _card(arguments: dict) -> dict:
+    return {
+        "tool_name": "time_value",
+        "arguments": {"direction": "save", **arguments},
+        "outcome": {"status": "succeeded", "result": {}},
+    }
+
+
 def _row(arguments: dict, language: str = "en") -> dict:
-    rows = market_counterfactual_rows(arguments, language=language)
+    rows = market_counterfactual_rows(_card(arguments), language=language)
     assert rows is not None
     return rows["rows"][0]
 
@@ -26,7 +34,7 @@ def _closes(monkeypatch, closes: dict[str, tuple[float, str]]) -> list[str]:
 def test_a_dollar_amount_is_offered_as_stated_with_no_lookup(monkeypatch) -> None:
     asked = _closes(monkeypatch, {})
 
-    row = _row({"present_value": 10000, "years": 10, "currency": "USD"})
+    row = _row({"present_value": 10000, "periods": 120, "currency": "USD"})
 
     assert row["label"] == "Test S&P 500 (SPY) with 10,000 USD over the last 10 years"
     assert row["send_text"] == (
@@ -37,7 +45,7 @@ def test_a_dollar_amount_is_offered_as_stated_with_no_lookup(monkeypatch) -> Non
 
 def test_one_year_reads_as_the_last_year_in_both_languages(monkeypatch) -> None:
     _closes(monkeypatch, {})
-    arguments = {"present_value": 500, "years": 1, "currency": "USD"}
+    arguments = {"present_value": 500, "periods": 12, "currency": "USD"}
 
     assert _row(arguments)["send_text"] == (
         "Test buying and holding SPY with 500 USD over the last year"
@@ -54,7 +62,7 @@ def test_another_currency_is_converted_at_the_pairs_close_and_the_label_says_so(
 ) -> None:
     _closes(monkeypatch, {"EURUSD": (1.084, "2026-09-11")})
 
-    row = _row({"present_value": 1000, "years": 5, "currency": "EUR"}, "es-419")
+    row = _row({"present_value": 1000, "periods": 60, "currency": "EUR"}, "es-419")
 
     assert row["label"] == (
         "Probar S&P 500 (SPY) con 1,084 USD (1,000 EUR a 1.084 USD por EUR el "
@@ -68,7 +76,9 @@ def test_another_currency_is_converted_at_the_pairs_close_and_the_label_says_so(
 def test_a_pair_quoted_as_dollars_first_is_inverted(monkeypatch) -> None:
     asked = _closes(monkeypatch, {"USDJPY": (147.0, "2026-09-11")})
 
-    row = _row({"payment": 30000, "periods_per_year": 12, "years": 5, "currency": "JPY"})
+    row = _row(
+        {"payment": 30000, "periods_per_year": 12, "periods": 60, "currency": "JPY"}
+    )
 
     assert row["label"] == (
         "Test S&P 500 (SPY) buying 204 USD every month (30,000 JPY at 0.006803 USD "
@@ -85,8 +95,8 @@ def test_a_currency_with_no_close_against_the_dollar_offers_no_test(monkeypatch)
 
     for arguments in (
         {"present_value": 100, "periods": 12, "currency": "DOP"},
-        {"present_value": 1000, "years": 3, "currency": "EUR"},
+        {"present_value": 1000, "periods": 36, "currency": "EUR"},
     ):
-        assert market_counterfactual_rows(arguments, language="es-419") is None
+        assert market_counterfactual_rows(_card(arguments), language="es-419") is None
 
     assert asked == ["EURUSD", "USDEUR"]
