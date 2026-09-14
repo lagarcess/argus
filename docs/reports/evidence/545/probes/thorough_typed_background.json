@@ -1,9 +1,9 @@
 {
   "probe": "thorough_typed_background",
   "purpose": "thorough background run on the Anthropic path under the schema",
-  "candidate_sha": "88cf7f6d4b0ee13bc85cc92485953b457163593c",
-  "captured_at": "2026-09-13T01:11:22.743217+00:00",
-  "elapsed_s": 21.14,
+  "candidate_sha": "e0a0d8ccd86e0ae370bc38a2c813f26c4bae7f9e",
+  "captured_at": "2026-09-13T23:58:41.671107+00:00",
+  "elapsed_s": 42.23,
   "request_overrides": {},
   "exchanges": [
     {
@@ -33,17 +33,17 @@
         "max_steps": 10,
         "max_output_tokens": 4096,
         "language_preference": "en",
-        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculation from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers it; never answer such a question with prose and follow-up questions alone. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. List in source_urls every retrieved page the answer relies on; the reader sees those pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. When a choice turns on a future figure nobody can cite, such as an exchange rate or a price, do not project it; show what the recent past did with cited figures, computed by Argus and labeled as history, not a forecast. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculations from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers them; never answer such a question with prose and follow-up questions alone. When a calculation needs a figure only the reader knows, leave that input null and write answer_markdown without that calculation's results: Argus offers the reader the calculation with that figure left to enter. When the reader leaves out a detail the math needs, such as how often interest compounds, assume the likeliest one, say plainly what you assumed, and fill a calculation for each option the reader weighs. When the answer turns on a figure only the reader knows, such as their own balance or rate, fill calculations anyway with that figure left null so Argus offers it, even when nothing else is computed. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculations and no follow-up questions. Fill calculations only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, how many years a sum takes to double, which option costs less or what a dividend yields at today's price, each with the one kind listed below that computes it. When the reader weighs options, fill one calculation for each option under its own short name, with the same kind when one kind computes them all, and never say which option to choose. Argus computes each one: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let a calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculations, write each figure a calculation uses or produces as {{name}}, with its input or result name, or as {{calculation_name.name}} when there is more than one calculation, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculations empty when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "response_format": {
           "type": "json_schema",
           "json_schema": {
-            "name": "argus_typed_answer",
+            "name": "argus_typed_answer_calculations",
             "strict": true,
             "schema": {
-              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, at most one calculation Argus computes, and the questions the reader may ask next.",
+              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, the retrieved pages it relies on, one calculation Argus computes for each option the reader weighs, and the questions the reader may ask next.",
               "properties": {
                 "answer_markdown": {
-                  "description": "The answer for the reader in markdown: the direct answer first, then sections, a table, the formula, a worked example or steps where they help. No links, no list of sources, no mention of tools, providers or models. Every figure the calculation uses or produces is written as its {{name}} reference.",
+                  "description": "The answer for the reader in markdown: the direct answer first, then sections, a table, the formula, a worked example or steps where they help. No links, no list of sources, no mention of tools, providers or models. Every figure a calculation uses or produces is written as its reference.",
                   "type": "string"
                 },
                 "rows": {
@@ -52,7 +52,7 @@
                     "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
                       "subject": {
-                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "description": "The entity the figure describes, as the source names it: Microsoft, Santander, Netflix.",
                         "type": "string"
                       },
                       "symbol": {
@@ -75,7 +75,7 @@
                         "type": "number"
                       },
                       "kind": {
-                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as price to book, count for a number of units such as shares.",
                         "enum": [
                           "currency",
                           "percent",
@@ -126,31 +126,109 @@
                   },
                   "type": "array"
                 },
-                "calculation": {
-                  "anyOf": [
-                    {
-                      "description": "The one calculation Argus computes for this answer.",
-                      "properties": {
-                        "kind": {
-                          "description": "The listed calculation that computes the figure the answer turns on.",
-                          "enum": [
-                            "bond_value",
-                            "debt_to_income",
-                            "discounted_cash_flow",
-                            "effective_rate",
-                            "expense_ratio",
-                            "growth_projection",
-                            "income_yield",
-                            "price_multiple",
-                            "ranked_comparison",
-                            "time_value",
-                            "valuation_scenarios"
-                          ],
-                          "type": "string"
-                        },
-                        "solve_for": {
-                          "anyOf": [
-                            {
+                "source_urls": {
+                  "description": "The URL of every retrieved page answer_markdown relies on, most relied on first.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "calculations": {
+                  "description": "One calculation Argus computes for each option the reader weighs, with every input and its source; empty when the answer computes nothing.",
+                  "items": {
+                    "description": "One calculation Argus computes for this answer.",
+                    "properties": {
+                      "name": {
+                        "description": "A short lowercase name for this calculation, such as the option it computes; with more than one calculation, each figure reference starts with it.",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "description": "The listed calculation that computes the figure the answer turns on.",
+                        "enum": [
+                          "bond_value",
+                          "debt_to_income",
+                          "discounted_cash_flow",
+                          "effective_rate",
+                          "expense_ratio",
+                          "growth_projection",
+                          "income_yield",
+                          "price_multiple",
+                          "ranked_comparison",
+                          "time_value",
+                          "valuation_scenarios"
+                        ],
+                        "type": "string"
+                      },
+                      "solve_for": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "amount",
+                              "annual_fee",
+                              "annual_income",
+                              "annual_rate_pct",
+                              "assets",
+                              "cash_flow",
+                              "compounding_per_year",
+                              "contribution",
+                              "coupon_rate_pct",
+                              "coupons_per_year",
+                              "currency",
+                              "direction",
+                              "discount_rate_pct",
+                              "end_value",
+                              "face_value",
+                              "fees",
+                              "future_value",
+                              "growth_base_pct",
+                              "growth_high_pct",
+                              "growth_low_pct",
+                              "growth_rate_pct",
+                              "horizon_years",
+                              "inflation_rate_pct",
+                              "items",
+                              "key_kind",
+                              "key_label",
+                              "monthly_debt_payments",
+                              "monthly_income",
+                              "multiple",
+                              "multiple_base",
+                              "multiple_high",
+                              "multiple_low",
+                              "nominal_rate_pct",
+                              "payment",
+                              "payment_timing",
+                              "per_share",
+                              "periods",
+                              "periods_per_year",
+                              "prefer",
+                              "present_value",
+                              "price",
+                              "ratio_pct",
+                              "start_date",
+                              "start_value",
+                              "symbol",
+                              "terminal_growth_rate_pct",
+                              "value",
+                              "years",
+                              "yield_pct",
+                              "yield_to_maturity_pct"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "For a kind that lists blanks, the name of the one blank to solve, left out of inputs; null otherwise."
+                      },
+                      "inputs": {
+                        "description": "Every input the kind needs, one entry each, with its source.",
+                        "items": {
+                          "description": "One input the calculation uses, with where its value came from.",
+                          "properties": {
+                            "name": {
+                              "description": "The input's name, exactly as the calculation list writes it.",
                               "enum": [
                                 "amount",
                                 "annual_fee",
@@ -205,191 +283,121 @@
                               ],
                               "type": "string"
                             },
-                            {
-                              "type": "null"
-                            }
-                          ],
-                          "description": "For a kind that lists blanks, the name of the one blank to solve, left out of inputs; null otherwise."
-                        },
-                        "inputs": {
-                          "description": "Every input the kind needs, one entry each, with its source.",
-                          "items": {
-                            "description": "One input the calculation uses, with where its value came from.",
-                            "properties": {
-                              "name": {
-                                "description": "The input's name, exactly as the calculation list writes it.",
-                                "enum": [
-                                  "amount",
-                                  "annual_fee",
-                                  "annual_income",
-                                  "annual_rate_pct",
-                                  "assets",
-                                  "cash_flow",
-                                  "compounding_per_year",
-                                  "contribution",
-                                  "coupon_rate_pct",
-                                  "coupons_per_year",
-                                  "currency",
-                                  "direction",
-                                  "discount_rate_pct",
-                                  "end_value",
-                                  "face_value",
-                                  "fees",
-                                  "future_value",
-                                  "growth_base_pct",
-                                  "growth_high_pct",
-                                  "growth_low_pct",
-                                  "growth_rate_pct",
-                                  "horizon_years",
-                                  "inflation_rate_pct",
-                                  "items",
-                                  "key_kind",
-                                  "key_label",
-                                  "monthly_debt_payments",
-                                  "monthly_income",
-                                  "multiple",
-                                  "multiple_base",
-                                  "multiple_high",
-                                  "multiple_low",
-                                  "nominal_rate_pct",
-                                  "payment",
-                                  "payment_timing",
-                                  "per_share",
-                                  "periods",
-                                  "periods_per_year",
-                                  "prefer",
-                                  "present_value",
-                                  "price",
-                                  "ratio_pct",
-                                  "start_date",
-                                  "start_value",
-                                  "symbol",
-                                  "terminal_growth_rate_pct",
-                                  "value",
-                                  "years",
-                                  "yield_pct",
-                                  "yield_to_maturity_pct"
-                                ],
-                                "type": "string"
-                              },
-                              "value": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "boolean"
-                                  },
-                                  {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "label": {
-                                          "type": "string"
-                                        },
-                                        "symbol": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ]
-                                        },
-                                        "value": {
-                                          "type": "number"
-                                        }
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "label": {
+                                        "type": "string"
                                       },
-                                      "required": [
-                                        "label",
-                                        "symbol",
-                                        "value"
-                                      ],
-                                      "type": "object"
+                                      "symbol": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
                                     },
-                                    "type": "array"
+                                    "required": [
+                                      "label",
+                                      "symbol",
+                                      "value"
+                                    ],
+                                    "type": "object"
                                   },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "description": "The value: a plain number (7 for 7 percent, 1250000 for 1.25 million), one of the listed options, a list of offers, or null for a figure only the user knows and has not said."
-                              },
-                              "source": {
-                                "description": "page: read from a page retrieved for this answer. market_data: the current price of the named asset, which Argus fills from its own market data. user: stated by the user. assumption: a figure you chose, which the answer states plainly as an assumption.",
-                                "enum": [
-                                  "page",
-                                  "market_data",
-                                  "user",
-                                  "assumption"
-                                ],
-                                "type": "string"
-                              },
-                              "source_url": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "description": "For page, the URL of the retrieved page the value was read from; otherwise null."
-                              },
-                              "as_of": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "description": "For page, the date the page gives for the value as YYYY-MM-DD; otherwise null."
-                              },
-                              "currency": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "description": "For a money amount, its ISO 4217 code; otherwise null."
-                              }
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "The value: a plain number (7 for 7 percent, 1250000 for 1.25 million), one of the listed options, a list of offers, or null for a figure only the user knows and has not said."
                             },
-                            "required": [
-                              "name",
-                              "value",
-                              "source",
-                              "source_url",
-                              "as_of",
-                              "currency"
-                            ],
-                            "type": "object",
-                            "additionalProperties": false
+                            "source": {
+                              "description": "page: read from a page retrieved for this answer. market_data: the current price of the named asset, which Argus fills from its own market data. user: stated by the user. assumption: a figure you chose, which the answer states plainly as an assumption.",
+                              "enum": [
+                                "page",
+                                "market_data",
+                                "user",
+                                "assumption"
+                              ],
+                              "type": "string"
+                            },
+                            "source_url": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For page, the URL of the retrieved page the value was read from; otherwise null."
+                            },
+                            "as_of": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For page, the date the page gives for the value as YYYY-MM-DD; otherwise null."
+                            },
+                            "currency": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For a money amount, its ISO 4217 code; otherwise null."
+                            }
                           },
-                          "type": "array"
-                        }
-                      },
-                      "required": [
-                        "kind",
-                        "solve_for",
-                        "inputs"
-                      ],
-                      "type": "object",
-                      "additionalProperties": false
+                          "required": [
+                            "name",
+                            "value",
+                            "source",
+                            "source_url",
+                            "as_of",
+                            "currency"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      }
                     },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "The one calculation Argus computes for this answer, with every input and its source, or null when the answer computes nothing."
+                    "required": [
+                      "name",
+                      "kind",
+                      "solve_for",
+                      "inputs"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
                 },
                 "follow_up_questions": {
                   "description": "Two to four short questions, in the reader's language, that this reader is likely to ask next.",
@@ -406,7 +414,8 @@
               "required": [
                 "answer_markdown",
                 "rows",
-                "calculation",
+                "source_urls",
+                "calculations",
                 "follow_up_questions",
                 "declined"
               ],
@@ -421,12 +430,12 @@
       "response": {
         "background": true,
         "completed_at": null,
-        "created_at": 1789261861,
+        "created_at": 1789343879,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_8fe39282-8d69-4f4b-98de-d2358d358bd3",
+        "id": "resp_69ab1a8e-e432-4cf6-966b-25685a653f6a",
         "incomplete_details": null,
-        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculation from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers it; never answer such a question with prose and follow-up questions alone. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. List in source_urls every retrieved page the answer relies on; the reader sees those pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. When a choice turns on a future figure nobody can cite, such as an exchange rate or a price, do not project it; show what the recent past did with cited figures, computed by Argus and labeled as history, not a forecast. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculations from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers them; never answer such a question with prose and follow-up questions alone. When a calculation needs a figure only the reader knows, leave that input null and write answer_markdown without that calculation's results: Argus offers the reader the calculation with that figure left to enter. When the reader leaves out a detail the math needs, such as how often interest compounds, assume the likeliest one, say plainly what you assumed, and fill a calculation for each option the reader weighs. When the answer turns on a figure only the reader knows, such as their own balance or rate, fill calculations anyway with that figure left null so Argus offers it, even when nothing else is computed. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculations and no follow-up questions. Fill calculations only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, how many years a sum takes to double, which option costs less or what a dividend yields at today's price, each with the one kind listed below that computes it. When the reader weighs options, fill one calculation for each option under its own short name, with the same kind when one kind computes them all, and never say which option to choose. Argus computes each one: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let a calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculations, write each figure a calculation uses or produces as {{name}}, with its input or result name, or as {{calculation_name.name}} when there is more than one calculation, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculations empty when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "max_output_tokens": 4096,
         "max_tool_calls": null,
         "metadata": {},
@@ -473,18 +482,18 @@
     },
     {
       "method": "GET",
-      "url": "https://api.perplexity.ai/v1/agent/resp_8fe39282-8d69-4f4b-98de-d2358d358bd3",
+      "url": "https://api.perplexity.ai/v1/agent/resp_69ab1a8e-e432-4cf6-966b-25685a653f6a",
       "request": null,
       "http_status": 200,
       "response": {
         "background": true,
-        "completed_at": 1789261882,
-        "created_at": 1789261882,
+        "completed_at": 1789343921,
+        "created_at": 1789343921,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_8fe39282-8d69-4f4b-98de-d2358d358bd3",
+        "id": "resp_69ab1a8e-e432-4cf6-966b-25685a653f6a",
         "incomplete_details": null,
-        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculation from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers it; never answer such a question with prose and follow-up questions alone. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. List in source_urls every retrieved page the answer relies on; the reader sees those pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. When a choice turns on a future figure nobody can cite, such as an exchange rate or a price, do not project it; show what the recent past did with cited figures, computed by Argus and labeled as history, not a forecast. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculations from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers them; never answer such a question with prose and follow-up questions alone. When a calculation needs a figure only the reader knows, leave that input null and write answer_markdown without that calculation's results: Argus offers the reader the calculation with that figure left to enter. When the reader leaves out a detail the math needs, such as how often interest compounds, assume the likeliest one, say plainly what you assumed, and fill a calculation for each option the reader weighs. When the answer turns on a figure only the reader knows, such as their own balance or rate, fill calculations anyway with that figure left null so Argus offers it, even when nothing else is computed. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculations and no follow-up questions. Fill calculations only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, how many years a sum takes to double, which option costs less or what a dividend yields at today's price, each with the one kind listed below that computes it. When the reader weighs options, fill one calculation for each option under its own short name, with the same kind when one kind computes them all, and never say which option to choose. Argus computes each one: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let a calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculations, write each figure a calculation uses or produces as {{name}}, with its input or result name, or as {{calculation_name.name}} when there is more than one calculation, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculations empty when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "max_output_tokens": 4096,
         "max_tool_calls": null,
         "metadata": {},
@@ -516,14 +525,35 @@
             "type": "finance_results"
           },
           {
+            "categories": [
+              "financials"
+            ],
+            "results": [
+              {
+                "category": "financials",
+                "content": "## NFLX FY 2025\n| date | period | income_statement_total_revenues |\n| --- | --- | --- |\n| 2025-12-31 | 2025 FY | 45,183,036,000 |\n\nData available in: `NFLX_annual_2025_income_statement_f560b4.csv` (row key column: date)",
+                "sources": [
+                  "https://www.perplexity.ai/finance/NFLX/financials"
+                ],
+                "tickers": [
+                  "NFLX"
+                ]
+              }
+            ],
+            "tickers": [
+              "NFLX"
+            ],
+            "type": "finance_results"
+          },
+          {
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"### Direct answer\\nOver the last two fiscal years, Netflix grew revenue much faster than Disney. Netflix expanded from 33,723,297,000 USD in FY2023 to 45,183,036,000 USD in FY2025, while Disney went from 88,898,000,000 USD in FY2023 to 94,425,000,000 USD in FY2025. Netflix's two‑year growth was roughly six times Disney's on a percentage basis.\\n\\n### Revenue by fiscal year\\n\\n| Fiscal year | Netflix (NFLX) | Disney (DIS) |\\n|---|---|---|\\n| FY2023 | 33,723,297,000 USD | 88,898,000,000 USD |\\n| FY2024 | 39,000,966,000 USD | 91,361,000,000 USD |\\n| FY2025 | 45,183,036,000 USD | 94,425,000,000 USD |\\n\\nNote on fiscal calendars: Netflix's fiscal year ends December 31, so FY2025 covers calendar year 2025 (ended 2025-12-31). Disney's fiscal year ends in late September, so FY2025 ended 2025-09-27.\\n\\n### Year‑over‑year and two‑year change\\n- Netflix FY2024 vs FY2023: +5,277,669,000 USD (about +15.6%).\\n- Netflix FY2025 vs FY2024: +6,182,070,000 USD (about +15.9%).\\n- Netflix two‑year change (FY2023 → FY2025): +11,459,739,000 USD (about +34.0%).\\n- Disney FY2024 vs FY2023: +2,463,000,000 USD (about +2.8%).\\n- Disney FY2025 vs FY2024: +3,064,000,000 USD (about +3.4%).\\n- Disney two‑year change (FY2023 → FY2025): +5,527,000,000 USD (about +6.2%).\\n\\n### Takeaway\\nNetflix compounded at a mid‑teens rate each year, while Disney's growth stayed in the low single digits. On absolute revenue, Disney is still roughly twice Netflix's size, but the growth gap has been widening the mix.\",\"calculation\":null,\"declined\":false,\"follow_up_questions\":[\"How did Netflix and Disney compare on operating margin over the same period?\",\"What drove Netflix's revenue acceleration in FY2025 — subscribers, pricing, or ads?\",\"How did Disney's streaming (DTC) segment grow versus Parks over the last two years?\",\"Compare Netflix and Disney free cash flow for FY2024 and FY2025.\"],\"rows\":[{\"as_of\":\"2023-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2023\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":33723297000},{\"as_of\":\"2024-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2024\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":39000966000},{\"as_of\":\"2025-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2025\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":45183036000},{\"as_of\":\"2023-09-30\",\"kind\":\"currency\",\"label\":\"Total revenue FY2023\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":88898000000},{\"as_of\":\"2024-09-28\",\"kind\":\"currency\",\"label\":\"Total revenue FY2024\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":91361000000},{\"as_of\":\"2025-09-27\",\"kind\":\"currency\",\"label\":\"Total revenue FY2025\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":94425000000}]}",
+                "text": " {\"answer_markdown\":\"### Direct answer\\n\\nOver their two most recent completed fiscal years, Netflix has grown revenue much faster than Disney. Netflix went from {{nflx.rank_1}} in FY2023 to {{nflx.rank_0}} in FY2025, while Disney went from {{dis.rank_1}} in FY2023 to {{dis.rank_0}} in FY2025.\\n\\nNote on fiscal calendars: Netflix's fiscal year ends December 31, so its two most recent completed years are FY2024 (ended 2024-12-31) and FY2025 (ended 2025-12-31). Disney's fiscal year ends in late September, so its two most recent completed years are FY2024 (ended 2024-09-28) and FY2025 (ended 2025-09-27).\\n\\n### Revenue by fiscal year\\n\\n| Company | FY2023 revenue | FY2024 revenue | FY2025 revenue |\\n| --- | --- | --- | --- |\\n| Netflix (NFLX) | 33,723,297,000 USD | 39,000,966,000 USD | 45,183,036,000 USD |\\n| Walt Disney (DIS) | 88,898,000,000 USD | 91,361,000,000 USD | 94,425,000,000 USD |\\n\\n### Year-over-year growth\\n\\nUsing the reported revenues above:\\n\\n- Netflix FY2024 vs FY2023: from 33,723,297,000 USD to 39,000,966,000 USD.\\n- Netflix FY2025 vs FY2024: from 39,000,966,000 USD to 45,183,036,000 USD.\\n- Disney FY2024 vs FY2023: from 88,898,000,000 USD to 91,361,000,000 USD.\\n- Disney FY2025 vs FY2024: from 91,361,000,000 USD to 94,425,000,000 USD.\\n\\nRanked by two-year revenue growth (FY2025 vs FY2023), higher is better:\\n\\n- Netflix: end value {{nflx.rank_0}}, start value {{nflx.rank_1}}.\\n- Disney: end value {{dis.rank_0}}, start value {{dis.rank_1}}.\\n\\n### Takeaway\\n\\nDisney is still much larger in absolute revenue, but Netflix has been adding revenue at a materially faster pace over the last two fiscal years, roughly mid-teens percent year over year versus low-single-digit percent for Disney. Keep in mind the fiscal-year end dates differ, so the comparison covers overlapping but not identical calendar periods.\",\"calculations\":[{\"inputs\":[{\"as_of\":null,\"currency\":\"USD\",\"name\":\"key_label\",\"source\":\"assumption\",\"source_url\":null,\"value\":\"revenue\"},{\"as_of\":null,\"currency\":\"USD\",\"name\":\"key_kind\",\"source\":\"assumption\",\"source_url\":null,\"value\":\"money\"},{\"as_of\":null,\"currency\":\"USD\",\"name\":\"prefer\",\"source\":\"assumption\",\"source_url\":null,\"value\":\"higher\"},{\"as_of\":\"2025-12-31\",\"currency\":\"USD\",\"name\":\"items\",\"source\":\"page\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"value\":[{\"label\":\"FY2025 revenue\",\"symbol\":\"NFLX\",\"value\":45183036000},{\"label\":\"FY2023 revenue\",\"symbol\":\"NFLX\",\"value\":33723297000}]}],\"kind\":\"ranked_comparison\",\"name\":\"nflx\",\"solve_for\":null},{\"inputs\":[{\"as_of\":null,\"currency\":\"USD\",\"name\":\"key_label\",\"source\":\"assumption\",\"source_url\":null,\"value\":\"revenue\"},{\"as_of\":null,\"currency\":\"USD\",\"name\":\"key_kind\",\"source\":\"assumption\",\"source_url\":null,\"value\":\"money\"},{\"as_of\":null,\"currency\":\"USD\",\"name\":\"prefer\",\"source\":\"assumption\",\"source_url\":null,\"value\":\"higher\"},{\"as_of\":\"2025-09-27\",\"currency\":\"USD\",\"name\":\"items\",\"source\":\"page\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"value\":[{\"label\":\"FY2025 revenue\",\"symbol\":\"DIS\",\"value\":94425000000},{\"label\":\"FY2023 revenue\",\"symbol\":\"DIS\",\"value\":88898000000}]}],\"kind\":\"ranked_comparison\",\"name\":\"dis\",\"solve_for\":null}],\"declined\":false,\"follow_up_questions\":[\"How did Netflix and Disney compare on operating margin over the same period?\",\"What drove Netflix's revenue acceleration in FY2024 and FY2025?\",\"How is Disney's direct-to-consumer segment growing versus its Experiences segment?\",\"What are analyst revenue growth expectations for NFLX and DIS next fiscal year?\"],\"rows\":[{\"as_of\":\"2023-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2023\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":33723297000},{\"as_of\":\"2024-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2024\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":39000966000},{\"as_of\":\"2025-12-31\",\"kind\":\"currency\",\"label\":\"Total revenue FY2025\",\"source_url\":\"https://www.perplexity.ai/finance/NFLX/financials\",\"subject\":\"Netflix\",\"symbol\":\"NFLX\",\"unit\":\"USD\",\"value\":45183036000},{\"as_of\":\"2023-09-30\",\"kind\":\"currency\",\"label\":\"Total revenue FY2023\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":88898000000},{\"as_of\":\"2024-09-28\",\"kind\":\"currency\",\"label\":\"Total revenue FY2024\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":91361000000},{\"as_of\":\"2025-09-27\",\"kind\":\"currency\",\"label\":\"Total revenue FY2025\",\"source_url\":\"https://www.perplexity.ai/finance/DIS/financials\",\"subject\":\"Walt Disney\",\"symbol\":\"DIS\",\"unit\":\"USD\",\"value\":94425000000}],\"source_urls\":[\"https://www.perplexity.ai/finance/NFLX/financials\",\"https://www.perplexity.ai/finance/DIS/financials\"]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_2698af35-5f41-480f-805d-260903961bb2",
+            "id": "msg_4a2ff3b1-15f9-433b-b358-90f8e10ac990",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -551,33 +581,33 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.20751,
+            "cache_creation_cost": 0.32361,
             "currency": "USD",
             "input_cost": 3e-05,
-            "output_cost": 0.04088,
-            "tool_calls_cost": 0.005,
+            "output_cost": 0.06518,
+            "tool_calls_cost": 0.01,
             "tool_calls_cost_details": {
-              "finance_search": 0.005
+              "finance_search": 0.01
             },
-            "total_cost": 0.25342
+            "total_cost": 0.39882
           },
-          "input_tokens": 33207,
+          "input_tokens": 51784,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 33201,
+            "cache_creation_input_tokens": 51777,
             "cache_read_input_tokens": 0,
             "cached_tokens": 0
           },
-          "output_tokens": 1635,
+          "output_tokens": 2607,
           "output_tokens_details": {
             "reasoning_tokens": 0
           },
           "tool_calls_details": {
             "finance_search": {
-              "cost_usd": 0.005,
-              "invocation": 1
+              "cost_usd": 0.01,
+              "invocation": 2
             }
           },
-          "total_tokens": 34842
+          "total_tokens": 54391
         },
         "user": null
       }
@@ -650,6 +680,7 @@
     ],
     "sources": [],
     "tool_results": [
+      "finance_results",
       "finance_results"
     ],
     "tickers": [
@@ -657,19 +688,19 @@
       "DIS"
     ],
     "usage": {
-      "invocations": 1,
-      "finance_search_invocations": 1,
+      "invocations": 2,
+      "finance_search_invocations": 2,
       "web_search_invocations": 0,
       "fetch_url_invocations": 0,
       "model": "anthropic/claude-opus-4-7",
       "latency_ms": 232,
-      "cost_usd": 0.25342,
-      "input_tokens": 33207,
-      "output_tokens": 1635,
-      "cache_creation_input_tokens": 33201,
+      "cost_usd": 0.39882,
+      "input_tokens": 51784,
+      "output_tokens": 2607,
+      "cache_creation_input_tokens": 51777,
       "cache_read_input_tokens": 0
     },
-    "answer_markdown": "### Direct answer\nOver the last two fiscal years, Netflix grew revenue much faster than Disney. Netflix expanded from 33,723,297,000 USD in FY2023 to 45,183,036,000 USD in FY2025, while Disney went from 88,898,000,000 USD in FY2023 to 94,425,000,000 USD in FY2025. Netflix's two‑year growth was roughly six times Disney's on a percentage basis.\n\n### Revenue by fiscal year\n\n| Fiscal year | Netflix (NFLX) | Disney (DIS) |\n|---|---|---|\n| FY2023 | 33,723,297,000 USD | 88,898,000,000 USD |\n| FY2024 | 39,000,966,000 USD | 91,361,000,000 USD |\n| FY2025 | 45,183,036,000 USD | 94,425,000,000 USD |\n\nNote on fiscal calendars: Netflix's fiscal year ends December 31, so FY2025 covers calendar year 2025 (ended 2025-12-31). Disney's fiscal year ends in late September, so FY2025 ended 2025-09-27.\n\n### Year‑over‑year and two‑year change\n- Netflix FY2024 vs FY2023: +5,277,669,000 USD (about +15.6%).\n- Netflix FY2025 vs FY2024: +6,182,070,000 USD (about +15.9%).\n- Netflix two‑year change (FY2023 → FY2025): +11,459,739,000 USD (about +34.0%).\n- Disney FY2024 vs FY2023: +2,463,000,000 USD (about +2.8%).\n- Disney FY2025 vs FY2024: +3,064,000,000 USD (about +3.4%).\n- Disney two‑year change (FY2023 → FY2025): +5,527,000,000 USD (about +6.2%).\n\n### Takeaway\nNetflix compounded at a mid‑teens rate each year, while Disney's growth stayed in the low single digits. On absolute revenue, Disney is still roughly twice Netflix's size, but the growth gap has been widening the mix."
+    "answer_markdown": "### Direct answer\n\nOver their two most recent completed fiscal years, Netflix has grown revenue much faster than Disney. Netflix went from {{nflx.rank_1}} in FY2023 to {{nflx.rank_0}} in FY2025, while Disney went from {{dis.rank_1}} in FY2023 to {{dis.rank_0}} in FY2025.\n\nNote on fiscal calendars: Netflix's fiscal year ends December 31, so its two most recent completed years are FY2024 (ended 2024-12-31) and FY2025 (ended 2025-12-31). Disney's fiscal year ends in late September, so its two most recent completed years are FY2024 (ended 2024-09-28) and FY2025 (ended 2025-09-27).\n\n### Revenue by fiscal year\n\n| Company | FY2023 revenue | FY2024 revenue | FY2025 revenue |\n| --- | --- | --- | --- |\n| Netflix (NFLX) | 33,723,297,000 USD | 39,000,966,000 USD | 45,183,036,000 USD |\n| Walt Disney (DIS) | 88,898,000,000 USD | 91,361,000,000 USD | 94,425,000,000 USD |\n\n### Year-over-year growth\n\nUsing the reported revenues above:\n\n- Netflix FY2024 vs FY2023: from 33,723,297,000 USD to 39,000,966,000 USD.\n- Netflix FY2025 vs FY2024: from 39,000,966,000 USD to 45,183,036,000 USD.\n- Disney FY2024 vs FY2023: from 88,898,000,000 USD to 91,361,000,000 USD.\n- Disney FY2025 vs FY2024: from 91,361,000,000 USD to 94,425,000,000 USD.\n\nRanked by two-year revenue growth (FY2025 vs FY2023), higher is better:\n\n- Netflix: end value {{nflx.rank_0}}, start value {{nflx.rank_1}}.\n- Disney: end value {{dis.rank_0}}, start value {{dis.rank_1}}.\n\n### Takeaway\n\nDisney is still much larger in absolute revenue, but Netflix has been adding revenue at a materially faster pace over the last two fiscal years, roughly mid-teens percent year over year versus low-single-digit percent for Disney. Keep in mind the fiscal-year end dates differ, so the comparison covers overlapping but not identical calendar periods."
   },
   "error": null
 }

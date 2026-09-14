@@ -1,9 +1,9 @@
 {
   "probe": "typed_rows_current_external",
   "purpose": "#545: typed rows and dated publisher sources, one-week recency",
-  "candidate_sha": "88cf7f6d4b0ee13bc85cc92485953b457163593c",
-  "captured_at": "2026-09-13T01:09:55.488697+00:00",
-  "elapsed_s": 34.91,
+  "candidate_sha": "e0a0d8ccd86e0ae370bc38a2c813f26c4bae7f9e",
+  "captured_at": "2026-09-13T23:57:34.389416+00:00",
+  "elapsed_s": 36.47,
   "request_overrides": {},
   "exchanges": [
     {
@@ -36,17 +36,17 @@
           "effort": "low"
         },
         "language_preference": "en",
-        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculation from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers it; never answer such a question with prose and follow-up questions alone. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. List in source_urls every retrieved page the answer relies on; the reader sees those pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. When a choice turns on a future figure nobody can cite, such as an exchange rate or a price, do not project it; show what the recent past did with cited figures, computed by Argus and labeled as history, not a forecast. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculations from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers them; never answer such a question with prose and follow-up questions alone. When a calculation needs a figure only the reader knows, leave that input null and write answer_markdown without that calculation's results: Argus offers the reader the calculation with that figure left to enter. When the reader leaves out a detail the math needs, such as how often interest compounds, assume the likeliest one, say plainly what you assumed, and fill a calculation for each option the reader weighs. When the answer turns on a figure only the reader knows, such as their own balance or rate, fill calculations anyway with that figure left null so Argus offers it, even when nothing else is computed. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculations and no follow-up questions. Fill calculations only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, how many years a sum takes to double, which option costs less or what a dividend yields at today's price, each with the one kind listed below that computes it. When the reader weighs options, fill one calculation for each option under its own short name, with the same kind when one kind computes them all, and never say which option to choose. Argus computes each one: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let a calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculations, write each figure a calculation uses or produces as {{name}}, with its input or result name, or as {{calculation_name.name}} when there is more than one calculation, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculations empty when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "response_format": {
           "type": "json_schema",
           "json_schema": {
-            "name": "argus_typed_answer",
+            "name": "argus_typed_answer_calculations",
             "strict": true,
             "schema": {
-              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, at most one calculation Argus computes, and the questions the reader may ask next.",
+              "description": "A grounded answer: prose for the reader, every figure it states in digits as a cited row, the retrieved pages it relies on, one calculation Argus computes for each option the reader weighs, and the questions the reader may ask next.",
               "properties": {
                 "answer_markdown": {
-                  "description": "The answer for the reader in markdown: the direct answer first, then sections, a table, the formula, a worked example or steps where they help. No links, no list of sources, no mention of tools, providers or models. Every figure the calculation uses or produces is written as its {{name}} reference.",
+                  "description": "The answer for the reader in markdown: the direct answer first, then sections, a table, the formula, a worked example or steps where they help. No links, no list of sources, no mention of tools, providers or models. Every figure a calculation uses or produces is written as its reference.",
                   "type": "string"
                 },
                 "rows": {
@@ -55,7 +55,7 @@
                     "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
                     "properties": {
                       "subject": {
-                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "description": "The entity the figure describes, as the source names it: Microsoft, Santander, Netflix.",
                         "type": "string"
                       },
                       "symbol": {
@@ -78,7 +78,7 @@
                         "type": "number"
                       },
                       "kind": {
-                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as price to book, count for a number of units such as shares.",
                         "enum": [
                           "currency",
                           "percent",
@@ -129,31 +129,109 @@
                   },
                   "type": "array"
                 },
-                "calculation": {
-                  "anyOf": [
-                    {
-                      "description": "The one calculation Argus computes for this answer.",
-                      "properties": {
-                        "kind": {
-                          "description": "The listed calculation that computes the figure the answer turns on.",
-                          "enum": [
-                            "bond_value",
-                            "debt_to_income",
-                            "discounted_cash_flow",
-                            "effective_rate",
-                            "expense_ratio",
-                            "growth_projection",
-                            "income_yield",
-                            "price_multiple",
-                            "ranked_comparison",
-                            "time_value",
-                            "valuation_scenarios"
-                          ],
-                          "type": "string"
-                        },
-                        "solve_for": {
-                          "anyOf": [
-                            {
+                "source_urls": {
+                  "description": "The URL of every retrieved page answer_markdown relies on, most relied on first.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "calculations": {
+                  "description": "One calculation Argus computes for each option the reader weighs, with every input and its source; empty when the answer computes nothing.",
+                  "items": {
+                    "description": "One calculation Argus computes for this answer.",
+                    "properties": {
+                      "name": {
+                        "description": "A short lowercase name for this calculation, such as the option it computes; with more than one calculation, each figure reference starts with it.",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "description": "The listed calculation that computes the figure the answer turns on.",
+                        "enum": [
+                          "bond_value",
+                          "debt_to_income",
+                          "discounted_cash_flow",
+                          "effective_rate",
+                          "expense_ratio",
+                          "growth_projection",
+                          "income_yield",
+                          "price_multiple",
+                          "ranked_comparison",
+                          "time_value",
+                          "valuation_scenarios"
+                        ],
+                        "type": "string"
+                      },
+                      "solve_for": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "amount",
+                              "annual_fee",
+                              "annual_income",
+                              "annual_rate_pct",
+                              "assets",
+                              "cash_flow",
+                              "compounding_per_year",
+                              "contribution",
+                              "coupon_rate_pct",
+                              "coupons_per_year",
+                              "currency",
+                              "direction",
+                              "discount_rate_pct",
+                              "end_value",
+                              "face_value",
+                              "fees",
+                              "future_value",
+                              "growth_base_pct",
+                              "growth_high_pct",
+                              "growth_low_pct",
+                              "growth_rate_pct",
+                              "horizon_years",
+                              "inflation_rate_pct",
+                              "items",
+                              "key_kind",
+                              "key_label",
+                              "monthly_debt_payments",
+                              "monthly_income",
+                              "multiple",
+                              "multiple_base",
+                              "multiple_high",
+                              "multiple_low",
+                              "nominal_rate_pct",
+                              "payment",
+                              "payment_timing",
+                              "per_share",
+                              "periods",
+                              "periods_per_year",
+                              "prefer",
+                              "present_value",
+                              "price",
+                              "ratio_pct",
+                              "start_date",
+                              "start_value",
+                              "symbol",
+                              "terminal_growth_rate_pct",
+                              "value",
+                              "years",
+                              "yield_pct",
+                              "yield_to_maturity_pct"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "For a kind that lists blanks, the name of the one blank to solve, left out of inputs; null otherwise."
+                      },
+                      "inputs": {
+                        "description": "Every input the kind needs, one entry each, with its source.",
+                        "items": {
+                          "description": "One input the calculation uses, with where its value came from.",
+                          "properties": {
+                            "name": {
+                              "description": "The input's name, exactly as the calculation list writes it.",
                               "enum": [
                                 "amount",
                                 "annual_fee",
@@ -208,191 +286,121 @@
                               ],
                               "type": "string"
                             },
-                            {
-                              "type": "null"
-                            }
-                          ],
-                          "description": "For a kind that lists blanks, the name of the one blank to solve, left out of inputs; null otherwise."
-                        },
-                        "inputs": {
-                          "description": "Every input the kind needs, one entry each, with its source.",
-                          "items": {
-                            "description": "One input the calculation uses, with where its value came from.",
-                            "properties": {
-                              "name": {
-                                "description": "The input's name, exactly as the calculation list writes it.",
-                                "enum": [
-                                  "amount",
-                                  "annual_fee",
-                                  "annual_income",
-                                  "annual_rate_pct",
-                                  "assets",
-                                  "cash_flow",
-                                  "compounding_per_year",
-                                  "contribution",
-                                  "coupon_rate_pct",
-                                  "coupons_per_year",
-                                  "currency",
-                                  "direction",
-                                  "discount_rate_pct",
-                                  "end_value",
-                                  "face_value",
-                                  "fees",
-                                  "future_value",
-                                  "growth_base_pct",
-                                  "growth_high_pct",
-                                  "growth_low_pct",
-                                  "growth_rate_pct",
-                                  "horizon_years",
-                                  "inflation_rate_pct",
-                                  "items",
-                                  "key_kind",
-                                  "key_label",
-                                  "monthly_debt_payments",
-                                  "monthly_income",
-                                  "multiple",
-                                  "multiple_base",
-                                  "multiple_high",
-                                  "multiple_low",
-                                  "nominal_rate_pct",
-                                  "payment",
-                                  "payment_timing",
-                                  "per_share",
-                                  "periods",
-                                  "periods_per_year",
-                                  "prefer",
-                                  "present_value",
-                                  "price",
-                                  "ratio_pct",
-                                  "start_date",
-                                  "start_value",
-                                  "symbol",
-                                  "terminal_growth_rate_pct",
-                                  "value",
-                                  "years",
-                                  "yield_pct",
-                                  "yield_to_maturity_pct"
-                                ],
-                                "type": "string"
-                              },
-                              "value": {
-                                "anyOf": [
-                                  {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "boolean"
-                                  },
-                                  {
-                                    "items": {
-                                      "additionalProperties": false,
-                                      "properties": {
-                                        "label": {
-                                          "type": "string"
-                                        },
-                                        "symbol": {
-                                          "anyOf": [
-                                            {
-                                              "type": "string"
-                                            },
-                                            {
-                                              "type": "null"
-                                            }
-                                          ]
-                                        },
-                                        "value": {
-                                          "type": "number"
-                                        }
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "label": {
+                                        "type": "string"
                                       },
-                                      "required": [
-                                        "label",
-                                        "symbol",
-                                        "value"
-                                      ],
-                                      "type": "object"
+                                      "symbol": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
                                     },
-                                    "type": "array"
+                                    "required": [
+                                      "label",
+                                      "symbol",
+                                      "value"
+                                    ],
+                                    "type": "object"
                                   },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "description": "The value: a plain number (7 for 7 percent, 1250000 for 1.25 million), one of the listed options, a list of offers, or null for a figure only the user knows and has not said."
-                              },
-                              "source": {
-                                "description": "page: read from a page retrieved for this answer. market_data: the current price of the named asset, which Argus fills from its own market data. user: stated by the user. assumption: a figure you chose, which the answer states plainly as an assumption.",
-                                "enum": [
-                                  "page",
-                                  "market_data",
-                                  "user",
-                                  "assumption"
-                                ],
-                                "type": "string"
-                              },
-                              "source_url": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "description": "For page, the URL of the retrieved page the value was read from; otherwise null."
-                              },
-                              "as_of": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "description": "For page, the date the page gives for the value as YYYY-MM-DD; otherwise null."
-                              },
-                              "currency": {
-                                "anyOf": [
-                                  {
-                                    "type": "string"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ],
-                                "description": "For a money amount, its ISO 4217 code; otherwise null."
-                              }
+                                  "type": "array"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "The value: a plain number (7 for 7 percent, 1250000 for 1.25 million), one of the listed options, a list of offers, or null for a figure only the user knows and has not said."
                             },
-                            "required": [
-                              "name",
-                              "value",
-                              "source",
-                              "source_url",
-                              "as_of",
-                              "currency"
-                            ],
-                            "type": "object",
-                            "additionalProperties": false
+                            "source": {
+                              "description": "page: read from a page retrieved for this answer. market_data: the current price of the named asset, which Argus fills from its own market data. user: stated by the user. assumption: a figure you chose, which the answer states plainly as an assumption.",
+                              "enum": [
+                                "page",
+                                "market_data",
+                                "user",
+                                "assumption"
+                              ],
+                              "type": "string"
+                            },
+                            "source_url": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For page, the URL of the retrieved page the value was read from; otherwise null."
+                            },
+                            "as_of": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For page, the date the page gives for the value as YYYY-MM-DD; otherwise null."
+                            },
+                            "currency": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "For a money amount, its ISO 4217 code; otherwise null."
+                            }
                           },
-                          "type": "array"
-                        }
-                      },
-                      "required": [
-                        "kind",
-                        "solve_for",
-                        "inputs"
-                      ],
-                      "type": "object",
-                      "additionalProperties": false
+                          "required": [
+                            "name",
+                            "value",
+                            "source",
+                            "source_url",
+                            "as_of",
+                            "currency"
+                          ],
+                          "type": "object",
+                          "additionalProperties": false
+                        },
+                        "type": "array"
+                      }
                     },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "The one calculation Argus computes for this answer, with every input and its source, or null when the answer computes nothing."
+                    "required": [
+                      "name",
+                      "kind",
+                      "solve_for",
+                      "inputs"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
                 },
                 "follow_up_questions": {
                   "description": "Two to four short questions, in the reader's language, that this reader is likely to ask next.",
@@ -409,7 +417,8 @@
               "required": [
                 "answer_markdown",
                 "rows",
-                "calculation",
+                "source_urls",
+                "calculations",
                 "follow_up_questions",
                 "declined"
               ],
@@ -422,13 +431,13 @@
       "http_status": 200,
       "response": {
         "background": false,
-        "completed_at": 1789261760,
-        "created_at": 1789261760,
+        "completed_at": 1789343818,
+        "created_at": 1789343818,
         "error": null,
         "frequency_penalty": 0,
-        "id": "resp_484bc6d9-4b33-4f30-a90d-c299da5da9b6",
+        "id": "resp_07401290-bd58-427b-be06-6e7544028ba8",
         "incomplete_details": null,
-        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. The reader sees the retrieved pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculation from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers it; never answer such a question with prose and follow-up questions alone. When the calculation needs a figure only the reader knows, leave that input null and write answer_markdown without the calculation's results: Argus offers the reader the calculation with that figure left to enter. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculation and no follow-up questions. Fill calculation only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, whether a price is high for its earnings, which option costs less or whether savings keep up with inflation, with the one kind listed below that computes it. Argus computes it: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let the calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculation, write each figure it uses or produces as {{name}}, with its input or result name, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculation null when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
+        "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. List in source_urls every retrieved page the answer relies on; the reader sees those pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. When a choice turns on a future figure nobody can cite, such as an exchange rate or a price, do not project it; show what the recent past did with cited figures, computed by Argus and labeled as history, not a forecast. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculations from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers them; never answer such a question with prose and follow-up questions alone. When a calculation needs a figure only the reader knows, leave that input null and write answer_markdown without that calculation's results: Argus offers the reader the calculation with that figure left to enter. When the reader leaves out a detail the math needs, such as how often interest compounds, assume the likeliest one, say plainly what you assumed, and fill a calculation for each option the reader weighs. When the answer turns on a figure only the reader knows, such as their own balance or rate, fill calculations anyway with that figure left null so Argus offers it, even when nothing else is computed. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculations and no follow-up questions. Fill calculations only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, how many years a sum takes to double, which option costs less or what a dividend yields at today's price, each with the one kind listed below that computes it. When the reader weighs options, fill one calculation for each option under its own short name, with the same kind when one kind computes them all, and never say which option to choose. Argus computes each one: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let a calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculations, write each figure a calculation uses or produces as {{name}}, with its input or result name, or as {{calculation_name.name}} when there is more than one calculation, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculations empty when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\n",
         "max_output_tokens": 2048,
         "max_tool_calls": null,
         "metadata": {},
@@ -446,7 +455,7 @@
             "results": [
               {
                 "category": "quote",
-                "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | previousClose |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-11 20:00:00 UTC | 2026-09-13 01:09:26 UTC | after_hours | 218.29 | USD | -0.07 | -0.03 | 218.36 |\n\nData available in: `NVDA_quotes_e410f2.csv` (row key column: symbol)",
+                "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open. Volume fields are raw share counts (crypto: token units).\n| symbol | name | timestamp | fetched_at | market_status | price | currency | change | changesPercentage | previousClose | dayLow | dayHigh | volume | avgVolume |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-11 20:00:00 UTC | 2026-09-13 23:57:04 UTC | after_hours | 218.29 | USD | -0.07 | -0.03 | 218.36 | 218.17 | 222 | 89,060,140 | 132,087,064 |\n\nData available in: `NVDA_quotes_94dd42.csv` (row key column: symbol)",
                 "sources": [
                   "https://www.perplexity.ai/finance/NVDA"
                 ],
@@ -462,41 +471,59 @@
           },
           {
             "queries": [
-              "NVIDIA stock September 2026 this week news",
-              "NVDA September 11 2026 stock move",
-              "NVIDIA investor relations September 2026 news"
+              "NVIDIA NVDA stock September 2026 week news",
+              "NVIDIA investor relations September 2026 news",
+              "NVDA stock moving this week September 13 2026"
             ],
             "results": [
               {
-                "date": "2026-09-10",
+                "date": "2026-09-08",
                 "id": 1,
-                "last_updated": "2026-09-12",
-                "snippet": "NVIDIA trades near $226.18 as of September 8, 2026. price target for NVIDIA is $308.85 over the next 12 months, implying 36.55% upside. delivered revenue of $ ...",
+                "last_updated": "2026-09-10",
+                "snippet": "NVDA shares rose 1% in overnight trading heading into Tuesday, extending a three-session winning streak that has lifted the stock more than 6.5%.",
                 "source": "web",
-                "title": "NVIDIA Stock Has Returned 14700% in 10 Years. Can It Do It Again?",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/prediction-nvidia-stock-returned-14-140007455.html"
-              },
-              {
-                "date": "2026-09-07",
-                "id": 2,
-                "last_updated": "2026-09-11",
-                "snippet": "NVIDIA reported stronger-than-expected quarterly results, with revenue up 105.9% year over year, while analysts maintain a “Moderate Buy” consensus and an average price target of $324.83.",
-                "source": "web",
-                "title": "Thomasville National Bank Acquires New Shares in NVIDIA Corporation $NVDA",
-                "url": "https://www.marketbeat.com/instant-alerts/filing-thomasville-national-bank-acquires-new-shares-in-nvidia-corporation-nvda-2026-09-07/"
+                "title": "NVDA Rises Overnight After Strong Week: CEO Jensen Huang Pumps Nvidia Chips As ‘Highly Rentable’ Money-Minting Assets",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/nvda-rises-overnight-strong-week-050924878.html"
               },
               {
                 "date": "2026-09-10",
-                "id": 3,
-                "last_updated": "2026-09-12",
+                "id": 2,
+                "last_updated": "2026-09-13",
                 "snippet": "Key Points NVIDIA shares fell 2.4% to $218.36 amid valuation concerns, rising yields, profit-taking and substantial insider selling, including a director’s $144 million share sale.",
                 "source": "web",
-                "title": "NVIDIA (NASDAQ:NVDA) Stock Price Down 2.4% - What's Next?",
+                "title": "NVIDIA (NASDAQ:NVDA) Stock Price Down 2.4%",
                 "url": "https://www.marketbeat.com/instant-alerts/price-nvidia-nasdaq-nvda-stock-price-down-24-whats-next-2026-09-10/"
+              },
+              {
+                "date": "2026-09-11",
+                "id": 3,
+                "last_updated": "2026-09-13",
+                "snippet": "Today 12:20pm ET Nvidia in discussions to invest up to $10B in Anthropic, Reuters reports Yesterday 1:29pm ET Stifel Says Buy AMD Stock, Cites ‘Durability of the EPYC Ramp’ Yesterday 11:00am ET Is Nvidia Still the Hottest AI Stock to Own?",
+                "source": "web",
+                "title": "NVDA Stock Quote Price and Forecast - CNN",
+                "url": "https://www.cnn.com/markets/stocks/NVDA"
               },
               {
                 "date": "2026-09-07",
                 "id": 4,
+                "last_updated": "2026-09-10",
+                "snippet": "MarketBeat Week in Review – 08/31 - 09/04Read Our Latest Analysis on NVDAMore NVIDIA NewsHere are the key news stories impacting NVIDIA this week: Positive Sentiment: Hugging Face expands NVIDIA’s AI ecosystem: The acquisition gives NVIDIA access to Hugging Face’s open-source platform, which hosts millions of models, applications and datasets used by more than 18 million developers.",
+                "source": "web",
+                "title": "Venturi Wealth Management LLC Acquires 15,227 Shares of NVIDIA ...",
+                "url": "https://www.marketbeat.com/instant-alerts/filing-venturi-wealth-management-llc-acquires-15227-shares-of-nvidia-corporation-nvda-2026-09-07/"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 5,
+                "last_updated": "2026-09-10",
+                "snippet": "Key Headlines Impacting NVIDIAHere are the key news stories impacting NVIDIA this week: Positive Sentiment: Hugging Face expands NVIDIA’s AI ecosystem: The acquisition gives NVIDIA access to Hugging Face’s open-source platform, which hosts millions of models, applications and datasets used by more than 18 million developers.",
+                "source": "web",
+                "title": "Colony Family Offices LLC Purchases 2732 Shares of ...",
+                "url": "https://www.marketbeat.com/instant-alerts/filing-colony-family-offices-llc-purchases-2732-shares-of-nvidia-corporation-nvda-2026-09-07/"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 6,
                 "last_updated": "2026-09-09",
                 "snippet": "MarketBeat Week in Review – 08/31 - 09/04Get Our Latest Stock Analysis on NVDAKey NVIDIA NewsHere are the key news stories impacting NVIDIA this week: Positive Sentiment: Hugging Face expands NVIDIA’s AI ecosystem: The acquisition gives NVIDIA access to Hugging Face’s open-source platform, which hosts millions of models, applications and datasets used by more than 18 million developers.",
                 "source": "web",
@@ -504,393 +531,85 @@
                 "url": "https://www.marketbeat.com/instant-alerts/filing-nvidia-corporation-nvda-position-trimmed-by-pathway-wealth-management-llc-2026-09-07/"
               },
               {
-                "date": "2026-09-07",
-                "id": 5,
-                "last_updated": "2026-09-10",
-                "snippet": "According to MarketBeat, the stock presently has an average rating of \"Moderate Buy\" and an average price target of $324.83.View Our Latest Research Report on NVIDIANVIDIA News SummaryHere are the key news stories impacting NVIDIA this week: Positive Sentiment: Hugging Face expands NVIDIA’s AI ecosystem: The acquisition gives NVIDIA access to Hugging Face’s open-source platform, which hosts millions of models, applications and datasets used by more than 18 million developers.",
-                "source": "web",
-                "title": "Farmers & Merchants Investments Inc. Purchases 13,817 Shares of NVIDIA Corporation $NVDA",
-                "url": "https://www.marketbeat.com/instant-alerts/filing-farmers-merchants-investments-inc-purchases-13817-shares-of-nvidia-corporation-nvda-2026-09-07/"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 6,
-                "last_updated": "2026-09-12",
-                "snippet": "MarketBeat Week in Review – 08/31 - 09/04Read Our Latest Stock Report on NVIDIATrending Headlines about NVIDIAHere are the key news stories impacting NVIDIA this week: Positive Sentiment: NVIDIA’s planned $12.93 billion acquisition of Hugging Face could expand its full-stack AI strategy by combining its chips and CUDA software with Hugging Face’s open-model library and developer community.",
-                "source": "web",
-                "title": "Oak Thistle LLC Invests $3.04 Million in NVIDIA ...",
-                "url": "https://www.marketbeat.com/instant-alerts/filing-oak-thistle-llc-invests-304-million-in-nvidia-corporation-nvda-2026-09-08/"
-              },
-              {
-                "date": "2026-09-11",
+                "date": "2026-09-12",
                 "id": 7,
-                "last_updated": "2026-09-12",
-                "snippet": "Nvidia (NASDAQ:NVDA), the dominant artificial-intelligence accelerator supplier, climbed roughly 0.6% to $220.43 Friday, finding buyers after a bruising stretch against rival chipmakers.",
+                "last_updated": "2026-09-13",
+                "snippet": "Piper Sandler started coverage of Nvidia (NVDA) with an overweight rating and a $300 price target, calling the company the \"outright leader in AI compute,\" according to Investing.com.",
                 "source": "web",
-                "title": "Nvidia Rebounds After Rivals Open a 10-Point Weekly Gap",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-rebounds-rivals-open-10-183944063.html"
-              },
-              {
-                "date": "2026-09-09",
-                "id": 8,
-                "last_updated": "2026-09-12",
-                "snippet": "-0.03%\n...\nThe comment landed just as OpenAI rolled out a brand-new model that the company says beats everything it has built before.",
-                "source": "web",
-                "title": "Nvidia CEO Jensen Huang Claims AGI Has Arrived as OpenAI ...",
-                "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-ceo-jensen-huang-claims-203637094.html"
-              },
-              {
-                "date": "2026-09-07",
-                "id": 9,
-                "last_updated": "2026-09-08",
-                "snippet": "NVDA closed at $230.36 on September 4, 2026, up 5.89% over the past week, 23.67% year to date, and 34.37% over the past year.",
-                "source": "web",
-                "title": "Jensen Huang Declares “AGI Has Arrived”",
-                "url": "https://www.aol.com/articles/jensen-huang-declares-agi-arrived-163016000.html"
+                "title": "Analyst sets jaw-dropping Nvidia price target - Yahoo Finance",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/analyst-sets-jaw-dropping-nvidia-173300433.html"
               },
               {
                 "date": "2026-09-11",
-                "id": 10,
-                "last_updated": "2026-09-12",
-                "snippet": "Fri, September 11, 2026 at 6:30 AM CST5 min read\n- NVDA\n-0.03%",
+                "id": 8,
+                "last_updated": "2026-09-13",
+                "snippet": "Get NVIDIA alerts:Sign UpNVIDIA News RoundupHere are the key news stories impacting NVIDIA this week: Positive Sentiment: NVIDIA’s AI growth outlook remains exceptionally strong.",
                 "source": "web",
-                "title": "The Next Phase of the AI Boom Could Be Great News for NVIDIA, Micron, and SanDisk",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/next-phase-ai-boom-could-123037531.html"
+                "title": "NVIDIA Corporation $NVDA Holdings Lowered by Franchise GP Ltd",
+                "url": "https://www.marketbeat.com/instant-alerts/filing-nvidia-corporation-nvda-holdings-lowered-by-franchise-gp-ltd-2026-09-11/"
               },
               {
                 "date": "2026-09-12",
+                "id": 9,
+                "last_updated": "2026-09-13",
+                "snippet": "### Nvidia a potential investor in Anthropic IPO: report\n### UAE modifies 5-GW Stargate data center project in wake of Iran war: report",
+                "source": "web",
+                "title": "NVIDIA Corporation (NVDA) Stock Price, Quote, News & Analysis",
+                "url": "https://seekingalpha.com/symbol/NVDA"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 10,
+                "last_updated": "2026-09-13",
+                "snippet": "- Nvidia announced the acquisition of open-source AI models and datasets company Hugging Face on Sept. 3, valued at $12.93 billion.",
+                "source": "web",
+                "title": "Top M&A Deals In September: Nvidia, Dominion Energy ...",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/top-m-deals-september-nvidia-061244979.html"
+              },
+              {
+                "date": "2026-09-09",
                 "id": 11,
-                "last_updated": "2026-09-12",
-                "snippet": "Nvidia is considering investing up to $10 billion in the IPO, one of the sources added. The plans remain under discussion and could change, they cautioned, ...",
+                "last_updated": "2026-09-13",
+                "snippet": "Mark A. Stevens, a director at NVIDIA Corp.\n(NASDAQ:NVDA), sold common stock totaling approximately $235.6 million over two days in early September.",
+                "source": "web",
+                "title": "NVIDIA director Mark Stevens sells $235.6m in shares",
+                "url": "https://www.investing.com/news/insider-trading-news/nvidia-director-mark-stevens-sells-2356m-in-shares-93CH-4893548"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 12,
+                "last_updated": "2026-09-13",
+                "snippet": "- Insiders sold 1.56 million NVIDIA shares worth roughly $335.4 million over the past 90 days, including significant sales by Director Mark A. Stevens and EVP Timothy S. Teter.",
+                "source": "web",
+                "title": "Global Financial Private Client LLC Increases Position in ...",
+                "url": "https://www.marketbeat.com/instant-alerts/filing-global-financial-private-client-llc-increases-position-in-nvidia-corporation-nvda-2026-09-07/"
+              },
+              {
+                "date": "2026-09-11",
+                "id": 13,
+                "last_updated": "2026-09-13",
+                "snippet": "Sept 11 (Reuters) - Anthropic is in talks to ​bring Nvidia (NVDA.O) , opens new tab as an anchor investor into what could be the largest IPO in history, two people familiar with the ‌matter told Reuters.",
                 "source": "web",
                 "title": "Nvidia in talks to invest in Anthropic's mega IPO, sources say | Reuters",
                 "url": "https://www.reuters.com/legal/transactional/nvidia-talks-invest-anthropics-mega-ipo-sources-say-2026-09-11/"
               },
               {
-                "date": "2026-09-08",
-                "id": 12,
-                "last_updated": "2026-09-12",
-                "snippet": "- Nvidia announced the acquisition of open-source AI models and datasets company Hugging Face on Sept. 3, valued at $12.93 billion.",
-                "source": "web",
-                "title": "Top M&A Deals In September: Nvidia, Dominion Energy, Nextera ...",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/top-m-deals-september-nvidia-061244979.html"
-              },
-              {
-                "date": "2026-09-07",
-                "id": 13,
-                "last_updated": "2026-09-11",
-                "snippet": "Key Stories Impacting NVIDIANVIDIA’s Hugging Face Deal Raises a Bigger Question About Its AI Moat NowHere are the key news stories impacting NVIDIA this week: Positive Sentiment: Hugging Face expands NVIDIA’s AI ecosystem: The acquisition gives NVIDIA access to Hugging Face’s open-source platform, which hosts millions of models, applications and datasets used by more than 18 million developers.",
-                "source": "web",
-                "title": "Allied Investment Advisors LLC Trims Holdings in NVIDIA ...",
-                "url": "https://www.marketbeat.com/instant-alerts/filing-allied-investment-advisors-llc-trims-holdings-in-nvidia-corporation-nvda-2026-09-07/"
-              },
-              {
-                "date": "2026-09-08",
+                "date": "2026-09-11",
                 "id": 14,
-                "last_updated": "2026-09-11",
-                "snippet": "CNBC's Jim Cramer identified Nvidia and Broadcom as the two stocks most likely to benefit from OpenAI's release of its GPT-6 Astra model, speaking Tuesday on CNBC's Morning Meeting.\n...\nNvidia stock opened higher Tuesday before falling 2%.",
-                "source": "web",
-                "title": "Jim Cramer picks Nvidia and Broadcom as OpenAI GPT-6 Astra winners",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/jim-cramer-picks-nvidia-broadcom-171803449.html"
-              },
-              {
-                "date": "2026-09-11",
-                "id": 15,
-                "last_updated": "2026-09-11",
-                "snippet": "Nvidia Corporation stock (ISIN US67066G1040) closed at USD 218.36 on Nasdaq on September 10, 2026, down about 2.3 percent from the previous close as investors reacted to news of a U.S. Department of Justice review of its licensing arrangement with AI chip firm Groq.",
-                "source": "web",
-                "title": "Nvidia stock falls after DOJ Groq probe as dividend hike and analyst support shape outlook",
-                "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-falls-after-doj-groq-probe-as-dividend-hike-and-analyst/70087554"
-              }
-            ],
-            "type": "search_results"
-          },
-          {
-            "queries": [
-              "Reuters Nvidia stock September 10 2026 DOJ Groq",
-              "Reuters Nvidia September 2026 stock falls yields",
-              "CNBC Nvidia stock September 10 2026"
-            ],
-            "results": [
-              {
-                "date": "2026-09-10",
-                "id": 31,
                 "last_updated": "2026-09-13",
-                "snippet": "The U.S. ​Justice Department is investigating whether Nvidia structured ‌its licensing deal with AI chip startup Groq to avoid antitrust scrutiny, ...",
+                "snippet": "## Key Points\n- **Piper Sandler upgraded NVIDIA to “Strong Buy,”** adding to an overwhelmingly bullish analyst consensus: 50 analysts rate the stock Buy and two rate it Hold, with an average price target of $324.34.",
                 "source": "web",
-                "title": "DOJ probes Nvidia's licensing deal with AI startup Groq, NYT reports",
-                "url": "https://www.reuters.com/legal/litigation/us-doj-probes-nvidias-licensing-deal-with-ai-startup-groq-nyt-reports-2026-09-10/"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 32,
-                "last_updated": "2026-09-12",
-                "snippet": "Reuters US DOJ probes Nvidia's licensing deal with AI startup Groq, Reuters could not immediately verify the report.",
-                "source": "web",
-                "title": "US DOJ probes Nvidia's licensing deal with AI startup Groq, NYT ...",
-                "url": "https://finance.yahoo.com/technology/ai/articles/us-doj-probes-nvidias-licensing-003659525.html"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 33,
-                "last_updated": "2026-09-12",
-                "snippet": "Piper Sandler says AI is causing 'insatiable demand' for compute capacity. These two stocks will benefit most Published Thu, Sep 10 20267:26. Nvidia with ...",
-                "source": "web",
-                "title": "Piper Sandler says these compute stocks will benefit from ... - CNBC",
-                "url": "https://www.cnbc.com/2026/09/10/piper-sandler-says-these-compute-stocks-will-benefit-from-high-demand.html"
-              },
-              {
-                "date": "2026-09-11",
-                "id": 34,
-                "last_updated": "2026-09-12",
-                "snippet": "The Investment Committee give you their top stocks to watch for the second half. 00:48. Thu, Sep 10 20261:07 PM EDT ... Global Business and Financial News, Stock ...",
-                "source": "web",
-                "title": "Final Trades: Snowflake, Tempus AI, Chubb and Nvidia - CNBC",
-                "url": "https://www.cnbc.com/video/2026/09/10/final-trades-snowflake-tempus-ai-chubb-and-nvidia.html"
-              },
-              {
-                "date": "2026-09-12",
-                "id": 35,
-                "last_updated": "2026-09-12",
-                "snippet": "DOJ is reportedly investigating Nvidia's Groq deal over antitrust concerns, raising questions about licensing, hiring and competition in AI chips.",
-                "source": "web",
-                "title": "DOJ reportedly probes Nvidia-Groq deal for antitrust concerns",
-                "url": "https://www.techtarget.com/it-infrastructure/news/366650378/DOJ-reportedly-probes-Nvidia-Groq-deal-for-antitrust-concerns"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 36,
-                "last_updated": "2026-09-12",
-                "snippet": "Nvidia (NASDAQ:NVDA) shares dipped about 1% early Thursday as a U.S. Justice Department review examined whether its $20 billion arrangement with AI chip startup Groq was designed to limit antitrust scrutiny, Bloomberg reported, citing people familiar with the matter.",
-                "source": "web",
-                "title": "Nvidia Stock Falls. DOJ Probes $20 Billion Groq Deal",
-                "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-stock-falls-doj-probes-122547655.html"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 37,
-                "last_updated": "2026-09-12",
-                "snippet": "Tech and other AI names Nvidia : We haven’t given up on Nvidia despite curbing our enthusiasm across the broader semiconductor group.",
-                "source": "web",
-                "title": "A rapid-fire update on our 33-stock portfolio, including 6 to ...",
-                "url": "https://www.cnbc.com/2026/09/10/a-rapid-fire-update-on-our-33-stock-portfolio-including-6-to-buy-now.html"
-              },
-              {
-                "date": "2026-09-11",
-                "id": 38,
-                "last_updated": "2026-09-11",
-                "snippet": "Heavyweight chipmakers lost ground, with Nvidia (NVDA.O) , opens new tab down 2.3% losing 4.7%, both weighing on the S&P 500.",
-                "source": "web",
-                "title": "S&P 500 ends down as Treasury yields rise and traders fret about ...",
-                "url": "https://www.reuters.com/business/sp-500-dow-futures-attempt-recovery-ahead-inflation-report-2026-09-10/"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 39,
-                "last_updated": "2026-09-12",
-                "snippet": "Sept 9 (Reuters) - The U.S. Justice Department is investigating whether Nvidia tried to skirt antitrust scrutiny of the chipmaker's licensing deal last year ...",
-                "source": "web",
-                "title": "US DOJ probes Nvidia's licensing deal with AI startup Groq, NYT ...",
-                "url": "https://www.investing.com/news/stock-market-news/us-doj-probes-nvidias-licensing-deal-with-ai-startup-groq-nyt-reports-4894824"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 40,
-                "last_updated": "2026-09-12",
-                "snippet": "Here are Thursday's biggest analyst calls: Nvidia, SpaceX, Tesla, Published Thu, Sep 10 20268:08 … its price target to $460 per share from $442. News, Stock ...",
-                "source": "web",
-                "title": "Biggest analyst calls Thursday like Nvidia - CNBC",
-                "url": "https://www.cnbc.com/2026/09/10/biggest-analyst-calls-thursday-like-nvidia.html"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 41,
-                "last_updated": "2026-09-12",
-                "snippet": "- NVDA\n-0.03%\n...\nNvidia shares fell almost 2% to $225.80 during the Sept. 8 session, while Broadcom gained nearly 3% to close at $368.17, CNBC reported.",
-                "source": "web",
-                "title": "Jim Cramer has strong message for Nvidia, Broadcom ...",
-                "url": "https://finance.yahoo.com/markets/stocks/articles/jim-cramer-strong-message-nvidia-140700696.html"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 42,
-                "last_updated": "2026-09-11",
-                "snippet": "Published Thu, Sep 10 202610:00 AM EDTUpdated Thu, Sep 10 202611:00 AM EDT",
-                "source": "web",
-                "title": "Our top 3 stocks that bucked the market's recent pullback - CNBC",
-                "url": "https://www.cnbc.com/2026/09/10/our-top-3-stocks-that-bucked-the-markets-recent-pullback-plus-a-look-at-the-bottom-3.html"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 43,
-                "last_updated": "2026-09-12",
-                "snippet": "-0.03%\n...\nThe Justice Department is investigating Nvidia's $20 billion non-exclusive\" licensing agreement with Groq to determine if it \"tried to skirt antitrust scrutiny,\" according to the NY Times.",
-                "source": "web",
-                "title": "DOJ investigates Nvidia's deal with Groq - Yahoo Finance",
-                "url": "https://finance.yahoo.com/technology/ai/articles/doj-investigates-nvidias-deal-groq-162930140.html"
-              },
-              {
-                "date": "2026-09-11",
-                "id": 44,
-                "last_updated": "2026-09-11",
-                "snippet": "Nvidia Corporation stock (ISIN US67066G1040) closed at USD 218.36 on Nasdaq on September 10, 2026, down about 2.3 percent from the previous close as investors reacted to news of a U.S. Department of Justice review of its licensing arrangement with AI chip firm Groq.\n...\nAs StocksDownUnder reported on September 11, 2026, Nvidia shares fell about 2.3 percent on September 10, 2026, closing at USD 218.36 after the DOJ began reviewing a roughly USD 17 billion Groq licensing-and-hiring arrangement that has become a focal point for regulatory risk around AI hardware spending.",
-                "source": "web",
-                "title": "Nvidia stock falls after DOJ Groq probe as dividend hike and analyst support shape outlook",
-                "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-falls-after-doj-groq-probe-as-dividend-hike-and-analyst/70087554"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 45,
-                "last_updated": "2026-09-12",
-                "snippet": "NVIDIA also returned to focus after Reuters reported that the US Justice Department is investigating whether the chipmaker attempted to avoid antitrust scrutiny through the structure of its licensing arrangement with AI chip startup Groq.\n...\nThe reported investigation concerns NVIDIA's roughly $20 billion non-exclusive licensing agreement with Groq, rather than an outright acquisition of the company.",
-                "source": "web",
-                "title": "Apple, NVIDIA & Intel: Tech Markets in Focus | Plus500",
-                "url": "https://us.plus500.com/en/newsandmarketinsights/apple-nvidia-intel-tech-markets-in-focus"
-              }
-            ],
-            "type": "search_results"
-          },
-          {
-            "queries": [
-              "site:nvidianews.nvidia.com September 2026 NVIDIA announcement",
-              "site:sec.gov NVIDIA Form 4 September 2026",
-              "NVIDIA Hugging Face acquisition September 3 2026 company"
-            ],
-            "results": [
-              {
-                "date": "2026-09-10",
-                "id": 16,
-                "last_updated": "2026-09-10",
-                "snippet": "Browse and search for NVIDIA latest news and archive news by month, year or category ... September 10, 2026. Skild AI Taps NVIDIA Physical AI to Teach Robots New ...",
-                "source": "web",
-                "title": "News Archive - NVIDIA Newsroom",
-                "url": "https://nvidianews.nvidia.com/news/nvidia-tsmc-semiconductor-manufacturing"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 17,
-                "last_updated": "2026-09-10",
-                "snippet": "September 10, 2026. NVIDIA and MediaTek Deepen Long-Standing Partnership to Build AI Edge to Cloud Computing Platforms. August 31, 2026. NVIDIA Announces ...",
-                "source": "web",
-                "title": "NVIDIA Expands AI Infrastructure Capacity in Partnership With ...",
-                "url": "https://nvidianews.nvidia.com/news/nvidia-expands-ai-infrastructure-capacity-in-partnership-with-australias-data-center-ecosystem"
-              },
-              {
-                "date": "2026-09-09",
-                "id": 18,
-                "last_updated": "2026-09-10",
-                "snippet": "I’m excited to announce that NVIDIA has agreed to acquire Hugging Face for $12,930,300,000.",
-                "source": "web",
-                "title": "NVIDIA CEO Jensen Huang and Global Technology ...",
-                "url": "https://nvidianews.nvidia.com/news/nvidia-ceo-jensen-huang-and-global-technology-leaders-to-showcase-age-of-ai-at-gtc-2026:@NVIDIA"
-              },
-              {
-                "date": "2026-09-11",
-                "id": 19,
-                "last_updated": "2026-09-10",
-                "snippet": "September 10, 2026. NVIDIA and Palantir Bring Sovereign Intelligence to Critical Supply Chains. News Summary: Collaboration establishes an AI stack combining ...",
-                "source": "web",
-                "title": "NVIDIA and Palantir Bring Sovereign Intelligence to Critical Supply ...",
-                "url": "https://nvidianews.nvidia.com/news/nvidia-and-palantir-bring-sovereign-intelligence-to-critical-supply-chains/?nvid=nv-cwmfg-359690"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 20,
-                "last_updated": "2026-09-10",
-                "snippet": "I’m excited to announce that NVIDIA has agreed to acquire Hugging Face for $12,930,300,000.",
-                "source": "web",
-                "title": "News Archive",
-                "url": "https://nvidianews.nvidia.com/news/rubin-r200-production-update-sept-2026"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 21,
-                "last_updated": "2026-09-10",
-                "snippet": "I’m excited to announce that NVIDIA has agreed to acquire Hugging Face for $12,930,300,000.",
-                "source": "web",
-                "title": "NVIDIA and Palantir Bring Sovereign Intelligence to Critical Supply ...",
-                "url": "https://nvidianews.nvidia.com/news/nvidia-and-palantir-bring-sovereign-intelligence-to-critical-supply-chains-6928068"
-              },
-              {
-                "date": "2026-09-10",
-                "id": 22,
-                "last_updated": "2026-09-10",
-                "snippet": "(NASDAQ: PLTR) and NVIDIA (NASDAQ: NVDA) today announced a collaboration to bring sovereign AI to critical supply chains, starting with NVIDIA’s own operations.",
-                "source": "web",
-                "title": "NVIDIA and Palantir Bring Sovereign Intelligence to Critical Supply Chains",
-                "url": "https://nvidianews.nvidia.com/news/nvidia-and-palantir-bring-sovereign-intelligence-to-critical-supply-chains/?nvid=nv-csfg-771428"
-              },
-              {
-                "date": "2026-09-07",
-                "id": 23,
-                "last_updated": "2026-09-12",
-                "snippet": "**Nvidia** (NASDAQ:NVDA) announced on September 3 that it has agreed to acquire Hugging Face, which runs one of the most widely used platforms for sharing artificial intelligence (AI) models.\nThe total deal value is about $12.9 billion.\nNvidia expects the deal to close in the first half of 2027.\nAnd the company says Hugging Face will stay an open platform for the whole AI ecosystem, with Nvidia compute never required to build on it.",
-                "source": "web",
-                "title": "History Says What Nvidia's Last Big Acquisition Became. ...",
-                "url": "https://finance.yahoo.com/technology/ai/articles/history-says-nvidias-last-big-033801868.html"
+                "title": "Piper Sandler Upgrades NVIDIA (NASDAQ:NVDA) to Strong-Buy",
+                "url": "https://www.marketbeat.com/instant-alerts/analyst-piper-sandler-upgrades-nvidia-nasdaq-nvda-to-strong-buy-2026-09-11/"
               },
               {
                 "date": "2026-09-08",
-                "id": 24,
-                "last_updated": "2026-09-08",
-                "snippet": "Nvidia has confirmed its $12.9 billion acquisition of Hugging Face, taking control of one of the most widely used platforms for sharing artificial intelligence models, datasets and applications.\nThe deal was announced on September 3 and is Nvidia’s second-largest acquisition, after its $20 billion purchase of Groq’s assets last year.",
-                "source": "web",
-                "title": "Nvidia says Hugging Face will remain an open platform",
-                "url": "https://dataconomy.com/2026/09/08/nvidia-hugging-face-acquisition-12-9-billion/"
-              },
-              {
-                "date": "2026-09-09",
-                "id": 25,
-                "last_updated": "2026-09-09",
-                "snippet": "**3^rd^ September 2026** – Nvidia has agreed to buy artificial intelligence platform Hugging Face in a deal valued at about $12.9bn (£9.5bn), one of the AI chipmaker’s biggest acquisitions as it expands into software.\n...\nUnder the agreement, Nvidia will pay about $11.9bn to Hugging Face investors and offer up to $1bn in stock-based incentives to employees who join the company.",
-                "source": "web",
-                "title": "Press release: Nvidia strikes $12.9bn deal to buy open source AI platform Hugging Face | Treasury Today",
-                "url": "https://treasurytoday.com/press-releases/press-release-nvidia-strikes-12-9bn-deal-to-buy-open-source-ai-platform-hugging-face/"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 26,
-                "last_updated": "2026-09-08",
-                "snippet": "I’m excited to announce that **Nvidia has agreed to acquire Hugging Face for $12,930,300,000**.",
-                "source": "web",
-                "title": "Nvidia to Acquire Hugging Face",
-                "url": "https://www.storagenewsletter.com/2026/09/08/nvidia-to-acquire-hugging-face/"
-              },
-              {
-                "date": "2026-09-08",
-                "id": 27,
-                "last_updated": "2026-09-09",
-                "snippet": "**Form 4** - Statement of changes in beneficial ownership of securities:\n**SEC Accession No.** 0001199039-26-000014\nFiling Date\n2026-09-08\nAccepted\n2026-09-08 17:09:19",
-                "source": "web",
-                "title": "Filing Detail",
-                "url": "https://www.sec.gov/Archives/edgar/data/1045810/000119903926000014/0001199039-26-000014-index.htm"
-              },
-              {
-                "date": "2026-09-07",
-                "id": 28,
+                "id": 15,
                 "last_updated": "2026-09-12",
-                "snippet": "NVIDIA announced on September 3, 2026, that it will acquire Hugging Face for $12.93 billion, a deal structured as approximately $11.9 billion in cash",
+                "snippet": "Get NVIDIA alerts:Sign UpKey Headlines Impacting NVIDIAHere are the key news stories impacting NVIDIA this week: Positive Sentiment: NVIDIA’s planned $12.93 billion acquisition of Hugging Face could expand its full-stack AI strategy by combining its chips and CUDA software with Hugging Face’s open-model library and developer community.",
                 "source": "web",
-                "title": "NVIDIA's $12.93B Hugging Face Acquisition Becomes Definitive",
-                "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-12-93b-hugging-face-075456869.html"
-              },
-              {
-                "date": "2026-09-09",
-                "id": 29,
-                "last_updated": "2026-09-09",
-                "snippet": "I’m excited to announce that NVIDIA has agreed to acquire Hugging Face for $12,930,300,000.",
-                "source": "web",
-                "title": "New GeForce GTX 1660 Ti Delivers Great Performance ...",
-                "url": "https://nvidianews.nvidia.com/news/new-geforce-gtx-1660-ti-delivers-great-performance-leap-for-every-gamer-starting-at-279:;New"
-              },
-              {
-                "date": "2026-09-09",
-                "id": 30,
-                "last_updated": "2026-09-09",
-                "snippet": "I’m excited to announce that NVIDIA has agreed to acquire Hugging Face for $12,930,300,000.",
-                "source": "web",
-                "title": "NVIDIA to Acquire Arm for $40 Billion, Creating World's ...",
-                "url": "https://nvidianews.nvidia.com/news/nvidia-to-acquire-arm-for-40-billion-creating-worlds-premier-computing-company-for-the-age-of-ai:?NVIDIA"
+                "title": "Webster Bank N. A. Has $41.38 Million Stock Position in NVIDIA Corporation $NVDA",
+                "url": "https://www.marketbeat.com/instant-alerts/filing-webster-bank-n-a-has-4138-million-stock-position-in-nvidia-corporation-nvda-2026-09-08/"
               }
             ],
             "type": "search_results"
@@ -898,14 +617,174 @@
           {
             "contents": [
               {
-                "snippet": "Sept 10 (Reuters) - U.S. stocks ended down on Thursday after producer price data for August ​and surging oil prices stoked worries the Federal Reserve will hike interest rates next week, while climbing Treasury yields made ‌stocks less attractive.\nHeavyweight chipmakers lost ground, with Nvidia (NVDA.O) , opens new tab down 2.3% and Micron Technology (MU.O) , opens new tab losing 4.7%, both weighing on the S&P 500. Apple (AAPL.O) , opens new tab rallied 3.6% a day after launching a $1,999 iPhone.\nWith supply routes through both the Strait of Hormuz and the Red Sea disrupted by the U.S.-Israeli war on Iran, Brent crude jumped 6% to $107 a barrel , adding to inflation ​worries and fueling expectations the Fed will raise interest rates at its policy meeting on Wednesday.\nYields on 10-year Treasury notes rose ​to their highest in nearly three years, while 30-year Treasury yields hit their highest in more than 19 years ⁠and 2-year Treasury yields reached their highest in more than two years.\n\"Yields are going up at the short end of the curve because the ​Fed is probably going to hike in the next couple months. Yields are going up at the long end of the curve because of debt ​and deficit issues, and sticky inflation,\" said Ross Mayfield, an investment strategy analyst at Baird in Louisville, Kentucky.\n\"Higher yields are a negative for the equity market. They lower valuations and they make it more expensive to operate a business, and more expensive for consumers to exist in the world.\"\nData on Thursday showed the U.S. producer price index , opens new tab (PPI) ​increased in line with expectations in August on a monthly basis amid a rebound in the cost of energy products. Investors will pay close ​attention to Friday's August consumer price data.\nThe S&P 500 declined 0.58% to end the session at 7,591.75 points.\nThe Nasdaq declined 0.65% to 26,081.73 points, while the Dow ‌Jones Industrial ⁠Average declined 0.60% to 52,064.10 points.\nThe S&P 500 has lost 2% in the past four sessions, its deepest four-day loss since June.\nNine of the 11 S&P 500 sector indexes declined, led lower by materials (.SPLRCM) , opens new tab , down 1.45%, followed by a 0.91% loss in information technology (.SPLRCT) , opens new tab .\nVolume on U.S. exchanges was relatively heavy, with 15.1 billion shares traded, compared to an average of 14.9 billion shares over the previous 20 sessions.\nTraders now see a 70% chance the Federal ​Reserve will raise interest rates by ​at least 25 basis points ⁠next week, up from about 64% before Thursday's report, the CME FedWatch tool showed.\nFollowing recent declines, the S&P 500 is down nearly 3% from its record high close on August 13, and it remains up 11% in ​2026.\nThe S&P 500's recent decline, coupled with a strong earnings outlook, has the benchmark trading at 19 times ​expected earnings, its ⁠cheapest since April 2025, when U.S. President Donald Trump's \"Liberation Day\" tariff announcements threw global markets into a tailspin.\nIn Thursday's trading, Macy's (M.N) , opens new tab fell 4.7%. The struggling department-store operator raised its annual forecasts, but not by enough to impress investors.\nAmerican Eagle Outfitters (AEO.N) , opens new tab dropped 14% to its lowest since October as the apparel maker reiterated its annual comparable sales forecast ⁠amid choppy ​discretionary spending.\nDeclining stocks outnumbered rising ones within the S&P 500 (.AD.SPX) , opens new tab by a 2.0-to-one ratio.\nThe S&P ​500 posted eight new highs and 28 new lows; the Nasdaq recorded 44 new highs and 215 new lows.",
-                "title": "S&P 500 ends down as Treasury yields rise and traders fret about inflation",
+                "snippet": "NVDA Rises Overnight After Strong Week: CEO Jensen Huang Pumps Nvidia Chips As ‘Highly Rentable’ Money-Minting Assets\n\n### Trending Tickers\n\n- AAPL\n  315.34\n\n  (-0.28%)\n- AVAV\n  140.80\n\n  (-5.36%)\n- M\n  META\n  653.69\n\n  (+6.55%)\n- NET\n  314.18\n\n  (+10.51%\n- A\n  AEO\n\n1. 1. 1. Compare Credit Cards\n   2. Best 0% APR cards\n   3. Best balance transfer cards\n   4. Best rewards cards\n   5. Best travel cards\n\nNetwork\n\n### U.S. markets open in 2h 45m\n\nCryptocurrencies\n\nRates\n\nCommodities\n\nCurrencies\n\nU.S. markets open in 2h 45m\n\nS&P Futures 7,649.00+5.25+0.07%\n\nDow Futures 52,540.00+115.00+0.22%\n\nNasdaq Futures 29,374.75-74.00-0.25%\n\nRussell 2000 Futures 2,926.10+3.10+0.11%\n\nVIX 16.54+0.08+0.49%\n\nGold 4,423.90-36.80-0.82%\n\nBitcoin USD 77,968.61-933.15-1.18%\n\nCrude Oil Oct 26 97.18+1.13+1.18%\n\n# NVDA Rises Overnight After Strong Week: CEO Jensen Huang Pumps Nvidia Chips As ‘Highly Rentable’ Money-Minting Assets\n\nYuvraj Malik\n\nTue, September 8, 2026 at 2:09 AM GMT-33 min read\n\n- NVDA\n  -0.91%\n\n- Huang called Nvidia compute a \"productive, revenue-generating asset\" as H100 rental prices climb.\n- OpenAI's GPT-6 Astra was trained on more than 100,000 Nvidia Grace Blackwell GPUs, according to Huang.\n- Nvidia shares are up 23.7% year to date, trailing the 73% gain in the iShares Semiconductor ETF (SOXX).\n\nNvidia CEO Jensen Huang is doubling down on the investment case for the company's AI chips, calling its compute infrastructure a \"productive, revenue-generating asset\" as demand for Nvidia GPUs continues to underpin the AI boom.\n\n\"NVIDIA compute is fungible, durable and highly rentable. It is a productive, revenue-generating asset,\" Huang said in a post on X, responding to a user who highlighted the surprising strength of the rental market for Nvidia's three-year-old H100 GPUs.\n\nSee what 10M+ investors are talking about. Get the Stocktwits Daily Rip for what retail is watching right now, free to your inbox\n\nThe user said H100 rental prices had risen 22% over the past month to $3.28 an hour, arguing that traditional depreciation schedules would assume a chip that old should be losing value rather than becoming more expensive.\n\nNVDA shares rose 1% in overnight trading heading into Tuesday, extending a three-session winning streak that has lifted the stock more than 6.5%. The rally marks a sharp upswing for a stock that has largely traded sideways this year.\n\nHuang's response offers a glimpse into how Nvidia views the economics of its chips: not simply as hardware that depreciates over time, but as income-producing infrastructure that can retain or even increase its economic value.\n\n## Huang Highlights Scale Of OpenAI's Nvidia Deployment\n\nThe Nvidia CEO made a similar bullish case for the company's latest-generation systems in a separate post earlier, highlighting the scale of computing used to train OpenAI's latest model.\n\n\"GPT-6 Astra, trained on ~100K+ NVIDIA Grace Blackwell NVLink72,\" Huang wrote on X, adding that the industry had gone \"from ChatGPT to o1 to Astra in 4 years,\" Huang wrote. \"AGI has arrived. Congratulations @OpenAI team. 400K GPUs coming online next,\" he added.\n\nThe comments underscore the massive amount of Nvidia hardware being deployed as AI companies race to train and run increasingly capable models.\n\n## Nvidia's Hugging Face Acquisition\n\nLast week, Nvidia agreed to buy Hugging Face for $12.9 billion, taking control of one of the most important platforms in open AI. Hugging Face has more than 18 million AI builders and hosts about 3 million models, 500,000 datasets and 1 million applications.\n\nStory Continues\n\nSeparately, the chipmaker is also in talks to invest about $2.5 billion in Thinking Machines Lab, the AI startup founded by former OpenAI CTO Mira Murati, according to The Information.\n\n## Retail View On NVDA\n\nOn Stocktwits, the retail sentiment for NVDA dipped last week and was 'neutral' on Monday. \"$NVDA there's going to be continuous buying today and tomorrow, Dividend ex date is on Thursday,\" said a trader.\n\nOn Huang's AGI claim, a trader wrote: \"$NVDA Second time Jensen's declared AGI this year. He said the same thing on Lex Fridman's podcast back in March.\"\n\nThis person added, \"Still no agreed definition of what AGI even means, so anyone can declare it whenever. I'm long and think they hit $6T in the next month or so, but declaring it is marketing, not a milestone.\"\n\nYear to date, NVDA stock is up 23.7%, compared to the 73% gain in the iShares Semiconductor ETF (SOXX).\n\n*For updates and corrections, email newsroom[at]stocktwits[dot]com.*\n\nRead Next: ORCL Stock Rallies Into Earnings Week: OpenAI GPT-6 Astra Buzz, Morgan Stanley's Big Target Give Bulls A Boost\n\nYuvraj Malik has no position in any of the stocks mentioned in this article. StockTwits' news team content is for informational purposes only and is not intended as investment advice. For more, see our editorial policy. This article was originally published on StockTwits.\n\n**Related:**\n\n- Cathie Wood's Biotech Bet Intellia Secured An FDA Priority Review For Rare Genetic Disorder Therapy – Retail Sees Upside In NTLA's Platform\n- Cathie Wood's Biotech Bet Intellia Secured An FDA Priority Review For Rare Genetic Disorder Therapy – Retail Sees Upside In NTLA's Platform\n- HOOD Stock Gains After Price Target Hike Driven By Rothera's Prediction Market Success\n\nTerms and Privacy Policy\n\nMore Info\n\n### Trending Tickers\n\n- AAPL\n\n  Apple Inc.\n\n  EquityNMS\n- AVAV\n\n  AeroVironment, Inc.\n\n  EquityNMS\n- META\n\n  Meta Platforms, Inc.\n\n  EquityNMS\n- NET\n\n  Cloudflare, Inc.\n\n  EquityNYQ\n- AEO\n\n  American Eagle Outfitters, Inc.\n\n  EquityNYQ\n\n- - AAPL Apple Inc. 315.34-0.88(-0.28%)\n  - AVAV AeroVironment, Inc. 140.80-7.98(-5.36%)\n  - 653.69+40.21(+6.55%)\n  - NET Cloudflare, Inc. 314.18(+10.51%)\n  - AEO American Eagle Outfitters, Inc. 16.89-0.33(-1.92%)",
+                "title": "NVDA Rises Overnight After Strong Week: CEO Jensen Huang Pumps Nvidia Chips As ‘Highly Rentable’ Money-Minting Assets",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/nvda-rises-overnight-strong-week-050924878.html"
+              },
+              {
+                "snippet": "Sept 11 (Reuters) - Anthropic is in talks to ​bring Nvidia (NVDA.O) , opens new tab as an anchor investor into what could be the largest IPO in history, two people familiar with the ‌matter told Reuters.\nAnthropic is seeking to raise as much as $100 billion that could value the artificial intelligence startup at around $2 trillion, the people said. Nvidia is considering investing up to $10 billion in the IPO, one of the sources added. The plans remain under discussion and could change, they cautioned, requesting anonymity because the discussions are confidential.\nNvidia's potential involvement ​in the IPO, which has not previously been reported, would give Anthropic an early strategic backer for the outsized offering, while further deepening ties ​between the chipmaker and one of its major customers. Bringing a deep-pocketed anchor investor like Nvidia onboard could boost ⁠investor confidence in the listing, which is shaping up to be a major test of public-market appetite for the enormous valuations and capital requirements ​of frontier AI labs.\nAnthropic declined to comment. Nvidia did not immediately respond to a request for comment.\nAnchor investors are typically institutional investors that commit to ​buy a set portion of an IPO before it is marketed more broadly, providing an early vote of confidence in the shares. It is increasingly common for mega IPOs to line up early institutional commitments, given the large amounts they seek to raise. Chip designer Arm's anchor investors included Nvidia and Amazon, while Saudi Arabia's PIF was among ​SpaceX's anchor investors.\nThe deepened relationship highlights the complex ties between AI model developers and the companies supplying the enormous amounts of computing power they ​require. Anthropic relies heavily on Nvidia GPUs, while also seeking to diversify its chip suppliers as demand for Claude has strained its available computing capacity , opens new tab .\nIn November 2025, Nvidia said ‌it would invest ⁠up to $10 billion in the AI startup as part of a broader partnership under which Anthropic committed to buy $30 billion of Microsoft Azure computing capacity powered by Nvidia chips.\nAnthropic already counts the biggest tech companies in the world as backers. These include Amazon and Google, who are also its major compute suppliers. In April, Anthropic said it would commit more than $100 billion over a decade to Amazon's AWS, while using more than 1 million of Amazon's ​Trainium2 chips. It has also agreed ​with Google and Broadcom to ⁠add multiple gigawatts of TPU capacity.\nThe company has been trying to access more compute as its revenue has surged. It is also working to gain greater control over its hardware costs by forming an in-house team to design custom ​chips tailored to Claude.\nThe listing, which is expected to complete before the U.S. midterm elections in November, would mark ​another jump in ⁠Anthropic's valuation. The Claude maker raised $65 billion in May at a post-money valuation of $965 billion. Its annualized revenue run rate had climbed above $65 billion by the end of July, from about $9 billion at the end of 2025, according to the company. The potential valuation also hinges in part on company projections of roughly $190 ⁠billion to $200 ​billion in revenue in 2028, Reuters previously reported .\nThe expected Anthropic IPO added to a string of ​blockbuster listings that has propelled the U.S. IPO market toward a record year , following Elon Musk's SpaceX's debut in June.\nU.S. IPOs, excluding special-purpose acquisition companies, have raised a record $137 billion through the ​end of August, according to Dealogic.",
+                "title": "EXCLUSIVE: Nvidia in talks to invest in Anthropic's mega IPO, sources say",
+                "url": "https://www.reuters.com/legal/transactional/nvidia-talks-invest-anthropics-mega-ipo-sources-say-2026-09-11/"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "queries": [
+              "Reuters Nvidia shares September 10 2026 stock fell",
+              "Nvidia September 8 2026 stock rose Jensen Huang profitability",
+              "NVIDIA newsroom September 2026 Hugging Face acquisition"
+            ],
+            "results": [
+              {
+                "date": "2026-09-10",
+                "id": 16,
+                "last_updated": "2026-09-13",
+                "snippet": "Heavyweight chipmakers lost ground, with Nvidia (NVDA.O), opens new tab down 2.3% and Micron Technology (MU.O), opens new tab losing 4.7%, both weighing on the S&P 500.",
+                "source": "web",
+                "title": "S&P 500 ends down as Treasury yields rise and traders fret about ...",
                 "url": "https://www.reuters.com/business/sp-500-dow-futures-attempt-recovery-ahead-inflation-report-2026-09-10/"
               },
               {
-                "snippet": "DOJ probes Nvidia's licensing deal with AI startup Groq, NYT reports | Reuters\n\n# DOJ probes Nvidia's licensing deal with AI startup Groq, NYT reports\n\nBy Reuters\nSeptember 10, 20261:07 AM UTCUpdated September 10, 2026\n\nText\n\nThe NVIDIA logo in this illustration taken June 11, 2026. REUTERS/Dado Ruvic/Illustration/File Photo Purchase Licensing Rights, opens new tab\n\n- Companies\n\n- Groq, Inc.\n- New York Times\n- NVIDIA Corporation\n\nSept 9 (Reuters) - The U.S. ​Justice Department is investigating whether Nvidia (NVDA.O), opens new tab structured ‌its licensing deal with AI chip startup Groq to avoid antitrust scrutiny, the New York Times reported ​on Wednesday, citing two people familiar ​with the matter.\n\nNvidia announced a $17 billion deal with ⁠Groq last year for a \"non-exclusive license\" to the ​startup's chip technology and hired several of its executives, including founder Jonathan ​Ross.\n\nJumpstart your morning with the latest legal news delivered straight to your inbox from The Daily Docket newsletter. Sign up here.\n\nThe Justice Department opened its investigation into the arrangement shortly after it was announced in December and has sent ​Nvidia a formal request for information, according to the ​NYT report.\n\n\"The Groq story is a prime example of the ‌American ⁠system working as designed to promote innovation, reward entrepreneurs, and benefit consumers,\" an Nvidia spokesperson said in a statement.\n\nGroq and the U.S. ​Justice Department ​did not ⁠immediately respond to Reuters' requests for comment outside regular business hours.\n\nThe ​agency could fine the company if ​it ⁠finds Nvidia mishandled the deal, though it is unlikely to seek to unwind the transaction, the ⁠report ​added.\n\nReporting by Carlos Méndez ​in Mexico City; additional reporting by Preetika Parashuraman and Nethra ​Sailesh; Editing by Sherry Jacob-Phillips and Rashmi Aich\n\nOur Standards: The Thomson Reuters Trust Principles., opens new tab\n\n- Suggested Topics:\n- Litigation\n- Regulatory Oversight\n\nPurchase Licensing Rights\n\n## Read Next / Editor's Picks\n\n- September 11, 2026Litigationcategory\n  Texas judge rules TikTok misled users on child safety feature\n- September 10, 2026Litigationcategory\n  Chemours, DuPont, Corteva settle North Carolina 'forever chemicals' claims for $455 million\n- September 8, 2026Litigationcategory\n  OpenAI, New York Times case tees up key test of AI training under copyright law\n- September 9, 2026Governmentcategory\n  Three jurors in Lindsay Clancy's US murder trial point fingers at holdout after mistrial\n- 11 hours agoGovernmentcategory\n  Lawyer cites fake witnesses in murder case and blames ChatGPT\n- September 8, 2026Governmentcategory\n  General Mills, Mars sue sugar producers in price-fixing lawsuit\n- September 8, 2026Governmentcategory\n  IRS under Trump unlawfully shared taxpayer info with immigration authorities, court rules\n- September 8, 2026World at Workcategory\n  Amazon accused in lawsuit of systematic discrimination against pregnant employees\n- September 9, 2026Litigationcategory\n  Huawei heads to trial in US over its business dealings in Iran\n- September 8, 2026Worldcategory\n  Judge reinforces order barring immediate work on Trump arch in Washington\n- September 8, 2026Governmentcategory\n  Missouri asks Supreme Court to revive Republican-drawn congressional map\n- September 4, 2026Worldcategory\n  US FCC asks court to reject Disney lawsuit over ABC TV station licenses\n- 3 hours agoLitigationcategory\n  OpenAI IPO will not happen in 2026 amid AI safety fears, Altman says\n- 7 hours agoLitigationcategory\n  Revolut confirms sensitive customer data breach, falling for fake government requests\n- 5 hours agoGovernmentcategory\n  US judge rules that Trump plan to halve FEMA workforce violated law\n- 16 hours agoLitigationcategory\n  Ford to recall about 223,500 US vehicles over fuel tank issues\n\nReuters, the news and media division of Thomson Reuters, is the world’s largest multimedia news provider, reaching billions of people worldwide every day. Reuters provides business, financial, national and international news to professionals via desktop terminals, the world's media organizations, industry events and directly to consumers.\n\n### LSEG Products\n- #### , opens new tab\n\n  Access unmatched financial data, news and content in a highly-customised workflow experience on desktop, web and mobile.\n- #### Data , opens new tab\n\n   Browse an unrivalled portfolio of real-time and historical market data and insights from worldwide sources and experts.\n- #### World-Check , opens new tab\n\n  Screen for heightened risk individual and entities globally to help uncover hidden risks in business relationships and human networks.",
-                "title": "DOJ probes Nvidia's licensing deal with AI startup Groq, NYT reports",
-                "url": "https://www.reuters.com/legal/litigation/us-doj-probes-nvidias-licensing-deal-with-ai-startup-groq-nyt-reports-2026-09-10/"
+                "date": "2026-09-10",
+                "id": 17,
+                "last_updated": "2026-09-12",
+                "snippet": "I’m excited to announce that NVIDIA has agreed to acquire Hugging Face for $12,930,300,000.\nTogether, we will scale Hugging Face’s platform, strengthen its infrastructure and expand access to AI for developers and institutions worldwide.",
+                "source": "web",
+                "title": "News Archive - NVIDIA Newsroom",
+                "url": "https://nvidianews.nvidia.com/news/nvidia-grace-hopper-superchips-designed-for-accelerated-generative-ai-enter-full-production."
+              },
+              {
+                "date": "2026-09-08",
+                "id": 18,
+                "last_updated": "2026-09-10",
+                "snippet": "NVDA shares rose 1% in overnight trading heading into Tuesday, extending a three-session winning streak that has lifted the stock more than 6.5%.",
+                "source": "web",
+                "title": "NVDA Rises Overnight After Strong Week: CEO Jensen Huang Pumps Nvidia Chips As ‘Highly Rentable’ Money-Minting Assets",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/nvda-rises-overnight-strong-week-050924878.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 19,
+                "last_updated": "2026-09-08",
+                "snippet": "I’m excited to announce that **Nvidia has agreed to acquire Hugging Face for $12,930,300,000**.",
+                "source": "web",
+                "title": "Nvidia to Acquire Hugging Face",
+                "url": "https://www.storagenewsletter.com/2026/09/08/nvidia-to-acquire-hugging-face/"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 20,
+                "last_updated": "2026-09-13",
+                "snippet": "NVIDIA announced on September 3, 2026, that it will acquire Hugging Face for $12.93 billion, a deal structured as approximately $11.9 billion in cash and up to $1 billion in equity retention for staff.",
+                "source": "web",
+                "title": "NVIDIA's $12.93B Hugging Face Acquisition Becomes ...",
+                "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-12-93b-hugging-face-075456869.html"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 21,
+                "last_updated": "2026-09-07",
+                "snippet": "Nvidia announced Thursday it will acquire Hugging Face for **$12.9 billion** in cash and stock, the largest M&amp;A commitment by the chipmaker since its failed **$40 billion** Arm Holdings bid collapsed in 2022.",
+                "source": "web",
+                "title": "Nvidia Pays $12.9B for Hugging Face, Seizing Open-Source AI Distribution",
+                "url": "https://www.pops4.com/markets/articles/nvidia-2026-09-07t06-1"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 22,
+                "last_updated": "2026-09-09",
+                "snippet": "**3^rd^ September 2026** – Nvidia has agreed to buy artificial intelligence platform Hugging Face in a deal valued at about $12.9bn (£9.5bn), one of the AI chipmaker’s biggest acquisitions as it expands into software.\n...\nUnder the agreement, Nvidia will pay about $11.9bn to Hugging Face investors and offer up to $1bn in stock-based incentives to employees who join the company.",
+                "source": "web",
+                "title": "Press release: Nvidia strikes $12.9bn deal to buy open source AI platform Hugging Face | Treasury Today",
+                "url": "https://treasurytoday.com/press-releases/press-release-nvidia-strikes-12-9bn-deal-to-buy-open-source-ai-platform-hugging-face/"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 23,
+                "last_updated": "2026-09-07",
+                "snippet": "Nvidia has agreed to buy it for $12.93 billion — the company's second-largest acquisition ever, after its $20 billion purchase of Groq's assets last year.\n...\nThe acquisition was confirmed on September 3, 2026.\nRegulatory review is expected in the European Union and the United States before the deal closes in H1 2027.",
+                "source": "web",
+                "title": "Nvidia paid $13 billion for Hugging Face — and promised not to close the library",
+                "url": "https://www.martincid.com/technology-sv/nvidia-acquires-hugging-face-13-billion-open-ai/"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 24,
+                "last_updated": "2026-09-09",
+                "snippet": "Other technology heavyweights also fell, with Nvidia and Alphabet down 0.60% and 2.54%, respectively.",
+                "source": "web",
+                "title": "Wall St slides as oil tops $100, yields hit 2023 high; Apple down before Ternus' first launch event as CEO",
+                "url": "https://hk.marketscreener.com/news/wall-st-slides-as-oil-tops-100-yields-hit-2023-high-apple-down-before-ternus-first-launch-event-ce785bd9d18ef524"
+              },
+              {
+                "date": "2026-09-10",
+                "id": 25,
+                "last_updated": "2026-09-13",
+                "snippet": "Key Points NVIDIA shares fell 2.4% to $218.36 amid valuation concerns, rising yields, profit-taking and substantial insider selling, including a director’s $144 million share sale.",
+                "source": "web",
+                "title": "NVIDIA (NASDAQ:NVDA) Stock Price Down 2.4%",
+                "url": "https://www.marketbeat.com/instant-alerts/price-nvidia-nasdaq-nvda-stock-price-down-24-whats-next-2026-09-10/"
+              },
+              {
+                "date": "2026-09-11",
+                "id": 26,
+                "last_updated": "2026-09-11",
+                "snippet": "Nvidia Corporation stock (ISIN US67066G1040) closed at USD 218.36 on Nasdaq on September 10, 2026, down about 2.3 percent from the previous close as investors reacted to news of a U.S. Department of Justice review of its licensing arrangement with AI chip firm Groq.",
+                "source": "web",
+                "title": "Nvidia stock falls after DOJ Groq probe as dividend hike and analyst support shape outlook",
+                "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-falls-after-doj-groq-probe-as-dividend-hike-and-analyst/70087554"
+              },
+              {
+                "date": "2026-09-12",
+                "id": 27,
+                "last_updated": "2026-09-13",
+                "snippet": "At the time of writing, NVDA shares were up nearly 1.3%.",
+                "source": "web",
+                "title": "Jensen Huang Says $12.9B Is What It Took To Close The Deal With ...",
+                "url": "https://stocktwits.com/news-articles/markets/equity/jensen-huang-nvidia-hugging-face-acquisition-nvda-stock/cZsMzvLRJvg"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 28,
+                "last_updated": "2026-09-09",
+                "snippet": "Nvidia posted record second-quarter revenue of $96.2 billion in August, and the stock rose more than 4% after the report.",
+                "source": "web",
+                "title": "Jensen Huang Says a 22% Rent Jump Proves Old Nvidia Chips ...",
+                "url": "https://finance.yahoo.com/technology/ai/articles/jensen-huang-says-22-rent-073305724.html"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 29,
+                "last_updated": "2026-09-12",
+                "snippet": "### Quick Read\n- Nvidia (NVDA) closed its $12.9B Hugging Face deal, but Jensen Huang's openness pledge lacks binding neutrality terms covering rival chips like AMD and Groq.",
+                "source": "web",
+                "title": "Nvidia's $12.9 Billion Hugging Face Bet Comes With One ...",
+                "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-12-9-billion-hugging-110515288.html"
+              },
+              {
+                "date": "2026-09-11",
+                "id": 30,
+                "last_updated": "2026-09-13",
+                "snippet": "The price of NVDA shares has decreased $0.07 since the market last closed.\nThis is a 0.03% drop.\n- Closed at $218.29.",
+                "source": "web",
+                "title": "NVDA Stock Quote Price and Forecast - CNN",
+                "url": "https://www.cnn.com/markets/stocks/NVDA"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "S&P 500 ends down as Treasury yields rise and traders fret about inflation | Reuters\n\n# S&P 500 ends down as Treasury yields rise and traders fret about inflation\n\nBy Noel Randewich and Niket Nishant\nSeptember 10, 20269:48 AM UTCUpdated September 10, 2026\n\n- Summary\n- Companies\n\n- Treasury yields hit highest level since 2023\n- S&P 500 trades at lowest forward PE since April 2025\n- Apple gains a day after releasing $1,999 folding iPhone\n- S&P 500 -0.58%, Nasdaq -0.65%, Dow -0.60%\n\nSept 10 (Reuters) - U.S. stocks ended down on Thursday after producer price data for August ​and surging oil prices stoked worries the Federal Reserve will hike interest rates next week, while climbing Treasury yields made ‌stocks less attractive.\n\nHeavyweight chipmakers lost ground, with Nvidia (NVDA.O), opens new tab down 2.3% and Micron Technology (MU.O), opens new tab losing 4.7%, both weighing on the S&P 500. Apple (AAPL.O), opens new tab rallied 3.6% a day after launching a $1,999 iPhone.\n\nThe Reuters Daily Briefing newsletter provides all the news you need to start your day. Sign up here.\n\nS&P 500's forward PE sinks to lowest since April 2025\nWith supply routes through both the Strait of Hormuz and the Red Sea disrupted by the U.S.-Israeli war on Iran, Brent crude jumped 6% to $107 a barrel, adding to inflation ​worries and fueling expectations the Fed will raise interest rates at its policy meeting on Wednesday.\n\nYields on 10-year Treasury notes rose ​to their highest in nearly three years, while 30-year Treasury yields hit their highest in more than 19 years ⁠and 2-year Treasury yields reached their highest in more than two years.\n\n\"Yields are going up at the short end of the curve because the ​Fed is probably going to hike in the next couple months. Yields are going up at the long end of the curve because of debt ​and deficit issues, and sticky inflation,\" said Ross Mayfield, an investment strategy analyst at Baird in Louisville, Kentucky.\n\n\"Higher yields are a negative for the equity market. They lower valuations and they make it more expensive to operate a business, and more expensive for consumers to exist in the world.\"\n\nData on Thursday showed the U.S. producer price index, opens new tab (PPI) ​increased in line with expectations in August on a monthly basis amid a rebound in the cost of energy products. Investors will pay close ​attention to Friday's August consumer price data.\n\nThe S&P 500 declined 0.58% to end the session at 7,591.75 points.\n\nThe Nasdaq declined 0.65% to 26,081.73 points, while the Dow ‌Jones Industrial ⁠Average declined 0.60% to 52,064.10 points.\n\nFutures-options traders work on the floor at the New York Stock Exchange's NYSE American (AMEX) in New York City, U.S., September 8, 2026. REUTERS/Brendan McDermid Purchase Licensing Rights, opens new tab\n\nThe S&P 500 has lost 2% in the past four sessions, its deepest four-day loss since June.\n\nNine of the 11 S&P 500 sector indexes declined, led lower by materials (.SPLRCM), opens new tab, down 1.45%, followed by a 0.91% loss in information technology , opens new tab\n\nVolume on U.S. exchanges was relatively heavy, with 15.1 billion shares traded, compared to an average of 14.9 billion shares over the previous 20 sessions.\n\nTraders now see a 70% chance the Federal ​Reserve will raise interest rates by ​at least 25 basis points ⁠next week, up from about 64% before Thursday's report, the CME FedWatch tool showed.\n\nFollowing recent declines, the S&P 500 is down nearly 3% from its record high close on August 13, and it remains up 11% in ​2026.\n\nThe S&P 500's recent decline, coupled with a strong earnings outlook, has the benchmark trading at 19 times ​expected earnings, its ⁠cheapest since April 2025, when U.S. President Donald Trump's \"Liberation Day\" tariff announcements threw global markets into a tailspin.\n\nIn Thursday's trading, Macy's (M.N), opens new tab fell 4.7%. The struggling department-store operator raised its annual forecasts, but not by enough to impress investors.\n\nAmerican Eagle Outfitters (AEO.N), opens new tab dropped 14% to its lowest since October as the apparel maker reiterated its annual comparable sales forecast ⁠amid choppy ​discretionary spending.\n\nDeclining stocks outnumbered rising ones within the S&P 500 (.AD.SPX), opens new tab by a 2.0-to-one ratio.\n\nThe S&P ​500 posted eight new highs and 28 new lows; the Nasdaq recorded 44 new highs and 215 new lows.\n\nReporting by Niket ​Nishant, Tharuniyaa Lakshmi and Johann M Cherian in Bengaluru, and by Noel Randewich in San Francisco; Editing by Sherry Jacob-Phillips, Maju Samuel and David Gregorio\n\nOur Standards: The Thomson Reuters Trust Principles., opens new tab\n\n- Suggested Topics:\n- U.S. Markets\n\nPurchase Licensing Rights\n\nNoel Randewich\nThomson Reuters\n\nSan Francisco correspondent covering the stock market with a focus on Big Tech, semiconductors and other Silicon Valley companies\n\n## Read Next\n\n- September 11, 2026Businesscategory\n  Wall St Week Ahead Investors brace for possible rate hike at uncertain Fed meeting\n- September 11, 2026Businesscategory\n  S&P 500 ends higher as strong inflation data cements rate-hike bets\n- September 11, 2026ANALYSIS\n  Edgy bond investors unconsoled by Bessent's big buyback\n- September 10, 2026Businesscategory\n  American Eagle shares slump on flat margin outlook, weakness in namesake brand\n- September 9, 2026Worldcategory\n  US Treasury to buy up to $6 billion in Sept 10 buyback operation\n\n## Business\n\n- ### Hyundai Motor to roll out in-house driver-assist system in 2029\n  Autos & Transportationcategory · September 13, 2026 · 12:02 AM UTC · 2 hours ago\n  Hyundai Motor Group will launch vehicles equipped with its proprietary driver-assistance software in late 2029, two years later than planned, turning to Nvidia in the interim to ​accelerate deployment.\n- Legalcategory\n\n  ### OpenAI IPO will not happen in 2026 amid AI safety fears, Altman says\n\n  5 hours ago\n- Autos & Transportationcategory\n\n  ### Tesla to unveil long-delayed Roadster on Oct. 1, Musk says\n\n  6 hours ago\n- Businesscategory\n\n  ### Larry Ellison cancels plan to sell Oracle stock\n\n  7 hours ago\n- category\n\n  ### India's central bank rejects Tata Sons request to avoid public listing, sources say\n\n  11 hours ago\n\nReuters, the news and media division of Thomson Reuters, is the world’s largest multimedia news provider, reaching billions of people worldwide every day. Reuters provides business, financial, national and international news to professionals via desktop terminals, the world's media organizations, industry events and directly to consumers.\n\n### LSEG Products\n- Access unmatched financial data, news and content in a highly-customised workflow experience on desktop, web and mobile.\n- #### , opens new tab\n\n   Browse an unrivalled portfolio of real-time and historical market data and insights from worldwide sources and experts.\n- #### World-Check , opens new tab\n\n  Screen for heightened risk individual and entities globally to help uncover hidden risks in business relationships and human networks.",
+                "title": "S&P 500 ends down as Treasury yields rise and traders fret ...",
+                "url": "https://www.reuters.com/business/sp-500-dow-futures-attempt-recovery-ahead-inflation-report-2026-09-10/"
+              },
+              {
+                "snippet": "September 10, 2026\n\n### Skild AI Taps NVIDIA Physical AI to Teach Robots New Tasks From a Single Video\n\nManufacturing floors, warehouses and production lines rarely stay fixed — tasks change, layouts shift and new products arrive, and most robots can’t keep up without significant reprogramming. Skild AI’s new S1 robot foundation model helps address ...\n\nRead Blog\n\nSeptember 10, 2026\n\n### Physical AI Takes the Wheel: How the World’s Robotaxi Leaders Are Building With NVIDIA Technologies\n\nThe global robotaxi market — physical AI’s first commercial breakthrough — is projected to reach $400 billion by 2035, with over 6 million commercial vehicles in operation as driverless fleets are already moving people through some of the world’s ...\n\nRead Blog\n\nSeptember 10, 2026\n\n### d-Matrix Adopts NVIDIA NVLink Fusion for Rack-Scale XPU Deployment\n\nAI inference chipmaker d-Matrix today announced it will use NVIDIA NVLink Fusion to connect its next-generation Raptor XPUs to NVIDIA’s AI infrastructure platform — joining a growing roster of ecosystem partners. By connecting Raptor to NVIDIA ...\n\nRead Blog\n\nSeptember 10, 2026\n\n### Boots on the Ground: ‘WARDOGS’ Goes All Out on GeForce NOW at Early-Access Launch\n\nGear up: The latest PC games and major updates are ready to play on GeForce NOW this week. WARDOGS drops onto the cloud at early-access launch, alongside the Valheim 1.0 Deep North update and Bus Simulator 27 — part of nine new titles joining the ...\n\nRead Blog\n\nSeptember 10, 2026\n\n### NVIDIA and Palantir Bring Sovereign Intelligence to Critical Supply Chains\n\nPalantir Technologies Inc. (NASDAQ: PLTR) and NVIDIA (NASDAQ: NVDA) today announced a collaboration to bring sovereign AI to critical supply chains, starting with NVIDIA’s own operations.\n\nRead Press Release\n\nSeptember 09, 2026\n\n### NVIDIA Expands AI Infrastructure Capacity in Partnership With Australia’s Data Center Ecosystem\n\nNVIDIA today announced that it is collaborating with a growing ecosystem of Australian NVIDIA Cloud Partners (NCPs) and AI infrastructure partners to expand land, power and shell capacity designed to host multiple generations of NVIDIA DSX™ AI ...\n\nRead Press Release\n\nSeptember 09, 2026\n\n### NVIDIA Brings Real-Time AI to Broadcast, Sports and Global Streaming at IBC\n\nAt the IBC conference, running Sept. 11-14 in Amsterdam, the creative, technology and business communities are coming together to turn ideas into action and discuss innovations across the media and entertainment industries. More than 44,000 ...\n\nRead Blog\n\nSeptember 03, 2026\n\n### Sparks Fly: NVIDIA Accelerates Local AI at IFA 2026\n\nFrontier intelligence is going local. At IFA 2026, NVIDIA, Microsoft and its partners are teaming up to provide faster inference and new tools that make agents easier to set up and run locally on NVIDIA hardware. New compact NVIDIA RTX Spark Windows ...\n\nRead Blog\n\nSeptember 03, 2026\n\n### ‘NBA 2K27’ With NVIDIA DLSS 5 Leads 26 New Games Coming to GeForce NOW\n\nSeptember is here with 26 more games streaming on GeForce NOW this month, led by a slam dunk: NBA 2K27 with the NVIDIA DLSS 5 3D-Guided Neural Rendering feature. Through NVIDIA’s close collaboration with Visual Concepts and 2K, DLSS 5 brings a new ...\n\nRead Blog\n\nSeptember 03, 2026\n\n### NVIDIA to Acquire Hugging Face\n\nI’m excited to announce that NVIDIA has agreed to acquire Hugging Face for $12,930,300,000. Together, we will scale Hugging Face’s platform, strengthen its infrastructure and expand access to AI for developers and institutions worldwide. Over the ...\n\nRead Blog",
+                "title": "News Archive - NVIDIA Newsroom",
+                "url": "https://nvidianews.nvidia.com/news/nvidia-grace-hopper-superchips-designed-for-accelerated-generative-ai-enter-full-production."
               }
             ],
             "type": "fetch_url_results"
@@ -914,11 +793,11 @@
             "content": [
               {
                 "annotations": [],
-                "text": "{\"answer_markdown\":\"**NVIDIA’s stock was pressured this week mainly by a broader technology selloff as Treasury yields rose, while a reported U.S. antitrust investigation added company-specific uncertainty.** NVDA finished the latest session at **$218.29**, down **0.03%**, as of **2026-09-11**; the exact full-week percentage change could not be verified from an available public page.\\n\\n### What moved the shares\\n\\n- **Higher interest rates hurt technology valuations.** On Thursday, rising Treasury yields and renewed inflation concerns weighed on U.S. equities. Reuters reported that NVIDIA fell **2.3%** during that session alongside other heavyweight chipmakers. Higher yields can pressure richly valued growth stocks because future profits become less valuable when discounted at higher rates.\\n- **Regulatory risk returned to the foreground.** Reuters reported that the U.S. Justice Department is investigating whether NVIDIA structured its licensing arrangement with AI-chip startup Groq to avoid antitrust review. The arrangement was reported at **$17 billion**. NVIDIA defended the deal, while Reuters said it had not received immediate responses from Groq or the Justice Department.\\n- **The regulatory headline’s precise price impact cannot be isolated.** It appeared during the same week as the selloff, but no verified public report established how much of NVIDIA’s decline resulted from the investigation rather than yields, inflation concerns, or broader semiconductor weakness.\\n\\n### Bottom line\\n\\nThis week’s movement was not tied to one clean operating update. The clearest verified explanation is a combination of **marketwide valuation pressure from rising yields** and **additional uncertainty around the Groq investigation**. Friday’s nearly flat finish suggests the sharpest selling had paused, but it does not establish that either concern was resolved.\",\"calculation\":null,\"declined\":false,\"follow_up_questions\":[\"How did NVIDIA perform versus other semiconductor stocks this week?\",\"What exactly is the Groq investigation about?\",\"What upcoming NVIDIA events could affect the stock?\",\"How sensitive is NVIDIA’s valuation to interest rates?\"],\"rows\":[{\"as_of\":\"2026-09-11\",\"kind\":\"currency\",\"label\":\"latest share price\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":218.29},{\"as_of\":\"2026-09-11\",\"kind\":\"percent\",\"label\":\"latest session change\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"%\",\"value\":-0.03},{\"as_of\":\"2026-09-10\",\"kind\":\"percent\",\"label\":\"Thursday share-price decline\",\"source_url\":\"https://www.reuters.com/business/sp-500-dow-futures-attempt-recovery-ahead-inflation-report-2026-09-10/\",\"subject\":\"Nvidia\",\"symbol\":\"NVDA\",\"unit\":\"%\",\"value\":2.3},{\"as_of\":\"2026-09-10\",\"kind\":\"currency\",\"label\":\"reported Groq licensing deal value\",\"source_url\":\"https://www.reuters.com/legal/litigation/us-doj-probes-nvidias-licensing-deal-with-ai-startup-groq-nyt-reports-2026-09-10/\",\"subject\":\"Nvidia\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":17000000000}]}",
+                "text": "{\"answer_markdown\":\"**NVIDIA moved sharply in both directions this week because company-specific AI optimism collided with a broader selloff in richly valued technology shares.** Early momentum followed upbeat signals about demand for NVIDIA computing and its expansion into AI software; later, rising Treasury yields and renewed interest-rate concerns pushed chip stocks lower.\\n\\n### What moved the shares\\n\\n| Period | Reported move | Main publicly reported context |\\n|---|---:|---|\\n| Early week | More than 6.5% over a three-session winning streak | NVIDIA CEO Jensen Huang highlighted strong rental economics for older H100 chips and the scale of NVIDIA hardware used for a new OpenAI model. The preceding Hugging Face acquisition also supported enthusiasm about NVIDIA expanding beyond chips into AI software and distribution. |\\n| 2026-09-10 | Down 2.3% | Producer-price data, higher oil prices and surging Treasury yields increased expectations of tighter Federal Reserve policy. The decline affected the wider chip sector, not NVIDIA alone. |\\n| 2026-09-11 close | Down 0.03% for the session, at USD 218.29 | The shares were effectively flat after the prior selloff. Reuters also reported that NVIDIA was considering investing up to USD 10 billion as an anchor investor in Anthropic’s planned IPO, although the discussions could change. |\\n\\n### Why rates matter so much here\\n\\nReuters reported that Treasury yields reached multiyear highs as investors worried about inflation and a possible Federal Reserve rate increase. Higher yields can reduce the present value investors assign to companies whose valuations depend heavily on profits expected far into the future. That makes growth-oriented semiconductor shares especially sensitive to rate changes.\\n\\n### Company-specific news underneath the volatility\\n\\nNVIDIA announced that it had agreed to acquire Hugging Face for USD 12,930,300,000. The company said the transaction would help scale Hugging Face’s platform, strengthen its infrastructure and broaden access to AI. That supports the market narrative that NVIDIA is building a wider AI ecosystem, although the acquisition’s eventual financial return is not yet known.\\n\\nReuters separately reported possible participation in Anthropic’s IPO. This was not a completed transaction: the report said discussions remained underway and could change. Consequently, it is best viewed as a potential strategic catalyst rather than confirmed financial value.\\n\\n### Bottom line\\n\\nThis week’s action was not traceable to one event. The verified evidence points to a tug-of-war between favorable AI-demand and ecosystem news on one side, and higher yields, inflation concerns and broad semiconductor selling on the other. A precise attribution of each price movement among those factors could not be independently verified.\",\"calculations\":[],\"declined\":false,\"follow_up_questions\":[\"How did NVIDIA perform against the semiconductor index this week?\",\"What does the Hugging Face acquisition add to NVIDIA’s business?\",\"Why are higher Treasury yields especially important for NVIDIA’s valuation?\"],\"rows\":[{\"as_of\":\"2026-09-08\",\"kind\":\"percent\",\"label\":\"three-session share-price gain\",\"source_url\":\"https://finance.yahoo.com/markets/stocks/articles/nvda-rises-overnight-strong-week-050924878.html\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"%\",\"value\":6.5},{\"as_of\":\"2026-09-10\",\"kind\":\"percent\",\"label\":\"daily share-price decline\",\"source_url\":\"https://www.reuters.com/business/sp-500-dow-futures-attempt-recovery-ahead-inflation-report-2026-09-10/\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"%\",\"value\":2.3},{\"as_of\":\"2026-09-11\",\"kind\":\"percent\",\"label\":\"daily share-price decline\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"%\",\"value\":0.03},{\"as_of\":\"2026-09-11\",\"kind\":\"currency\",\"label\":\"closing share price\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":218.29},{\"as_of\":\"2026-09-11\",\"kind\":\"currency\",\"label\":\"potential Anthropic IPO investment\",\"source_url\":\"https://www.reuters.com/legal/transactional/nvidia-talks-invest-anthropics-mega-ipo-sources-say-2026-09-11/\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":10000000000},{\"as_of\":\"2026-09-03\",\"kind\":\"currency\",\"label\":\"Hugging Face acquisition value\",\"source_url\":\"https://nvidianews.nvidia.com/news/nvidia-grace-hopper-superchips-designed-for-accelerated-generative-ai-enter-full-production.\",\"subject\":\"NVIDIA\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":12930300000}],\"source_urls\":[\"https://www.reuters.com/business/sp-500-dow-futures-attempt-recovery-ahead-inflation-report-2026-09-10/\",\"https://finance.yahoo.com/markets/stocks/articles/nvda-rises-overnight-strong-week-050924878.html\",\"https://www.reuters.com/legal/transactional/nvidia-talks-invest-anthropics-mega-ipo-sources-say-2026-09-11/\",\"https://nvidianews.nvidia.com/news/nvidia-grace-hopper-superchips-designed-for-accelerated-generative-ai-enter-full-production.\",\"https://www.perplexity.ai/finance/NVDA\"]}",
                 "type": "output_text"
               }
             ],
-            "id": "msg_77eaeaf6-09e6-450c-8756-988f241fe73b",
+            "id": "msg_6501397c-295f-4658-ae6b-6e620a7b0bb3",
             "role": "assistant",
             "status": "completed",
             "type": "message"
@@ -963,44 +842,44 @@
         "truncation": "",
         "usage": {
           "cost": {
-            "cache_creation_cost": 0.08522,
-            "cache_read_cost": 0.01725,
+            "cache_creation_cost": 0.09478,
+            "cache_read_cost": 0.01813,
             "currency": "USD",
             "input_cost": 6e-05,
-            "output_cost": 0.03352,
-            "tool_calls_cost": 0.013,
+            "output_cost": 0.04048,
+            "tool_calls_cost": 0.011,
             "tool_calls_cost_details": {
-              "fetch_url": 0.0005,
+              "fetch_url": 0.001,
               "finance_search": 0.005,
-              "search_web": 0.0075
+              "search_web": 0.005
             },
-            "total_cost": 0.14905
+            "total_cost": 0.16445
           },
-          "input_tokens": 60185,
+          "input_tokens": 64285,
           "input_tokens_details": {
-            "cache_creation_input_tokens": 17043,
-            "cache_read_input_tokens": 43127,
-            "cached_tokens": 43127
+            "cache_creation_input_tokens": 18955,
+            "cache_read_input_tokens": 45315,
+            "cached_tokens": 45315
           },
-          "output_tokens": 1676,
+          "output_tokens": 2024,
           "output_tokens_details": {
-            "reasoning_tokens": 542
+            "reasoning_tokens": 398
           },
           "tool_calls_details": {
             "fetch_url": {
-              "cost_usd": 0.0005,
-              "invocation": 1
+              "cost_usd": 0.001,
+              "invocation": 2
             },
             "finance_search": {
               "cost_usd": 0.005,
               "invocation": 1
             },
             "search_web": {
-              "cost_usd": 0.0075,
-              "invocation": 3
+              "cost_usd": 0.005,
+              "invocation": 2
             }
           },
-          "total_tokens": 61861
+          "total_tokens": 66309
         },
         "user": null
       }
@@ -1011,29 +890,19 @@
     "unsourced_rows": [],
     "rows": [
       {
-        "subject": "NVIDIA Corporation",
+        "subject": "NVIDIA",
         "symbol": "NVDA",
-        "label": "latest share price",
-        "value": 218.29,
-        "kind": "currency",
-        "unit": "USD",
-        "as_of": "2026-09-11",
-        "source_url": null
-      },
-      {
-        "subject": "NVIDIA Corporation",
-        "symbol": "NVDA",
-        "label": "latest session change",
-        "value": -0.03,
+        "label": "three-session share-price gain",
+        "value": 6.5,
         "kind": "percent",
         "unit": "%",
-        "as_of": "2026-09-11",
-        "source_url": null
+        "as_of": "2026-09-08",
+        "source_url": "https://finance.yahoo.com/markets/stocks/articles/nvda-rises-overnight-strong-week-050924878.html"
       },
       {
-        "subject": "Nvidia",
+        "subject": "NVIDIA",
         "symbol": "NVDA",
-        "label": "Thursday share-price decline",
+        "label": "daily share-price decline",
         "value": 2.3,
         "kind": "percent",
         "unit": "%",
@@ -1041,31 +910,71 @@
         "source_url": "https://www.reuters.com/business/sp-500-dow-futures-attempt-recovery-ahead-inflation-report-2026-09-10/"
       },
       {
-        "subject": "Nvidia",
+        "subject": "NVIDIA",
         "symbol": "NVDA",
-        "label": "reported Groq licensing deal value",
-        "value": 17000000000.0,
+        "label": "daily share-price decline",
+        "value": 0.03,
+        "kind": "percent",
+        "unit": "%",
+        "as_of": "2026-09-11",
+        "source_url": null
+      },
+      {
+        "subject": "NVIDIA",
+        "symbol": "NVDA",
+        "label": "closing share price",
+        "value": 218.29,
         "kind": "currency",
         "unit": "USD",
-        "as_of": "2026-09-10",
-        "source_url": "https://www.reuters.com/legal/litigation/us-doj-probes-nvidias-licensing-deal-with-ai-startup-groq-nyt-reports-2026-09-10/"
+        "as_of": "2026-09-11",
+        "source_url": null
+      },
+      {
+        "subject": "NVIDIA",
+        "symbol": "NVDA",
+        "label": "potential Anthropic IPO investment",
+        "value": 10000000000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-11",
+        "source_url": "https://www.reuters.com/legal/transactional/nvidia-talks-invest-anthropics-mega-ipo-sources-say-2026-09-11/"
+      },
+      {
+        "subject": "NVIDIA",
+        "symbol": "NVDA",
+        "label": "Hugging Face acquisition value",
+        "value": 12930300000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-03",
+        "source_url": "https://nvidianews.nvidia.com/news/nvidia-grace-hopper-superchips-designed-for-accelerated-generative-ai-enter-full-production."
       }
     ],
     "sources": [
       {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/prediction-nvidia-stock-returned-14-140007455.html",
-        "title": "NVIDIA Stock Has Returned 14700% in 10 Years. Can It Do It Again?",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://www.marketbeat.com/instant-alerts/filing-thomasville-national-bank-acquires-new-shares-in-nvidia-corporation-nvda-2026-09-07/",
-        "title": "Thomasville National Bank Acquires New Shares in NVIDIA Corporation $NVDA",
-        "source_date": "2026-09-07"
+        "url": "https://finance.yahoo.com/markets/stocks/articles/nvda-rises-overnight-strong-week-050924878.html",
+        "title": "NVDA Rises Overnight After Strong Week: CEO Jensen Huang Pumps Nvidia Chips As ‘Highly Rentable’ Money-Minting Assets",
+        "source_date": "2026-09-08"
       },
       {
         "url": "https://www.marketbeat.com/instant-alerts/price-nvidia-nasdaq-nvda-stock-price-down-24-whats-next-2026-09-10/",
-        "title": "NVIDIA (NASDAQ:NVDA) Stock Price Down 2.4% - What's Next?",
+        "title": "NVIDIA (NASDAQ:NVDA) Stock Price Down 2.4%",
         "source_date": "2026-09-10"
+      },
+      {
+        "url": "https://www.cnn.com/markets/stocks/NVDA",
+        "title": "NVDA Stock Quote Price and Forecast - CNN",
+        "source_date": "2026-09-11"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/filing-venturi-wealth-management-llc-acquires-15227-shares-of-nvidia-corporation-nvda-2026-09-07/",
+        "title": "Venturi Wealth Management LLC Acquires 15,227 Shares of NVIDIA ...",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/filing-colony-family-offices-llc-purchases-2732-shares-of-nvidia-corporation-nvda-2026-09-07/",
+        "title": "Colony Family Offices LLC Purchases 2732 Shares of ...",
+        "source_date": "2026-09-07"
       },
       {
         "url": "https://www.marketbeat.com/instant-alerts/filing-nvidia-corporation-nvda-position-trimmed-by-pathway-wealth-management-llc-2026-09-07/",
@@ -1073,179 +982,59 @@
         "source_date": "2026-09-07"
       },
       {
-        "url": "https://www.marketbeat.com/instant-alerts/filing-farmers-merchants-investments-inc-purchases-13817-shares-of-nvidia-corporation-nvda-2026-09-07/",
-        "title": "Farmers & Merchants Investments Inc. Purchases 13,817 Shares of NVIDIA Corporation $NVDA",
-        "source_date": "2026-09-07"
+        "url": "https://finance.yahoo.com/markets/stocks/articles/analyst-sets-jaw-dropping-nvidia-173300433.html",
+        "title": "Analyst sets jaw-dropping Nvidia price target - Yahoo Finance",
+        "source_date": "2026-09-12"
       },
       {
-        "url": "https://www.marketbeat.com/instant-alerts/filing-oak-thistle-llc-invests-304-million-in-nvidia-corporation-nvda-2026-09-08/",
-        "title": "Oak Thistle LLC Invests $3.04 Million in NVIDIA ...",
-        "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-rebounds-rivals-open-10-183944063.html",
-        "title": "Nvidia Rebounds After Rivals Open a 10-Point Weekly Gap",
+        "url": "https://www.marketbeat.com/instant-alerts/filing-nvidia-corporation-nvda-holdings-lowered-by-franchise-gp-ltd-2026-09-11/",
+        "title": "NVIDIA Corporation $NVDA Holdings Lowered by Franchise GP Ltd",
         "source_date": "2026-09-11"
       },
       {
-        "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-ceo-jensen-huang-claims-203637094.html",
-        "title": "Nvidia CEO Jensen Huang Claims AGI Has Arrived as OpenAI ...",
-        "source_date": "2026-09-09"
-      },
-      {
-        "url": "https://www.aol.com/articles/jensen-huang-declares-agi-arrived-163016000.html",
-        "title": "Jensen Huang Declares “AGI Has Arrived”",
-        "source_date": "2026-09-07"
-      },
-      {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/next-phase-ai-boom-could-123037531.html",
-        "title": "The Next Phase of the AI Boom Could Be Great News for NVIDIA, Micron, and SanDisk",
-        "source_date": "2026-09-11"
-      },
-      {
-        "url": "https://www.reuters.com/legal/transactional/nvidia-talks-invest-anthropics-mega-ipo-sources-say-2026-09-11/",
-        "title": "Nvidia in talks to invest in Anthropic's mega IPO, sources say | Reuters",
+        "url": "https://seekingalpha.com/symbol/NVDA",
+        "title": "NVIDIA Corporation (NVDA) Stock Price, Quote, News & Analysis",
         "source_date": "2026-09-12"
       },
       {
         "url": "https://finance.yahoo.com/markets/stocks/articles/top-m-deals-september-nvidia-061244979.html",
-        "title": "Top M&A Deals In September: Nvidia, Dominion Energy, Nextera ...",
+        "title": "Top M&A Deals In September: Nvidia, Dominion Energy ...",
         "source_date": "2026-09-08"
       },
       {
-        "url": "https://www.marketbeat.com/instant-alerts/filing-allied-investment-advisors-llc-trims-holdings-in-nvidia-corporation-nvda-2026-09-07/",
-        "title": "Allied Investment Advisors LLC Trims Holdings in NVIDIA ...",
+        "url": "https://www.investing.com/news/insider-trading-news/nvidia-director-mark-stevens-sells-2356m-in-shares-93CH-4893548",
+        "title": "NVIDIA director Mark Stevens sells $235.6m in shares",
+        "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/filing-global-financial-private-client-llc-increases-position-in-nvidia-corporation-nvda-2026-09-07/",
+        "title": "Global Financial Private Client LLC Increases Position in ...",
         "source_date": "2026-09-07"
       },
       {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/jim-cramer-picks-nvidia-broadcom-171803449.html",
-        "title": "Jim Cramer picks Nvidia and Broadcom as OpenAI GPT-6 Astra winners",
+        "url": "https://www.reuters.com/legal/transactional/nvidia-talks-invest-anthropics-mega-ipo-sources-say-2026-09-11/",
+        "title": "Nvidia in talks to invest in Anthropic's mega IPO, sources say | Reuters",
+        "source_date": "2026-09-11"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/analyst-piper-sandler-upgrades-nvidia-nasdaq-nvda-to-strong-buy-2026-09-11/",
+        "title": "Piper Sandler Upgrades NVIDIA (NASDAQ:NVDA) to Strong-Buy",
+        "source_date": "2026-09-11"
+      },
+      {
+        "url": "https://www.marketbeat.com/instant-alerts/filing-webster-bank-n-a-has-4138-million-stock-position-in-nvidia-corporation-nvda-2026-09-08/",
+        "title": "Webster Bank N. A. Has $41.38 Million Stock Position in NVIDIA Corporation $NVDA",
         "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-falls-after-doj-groq-probe-as-dividend-hike-and-analyst/70087554",
-        "title": "Nvidia stock falls after DOJ Groq probe as dividend hike and analyst support shape outlook",
-        "source_date": "2026-09-11"
-      },
-      {
-        "url": "https://www.reuters.com/legal/litigation/us-doj-probes-nvidias-licensing-deal-with-ai-startup-groq-nyt-reports-2026-09-10/",
-        "title": "DOJ probes Nvidia's licensing deal with AI startup Groq, NYT reports",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://finance.yahoo.com/technology/ai/articles/us-doj-probes-nvidias-licensing-003659525.html",
-        "title": "US DOJ probes Nvidia's licensing deal with AI startup Groq, NYT ...",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://www.cnbc.com/2026/09/10/piper-sandler-says-these-compute-stocks-will-benefit-from-high-demand.html",
-        "title": "Piper Sandler says these compute stocks will benefit from ... - CNBC",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://www.cnbc.com/video/2026/09/10/final-trades-snowflake-tempus-ai-chubb-and-nvidia.html",
-        "title": "Final Trades: Snowflake, Tempus AI, Chubb and Nvidia - CNBC",
-        "source_date": "2026-09-11"
-      },
-      {
-        "url": "https://www.techtarget.com/it-infrastructure/news/366650378/DOJ-reportedly-probes-Nvidia-Groq-deal-for-antitrust-concerns",
-        "title": "DOJ reportedly probes Nvidia-Groq deal for antitrust concerns",
-        "source_date": "2026-09-12"
-      },
-      {
-        "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-stock-falls-doj-probes-122547655.html",
-        "title": "Nvidia Stock Falls. DOJ Probes $20 Billion Groq Deal",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://www.cnbc.com/2026/09/10/a-rapid-fire-update-on-our-33-stock-portfolio-including-6-to-buy-now.html",
-        "title": "A rapid-fire update on our 33-stock portfolio, including 6 to ...",
-        "source_date": "2026-09-10"
       },
       {
         "url": "https://www.reuters.com/business/sp-500-dow-futures-attempt-recovery-ahead-inflation-report-2026-09-10/",
         "title": "S&P 500 ends down as Treasury yields rise and traders fret about ...",
-        "source_date": "2026-09-11"
-      },
-      {
-        "url": "https://www.investing.com/news/stock-market-news/us-doj-probes-nvidias-licensing-deal-with-ai-startup-groq-nyt-reports-4894824",
-        "title": "US DOJ probes Nvidia's licensing deal with AI startup Groq, NYT ...",
         "source_date": "2026-09-10"
       },
       {
-        "url": "https://www.cnbc.com/2026/09/10/biggest-analyst-calls-thursday-like-nvidia.html",
-        "title": "Biggest analyst calls Thursday like Nvidia - CNBC",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://finance.yahoo.com/markets/stocks/articles/jim-cramer-strong-message-nvidia-140700696.html",
-        "title": "Jim Cramer has strong message for Nvidia, Broadcom ...",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://www.cnbc.com/2026/09/10/our-top-3-stocks-that-bucked-the-markets-recent-pullback-plus-a-look-at-the-bottom-3.html",
-        "title": "Our top 3 stocks that bucked the market's recent pullback - CNBC",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://finance.yahoo.com/technology/ai/articles/doj-investigates-nvidias-deal-groq-162930140.html",
-        "title": "DOJ investigates Nvidia's deal with Groq - Yahoo Finance",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://us.plus500.com/en/newsandmarketinsights/apple-nvidia-intel-tech-markets-in-focus",
-        "title": "Apple, NVIDIA & Intel: Tech Markets in Focus | Plus500",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://nvidianews.nvidia.com/news/nvidia-tsmc-semiconductor-manufacturing",
+        "url": "https://nvidianews.nvidia.com/news/nvidia-grace-hopper-superchips-designed-for-accelerated-generative-ai-enter-full-production.",
         "title": "News Archive - NVIDIA Newsroom",
         "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://nvidianews.nvidia.com/news/nvidia-expands-ai-infrastructure-capacity-in-partnership-with-australias-data-center-ecosystem",
-        "title": "NVIDIA Expands AI Infrastructure Capacity in Partnership With ...",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://nvidianews.nvidia.com/news/nvidia-ceo-jensen-huang-and-global-technology-leaders-to-showcase-age-of-ai-at-gtc-2026:@NVIDIA",
-        "title": "NVIDIA CEO Jensen Huang and Global Technology ...",
-        "source_date": "2026-09-09"
-      },
-      {
-        "url": "https://nvidianews.nvidia.com/news/nvidia-and-palantir-bring-sovereign-intelligence-to-critical-supply-chains/?nvid=nv-cwmfg-359690",
-        "title": "NVIDIA and Palantir Bring Sovereign Intelligence to Critical Supply ...",
-        "source_date": "2026-09-11"
-      },
-      {
-        "url": "https://nvidianews.nvidia.com/news/rubin-r200-production-update-sept-2026",
-        "title": "News Archive",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://nvidianews.nvidia.com/news/nvidia-and-palantir-bring-sovereign-intelligence-to-critical-supply-chains-6928068",
-        "title": "NVIDIA and Palantir Bring Sovereign Intelligence to Critical Supply ...",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://nvidianews.nvidia.com/news/nvidia-and-palantir-bring-sovereign-intelligence-to-critical-supply-chains/?nvid=nv-csfg-771428",
-        "title": "NVIDIA and Palantir Bring Sovereign Intelligence to Critical Supply Chains",
-        "source_date": "2026-09-10"
-      },
-      {
-        "url": "https://finance.yahoo.com/technology/ai/articles/history-says-nvidias-last-big-033801868.html",
-        "title": "History Says What Nvidia's Last Big Acquisition Became. ...",
-        "source_date": "2026-09-07"
-      },
-      {
-        "url": "https://dataconomy.com/2026/09/08/nvidia-hugging-face-acquisition-12-9-billion/",
-        "title": "Nvidia says Hugging Face will remain an open platform",
-        "source_date": "2026-09-08"
-      },
-      {
-        "url": "https://treasurytoday.com/press-releases/press-release-nvidia-strikes-12-9bn-deal-to-buy-open-source-ai-platform-hugging-face/",
-        "title": "Press release: Nvidia strikes $12.9bn deal to buy open source AI platform Hugging Face | Treasury Today",
-        "source_date": "2026-09-09"
       },
       {
         "url": "https://www.storagenewsletter.com/2026/09/08/nvidia-to-acquire-hugging-face/",
@@ -1253,30 +1042,55 @@
         "source_date": "2026-09-08"
       },
       {
-        "url": "https://www.sec.gov/Archives/edgar/data/1045810/000119903926000014/0001199039-26-000014-index.htm",
-        "title": "Filing Detail",
-        "source_date": "2026-09-08"
-      },
-      {
         "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-12-93b-hugging-face-075456869.html",
-        "title": "NVIDIA's $12.93B Hugging Face Acquisition Becomes Definitive",
+        "title": "NVIDIA's $12.93B Hugging Face Acquisition Becomes ...",
         "source_date": "2026-09-07"
       },
       {
-        "url": "https://nvidianews.nvidia.com/news/new-geforce-gtx-1660-ti-delivers-great-performance-leap-for-every-gamer-starting-at-279:;New",
-        "title": "New GeForce GTX 1660 Ti Delivers Great Performance ...",
+        "url": "https://www.pops4.com/markets/articles/nvidia-2026-09-07t06-1",
+        "title": "Nvidia Pays $12.9B for Hugging Face, Seizing Open-Source AI Distribution",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://treasurytoday.com/press-releases/press-release-nvidia-strikes-12-9bn-deal-to-buy-open-source-ai-platform-hugging-face/",
+        "title": "Press release: Nvidia strikes $12.9bn deal to buy open source AI platform Hugging Face | Treasury Today",
         "source_date": "2026-09-09"
       },
       {
-        "url": "https://nvidianews.nvidia.com/news/nvidia-to-acquire-arm-for-40-billion-creating-worlds-premier-computing-company-for-the-age-of-ai:?NVIDIA",
-        "title": "NVIDIA to Acquire Arm for $40 Billion, Creating World's ...",
+        "url": "https://www.martincid.com/technology-sv/nvidia-acquires-hugging-face-13-billion-open-ai/",
+        "title": "Nvidia paid $13 billion for Hugging Face — and promised not to close the library",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://hk.marketscreener.com/news/wall-st-slides-as-oil-tops-100-yields-hit-2023-high-apple-down-before-ternus-first-launch-event-ce785bd9d18ef524",
+        "title": "Wall St slides as oil tops $100, yields hit 2023 high; Apple down before Ternus' first launch event as CEO",
         "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://www.ad-hoc-news.de/boerse/news/corporate-news/nvidia-stock-falls-after-doj-groq-probe-as-dividend-hike-and-analyst/70087554",
+        "title": "Nvidia stock falls after DOJ Groq probe as dividend hike and analyst support shape outlook",
+        "source_date": "2026-09-11"
+      },
+      {
+        "url": "https://stocktwits.com/news-articles/markets/equity/jensen-huang-nvidia-hugging-face-acquisition-nvda-stock/cZsMzvLRJvg",
+        "title": "Jensen Huang Says $12.9B Is What It Took To Close The Deal With ...",
+        "source_date": "2026-09-12"
+      },
+      {
+        "url": "https://finance.yahoo.com/technology/ai/articles/jensen-huang-says-22-rent-073305724.html",
+        "title": "Jensen Huang Says a 22% Rent Jump Proves Old Nvidia Chips ...",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-12-9-billion-hugging-110515288.html",
+        "title": "Nvidia's $12.9 Billion Hugging Face Bet Comes With One ...",
+        "source_date": "2026-09-08"
       }
     ],
     "tool_results": [
       "finance_results",
       "search_results",
-      "search_results",
+      "fetch_url_results",
       "search_results",
       "fetch_url_results"
     ],
@@ -1286,17 +1100,17 @@
     "usage": {
       "invocations": 1,
       "finance_search_invocations": 1,
-      "web_search_invocations": 3,
-      "fetch_url_invocations": 1,
+      "web_search_invocations": 2,
+      "fetch_url_invocations": 2,
       "model": "openai/gpt-5.6-sol",
-      "latency_ms": 34906,
-      "cost_usd": 0.14905,
-      "input_tokens": 60185,
-      "output_tokens": 1676,
-      "cache_creation_input_tokens": 17043,
-      "cache_read_input_tokens": 43127
+      "latency_ms": 36462,
+      "cost_usd": 0.16445,
+      "input_tokens": 64285,
+      "output_tokens": 2024,
+      "cache_creation_input_tokens": 18955,
+      "cache_read_input_tokens": 45315
     },
-    "answer_markdown": "**NVIDIA’s stock was pressured this week mainly by a broader technology selloff as Treasury yields rose, while a reported U.S. antitrust investigation added company-specific uncertainty.** NVDA finished the latest session at **$218.29**, down **0.03%**, as of **2026-09-11**; the exact full-week percentage change could not be verified from an available public page.\n\n### What moved the shares\n\n- **Higher interest rates hurt technology valuations.** On Thursday, rising Treasury yields and renewed inflation concerns weighed on U.S. equities. Reuters reported that NVIDIA fell **2.3%** during that session alongside other heavyweight chipmakers. Higher yields can pressure richly valued growth stocks because future profits become less valuable when discounted at higher rates.\n- **Regulatory risk returned to the foreground.** Reuters reported that the U.S. Justice Department is investigating whether NVIDIA structured its licensing arrangement with AI-chip startup Groq to avoid antitrust review. The arrangement was reported at **$17 billion**. NVIDIA defended the deal, while Reuters said it had not received immediate responses from Groq or the Justice Department.\n- **The regulatory headline’s precise price impact cannot be isolated.** It appeared during the same week as the selloff, but no verified public report established how much of NVIDIA’s decline resulted from the investigation rather than yields, inflation concerns, or broader semiconductor weakness.\n\n### Bottom line\n\nThis week’s movement was not tied to one clean operating update. The clearest verified explanation is a combination of **marketwide valuation pressure from rising yields** and **additional uncertainty around the Groq investigation**. Friday’s nearly flat finish suggests the sharpest selling had paused, but it does not establish that either concern was resolved."
+    "answer_markdown": "**NVIDIA moved sharply in both directions this week because company-specific AI optimism collided with a broader selloff in richly valued technology shares.** Early momentum followed upbeat signals about demand for NVIDIA computing and its expansion into AI software; later, rising Treasury yields and renewed interest-rate concerns pushed chip stocks lower.\n\n### What moved the shares\n\n| Period | Reported move | Main publicly reported context |\n|---|---:|---|\n| Early week | More than 6.5% over a three-session winning streak | NVIDIA CEO Jensen Huang highlighted strong rental economics for older H100 chips and the scale of NVIDIA hardware used for a new OpenAI model. The preceding Hugging Face acquisition also supported enthusiasm about NVIDIA expanding beyond chips into AI software and distribution. |\n| 2026-09-10 | Down 2.3% | Producer-price data, higher oil prices and surging Treasury yields increased expectations of tighter Federal Reserve policy. The decline affected the wider chip sector, not NVIDIA alone. |\n| 2026-09-11 close | Down 0.03% for the session, at USD 218.29 | The shares were effectively flat after the prior selloff. Reuters also reported that NVIDIA was considering investing up to USD 10 billion as an anchor investor in Anthropic’s planned IPO, although the discussions could change. |\n\n### Why rates matter so much here\n\nReuters reported that Treasury yields reached multiyear highs as investors worried about inflation and a possible Federal Reserve rate increase. Higher yields can reduce the present value investors assign to companies whose valuations depend heavily on profits expected far into the future. That makes growth-oriented semiconductor shares especially sensitive to rate changes.\n\n### Company-specific news underneath the volatility\n\nNVIDIA announced that it had agreed to acquire Hugging Face for USD 12,930,300,000. The company said the transaction would help scale Hugging Face’s platform, strengthen its infrastructure and broaden access to AI. That supports the market narrative that NVIDIA is building a wider AI ecosystem, although the acquisition’s eventual financial return is not yet known.\n\nReuters separately reported possible participation in Anthropic’s IPO. This was not a completed transaction: the report said discussions remained underway and could change. Consequently, it is best viewed as a potential strategic catalyst rather than confirmed financial value.\n\n### Bottom line\n\nThis week’s action was not traceable to one event. The verified evidence points to a tug-of-war between favorable AI-demand and ecosystem news on one side, and higher yields, inflation concerns and broad semiconductor selling on the other. A precise attribution of each price movement among those factors could not be independently verified."
   },
   "error": null
 }
