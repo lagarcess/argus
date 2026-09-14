@@ -5,14 +5,14 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import InvalidOperation
 from typing import Any, TypedDict
 
 from babel.dates import format_date
 from babel.numbers import format_decimal
 
 from argus.domain.display_figure import DISPLAY_DECIMALS, display_figure
-from argus.domain.result_money import CURRENCY_FRACTION_DIGITS, CURRENCY_ROUNDING
+from argus.domain.result_money import CURRENCY_FRACTION_DIGITS, rounded_result_money
 from argus.domain.result_readout_content import normalize_readout_language
 
 
@@ -70,9 +70,7 @@ def readout_display_value(
         # Modeled costs are small amounts whose parts must add up, so they keep cents.
         digits = 2 if "currency_cents" in presentation else currency_fraction_digits
         try:
-            amount = Decimal(str(value)).quantize(
-                Decimal(1).scaleb(-digits), rounding=CURRENCY_ROUNDING
-            )
+            amount = rounded_result_money(value, fraction_digits=digits)
         except InvalidOperation:
             return None
         pattern = "#,##0" + ("." + "0" * digits if digits else "")

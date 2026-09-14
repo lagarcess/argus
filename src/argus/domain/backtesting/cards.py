@@ -16,6 +16,7 @@ from argus.domain.result_figures import shown_benchmark_gap, shown_cost_drag
 from argus.domain.result_money import (
     CURRENCY_FRACTION_DIGITS,
     format_result_money,
+    rounded_result_money,
     run_currency_fraction_digits,
     with_currency_fraction_digits,
 )
@@ -195,6 +196,9 @@ def build_result_card(
         },
         "status_label": status_label,
         "rows": rows,
+        "profit": float(
+            rounded_result_money(performance["profit"], fraction_digits=fraction_digits)
+        ),
         "assumptions": assumptions,
         "benchmark_note": None,
         "actions": actions,

@@ -268,7 +268,8 @@ export function heroDeltaEvidenceView(
     : normalizeSignedPercent(totalReturn?.value, locale);
   const isContributionReturn =
     totalReturn?.key === "contribution_return_pct" || typedFacts?.strategyType === "dca_accumulation";
-  const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
+  const profit = numberValue(result.profit);
+  const tone = evidenceTone(profit, totalReturnValue);
   const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale, moneyDigits);
   const benchmarkSymbol = facts.benchmark;
   const delta = typedFacts?.benchmarkDeltaPct;
@@ -286,7 +287,7 @@ export function heroDeltaEvidenceView(
       value: parsedEndingValue?.endingDisplay ?? copy.unavailable,
       label: copy.endingValueLabel,
       detail: heroDetail(
-        parsedEndingValue?.change,
+        profit,
         totalReturnValue,
         copy,
         options?.locale,
@@ -612,7 +613,6 @@ function parseEndingValue(value?: string, locale?: string, moneyDigits?: number)
   return {
     start,
     ending,
-    change: start == null ? undefined : ending - start,
     endingDisplay: formatCurrency(ending, locale, "USD", moneyDigits),
   };
 }
@@ -648,7 +648,7 @@ function heroDetail(
 ) {
   const suffix = returnSuffix ?? copy.totalReturnSuffix;
   const returnLabel = totalReturn ?? copy.returnUnavailable;
-  if (change == null) return returnLabel;
+  if (change == null) return `${returnLabel} ${suffix}`;
   // A change reads as none only when it rounds to zero at this run's precision.
   if (Math.abs(change) < 0.5 / 10 ** resultCurrencyFractionDigits(moneyDigits)) {
     return `${formatCurrency(0, locale, "USD", moneyDigits)} ${copy.changeNoun} · ${returnLabel} ${suffix}`;
