@@ -2,6 +2,7 @@ import { chmod, readFile, writeFile } from "node:fs/promises";
 
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type Session, type User } from "@supabase/supabase-js";
+import { isReasonCode } from "./private-alpha-canary-reasons";
 
 type CookieOptions = {
   httpOnly?: boolean;
@@ -534,7 +535,11 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  const reason = error instanceof Error ? error.message : "unknown_failure";
+  // Client and network errors carry backend text; only this tool's codes are printed.
+  const reason =
+    error instanceof Error && isReasonCode(error.message)
+      ? error.message
+      : "unknown_failure";
   console.error(`canary_session_state=failed reason=${reason}`);
   process.exitCode = 1;
 });

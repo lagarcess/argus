@@ -797,7 +797,8 @@ checks = payload.get("checks")
 if not isinstance(checks, dict) or list(checks) != browser_checks:
     raise SystemExit("browser check handoff does not report the profile's browser checks")
 
-reason_pattern = re.compile(r"[a-z0-9_]{1,120}")
+# Words and HTTP statuses only, the contract web/e2e/support/private-alpha-canary-reasons.ts builds.
+reason_pattern = re.compile(r"[a-z]+(?:_(?:[a-z]+|0|[1-5][0-9]{2}))*")
 id_pattern = re.compile(r"[0-9A-Za-z_-]{1,64}")
 evidence: dict[str, dict[str, object]] = {}
 raw_ids: list[str] = []
@@ -809,7 +810,7 @@ for name in browser_checks:
     summary: dict[str, object] = {"status": entry["status"]}
     reason = entry.get("reason")
     if reason is not None:
-        if not isinstance(reason, str) or not reason_pattern.fullmatch(reason):
+        if not isinstance(reason, str) or len(reason) > 120 or not reason_pattern.fullmatch(reason):
             raise SystemExit("browser check handoff has an unsafe failure reason")
         summary["reason"] = reason
     attempts = entry.get("sign_in_attempts")

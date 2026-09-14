@@ -2,6 +2,7 @@ import { hydrateMessagesFromApi } from "../../components/chat/chat-message-proje
 import type { Message } from "../../components/chat/types";
 import type { ApiMessage } from "../../lib/argus-api";
 import { isRetryAction } from "../../lib/chat-retry-actions";
+import { reasonCode } from "./private-alpha-canary-reasons";
 
 // The canary judges an answer by its two owners: the transcript projection says
 // what the turn is, and the rendered message says what the chat announces.
@@ -33,11 +34,11 @@ export function latestAssistantMessage(payload: unknown): Message | null {
 export function ordinaryAnswerFailure(message: Message | null): string | null {
   if (!message || message.role !== "ai") return "assistant_answer_missing";
   if (message.kind !== "text") {
-    return `assistant_answer_rendered_as_${message.kind}`;
+    return reasonCode("assistant_answer_rendered_as", message.kind ?? "none");
   }
   const recovery =
     message.assistantRecoveryCode ?? message.recoveryDisplay?.kind;
-  if (recovery) return `assistant_answer_recovery_${recovery}`;
+  if (recovery) return reasonCode("assistant_answer_recovery", recovery);
   if (message.actions?.some(isRetryAction)) {
     return "assistant_answer_offered_retry";
   }
@@ -50,7 +51,7 @@ export function researchAnswerFailure(message: Message | null): string | null {
   const answerFailure = ordinaryAnswerFailure(message);
   if (answerFailure) return answerFailure;
   if (message?.researchDegradedCode) {
-    return `research_answer_degraded_${message.researchDegradedCode}`;
+    return reasonCode("research_answer_degraded", message.researchDegradedCode);
   }
   return message?.researchSources?.length ? null : "research_sources_missing";
 }

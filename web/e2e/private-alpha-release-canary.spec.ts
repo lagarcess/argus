@@ -12,6 +12,7 @@ import {
   ordinaryAnswerFailure,
   researchAnswerFailure,
 } from "./support/private-alpha-canary-answers";
+import { CheckFailure, reasonCode } from "./support/private-alpha-canary-reasons";
 
 // The canary's browser checks never follow features: each one reads an API
 // response or a product-owned test id, never result facts or feature copy.
@@ -56,25 +57,8 @@ const SIGN_IN_RETRY_DELAY_MS = 5_000;
 const COMPOSER_RELEASE_TIMEOUT_MS = 240_000;
 const PENDING_JOB_STATUSES = new Set(["queued", "running"]);
 
-/** A check failure whose reason is safe to publish in canary evidence. */
-class CheckFailure extends Error {
-  constructor(readonly reason: string) {
-    super(reason);
-  }
-}
-
 /** Sign-in failed, so no later check can run. */
 class SignInFailure extends CheckFailure {}
-
-function reasonCode(...parts: Array<string | number>): string {
-  const code = parts
-    .map((part) => String(part).toLowerCase().replace(/[^a-z0-9]+/g, "_"))
-    .join("_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "")
-    .slice(0, 120);
-  return code || "unknown";
-}
 
 function label(key: string): string {
   const value = labels[key];

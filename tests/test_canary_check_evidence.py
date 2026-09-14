@@ -170,6 +170,13 @@ def test_browser_check_import_names_the_first_check_that_did_not_pass(
         ),
         pytest.param(
             lambda handoff: next(iter(handoff["checks"].values())).update(
+                status="failed",
+                reason="backtest_job_failed_3f2a1b4c_9d8e_4f7a_8b6c_5d4e3f2a1b0c",
+            ),
+            id="normalized-identifier-reason",
+        ),
+        pytest.param(
+            lambda handoff: next(iter(handoff["checks"].values())).update(
                 conversation_id="../../api/v1/admin"
             ),
             id="unsafe-identity",
@@ -352,3 +359,16 @@ def test_browser_artifact_redaction_masks_every_rendered_identifier(
         assert identifier not in redacted.lower()
     assert redacted.count("<redacted>") == len(identifiers) + 1
     assert (tmp_path / "playwright-results" / ".redacted").is_file()
+
+
+def test_browser_reasons_share_one_identifier_free_contract() -> None:
+    # The importer accepts exactly the reasons the browser's one builder produces.
+    contract = "[a-z]+(?:_(?:[a-z]+|0|[1-5][0-9]{2}))*"
+    assert f're.compile(r"{contract}")' in _source(RENDER_RUNNER)
+    reasons = _source("web/e2e/support/private-alpha-canary-reasons.ts")
+    assert f"REASON_CODE_PATTERN = /^{contract}$/;" in reasons
+    spec = _source("web/e2e/private-alpha-release-canary.spec.ts")
+    assert "function reasonCode" not in spec
+    assert "class CheckFailure extends Error" not in spec
+    session = _source("web/e2e/support/private-alpha-canary-session.ts")
+    assert "isReasonCode(error.message)" in session
