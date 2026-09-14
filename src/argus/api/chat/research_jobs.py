@@ -130,8 +130,8 @@ def apply_research_job_request(
     except ResearchUnavailableError as exc:
         # No job was started here: the turn ends on the lookup recovery the
         # inline path takes, retryable when the failure is. A submission whose
-        # answer was lost may still have started a provider run; the client
-        # records that attempt as unpriced.
+        # answer was lost may already have started a billing run, so the client
+        # marks it not retryable and records the attempt as unpriced.
         runtime_result.update(research_lookup_failure_for_job(job_request, failure=exc))
         _attach_completed_tool_card(
             runtime_result, job_request, failure_code="research_failed"

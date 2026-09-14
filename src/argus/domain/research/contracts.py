@@ -158,6 +158,8 @@ class ResearchUnavailableError(Exception):
     ``retry_after_seconds`` the wait that response asked for, when it gave one.
     ``sent`` is False only when the request provably never reached the
     provider, because the connection failed before it was sent.
+    ``run_may_be_billing`` marks a background submission that failed after it
+    was sent: the provider may already be running, and billing, that run.
     ``usage`` carries the invoice of a response that was read far enough to
     establish one before being rejected. Argus paid for that response, so the
     turn that discards it still records its spend.
@@ -171,6 +173,7 @@ class ResearchUnavailableError(Exception):
         status: int | None = None,
         retry_after_seconds: float | None = None,
         sent: bool = True,
+        run_may_be_billing: bool = False,
         usage: ResearchUsage | None = None,
     ) -> None:
         super().__init__(reason)
@@ -179,6 +182,7 @@ class ResearchUnavailableError(Exception):
         self.status = status
         self.retry_after_seconds = retry_after_seconds
         self.sent = sent
+        self.run_may_be_billing = run_may_be_billing
         self.usage = usage
 
     @property
@@ -194,10 +198,13 @@ class ResearchUnavailableError(Exception):
 
     @property
     def transient(self) -> bool:
-        """Whether the same request can succeed when asked again: the provider
-        failed on its side (5xx), rate limited it (429), or was too slow or
-        unreachable. A request it refused, a missing key and an answer that
-        could not be read fail the same way every time."""
+        """Whether the reader may usefully ask the same request again: the
+        provider failed on its side (5xx), rate limited it (429), or was too slow
+        or unreachable. A request it refused, a missing key and an answer that
+        could not be read fail the same way every time, and a background
+        submission whose run may already be billing would start a second run."""
+        if self.run_may_be_billing:
+            return False
         if self.status is not None:
             return self.status == 429 or self.status >= 500
         return self.reason in ("timeout", "transport")

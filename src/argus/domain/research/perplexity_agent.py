@@ -1,13 +1,13 @@
 """Perplexity Agent API client for finance_search research.
 
-One HTTP boundary with an injectable transport so tests stay hermetic. Every
-request ends by its deadline: the host lookup and each connect, write and read
-are capped at the time left. A failure after which the provider cannot have
-started paid work (a 429, a 5xx, a connection that failed before the request
-was sent) is asked again at that boundary, a bounded number of times inside
-the call's own deadline. After a read timeout or a connection dropped
-mid-request the reader decides, and the attempt is recorded as unpriced. The
-parser is deterministic: it walks the typed ``output`` items the Agent API
+One HTTP boundary with an injectable transport so tests stay hermetic. Each
+attempt's httpx timeouts are sized from what is left of the call's own
+timeout. A failure after which the provider cannot have started paid work (a
+429, a 5xx, a connection that failed before the request was sent) is asked
+again at that boundary, a bounded number of times inside that timeout. After a
+read timeout or a connection dropped mid-request the attempt is recorded as
+unpriced, and a background submission is marked as possibly billing a run.
+The parser is deterministic: it walks the typed ``output`` items the Agent API
 documents, never user language. Provider identity is scrubbed at parse time
 because route receipts and the cost ledger own provenance, not prose.
 
@@ -23,13 +23,8 @@ from __future__ import annotations
 
 import json
 import re
-import select
-import socket
-import ssl
 import time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -251,7 +246,14 @@ class PerplexityAgentClient:
     def submit_background(self, prompt: str, spec: ResearchConfigSpec) -> str:
         payload = self._request_body(prompt, spec)
         payload["background"] = True
-        response = self._post(payload, timeout_seconds=spec.timeout_seconds)
+        try:
+            response = self._post(payload, timeout_seconds=spec.timeout_seconds)
+        except ResearchUnavailableError as exc:
+            if exc.transient and not exc.paid_work_ruled_out:
+                # The provider may already be running, and billing, this run; a
+                # Retry would start a second one, so the reader is not offered one.
+                exc.run_may_be_billing = True
+            raise
         background_id = str(response.get("id") or "").strip()
         if not background_id:
             raise ResearchUnavailableError("malformed_response", "missing id")
@@ -325,9 +327,8 @@ class PerplexityAgentClient:
         """One request, asked again only when the provider cannot have started
         paid work on it.
 
-        Every attempt shares the call's ceiling as one deadline that caps each
-        connect, write and read, so a retried call ends by the same deadline as
-        one that was never retried."""
+        Each attempt's httpx timeouts are sized from what is left of the call's
+        timeout, and a retry starts only while at least half of it is left."""
         deadline = self._clock() + timeout_seconds
         remaining = timeout_seconds
         attempt = 1
@@ -394,16 +395,15 @@ class PerplexityAgentClient:
             "Content-Type": "application/json",
         }
         started = self._clock()
-        transport = (
-            self._transport
-            if self._transport is not None
-            else _deadline_transport(started + timeout_seconds, self._clock)
-        )
         try:
-            with httpx.Client(transport=transport, timeout=timeout_seconds) as client:
+            # httpx applies this timeout to each connect, read, write and pool
+            # wait on its own.
+            with httpx.Client(
+                transport=self._transport, timeout=timeout_seconds
+            ) as client:
                 response = client.request(method, url, headers=headers, json=payload)
         except (httpx.HTTPError, OSError) as exc:
-            # An OSError the socket layer did not map fails closed, as sent.
+            # An OSError httpx did not map fails closed, as sent.
             timed_out = isinstance(exc, (httpx.TimeoutException, TimeoutError))
             failure = ResearchUnavailableError(
                 "timeout" if timed_out else "transport",
@@ -478,193 +478,6 @@ _UNSENT_ERRORS = (
     httpx.PoolTimeout,
     httpx.ProxyError,
 )
-
-
-# Host lookups run on a small shared pool: a stalled resolver holds at most
-# these threads until it gives up, and a request stops waiting at its deadline.
-_RESOLVER = ThreadPoolExecutor(max_workers=4, thread_name_prefix="research-resolver")
-
-
-def _deadline_transport(
-    deadline: float, clock: Callable[[], float]
-) -> httpx.HTTPTransport:
-    """The default transport with its sockets owned by `_DeadlineBackend`: the
-    host lookup, each connect and TLS handshake, and every write and read end by
-    the deadline, so neither a stalled resolver nor a provider that trickles its
-    answer holds the request open."""
-    transport = httpx.HTTPTransport()
-    # httpx 0.28 has no public hook into its connection pool's sockets.
-    transport._pool._network_backend = _DeadlineBackend(deadline, clock)
-    return transport
-
-
-class _DeadlineBackend:
-    """Opens its sockets itself, so no library call that can block, such as the
-    second lookup inside `socket.create_connection`, runs outside the deadline."""
-
-    def __init__(self, deadline: float, clock: Callable[[], float]) -> None:
-        self._deadline = deadline
-        self._clock = clock
-
-    def left(self, timeout: float | None, error: type[httpx.TimeoutException]) -> float:
-        left = self._deadline - self._clock()
-        if left <= 0:
-            raise error("research request deadline passed")
-        return left if timeout is None else min(timeout, left)
-
-    def connect_tcp(
-        self,
-        host: str,
-        port: int,
-        timeout: float | None = None,
-        local_address: str | None = None,
-        socket_options: Any = None,
-    ) -> _DeadlineStream:
-        failure: httpx.TransportError = httpx.ConnectError(
-            f"no address found for {host}"
-        )
-        for family, kind, proto, _, address in self._resolve(host, port, timeout):
-            wait = self.left(timeout, httpx.ConnectTimeout)
-            sock: socket.socket | None = None
-            try:
-                # Creating the socket can fail too: no descriptors left, or a
-                # family this host cannot open.
-                sock = socket.socket(family, kind, proto)
-                sock.settimeout(wait)
-                for option in socket_options or ():
-                    sock.setsockopt(*option)
-                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                if local_address:
-                    sock.bind((local_address, 0))
-                sock.connect(address)
-            except OSError as exc:
-                # The next address gets whatever time is left.
-                if sock is not None:
-                    sock.close()
-                failure = _connect_failure(exc)
-                continue
-            return _DeadlineStream(sock, self)
-        raise failure
-
-    def _resolve(self, host: str, port: int, timeout: float | None) -> list[Any]:
-        wait = self.left(timeout, httpx.ConnectTimeout)
-        pending = _RESOLVER.submit(
-            socket.getaddrinfo, host, port, 0, socket.SOCK_STREAM
-        )
-        try:
-            found = pending.result(timeout=wait)
-        except FutureTimeoutError:
-            pending.cancel()
-            raise httpx.ConnectTimeout(
-                "research request deadline passed while resolving the provider host"
-            ) from None
-        except OSError as exc:
-            raise httpx.ConnectError(str(exc)) from exc
-        return list(dict.fromkeys(found))
-
-    def connect_unix_socket(
-        self, path: str, timeout: float | None = None, socket_options: Any = None
-    ) -> _DeadlineStream:
-        wait = self.left(timeout, httpx.ConnectTimeout)
-        sock: socket.socket | None = None
-        try:
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            sock.settimeout(wait)
-            for option in socket_options or ():
-                sock.setsockopt(*option)
-            sock.connect(path)
-        except OSError as exc:
-            if sock is not None:
-                sock.close()
-            raise _connect_failure(exc) from exc
-        return _DeadlineStream(sock, self)
-
-    def sleep(self, seconds: float) -> None:
-        time.sleep(seconds)
-
-
-def _connect_failure(exc: OSError) -> httpx.TransportError:
-    if isinstance(exc, TimeoutError):
-        return httpx.ConnectTimeout(str(exc))
-    return httpx.ConnectError(str(exc))
-
-
-def _readable(sock: socket.socket) -> bool:
-    """Whether an idle connection has data waiting or was closed by its peer.
-    poll where the platform has it: select rejects a descriptor past
-    FD_SETSIZE, which a busy process reaches."""
-    if sock.fileno() < 0:
-        return True
-    if hasattr(select, "poll"):
-        poller = select.poll()
-        poller.register(sock, select.POLLIN)
-        return bool(poller.poll(0))
-    return bool(select.select([sock], [], [], 0)[0])
-
-
-class _DeadlineStream:
-    """One owned socket; every operation waits at most the time left."""
-
-    def __init__(self, sock: socket.socket, backend: _DeadlineBackend) -> None:
-        self._sock = sock
-        self._backend = backend
-
-    def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
-        wait = self._backend.left(timeout, httpx.ReadTimeout)
-        try:
-            self._sock.settimeout(wait)
-            return self._sock.recv(max_bytes)
-        except TimeoutError as exc:
-            raise httpx.ReadTimeout(str(exc)) from exc
-        except OSError as exc:
-            raise httpx.ReadError(str(exc)) from exc
-
-    def write(self, buffer: bytes, timeout: float | None = None) -> None:
-        if not buffer:
-            return
-        wait = self._backend.left(timeout, httpx.WriteTimeout)
-        try:
-            # A socket timeout bounds all of sendall, not each chunk it sends.
-            self._sock.settimeout(wait)
-            self._sock.sendall(buffer)
-        except TimeoutError as exc:
-            raise httpx.WriteTimeout(str(exc)) from exc
-        except OSError as exc:
-            raise httpx.WriteError(str(exc)) from exc
-
-    def close(self) -> None:
-        self._sock.close()
-
-    def start_tls(
-        self,
-        ssl_context: ssl.SSLContext,
-        server_hostname: str | None = None,
-        timeout: float | None = None,
-    ) -> _DeadlineStream:
-        # The handshake verifies server_hostname, the request's own host, not the
-        # address connected to, and its socket timeout bounds the whole handshake.
-        try:
-            self._sock.settimeout(self._backend.left(timeout, httpx.ConnectTimeout))
-            tls = ssl_context.wrap_socket(self._sock, server_hostname=server_hostname)
-        except BaseException as exc:
-            self._sock.close()
-            if isinstance(exc, OSError):
-                raise _connect_failure(exc) from exc
-            raise
-        return _DeadlineStream(tls, self._backend)
-
-    def get_extra_info(self, info: str) -> Any:
-        if info == "ssl_object":
-            return self._sock if isinstance(self._sock, ssl.SSLSocket) else None
-        if info == "client_addr":
-            return self._sock.getsockname()
-        if info == "server_addr":
-            return self._sock.getpeername()
-        if info == "socket":
-            return self._sock
-        if info == "is_readable":
-            return _readable(self._sock)
-        return None
 
 
 def _retry_after_seconds(value: str | None) -> float | None:

@@ -6,8 +6,7 @@ Every provider here is scripted, and so is time: a retry's wait is asserted,
 never slept. The failures are the five the issue names (a 500, a 429 with
 Retry-After, a timeout, a 400 and a missing key), plus a connection refused
 before the request was sent and one dropped mid-request, which the founder's
-paid-work rule tells apart. The socket-level deadline, proven against a real
-local server, lives in ``test_research_request_deadline.py``.
+paid-work rule tells apart.
 """
 
 from __future__ import annotations
@@ -398,11 +397,50 @@ def test_a_background_submission_is_sent_again_only_when_no_run_can_have_started
     else:
         with pytest.raises(ResearchUnavailableError) as raised:
             client.submit_background(QUESTION, FAST)
-        # The reader decides, and the attempt that may have started a run is on record.
-        assert raised.value.transient and not raised.value.paid_work_ruled_out
+        # A run may already be billing: no Retry for the reader, and it is on record.
+        assert raised.value.run_may_be_billing and not raised.value.transient
         assert [spend.reason for spend in unpriced] == ["unanswered_attempt"]
 
     assert len(provider.requests) == sent
+
+
+@pytest.mark.parametrize(
+    ("steps", "code"),
+    [
+        ([transport_error(httpx.ReadTimeout)], "research_lookup_unavailable"),
+        ([transport_error(httpx.RemoteProtocolError)], "research_lookup_unavailable"),
+        ([status(503)] * ATTEMPTS, "research_lookup_failed"),
+    ],
+    ids=["read_timeout", "connection_dropped", "server_error"],
+)
+def test_a_background_submission_offers_retry_only_when_no_run_can_be_billing(
+    monkeypatch: pytest.MonkeyPatch, steps: list[Step], code: str
+) -> None:
+    from argus.api.chat import research_jobs
+
+    from tests.research.test_research_jobs import _job_request, _JobGateway
+
+    unpriced: list[Any] = []
+    monkeypatch.setattr(perplexity_agent, "record_unpriced_spend", unpriced.append)
+    gateway = _JobGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+    client, provider = scripted_client(ScriptedClock(), list(steps))
+    monkeypatch.setattr(research_jobs, "_client", lambda: client)
+    runtime_result: dict[str, Any] = {"research_job_request": _job_request()}
+
+    job = research_jobs.apply_research_job_request(
+        runtime_result,
+        user_id="u1",
+        conversation_id="c1",
+        request_message_id="m1",
+        request_id="r1",
+    )
+
+    retryable = code in DURABLE_RETRY_RECOVERY_CODES
+    assert job is None and gateway.rows == {}
+    assert runtime_result["recovery"] == {"code": code, "retryable": retryable}
+    assert len(provider.requests) == len(steps)
+    assert len(unpriced) == (0 if retryable else 1)
 
 
 @pytest.mark.parametrize(
@@ -419,6 +457,7 @@ def test_a_background_submission_is_sent_again_only_when_no_run_can_have_started
         (ResearchUnavailableError("not_configured"), False),
         (ResearchUnavailableError("malformed_response"), False),
         (ResearchUnavailableError("empty_answer"), False),
+        (ResearchUnavailableError("timeout", run_may_be_billing=True), False),
     ],
 )
 def test_transient_is_derived_from_the_status_or_the_reason(

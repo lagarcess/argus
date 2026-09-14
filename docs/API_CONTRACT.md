@@ -4164,10 +4164,12 @@ Contract rules:
   at least half of the deadline is left. After a read timeout or a connection
   dropped mid-request it does not ask again: the turn ends on the retry notice
   so the reader decides, and the attempt is recorded as an unpriced anomaly
-  with a null provider response id. Every attempt shares the call's own timeout
-  as one deadline that caps the host lookup and each connect, TLS handshake,
-  write and read, so neither a stalled resolver nor a provider that trickles
-  its answer can hold the call past it. A background poll is not
+  with a null provider response id. Each attempt's httpx connect, read, write
+  and pool timeouts are sized from what is left of the call's own timeout.
+  httpx applies each one to a single operation, so an attempt can run past the
+  limit: a stalled DNS lookup by as much as the system resolver's own timeout,
+  and a provider that keeps sending bytes slowly for as long as it keeps
+  sending. A background poll is not
   retried by the client; the poller already asks again until its own deadline.
   A call claims research capacity once, however many attempts it takes.
 - When no attempt answers, the turn publishes no answer, no rows and no
@@ -4181,7 +4183,10 @@ Contract rules:
   `recovery = {"code": "research_lookup_unavailable", "retryable": false}`,
   completes its turn with nothing to retry, and renders as the quiet failure
   notice. A thorough request whose background submission fails ends on the
-  same recovery. The persisted `content` is English compatibility text;
+  same recovery, except after a read timeout or a connection dropped
+  mid-request: the provider may already be running, and billing, that run, so
+  the turn ends on the quiet notice with no Retry and the attempt is recorded
+  as unpriced. The persisted `content` is English compatibility text;
   clients render localized copy from the code.
 - That turn's `research` sidecar keeps `degraded.code =
   "research_unavailable_<reason>"`, where the reason is `http_error`,

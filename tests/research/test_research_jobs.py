@@ -650,8 +650,14 @@ def test_missing_key_raises_before_any_job_or_spend(monkeypatch) -> None:
             ResearchUnavailableError("http_error", "http 400", status=400),
             "research_lookup_unavailable",
         ),
+        (
+            ResearchUnavailableError(
+                "timeout", "read timed out", run_may_be_billing=True
+            ),
+            "research_lookup_unavailable",
+        ),
     ],
-    ids=["transient", "refused"],
+    ids=["transient", "refused", "run_may_be_billing"],
 )
 def test_a_submission_the_provider_fails_ends_on_the_lookup_recovery(
     monkeypatch, failure: ResearchUnavailableError, code: str
@@ -681,8 +687,8 @@ def test_a_submission_the_provider_fails_ends_on_the_lookup_recovery(
     research = runtime_result["research"]
     assert research["shape"] == "thorough"
     assert research["degraded"] == {
-        "code": "research_unavailable_http_error",
-        "status": failure.status,
+        "code": f"research_unavailable_{failure.reason}",
+        **({"status": failure.status} if failure.status is not None else {}),
     }
     assert research["rows"] == []
     assert research["anchor_symbols"] == ["NFLX", "DIS"]
