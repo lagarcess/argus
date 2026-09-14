@@ -40,9 +40,7 @@ function confirmation(retestPeriod: RetestPeriodFixture): RetestConfirmationFixt
     asset_class: "equity",
     title: "AAPL",
     status: "ready_to_run",
-    statusLabel: "Ready to run",
-    summary: "Review this backtest before running it.",
-    strategy_type: "buy_and_hold",
+    statusLabel: "Ready to run",    strategy_type: "buy_and_hold",
     date_range: retestPeriod.effective_date_range,
     display_facts: {
       benchmark_symbol: "SPY",

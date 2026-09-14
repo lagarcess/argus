@@ -229,7 +229,6 @@ export type StrategyConfirmationPayload = {
   title: string;
   status?: StrategyConfirmationStatus;
   statusLabel: string;
-  summary: string;
   strategy_type?: string;
   display_facts?: ConfirmationDisplayFacts;
   capabilities?: StrategyConfirmationCapabilities;

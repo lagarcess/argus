@@ -1442,9 +1442,7 @@ test("@guest-shell hints require typed artifacts and dismiss locally without wri
           confirmation_state: "active",
           title: "AAPL buy and hold",
           status: "ready_to_run",
-          statusLabel: "Ready to run",
-          summary: "Buy and hold AAPL with SPY as the benchmark.",
-          rows: [
+          statusLabel: "Ready to run",          rows: [
             { key: "strategy", label: "Strategy", value: "Buy and hold" },
             { key: "assets", label: "Assets", value: "AAPL" },
             { key: "period", label: "Period", value: "Last 12 months" },

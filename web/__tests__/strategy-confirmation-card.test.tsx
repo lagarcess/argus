@@ -15,9 +15,7 @@ function confirmation(
   return {
     title: "Ready to test",
     status: "ready_to_run",
-    statusLabel: "Ready to run",
-    summary: "Review this backtest before running it.",
-    strategy_type: strategyType,
+    statusLabel: "Ready to run",    strategy_type: strategyType,
     rows: [
       { key: "assets", label: "Assets", value: symbols.join(", ") },
       { key: "period", label: "Period", value: "Last 12 months" },
