@@ -115,14 +115,27 @@ writers; the one-owner invariant; and an in-place edit of a legacy row.
 
 All 40 pass at `e8925e04`.
 
+## Live route check
+
+`route-check/` drove real turns through the chat route at `4e89d289`, in
+English and Spanish: create a card, change an input, run it, and ask about the
+result, with artifact naming running. Every card turn reached the model and
+naming as the card's typed facts, the retired sentence appeared in no model
+input, and no follow-up misread the card. The Spanish result question timed out
+once at the answer composer and answered correctly on one retry. Billed $0.162
+of the $0.50 cap. The full live measurement was skipped because it builds each
+case's history itself and cannot see this change.
+
 ## Limits
 
 - Rows written before this change keep the English sentence in
-  `conversations.last_message_preview` until the conversation's next message.
-  No backfill migration; readers never receive that column. In the replay the
+  `conversations.last_message_preview` until the conversation's next message,
+  and the interpreter keeps reading a legacy card's `summary` until that card
+  is rebuilt. The founder accepted both as they are: no backfill, no change to
+  what the model reads for cards made before this change. In the replay the
   legacy row's preview was written at head, so it shows typed search text.
-- Model context changed: card turns in thread history are typed-facts JSON.
-  The live measurement eval was not run and waits for the founder.
+- Model context changed: card turns in thread history are typed-facts JSON,
+  checked live by the route check above.
 - For conversations whose card predates this change, the interpreter's
   `active_confirmation_reference` dump into model context
   (`llm_interpreter.py`, `focused_extraction.py`) still carries that legacy
