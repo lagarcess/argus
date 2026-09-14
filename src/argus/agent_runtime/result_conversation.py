@@ -48,6 +48,7 @@ from argus.domain.research.contracts import (
 )
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.result_money import stored_currency_fraction_digits
 from argus.domain.result_readout_content import normalize_readout_language
 from argus.domain.result_readout_grounding import (
     READOUT_FIGURE_REFERENCE_INSTRUCTIONS,
@@ -340,6 +341,7 @@ def _run_sheet(metadata: dict[str, Any]) -> dict[str, Any]:
         or config.get("benchmark_symbol"),
         date_range=card.get("date_range") or config.get("date_range"),
         chart=metadata.get("chart"),
+        currency_fraction_digits=stored_currency_fraction_digits(card),
     )
 
 

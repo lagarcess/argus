@@ -1,4 +1,5 @@
 {
   "currency_fraction_digits": 0,
-  "currency_rounding_mode": "halfExpand"
+  "currency_rounding_mode": "halfExpand",
+  "currency_cents_below": 1000
 }

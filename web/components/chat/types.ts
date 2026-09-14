@@ -155,6 +155,8 @@ export type StrategyResultPayload = {
   actions?: ChatActionOption[];
   chart?: ResultChartPayload | null;
   executionCosts?: ExecutionCostEvidence | null;
+  /** Money precision the backend stored on the result card. */
+  currencyFractionDigits?: number;
 };
 
 export type ExecutionCostEvidence = {

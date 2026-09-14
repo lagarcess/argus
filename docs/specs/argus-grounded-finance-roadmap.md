@@ -363,15 +363,13 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-14 at integration `8e9f40bc`, after production promotion
+**Updated 2026-09-14 at integration `2cd359c8`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Research provider failures take the retryable notice | PR #612 for #609, ready at `b880ad75` before Any grounded math landed. It now merges integration, composes its retry notice with the answer without the lookup (decision 5) and proposes a live check. |
-| A confirmation card turn carries no prose | PR #618. The chat-route live check passed in English and Spanish for $0.16, and its evidence now states only computed totals. After its last scoped review it merges integration and keeps both sides where Any grounded math touched the same history and naming code. |
-| $10 minimum starting capital | PR #621 at `2b4152d4`, CI green. Stopped for the founder's call on how small results show cents. Capital in the stated currency is specced, not built: no exchange-rate history exists in Argus today. |
+| Research provider failures take the retryable notice | PR #612 for #609. Decision 5 is built and merged with the latest integration locally. Its last two Codex rounds were about which replies chat history keeps after a Retry; the founder is choosing between the earlier rule, with Retry seeing the failed answer as a known limit, and sending the failed reply's id with the Retry. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1446,7 +1444,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `8e9f40bc`.
+shipped means live in production. Integration is `2cd359c8`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1529,10 +1527,12 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Production promotion 2026-09-13 | its own promotion | **SHIPPED** `3d98057c`, PR #603. See the promotion paragraph above. |
 | Readout receipts admit every model tier | outside the releases | **LANDED** `6eb93d84`, PR #610, closing #605. `route_receipts` accepts the readout tier, and a test pins the check to the runtime's tier list. Its migration, classed destructive for its dropped and re-added check, ships at the next promotion. |
 | Stated money survives a timed-out interpretation | outside the releases | **LANDED** `b7c69b54`, PR #602, closing #600. Focused repair keeps a stated deposit, contribution, fees and slippage; 22 of 22 targeted live reruns passed. Ships at the next promotion. |
-| Research provider failures take the retryable notice | outside the releases | **Composing**, PR #612 for #609, ready at `b880ad75` before Any grounded math landed. Transient provider errors retry with backoff, a failure that persists shows the existing retryable notice, and a guest gets the research question back. It now composes with the answer without the lookup. |
+| Research provider failures take the retryable notice | outside the releases | **In review**, PR #612 for #609. Transient provider errors retry with backoff, a failure that persists shows the existing retryable notice, a guest gets the research question back, and when research still fails the answer without the lookup runs with the notice under it. Waiting on the founder's call on chat history after a Retry. |
 | One owner for the support address | outside the releases | **LANDED** `9630ffe2`, PR #615, closing #596. The API constant and the web fallback both read `web/argus_display_contract/support_contact.json`, and a test fails if any code types the address again. Ships at the next promotion. |
 | Canary core checks | outside the releases | **LANDED** `7adaf073`, PR #617, for #614. The canary checks that the three services run one commit, a signed-in account gets an ordinary chat answer, one backtest completes and one research answer has sources, plus the release config, signup denial and welcome email. It expects manual deploys (`autoDeployTrigger` off in `render.yaml` and the release profile). Proven twice against production `3d98057c` (runs 34796700214 and 34808072927). #614 stays open until the first scheduled run on main passes after the next promotion. |
 | One provenance policy for promotion evidence | outside the releases | **LANDED** `1bd2f8cb`, PR #616, closing #608. `tests/promotion_evidence_identity.py` owns whether evidence still stands: every file the eval could import or read counts, while `render.yaml`, `.env.example`, docs and dated evidence scripts do not. The eval refuses a tracked file as its environment. Model and flag identity in scorecards is #619. |
+| A confirmation card turn carries no prose | outside the releases | **LANDED** `14d4a870`, PR #618. A confirmation card no longer stores an English summary sentence. Card turns reach the model's history, naming and search as typed facts, and old rows are scrubbed on read. The chat-route live check passed in English and Spanish for $0.16. |
+| $10 minimum starting capital | outside the releases | **LANDED** `2cd359c8`, PR #621. One owner sets the minimum at $10 for every way capital is set or edited, and the recovery offers the minimum. A run under $1,000 shows cents, with decimals decided once per run and rounded half up. Capital in a stated currency, converted to dollars, is #623; a gain that subtracts rounded values is #624. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes

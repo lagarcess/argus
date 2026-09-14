@@ -27,11 +27,14 @@ import {
   type ResultChartRangeOption,
   type ResultChartSelection,
 } from "@/lib/result-chart-range";
+import { resultMoneyFormatOptions } from "@/lib/result-money";
 import ResultChartExploration from "./ResultChartExploration";
 import { type ResultChartMarker, type ResultChartPayload } from "./types";
 
 type ResultEquityChartProps = {
   chart: ResultChartPayload;
+  /** Money precision the backend stored on the result card. */
+  currencyFractionDigits?: number;
   presentation?: "default" | "heroDeltaEvidence";
   appearanceOverride?: "light" | "dark";
 };
@@ -128,6 +131,7 @@ function resultChartDataForWindow(
 export default function ResultEquityChart({
   chart,
   appearanceOverride,
+  currencyFractionDigits,
   presentation = "default",
 }: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -164,8 +168,9 @@ export default function ResultEquityChart({
     [t],
   );
   const currencyFormatter = useMemo(
-    () => chartCurrencyFormatter(chart.currency, chartLocale),
-    [chart.currency, chartLocale],
+    () =>
+      chartCurrencyFormatter(chart.currency, chartLocale, currencyFractionDigits),
+    [chart.currency, chartLocale, currencyFractionDigits],
   );
   const data = useMemo<BaselineData<Time>[]>(
     () =>
@@ -648,6 +653,7 @@ export default function ResultEquityChart({
         selection={selection}
         summary={visibleSummary}
         currency={chart.currency}
+        currencyFractionDigits={currencyFractionDigits}
         locale={i18n.language}
         showTimes={intradayTimes}
         detailsOpen={detailsOpen}
@@ -800,12 +806,15 @@ function resolveChartLocale(locale?: string | null) {
   return normalized;
 }
 
-function chartCurrencyFormatter(currency: string | undefined, locale: string) {
+function chartCurrencyFormatter(
+  currency: string | undefined,
+  locale: string,
+  currencyFractionDigits?: number,
+) {
   return new Intl.NumberFormat(resolveChartLocale(locale), {
     style: "currency",
     currency: currency ?? "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    ...resultMoneyFormatOptions(currencyFractionDigits),
   });
 }
 
@@ -813,8 +822,9 @@ export function formatChartCurrency(
   value: number,
   currency = "USD",
   locale = "en-US",
+  currencyFractionDigits?: number,
 ) {
-  return chartCurrencyFormatter(currency, locale).format(value);
+  return chartCurrencyFormatter(currency, locale, currencyFractionDigits).format(value);
 }
 
 export function formatChartDateLabel(

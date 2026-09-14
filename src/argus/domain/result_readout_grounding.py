@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from argus.domain.benchmark_comparison import benchmark_comparison_from_delta
 from argus.domain.result_figures import shown_benchmark_gap, shown_cost_drag
+from argus.domain.result_money import with_currency_fraction_digits
 from argus.domain.result_readout_content import (
     ReadoutLanguage,
     normalize_readout_language,
@@ -91,6 +92,7 @@ def stored_readout_facts(
     date_range: object = None,
     chart: object = None,
     comparison_metrics: dict[str, Any] | None = None,
+    currency_fraction_digits: int | None = None,
 ) -> dict[str, Any]:
     """Keep every stored metric, with optional path data and explicit illustrations.
 
@@ -174,7 +176,11 @@ def stored_readout_facts(
             "meaning": "Illustration using the starting capital, not the actual "
             "peak-to-trough dollar loss. Contributions change the capital at risk.",
         }
-    return build_labeled_fact_sheet(facts)
+    sheet = build_labeled_fact_sheet(facts)
+    if currency_fraction_digits is not None:
+        # The precision the run's result card stores travels with its sheet.
+        with_currency_fraction_digits(sheet, currency_fraction_digits)
+    return sheet
 
 
 def accepted_readout_text(

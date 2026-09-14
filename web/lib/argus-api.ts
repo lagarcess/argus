@@ -159,6 +159,7 @@ export type ConversationResultCard = {
   actions: ChatActionOption[];
   chart?: ResultChartPayload | null;
   execution_costs?: ExecutionCostEvidence | null;
+  currency_fraction_digits?: number | null;
 };
 
 // ─── Domain objects ──────────────────────────────────────────────────────────
@@ -518,6 +519,7 @@ export function resultCardFromConversationCard(
     })),
     chart: card.chart ?? null,
     executionCosts: card.execution_costs ?? null,
+    currencyFractionDigits: card.currency_fraction_digits ?? undefined,
   };
 }
 

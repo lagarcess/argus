@@ -25,6 +25,7 @@ export type ResultReadoutFacts = {
   costs?: ExecutionCostEvidence;
   indicator?: { name: "rsi"; period?: number; entryThreshold?: number; exitThreshold?: number };
   rules?: ResultRuleGroup[];
+  currencyFractionDigits?: number;
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -85,6 +86,7 @@ export function resultReadoutFacts(value: unknown): ResultReadoutFacts | null {
       ? number(parameters.starting_capital) ?? number(strategy.initial_capital)
       : number(config.starting_capital) ?? number(parameters.starting_capital) ?? number(strategy.capital_amount),
     recurringContribution: number(parameters.recurring_contribution) ?? number(strategy.recurring_contribution),
+    currencyFractionDigits: number(card.currency_fraction_digits),
     contributionPeriod,
     timeframe: string(config.timeframe) ?? string(parameters.timeframe),
     indicator: indicatorName === "rsi" ? {

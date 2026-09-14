@@ -2304,7 +2304,7 @@ Hard-coded technical limits in the backtesting logic.
 - **Symbols**: Max 5 symbols per run.
 - **Timeframe**: 1h, 2h, 4h, 6h, 12h, 1D.
 - **Provider windows**: Stored run configs must reflect provider-available history for the selected asset class and timeframe. Alpaca equity history starts in 2016 for the launch path; Kraken OHLC currency-pair windows are limited to the latest 720 candles for the requested interval.
-- **Capital**: Min 1,000 / Max 100,000,000.
+- **Capital**: Min 10 / Max 100,000,000 (`MIN_STARTING_CAPITAL`, `MAX_STARTING_CAPITAL`). A recurring plan keeps its own seed and contribution rules.
 - **Side**: Long-only.
 
 ### Layer 2: Rate Limits
