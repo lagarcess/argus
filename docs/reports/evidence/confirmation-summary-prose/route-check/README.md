@@ -16,16 +16,20 @@ check drives real turns through the chat route instead.
   each: create a card (Apple buy and hold, January 2023 to December 2024,
   $10000), change an input ("make it $5000"), run it with the card's own Run
   action, and ask about the result ("How did that do compared to SPY?",
-  "¿Cómo le fue frente a SPY?"). Artifact naming ran after every turn.
+  "¿Cómo le fue frente a SPY?"). Artifact naming was invoked after every turn
+  and named each conversation once; see Naming.
 - Retry rule: a result question that returns a retryable typed recovery is
   asked once more, recorded as its own step, and never replaces the first
   result. During this capture the Spanish retry was sent by hand under that
   rule; the driver now encodes it.
 - Captured:
-  - `model_requests.jsonl`: every request body sent to OpenRouter, never headers.
-  - `receipts.jsonl`: every cost receipt.
+  - `model_requests.jsonl`: request bodies sent to OpenRouter, never headers.
+    A request cancelled by a timeout is not recorded; see below.
+  - `receipts.jsonl`: every OpenRouter cost receipt, including skipped and
+    timed-out calls.
   - `thread_history.jsonl`: the history the chat route and artifact naming loaded.
-  - `naming_input.jsonl`, `naming_output.jsonl`: the naming context and the name.
+  - `naming_input.jsonl`, `naming_output.jsonl`: the naming context and the
+    name, for each invocation that built its input.
   - `steps.jsonl`: the step stream, retry included: conversation, request,
     reply, card facts, title, spend, and a slim final payload per step. The
     driver keeps full payloads in `driver-debug.jsonl`, which is not committed.
@@ -47,17 +51,17 @@ No follow-up misread the card, so no conversation was rerun on integration.
 ### The history the model received
 
 The history the chat route loaded held every card turn in the card's
-typed-facts form, and every model call that received a card turn received that
-form:
+typed-facts form, and every captured model call that received a card turn
+received that form:
 
 ```json
 {"confirmation_card":{"strategy_type":"buy_and_hold","symbols":["AAPL"],"date_range":{"start":"2023-01-03","end":"2024-12-31"}}}
 ```
 
 The retired sentence appears in none of the captured model request bodies.
-Every interpretation call sent only the new message, because the interpreter
-reads the active card from its artifact context rather than from history. The
-result answer composer reads a recent-conversation window:
+Every captured interpretation call sent only the new message, because the
+interpreter reads the active card from its artifact context rather than from
+history. The result answer composer reads a recent-conversation window:
 
 - English: both card turns in the form above, then the run's result text.
 - Spanish retry: the second card turn in the form above, the run's result text,
@@ -71,11 +75,15 @@ raise an ordinary error, so that body is not in `model_requests.jsonl`.
 
 ### Naming
 
-Naming ran once per conversation, right after the first card turn, and read
-that card turn in the same typed-facts form, as the history line and as
+Artifact naming was invoked after every turn: `receipts.jsonl` holds one
+`name_suggestion` receipt for each of the nine turns. It built its input and
+generated a title only after each conversation's first card turn, the two rows
+in `naming_input.jsonl` and `naming_output.jsonl`, and there it read that card
+turn in the same typed-facts form, as the history line and as
 `latest_assistant`. The titles were "Apple Buy and Hold Backtest" and "Backtest
-de Apple comprar y mantener". Later turns, including the edited cards, skipped
-naming because the conversations already had titles.
+de Apple comprar y mantener". The other seven invocations, including those after
+the edited cards, skipped with `title_not_generated` because the conversations
+already had titles, so they read no history.
 
 ### Replies to the result question
 
@@ -94,10 +102,10 @@ naming because the conversations already had titles.
 ## Spend
 
 Billed $0.162 against the $0.50 cap: $0.151 for the two conversations and
-$0.011 for the retry. Eight receipts carried no price: seven naming receipts
-that skipped because a title already existed, and the timed-out call. The driver
-counted each unpriced receipt at $0.02, a ceiling of $0.322, and checked the cap
-before every step. No research calls ran.
+$0.011 for the retry. Eight receipts carried no price: the seven skipped naming
+invocations and the timed-out call. The driver counted each unpriced receipt at
+$0.02, a ceiling of $0.322, and checked the cap before every step. No research
+calls ran.
 
 ## Limits
 
