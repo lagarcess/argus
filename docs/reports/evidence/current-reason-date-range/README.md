@@ -110,3 +110,26 @@ After approval: measure, compare every existing case, commit evidence and the
 new fingerprint, finish exact-head CI and Codex review, then report without
 merging. If Codex raises a second finding on the same mechanism, stop and
 report instead of applying another fix.
+
+## First Codex review follow-up
+
+Codex reviewed `c2faeadc7769bc5cc7da87bdfd74e58fa2c8ab18` and raised one P1:
+if primary and focused extraction both label the finer range as a calendar
+year, declining weak parser evidence alone still lets that whole-year result
+become state. Eight scripted cases reproduced it (both languages, both year
+intent kinds, with and without the focused read).
+
+The strategy-construction boundary now rejects that contradiction through the
+existing `InterpretationContractError` path before creating canonical state.
+The normal bounded corrective re-ask reuses `DATE_RANGE_PRECISION_GUIDANCE`,
+the same sentence already added to the schema above. There is no new wording.
+The rendered schema description was checked byte-for-byte against the first
+reviewed head. Rejected reads use existing contract-rejection telemetry; they
+cannot quietly persist a wider window.
+
+The first head's CI completed with frontend and guest gates passing. Backend
+had **8521 passed, 604 skipped, and only the deliberately pending prompt-freeze
+failure**. The 22 local logic failures also reproduce on original source when
+loaded with the same local environment; they were absent in clean CI.
+
+A second finding on this date mechanism will stop the lane, as directed.

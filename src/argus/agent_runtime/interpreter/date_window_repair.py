@@ -32,7 +32,9 @@ from argus.agent_runtime.interpreter.shared import (
     _normalized_stated_field,
 )
 from argus.agent_runtime.llm_interpreter_types import (
+    DATE_RANGE_PRECISION_GUIDANCE,
     FocusedDateWindowExtraction,
+    InterpretationContractError,
     LLMDateRangeIntent,
     LLMInterpretationResponse,
     LLMStrategyDraft,
@@ -47,10 +49,46 @@ from argus.agent_runtime.strategy_contract import (
     resolve_date_range,
 )
 from argus.nlp.natural_time import (
+    contains_named_date_evidence,
     resolve_date_range_intent,
     resolve_date_range_text,
     resolve_rolling_window_intent_text,
 )
+
+
+def validate_date_range_precision(
+    draft: LLMStrategyDraft,
+    current_user_message: str | None,
+) -> None:
+    """Reject a whole-year reading of finer dates at the runtime boundary.
+
+    Agreement between primary and focused models does not establish fidelity.
+    A bounded corrective re-ask can supply explicit endpoints; until then the
+    wider window must not become canonical strategy state.
+    """
+    intent = draft.date_range_intent
+    if intent is None or intent.kind not in {"calendar_year", "year_to_date"}:
+        return
+    text = (
+        current_user_message
+        if current_user_message is not None
+        else draft.date_range_raw_text or intent.evidence or ""
+    )
+    for languages in _natural_time_language_candidates_from_hints(draft.language):
+        if not contains_named_date_evidence(text, languages=languages):
+            continue
+        bounded = resolve_date_range_text(text, languages=languages)
+        resolved = resolve_date_range_intent(intent)
+        if (
+            bounded is not None
+            and resolved is not None
+            and bounded.payload == resolved.payload
+        ):
+            return
+        raise InterpretationContractError(
+            "date_range_precision: whole-year intent conflicts with stated dates",
+            corrective_hint=DATE_RANGE_PRECISION_GUIDANCE,
+        )
 
 
 def _response_needs_temporal_runtime_repair(

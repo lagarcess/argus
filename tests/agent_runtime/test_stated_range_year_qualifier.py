@@ -79,3 +79,70 @@ def test_stated_endpoints_survive_year_qualifier(
     )
     if not model_end_correct:
         assert "runtime_date_range_normalization" in normalized.reason_codes
+
+
+@pytest.mark.parametrize(
+    "language,phrase",
+    [
+        ("en", "from August 16 to August 19 just a few days this year"),
+        ("es-419", "del 16 de agosto al 19 de agosto solo unos días este año"),
+    ],
+)
+@pytest.mark.parametrize("kind", ["calendar_year", "year_to_date"])
+@pytest.mark.parametrize("focused", [False, True])
+def test_rejects_whole_year_even_when_both_model_reads_agree(
+    freeze_new_york_clock,
+    language,
+    phrase,
+    kind,
+    focused,
+):
+    from argus.agent_runtime.capabilities.contract import (
+        build_default_capability_contract,
+    )
+    from argus.agent_runtime.interpreter.date_window_repair import (
+        _response_from_focused_date_window_extraction,
+    )
+    from argus.agent_runtime.llm_interpreter import OpenRouterStructuredInterpreter
+    from argus.agent_runtime.llm_interpreter_types import (
+        FocusedDateWindowExtraction,
+        InterpretationContractError,
+    )
+
+    freeze_new_york_clock(datetime(2026, 9, 14, 12, tzinfo=EASTERN))
+    intent = LLMDateRangeIntent(kind=kind, year=2026, evidence=phrase)
+    response = LLMInterpretationResponse(
+        intent="backtest_execution",
+        task_relation="new_task",
+        semantic_turn_act="new_idea",
+        user_goal_summary="Test MRNA.",
+        candidate_strategy_draft=LLMStrategyDraft(
+            strategy_type="buy_and_hold",
+            asset_universe=["MRNA"],
+            asset_class="equity",
+            capital_amount=100,
+            date_range_raw_text=phrase,
+            date_range_intent=intent,
+            date_range={"start": "2026-01-01", "end": "2026-12-31"},
+        ),
+    )
+    request = InterpretationRequest(
+        current_user_message=phrase,
+        user=UserState(user_id="test-user", language_preference=language),
+    )
+    if focused:
+        response = _response_from_focused_date_window_extraction(
+            response=response,
+            request=request,
+            extraction=FocusedDateWindowExtraction(
+                has_date_window=True,
+                date_range_intent=intent,
+                date_range_raw_text=phrase,
+                confidence=0.9,
+            ),
+        )
+        assert response is not None
+    with pytest.raises(InterpretationContractError, match="date_range_precision"):
+        OpenRouterStructuredInterpreter(
+            contract=build_default_capability_contract()
+        )._to_runtime_interpretation(response, request=request)
