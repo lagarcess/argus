@@ -4165,8 +4165,9 @@ Contract rules:
   dropped mid-request it does not ask again: the turn ends on the retry notice
   so the reader decides, and the attempt is recorded as an unpriced anomaly
   with a null provider response id. Every attempt shares the call's own timeout
-  as one deadline that caps each connect, write and read, so a provider that
-  trickles its answer cannot hold the call past it. A background poll is not
+  as one deadline that caps the host lookup and each connect, TLS handshake,
+  write and read, so neither a stalled resolver nor a provider that trickles
+  its answer can hold the call past it. A background poll is not
   retried by the client; the poller already asks again until its own deadline.
   A call claims research capacity once, however many attempts it takes.
 - When no attempt answers, the turn publishes no answer, no rows and no

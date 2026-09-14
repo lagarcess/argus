@@ -399,8 +399,12 @@ class TricklingProvider:
         threading.Thread(target=self._serve, daemon=True).start()
 
     @property
+    def port(self) -> int:
+        return self._listener.getsockname()[1]
+
+    @property
     def url(self) -> str:
-        return f"http://127.0.0.1:{self._listener.getsockname()[1]}/v1/agent"
+        return f"http://127.0.0.1:{self.port}/v1/agent"
 
     def _serve(self) -> None:
         try:
@@ -431,6 +435,14 @@ class TricklingProvider:
             body += conn.recv(65536)
 
     def _play(self, conn: socket.socket, step: str) -> None:
+        if step == "answer":
+            body = json.dumps(agent_response()).encode()
+            conn.sendall(
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                + f"Content-Length: {len(body)}\r\n\r\n".encode()
+                + body
+            )
+            return
         if step == "503":
             conn.sendall(
                 b"HTTP/1.1 503 Service Unavailable\r\n"
@@ -487,6 +499,72 @@ def test_a_trickled_answer_ends_the_request_itself_at_the_deadline(
     assert server.closed_by_client_at - started < ceiling + 2.0
     assert server.connections == len(steps)
     assert [spend.reason for spend in unpriced] == ["unanswered_attempt"]
+
+
+def test_a_stalled_host_lookup_cannot_hold_a_request_past_its_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ceiling = 0.5
+    release = threading.Event()
+    real_lookup = socket.getaddrinfo
+
+    def lookup(host: Any, *args: Any, **kwargs: Any) -> Any:
+        if host == "provider.test":
+            release.wait(10)
+        return real_lookup(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    monkeypatch.setattr(
+        perplexity_agent, "PERPLEXITY_AGENT_URL", "http://provider.test/v1/agent"
+    )
+    unpriced: list[Any] = []
+    monkeypatch.setattr(perplexity_agent, "record_unpriced_spend", unpriced.append)
+    client = PerplexityAgentClient("k")
+    try:
+        started = time.monotonic()
+        with pytest.raises(ResearchUnavailableError) as raised:
+            client.run_research(
+                QUESTION, FAST.model_copy(update={"timeout_seconds": ceiling})
+            )
+        elapsed = time.monotonic() - started
+    finally:
+        release.set()
+
+    assert raised.value.reason == "timeout" and not raised.value.sent
+    assert elapsed < ceiling + 2.0, "a stalled lookup holds the request for ten seconds"
+    assert unpriced == []
+
+
+def test_a_refused_address_hands_the_time_left_to_the_next_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    server = TricklingProvider(["answer"])
+    closed = socket.create_server(("127.0.0.1", 0))
+    refused_port = closed.getsockname()[1]
+    closed.close()
+    real_lookup = socket.getaddrinfo
+
+    def lookup(host: Any, port: Any, *args: Any, **kwargs: Any) -> Any:
+        if host != "provider.test":
+            return real_lookup(host, port, *args, **kwargs)
+        # The first address refuses the connection; the second is the provider.
+        return real_lookup("127.0.0.1", refused_port, *args, **kwargs) + real_lookup(
+            "127.0.0.1", server.port, *args, **kwargs
+        )
+
+    monkeypatch.setattr(socket, "getaddrinfo", lookup)
+    monkeypatch.setattr(
+        perplexity_agent, "PERPLEXITY_AGENT_URL", "http://provider.test/v1/agent"
+    )
+    try:
+        packet = PerplexityAgentClient("k").run_research(
+            QUESTION, FAST.model_copy(update={"timeout_seconds": 5.0})
+        )
+    finally:
+        server.close()
+
+    assert packet.answer_markdown.startswith("Apple")
+    assert server.connections == 1
 
 
 @pytest.mark.parametrize(

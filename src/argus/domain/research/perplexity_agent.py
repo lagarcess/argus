@@ -1,15 +1,15 @@
 """Perplexity Agent API client for finance_search research.
 
 One HTTP boundary with an injectable transport so tests stay hermetic. Every
-request ends by its deadline: each connect, write and read is capped at the
-time left. A failure after which the provider cannot have started paid work (a
-429, a 5xx, a connection that failed before the request was sent) is asked
-again at that boundary, a bounded number of times inside the call's own
-deadline. After a read timeout or a connection dropped mid-request the reader
-decides, and the attempt is recorded as unpriced. The parser is deterministic:
-it walks the typed ``output`` items the Agent API documents, never user
-language. Provider identity is scrubbed at parse time because route receipts
-and the cost ledger own provenance, not prose.
+request ends by its deadline: the host lookup and each connect, write and read
+are capped at the time left. A failure after which the provider cannot have
+started paid work (a 429, a 5xx, a connection that failed before the request
+was sent) is asked again at that boundary, a bounded number of times inside
+the call's own deadline. After a read timeout or a connection dropped
+mid-request the reader decides, and the attempt is recorded as unpriced. The
+parser is deterministic: it walks the typed ``output`` items the Agent API
+documents, never user language. Provider identity is scrubbed at parse time
+because route receipts and the cost ledger own provenance, not prose.
 
 Every request carries the retrieval parameters the spec derived for it: the
 model fallback chain, the strict typed-output schema, the response language,
@@ -23,8 +23,11 @@ from __future__ import annotations
 
 import json
 import re
+import socket
 import time
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -473,12 +476,17 @@ _UNSENT_ERRORS = (
 )
 
 
+# Host lookups run on a small shared pool: a stalled resolver holds at most
+# these threads until it gives up, and a request stops waiting at its deadline.
+_RESOLVER = ThreadPoolExecutor(max_workers=4, thread_name_prefix="research-resolver")
+
+
 def _deadline_transport(
     deadline: float, clock: Callable[[], float]
 ) -> httpx.HTTPTransport:
-    """The default transport, with every connect, write and read capped at the
-    time left before the deadline, so a provider that trickles its answer ends
-    the request at the deadline instead of holding it open."""
+    """The default transport, with the host lookup and every connect, write and
+    read capped at the time left before the deadline, so neither a stalled
+    resolver nor a provider that trickles its answer holds the request open."""
     transport = httpx.HTTPTransport()
     # httpx 0.28 has no public hook into its connection pool's sockets.
     pool = transport._pool
@@ -510,14 +518,39 @@ class _DeadlineBackend:
         local_address: str | None = None,
         socket_options: Any = None,
     ) -> _DeadlineStream:
-        stream = self._backend.connect_tcp(
-            host,
-            port,
-            self.left(timeout, httpx.ConnectTimeout),
-            local_address,
-            socket_options,
+        # Resolved here, not in socket.create_connection: its lookup has no
+        # timeout, and it would give every address the full connect timeout.
+        failure: Exception = httpx.ConnectError(f"no address found for {host}")
+        for address, address_port in self._resolve(host, port, timeout):
+            wait = self.left(timeout, httpx.ConnectTimeout)
+            try:
+                stream = self._backend.connect_tcp(
+                    address, address_port, wait, local_address, socket_options
+                )
+            except Exception as exc:  # noqa: BLE001
+                # The next address gets whatever time is left.
+                failure = exc
+                continue
+            return _DeadlineStream(stream, self)
+        raise failure
+
+    def _resolve(
+        self, host: str, port: int, timeout: float | None
+    ) -> list[tuple[str, int]]:
+        wait = self.left(timeout, httpx.ConnectTimeout)
+        pending = _RESOLVER.submit(
+            socket.getaddrinfo, host, port, 0, socket.SOCK_STREAM
         )
-        return _DeadlineStream(stream, self)
+        try:
+            found = pending.result(timeout=wait)
+        except FutureTimeoutError:
+            pending.cancel()
+            raise httpx.ConnectTimeout(
+                "research request deadline passed while resolving the provider host"
+            ) from None
+        except OSError as exc:
+            raise httpx.ConnectError(str(exc)) from exc
+        return list(dict.fromkeys((entry[4][0], entry[4][1]) for entry in found))
 
     def connect_unix_socket(
         self, path: str, timeout: float | None = None, socket_options: Any = None
