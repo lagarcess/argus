@@ -41,6 +41,7 @@ from argus.api.main import app
 from argus.api.public_excerpts import revoke_receipts_for_conversation
 from argus.api.routers.evidence_receipts import reset_receipt_create_limiter_for_tests
 from argus.api.schemas import Message
+from argus.domain.backtest_job_scopes import CHAT_RUN_SCOPE
 from argus.domain.backtest_message_projection import result_fact_bank
 from argus.domain.backtesting.cards import build_result_card as generate_result_card
 from fastapi import HTTPException
@@ -142,7 +143,7 @@ def seed(language: str, index: int) -> None:
         "conversation_id": conversation_id,
         "request_message_id": messages[0].id,
         "result_run_id": run.id,
-        "operation_scope": "chat.run_backtest",
+        "operation_scope": CHAT_RUN_SCOPE,
         "status": "succeeded",
     }
     research = {
