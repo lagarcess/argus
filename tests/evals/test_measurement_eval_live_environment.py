@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import textwrap
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,26 +14,55 @@ import pytest
 from tests.evals import measurement_eval_scorecard as scorecards
 
 
-def test_eval_env_file_may_not_be_a_tracked_repository_file(tmp_path: Path) -> None:
-    """A tracked file would feed the measurement settings that evidence identity
-    does not compare, so the eval refuses it as its environment source."""
+def _environment_sources(tmp_path: Path) -> Path:
+    """A repository with a tracked template and symlink, an untracked file, an
+    alias into the template, and a folder link that reaches it from outside."""
 
     repository = tmp_path / "repository"
     repository.mkdir()
     subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
     settings = "ARGUS_TURN_CALL_ALLOWANCE=3\n"
-    tracked = repository / ".env.example"
-    tracked.write_text(settings, encoding="utf-8")
-    subprocess.run(["git", "add", ".env.example"], cwd=repository, check=True)
-    untracked = repository / ".env"
-    untracked.write_text(settings, encoding="utf-8")
     outside = tmp_path / "live-eval.env"
     outside.write_text(settings, encoding="utf-8")
+    (repository / ".env.example").write_text(settings, encoding="utf-8")
+    (repository / ".env.link").symlink_to(outside)
+    subprocess.run(
+        ["git", "add", ".env.example", ".env.link"], cwd=repository, check=True
+    )
+    (repository / ".env").write_text(settings, encoding="utf-8")
+    (repository / ".env.alias").symlink_to(repository / ".env.example")
+    (tmp_path / "via").symlink_to(repository)
+    return repository
 
-    with pytest.raises(RuntimeError, match="scorecard_provenance:eval_env_file_tracked"):
-        scorecards.assert_eval_env_file_untracked(tracked, repository_root=repository)
-    scorecards.assert_eval_env_file_untracked(untracked, repository_root=repository)
-    scorecards.assert_eval_env_file_untracked(outside, repository_root=repository)
+
+@pytest.mark.parametrize(
+    ("env_file", "refused"),
+    [
+        pytest.param("repository/.env.example", True, id="tracked-file"),
+        pytest.param("repository/.env.link", True, id="tracked-symlink-pointing-outside"),
+        pytest.param("repository/.env.alias", True, id="alias-of-a-tracked-file"),
+        pytest.param("via/.env.example", True, id="tracked-file-through-a-linked-folder"),
+        pytest.param("repository/.env", False, id="untracked-file"),
+        pytest.param("live-eval.env", False, id="file-outside-the-repository"),
+    ],
+)
+def test_eval_env_file_may_not_be_a_tracked_repository_file(
+    tmp_path: Path, env_file: str, refused: bool
+) -> None:
+    """A tracked file would feed the measurement settings that evidence identity
+    does not compare, so the eval refuses it as its environment source."""
+
+    repository = _environment_sources(tmp_path)
+    outcome = (
+        pytest.raises(RuntimeError, match="scorecard_provenance:eval_env_file_tracked")
+        if refused
+        else nullcontext()
+    )
+
+    with outcome:
+        scorecards.assert_eval_env_file_untracked(
+            tmp_path / env_file, repository_root=repository
+        )
 
 
 def test_live_eval_refuses_a_tracked_file_before_loading_it() -> None:

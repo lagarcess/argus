@@ -513,35 +513,41 @@ def assert_eval_env_file_untracked(
     """Refuse a tracked file as the eval's environment source.
 
     Promotion evidence identity never compares the release templates, so a
-    setting fed from a tracked file could change without a new measurement.
+    setting fed from a tracked file could change without a new measurement. The
+    path counts as named, so a tracked symlink cannot point away, and as
+    resolved, so an alias cannot point into a tracked file.
     """
 
     root = repository_root.resolve()
-    try:
-        relative = env_file.resolve().relative_to(root)
-    except ValueError:
-        return
-    try:
-        completed = subprocess.run(
-            [
-                "git",
-                "--no-replace-objects",
-                "--literal-pathspecs",
-                "ls-files",
-                "-z",
-                "--",
-                relative.as_posix(),
-            ],
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise RuntimeError("scorecard_provenance:eval_env_file_status_unavailable") from exc
-    if completed.stdout:
-        raise RuntimeError("scorecard_provenance:eval_env_file_tracked")
+    named = env_file.absolute().parent.resolve() / env_file.name
+    for candidate in dict.fromkeys((named, env_file.resolve())):
+        try:
+            relative = candidate.relative_to(root)
+        except ValueError:
+            continue
+        try:
+            completed = subprocess.run(
+                [
+                    "git",
+                    "--no-replace-objects",
+                    "--literal-pathspecs",
+                    "ls-files",
+                    "-z",
+                    "--",
+                    relative.as_posix(),
+                ],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(
+                "scorecard_provenance:eval_env_file_status_unavailable"
+            ) from exc
+        if completed.stdout:
+            raise RuntimeError("scorecard_provenance:eval_env_file_tracked")
 
 
 def _provider_usage(results: list[dict[str, Any]]) -> dict[str, Any]:
