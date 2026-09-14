@@ -1820,9 +1820,6 @@ you, never prescribe what they should do" still stands.
   the chat out of history, Search or the model providers. Decide what private means
   and whether memory reaches every registered user before continuity and saved
   living items build on it.
-- **The canary needs a decision: shrink it or retire it (#614).** Founder,
-  2026-09-13: it has never worked and becomes a moving target as Argus grows. It
-  failed 97 of its last 100 runs.
 
 Resolved:
 
@@ -1834,6 +1831,13 @@ Resolved:
   current figures, never direct, and compute only what cited figures support.
 - **The history-not-forecast line reaches only non-scenario answers.** Founder,
   2026-09-13: decision 10's scenario answers keep projecting from cited inputs.
+- **The canary keeps its purpose and loses its feature checks (#614).** Founder,
+  2026-09-13. It had failed 97 of its last 100 runs, because its browser journey
+  checked features and its release audit expected autodeploy while deploys are
+  manual. It becomes a small fixed check that never follows features: the three
+  services run the same commit, a signed-in account loads the chat and gets one
+  ordinary answer, one backtest completes, and one research question returns
+  sources. It expects manual deploys. Feature checks belong to the promotion walk.
 
 - **No Dominican source list.** Dropped by the founder 2026-09-10; #593 removed
   `LOCAL_SOURCE_DOMAINS` and `local_sources`.
