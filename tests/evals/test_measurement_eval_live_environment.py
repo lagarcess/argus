@@ -5,12 +5,108 @@ import os
 import subprocess
 import sys
 import textwrap
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from tests.evals import measurement_eval_scorecard as scorecards
+
+
+def _environment_sources(tmp_path: Path) -> Path:
+    """A checkout tracking a template, a symlink out of it and a folder symlink,
+    with a gitignored .env, and outside links and hard links that reach tracked
+    entries."""
+
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repository, check=True)
+    settings = "ARGUS_TURN_CALL_ALLOWANCE=3\n"
+    outside = tmp_path / "live-eval.env"
+    outside.write_text(settings, encoding="utf-8")
+    (tmp_path / "outside-link.env").symlink_to(outside)
+    (tmp_path / "envdir").mkdir()
+    (tmp_path / "envdir" / "live.env").write_text(settings, encoding="utf-8")
+    (repository / ".gitignore").write_text(".env\n", encoding="utf-8")
+    (repository / ".env.example").write_text(settings, encoding="utf-8")
+    (repository / ".env.link").symlink_to(outside)
+    (repository / "envs").symlink_to(tmp_path / "envdir")
+    subprocess.run(
+        ["git", "add", ".gitignore", ".env.example", ".env.link", "envs"],
+        cwd=repository,
+        check=True,
+    )
+    (repository / ".env").write_text(settings, encoding="utf-8")
+    os.link(repository / ".env.example", tmp_path / "hard-link.env")
+    os.link(
+        repository / ".env.link",
+        tmp_path / "symlink-hard-link.env",
+        follow_symlinks=False,
+    )
+    (tmp_path / "via").symlink_to(repository)
+    (tmp_path / "hop").symlink_to(repository / "envs")
+    return repository
+
+
+@pytest.mark.parametrize(
+    ("env_file", "refused"),
+    [
+        pytest.param("repository/.env.example", True, id="tracked-template"),
+        pytest.param("repository/.env.link", True, id="tracked-symlink"),
+        pytest.param(
+            "repository/envs/live.env", True, id="tracked-folder-symlink-on-the-way"
+        ),
+        pytest.param("via/.env.example", True, id="link-to-a-tracked-file"),
+        pytest.param("hop/live.env", True, id="link-through-a-tracked-symlink"),
+        pytest.param("hard-link.env", True, id="hard-link-to-a-tracked-file"),
+        pytest.param(
+            "symlink-hard-link.env", True, id="hard-link-to-a-tracked-symlink"
+        ),
+        pytest.param("repository/.env", False, id="gitignored-file-in-the-checkout"),
+        pytest.param("live-eval.env", False, id="file-outside-the-checkout"),
+        pytest.param("outside-link.env", False, id="link-to-an-untracked-file"),
+    ],
+)
+def test_eval_env_file_may_not_be_fed_by_a_tracked_file(
+    tmp_path: Path, env_file: str, refused: bool
+) -> None:
+    """Evidence identity compares the tree, never the eval's environment, so no
+    tracked file may feed that environment, whatever path or link reaches it."""
+
+    repository = _environment_sources(tmp_path)
+    outcome = (
+        pytest.raises(RuntimeError, match="scorecard_provenance:eval_env_file_tracked")
+        if refused
+        else nullcontext()
+    )
+
+    with outcome:
+        scorecards.assert_eval_env_file_untracked(
+            tmp_path / env_file, repository_root=repository
+        )
+
+
+def test_live_eval_refuses_a_tracked_env_file_before_loading_it() -> None:
+    process_env = os.environ.copy()
+    process_env.update(
+        {
+            "ARGUS_EVAL_ENV_FILE": str(scorecards.REPOSITORY_ROOT / ".env.example"),
+            "PYTHONDONTWRITEBYTECODE": "1",
+        }
+    )
+
+    completed = subprocess.run(
+        [sys.executable, "-c", "import tests.evals.test_measurement_eval_live"],
+        cwd=scorecards.REPOSITORY_ROOT,
+        env=process_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode != 0
+    assert "scorecard_provenance:eval_env_file_tracked" in completed.stderr
 
 
 def test_live_eval_env_preloads_calendar_aware_confirmation(
