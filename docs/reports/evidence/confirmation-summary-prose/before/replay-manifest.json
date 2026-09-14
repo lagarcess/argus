@@ -1,0 +1,28 @@
+{
+  "head": "736dfd035107203b2de2eb9aa8cfd6effaca7a24",
+  "language": "es-419",
+  "api_port": 8593,
+  "web_origin": "http://127.0.0.1:3293",
+  "provider_calls": 0,
+  "hosted_database_reads_or_writes": 0,
+  "conversations": [
+    {
+      "shape": "buy_and_hold",
+      "conversation_id": "00000000-0000-4000-8000-000000009301",
+      "strategy_type": "buy_and_hold",
+      "summary": "Ready to test buy-and-hold for AAPL over 2 de enero de 2024 al 31 de diciembre de 2024."
+    },
+    {
+      "shape": "recurring",
+      "conversation_id": "00000000-0000-4000-8000-000000009302",
+      "strategy_type": "dca_accumulation",
+      "summary": "Ready to test recurring buys for AAPL over 2 de enero de 2024 al 31 de diciembre de 2024."
+    },
+    {
+      "shape": "rule",
+      "conversation_id": "00000000-0000-4000-8000-000000009303",
+      "strategy_type": "indicator_threshold",
+      "summary": "Ready to test TSLA with an RSI threshold over 2 de enero de 2024 al 31 de diciembre de 2024."
+    }
+  ]
+}

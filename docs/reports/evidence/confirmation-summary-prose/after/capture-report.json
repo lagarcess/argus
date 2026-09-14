@@ -1,0 +1,67 @@
+{
+  "head": "0d57492ae9836ca614d0dbc8ab95f4726ce6d87d",
+  "captured_at_utc": "2026-09-14T01:29:47.704Z",
+  "captures": [
+    {
+      "label": "es-buy-and-hold-card",
+      "shape": "buy_and_hold",
+      "conversation_id": "00000000-0000-4000-8000-000000009301",
+      "screenshot": "es-buy-and-hold-card.png",
+      "html_lang": "es-419",
+      "dom_contains_ready_to_test": false,
+      "transport_card_turn_content": "",
+      "transport_card_has_summary": false,
+      "visible_text": "argus\nNuevo chat\nBuscar\nRecientes\nAjustes\nReplay buy_and_hold\nCompra y mantén AAPL durante 2024 con 10000 dólares\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n2 ene 2024 → 31 dic 2024\nAcciones\nDatos diarios\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nHaz una pregunta de seguimiento...\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera."
+    },
+    {
+      "label": "es-recurring-buys-card",
+      "shape": "recurring_buys",
+      "conversation_id": "00000000-0000-4000-8000-000000009302",
+      "screenshot": "es-recurring-buys-card.png",
+      "html_lang": "es-419",
+      "dom_contains_ready_to_test": false,
+      "transport_card_turn_content": "",
+      "transport_card_has_summary": false,
+      "visible_text": "argus\nNuevo chat\nBuscar\nRecientes\nAjustes\nReplay recurring_buys\nInvierte 500 dólares cada mes en AAPL durante 2024\nAAPL\nCompras recurrentes\nListo para ejecutar\nAPORTE\n$500 cada mes\nPERIODO\n2 ene 2024 → 31 dic 2024\nCapital inicial\n$0\nAcciones\nDatos diarios\nReferencia: SPY\nEditar montos\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nHaz una pregunta de seguimiento...\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera."
+    },
+    {
+      "label": "es-rsi-threshold-card",
+      "shape": "rsi_threshold",
+      "conversation_id": "00000000-0000-4000-8000-000000009303",
+      "screenshot": "es-rsi-threshold-card.png",
+      "html_lang": "es-419",
+      "dom_contains_ready_to_test": false,
+      "transport_card_turn_content": "",
+      "transport_card_has_summary": false,
+      "visible_text": "argus\nNuevo chat\nBuscar\nRecientes\nAjustes\nReplay rsi_threshold\nCompra TSLA cuando el RSI baje de 30 y vende arriba de 70\nTSLA\nUmbral RSI\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n2 ene 2024 → 31 dic 2024\nAcciones\nDatos diarios\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nHaz una pregunta de seguimiento...\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera."
+    },
+    {
+      "label": "es-legacy-card-turn",
+      "shape": "legacy_buy_and_hold",
+      "conversation_id": "00000000-0000-4000-8000-000000009304",
+      "screenshot": "es-legacy-card-turn.png",
+      "html_lang": "es-419",
+      "dom_contains_ready_to_test": false,
+      "transport_card_turn_content": "",
+      "transport_card_has_summary": false,
+      "visible_text": "argus\nNuevo chat\nBuscar\nRecientes\nAjustes\nReplay legacy_buy_and_hold\nCompra y mantén AAPL durante 2024 con 10000 dólares\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$10,000\nPERIODO\n2 ene 2024 → 31 dic 2024\nAcciones\nDatos diarios\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nHaz una pregunta de seguimiento...\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera."
+    },
+    {
+      "label": "es-buy-and-hold-card-after-in-place-edit",
+      "shape": "buy_and_hold",
+      "conversation_id": "00000000-0000-4000-8000-000000009301",
+      "screenshot": "es-buy-and-hold-card-after-in-place-edit.png",
+      "html_lang": "es-419",
+      "dom_contains_ready_to_test": false,
+      "transport_card_turn_content": "",
+      "transport_card_has_summary": false,
+      "visible_text": "argus\nNuevo chat\nBuscar\nRecientes\nAjustes\nReplay buy_and_hold\nCompra y mantén AAPL durante 2024 con 10000 dólares\nAAPL\nComprar y mantener\nListo para ejecutar\nCAPITAL INICIAL\n$25,000\nPERIODO\n2 ene 2024 → 31 dic 2024\nAcciones\nDatos diarios\nSin comisiones\nSin deslizamiento\nReferencia: SPY\nEditar capital\nEditar fechas\nEditar costos\nEjecutar backtest\nCambiar supuestos\nCancelar\nHaz una pregunta de seguimiento...\n\nArgus puede equivocarse. Solo con fines educativos. No es asesoría financiera."
+    }
+  ],
+  "direct_edit": {
+    "status": 200,
+    "response_content": "",
+    "response_card_has_summary": false
+  },
+  "console_errors": []
+}

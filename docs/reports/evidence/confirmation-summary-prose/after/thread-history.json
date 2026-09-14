@@ -1,0 +1,66 @@
+{
+  "buy_and_hold": {
+    "stored_content": "",
+    "stored_card_has_summary": false,
+    "thread_history": [
+      {
+        "role": "user",
+        "content": "Compra y mantén AAPL durante 2024 con 10000 dólares"
+      },
+      {
+        "role": "assistant",
+        "content": "{\"confirmation_card\":{\"strategy_type\":\"buy_and_hold\",\"symbols\":[\"AAPL\"],\"date_range\":{\"start\":\"2024-01-02\",\"end\":\"2024-12-31\"}}}"
+      }
+    ],
+    "artifact_naming_assistant_message": "{\"confirmation_card\":{\"strategy_type\":\"buy_and_hold\",\"symbols\":[\"AAPL\"],\"date_range\":{\"start\":\"2024-01-02\",\"end\":\"2024-12-31\"}}}",
+    "stored_last_message_preview": "AAPL buy_and_hold 2024-01-02 2024-12-31"
+  },
+  "recurring_buys": {
+    "stored_content": "",
+    "stored_card_has_summary": false,
+    "thread_history": [
+      {
+        "role": "user",
+        "content": "Invierte 500 dólares cada mes en AAPL durante 2024"
+      },
+      {
+        "role": "assistant",
+        "content": "{\"confirmation_card\":{\"strategy_type\":\"dca_accumulation\",\"symbols\":[\"AAPL\"],\"date_range\":{\"start\":\"2024-01-02\",\"end\":\"2024-12-31\"}}}"
+      }
+    ],
+    "artifact_naming_assistant_message": "{\"confirmation_card\":{\"strategy_type\":\"dca_accumulation\",\"symbols\":[\"AAPL\"],\"date_range\":{\"start\":\"2024-01-02\",\"end\":\"2024-12-31\"}}}",
+    "stored_last_message_preview": "AAPL dca_accumulation 2024-01-02 2024-12-31"
+  },
+  "rsi_threshold": {
+    "stored_content": "",
+    "stored_card_has_summary": false,
+    "thread_history": [
+      {
+        "role": "user",
+        "content": "Compra TSLA cuando el RSI baje de 30 y vende arriba de 70"
+      },
+      {
+        "role": "assistant",
+        "content": "{\"confirmation_card\":{\"strategy_type\":\"indicator_threshold\",\"symbols\":[\"TSLA\"],\"date_range\":{\"start\":\"2024-01-02\",\"end\":\"2024-12-31\"}}}"
+      }
+    ],
+    "artifact_naming_assistant_message": "{\"confirmation_card\":{\"strategy_type\":\"indicator_threshold\",\"symbols\":[\"TSLA\"],\"date_range\":{\"start\":\"2024-01-02\",\"end\":\"2024-12-31\"}}}",
+    "stored_last_message_preview": "TSLA indicator_threshold 2024-01-02 2024-12-31"
+  },
+  "legacy_buy_and_hold": {
+    "stored_content": "Ready to test buy-and-hold for AAPL over 2 de enero de 2024 al 31 de diciembre de 2024.",
+    "stored_card_has_summary": true,
+    "thread_history": [
+      {
+        "role": "user",
+        "content": "Compra y mantén AAPL durante 2024 con 10000 dólares"
+      },
+      {
+        "role": "assistant",
+        "content": "{\"confirmation_card\":{\"strategy_type\":\"buy_and_hold\",\"symbols\":[\"AAPL\"],\"date_range\":{\"start\":\"2024-01-02\",\"end\":\"2024-12-31\"}}}"
+      }
+    ],
+    "artifact_naming_assistant_message": "{\"confirmation_card\":{\"strategy_type\":\"buy_and_hold\",\"symbols\":[\"AAPL\"],\"date_range\":{\"start\":\"2024-01-02\",\"end\":\"2024-12-31\"}}}",
+    "stored_last_message_preview": "AAPL buy_and_hold 2024-01-02 2024-12-31"
+  }
+}
