@@ -274,14 +274,17 @@ def test_browser_checks_read_product_owned_signals() -> None:
     assert 'page.getByTestId("user-turn-recovery")' in spec
     assert '"[data-message-id]"' in spec
     assert 'label("chat.confirmation.actions.run_backtest")' in spec
-    # Answer checks judge the persisted message with the chat's own projections.
-    assert "persistedAssistantMessage(page, conversationId)" in spec
-    assert "ordinaryAnswerFailure(" in spec
-    assert "researchAnswerFailure(" in spec
+    # Answer checks judge the persisted turn through the chat's projection, then
+    # the message the reopened chat renders by what it announces.
+    compact = "".join(spec.split())
+    assert "persistedAnswerFailure(page,conversationId,ordinaryAnswerFailure," in compact
+    assert "persistedAnswerFailure(page,conversationId,researchAnswerFailure," in compact
+    assert "rendered.locator(ANNOUNCEMENT_SELECTOR)" in spec
     support = _source("web/e2e/support/private-alpha-canary-answers.ts")
     # Acceptance derives from the transcript projection, never from saved fields.
     assert "hydrateMessagesFromApi" in support
     assert "metadata" not in support
+    assert 'ANNOUNCEMENT_ROLES = ["status", "alert"] as const;' in support
 
 
 def test_sign_in_retries_once_and_records_the_attempt_count() -> None:

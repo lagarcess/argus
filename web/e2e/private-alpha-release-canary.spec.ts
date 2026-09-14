@@ -7,6 +7,7 @@ import {
   type Response,
 } from "@playwright/test";
 import {
+  ANNOUNCEMENT_SELECTOR,
   latestAssistantMessage,
   ordinaryAnswerFailure,
   researchAnswerFailure,
@@ -298,11 +299,15 @@ async function sendTurn(
   return conversationId;
 }
 
-/** The newest persisted assistant message as the chat renders it, read by reopening the chat. */
-async function persistedAssistantMessage(
+/**
+ * Why the newest persisted answer is not accepted, or null. Reopening the chat
+ * judges the turn through its projection, then the message it renders.
+ */
+async function persistedAnswerFailure(
   page: Page,
   conversationId: string,
-): Promise<ReturnType<typeof latestAssistantMessage>> {
+  judge: (message: ReturnType<typeof latestAssistantMessage>) => string | null,
+): Promise<string | null> {
   const messagesPath = `/api/v1/conversations/${conversationId}/messages`;
   const messages = page
     .waitForResponse(
@@ -326,7 +331,20 @@ async function persistedAssistantMessage(
       reasonCode("messages_http", response?.status() ?? 0),
     );
   }
-  return latestAssistantMessage(await response.json().catch(() => null));
+  const message = latestAssistantMessage(
+    await response.json().catch(() => null),
+  );
+  const failure = judge(message);
+  if (failure || !message) return failure ?? "assistant_answer_missing";
+  const rendered = page.locator(`[data-message-id="${message.id}"]`);
+  await expect(rendered)
+    .toBeVisible({ timeout: 60_000 })
+    .catch(() => {
+      throw new CheckFailure("assistant_answer_not_rendered");
+    });
+  return (await rendered.locator(ANNOUNCEMENT_SELECTOR).count()) > 0
+    ? "assistant_answer_announced_notice"
+    : null;
 }
 
 function watchBacktestJobs(page: Page) {
@@ -374,8 +392,10 @@ async function signedInChatAnswer(context: CheckContext): Promise<void> {
   if (!answer || answer === prompt.trim()) {
     throw new CheckFailure("assistant_answer_missing");
   }
-  const failure = ordinaryAnswerFailure(
-    await persistedAssistantMessage(page, conversationId),
+  const failure = await persistedAnswerFailure(
+    page,
+    conversationId,
+    ordinaryAnswerFailure,
   );
   if (failure) throw new CheckFailure(reasonCode(failure));
 }
@@ -460,8 +480,10 @@ async function researchAnswerWithSources(
     .catch(() => {
       throw new CheckFailure("research_sources_missing");
     });
-  const failure = researchAnswerFailure(
-    await persistedAssistantMessage(page, conversationId),
+  const failure = await persistedAnswerFailure(
+    page,
+    conversationId,
+    researchAnswerFailure,
   );
   if (failure) throw new CheckFailure(reasonCode(failure));
 }

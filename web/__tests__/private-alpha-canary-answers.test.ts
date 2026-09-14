@@ -1,24 +1,58 @@
 import { describe, expect, test } from "bun:test";
+import i18next from "i18next";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { I18nextProvider } from "react-i18next";
 
+import ChatMessage from "../components/chat/ChatMessage";
+import type { Message } from "../components/chat/types";
 import type { ApiMessage } from "../lib/argus-api";
+import type { ToolResultCard } from "../lib/tool-result-card";
 import {
+  ANNOUNCEMENT_ROLES,
   latestAssistantMessage,
   ordinaryAnswerFailure,
   researchAnswerFailure,
 } from "../e2e/support/private-alpha-canary-answers";
+import en from "../public/locales/en/common.json";
+import es from "../public/locales/es-419/common.json";
+import { toolCardFixture } from "./fixtures/tool-result-card";
 
-// Fixtures are messages API pages, judged through the transcript projection
-// the chat renders, so an answer passes only if a reader sees an answer.
+// Fixtures are messages API pages. Each is judged as the canary judges it in
+// the browser: through the transcript projection, then as ChatMessage renders it.
 
 const PROMPT = "Hola, ¿qué puedes hacer por mí?";
 const ANSWER = "Puedo ayudarte a probar una idea de inversion con datos historicos.";
 const RETRYABLE_RUNTIME_FAILURE = { code: "runtime_failure", retryable: true };
+const ARTIFACT_ACTION_RECOVERY = {
+  kind: "artifact_action_recovery",
+  facts: {
+    status: "inactive",
+    user_safe_message: "Esa accion ya no esta disponible.",
+  },
+};
+const FAILED_TOOL_CARD = toolCardFixture({
+  outcome: {
+    status: "unavailable",
+    result: null,
+    failure: { code: "tool_unavailable", fields: [] },
+  },
+  presentation: { ...toolCardFixture().presentation, answer: null },
+} as Partial<ToolResultCard>);
 const SOURCE = {
   title: "Apple quarterly results",
   domain: "example.com",
   url: "https://example.com/apple-results",
   source_date: "2026-07-31",
 };
+
+const i18n = i18next.createInstance();
+await i18n.init({
+  lng: "es-419",
+  fallbackLng: "en",
+  interpolation: { escapeValue: false },
+  resources: { en: { translation: en }, "es-419": { translation: es } },
+});
 
 function message(
   overrides: Partial<ApiMessage> & Pick<ApiMessage, "id" | "role" | "created_at">,
@@ -60,35 +94,90 @@ function research(options: { degraded?: { code: string }; sources?: unknown[] } 
   };
 }
 
+function projected(payload: unknown): Message {
+  const latest = latestAssistantMessage(payload);
+  if (!latest) throw new Error("fixture has no assistant message");
+  return latest;
+}
+
+function announces(answer: Message): boolean {
+  const markup = renderToStaticMarkup(
+    createElement(I18nextProvider, { i18n }, createElement(ChatMessage, { message: answer })),
+  );
+  return ANNOUNCEMENT_ROLES.some((role) => markup.includes(`role="${role}"`));
+}
+
 const answerFailure = (payload: unknown) =>
   ordinaryAnswerFailure(latestAssistantMessage(payload));
 const researchFailure = (payload: unknown) =>
   researchAnswerFailure(latestAssistantMessage(payload));
 
-describe("private-alpha canary answers judge the rendered transcript", () => {
-  test("a plain answer bubble passes", () => {
-    expect(answerFailure(turn({}))).toBeNull();
+describe("private-alpha canary answers", () => {
+  test("a plain answer and a published research answer pass both judges", () => {
+    const answer = projected(turn({}));
+    const researched = projected(turn(research()));
+
+    expect(ordinaryAnswerFailure(answer)).toBeNull();
+    expect(researchAnswerFailure(researched)).toBeNull();
+    expect(announces(answer)).toBe(false);
+    expect(announces(researched)).toBe(false);
   });
 
-  test("anything the chat renders other than a plain answer is refused", () => {
+  test("every failure the chat presents inside an answer is announced", () => {
+    const presented: Record<string, Record<string, unknown>> = {
+      unavailable_tool_results: {
+        ...research(),
+        tool_result_cards: [{ kind: "tool_result" }],
+      },
+      failed_tool_card: { tool_result_cards: [FAILED_TOOL_CARD] },
+      failed_tool_job: {
+        tool_jobs: [
+          {
+            call_id: "call-job-1",
+            tool_name: "run_backtest",
+            artifact_id: "artifact-job-1",
+            job: { id: "job-1", conversation_id: "conversation-1", status: "failed" },
+          },
+        ],
+      },
+      retryable_recovery: { recovery: RETRYABLE_RUNTIME_FAILURE },
+      artifact_action_recovery: { response_intent: ARTIFACT_ACTION_RECOVERY },
+    };
+
+    expect(
+      projected(turn(presented.failed_tool_card)).toolResultCards?.[0]?.outcome.status,
+    ).toBe("unavailable");
+    expect(projected(turn(presented.failed_tool_job)).toolJobs?.[0]?.job.status).toBe(
+      "failed",
+    );
+    expect(
+      Object.fromEntries(
+        Object.entries(presented).map(([name, metadata]) => [
+          name,
+          announces(projected(turn(metadata))),
+        ]),
+      ),
+    ).toEqual({
+      unavailable_tool_results: true,
+      failed_tool_card: true,
+      failed_tool_job: true,
+      retryable_recovery: true,
+      artifact_action_recovery: true,
+    });
+  });
+
+  test("the projection refuses turns that are not an ordinary answer", () => {
+    const textRecovery = turn({ recovery: { code: "runtime_failure", retryable: false } });
+
+    // A recovery the chat draws as plain text announces nothing, so the
+    // projection's recovery declaration is what refuses it.
+    expect(announces(projected(textRecovery))).toBe(false);
+    expect(answerFailure(textRecovery)).toBe("assistant_answer_recovery_recovery_code");
     expect(answerFailure(turn({ recovery: RETRYABLE_RUNTIME_FAILURE }))).toBe(
       "assistant_answer_recovery_runtime_failure",
     );
-    expect(
-      answerFailure(
-        turn({
-          response_intent: {
-            kind: "artifact_action_recovery",
-            facts: {
-              status: "inactive",
-              user_safe_message: "Esa accion ya no esta disponible.",
-            },
-          },
-        }),
-      ),
-    ).toBe("assistant_answer_rendered_as_artifact_action_recovery");
-    expect(answerFailure(turn({ artifact_presentation_kind: "result" }))).toBe(
-      "assistant_answer_rendered_as_result_readout",
+    expect(answerFailure(turn({ response_intent: ARTIFACT_ACTION_RECOVERY }))).toBe(
+      "assistant_answer_recovery_artifact_action_recovery",
     );
     expect(answerFailure(turn({ retry_last_turn: { message: PROMPT } }))).toBe(
       "assistant_answer_offered_retry",
