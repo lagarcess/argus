@@ -14,6 +14,10 @@ from pathlib import Path
 from tests.evals.measurement_eval_scorecard import (
     measurement_fixture_identity_at_git_sha,
 )
+from tests.promotion_evidence_configuration import (
+    MANIFESTS_BEFORE_CONFIGURATION,
+    release_configuration_at_commit,
+)
 from tests.promotion_evidence_identity import (
     assert_measurement_stands_for,
     reachable_changes,
@@ -75,7 +79,11 @@ def assert_main_promotion_live_eval_evidence(
         (repository_root / "docs" / "reports" / "evidence").resolve()
     ), f"{manifest_path.name}: live eval scorecard is not durable evidence"
     scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
-    assert scorecard.get("schema_version") == 2
+    assert scorecard.get("schema_version") in {2, 3}
+    assert (
+        scorecard.get("schema_version") == 3
+        or manifest_path.name in MANIFESTS_BEFORE_CONFIGURATION
+    ), "release_configuration: new promotions require measurement scorecard schema v3"
     provenance = scorecard.get("provenance", {})
     assert provenance.get("evaluation_mode") == "live"
     assert provenance.get("market_data_provider_mode") == "live_provider"
@@ -84,6 +92,7 @@ def assert_main_promotion_live_eval_evidence(
         manifest,
         manifest_path,
         evidence="the live eval scorecard",
+        release_configuration=provenance.get("release_configuration"),
         measured_sha=str(provenance.get("candidate_sha") or ""),
         shipped_sha=candidate_match.group(1),
         repository_root=repository_root,
@@ -187,12 +196,16 @@ def assert_main_promotion_baseline_comparison(
             manifest,
             manifest_path,
             evidence="the baseline eval scorecard",
+            release_configuration=baseline_provenance.get("release_configuration"),
             measured_sha=str(baseline_provenance.get("candidate_sha") or ""),
             shipped_sha=rollback_match.group(1),
             repository_root=repository_root,
         )
         assert baseline_provenance.get("evaluation_mode") == "live"
     else:
+        assert manifest_path.name in MANIFESTS_BEFORE_CONFIGURATION, (
+            "baseline: missing release_configuration for a new promotion"
+        )
         assert rollback_match.group(1)[:8] in baseline_path.name, (
             f"{manifest_path.name}: a pre-provenance baseline must carry the "
             "deployed SHA in its filename"
@@ -219,6 +232,13 @@ def assert_main_promotion_baseline_comparison(
         rollback_match.group(1),
         candidate_match.group(1),
         repository_root=repository_root,
+    ) and (
+        manifest_path.name in MANIFESTS_BEFORE_CONFIGURATION
+        or release_configuration_at_commit(
+            rollback_match.group(1), repository_root=repository_root
+        ) == release_configuration_at_commit(
+            candidate_match.group(1), repository_root=repository_root
+        )
     ):
         return
 
@@ -304,6 +324,9 @@ def assert_prose_failure_measured_on_both_sides(
             manifest,
             manifest_path,
             evidence=f"the {side} A/B for {case_id}",
+            release_configuration=(document.get("provenance") or {}).get(
+                "release_configuration"
+            ),
             measured_sha=str((document.get("provenance") or {}).get("candidate_sha") or ""),
             shipped_sha=expected_sha[side],
             repository_root=repository_root,
