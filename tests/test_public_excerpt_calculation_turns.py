@@ -129,6 +129,28 @@ def test_a_computed_answer_previews_visible_user_inputs_and_public_sources(owner
     assert not api_state.store.public_excerpt_snapshots
 
 
+def test_ranked_receipt_omits_the_comparison_only_leader_gap(owner):
+    arguments = WORKED_ARGUMENTS["ranked_comparison"]
+    answer, card = add_calculation(
+        owner,
+        kind="ranked_comparison",
+        arguments={
+            **arguments,
+            "sources": {
+                name: CITED_PRICE["sources"]["price"]
+                for name in ("key_label", "prefer")
+            },
+        },
+    )
+    (calculation,) = preview(owner, [answer]).payload.turns[0].calculations
+    leader_gap = next(fact for fact in card.presentation.rows if fact.name == "gap_0")
+    assert all(
+        fact.label.interpolation_args != leader_gap.label.interpolation_args
+        for fact in calculation.rows
+    )
+    assert len(calculation.rows) == len(card.presentation.rows) - 1
+
+
 def test_candidates_name_the_calculation_kind_and_readable_refusals(owner):
     eligible, _ = add_calculation(owner)
     failed, _ = add_calculation(

@@ -1,0 +1,705 @@
+{
+  "label": "registered-q10-es-419",
+  "phase": "registered",
+  "question": "q10",
+  "language": "es-419",
+  "country": "DO",
+  "account_kind": "registered",
+  "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+  "message": "¿Debería poner mi fondo de emergencia en cripto?",
+  "answer": {
+    "id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+    "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+    "role": "assistant",
+    "content": "Para la función estricta de un fondo de emergencia, las criptomonedas encajan mal: pueden perder valor justo cuando necesitas el dinero y no tienen la protección de depósitos del sistema financiero tradicional. Si quieres exposición a cripto, conviene evaluarla como capital de riesgo separado, no como el dinero destinado a cubrir imprevistos.\n\n### Qué debe resolver un fondo de emergencia\n\nSu propósito exige tres características:\n\n- **Disponibilidad:** poder convertirlo rápidamente en DOP para pagar alquiler, alimentos, salud o reparaciones.\n- **Estabilidad:** evitar que una caída del mercado reduzca el dinero disponible durante una emergencia.\n- **Protección institucional:** saber qué entidad custodia el dinero y qué mecanismos aplican si esa entidad enfrenta problemas.\n\n### Comparación práctica\n\n| Alternativa | Estabilidad en DOP | Acceso durante una emergencia | Protección relevante | Riesgo principal |\n|---|---|---|---|---|\n| Cuenta de ahorro en una entidad autorizada de República Dominicana | El saldo permanece denominado en DOP | Depende de los canales y condiciones de la entidad | Los usuarios de entidades registradas pueden estar amparados por el Fondo de Contingencia, sujeto a sus reglas y límites vigentes | Inflación, cargos y restricciones operativas |\n| Criptomoneda | Su valor en DOP cambia con el mercado y el tipo de conversión | Requiere venderla, convertirla y retirar los fondos | No está cubierta por los mecanismos tradicionales de garantía de depósitos | Caída de precio, fallas de la plataforma, fraude o pérdida de acceso |\n| Fondo dividido entre ambos | Solo la parte mantenida en DOP conserva estabilidad nominal | La liquidez depende de dónde esté cada parte | La protección bancaria no se extiende automáticamente a la parte en cripto | Que la porción volátil resulte insuficiente cuando haga falta |\n\n### La prueba decisiva\n\nImagina una emergencia que coincida con una caída del precio de la criptomoneda o con una suspensión temporal de retiros. Si para pagar debes vender con pérdida, esperar una transferencia o depender de que una plataforma siga funcionando, ese dinero no está desempeñando plenamente la función de reserva de emergencia.\n\nUna cuenta bancaria tampoco elimina todos los riesgos: pueden existir cargos, límites de retiro y pérdida de poder adquisitivo. La diferencia es que su saldo en DOP no depende de vender primero un activo cuyo precio fluctúa.\n\n### Qué revisar en República Dominicana\n\nAntes de comparar cuentas, confirma directamente con la entidad:\n\n- que figure como entidad autorizada o registrada ante la Superintendencia de Bancos;\n- si el producto y el titular califican para el Fondo de Contingencia;\n- cuál es el límite de cobertura vigente;\n- cargos, saldo mínimo y restricciones de retiro;\n- disponibilidad de cajeros, transferencias y atención fuera del horario habitual.\n\nPara cualquier porción en cripto, revisa quién conserva las claves, si los retiros pueden suspenderse, los costos de convertir a DOP y qué recurso tendrías si la plataforma falla. La decisión depende de cuánto valoras la estabilidad inmediata frente a aceptar volatilidad y riesgos operativos.",
+    "created_at": "2026-09-14T17:15:29.941223Z",
+    "metadata": {
+      "research": {
+        "rows": [],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.15272,
+          "latency_ms": 40603,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://tusolcaribe.com/2021/09/superintendencia-de-bancos-lanza-sello-que-identifica-entidades-autorizadas/",
+            "title": "Superintendencia de Bancos lanza sello que identifica entidades autorizadas",
+            "domain": "tusolcaribe.com",
+            "source_date": "2026-09-10"
+          },
+          {
+            "url": "https://www.imagenradio.com.mx/finanzas/que-son-criptomonedas-funcionan-como-minan",
+            "title": "¿Qué son las criptomonedas? Así funcionan y cómo se minan",
+            "domain": "www.imagenradio.com.mx",
+            "source_date": "2026-09-08"
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "¿Cómo comparo cuentas de ahorro para mi fondo de emergencia en República Dominicana?",
+            "¿Qué debo verificar sobre el Fondo de Contingencia dominicano?",
+            "¿Cómo separo un fondo de emergencia de una inversión en cripto?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T17:15:29.924984+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "¿Cómo comparo cuentas de ahorro para mi fondo de emergencia en República Dominicana?",
+            "type": "question"
+          },
+          {
+            "text": "¿Qué debo verificar sobre el Fondo de Contingencia dominicano?",
+            "type": "question"
+          },
+          {
+            "text": "¿Cómo separo un fondo de emergencia de una inversión en cripto?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "c4ece8e7-4a18-494f-9d00-0a0c131523a9",
+        "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "Para la función estricta de un fondo de emergencia, las criptomonedas encajan mal: pueden perder valor justo cuando necesitas el dinero y no tienen la protección de depósitos del sistema financiero tradicional. Si quieres exposición a cripto, conviene evaluarla como capital de riesgo separado, no como el dinero destinado a cubrir imprevistos.\n\n### Qué debe resolver un fondo de emergencia\n\nSu propósito exige tres características:\n\n- **Disponibilidad:** poder convertirlo rápidamente en DOP para pagar alquiler, alimentos, salud o reparaciones.\n- **Estabilidad:** evitar que una caída del mercado reduzca el dinero disponible durante una emergencia.\n- **Protección institucional:** saber qué entidad custodia el dinero y qué mecanismos aplican si esa entidad enfrenta problemas.\n\n### Comparación práctica\n\n| Alternativa | Estabilidad en DOP | Acceso durante una emergencia | Protección relevante | Riesgo principal |\n|---|---|---|---|---|\n| Cuenta de ahorro en una entidad autorizada de República Dominicana | El saldo permanece denominado en DOP | Depende de los canales y condiciones de la entidad | Los usuarios de entidades registradas pueden estar amparados por el Fondo de Contingencia, sujeto a sus reglas y límites vigentes | Inflación, cargos y restricciones operativas |\n| Criptomoneda | Su valor en DOP cambia con el mercado y el tipo de conversión | Requiere venderla, convertirla y retirar los fondos | No está cubierta por los mecanismos tradicionales de garantía de depósitos | Caída de precio, fallas de la plataforma, fraude o pérdida de acceso |\n| Fondo dividido entre ambos | Solo la parte mantenida en DOP conserva estabilidad nominal | La liquidez depende de dónde esté cada parte | La protección bancaria no se extiende automáticamente a la parte en cripto | Que la porción volátil resulte insuficiente cuando haga falta |\n\n### La prueba decisiva\n\nImagina una emergencia que coincida con una caída del precio de la criptomoneda o con una suspensión temporal de retiros. Si para pagar debes vender con pérdida, esperar una transferencia o depender de que una plataforma siga funcionando, ese dinero no está desempeñando plenamente la función de reserva de emergencia.\n\nUna cuenta bancaria tampoco elimina todos los riesgos: pueden existir cargos, límites de retiro y pérdida de poder adquisitivo. La diferencia es que su saldo en DOP no depende de vender primero un activo cuyo precio fluctúa.\n\n### Qué revisar en República Dominicana\n\nAntes de comparar cuentas, confirma directamente con la entidad:\n\n- que figure como entidad autorizada o registrada ante la Superintendencia de Bancos;\n- si el producto y el titular califican para el Fondo de Contingencia;\n- cuál es el límite de cobertura vigente;\n- cargos, saldo mínimo y restricciones de retiro;\n- disponibilidad de cajeros, transferencias y atención fuera del horario habitual.\n\nPara cualquier porción en cripto, revisa quién conserva las claves, si los retiros pueden suspenderse, los costos de convertir a DOP y qué recurso tendrías si la plataforma falla. La decisión depende de cuánto valoras la estabilidad inmediata frente a aceptar volatilidad y riesgos operativos."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "Para la función estricta de un fondo de emergencia, las criptomonedas encajan mal: pueden perder valor justo cuando necesitas el dinero y no tienen la protección de depósitos del sistema financiero tradicional. Si quieres exposición a cripto, conviene evaluarla como capital de riesgo separado, no como el dinero destinado a cubrir imprevistos.\n\n### Qué debe resolver un fondo de emergencia\n\nSu propósito exige tres características:\n\n- **Disponibilidad:** poder convertirlo rápidamente en DOP para pagar alquiler, alimentos, salud o reparaciones.\n- **Estabilidad:** evitar que una caída del mercado reduzca el dinero disponible durante una emergencia.\n- **Protección institucional:** saber qué entidad custodia el dinero y qué mecanismos aplican si esa entidad enfrenta problemas.\n\n### Comparación práctica\n\n| Alternativa | Estabilidad en DOP | Acceso durante una emergencia | Protección relevante | Riesgo principal |\n|---|---|---|---|---|\n| Cuenta de ahorro en una entidad autorizada de República Dominicana | El saldo permanece denominado en DOP | Depende de los canales y condiciones de la entidad | Los usuarios de entidades registradas pueden estar amparados por el Fondo de Contingencia, sujeto a sus reglas y límites vigentes | Inflación, cargos y restricciones operativas |\n| Criptomoneda | Su valor en DOP cambia con el mercado y el tipo de conversión | Requiere venderla, convertirla y retirar los fondos | No está cubierta por los mecanismos tradicionales de garantía de depósitos | Caída de precio, fallas de la plataforma, fraude o pérdida de acceso |\n| Fondo dividido entre ambos | Solo la parte mantenida en DOP conserva estabilidad nominal | La liquidez depende de dónde esté cada parte | La protección bancaria no se extiende automáticamente a la parte en cripto | Que la porción volátil resulte insuficiente cuando haga falta |\n\n### La prueba decisiva\n\nImagina una emergencia que coincida con una caída del precio de la criptomoneda o con una suspensión temporal de retiros. Si para pagar debes vender con pérdida, esperar una transferencia o depender de que una plataforma siga funcionando, ese dinero no está desempeñando plenamente la función de reserva de emergencia.\n\nUna cuenta bancaria tampoco elimina todos los riesgos: pueden existir cargos, límites de retiro y pérdida de poder adquisitivo. La diferencia es que su saldo en DOP no depende de vender primero un activo cuyo precio fluctúa.\n\n### Qué revisar en República Dominicana\n\nAntes de comparar cuentas, confirma directamente con la entidad:\n\n- que figure como entidad autorizada o registrada ante la Superintendencia de Bancos;\n- si el producto y el titular califican para el Fondo de Contingencia;\n- cuál es el límite de cobertura vigente;\n- cargos, saldo mínimo y restricciones de retiro;\n- disponibilidad de cajeros, transferencias y atención fuera del horario habitual.\n\nPara cualquier porción en cripto, revisa quién conserva las claves, si los retiros pueden suspenderse, los costos de convertir a DOP y qué recurso tendrías si la plataforma falla. La decisión depende de cuánto valoras la estabilidad inmediata frente a aceptar volatilidad y riesgos operativos.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "¿Cómo comparo cuentas de ahorro para mi fondo de emergencia en República Dominicana?"
+            },
+            {
+              "type": "question",
+              "text": "¿Qué debo verificar sobre el Fondo de Contingencia dominicano?"
+            },
+            {
+              "type": "question",
+              "text": "¿Cómo separo un fondo de emergencia de una inversión en cripto?"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "Superintendencia de Bancos lanza sello que identifica entidades autorizadas",
+              "domain": "tusolcaribe.com",
+              "url": "https://tusolcaribe.com/2021/09/superintendencia-de-bancos-lanza-sello-que-identifica-entidades-autorizadas/",
+              "source_date": "2026-09-10"
+            },
+            {
+              "title": "¿Qué son las criptomonedas? Así funcionan y cómo se minan",
+              "domain": "www.imagenradio.com.mx",
+              "url": "https://www.imagenradio.com.mx/finanzas/que-son-criptomonedas-funcionan-como-minan",
+              "source_date": "2026-09-08"
+            }
+          ],
+          "rows": [],
+          "retrieved_at": "2026-09-14T17:15:29.924984+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 40603,
+            "cost_usd": 0.15272,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "¿Cómo comparo cuentas de ahorro para mi fondo de emergencia en República Dominicana?",
+              "¿Qué debo verificar sobre el Fondo de Contingencia dominicano?",
+              "¿Cómo separo un fondo de emergencia de una inversión en cripto?"
+            ]
+          }
+        },
+        "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 67.962,
+  "screenshot": {
+    "file": "screenshots/registered-q10-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Para la función estricta de un fondo de emergencia, las criptomonedas encajan mal: pueden perder valor justo cuando necesitas el dinero y no tienen la protección de depósitos del sistema financiero tradicional. Si quieres exposición a cripto, conviene evaluarla como capital de riesgo separado, no como el dinero destinado a cubrir imprevistos.\n\nQué debe resolver un fondo de emergencia\n\nSu propósito exige tres características:\n\nDisponibilidad: poder convertirlo rápidamente en DOP para pagar alquiler, alimentos, salud o reparaciones.\nEstabilidad: evitar que una caída del mercado reduzca el dinero disponible durante una emergencia.\nProtección institucional: saber qué entidad custodia el dinero y qué mecanismos aplican si esa entidad enfrenta problemas.\nComparación práctica\nALTERNATIVA\tESTABILIDAD EN DOP\tACCESO DURANTE UNA EMERGENCIA\tPROTECCIÓN RELEVANTE\tRIESGO PRINCIPAL\nCuenta de ahorro en una entidad autorizada de República Dominicana\tEl saldo permanece denominado en DOP\tDepende de los canales y condiciones de la entidad\tLos usuarios de entidades registradas pueden estar amparados por el Fondo de Contingencia, sujeto a sus reglas y límites vigentes\tInflación, cargos y restricciones operativas\nCriptomoneda\tSu valor en DOP cambia con el mercado y el tipo de conversión\tRequiere venderla, convertirla y retirar los fondos\tNo está cubierta por los mecanismos tradicionales de garantía de depósitos\tCaída de precio, fallas de la plataforma, fraude o pérdida de acceso\nFondo dividido entre ambos\tSolo la parte mantenida en DOP conserva estabilidad nominal\tLa liquidez depende de dónde esté cada parte\tLa protección bancaria no se extiende automáticamente a la parte en cripto\tQue la porción volátil resulte insuficiente cuando haga falta\nLa prueba decisiva\n\nImagina una emergencia que coincida con una caída del precio de la criptomoneda o con una suspensión temporal de retiros. Si para pagar debes vender con pérdida, esperar una transferencia o depender de que una plataforma siga funcionando, ese dinero no está desempeñando plenamente la función de reserva de emergencia.\n\nUna cuenta bancaria tampoco elimina todos los riesgos: pueden existir cargos, límites de retiro y pérdida de poder adquisitivo. La diferencia es que su saldo en DOP no depende de vender primero un activo cuyo precio fluctúa.\n\nQué revisar en República Dominicana\n\nAntes de comparar cuentas, confirma directamente con la entidad:\n\nque figure como entidad autorizada o registrada ante la Superintendencia de Bancos;\nsi el producto y el titular califican para el Fondo de Contingencia;\ncuál es el límite de cobertura vigente;\ncargos, saldo mínimo y restricciones de retiro;\ndisponibilidad de cajeros, transferencias y atención fuera del horario habitual.\n\nPara cualquier porción en cripto, revisa quién conserva las claves, si los retiros pueden suspenderse, los costos de convertir a DOP y qué recurso tendrías si la plataforma falla. La decisión depende de cuánto valoras la estabilidad inmediata frente a aceptar volatilidad y riesgos operativos.\n\n2 fuentes ›\nQUÉ PROBAR DESPUÉS\n↳\n¿Cómo comparo cuentas de ahorro para mi fondo de emergencia en República Dominicana?\n↳\n¿Qué debo verificar sobre el Fondo de Contingencia dominicano?\n↳\n¿Cómo separo un fondo de emergencia de una inversión en cripto?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "bcc03a93-7bec-4889-aa36-04b52b5949b0",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 1552,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 834,
+        "cached_tokens": 128,
+        "prompt_tokens": 788,
+        "completion_tokens": 46,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 65.932,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:14:25.599830+00:00"
+    },
+    {
+      "id": "97ae3baa-344a-4d70-b257-9976210db873",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 9613,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 11796,
+        "cached_tokens": 192,
+        "prompt_tokens": 10771,
+        "completion_tokens": 1025,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 65.932,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:14:35.305332+00:00"
+    },
+    {
+      "id": "926f4e5b-227f-4e51-a7ff-a5f18b21ea98",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 752,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 262,
+        "cached_tokens": 0,
+        "prompt_tokens": 245,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:15:30.736815+00:00"
+    },
+    {
+      "id": "04c56f3c-6053-4df9-bf84-d218e1990c54",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 739,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 288,
+        "cached_tokens": 0,
+        "prompt_tokens": 277,
+        "completion_tokens": 11,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:15:31.477397+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "f237219e-a714-411c-a302-65c94117d756",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "bcc03a93-7bec-4889-aa36-04b52b5949b0",
+      "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+      "correlation_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f:73ac6f15-0fa2-42f2-b22c-35d3a4976000:8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 834,
+        "cached_tokens": 128,
+        "prompt_tokens": 788,
+        "usage_cost_usd": 0.0009656,
+        "completion_tokens": 46,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 788,
+      "output_tokens": 46,
+      "total_tokens": 834,
+      "billable_unit": "token",
+      "billable_quantity": "834.000000",
+      "cost_amount": "0.00096560",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1552,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 65.932,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:14:25.599830+00:00",
+      "created_at": "2026-09-14 17:15:29.960677+00:00"
+    },
+    {
+      "id": "d3d8419f-3a8f-49ed-888e-d69d0134122c",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "97ae3baa-344a-4d70-b257-9976210db873",
+      "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+      "correlation_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f:73ac6f15-0fa2-42f2-b22c-35d3a4976000:8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 11796,
+        "cached_tokens": 192,
+        "prompt_tokens": 10771,
+        "usage_cost_usd": 0.01582465,
+        "completion_tokens": 1025,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10771,
+      "output_tokens": 1025,
+      "total_tokens": 11796,
+      "billable_unit": "token",
+      "billable_quantity": "11796.000000",
+      "cost_amount": "0.01582465",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 9613,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 65.932,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:14:35.305332+00:00",
+      "created_at": "2026-09-14 17:15:29.967832+00:00"
+    },
+    {
+      "id": "f9fccf6a-54ba-4596-b8da-826350e3bf47",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+      "correlation_id": "research:0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.15272000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 40603,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 17:15:29.952074+00:00",
+      "created_at": "2026-09-14 17:15:29.952953+00:00"
+    },
+    {
+      "id": "a41d387c-0650-43d1-b867-116fd38bad90",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "926f4e5b-227f-4e51-a7ff-a5f18b21ea98",
+      "request_id": null,
+      "correlation_id": "api_turn:73ac6f15-0fa2-42f2-b22c-35d3a4976000:8f4a8429-ba43-4ac1-9938-60c15903dce7:926f4e5b-227f-4e51-a7ff-a5f18b21ea98",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 262,
+        "cached_tokens": 0,
+        "prompt_tokens": 245,
+        "usage_cost_usd": 3.13e-05,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 245,
+      "output_tokens": 17,
+      "total_tokens": 262,
+      "billable_unit": "token",
+      "billable_quantity": "262.000000",
+      "cost_amount": "0.00003130",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 752,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:15:30.736815+00:00",
+      "created_at": "2026-09-14 17:15:31.483354+00:00"
+    },
+    {
+      "id": "b7768574-cdc7-48e1-8eef-1755b448319b",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "8f4a8429-ba43-4ac1-9938-60c15903dce7",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "04c56f3c-6053-4df9-bf84-d218e1990c54",
+      "request_id": null,
+      "correlation_id": "api_turn:73ac6f15-0fa2-42f2-b22c-35d3a4976000:8f4a8429-ba43-4ac1-9938-60c15903dce7:04c56f3c-6053-4df9-bf84-d218e1990c54",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 288,
+        "cached_tokens": 0,
+        "prompt_tokens": 277,
+        "usage_cost_usd": 3.21e-05,
+        "completion_tokens": 11,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 277,
+      "output_tokens": 11,
+      "total_tokens": 288,
+      "billable_unit": "token",
+      "billable_quantity": "288.000000",
+      "cost_amount": "0.00003210",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 739,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:15:31.477397+00:00",
+      "created_at": "2026-09-14 17:15:31.490918+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 9,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.15272,
+        "latency_ms": 40603,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://tusolcaribe.com/2021/09/superintendencia-de-bancos-lanza-sello-que-identifica-entidades-autorizadas/",
+          "title": "Superintendencia de Bancos lanza sello que identifica entidades autorizadas",
+          "domain": "tusolcaribe.com",
+          "source_date": "2026-09-10"
+        },
+        {
+          "url": "https://www.imagenradio.com.mx/finanzas/que-son-criptomonedas-funcionan-como-minan",
+          "title": "¿Qué son las criptomonedas? Así funcionan y cómo se minan",
+          "domain": "www.imagenradio.com.mx",
+          "source_date": "2026-09-08"
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "¿Cómo comparo cuentas de ahorro para mi fondo de emergencia en República Dominicana?",
+          "¿Qué debo verificar sobre el Fondo de Contingencia dominicano?",
+          "¿Cómo separo un fondo de emergencia de una inversión en cripto?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T17:15:29.924984+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "c4ece8e7-4a18-494f-9d00-0a0c131523a9",
+      "terminal": true,
+      "request_id": "0e4dc72b-b7e4-45b9-b2e9-1406de78ed0f"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

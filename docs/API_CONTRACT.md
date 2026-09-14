@@ -3420,6 +3420,12 @@ unknown. Their `visibility` defaults to `private`; a declaration explicitly
 marks shareable input facts `public`. This display contract does not
 replace any tool's argument or result model.
 
+Supporting row facts may carry `comparison_only: true` (absent means false).
+These facts participate in answer comparisons but are omitted from displayed
+card rows, card copy text and public receipts. Ranked comparisons retain a
+`gap_0` fact with value zero for the first item this way: every item's gap can
+be paired by item identity when the leader changes, without an extra zero row.
+
 Additive since the calculations lane (2026-09-11): every fact may carry a
 `source`, `{kind, title?, url?, date?}`, where `kind` is `user` (the user
 stated it), `page` (a retrieved page, which alone carries its title, url and

@@ -121,6 +121,8 @@ class ToolFact(ToolContract):
     unit: LocalizedText | None = None
     # Additive: older cards carry no source and remain readable.
     source: ToolFactSource | None = None
+    # Supporting rows retained for comparisons, omitted from card display.
+    comparison_only: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class ToolInputFact(ToolFact):

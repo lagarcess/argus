@@ -356,7 +356,11 @@ def _public_calculation(card: Any) -> PublicExcerptCalculation:
     return PublicExcerptCalculation(
         title=_public_text(presentation.title),
         answer=_public_fact(presentation.answer),
-        rows=[_public_fact(fact) for fact in presentation.rows],
+        rows=[
+            _public_fact(fact)
+            for fact in presentation.rows
+            if not fact.comparison_only
+        ],
         inputs=[_public_fact(fact) for fact in stated if _selected_input(fact)],
         notes=[_public_text(item) for item in presentation.notes],
     )

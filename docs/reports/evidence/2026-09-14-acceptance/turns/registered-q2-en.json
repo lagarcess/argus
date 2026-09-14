@@ -1,0 +1,2451 @@
+{
+  "label": "registered-q2-en",
+  "phase": "registered",
+  "question": "q2",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+  "message": "What do I need to earn to afford a Porsche?",
+  "answer": {
+    "id": "b551b16b-53f5-474d-bfba-15520e620e25",
+    "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+    "role": "assistant",
+    "content": "Here is the calculation from these inputs. Change any input to recompute it.",
+    "created_at": "2026-09-14T16:50:10.008360Z",
+    "metadata": {
+      "research": {
+        "rows": [
+          {
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-09-12",
+            "label": "monthly lease payment",
+            "value": 1129,
+            "symbol": null,
+            "subject": "Porsche Macan 4 Electric",
+            "source_url": "https://warrington.porsche.com/en/specials/new"
+          },
+          {
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-09-12",
+            "label": "amount due at signing",
+            "value": 12224,
+            "symbol": null,
+            "subject": "Porsche Macan 4 Electric",
+            "source_url": "https://warrington.porsche.com/en/specials/new"
+          },
+          {
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-09-12",
+            "label": "vehicle MSRP",
+            "value": 98430,
+            "symbol": null,
+            "subject": "Porsche Macan 4 Electric",
+            "source_url": "https://warrington.porsche.com/en/specials/new"
+          },
+          {
+            "kind": "count",
+            "unit": "months",
+            "as_of": "2026-09-12",
+            "label": "lease term in months",
+            "value": 39,
+            "symbol": null,
+            "subject": "Porsche Macan 4 Electric",
+            "source_url": "https://warrington.porsche.com/en/specials/new"
+          },
+          {
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-08-21",
+            "label": "monthly lease payment",
+            "value": 2525,
+            "symbol": null,
+            "subject": "Porsche 911 Carrera S",
+            "source_url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420"
+          }
+        ],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.17927,
+          "latency_ms": 42316,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://www.consumerfinance.gov/ask-cfpb/what-is-a-debt-to-income-ratio-en-1791/",
+            "title": "What is a debt-to-income ratio? | Consumer Financial Protection ...",
+            "domain": "www.consumerfinance.gov",
+            "source_date": null
+          },
+          {
+            "url": "https://warrington.porsche.com/en/specials/new",
+            "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+            "domain": "warrington.porsche.com",
+            "source_date": "2026-09-11"
+          },
+          {
+            "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+            "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+            "domain": "www.dailydrive.us",
+            "source_date": "2026-08-15"
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "How would the result change if I financed instead of leased?",
+            "Can you include my rent and existing monthly debts?",
+            "What income would I need for a specific Porsche model?",
+            "Can you include insurance and maintenance costs?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T16:50:09.808945+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "How would the result change if I financed instead of leased?",
+            "type": "question"
+          },
+          {
+            "text": "Can you include my rent and existing monthly debts?",
+            "type": "question"
+          },
+          {
+            "text": "What income would I need for a specific Porsche model?",
+            "type": "question"
+          },
+          {
+            "text": "Can you include insurance and maintenance costs?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "computation": {
+        "calculations": [
+          {
+            "kind": "debt_to_income",
+            "inputs": {
+              "sources": {
+                "ratio_pct": {
+                  "kind": "assumption"
+                },
+                "monthly_debt_payments": {
+                  "url": "https://warrington.porsche.com/en/specials/new",
+                  "date": "2026-09-12",
+                  "kind": "page",
+                  "title": "Porsche Lease Deals in PA [September 2026 Offers]"
+                }
+              },
+              "currency": "USD",
+              "ratio_pct": 10,
+              "monthly_income": null,
+              "monthly_debt_payments": 1129
+            }
+          },
+          {
+            "kind": "debt_to_income",
+            "inputs": {
+              "sources": {
+                "ratio_pct": {
+                  "kind": "assumption"
+                },
+                "monthly_debt_payments": {
+                  "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                  "date": "2026-08-21",
+                  "kind": "page",
+                  "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo"
+                }
+              },
+              "currency": "USD",
+              "ratio_pct": 10,
+              "monthly_income": null,
+              "monthly_debt_payments": 2525
+            }
+          }
+        ]
+      },
+      "conversation_mode": "guide",
+      "tool_result_cards": [
+        {
+          "kind": "tool_result",
+          "call_id": "answer-d9f38cf9-dfd3-461d-b4f3-7ecb9f43d7a1",
+          "outcome": {
+            "result": {
+              "ratio_pct": 10,
+              "solved_field": "monthly_income",
+              "solved_value": 11290,
+              "monthly_income": 11290,
+              "income_after_debt": 10161,
+              "monthly_debt_payments": 1129
+            },
+            "status": "succeeded",
+            "failure": null
+          },
+          "arguments": {
+            "sources": {
+              "ratio_pct": {
+                "kind": "assumption"
+              },
+              "monthly_debt_payments": {
+                "url": "https://warrington.porsche.com/en/specials/new",
+                "date": "2026-09-12",
+                "kind": "page",
+                "title": "Porsche Lease Deals in PA [September 2026 Offers]"
+              }
+            },
+            "currency": "USD",
+            "ratio_pct": 10,
+            "monthly_income": null,
+            "monthly_debt_payments": 1129
+          },
+          "card_type": "debt_to_income",
+          "tool_name": "debt_to_income",
+          "artifact_id": "364d65f7-91cf-42a5-af09-9a7f31bee150",
+          "card_version": 1,
+          "presentation": {
+            "rows": [
+              {
+                "name": "income_after_debt",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.income_after_debt",
+                  "interpolation_args": {}
+                },
+                "value": 10161,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              }
+            ],
+            "notes": [],
+            "title": {
+              "locale_key": "tools.calc.debt_to_income.title",
+              "interpolation_args": {}
+            },
+            "answer": {
+              "name": "monthly_income",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.monthly_income",
+                "interpolation_args": {}
+              },
+              "value": 11290,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            "inputs": [
+              {
+                "name": "monthly_debt_payments",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.monthly_debt_payments",
+                  "interpolation_args": {}
+                },
+                "value": 1129,
+                "source": {
+                  "url": "https://warrington.porsche.com/en/specials/new",
+                  "date": "2026-09-12",
+                  "kind": "page",
+                  "title": "Porsche Lease Deals in PA [September 2026 Offers]"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "monthly_income",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.monthly_income",
+                  "interpolation_args": {}
+                },
+                "value": null,
+                "source": {
+                  "kind": "computed"
+                },
+                "driving": false,
+                "unknown": true,
+                "editable": false,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "ratio_pct",
+                "unit": {
+                  "locale_key": "chat.tools.units.percent",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.ratio_pct",
+                  "interpolation_args": {}
+                },
+                "value": 10,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              }
+            ],
+            "visual": null,
+            "sources": [],
+            "narrative": null
+          },
+          "artifact_state": "active",
+          "input_revision": 0,
+          "schema_version": 1
+        },
+        {
+          "kind": "tool_result",
+          "call_id": "answer-94ff3eb0-e227-4315-9124-1211854b7801",
+          "outcome": {
+            "result": {
+              "ratio_pct": 10,
+              "solved_field": "monthly_income",
+              "solved_value": 25250,
+              "monthly_income": 25250,
+              "income_after_debt": 22725,
+              "monthly_debt_payments": 2525
+            },
+            "status": "succeeded",
+            "failure": null
+          },
+          "arguments": {
+            "sources": {
+              "ratio_pct": {
+                "kind": "assumption"
+              },
+              "monthly_debt_payments": {
+                "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                "date": "2026-08-21",
+                "kind": "page",
+                "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo"
+              }
+            },
+            "currency": "USD",
+            "ratio_pct": 10,
+            "monthly_income": null,
+            "monthly_debt_payments": 2525
+          },
+          "card_type": "debt_to_income",
+          "tool_name": "debt_to_income",
+          "artifact_id": "a0b7eab1-9023-4805-af41-e4a9e784dcd9",
+          "card_version": 1,
+          "presentation": {
+            "rows": [
+              {
+                "name": "income_after_debt",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.income_after_debt",
+                  "interpolation_args": {}
+                },
+                "value": 22725,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              }
+            ],
+            "notes": [],
+            "title": {
+              "locale_key": "tools.calc.debt_to_income.title",
+              "interpolation_args": {}
+            },
+            "answer": {
+              "name": "monthly_income",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.monthly_income",
+                "interpolation_args": {}
+              },
+              "value": 25250,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            "inputs": [
+              {
+                "name": "monthly_debt_payments",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.monthly_debt_payments",
+                  "interpolation_args": {}
+                },
+                "value": 2525,
+                "source": {
+                  "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                  "date": "2026-08-21",
+                  "kind": "page",
+                  "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "monthly_income",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.monthly_income",
+                  "interpolation_args": {}
+                },
+                "value": null,
+                "source": {
+                  "kind": "computed"
+                },
+                "driving": false,
+                "unknown": true,
+                "editable": false,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "ratio_pct",
+                "unit": {
+                  "locale_key": "chat.tools.units.percent",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.ratio_pct",
+                  "interpolation_args": {}
+                },
+                "value": 10,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              }
+            ],
+            "visual": null,
+            "sources": [],
+            "narrative": null
+          },
+          "artifact_state": "active",
+          "input_revision": 0,
+          "schema_version": 1
+        }
+      ],
+      "agent_runtime_turn": {
+        "turn_id": "9cf91fa7-e51e-4d3a-84c3-10927816daa2",
+        "request_id": "03162287-1b91-4988-89fe-399a35687537",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "Here is the calculation from these inputs. Change any input to recompute it."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [
+          {
+            "artifact_kind": "tool_result",
+            "artifact_id": "364d65f7-91cf-42a5-af09-9a7f31bee150",
+            "artifact_status": "active",
+            "metadata": {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "debt_to_income",
+              "call_id": "answer-d9f38cf9-dfd3-461d-b4f3-7ecb9f43d7a1",
+              "artifact_id": "364d65f7-91cf-42a5-af09-9a7f31bee150",
+              "input_revision": 0,
+              "card_type": "debt_to_income",
+              "card_version": 1,
+              "arguments": {
+                "currency": "USD",
+                "sources": {
+                  "monthly_debt_payments": {
+                    "kind": "page",
+                    "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                    "url": "https://warrington.porsche.com/en/specials/new",
+                    "date": "2026-09-12"
+                  },
+                  "ratio_pct": {
+                    "kind": "assumption"
+                  }
+                },
+                "monthly_debt_payments": 1129,
+                "monthly_income": null,
+                "ratio_pct": 10
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "monthly_income",
+                  "solved_value": 11290,
+                  "monthly_debt_payments": 1129,
+                  "monthly_income": 11290,
+                  "ratio_pct": 10,
+                  "income_after_debt": 10161
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.debt_to_income.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "monthly_income",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_income",
+                    "interpolation_args": {}
+                  },
+                  "value": 11290,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "income_after_debt",
+                    "label": {
+                      "locale_key": "tools.calc.fields.income_after_debt",
+                      "interpolation_args": {}
+                    },
+                    "value": 10161,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "monthly_debt_payments",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_debt_payments",
+                      "interpolation_args": {}
+                    },
+                    "value": 1129,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                      "url": "https://warrington.porsche.com/en/specials/new",
+                      "date": "2026-09-12"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "monthly_income",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_income",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "ratio_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.ratio_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 10,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          },
+          {
+            "artifact_kind": "tool_result",
+            "artifact_id": "a0b7eab1-9023-4805-af41-e4a9e784dcd9",
+            "artifact_status": "active",
+            "metadata": {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "debt_to_income",
+              "call_id": "answer-94ff3eb0-e227-4315-9124-1211854b7801",
+              "artifact_id": "a0b7eab1-9023-4805-af41-e4a9e784dcd9",
+              "input_revision": 0,
+              "card_type": "debt_to_income",
+              "card_version": 1,
+              "arguments": {
+                "currency": "USD",
+                "sources": {
+                  "monthly_debt_payments": {
+                    "kind": "page",
+                    "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+                    "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                    "date": "2026-08-21"
+                  },
+                  "ratio_pct": {
+                    "kind": "assumption"
+                  }
+                },
+                "monthly_debt_payments": 2525,
+                "monthly_income": null,
+                "ratio_pct": 10
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "monthly_income",
+                  "solved_value": 25250,
+                  "monthly_debt_payments": 2525,
+                  "monthly_income": 25250,
+                  "ratio_pct": 10,
+                  "income_after_debt": 22725
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.debt_to_income.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "monthly_income",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_income",
+                    "interpolation_args": {}
+                  },
+                  "value": 25250,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "income_after_debt",
+                    "label": {
+                      "locale_key": "tools.calc.fields.income_after_debt",
+                      "interpolation_args": {}
+                    },
+                    "value": 22725,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "monthly_debt_payments",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_debt_payments",
+                      "interpolation_args": {}
+                    },
+                    "value": 2525,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+                      "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                      "date": "2026-08-21"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "monthly_income",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_income",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "ratio_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.ratio_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 10,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          }
+        ],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "Here is the calculation from these inputs. Change any input to recompute it.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "How would the result change if I financed instead of leased?"
+            },
+            {
+              "type": "question",
+              "text": "Can you include my rent and existing monthly debts?"
+            },
+            {
+              "type": "question",
+              "text": "What income would I need for a specific Porsche model?"
+            },
+            {
+              "type": "question",
+              "text": "Can you include insurance and maintenance costs?"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "What is a debt-to-income ratio? | Consumer Financial Protection ...",
+              "domain": "www.consumerfinance.gov",
+              "url": "https://www.consumerfinance.gov/ask-cfpb/what-is-a-debt-to-income-ratio-en-1791/",
+              "source_date": null
+            },
+            {
+              "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+              "domain": "warrington.porsche.com",
+              "url": "https://warrington.porsche.com/en/specials/new",
+              "source_date": "2026-09-11"
+            },
+            {
+              "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+              "domain": "www.dailydrive.us",
+              "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+              "source_date": "2026-08-15"
+            }
+          ],
+          "rows": [
+            {
+              "subject": "Porsche Macan 4 Electric",
+              "symbol": null,
+              "label": "monthly lease payment",
+              "value": 1129,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-12",
+              "source_url": "https://warrington.porsche.com/en/specials/new"
+            },
+            {
+              "subject": "Porsche Macan 4 Electric",
+              "symbol": null,
+              "label": "amount due at signing",
+              "value": 12224,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-12",
+              "source_url": "https://warrington.porsche.com/en/specials/new"
+            },
+            {
+              "subject": "Porsche Macan 4 Electric",
+              "symbol": null,
+              "label": "vehicle MSRP",
+              "value": 98430,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-12",
+              "source_url": "https://warrington.porsche.com/en/specials/new"
+            },
+            {
+              "subject": "Porsche Macan 4 Electric",
+              "symbol": null,
+              "label": "lease term in months",
+              "value": 39,
+              "kind": "count",
+              "unit": "months",
+              "as_of": "2026-09-12",
+              "source_url": "https://warrington.porsche.com/en/specials/new"
+            },
+            {
+              "subject": "Porsche 911 Carrera S",
+              "symbol": null,
+              "label": "monthly lease payment",
+              "value": 2525,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-08-21",
+              "source_url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420"
+            }
+          ],
+          "retrieved_at": "2026-09-14T16:50:09.808945+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 42316,
+            "cost_usd": 0.17927,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "How would the result change if I financed instead of leased?",
+              "Can you include my rent and existing monthly debts?",
+              "What income would I need for a specific Porsche model?",
+              "Can you include insurance and maintenance costs?"
+            ]
+          }
+        },
+        "final_response_payload": {
+          "tool_result_cards": [
+            {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "debt_to_income",
+              "call_id": "answer-d9f38cf9-dfd3-461d-b4f3-7ecb9f43d7a1",
+              "artifact_id": "364d65f7-91cf-42a5-af09-9a7f31bee150",
+              "input_revision": 0,
+              "card_type": "debt_to_income",
+              "card_version": 1,
+              "arguments": {
+                "currency": "USD",
+                "sources": {
+                  "monthly_debt_payments": {
+                    "kind": "page",
+                    "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                    "url": "https://warrington.porsche.com/en/specials/new",
+                    "date": "2026-09-12"
+                  },
+                  "ratio_pct": {
+                    "kind": "assumption"
+                  }
+                },
+                "monthly_debt_payments": 1129,
+                "monthly_income": null,
+                "ratio_pct": 10
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "monthly_income",
+                  "solved_value": 11290,
+                  "monthly_debt_payments": 1129,
+                  "monthly_income": 11290,
+                  "ratio_pct": 10,
+                  "income_after_debt": 10161
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.debt_to_income.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "monthly_income",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_income",
+                    "interpolation_args": {}
+                  },
+                  "value": 11290,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "income_after_debt",
+                    "label": {
+                      "locale_key": "tools.calc.fields.income_after_debt",
+                      "interpolation_args": {}
+                    },
+                    "value": 10161,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "monthly_debt_payments",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_debt_payments",
+                      "interpolation_args": {}
+                    },
+                    "value": 1129,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                      "url": "https://warrington.porsche.com/en/specials/new",
+                      "date": "2026-09-12"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "monthly_income",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_income",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "ratio_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.ratio_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 10,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            },
+            {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "debt_to_income",
+              "call_id": "answer-94ff3eb0-e227-4315-9124-1211854b7801",
+              "artifact_id": "a0b7eab1-9023-4805-af41-e4a9e784dcd9",
+              "input_revision": 0,
+              "card_type": "debt_to_income",
+              "card_version": 1,
+              "arguments": {
+                "currency": "USD",
+                "sources": {
+                  "monthly_debt_payments": {
+                    "kind": "page",
+                    "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+                    "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                    "date": "2026-08-21"
+                  },
+                  "ratio_pct": {
+                    "kind": "assumption"
+                  }
+                },
+                "monthly_debt_payments": 2525,
+                "monthly_income": null,
+                "ratio_pct": 10
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "monthly_income",
+                  "solved_value": 25250,
+                  "monthly_debt_payments": 2525,
+                  "monthly_income": 25250,
+                  "ratio_pct": 10,
+                  "income_after_debt": 22725
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.debt_to_income.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "monthly_income",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_income",
+                    "interpolation_args": {}
+                  },
+                  "value": 25250,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "income_after_debt",
+                    "label": {
+                      "locale_key": "tools.calc.fields.income_after_debt",
+                      "interpolation_args": {}
+                    },
+                    "value": 22725,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "monthly_debt_payments",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_debt_payments",
+                      "interpolation_args": {}
+                    },
+                    "value": 2525,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+                      "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                      "date": "2026-08-21"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "monthly_income",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_income",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "USD"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "ratio_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.ratio_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 10,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          ],
+          "code": null,
+          "result": null,
+          "backtest_job": null,
+          "error": null,
+          "summary": null,
+          "result_card": null,
+          "explanation_context": null
+        },
+        "tool_result_cards": [
+          {
+            "kind": "tool_result",
+            "schema_version": 1,
+            "tool_name": "debt_to_income",
+            "call_id": "answer-d9f38cf9-dfd3-461d-b4f3-7ecb9f43d7a1",
+            "artifact_id": "364d65f7-91cf-42a5-af09-9a7f31bee150",
+            "input_revision": 0,
+            "card_type": "debt_to_income",
+            "card_version": 1,
+            "arguments": {
+              "currency": "USD",
+              "sources": {
+                "monthly_debt_payments": {
+                  "kind": "page",
+                  "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                  "url": "https://warrington.porsche.com/en/specials/new",
+                  "date": "2026-09-12"
+                },
+                "ratio_pct": {
+                  "kind": "assumption"
+                }
+              },
+              "monthly_debt_payments": 1129,
+              "monthly_income": null,
+              "ratio_pct": 10
+            },
+            "outcome": {
+              "status": "succeeded",
+              "result": {
+                "solved_field": "monthly_income",
+                "solved_value": 11290,
+                "monthly_debt_payments": 1129,
+                "monthly_income": 11290,
+                "ratio_pct": 10,
+                "income_after_debt": 10161
+              },
+              "failure": null
+            },
+            "presentation": {
+              "title": {
+                "locale_key": "tools.calc.debt_to_income.title",
+                "interpolation_args": {}
+              },
+              "answer": {
+                "name": "monthly_income",
+                "label": {
+                  "locale_key": "tools.calc.fields.monthly_income",
+                  "interpolation_args": {}
+                },
+                "value": 11290,
+                "value_text": null,
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "source": {
+                  "kind": "computed"
+                }
+              },
+              "narrative": null,
+              "sources": [],
+              "visual": null,
+              "rows": [
+                {
+                  "name": "income_after_debt",
+                  "label": {
+                    "locale_key": "tools.calc.fields.income_after_debt",
+                    "interpolation_args": {}
+                  },
+                  "value": 10161,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                }
+              ],
+              "inputs": [
+                {
+                  "name": "monthly_debt_payments",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_debt_payments",
+                    "interpolation_args": {}
+                  },
+                  "value": 1129,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+                    "url": "https://warrington.porsche.com/en/specials/new",
+                    "date": "2026-09-12"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "monthly_income",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_income",
+                    "interpolation_args": {}
+                  },
+                  "value": null,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  },
+                  "editable": false,
+                  "unknown": true,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "ratio_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.ratio_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 10,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                }
+              ],
+              "notes": []
+            },
+            "artifact_state": "active"
+          },
+          {
+            "kind": "tool_result",
+            "schema_version": 1,
+            "tool_name": "debt_to_income",
+            "call_id": "answer-94ff3eb0-e227-4315-9124-1211854b7801",
+            "artifact_id": "a0b7eab1-9023-4805-af41-e4a9e784dcd9",
+            "input_revision": 0,
+            "card_type": "debt_to_income",
+            "card_version": 1,
+            "arguments": {
+              "currency": "USD",
+              "sources": {
+                "monthly_debt_payments": {
+                  "kind": "page",
+                  "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+                  "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                  "date": "2026-08-21"
+                },
+                "ratio_pct": {
+                  "kind": "assumption"
+                }
+              },
+              "monthly_debt_payments": 2525,
+              "monthly_income": null,
+              "ratio_pct": 10
+            },
+            "outcome": {
+              "status": "succeeded",
+              "result": {
+                "solved_field": "monthly_income",
+                "solved_value": 25250,
+                "monthly_debt_payments": 2525,
+                "monthly_income": 25250,
+                "ratio_pct": 10,
+                "income_after_debt": 22725
+              },
+              "failure": null
+            },
+            "presentation": {
+              "title": {
+                "locale_key": "tools.calc.debt_to_income.title",
+                "interpolation_args": {}
+              },
+              "answer": {
+                "name": "monthly_income",
+                "label": {
+                  "locale_key": "tools.calc.fields.monthly_income",
+                  "interpolation_args": {}
+                },
+                "value": 25250,
+                "value_text": null,
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "USD"
+                  }
+                },
+                "source": {
+                  "kind": "computed"
+                }
+              },
+              "narrative": null,
+              "sources": [],
+              "visual": null,
+              "rows": [
+                {
+                  "name": "income_after_debt",
+                  "label": {
+                    "locale_key": "tools.calc.fields.income_after_debt",
+                    "interpolation_args": {}
+                  },
+                  "value": 22725,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                }
+              ],
+              "inputs": [
+                {
+                  "name": "monthly_debt_payments",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_debt_payments",
+                    "interpolation_args": {}
+                  },
+                  "value": 2525,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+                    "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                    "date": "2026-08-21"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "monthly_income",
+                  "label": {
+                    "locale_key": "tools.calc.fields.monthly_income",
+                    "interpolation_args": {}
+                  },
+                  "value": null,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "USD"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  },
+                  "editable": false,
+                  "unknown": true,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "ratio_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.ratio_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 10,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                }
+              ],
+              "notes": []
+            },
+            "artifact_state": "active"
+          }
+        ],
+        "message_id": "b551b16b-53f5-474d-bfba-15520e620e25",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 72.639,
+  "screenshot": {
+    "file": "screenshots/registered-q2-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Here is the calculation from these inputs. Change any input to recompute it.\n\nUSD 11,290.00\nMonthly income\nShow the numbers\nUSD 25,250.00\nMonthly income\nShow the numbers\nAdd decision\nContinue in a new chat\n3 sources ›\nTRY NEXT\n↳\nHow would the result change if I financed instead of leased?\n↳\nCan you include my rent and existing monthly debts?\n↳\nWhat income would I need for a specific Porsche model?\n↳\nCan you include insurance and maintenance costs?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "7a59cb57-85e5-4abe-8b15-83ba38c625c4",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+      "run_id": null,
+      "message_id": "b551b16b-53f5-474d-bfba-15520e620e25",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 17229,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 803,
+        "cached_tokens": 768,
+        "prompt_tokens": 786,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "03162287-1b91-4988-89fe-399a35687537",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 70.635,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e81bfa66f43777a4fd24e525c728e9cee962818399d144be2c13164cf926f34a",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:49:16.656867+00:00"
+    },
+    {
+      "id": "e2702502-5bbe-4e8f-9a0c-2653cfe315e7",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+      "run_id": null,
+      "message_id": "b551b16b-53f5-474d-bfba-15520e620e25",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 10800,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 11963,
+        "cached_tokens": 192,
+        "prompt_tokens": 10767,
+        "completion_tokens": 1196,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "03162287-1b91-4988-89fe-399a35687537",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 70.635,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e81bfa66f43777a4fd24e525c728e9cee962818399d144be2c13164cf926f34a",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:49:27.457805+00:00"
+    },
+    {
+      "id": "af177188-90d0-4f96-a927-1ec812636186",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+      "run_id": null,
+      "message_id": "b551b16b-53f5-474d-bfba-15520e620e25",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 694,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 135,
+        "cached_tokens": 0,
+        "prompt_tokens": 121,
+        "completion_tokens": 14,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 16:50:10.751106+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "76f53961-e37e-4adb-9f39-a8f24fff4295",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+      "message_id": "b551b16b-53f5-474d-bfba-15520e620e25",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "7a59cb57-85e5-4abe-8b15-83ba38c625c4",
+      "request_id": "03162287-1b91-4988-89fe-399a35687537",
+      "correlation_id": "03162287-1b91-4988-89fe-399a35687537:46b091e8-5b57-43d2-a448-d7094db75319:b551b16b-53f5-474d-bfba-15520e620e25",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 803,
+        "cached_tokens": 768,
+        "prompt_tokens": 786,
+        "usage_cost_usd": 0.0002186,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 786,
+      "output_tokens": 17,
+      "total_tokens": 803,
+      "billable_unit": "token",
+      "billable_quantity": "803.000000",
+      "cost_amount": "0.00021860",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 17229,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "03162287-1b91-4988-89fe-399a35687537",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 70.635,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e81bfa66f43777a4fd24e525c728e9cee962818399d144be2c13164cf926f34a",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:49:16.656867+00:00",
+      "created_at": "2026-09-14 16:50:10.034167+00:00"
+    },
+    {
+      "id": "53c4a254-221b-4c7b-b1cc-b8366b2c5b2d",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+      "message_id": "b551b16b-53f5-474d-bfba-15520e620e25",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "e2702502-5bbe-4e8f-9a0c-2653cfe315e7",
+      "request_id": "03162287-1b91-4988-89fe-399a35687537",
+      "correlation_id": "03162287-1b91-4988-89fe-399a35687537:46b091e8-5b57-43d2-a448-d7094db75319:b551b16b-53f5-474d-bfba-15520e620e25",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 11963,
+        "cached_tokens": 192,
+        "prompt_tokens": 10767,
+        "usage_cost_usd": 0.01624715,
+        "completion_tokens": 1196,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10767,
+      "output_tokens": 1196,
+      "total_tokens": 11963,
+      "billable_unit": "token",
+      "billable_quantity": "11963.000000",
+      "cost_amount": "0.01624715",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 10800,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "03162287-1b91-4988-89fe-399a35687537",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 70.635,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "e81bfa66f43777a4fd24e525c728e9cee962818399d144be2c13164cf926f34a",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:49:27.457805+00:00",
+      "created_at": "2026-09-14 16:50:10.041555+00:00"
+    },
+    {
+      "id": "96e9bf35-dd2e-4bca-8fef-950ddaac7115",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+      "message_id": "b551b16b-53f5-474d-bfba-15520e620e25",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "03162287-1b91-4988-89fe-399a35687537",
+      "correlation_id": "research:03162287-1b91-4988-89fe-399a35687537",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.17927000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 42316,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 16:50:10.022775+00:00",
+      "created_at": "2026-09-14 16:50:10.023524+00:00"
+    },
+    {
+      "id": "85d24a0e-015b-4acd-acc9-7d5a37af39ff",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "46b091e8-5b57-43d2-a448-d7094db75319",
+      "message_id": "b551b16b-53f5-474d-bfba-15520e620e25",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "af177188-90d0-4f96-a927-1ec812636186",
+      "request_id": null,
+      "correlation_id": "api_turn:46b091e8-5b57-43d2-a448-d7094db75319:b551b16b-53f5-474d-bfba-15520e620e25:af177188-90d0-4f96-a927-1ec812636186",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 135,
+        "cached_tokens": 0,
+        "prompt_tokens": 121,
+        "usage_cost_usd": 1.77e-05,
+        "completion_tokens": 14,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 121,
+      "output_tokens": 14,
+      "total_tokens": 135,
+      "billable_unit": "token",
+      "billable_quantity": "135.000000",
+      "cost_amount": "0.00001770",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 694,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:50:10.751106+00:00",
+      "created_at": "2026-09-14 16:50:10.770388+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 10,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [
+        {
+          "kind": "currency",
+          "unit": "USD",
+          "as_of": "2026-09-12",
+          "label": "monthly lease payment",
+          "value": 1129.0,
+          "symbol": null,
+          "subject": "Porsche Macan 4 Electric",
+          "source_url": "https://warrington.porsche.com/en/specials/new"
+        },
+        {
+          "kind": "currency",
+          "unit": "USD",
+          "as_of": "2026-09-12",
+          "label": "amount due at signing",
+          "value": 12224.0,
+          "symbol": null,
+          "subject": "Porsche Macan 4 Electric",
+          "source_url": "https://warrington.porsche.com/en/specials/new"
+        },
+        {
+          "kind": "currency",
+          "unit": "USD",
+          "as_of": "2026-09-12",
+          "label": "vehicle MSRP",
+          "value": 98430.0,
+          "symbol": null,
+          "subject": "Porsche Macan 4 Electric",
+          "source_url": "https://warrington.porsche.com/en/specials/new"
+        },
+        {
+          "kind": "count",
+          "unit": "months",
+          "as_of": "2026-09-12",
+          "label": "lease term in months",
+          "value": 39.0,
+          "symbol": null,
+          "subject": "Porsche Macan 4 Electric",
+          "source_url": "https://warrington.porsche.com/en/specials/new"
+        },
+        {
+          "kind": "currency",
+          "unit": "USD",
+          "as_of": "2026-08-21",
+          "label": "monthly lease payment",
+          "value": 2525.0,
+          "symbol": null,
+          "subject": "Porsche 911 Carrera S",
+          "source_url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420"
+        }
+      ],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.17927,
+        "latency_ms": 42316,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://www.consumerfinance.gov/ask-cfpb/what-is-a-debt-to-income-ratio-en-1791/",
+          "title": "What is a debt-to-income ratio? | Consumer Financial Protection ...",
+          "domain": "www.consumerfinance.gov",
+          "source_date": null
+        },
+        {
+          "url": "https://warrington.porsche.com/en/specials/new",
+          "title": "Porsche Lease Deals in PA [September 2026 Offers]",
+          "domain": "warrington.porsche.com",
+          "source_date": "2026-09-11"
+        },
+        {
+          "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+          "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo",
+          "domain": "www.dailydrive.us",
+          "source_date": "2026-08-15"
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "How would the result change if I financed instead of leased?",
+          "Can you include my rent and existing monthly debts?",
+          "What income would I need for a specific Porsche model?",
+          "Can you include insurance and maintenance costs?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T16:50:09.808945+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "tool_result_cards": [
+      {
+        "kind": "tool_result",
+        "call_id": "answer-d9f38cf9-dfd3-461d-b4f3-7ecb9f43d7a1",
+        "outcome": {
+          "result": {
+            "ratio_pct": 10.0,
+            "solved_field": "monthly_income",
+            "solved_value": 11290.0,
+            "monthly_income": 11290.0,
+            "income_after_debt": 10161.0,
+            "monthly_debt_payments": 1129.0
+          },
+          "status": "succeeded",
+          "failure": null
+        },
+        "arguments": {
+          "sources": {
+            "ratio_pct": {
+              "kind": "assumption"
+            },
+            "monthly_debt_payments": {
+              "url": "https://warrington.porsche.com/en/specials/new",
+              "date": "2026-09-12",
+              "kind": "page",
+              "title": "Porsche Lease Deals in PA [September 2026 Offers]"
+            }
+          },
+          "currency": "USD",
+          "ratio_pct": 10.0,
+          "monthly_income": null,
+          "monthly_debt_payments": 1129.0
+        },
+        "card_type": "debt_to_income",
+        "tool_name": "debt_to_income",
+        "artifact_id": "364d65f7-91cf-42a5-af09-9a7f31bee150",
+        "card_version": 1,
+        "presentation": {
+          "rows": [
+            {
+              "name": "income_after_debt",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.income_after_debt",
+                "interpolation_args": {}
+              },
+              "value": 10161.0,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            }
+          ],
+          "notes": [],
+          "title": {
+            "locale_key": "tools.calc.debt_to_income.title",
+            "interpolation_args": {}
+          },
+          "answer": {
+            "name": "monthly_income",
+            "unit": {
+              "locale_key": "tools.calc.units.currency",
+              "interpolation_args": {
+                "code": "USD"
+              }
+            },
+            "label": {
+              "locale_key": "tools.calc.fields.monthly_income",
+              "interpolation_args": {}
+            },
+            "value": 11290.0,
+            "source": {
+              "kind": "computed"
+            },
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "name": "monthly_debt_payments",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.monthly_debt_payments",
+                "interpolation_args": {}
+              },
+              "value": 1129.0,
+              "source": {
+                "url": "https://warrington.porsche.com/en/specials/new",
+                "date": "2026-09-12",
+                "kind": "page",
+                "title": "Porsche Lease Deals in PA [September 2026 Offers]"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "monthly_income",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.monthly_income",
+                "interpolation_args": {}
+              },
+              "value": null,
+              "source": {
+                "kind": "computed"
+              },
+              "driving": false,
+              "unknown": true,
+              "editable": false,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "ratio_pct",
+              "unit": {
+                "locale_key": "chat.tools.units.percent",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.ratio_pct",
+                "interpolation_args": {}
+              },
+              "value": 10.0,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "visual": null,
+          "sources": [],
+          "narrative": null
+        },
+        "artifact_state": "active",
+        "input_revision": 0,
+        "schema_version": 1
+      },
+      {
+        "kind": "tool_result",
+        "call_id": "answer-94ff3eb0-e227-4315-9124-1211854b7801",
+        "outcome": {
+          "result": {
+            "ratio_pct": 10.0,
+            "solved_field": "monthly_income",
+            "solved_value": 25250.0,
+            "monthly_income": 25250.0,
+            "income_after_debt": 22725.0,
+            "monthly_debt_payments": 2525.0
+          },
+          "status": "succeeded",
+          "failure": null
+        },
+        "arguments": {
+          "sources": {
+            "ratio_pct": {
+              "kind": "assumption"
+            },
+            "monthly_debt_payments": {
+              "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+              "date": "2026-08-21",
+              "kind": "page",
+              "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo"
+            }
+          },
+          "currency": "USD",
+          "ratio_pct": 10.0,
+          "monthly_income": null,
+          "monthly_debt_payments": 2525.0
+        },
+        "card_type": "debt_to_income",
+        "tool_name": "debt_to_income",
+        "artifact_id": "a0b7eab1-9023-4805-af41-e4a9e784dcd9",
+        "card_version": 1,
+        "presentation": {
+          "rows": [
+            {
+              "name": "income_after_debt",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.income_after_debt",
+                "interpolation_args": {}
+              },
+              "value": 22725.0,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            }
+          ],
+          "notes": [],
+          "title": {
+            "locale_key": "tools.calc.debt_to_income.title",
+            "interpolation_args": {}
+          },
+          "answer": {
+            "name": "monthly_income",
+            "unit": {
+              "locale_key": "tools.calc.units.currency",
+              "interpolation_args": {
+                "code": "USD"
+              }
+            },
+            "label": {
+              "locale_key": "tools.calc.fields.monthly_income",
+              "interpolation_args": {}
+            },
+            "value": 25250.0,
+            "source": {
+              "kind": "computed"
+            },
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "name": "monthly_debt_payments",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.monthly_debt_payments",
+                "interpolation_args": {}
+              },
+              "value": 2525.0,
+              "source": {
+                "url": "https://www.dailydrive.us/inventory/2026-porsche-911-carrera-s-39420",
+                "date": "2026-08-21",
+                "kind": "page",
+                "title": "2026 Porsche 911 Carrera S — Lease from $2,525/mo"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "monthly_income",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "USD"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.monthly_income",
+                "interpolation_args": {}
+              },
+              "value": null,
+              "source": {
+                "kind": "computed"
+              },
+              "driving": false,
+              "unknown": true,
+              "editable": false,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "ratio_pct",
+              "unit": {
+                "locale_key": "chat.tools.units.percent",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.ratio_pct",
+                "interpolation_args": {}
+              },
+              "value": 10.0,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "visual": null,
+          "sources": [],
+          "narrative": null
+        },
+        "artifact_state": "active",
+        "input_revision": 0,
+        "schema_version": 1
+      }
+    ],
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "9cf91fa7-e51e-4d3a-84c3-10927816daa2",
+      "terminal": true,
+      "request_id": "03162287-1b91-4988-89fe-399a35687537"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

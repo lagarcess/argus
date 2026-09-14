@@ -1,0 +1,815 @@
+{
+  "label": "followups-q10-en",
+  "phase": "followups",
+  "question": "q10",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+  "message": "Change only the access assumption: suppose I can sell the crypto instantly with no withdrawal delay. Does the price risk you described still remain? Explain using only the risks already in your answer, with no new lookup.",
+  "answer": {
+    "id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+    "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+    "role": "assistant",
+    "content": "The price risk remains even with instant sale.\n\n*The lookup for this answer failed.*",
+    "created_at": "2026-09-14T17:24:45.548968Z",
+    "metadata": {
+      "research": {
+        "rows": [],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.04886,
+          "latency_ms": 6904,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [],
+        "degraded": {
+          "code": "research_not_grounded"
+        },
+        "follow_up": {
+          "subjects": [],
+          "questions": [],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T17:24:44.596870+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "6ab53140-462a-41aa-a4a9-08011f47b3ae",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "The price risk remains even with instant sale.\n\n*The lookup for this answer failed.*"
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "The price risk remains even with instant sale.\n\n*The lookup for this answer failed.*",
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [],
+          "rows": [],
+          "retrieved_at": "2026-09-14T17:24:44.596870+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 6904,
+            "cost_usd": 0.04886,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": []
+          },
+          "degraded": {
+            "code": "research_not_grounded"
+          }
+        },
+        "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 88.588,
+  "screenshot": {
+    "file": "screenshots/followups-q10-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "The price risk remains even with instant sale.\n\nThe lookup for this answer failed."
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "68d838f9-727a-4c00-9f87-039049f665d1",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "run_id": null,
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 701,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 834,
+        "cached_tokens": 768,
+        "prompt_tokens": 817,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 86.545,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:23:19.745337+00:00"
+    },
+    {
+      "id": "4611230d-80fb-4049-ab87-a9c84a71d6ed",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "run_id": null,
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 18308,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 13046,
+        "cached_tokens": 10560,
+        "prompt_tokens": 11361,
+        "completion_tokens": 1685,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 86.545,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:23:38.054903+00:00"
+    },
+    {
+      "id": "295c2971-a0bd-474b-b31f-8e3a07818587",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "run_id": null,
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedStrategyExtraction",
+      "latency_ms": 2030,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3677,
+        "cached_tokens": 128,
+        "prompt_tokens": 3500,
+        "completion_tokens": 177,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "f9310a3cf2d8a639ef29562ec9c7e5e11a85f7f362efabd9ea0d7f853abdc94f",
+          "before_fingerprint": "f9310a3cf2d8a639ef29562ec9c7e5e11a85f7f362efabd9ea0d7f853abdc94f",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 86.545,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:24:37.665284+00:00"
+    },
+    {
+      "id": "0b0b2397-89fd-4bbb-97d1-d2b5ece04090",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "run_id": null,
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "task": "knowledge_voicing",
+      "tier": "chat",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "CalculatedVoicedAnswer",
+      "latency_ms": 890,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3151,
+        "cached_tokens": 128,
+        "prompt_tokens": 3123,
+        "completion_tokens": 28,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 86.545,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:24:45.532112+00:00"
+    },
+    {
+      "id": "fb6143dc-21c3-4bc0-aa5f-839a349dc2cc",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "run_id": null,
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 0,
+      "outcome": "skipped",
+      "failure_mode": "title_not_generated",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:24:45.591435+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "a2efeda9-7ac7-4d9f-8bcb-17bb97dd1942",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "68d838f9-727a-4c00-9f87-039049f665d1",
+      "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+      "correlation_id": "075401bd-ac64-416d-9890-61021f8998d7:772021de-cc74-4f48-a89b-6fd98b0671de:314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 834,
+        "cached_tokens": 768,
+        "prompt_tokens": 817,
+        "usage_cost_usd": 0.00025735,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 817,
+      "output_tokens": 17,
+      "total_tokens": 834,
+      "billable_unit": "token",
+      "billable_quantity": "834.000000",
+      "cost_amount": "0.00025735",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 701,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 86.545,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:23:19.745337+00:00",
+      "created_at": "2026-09-14 17:24:45.566519+00:00"
+    },
+    {
+      "id": "a36d23b4-9ec9-4413-ad96-a3bbffed9893",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "4611230d-80fb-4049-ab87-a9c84a71d6ed",
+      "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+      "correlation_id": "075401bd-ac64-416d-9890-61021f8998d7:772021de-cc74-4f48-a89b-6fd98b0671de:314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 13046,
+        "cached_tokens": 10560,
+        "prompt_tokens": 11361,
+        "usage_cost_usd": 0.00732575,
+        "completion_tokens": 1685,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 11361,
+      "output_tokens": 1685,
+      "total_tokens": 13046,
+      "billable_unit": "token",
+      "billable_quantity": "13046.000000",
+      "cost_amount": "0.00732575",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 18308,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 86.545,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:23:38.054903+00:00",
+      "created_at": "2026-09-14 17:24:45.573145+00:00"
+    },
+    {
+      "id": "af9d0df9-9020-4e35-b059-42b0efcac452",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "295c2971-a0bd-474b-b31f-8e3a07818587",
+      "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+      "correlation_id": "075401bd-ac64-416d-9890-61021f8998d7:772021de-cc74-4f48-a89b-6fd98b0671de:314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3677,
+        "cached_tokens": 128,
+        "prompt_tokens": 3500,
+        "usage_cost_usd": 0.0046831,
+        "completion_tokens": 177,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3500,
+      "output_tokens": 177,
+      "total_tokens": 3677,
+      "billable_unit": "token",
+      "billable_quantity": "3677.000000",
+      "cost_amount": "0.00468310",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 2030,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "schema_name": "FocusedStrategyExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "f9310a3cf2d8a639ef29562ec9c7e5e11a85f7f362efabd9ea0d7f853abdc94f",
+          "before_fingerprint": "f9310a3cf2d8a639ef29562ec9c7e5e11a85f7f362efabd9ea0d7f853abdc94f",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 86.545,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:24:37.665284+00:00",
+      "created_at": "2026-09-14 17:24:45.579026+00:00"
+    },
+    {
+      "id": "196f5fac-d7e4-48ce-a520-3e329e2b06ba",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "knowledge_voicing",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "0b0b2397-89fd-4bbb-97d1-d2b5ece04090",
+      "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+      "correlation_id": "075401bd-ac64-416d-9890-61021f8998d7:772021de-cc74-4f48-a89b-6fd98b0671de:314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3151,
+        "cached_tokens": 128,
+        "prompt_tokens": 3123,
+        "usage_cost_usd": 0.00383935,
+        "completion_tokens": 28,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3123,
+      "output_tokens": 28,
+      "total_tokens": 3151,
+      "billable_unit": "token",
+      "billable_quantity": "3151.000000",
+      "cost_amount": "0.00383935",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 890,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+        "schema_name": "CalculatedVoicedAnswer",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 86.545,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:24:45.532112+00:00",
+      "created_at": "2026-09-14 17:24:45.585419+00:00"
+    },
+    {
+      "id": "802e1f1e-689a-4401-906b-65604b925948",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "075401bd-ac64-416d-9890-61021f8998d7",
+      "correlation_id": "research:075401bd-ac64-416d-9890-61021f8998d7",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "degraded_code": "research_not_grounded",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.04886000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 6904,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 17:24:45.558518+00:00",
+      "created_at": "2026-09-14 17:24:45.558859+00:00"
+    },
+    {
+      "id": "5e5b4b84-ad31-4fad-9418-74a06d349a16",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "314eb0af-4c24-418d-8cc3-bba11322e88c",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "fb6143dc-21c3-4bc0-aa5f-839a349dc2cc",
+      "request_id": null,
+      "correlation_id": "api_turn:772021de-cc74-4f48-a89b-6fd98b0671de:314eb0af-4c24-418d-8cc3-bba11322e88c:fb6143dc-21c3-4bc0-aa5f-839a349dc2cc",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "skipped",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": "title_not_generated",
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:24:45.591435+00:00",
+      "created_at": "2026-09-14 17:24:45.595914+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 8,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.04886,
+        "latency_ms": 6904,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [],
+      "degraded": {
+        "code": "research_not_grounded"
+      },
+      "follow_up": {
+        "subjects": [],
+        "questions": [],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T17:24:44.596870+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "6ab53140-462a-41aa-a4a9-08011f47b3ae",
+      "terminal": true,
+      "request_id": "075401bd-ac64-416d-9890-61021f8998d7"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

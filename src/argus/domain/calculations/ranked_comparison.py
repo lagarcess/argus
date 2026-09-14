@@ -126,14 +126,16 @@ def present_ranked_comparison(
         for index, row in enumerate(result.rows)
     ]
     rows: list[ToolFact] = []
-    for index, row in enumerate(result.rows[1:], start=1):
-        rows.append(facts[index])
+    for index, row in enumerate(result.rows):
+        if index > 0:
+            rows.append(facts[index])
         rows.append(
             ToolFact(
                 name=f"{GAP_FACT_PREFIX}{index}",
                 label=text("tools.calc.ranked_comparison.gap", label=row.label),
                 value=round(row.gap_to_best, 2),
                 unit=unit,
+                comparison_only=index == 0,
             )
         )
     return ToolCardPresentation(
