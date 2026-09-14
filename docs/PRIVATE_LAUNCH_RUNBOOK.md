@@ -877,22 +877,39 @@ them.
   harness refuses an `ARGUS_EVAL_ENV_FILE` that is, or passes through, a tracked
   file or tracked symlink), and documentation. Import roots come from the pytest and Poetry configuration,
   never from a list of product paths.
-- **A change outside that keeps the evidence:** `render.yaml`, `.env.example`,
+- **A change outside that keeps the code evidence:** `render.yaml`, `.env.example`,
   the release profile, migrations, frontend code, docs and evidence scripts.
+  Release-profile models and on/off flags must also pass the configuration check below.
 - **A change inside it needs a new measurement.** The gate names the changed
   files.
-- **A model or provider change still needs a new run.** The eval reads its own
-  environment, not `render.yaml`, so this rule cannot see a model swap there.
-  `tests/evals/README.md` requires a live run after any interpreter model or
-  provider change.
+- **Measured models and flags must match the build.** Measurement scorecards
+  use schema v3 and record `provenance.release_configuration`. Its keys derive
+  from the API service in `.github/private-alpha-release-profile.json`: every
+  `_MODEL` key and every setting whose contract value is `true` or `false`.
+  The eval records runtime-resolved model IDs and flags from its own environment,
+  then rechecks them before serialization. Set flags explicitly to `true` or
+  `false`; an absent flag stays unknown and aliases are not treated as equivalent.
+  The shared evidence-identity check compares those values with the release
+  profile read from the build's commit, even when measured and build SHAs match.
+  A mismatch names the key, measured value and contract value. Timeouts,
+  allowances, other environment settings, and other services stay out of scope.
+  Candidate, baseline and targeted A/B evidence all use this check against the
+  build each side represents; a configuration-only change cannot skip baseline
+  failure comparison. Targeted A/B documents carry the same provenance field.
+  The fixed historical manifests listed in `tests/promotion_evidence_configuration.py`
+  retain their original scorecards unchanged. New promotions require schema-v3
+  measurement scorecards and configuration-bearing baseline/A/B evidence.
+  This catches configuration mistakes, not deliberate evidence tampering.
+  `tests/evals/README.md` still requires a live run after a model/provider change.
 - **The manifest names both commits.** Beside the candidate or rollback SHA,
   name the SHA each piece of evidence measured whenever the two differ.
 
 On 2026-09-13 a promotion turned sharing off after its full run. Between the
 measured head `df7aee12` and the candidate `4fd587bf` only `render.yaml`, the
 release profile and docs changed, yet the checks disagreed and forced a paid
-re-measurement of unchanged eval code. Under this rule the retained scorecard
-stands for the candidate:
+re-measurement of unchanged eval code. That historical manifest retains its
+scorecard under the explicit compatibility rule; new promotions must also pass
+model and flag comparison:
 
 ```text
 - Candidate SHA: `4fd587bf24ce39b794c2228d61f94693826d0da2`

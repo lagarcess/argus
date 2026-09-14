@@ -26,6 +26,13 @@ privacy-safe labels from canary evidence.
 Evidence stands for the build it names only when nothing the measurement can
 reach changed between them (`tests/promotion_evidence_identity.py`). Name the
 measured SHA beside each piece of evidence whenever it differs from that build.
+New promotions require schema-v3 measurement scorecards with
+`provenance.release_configuration`: the API service's model IDs and explicit
+`true`/`false` flags as the eval environment had them. Baseline and targeted A/B
+documents must carry the same field. The shared gate compares each side with
+its build's committed release profile; missing or different values fail. Other
+environment settings and other services are out of scope. Historical manifests
+remain unchanged under the fixed compatibility list.
 
 - Live eval scorecard:
 - Live eval measured SHA:

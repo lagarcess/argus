@@ -148,7 +148,9 @@ def test_targeted_ab_side_stands_for_a_commit_it_cannot_tell_apart(
             {
                 "case_id": "case-a",
                 "side": side,
-                "provenance": {"candidate_sha": sha},
+                "provenance": live_eval_scorecard(
+                    tmp_path, measured_sha=sha
+                )["provenance"],
                 "measurement": {"attempts": 10, "defect_count": 0},
             },
         )

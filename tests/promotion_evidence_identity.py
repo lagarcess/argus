@@ -26,6 +26,11 @@ from pathlib import Path, PurePosixPath
 
 import iniconfig
 
+from tests.promotion_evidence_configuration import (
+    MANIFESTS_BEFORE_CONFIGURATION,
+    assert_release_configuration_matches,
+)
+
 try:
     import tomllib
 except ModuleNotFoundError:  # Python 3.10
@@ -80,18 +85,26 @@ def assert_measurement_stands_for(
     measured_sha: str,
     shipped_sha: str,
     repository_root: Path,
+    release_configuration: object = None,
 ) -> None:
     """Evidence stands for a commit it did not measure only when the measurement
     cannot tell the two apart, and the manifest names both."""
 
-    if measured_sha == shipped_sha:
-        return
     name = manifest_path.name
     for sha in (measured_sha, shipped_sha):
         assert _FULL_SHA.fullmatch(sha) and _is_commit(sha, repository_root), (
             f"{name}: {evidence} binds {sha or '<unrecorded>'}, which is not a "
             "commit in this repository."
         )
+    if name not in MANIFESTS_BEFORE_CONFIGURATION:
+        assert_release_configuration_matches(
+            release_configuration,
+            shipped_sha=shipped_sha,
+            repository_root=repository_root,
+            evidence=f"{name}: {evidence}",
+        )
+    if measured_sha == shipped_sha:
+        return
     known = _RECORDS_BEFORE_THIS_RULE.get(name, frozenset())
     touched = [
         path
