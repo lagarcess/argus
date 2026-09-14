@@ -1,0 +1,638 @@
+{
+  "label": "registered-q7-en",
+  "phase": "registered",
+  "question": "q7",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+  "message": "Should I save in pesos or in dollars?",
+  "answer": {
+    "id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+    "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+    "role": "assistant",
+    "content": "For savings intended to pay expenses in the United States, dollars avoid the exchange-rate risk created by converting pesos back to dollars. Peso savings are better viewed as money reserved for known peso-denominated expenses, not automatically as a higher-return substitute for dollar savings.\n\n### How the options differ\n\n| Option | Main benefit | Main risk |\n|---|---|---|\n| Dollars | Your savings and expected U.S. spending use the same currency | The account’s interest may not keep pace with inflation |\n| Pesos | Matches future expenses priced in that particular peso and may offer a different interest rate | Exchange-rate movements can reduce the dollar value, while conversion fees and currency controls may limit access |\n| Split between both | Matches separate spending needs in each currency | Adds conversion costs and account-management complexity |\n\n### The key test\n\nCompare each option in **dollar terms after interest, fees, taxes, and currency conversion**. A higher peso interest rate does not by itself mean a higher dollar return: changes in the exchange rate can increase or reduce the result.\n\nAlso verify what “pesos” means, since several countries use that name. The relevant inflation, deposit rate, conversion cost, banking protections, and exchange-rate risk depend on the specific country and account.\n\n### Safety and access\n\nFor a U.S. bank account, eligible checking, savings, money-market deposit accounts, and certificates of deposit can receive FDIC protection when held at an insured bank and within the applicable coverage rules. A foreign account or currency product should be checked separately; do not assume it has the same protection or legal remedies. Some countries may also impose controls that restrict or delay moving currency out of the country.",
+    "created_at": "2026-09-14T16:55:22.224152Z",
+    "metadata": {
+      "research": {
+        "rows": [],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.13466,
+          "latency_ms": 30305,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://www.investor.gov/introduction-investing/investing-basics/investment-products/international-investing",
+            "title": "International Investing | Investor.gov",
+            "domain": "www.investor.gov",
+            "source_date": null
+          },
+          {
+            "url": "https://www.fdic.gov/resources/deposit-insurance/faq/",
+            "title": "Deposit Insurance FAQs | FDIC.gov",
+            "domain": "www.fdic.gov",
+            "source_date": null
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "Which country’s peso are you considering?",
+            "Will you spend this money in the United States or abroad?",
+            "Do you want to compare two specific savings-account rates and fees?",
+            "How can I compare the accounts after exchange costs and taxes?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T16:55:22.208977+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "Which country’s peso are you considering?",
+            "type": "question"
+          },
+          {
+            "text": "Will you spend this money in the United States or abroad?",
+            "type": "question"
+          },
+          {
+            "text": "Do you want to compare two specific savings-account rates and fees?",
+            "type": "question"
+          },
+          {
+            "text": "How can I compare the accounts after exchange costs and taxes?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "b5b9e5bf-5b50-4d67-b1ac-6e9d9a1c1308",
+        "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "For savings intended to pay expenses in the United States, dollars avoid the exchange-rate risk created by converting pesos back to dollars. Peso savings are better viewed as money reserved for known peso-denominated expenses, not automatically as a higher-return substitute for dollar savings.\n\n### How the options differ\n\n| Option | Main benefit | Main risk |\n|---|---|---|\n| Dollars | Your savings and expected U.S. spending use the same currency | The account’s interest may not keep pace with inflation |\n| Pesos | Matches future expenses priced in that particular peso and may offer a different interest rate | Exchange-rate movements can reduce the dollar value, while conversion fees and currency controls may limit access |\n| Split between both | Matches separate spending needs in each currency | Adds conversion costs and account-management complexity |\n\n### The key test\n\nCompare each option in **dollar terms after interest, fees, taxes, and currency conversion**. A higher peso interest rate does not by itself mean a higher dollar return: changes in the exchange rate can increase or reduce the result.\n\nAlso verify what “pesos” means, since several countries use that name. The relevant inflation, deposit rate, conversion cost, banking protections, and exchange-rate risk depend on the specific country and account.\n\n### Safety and access\n\nFor a U.S. bank account, eligible checking, savings, money-market deposit accounts, and certificates of deposit can receive FDIC protection when held at an insured bank and within the applicable coverage rules. A foreign account or currency product should be checked separately; do not assume it has the same protection or legal remedies. Some countries may also impose controls that restrict or delay moving currency out of the country."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "For savings intended to pay expenses in the United States, dollars avoid the exchange-rate risk created by converting pesos back to dollars. Peso savings are better viewed as money reserved for known peso-denominated expenses, not automatically as a higher-return substitute for dollar savings.\n\n### How the options differ\n\n| Option | Main benefit | Main risk |\n|---|---|---|\n| Dollars | Your savings and expected U.S. spending use the same currency | The account’s interest may not keep pace with inflation |\n| Pesos | Matches future expenses priced in that particular peso and may offer a different interest rate | Exchange-rate movements can reduce the dollar value, while conversion fees and currency controls may limit access |\n| Split between both | Matches separate spending needs in each currency | Adds conversion costs and account-management complexity |\n\n### The key test\n\nCompare each option in **dollar terms after interest, fees, taxes, and currency conversion**. A higher peso interest rate does not by itself mean a higher dollar return: changes in the exchange rate can increase or reduce the result.\n\nAlso verify what “pesos” means, since several countries use that name. The relevant inflation, deposit rate, conversion cost, banking protections, and exchange-rate risk depend on the specific country and account.\n\n### Safety and access\n\nFor a U.S. bank account, eligible checking, savings, money-market deposit accounts, and certificates of deposit can receive FDIC protection when held at an insured bank and within the applicable coverage rules. A foreign account or currency product should be checked separately; do not assume it has the same protection or legal remedies. Some countries may also impose controls that restrict or delay moving currency out of the country.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "Which country’s peso are you considering?"
+            },
+            {
+              "type": "question",
+              "text": "Will you spend this money in the United States or abroad?"
+            },
+            {
+              "type": "question",
+              "text": "Do you want to compare two specific savings-account rates and fees?"
+            },
+            {
+              "type": "question",
+              "text": "How can I compare the accounts after exchange costs and taxes?"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "International Investing | Investor.gov",
+              "domain": "www.investor.gov",
+              "url": "https://www.investor.gov/introduction-investing/investing-basics/investment-products/international-investing",
+              "source_date": null
+            },
+            {
+              "title": "Deposit Insurance FAQs | FDIC.gov",
+              "domain": "www.fdic.gov",
+              "url": "https://www.fdic.gov/resources/deposit-insurance/faq/",
+              "source_date": null
+            }
+          ],
+          "rows": [],
+          "retrieved_at": "2026-09-14T16:55:22.208977+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 30305,
+            "cost_usd": 0.13466,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "Which country’s peso are you considering?",
+              "Will you spend this money in the United States or abroad?",
+              "Do you want to compare two specific savings-account rates and fees?",
+              "How can I compare the accounts after exchange costs and taxes?"
+            ]
+          }
+        },
+        "message_id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 55.112,
+  "screenshot": {
+    "file": "screenshots/registered-q7-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "For savings intended to pay expenses in the United States, dollars avoid the exchange-rate risk created by converting pesos back to dollars. Peso savings are better viewed as money reserved for known peso-denominated expenses, not automatically as a higher-return substitute for dollar savings.\n\nHow the options differ\nOPTION\tMAIN BENEFIT\tMAIN RISK\nDollars\tYour savings and expected U.S. spending use the same currency\tThe account’s interest may not keep pace with inflation\nPesos\tMatches future expenses priced in that particular peso and may offer a different interest rate\tExchange-rate movements can reduce the dollar value, while conversion fees and currency controls may limit access\nSplit between both\tMatches separate spending needs in each currency\tAdds conversion costs and account-management complexity\nThe key test\n\nCompare each option in dollar terms after interest, fees, taxes, and currency conversion. A higher peso interest rate does not by itself mean a higher dollar return: changes in the exchange rate can increase or reduce the result.\n\nAlso verify what “pesos” means, since several countries use that name. The relevant inflation, deposit rate, conversion cost, banking protections, and exchange-rate risk depend on the specific country and account.\n\nSafety and access\n\nFor a U.S. bank account, eligible checking, savings, money-market deposit accounts, and certificates of deposit can receive FDIC protection when held at an insured bank and within the applicable coverage rules. A foreign account or currency product should be checked separately; do not assume it has the same protection or legal remedies. Some countries may also impose controls that restrict or delay moving currency out of the country.\n\n2 sources ›\nTRY NEXT\n↳\nWhich country’s peso are you considering?\n↳\nWill you spend this money in the United States or abroad?\n↳\nDo you want to compare two specific savings-account rates and fees?\n↳\nHow can I compare the accounts after exchange costs and taxes?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "0fefb81f-f480-43ac-b04b-e15e22c8a5f7",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+      "run_id": null,
+      "message_id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 1119,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 801,
+        "cached_tokens": 128,
+        "prompt_tokens": 784,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 53.026,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:54:30.354807+00:00"
+    },
+    {
+      "id": "15c0cf2d-4c0c-4477-acbd-0326062ebfdb",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+      "run_id": null,
+      "message_id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 12771,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12273,
+        "cached_tokens": 10752,
+        "prompt_tokens": 10765,
+        "completion_tokens": 1508,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 53.026,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:54:43.127408+00:00"
+    },
+    {
+      "id": "964cdeac-e15f-4e03-a1b4-cfa6ca18cada",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+      "run_id": null,
+      "message_id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 586,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 237,
+        "cached_tokens": 0,
+        "prompt_tokens": 223,
+        "completion_tokens": 14,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 16:55:22.846574+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "b6ddaf71-37c4-4a24-9dab-a3e92e3eae09",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+      "message_id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "0fefb81f-f480-43ac-b04b-e15e22c8a5f7",
+      "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+      "correlation_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d:e518a1fc-0111-49a8-8532-8d7bf3f57b23:2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 801,
+        "cached_tokens": 128,
+        "prompt_tokens": 784,
+        "usage_cost_usd": 0.0008881,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 784,
+      "output_tokens": 17,
+      "total_tokens": 801,
+      "billable_unit": "token",
+      "billable_quantity": "801.000000",
+      "cost_amount": "0.00088810",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1119,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 53.026,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:54:30.354807+00:00",
+      "created_at": "2026-09-14 16:55:22.240025+00:00"
+    },
+    {
+      "id": "7099b900-b502-4db0-ae45-9560d7dc4870",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+      "message_id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "15c0cf2d-4c0c-4477-acbd-0326062ebfdb",
+      "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+      "correlation_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d:e518a1fc-0111-49a8-8532-8d7bf3f57b23:2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12273,
+        "cached_tokens": 10752,
+        "prompt_tokens": 10765,
+        "usage_cost_usd": 0.00593665,
+        "completion_tokens": 1508,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10765,
+      "output_tokens": 1508,
+      "total_tokens": 12273,
+      "billable_unit": "token",
+      "billable_quantity": "12273.000000",
+      "cost_amount": "0.00593665",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 12771,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 53.026,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:54:43.127408+00:00",
+      "created_at": "2026-09-14 16:55:22.247043+00:00"
+    },
+    {
+      "id": "5be741d4-d913-4566-a493-ac336855692c",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+      "message_id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+      "correlation_id": "research:0b084f53-b9c3-4c68-b0d3-031a6515db7d",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.13466000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 30305,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 16:55:22.232555+00:00",
+      "created_at": "2026-09-14 16:55:22.233237+00:00"
+    },
+    {
+      "id": "07dccf25-0674-4113-8d98-3e4d79b6fd15",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e518a1fc-0111-49a8-8532-8d7bf3f57b23",
+      "message_id": "2be41bc8-26d1-4455-b4d9-6cbeeaf01291",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "964cdeac-e15f-4e03-a1b4-cfa6ca18cada",
+      "request_id": null,
+      "correlation_id": "api_turn:e518a1fc-0111-49a8-8532-8d7bf3f57b23:2be41bc8-26d1-4455-b4d9-6cbeeaf01291:964cdeac-e15f-4e03-a1b4-cfa6ca18cada",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 237,
+        "cached_tokens": 0,
+        "prompt_tokens": 223,
+        "usage_cost_usd": 2.79e-05,
+        "completion_tokens": 14,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 223,
+      "output_tokens": 14,
+      "total_tokens": 237,
+      "billable_unit": "token",
+      "billable_quantity": "237.000000",
+      "cost_amount": "0.00002790",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 586,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:55:22.846574+00:00",
+      "created_at": "2026-09-14 16:55:22.858512+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 8,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.13466,
+        "latency_ms": 30305,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://www.investor.gov/introduction-investing/investing-basics/investment-products/international-investing",
+          "title": "International Investing | Investor.gov",
+          "domain": "www.investor.gov",
+          "source_date": null
+        },
+        {
+          "url": "https://www.fdic.gov/resources/deposit-insurance/faq/",
+          "title": "Deposit Insurance FAQs | FDIC.gov",
+          "domain": "www.fdic.gov",
+          "source_date": null
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "Which country’s peso are you considering?",
+          "Will you spend this money in the United States or abroad?",
+          "Do you want to compare two specific savings-account rates and fees?",
+          "How can I compare the accounts after exchange costs and taxes?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T16:55:22.208977+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "b5b9e5bf-5b50-4d67-b1ac-6e9d9a1c1308",
+      "terminal": true,
+      "request_id": "0b084f53-b9c3-4c68-b0d3-031a6515db7d"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

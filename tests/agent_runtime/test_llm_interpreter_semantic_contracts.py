@@ -5080,7 +5080,7 @@ async def test_vague_guidance_does_not_preempt_focused_strategy_extraction(
 
 
 @pytest.mark.asyncio
-async def test_explicit_model_timeout_churn_uses_focused_strategy_repair(
+async def test_explicit_model_timeout_churn_does_not_invent_strategy_ownership(
     monkeypatch,
 ) -> None:
     from argus.agent_runtime import llm_interpreter as interpreter_module
@@ -5118,39 +5118,8 @@ async def test_explicit_model_timeout_churn_uses_focused_strategy_repair(
         raise ValueError("invalid_symbol")
 
     async def repair_schema(**kwargs):
-        schema_name = kwargs["schema_name"]
-        repair_calls.append(schema_name)
-        if schema_name == "FocusedStrategyExtraction":
-            return interpreter_module.FocusedStrategyExtraction(
-                is_testable_strategy=True,
-                requires_clarification=False,
-                user_goal_summary="Test weekly Nvidia purchases.",
-                language="en",
-                strategy_type="dca_accumulation",
-                strategy_thesis="Buy $250 of Nvidia every week.",
-                asset_universe=["NVDA"],
-                asset_class="equity",
-                capital_amount=250,
-                recurring_contribution=250,
-                cadence="weekly",
-                date_range_raw_text="during the last year",
-                date_range_intent=interpreter_module.LLMDateRangeIntent(
-                    kind="rolling_window",
-                    count=1,
-                    unit="year",
-                    anchor="today",
-                    confidence=0.92,
-                    evidence="during the last year",
-                ),
-                confidence=0.91,
-                evidence_spans={
-                    "asset_universe": "Nvidia",
-                    "recurring_contribution": "$250",
-                    "cadence": "every week",
-                    "date_range": "during the last year",
-                },
-            )
-        raise AssertionError(f"Unexpected schema {schema_name}")
+        repair_calls.append(kwargs["schema_name"])
+        raise AssertionError("An unread turn must not enter focused strategy repair")
 
     monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", "primary/model")
     monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "fallback/model")
@@ -5182,15 +5151,9 @@ async def test_explicit_model_timeout_churn_uses_focused_strategy_repair(
     )
 
     assert build_calls == ["primary/model", "fallback/model"]
-    assert "FocusedStrategyExtraction" in repair_calls
-    assert result is not None
-    assert interpreter.last_status == "fallback_used"
-    assert result.intent == "backtest_execution"
-    assert result.candidate_strategy_draft.strategy_type == "dca_accumulation"
-    assert result.candidate_strategy_draft.asset_universe == ["NVDA"]
-    assert result.candidate_strategy_draft.capital_amount == 250
-    assert result.candidate_strategy_draft.cadence == "weekly"
-    assert "focused_strategy_extraction_repair" in result.reason_codes
+    assert repair_calls == []
+    assert result is None
+    assert interpreter.last_status == "failed"
 
 
 @pytest.mark.asyncio

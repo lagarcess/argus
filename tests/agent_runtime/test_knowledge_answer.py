@@ -107,7 +107,7 @@ def test_pending_reply_and_execution_turns_are_left_alone(monkeypatch) -> None:
 
     assert (
         _run(
-            _interpretation(),
+            _interpretation(intent="strategy_drafting", semantic_turn_act="answer_pending_need"),
             metadata={"last_stage_outcome": "await_user_reply"},
         )
         is None

@@ -527,6 +527,23 @@ backtest run, a job, an evidence artifact or a strategy. The only paid read is
 a refresh of cited inputs the user starts, which goes through the research
 allowance and the cost ledger like a turn.
 
+Recovery preserves the current question's ownership. When interpreter candidates
+fail, focused strategy repair requires a typed strategy read from that same turn;
+an outage, a ticker, or a pending test cannot supply that intent. An unread turn
+keeps the interpreter-unavailable recovery and retry contract. Likewise, the
+current interpretation must identify an answer to a pending need before it can
+block knowledge or arithmetic; the previous `await_user_reply` alone cannot.
+
+Inline research attempts share the active turn's remaining deadline. The lookup
+ladder reserves the normal knowledge-voicing timeout (at most half the remaining
+turn) for the existing answer-without-lookup path, and bounds both the provider
+transport and its async wait. The turn also owns a single-use call reservation
+for that recovery answer, so interpreter retries cannot consume its last attempt.
+A cancelled sync provider may still finish remotely,
+so its admission charge is retained and its late result is never published or
+cached. Interpreter-unavailable copy names failed question understanding in both
+locales without assuming the user requested a test.
+
 Progress is a declaration locale key with typed arguments, emitted when that
 call executes. Graph-stage events retain operational meaning and cannot select
 product prose. A stage without tool progress renders a neutral loader. This

@@ -1,0 +1,20 @@
+{
+  "project_id": "argus-acceptance-20260914",
+  "supabase_stop_exit_code": 0,
+  "owned_processes_signaled": [
+    84296
+  ],
+  "owned_ports_closed": {
+    "8149": true,
+    "3149": true,
+    "56731": true,
+    "56732": true
+  },
+  "owned_containers_remaining": [],
+  "owned_volumes_remaining": [],
+  "unrelated_stack_preserved": true,
+  "private_replay_input_was_present": true,
+  "private_directory_and_logs_deleted": true,
+  "customer_text_retained_in_repo": false,
+  "checked_at_epoch": 1789408647.3552089
+}
