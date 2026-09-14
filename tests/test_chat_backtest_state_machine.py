@@ -1737,7 +1737,7 @@ def test_bare_symbol_turn_uses_reliable_setup_fallback_without_jargon(
     )
 
     text = _stream_payloads(response.text, "token")[0]["text"]
-    assert "reliable test setup" in text
+    assert "understand your question" in text
     assert "draft" not in text.lower()
     assert "interpreter" not in text.lower()
 

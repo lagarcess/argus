@@ -69,6 +69,7 @@ class TurnExecutionContext:
     entry_fingerprint: str | None
     calls_reserved: int = 0
     routing_reserved: bool = False
+    research_recovery_reserved: bool = False
     last_resort_repair_calls_granted: int = 0
     last_resort_repair_grant_used: int = 0
     terminal: ProgressOutcome | None = None
@@ -108,6 +109,22 @@ _LAST_RESORT_REPAIR_SCOPE: ContextVar[bool] = ContextVar(
     default=False,
 )
 LAST_RESORT_REPAIR_CALL_GRANT = 2
+
+# Retrieval failure still needs one answer attempt after interpretation has
+# used its corridor. Only the no-lookup answer enters this scope; the turn owns
+# the single-use reservation, so nested/repeated recovery cannot replenish it.
+_RESEARCH_RECOVERY_SCOPE: ContextVar[bool] = ContextVar(
+    "research_recovery_scope", default=False
+)
+
+
+@contextmanager
+def research_recovery_scope() -> Iterator[None]:
+    token = _RESEARCH_RECOVERY_SCOPE.set(True)
+    try:
+        yield
+    finally:
+        _RESEARCH_RECOVERY_SCOPE.reset(token)
 
 
 @contextmanager
@@ -173,6 +190,16 @@ def reserve_provider_call(
         execution.deadline_exhausted = True
         execution.blocked_tasks.append(task_name)
         return None
+    if (
+        _RESEARCH_RECOVERY_SCOPE.get()
+        and task_name == "knowledge_voicing"
+        and not execution.research_recovery_reserved
+    ):
+        execution.research_recovery_reserved = True
+        timeout_seconds = remaining_seconds
+        if task_timeout_seconds is not None:
+            timeout_seconds = min(timeout_seconds, float(task_timeout_seconds))
+        return ProviderCallPermit(task=task_name, timeout_seconds=timeout_seconds)
     if task_name == _ROUTING_RESERVED_TASK and not execution.routing_reserved:
         from argus.domain.research.config import research_rail_enabled
 
@@ -363,6 +390,7 @@ def turn_execution_summary(
         "calls_reserved": execution.calls_reserved,
         "call_allowance": execution.call_allowance,
         "routing_reserved": execution.routing_reserved,
+        "research_recovery_reserved": execution.research_recovery_reserved,
         "last_resort_repair_calls_granted": execution.last_resort_repair_calls_granted,
         "last_resort_repair_grant_used": execution.last_resort_repair_grant_used,
         "deadline_seconds": execution.deadline_seconds,
