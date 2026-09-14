@@ -550,3 +550,44 @@ def test_continuing_an_answer_points_its_prose_at_the_copied_cards(answer) -> No
     ]
     assert body["content"] == _prose(stored)
     assert body["content"] != continued["content"]
+
+
+def test_recomputing_the_latest_answer_refreshes_the_conversation_preview() -> None:
+    client = TestClient(app)
+    client.post("/api/v1/dev/reset")
+    owner = client.get("/api/v1/me").json()["user"]["id"]
+    conversation = client.post("/api/v1/conversations", json={}).json()["conversation"]
+    card = _card("time_value", {**LOAN, "periods_per_year": 12, "payment_timing": "end"})
+    template = "The loan costs {{payment}} a month."
+    computation = computation_from_tool_cards([card])
+    assert computation is not None
+    message = create_message(
+        user_id=owner,
+        conversation_id=conversation["id"],
+        role="assistant",
+        content=f"The loan costs {figure_text(card.presentation.answer)} a month.",
+        metadata={
+            "tool_result_cards": [card.model_dump(mode="json")],
+            "computation": computation.model_dump(mode="json"),
+            ANSWER_TEMPLATE_KEY: {
+                "cards": {"loan": card.artifact_id},
+                "text": template,
+                "language": "en",
+            },
+        },
+    )
+    response = client.post(
+        f"/api/v1/conversations/{conversation['id']}/tool-results/{card.artifact_id}/recompute",
+        json={
+            "message_id": message.id,
+            "input_revision": 0,
+            "arguments": {"periods": 240},
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()["message"]
+    revised = ToolResultCard.model_validate(body["metadata"]["tool_result_cards"][0])
+    assert body["content"] != message.content
+    preview = api_state.store.conversations[conversation["id"]].last_message_preview
+    assert preview is not None
+    assert figure_text(revised.presentation.answer) in preview

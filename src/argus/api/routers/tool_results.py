@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-from functools import partial
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +13,7 @@ from argus.api.chat.tool_results import tool_cards_from_metadata
 from argus.api.dependencies import current_user, problem
 from argus.api.message_store import (
     latest_message,
+    message_preview,
     owned_conversation_message,
     update_message_artifact,
 )
@@ -155,6 +155,19 @@ async def recompute_tool_result(
     content, assumptions = _recomputed_answer(source, revised, current)
     if assumptions is not None:
         metadata["answer_assumptions"] = assumptions
+
+    def _write(**values: Any) -> Message:
+        # The rewritten prose is the conversation's preview when this answer is its
+        # latest message, as a confirmation edit's is.
+        return update_message_artifact(
+            user_id=user.id,
+            conversation_id=conversation,
+            **values,
+            preview=message_preview(
+                values["content"], role=str(source.role), metadata=values["metadata"]
+            ),
+        )
+
     # The message remains the only durable owner. No checkpoint projection is
     # written here; subsequent turns re-read these current artifact facts.
     try:
@@ -164,9 +177,7 @@ async def recompute_tool_result(
             expected_source_metadata=copy.deepcopy(source.metadata),
             expected_latest_message_id=latest.id,
             prepare=lambda: PendingArtifactUpdate(content=content, metadata=metadata),
-            write=partial(
-                update_message_artifact, user_id=user.id, conversation_id=conversation
-            ),
+            write=_write,
         )
     except (StaleMessageArtifactError, DeadPendingArtifactError) as exc:
         raise _changed(request) from exc
