@@ -2098,7 +2098,8 @@
         "fees_exceed_amount": "The {{field}} exceed the amount received.",
         "no_periods": "The {{field}} must be at least one.",
         "periods_not_whole": "The {{field}} must end on a coupon date.",
-        "scenarios_out_of_order": "The low, base and high cases must rise in order; check the {{field}}."
+        "scenarios_out_of_order": "The low, base and high cases must rise in order; check the {{field}}.",
+        "periods_beyond_limit": "With this {{field}}, the plan would take more than 1,200 periods."
       },
       "title": "Result",
       "solved_value": "Solved value",

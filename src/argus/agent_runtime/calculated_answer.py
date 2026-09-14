@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from loguru import logger
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, ValidationError, field_validator
 
 from argus.agent_runtime.answer_calculation import (
     ANSWER_ASSUMPTIONS_KEY,
@@ -41,6 +41,7 @@ from argus.domain.calculations.answer_request import (
     ANSWER_CALCULATION_INSTRUCTIONS,
     MAX_ANSWER_CALCULATIONS,
     AnswerCalculation,
+    AnswerCalculationInput,
     all_properties_required,
     calculation_kinds_clause,
 )
@@ -56,6 +57,10 @@ PENDING_PAYLOAD_KEY = "calculations"
 LEGACY_PENDING_PAYLOAD_KEY = "calculation"
 CALCULATED_ANSWER_REASON_CODE = "calculated_answer"
 PENDING_REPLY_REASON_CODE = "calculation_pending_reply"
+# Recorded when a reply's voiced calculation changed a figure its pending
+# question already held: the stored calculation stands, and only the blanks it
+# owed take the reply's figures.
+PENDING_KEPT_REASON_CODE = "calculation_pending_reply_kept_stored"
 INPUT_MISSING_REASON_CODE = "calculation_input_missing"
 # Recorded when a voiced answer only restated the user's question; it is never
 # published, and the caller's honest note stands in.
@@ -181,8 +186,13 @@ def calculated_answer(
         return None if "{{" in prose else CalculatedAnswer(prose, {}, None, None, None)
     from argus.domain.capability_registry import get_tool_catalog
 
+    calculations = (
+        completed_pending(pending, voiced.calculations, notes)
+        if pending
+        else list(voiced.calculations)
+    )
     published = publish_calculations(
-        voiced.calculations,
+        calculations,
         template=prose,
         language=language,
         catalog=get_tool_catalog(),
@@ -194,7 +204,7 @@ def calculated_answer(
         evidence=evidence,
     )
     return answer_from_published(
-        voiced.calculations,
+        calculations,
         published,
         prose=prose,
         language=language,
@@ -408,6 +418,57 @@ def pending_requests(payload: Mapping[str, Any] | None) -> list[dict[str, Any]]:
         return [item for item in items if isinstance(item, dict)]
     single = payload.get(LEGACY_PENDING_PAYLOAD_KEY)
     return [single] if isinstance(single, dict) else []
+
+
+def completed_pending(
+    pending: Mapping[str, Any],
+    voiced: Sequence[AnswerCalculation],
+    notes: list[str],
+) -> list[AnswerCalculation]:
+    """The pending question's own calculations, each blank it owed filled from the
+    reply when the reply states it; every figure it already held keeps its value
+    and source, whatever the voiced reply wrote."""
+    try:
+        stored = [
+            AnswerCalculation.model_validate(item) for item in pending_requests(pending)
+        ]
+    except ValidationError:
+        return list(voiced)
+    if not stored:
+        return list(voiced)
+    replied = {calculation.name: calculation for calculation in voiced}
+    changed = len(voiced) != len(stored)
+    completed: list[AnswerCalculation] = []
+    for request in stored:
+        answer = replied.get(request.name)
+        same = (
+            answer is not None
+            and answer.kind == request.kind
+            and answer.solve_for == request.solve_for
+        )
+        changed = changed or not same
+        filled = {item.name: item for item in answer.inputs} if same and answer else {}
+        inputs: list[AnswerCalculationInput] = []
+        for item in request.inputs:
+            reply = filled.pop(item.name, None)
+            if item.value is None:
+                owed = reply is not None and reply.value is not None
+                inputs.append(reply if owed and reply.source != "assumption" else item)
+                continue
+            if reply is not None and (
+                reply.value != item.value or reply.source != item.source
+            ):
+                changed = True
+            inputs.append(item)
+        changed = changed or bool(filled)
+        completed.append(request.model_copy(update={"inputs": inputs}))
+    if changed and PENDING_KEPT_REASON_CODE not in notes:
+        notes.append(PENDING_KEPT_REASON_CODE)
+        logger.info(
+            "A pending reply changed figures its question held; the stored ones stand",
+            failure_classification=PENDING_KEPT_REASON_CODE,
+        )
+    return completed
 
 
 def question_stage_result(

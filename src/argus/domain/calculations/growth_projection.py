@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 
 from argus.domain.calculations._shared import (
+    MAX_PERIODS,
     CalculationArguments,
     CalculationResult,
     free_policy,
@@ -12,6 +13,7 @@ from argus.domain.calculations._shared import (
     money_fact,
     money_input,
     no_solution,
+    note,
     number_fact,
     pct,
     percent_fact,
@@ -54,10 +56,12 @@ class GrowthResult(CalculationResult):
     growth: float
     real_end_value: float
     real_annual_rate_pct: float
+    notes: list[str] = Field(default_factory=list)
 
 
 def compute_growth(arguments: GrowthArguments) -> GrowthResult:
     unknown = next(name for name in UNKNOWN_FIELDS if getattr(arguments, name) is None)
+    notes: list[str] = []
     start = arguments.start_value or 0.0
     end = arguments.end_value or 0.0
     periods = float(arguments.periods) if arguments.periods is not None else None
@@ -77,7 +81,11 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
         # saver pays in; the starting balance is its magnitude.
         start = -tvm.present_value(end, -contribution, per_period, periods)
         if start < 0:
+            # Contributions alone reach past the target: no starting amount is
+            # needed, and the balance ends where they take it.
             start = 0.0
+            end = tvm.future_value(0.0, -contribution, per_period, periods)
+            notes.append("already_covered")
         solved_value = start
     elif unknown == "annual_rate_pct":
         assert periods is not None
@@ -92,6 +100,13 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
         if isinstance(count, NoSolution):
             raise no_solution(
                 NoSolution(field="annual_rate_pct", code="rate_never_reaches_target")
+            )
+        if count > MAX_PERIODS:
+            raise no_solution(
+                NoSolution(
+                    field="contribution" if contribution else "annual_rate_pct",
+                    code="periods_beyond_limit",
+                )
             )
         periods = count
         solved_value = count
@@ -120,6 +135,7 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
         growth=end - total_contributed,
         real_end_value=real_end,
         real_annual_rate_pct=real_annual * 100.0,
+        notes=notes,
     )
 
 
@@ -156,7 +172,13 @@ def present_growth(
         money_fact("real_end_value", result.real_end_value, currency),
         percent_fact("real_annual_rate_pct", pct(result.real_annual_rate_pct)),
     ]
-    return ToolCardPresentation(title=title, answer=answer, rows=rows, inputs=inputs)
+    return ToolCardPresentation(
+        title=title,
+        answer=answer,
+        rows=rows,
+        inputs=inputs,
+        notes=[note(code) for code in result.notes],
+    )
 
 
 def get_growth_projection_declaration() -> ToolDeclaration:

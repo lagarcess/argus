@@ -1206,6 +1206,7 @@
             "annual_rate_pct": 1.0,
             "end_value": 10100.45960887181,
             "growth": 100.4596088718099,
+            "notes": [],
             "periods": 12.0,
             "real_annual_rate_pct": -2.880196068540286,
             "real_end_value": 9711.98039314597,

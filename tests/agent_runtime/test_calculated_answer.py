@@ -499,3 +499,65 @@ def test_the_public_turn_result_carries_the_answers_template_assumptions_and_off
     assert public["answer_assumptions"] == assumptions
     assert public["calculation_offer"] == offer
     assert "internal_only" not in public
+
+
+def test_a_reply_that_changes_a_held_figure_keeps_the_stored_calculation(
+    monkeypatch,
+) -> None:
+    _voice(
+        monkeypatch,
+        [
+            _voiced(
+                "How many months are left on the loan?",
+                [*LOAN, {"name": "periods", "value": None, "source": "user"}],
+            ),
+            _voiced(
+                "With {{periods}} months left, the payment is {{payment}}.",
+                [
+                    {"name": "direction", "value": "borrow", "source": "user"},
+                    {
+                        "name": "present_value",
+                        "value": 150000,
+                        "source": "user",
+                        "currency": "DOP",
+                    },
+                    {"name": "annual_rate_pct", "value": 14, "source": "user"},
+                    {"name": "future_value", "value": 0, "source": "user"},
+                    {"name": "periods", "value": 48, "source": "user"},
+                ],
+            ),
+        ],
+    )
+    asked = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="I owe 180,000 on the car at 14 percent. Is paying extra worth it?",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert asked is not None and asked.outcome == "await_user_reply"
+
+    class _Interpreter:
+        async def ainvoke(self, request):
+            return _read()
+
+    reply = asyncio.run(
+        interpret_stage_async(
+            state=RunState.new(current_user_message="48", recent_thread_history=[]),
+            user=USER,
+            latest_task_snapshot=None,
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "clarification": asked.patch["clarification"],
+            },
+            structured_interpreter=_Interpreter(),
+        )
+    )
+    assert reply.outcome == "ready_to_respond"
+    card = reply.patch["final_response_payload"]["tool_result_cards"][0]
+    assert card["arguments"]["present_value"] == 180000
+    assert card["arguments"]["periods"] == 48
+    assert ca.PENDING_KEPT_REASON_CODE in reply.decision.reason_codes

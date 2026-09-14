@@ -9,6 +9,7 @@ from typing import Literal
 from pydantic import Field
 
 from argus.domain.calculations._shared import (
+    MAX_PERIODS,
     CalculationArguments,
     CalculationResult,
     dated_path,
@@ -116,6 +117,13 @@ def compute_time_value(arguments: TimeValueArguments) -> TimeValueResult:
         count = tvm.periods(pv_s, pmt_s, fv_s, per_period, timing)
         if isinstance(count, NoSolution):
             raise no_solution(_periods_repair(count, pv_s, per_period, arguments))
+        if count > MAX_PERIODS:
+            raise no_solution(
+                NoSolution(
+                    field="payment" if payment else "annual_rate_pct",
+                    code="periods_beyond_limit",
+                )
+            )
         if count == 0:
             # The balance already meets the target: no period is needed.
             notes.append("already_covered")
@@ -143,15 +151,30 @@ def compute_time_value(arguments: TimeValueArguments) -> TimeValueResult:
         solved_value if unknown == "future_value" else future,
     )
     assert per_period is not None and periods is not None
+    covered = "already_covered" in notes and unknown != "periods"
+    if covered and unknown != "future_value":
+        # The other inputs reach past the target on their own, so the plan ends
+        # where they take it rather than at the target.
+        start_s, payment_s, _ = _signed(arguments.direction, present, payment, 0.0)
+        future = _magnitude(
+            arguments.direction,
+            "future_value",
+            tvm.future_value(start_s, payment_s, per_period, periods, timing),
+        )
     whole_periods = max(int(math.ceil(periods - 1e-9)), 1)
     if arguments.direction == "borrow":
         balances = [
-            row.balance
+            max(row.balance, 0.0)
             for row in tvm.amortization_schedule(
                 present, per_period, payment, whole_periods, timing
             )
         ]
-        total_payments = payment * periods + future
+        # Payments that clear the loan before its last period stop there.
+        total_payments = (
+            tvm.total_paid(present, per_period, payment, whole_periods, timing)
+            if covered and unknown == "future_value"
+            else payment * periods + future
+        )
         total_interest = total_payments - present
     else:
         balances = tvm.savings_path(present, per_period, payment, whole_periods, timing)

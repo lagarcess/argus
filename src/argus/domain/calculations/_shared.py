@@ -38,6 +38,8 @@ UNIT_MONTHS_KEY = "tools.calc.units.months"
 UNIT_YEARS_KEY = "tools.calc.units.years"
 UNIT_MULTIPLE_KEY = "tools.calc.units.multiple"
 NOTE_PREFIX = "tools.calc.notes"
+# The most periods a plan's arguments accept; a solved count past it is no plan.
+MAX_PERIODS = 1200
 REPAIR_PREFIX = "tools.calc.repairs"
 # The one argument name that identifies an asset a calculation is about.
 SYMBOL_FIELD = "symbol"

@@ -171,6 +171,30 @@ def amortization_schedule(
     return rows
 
 
+def total_paid(
+    principal: float,
+    rate_per_period: float,
+    payment_amount: float,
+    periods_count: int,
+    timing: Timing = 0,
+) -> float:
+    """What level payments pay over at most ``periods_count`` periods, stopping
+    once the balance is cleared: the last payment is only what remains."""
+    balance, paid = principal, 0.0
+    for _ in range(periods_count):
+        if timing == 1:
+            due = min(payment_amount, balance)
+            balance = (balance - due) * (1.0 + rate_per_period)
+        else:
+            balance *= 1.0 + rate_per_period
+            due = min(payment_amount, balance)
+            balance -= due
+        paid += due
+        if balance <= 1e-9:
+            break
+    return paid
+
+
 def savings_path(
     start: float,
     rate_per_period: float,

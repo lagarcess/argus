@@ -205,3 +205,48 @@ def test_a_savings_target_already_met_takes_no_periods() -> None:
     assert card.outcome.status == "succeeded"
     assert answer_value(card) == pytest.approx(0.0)
     assert card.outcome.result["notes"] == ["already_covered"]
+
+
+def test_a_covered_savings_plan_ends_where_its_inputs_take_it() -> None:
+    plan = {"direction": "save", "currency": "USD", "annual_rate_pct": 0, "periods": 12}
+    deposits = run_calculation(
+        "time_value",
+        {**plan, "present_value": None, "payment": 100, "future_value": 1_000},
+    )
+    balance = run_calculation(
+        "time_value",
+        {**plan, "present_value": 2_000, "payment": None, "future_value": 1_000},
+    )
+    assert row_value(deposits, "future_value") == pytest.approx(1_200.0)
+    assert row_value(deposits, "total_growth") == pytest.approx(0.0)
+    assert row_value(balance, "future_value") == pytest.approx(2_000.0)
+    assert row_value(balance, "total_growth") == pytest.approx(0.0)
+
+
+def test_payments_that_clear_a_loan_early_stop_there() -> None:
+    loan = {"direction": "borrow", "currency": "USD", "future_value": None}
+    flat = run_calculation(
+        "time_value",
+        {
+            **loan,
+            "present_value": 1_000,
+            "payment": 200,
+            "annual_rate_pct": 0,
+            "periods": 12,
+        },
+    )
+    car = run_calculation(
+        "time_value",
+        {
+            **loan,
+            "present_value": 180_000,
+            "payment": 5_000,
+            "annual_rate_pct": 14,
+            "periods": 60,
+        },
+    )
+    assert answer_value(flat) == pytest.approx(0.0)
+    assert row_value(flat, "total_payments") == pytest.approx(1_000.0)
+    assert row_value(flat, "total_interest") == pytest.approx(0.0)
+    assert row_value(car, "total_payments") == pytest.approx(234_814.73, abs=0.01)
+    assert min(car.outcome.result["balances"]) == 0.0
