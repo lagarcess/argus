@@ -1,0 +1,15 @@
+2026-09-13T23:00:31.6466228Z 
+2026-09-13T23:00:31.6466485Z     Error: Rendered profile hydration failed
+2026-09-13T23:00:31.6466889Z 
+2026-09-13T23:00:31.6467587Z       127 |   const profileResponse = await profileResponsePromise;
+2026-09-13T23:00:31.6468306Z       128 |   if (!profileResponse.ok())
+2026-09-13T23:00:31.6468954Z     > 129 |     throw new Error("Rendered profile hydration failed");
+2026-09-13T23:00:31.6476780Z   1 did not run
+2026-09-13T23:00:31.6880412Z ERROR: canary failed at browser: rendered_golden_path_failed
+2026-09-13T23:00:31.7406832Z canary_capture_path=temp/canary-evidence/authenticated-browser-capture.json
+2026-09-13T23:00:31.7447161Z canary_capture_write_status=written
+2026-09-13T23:00:31.7887726Z canary_evidence_path=temp/canary-evidence/authenticated-browser.json
+2026-09-13T23:00:32.0779550Z canary_session_revocation=completed
+2026-09-13T23:00:32.1170620Z ##[error]Process completed with exit code 1.
+2026-09-13T23:00:32.1219260Z ##[group]Run status_file="temp/canary-evidence/authenticated-browser.exit"
+2026-09-13T23:00:32.1219872Z status_file="temp/canary-evidence/authenticated-browser.exit"

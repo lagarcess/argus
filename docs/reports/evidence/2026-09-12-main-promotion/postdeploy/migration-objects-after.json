@@ -1,0 +1,991 @@
+{
+  "checked_at": "2026-09-13T22:51:45.193055+00:00",
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "phase": "after",
+  "columns": [
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "source",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "service",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "provider",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "model",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "feature_area",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "task",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "conversation_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "message_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "backtest_run_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "backtest_job_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "route_receipt_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "request_id",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "correlation_id",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "provider_request_id",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "upstream_id",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "usage_metadata",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "input_tokens",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "output_tokens",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "total_tokens",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "billable_unit",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "billable_quantity",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "cost_amount",
+      "data_type": "numeric",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "cost_currency",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "cost_source",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "latency_ms",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "status",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "metadata",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "occurred_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "idea_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "idea_version_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "evidence_artifact_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "source_conversation_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "decision_state",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "note",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "source_message_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "decision_notes",
+      "column_name": "computation",
+      "data_type": "jsonb",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "messages",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "messages",
+      "column_name": "conversation_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "messages",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "messages",
+      "column_name": "role",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "messages",
+      "column_name": "content",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "messages",
+      "column_name": "metadata",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "messages",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "email",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "username",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "display_name",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "language",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "locale",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "is_admin",
+      "data_type": "boolean",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "onboarding",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "updated_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "avatar_theme",
+      "data_type": "USER-DEFINED",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "preferred_name",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "country",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "profiles",
+      "column_name": "currency_override",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "public_id",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "owner_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "evidence_artifact_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "source_conversation_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "source_run_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "title",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "payload",
+      "data_type": "jsonb",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "payload_digest",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "revoked_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "revocation_reason",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "kind",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "source_message_ids",
+      "data_type": "ARRAY",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "source_run_ids",
+      "data_type": "ARRAY",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "source_artifact_ids",
+      "data_type": "ARRAY",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "column_name": "selection_key",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "request_id",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "conversation_id",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "request_message_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "response_message_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "status_code",
+      "data_type": "integer",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "asked",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "action",
+      "data_type": "jsonb",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "outcome",
+      "data_type": "jsonb",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_log",
+      "column_name": "response",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "user_id",
+      "data_type": "uuid",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "request_id",
+      "data_type": "text",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "conversation_id",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "request_message_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "response_message_id",
+      "data_type": "uuid",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "asked",
+      "data_type": "text",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "action",
+      "data_type": "jsonb",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "outcome",
+      "data_type": "jsonb",
+      "is_nullable": "YES"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "status_code",
+      "data_type": "integer",
+      "is_nullable": "NO"
+    },
+    {
+      "table_name": "refusal_observations",
+      "column_name": "created_at",
+      "data_type": "timestamp with time zone",
+      "is_nullable": "NO"
+    }
+  ],
+  "constraints": [
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_backtest_job_id_fkey",
+      "definition": "FOREIGN KEY (backtest_job_id) REFERENCES backtest_jobs(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_backtest_run_id_fkey",
+      "definition": "FOREIGN KEY (backtest_run_id) REFERENCES backtest_runs(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_billable_quantity_check",
+      "definition": "CHECK (((billable_quantity IS NULL) OR (billable_quantity >= (0)::numeric)))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_billable_unit_check",
+      "definition": "CHECK ((billable_unit = ANY (ARRAY['token'::text, 'request'::text, 'compute_second'::text, 'audio_second'::text, 'storage_byte'::text, 'row'::text, 'unknown'::text])))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_conversation_id_fkey",
+      "definition": "FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_cost_amount_check",
+      "definition": "CHECK (((cost_amount IS NULL) OR (cost_amount >= (0)::numeric)))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_cost_source_check",
+      "definition": "CHECK ((cost_source = ANY (ARRAY['provider_reported'::text, 'estimated'::text, 'derived'::text, 'reconciled'::text, 'unavailable'::text])))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_input_tokens_check",
+      "definition": "CHECK (((input_tokens IS NULL) OR (input_tokens >= 0)))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_latency_ms_check",
+      "definition": "CHECK (((latency_ms IS NULL) OR (latency_ms >= 0)))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_message_id_fkey",
+      "definition": "FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_output_tokens_check",
+      "definition": "CHECK (((output_tokens IS NULL) OR (output_tokens >= 0)))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_route_receipt_id_fkey",
+      "definition": "FOREIGN KEY (route_receipt_id) REFERENCES route_receipts(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_source_check",
+      "definition": "CHECK ((source = ANY (ARRAY['api_turn'::text, 'render_workflow'::text, 'eval_harness'::text, 'manual_reconciliation'::text, 'runtime_compute'::text, 'storage'::text, 'market_data'::text, 'stt'::text, 'research'::text])))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_status_check",
+      "definition": "CHECK ((status = ANY (ARRAY['succeeded'::text, 'failed'::text, 'skipped'::text, 'estimated'::text, 'reconciled'::text])))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_status_required",
+      "definition": "CHECK (((status IS NOT NULL) OR ((source = 'research'::text) AND (feature_area = 'research_rail'::text))))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_total_tokens_check",
+      "definition": "CHECK (((total_tokens IS NULL) OR (total_tokens >= 0)))"
+    },
+    {
+      "table_name": "cost_ledger_entries",
+      "name": "cost_ledger_entries_user_id_fkey",
+      "definition": "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_attachment_check",
+      "definition": "CHECK (((evidence_artifact_id IS NOT NULL) <> (computation IS NOT NULL)))"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_decision_state_check",
+      "definition": "CHECK ((decision_state = ANY (ARRAY['watching'::text, 'promising'::text, 'rejected'::text, 'revisit_later'::text])))"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_evidence_artifact_id_fkey",
+      "definition": "FOREIGN KEY (evidence_artifact_id) REFERENCES evidence_artifacts(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_evidence_lineage_check",
+      "definition": "CHECK ((((evidence_artifact_id IS NULL) = (idea_id IS NULL)) AND ((evidence_artifact_id IS NULL) = (idea_version_id IS NULL))))"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_idea_id_fkey",
+      "definition": "FOREIGN KEY (idea_id) REFERENCES ideas(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_idea_version_id_fkey",
+      "definition": "FOREIGN KEY (idea_version_id) REFERENCES idea_versions(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_source_conversation_id_fkey",
+      "definition": "FOREIGN KEY (source_conversation_id) REFERENCES conversations(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_source_message_id_fkey",
+      "definition": "FOREIGN KEY (source_message_id) REFERENCES messages(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_user_artifact_unique",
+      "definition": "UNIQUE (user_id, evidence_artifact_id)"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_user_id_fkey",
+      "definition": "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "decision_notes",
+      "name": "decision_notes_user_message_unique",
+      "definition": "UNIQUE (user_id, source_message_id)"
+    },
+    {
+      "table_name": "messages",
+      "name": "messages_conversation_id_fkey",
+      "definition": "FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "messages",
+      "name": "messages_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "messages",
+      "name": "messages_role_check",
+      "definition": "CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text, 'tool'::text])))"
+    },
+    {
+      "table_name": "messages",
+      "name": "messages_user_id_fkey",
+      "definition": "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_country_shape",
+      "definition": "CHECK (((country IS NULL) OR (country ~ '^[A-Z]{2}$'::text)))"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_currency_override_shape",
+      "definition": "CHECK (((currency_override IS NULL) OR (currency_override ~ '^[A-Z]{3}$'::text)))"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_id_fkey",
+      "definition": "FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_language_check",
+      "definition": "CHECK ((language = ANY (ARRAY['en'::text, 'es-419'::text])))"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_locale_check",
+      "definition": "CHECK ((locale = ANY (ARRAY['en-US'::text, 'es-419'::text])))"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_preferred_name_length",
+      "definition": "CHECK (((preferred_name IS NULL) OR ((char_length(preferred_name) >= 1) AND (char_length(preferred_name) <= 40))))"
+    },
+    {
+      "table_name": "profiles",
+      "name": "profiles_username_key",
+      "definition": "UNIQUE (username)"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_revocation_is_complete",
+      "definition": "CHECK (((revoked_at IS NULL) = (revocation_reason IS NULL)))"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_selection_bounds",
+      "definition": "CHECK ((((selection_key IS NULL) AND (cardinality(source_message_ids) = 0)) OR ((selection_key IS NOT NULL) AND (cardinality(source_message_ids) >= 1))))"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_evidence_artifact_id_fkey",
+      "definition": "FOREIGN KEY (evidence_artifact_id) REFERENCES evidence_artifacts(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_kind_check",
+      "definition": "CHECK ((kind = ANY (ARRAY['backtest'::text, 'research_answer'::text, 'mixed'::text])))"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_owner_id_fkey",
+      "definition": "FOREIGN KEY (owner_id) REFERENCES profiles(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_payload_digest_check",
+      "definition": "CHECK ((payload_digest ~ '^[0-9a-f]{64}$'::text))"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_public_id_check",
+      "definition": "CHECK ((public_id ~ '^[A-Za-z0-9_-]{22,64}$'::text))"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_public_id_key",
+      "definition": "UNIQUE (public_id)"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_revocation_reason_check",
+      "definition": "CHECK ((revocation_reason = ANY (ARRAY['owner_revoked'::text, 'source_deleted'::text, 'removed_by_argus'::text])))"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_selection_key_check",
+      "definition": "CHECK ((selection_key ~ '^[0-9a-f]{64}$'::text))"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_source_conversation_id_fkey",
+      "definition": "FOREIGN KEY (source_conversation_id) REFERENCES conversations(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "public_excerpt_snapshots",
+      "name": "public_excerpt_snapshots_source_run_id_fkey",
+      "definition": "FOREIGN KEY (source_run_id) REFERENCES backtest_runs(id) ON DELETE SET NULL"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_action_check",
+      "definition": "CHECK (((action IS NULL) OR (jsonb_typeof(action) = 'object'::text)))"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_outcome_check",
+      "definition": "CHECK (((outcome IS NULL) OR (jsonb_typeof(outcome) = 'object'::text)))"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_pkey",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_request_id_check",
+      "definition": "CHECK ((length(request_id) > 0))"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_request_message_id_fkey",
+      "definition": "FOREIGN KEY (request_message_id) REFERENCES messages(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_response_message_id_fkey",
+      "definition": "FOREIGN KEY (response_message_id) REFERENCES messages(id) ON DELETE CASCADE"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_response_message_id_key",
+      "definition": "UNIQUE (response_message_id)"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_shape_check",
+      "definition": "CHECK ((((request_message_id IS NOT NULL) AND (response_message_id IS NOT NULL) AND (conversation_id IS NOT NULL) AND (status_code = 200) AND (asked IS NULL) AND (action IS NULL) AND (outcome IS NULL)) OR ((request_message_id IS NULL) AND (response_message_id IS NULL) AND (asked IS NOT NULL) AND (outcome IS NOT NULL) AND ((status_code >= 400) AND (status_code <= 599)))))"
+    },
+    {
+      "table_name": "refusal_observations",
+      "name": "refusal_observations_user_id_fkey",
+      "definition": "FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE"
+    }
+  ],
+  "relations": [
+    {
+      "name": "cost_ledger_entries",
+      "relkind": "r",
+      "relrowsecurity": true
+    },
+    {
+      "name": "decision_notes",
+      "relkind": "r",
+      "relrowsecurity": true
+    },
+    {
+      "name": "messages",
+      "relkind": "r",
+      "relrowsecurity": true
+    },
+    {
+      "name": "profiles",
+      "relkind": "r",
+      "relrowsecurity": true
+    },
+    {
+      "name": "public_excerpt_snapshots",
+      "relkind": "r",
+      "relrowsecurity": true
+    },
+    {
+      "name": "refusal_log",
+      "relkind": "v",
+      "relrowsecurity": false
+    },
+    {
+      "name": "refusal_observations",
+      "relkind": "r",
+      "relrowsecurity": true
+    }
+  ],
+  "scope": "catalog metadata only; no customer rows"
+}

@@ -1,0 +1,13 @@
+{
+  "isError": false,
+  "source_feedback_ask_present": true,
+  "positive_rating_present": true,
+  "matches_test_conversation": true,
+  "recipient": "support@get-argus.com",
+  "new_support_email_count": 1,
+  "status": "delivered",
+  "sent_at": "2026-09-14T00:11:31.061Z",
+  "subject": "Argus feedback (general): positive rating with tags",
+  "provider_email_label": "resend-220fafd00442",
+  "privacy": "no raw email IDs, user IDs, conversation IDs, message body or credentials"
+}
