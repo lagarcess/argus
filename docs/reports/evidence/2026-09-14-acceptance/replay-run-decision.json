@@ -1,0 +1,10 @@
+{
+  "ab_completed": true,
+  "founder_replay_authorized_after_ab": true,
+  "estimated_cost_usd": 2.8,
+  "reported_before_execution": true,
+  "window": "union_august_12",
+  "note": "Current task approval replaces historical AB gate; set ab_completed only after smoke phases terminate.",
+  "smoke_completed_turns": 46,
+  "smoke_metered_usd": 6.1017571460000015
+}

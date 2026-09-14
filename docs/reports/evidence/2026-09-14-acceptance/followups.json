@@ -1,0 +1,82 @@
+{
+  "q1-en": {
+    "message": "Use a 12-month deadline. Using only what is already in this chat, what information is still missing?",
+    "depends_on": "The answer asks how soon I want the iPad; supplies that one input."
+  },
+  "q2-en": {
+    "message": "For the Macan calculation, change only the assumed income share from 10% to 15%. Keep the same quoted lease payment and use no new lookup. What monthly income does that give?",
+    "depends_on": "The first card uses the cited USD 1,129 payment and 10 percent income share."
+  },
+  "q3-en": {
+    "message": "There are 48 monthly payments remaining. Use that term with the balance and rate already in this chat, without a new lookup. What is the regular monthly payment?",
+    "depends_on": "Supplies the periods field the stored time_value clarification requests."
+  },
+  "q4-en": {
+    "message": "Keep that 10.5% coupon and the same at-par assumption. Change only the face value to DOP 500,000. What annual coupon income does that give, using only the cited figures already here?",
+    "depends_on": "Halves the face value in the computed DOP 105,000 annual-income answer."
+  },
+  "q5-en": {
+    "message": "Using only the 2% cash-back rate you quoted, how much would USD 1,000 of purchases earn if paid in full? No new card lookup.",
+    "depends_on": "Asks arithmetic on the quoted flat reward figure; no new source needed."
+  },
+  "q6-en": {
+    "message": "Keep the USD 335.11 price from that calculation, but change only earnings per share to USD 9.50. What P/E does that imply? Use the existing figures, without a new lookup.",
+    "depends_on": "Changes the EPS input of the prior price_multiple card."
+  },
+  "q7-en": {
+    "message": "Change only the goal: these savings are for an expense priced in pesos, rather than US expenses. Using your same comparison, which currency-mismatch risk would matching the savings to that expense remove? No new lookup.",
+    "depends_on": "Changes the spending-currency input in the prior comparison; asks about the existing risk explanation."
+  },
+  "q8-en": {
+    "message": "Change only the APY in your USD 1,000 illustration from 0.38% to 4%. Keep the same 3.4% inflation and one-year period. What is the inflation-adjusted ending amount? No new lookup.",
+    "depends_on": "Changes one input of the existing growth_projection illustration."
+  },
+  "q9-en": {
+    "message": "Change only the starting capital on that Apple confirmation to $12,000. Keep the same strategy and dates.",
+    "depends_on": "Edits the existing confirmation amount; exercises strategy history without new research."
+  },
+  "q10-en": {
+    "message": "Change only the access assumption: suppose I can sell the crypto instantly with no withdrawal delay. Does the price risk you described still remain? Explain using only the risks already in your answer, with no new lookup.",
+    "depends_on": "Changes one assumption in the prior price-risk versus access-risk comparison."
+  },
+  "q1-es-419": {
+    "message": "Quiero comprarla en 12 meses. Con lo que ya sabes de este chat, ¿qué información sigue faltando para el cálculo? No hagas otra búsqueda.",
+    "depends_on": "Supplies only the deadline requested by the previous answer."
+  },
+  "q2-es-419": {
+    "message": "Dijiste que mi conversación quedó guardada. Sin buscar datos nuevos, ¿qué pregunta mía quedó guardada?",
+    "depends_on": "The only answer was an error claiming the conversation was saved; tests that exact continuity claim without retrying research."
+  },
+  "q3-es-419": {
+    "message": "Quedan 48 pagos mensuales. Usa ese plazo con el saldo y la tasa que ya están en el chat, sin otra búsqueda. ¿Cuál sería la cuota mensual normal?",
+    "depends_on": "Supplies the requested periods field of the time_value clarification."
+  },
+  "q4-es-419": {
+    "message": "Mantén ese mismo bono y cambia solo el monto a DOP 500,000. Sin buscar datos nuevos, ¿qué dato del cupón falta para calcular sus ingresos?",
+    "depends_on": "Keeps the bond from the refused answer and changes one amount; tests whether history can recover a bounded income calculation."
+  },
+  "q5-es-419": {
+    "message": "Con el reembolso de 5% que citaste, ¿cuánto sería el reembolso bruto sobre DOP 6,000 de compras elegibles, antes de topes y cargos? Usa solo esa tasa, sin otra búsqueda.",
+    "depends_on": "Computes from the reward percentage in the previous answer, without inventing unavailable fees or caps."
+  },
+  "q6-es-419": {
+    "message": "Usa USD 300 como precio por acción. Con ese dato y sin hacer otra búsqueda, ¿qué dato sigue faltando para calcular el P/E?",
+    "depends_on": "Supplies one of the two explicitly missing inputs from the failed-lookup answer."
+  },
+  "q7-es-419": {
+    "message": "Con la tasa de venta de DOP 58.8666 por USD que citaste, ¿cuántos pesos costarían USD 100 antes de comisiones? Usa esa misma tasa, sin buscar una nueva.",
+    "depends_on": "Asks arithmetic on the exact quoted exchange-rate figure."
+  },
+  "q8-es-419": {
+    "message": "Cambia solo el saldo inicial de tu ejemplo de DOP 100 a DOP 1,000. Mantén 0% de rendimiento y 5.13% de inflación durante el mismo período. ¿Cuál sería el valor real final? Sin otra búsqueda.",
+    "depends_on": "Scales the existing growth_projection example by changing one input."
+  },
+  "q9-es-419": {
+    "message": "Cambia solo el capital inicial de esa confirmación de Apple a $12,000. Mantén la misma estrategia y las mismas fechas.",
+    "depends_on": "Edits one input on the existing historical confirmation."
+  },
+  "q10-es-419": {
+    "message": "Cambia solo el supuesto de acceso: puedo vender la cripto al instante, sin demora de retiro. ¿Sigue existiendo el riesgo de pérdida de valor que explicaste? Usa solo los riesgos ya descritos, sin otra búsqueda.",
+    "depends_on": "Changes one access assumption in the prior stability/access comparison."
+  }
+}

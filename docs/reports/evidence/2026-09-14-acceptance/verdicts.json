@@ -1,0 +1,226 @@
+{
+  "registered-q1-en": {
+    "pass": true,
+    "reason": "Bounds the savings calculation by asking for target model/price and deadline; no unrelated capability refusal. No primitive is executed yet.",
+    "baseline": "Committed answer computed MXN 980.75 using assumed currency and deadline; current answer clarifies instead."
+  },
+  "registered-q2-en": {
+    "pass": true,
+    "reason": "Computes monthly income from cited lease payments with a labeled 10 percent assumption in debt-to-income cards; no unrelated refusal.",
+    "baseline": "Retains cited lease-to-income computation; answer prose is now generic and leaves explanation to cards."
+  },
+  "registered-q3-en": {
+    "pass": true,
+    "reason": "Selects time_value and honestly asks for the missing loan term. No unrelated refusal. Phone wording uses the unclear field label periods.",
+    "baseline": "Committed English answer asked for payment; this run asks for term and has degraded_fallback copy. USD still carries user provenance despite being profile-derived."
+  },
+  "registered-q4-en": {
+    "pass": true,
+    "reason": "Computes DOP 105,000 annual coupon income at the cited 10.5 percent, distinguishes semiannual cash from monthly equivalent, and bounds the unknown current price/yield.",
+    "baseline": "Retains cited coupon computation and explicitly identifies maturity and price uncertainty."
+  },
+  "registered-q5-en": {
+    "pass": false,
+    "cause": "prescriptive_product_selection",
+    "reason": "Names Citi Double Cash as the closest general-purpose fit despite acknowledging missing user context. The comparison becomes a personal product selection rather than a bounded comparison.",
+    "baseline": "Committed Q5 compared cards without selecting one. Current output singles out a closest fit."
+  },
+  "registered-q6-en": {
+    "pass": true,
+    "reason": "Computes P/E 38.39 from USD 335.11 price and 8.73 EPS, states that earnings yield is not a promised return, and bounds the valuation conclusion by uncertain future growth.",
+    "baseline": "Retains price_multiple grounding; current answer uses conditional valuation discussion instead of a scenario card."
+  },
+  "registered-q7-en": {
+    "pass": true,
+    "reason": "Uses dollar terms for the US reader, matches currency to expenses, and bounds comparison because the peso country/account is unknown. No allocation direction or unsupported numeric comparison; current rates cannot be selected honestly yet.",
+    "baseline": "Committed answer also required the peso identity. This answer explains the comparison and cites banking-protection sources but supplies no current exchange-rate figure."
+  },
+  "registered-q8-en": {
+    "pass": true,
+    "reason": "Computes a labeled USD 1,000 illustration at 0.38 percent APY and 3.4 percent inflation: USD 970.79 real value and -2.92 percent real return. Distinguishes the benchmark from the user account and history from forecast.",
+    "baseline": "Committed Q8 English failed for prose without calculation; current answer includes growth_projection. The phrase for 1 omits the period unit in prose."
+  },
+  "registered-q9-en": {
+    "pass": true,
+    "reason": "Lands on the historical primitive and presents a structured Apple buy-and-hold confirmation for USD 10,000. Waiting for explicit Run approval is an honest execution boundary, with no unrelated refusal.",
+    "baseline": "Matches committed ready-to-test state; this initial question does not itself authorize the product confirmation button."
+  },
+  "registered-q10-en": {
+    "pass": false,
+    "cause": "missing_historical_drawdown",
+    "reason": "Returns a researched risk essay and tells the reader how to separate money, but computes or shows no drawdown and offers no concrete historical calculation boundary. No computation, tool card, or historical confirmation is stored.",
+    "baseline": "Earlier evidence accepted a generic boundary answer. The active smoke table explicitly requires computing and showing drawdown, so this run fails that bar."
+  },
+  "registered-q1-es-419": {
+    "pass": true,
+    "reason": "Bounds the savings question by asking for price, deadline and annual rate, with no invented result or unrelated refusal. Research timed out and the reply does not disclose that degradation; no fetched price was delivered.",
+    "baseline": "Committed Q1 Spanish also had a provider failure. This attempt records research_unavailable_timeout and a missing-invoice estimate."
+  },
+  "registered-q2-es-419": {
+    "pass": false,
+    "cause": "runtime_timeout_no_answer",
+    "reason": "Research-stage turn ends after 180 seconds in agent_runtime_failure, with only a generic error and no computation or useful money bound. The stored error is English; the web correctly localizes it into Spanish but repeats it in two places. Missing research invoice is estimated separately.",
+    "baseline": "Committed answer computed three financing-income examples. Current run produces no money answer."
+  },
+  "registered-q3-es-419": {
+    "pass": true,
+    "reason": "Selects time_value and asks for the missing term rather than refusing. Typed clarification carries USD with user provenance despite the DO profile; no currency amount is yet presented, so the follow-up checks this risk.",
+    "baseline": "Retains the missing-term clarification. Both current and baseline have fallback clarification prose."
+  },
+  "registered-q4-es-419": {
+    "pass": false,
+    "cause": "unrequested_backtest_refusal",
+    "reason": "Turns the bond question into a buy-and-hold strategy and refuses an unsupported symbol, offering stocks or crypto. The user asked about a bond amount, not a trading rule. Stored reason: unsupported_symbol; prompt_source: degraded_fallback. Stored English fallback is localized into Spanish by the web renderer.",
+    "baseline": "Committed Spanish answer reached bond research and failed there. Current answer instead invents a backtest capability requirement; English Q4 computes the coupon."
+  },
+  "registered-q5-es-419": {
+    "pass": true,
+    "reason": "Provides cited Dominican card rewards as an option to compare, explicitly withholds a best/cheapest selection, and names missing costs and spending inputs for a DOP comparison.",
+    "baseline": "Committed answer lacked comparable fee tables and asked for the already-known country. Current answer uses Dominican context and quotes Qik rewards while retaining cost limits."
+  },
+  "registered-q6-es-419": {
+    "pass": true,
+    "reason": "Explicitly discloses the failed lookup and bounds the P/E calculation by missing price and EPS. It refuses no unrelated capability and invents no valuation. Degraded research timeout prevents a computed answer.",
+    "baseline": "Committed answer computed 38.06x from price/EPS. Current lookup times out and delivers an honest bounded answer instead."
+  },
+  "registered-q7-es-419": {
+    "pass": true,
+    "reason": "Answers in DOP, matches each currency to the spending goal, cites dated buy/sell rates and Dominican inflation, and withholds a higher-return choice because comparable product rates are absent. No unsupported computation or promised exchange rate.",
+    "baseline": "Retains the founder-approved currency-choice shape: DOP context, dated figures, conditional goal matching, and no forced math."
+  },
+  "registered-q8-es-419": {
+    "pass": true,
+    "reason": "Computes DOP 95.12 real value from a labeled DOP 100, zero-interest illustration using dated 5.13 percent inflation. Explicitly says it is not the user’s particular loss and identifies the missing account rate/fees. No forecast is stated as fact.",
+    "baseline": "Retains the zero-interest illustration and calculation; current answer omits the earlier optional bank-rate comparison."
+  },
+  "registered-q9-es-419": {
+    "pass": true,
+    "reason": "Lands on a structured Apple buy-and-hold confirmation with the requested capital and historical window, without an unrelated refusal. Execution remains behind the product’s explicit Run confirmation.",
+    "baseline": "Matches the committed ready-to-test state."
+  },
+  "registered-q10-es-419": {
+    "pass": false,
+    "cause": "missing_historical_drawdown",
+    "reason": "Provides a localized risk comparison but no historical drawdown calculation, display, or concrete boundary on obtaining it. It therefore fails Q10’s explicit compute-and-show requirement.",
+    "baseline": "Like the committed Spanish answer, it stays at qualitative risk discussion. The active smoke table requires historical drawdown evidence."
+  },
+  "followups-q1-en": {
+    "pass": true,
+    "reason": "Retains the supplied 12-month deadline and asks only for remaining iPad price/model. No lookup or unrelated refusal."
+  },
+  "followups-q2-en": {
+    "pass": false,
+    "cause": "history_loses_card_inputs",
+    "reason": "Asks the user to repeat the Macan payment, saying it is absent from context, although the same conversation’s immediately prior computation stores USD 1,129. Expected income at 15 percent is USD 7,526.67.",
+    "baseline": "Initial card computed correctly; follow-up cannot use its canonical input."
+  },
+  "followups-q3-en": {
+    "pass": false,
+    "cause": "pending_calculation_drops_reply",
+    "reason": "The user supplies 48 monthly payments, but the next clarification still stores periods=null and asks for periods again. The needed input was provided, so this is not an honest missing-input bound."
+  },
+  "followups-q4-en": {
+    "pass": false,
+    "cause": "arithmetic_bypasses_primitive",
+    "reason": "Returns the numerically correct DOP 52,500 as bare model prose, but the stream only interprets and stores no computation or tool result. The requested changed-input arithmetic did not land on an executed primitive."
+  },
+  "followups-q5-en": {
+    "pass": false,
+    "cause": "arithmetic_bypasses_primitive",
+    "reason": "Acknowledges the retained 2 percent reward rate and USD 1,000 amount, but only says it can compute. It gives neither the USD 20 result nor a tool/computation record or a genuine missing-input bound."
+  },
+  "followups-q6-en": {
+    "pass": true,
+    "reason": "Runs price_multiple with the retained AAPL context, USD 335.11 price and changed USD 9.50 EPS; displays the correct 35.27x result. No new lookup."
+  },
+  "followups-q7-en": {
+    "pass": false,
+    "cause": "currency_goal_change_misread",
+    "reason": "After the goal changes to a peso expense, the answer names peso depreciation as the removed mismatch risk. For dollar savings funding a fixed peso bill, peso appreciation is the adverse direction; generic mismatch risk would be the honest answer. It also performs a paid lookup despite the explicit history-only request, then reports research_not_grounded."
+  },
+  "followups-q8-en": {
+    "pass": true,
+    "reason": "Executes growth_projection with the changed 4 percent APY and retained USD 1,000/3.4 percent/one-year inputs. Prose gives the correct USD 1,005.80 real amount; the card labels USD 1,040 as nominal ending value. Input provenance is relabeled assumption, a separate evidence-quality observation."
+  },
+  "followups-q9-en": {
+    "pass": true,
+    "reason": "Changes the same Apple confirmation to USD 12,000 while preserving buy-and-hold, Sep 15 2025–Sep 11 2026, and SPY benchmark. It does not launch an unapproved run or research lookup."
+  },
+  "followups-q10-en": {
+    "pass": true,
+    "reason": "Correctly preserves the price-risk conclusion after changing only sale access. It unnecessarily calls research and appends research_not_grounded despite the no-lookup request; that is a routing/spend observation, not an unrelated capability refusal."
+  },
+  "followups-q1-es-419": {
+    "pass": false,
+    "cause": "unrequested_backtest_refusal",
+    "reason": "A savings-deadline follow-up returns interpreter_unavailable recovery saying it could not create a reliable test setup. No test was requested. The separate lifecycle metadata nevertheless says completed with failure_code=null; the recovery payload owns the visible failure."
+  },
+  "followups-q2-es-419": {
+    "pass": true,
+    "reason": "Correctly recalls the prior Porsche question after the failed turn, confirming that the saved-history claim is true. No lookup or new numeric claim."
+  },
+  "followups-q3-es-419": {
+    "pass": false,
+    "cause": "calculation_reply_disagrees_with_result",
+    "additional_causes": [
+      "profile_currency_not_grounded"
+    ],
+    "reason": "The card correctly computes 4,918.77 using periods=48, but the prose still asks for periods. It also displays USD although the registered profile resolves DOP and no USD currency was supplied. The visible answer and canonical inputs do not agree."
+  },
+  "followups-q4-es-419": {
+    "pass": false,
+    "reason": "Asks for a test asset and dates instead of identifying the missing coupon rate; the pending backtest context traps a bond-income follow-up.",
+    "cause": "history_wrong_primitive"
+  },
+  "followups-q5-es-419": {
+    "pass": false,
+    "reason": "Asks for monthly category spend even though DOP 6,000 was supplied; does not compute the requested gross 5% rebate of DOP 300.",
+    "cause": "history_loses_inputs"
+  },
+  "followups-q6-es-419": {
+    "pass": true,
+    "reason": "Correctly identifies earnings per share as the remaining missing input after the price is supplied. An unnecessary failed lookup is separately recorded."
+  },
+  "followups-q7-es-419": {
+    "pass": false,
+    "reason": "Reverses the exchange direction and asks for pesos and fees despite a supplied USD 100 amount and an explicit gross conversion at the already quoted rate; no DOP 5,886.66 computation.",
+    "cause": "history_loses_inputs"
+  },
+  "followups-q8-es-419": {
+    "pass": false,
+    "reason": "Routes an inflation arithmetic follow-up to a pending strategy and asks for a backtest date window instead of preserving the one-year scenario.",
+    "cause": "history_wrong_primitive"
+  },
+  "followups-q9-es-419": {
+    "pass": true,
+    "reason": "Updates the same Apple confirmation to 12,000 while preserving strategy, dates and benchmark."
+  },
+  "followups-q10-es-419": {
+    "pass": true,
+    "reason": "Correctly preserves price-loss risk when withdrawal delay is removed. An unnecessary failed lookup is separately recorded."
+  },
+  "guest-q1-en": {
+    "pass": true,
+    "reason": "Computes monthly savings from a cited price with explicit currency, deadline and interest assumptions; guest has no home-country profile. Affordability remains honestly bounded by missing expenses."
+  },
+  "guest-q7-en": {
+    "pass": true,
+    "reason": "Matches currency to the spending goal, gives no winner or forecast, and explicitly bounds current figures because the guest has not identified a country or accounts."
+  },
+  "guest-q9-en": {
+    "pass": true,
+    "reason": "Produces the historical Apple confirmation with the requested capital, last-year trading window and SPY benchmark; execution remains behind the normal user confirmation."
+  },
+  "guest-q1-es-419": {
+    "pass": true,
+    "reason": "Computes monthly savings from a cited price with explicit currency, deadline and interest assumptions; guest has no home-country profile. Affordability remains honestly bounded by missing expenses."
+  },
+  "guest-q7-es-419": {
+    "pass": true,
+    "reason": "Matches currency to the spending goal, gives no winner or forecast, and explicitly bounds current figures because the guest has not identified a country or accounts."
+  },
+  "guest-q9-es-419": {
+    "pass": true,
+    "reason": "Produces the historical Apple confirmation with the requested capital, last-year trading window and SPY benchmark; execution remains behind the normal user confirmation."
+  }
+}

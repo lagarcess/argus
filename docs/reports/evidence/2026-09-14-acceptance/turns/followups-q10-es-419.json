@@ -1,0 +1,758 @@
+{
+  "label": "followups-q10-es-419",
+  "phase": "followups",
+  "question": "q10",
+  "language": "es-419",
+  "country": "DO",
+  "account_kind": "registered",
+  "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+  "message": "Cambia solo el supuesto de acceso: puedo vender la cripto al instante, sin demora de retiro. ¿Sigue existiendo el riesgo de pérdida de valor que explicaste? Usa solo los riesgos ya descritos, sin otra búsqueda.",
+  "answer": {
+    "id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+    "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+    "role": "assistant",
+    "content": "Sí, el riesgo de pérdida de valor sigue existiendo aunque puedas vender al instante.\n\n*La búsqueda falló; se responde con los datos del usuario.*",
+    "created_at": "2026-09-14T17:32:00.617165Z",
+    "metadata": {
+      "research": {
+        "rows": [],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.04973,
+          "latency_ms": 10464,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [],
+        "degraded": {
+          "code": "research_not_grounded"
+        },
+        "follow_up": {
+          "subjects": [],
+          "questions": [],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T17:31:59.223117+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "cd32a6a1-a024-4f7f-a714-eb64eb63f646",
+        "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "Sí, el riesgo de pérdida de valor sigue existiendo aunque puedas vender al instante.\n\n*La búsqueda falló; se responde con los datos del usuario.*"
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "Sí, el riesgo de pérdida de valor sigue existiendo aunque puedas vender al instante.\n\n*La búsqueda falló; se responde con los datos del usuario.*",
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [],
+          "rows": [],
+          "retrieved_at": "2026-09-14T17:31:59.223117+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 10464,
+            "cost_usd": 0.04973,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": []
+          },
+          "degraded": {
+            "code": "research_not_grounded"
+          }
+        },
+        "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 86.077,
+  "screenshot": {
+    "file": "screenshots/followups-q10-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Sí, el riesgo de pérdida de valor sigue existiendo aunque puedas vender al instante.\n\nLa búsqueda falló; se responde con los datos del usuario."
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "5f4c4abe-6768-4674-8894-16387699a525",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 1103,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 871,
+        "cached_tokens": 128,
+        "prompt_tokens": 825,
+        "completion_tokens": 46,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 84.064,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:30:37.721842+00:00"
+    },
+    {
+      "id": "0ff6ddd4-d705-475e-920a-b2b5f4de9fc3",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 12008,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12726,
+        "cached_tokens": 10560,
+        "prompt_tokens": 11466,
+        "completion_tokens": 1260,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 84.064,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:30:49.823698+00:00"
+    },
+    {
+      "id": "03f6119c-64f7-4752-ab23-4f4be7ce2b06",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "task": "knowledge_voicing",
+      "tier": "chat",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "CalculatedVoicedAnswer",
+      "latency_ms": 1326,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3175,
+        "cached_tokens": 128,
+        "prompt_tokens": 3133,
+        "completion_tokens": 42,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 84.064,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:32:00.600986+00:00"
+    },
+    {
+      "id": "94d0de15-1d6d-4890-8bcc-fa5a69950054",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 726,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 268,
+        "cached_tokens": 0,
+        "prompt_tokens": 252,
+        "completion_tokens": 16,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:32:01.390610+00:00"
+    },
+    {
+      "id": "41618236-d2b8-48c4-8e3e-33fab50e8b5d",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "run_id": null,
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 659,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 294,
+        "cached_tokens": 0,
+        "prompt_tokens": 283,
+        "completion_tokens": 11,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:32:02.050502+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "24ecc754-4fda-4e43-a0d7-06156c819ae7",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "5f4c4abe-6768-4674-8894-16387699a525",
+      "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+      "correlation_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3:73ac6f15-0fa2-42f2-b22c-35d3a4976000:98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 871,
+        "cached_tokens": 128,
+        "prompt_tokens": 825,
+        "usage_cost_usd": 0.00101185,
+        "completion_tokens": 46,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 825,
+      "output_tokens": 46,
+      "total_tokens": 871,
+      "billable_unit": "token",
+      "billable_quantity": "871.000000",
+      "cost_amount": "0.00101185",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1103,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 84.064,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:30:37.721842+00:00",
+      "created_at": "2026-09-14 17:32:00.635274+00:00"
+    },
+    {
+      "id": "2b77d48d-90ba-4a5c-9777-3388467918c5",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "0ff6ddd4-d705-475e-920a-b2b5f4de9fc3",
+      "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+      "correlation_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3:73ac6f15-0fa2-42f2-b22c-35d3a4976000:98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12726,
+        "cached_tokens": 10560,
+        "prompt_tokens": 11466,
+        "usage_cost_usd": 0.0063945,
+        "completion_tokens": 1260,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 11466,
+      "output_tokens": 1260,
+      "total_tokens": 12726,
+      "billable_unit": "token",
+      "billable_quantity": "12726.000000",
+      "cost_amount": "0.00639450",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 12008,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 84.064,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:30:49.823698+00:00",
+      "created_at": "2026-09-14 17:32:00.642181+00:00"
+    },
+    {
+      "id": "16a754a2-c45a-4488-bdd0-51c4762ed57b",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "knowledge_voicing",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "03f6119c-64f7-4752-ab23-4f4be7ce2b06",
+      "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+      "correlation_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3:73ac6f15-0fa2-42f2-b22c-35d3a4976000:98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3175,
+        "cached_tokens": 128,
+        "prompt_tokens": 3133,
+        "usage_cost_usd": 0.00388685,
+        "completion_tokens": 42,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3133,
+      "output_tokens": 42,
+      "total_tokens": 3175,
+      "billable_unit": "token",
+      "billable_quantity": "3175.000000",
+      "cost_amount": "0.00388685",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1326,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+        "schema_name": "CalculatedVoicedAnswer",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 84.064,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:32:00.600986+00:00",
+      "created_at": "2026-09-14 17:32:00.647713+00:00"
+    },
+    {
+      "id": "0f2ba0e0-afb4-4e97-a9e5-6d7b3aa80efb",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+      "correlation_id": "research:d5ccbcb5-4041-46d3-a4ca-18684f5011c3",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "degraded_code": "research_not_grounded",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.04973000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 10464,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 17:32:00.626377+00:00",
+      "created_at": "2026-09-14 17:32:00.627031+00:00"
+    },
+    {
+      "id": "09b95774-3360-4caf-ba23-1f3bfdaaf376",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "94d0de15-1d6d-4890-8bcc-fa5a69950054",
+      "request_id": null,
+      "correlation_id": "api_turn:73ac6f15-0fa2-42f2-b22c-35d3a4976000:98610405-2f12-4f63-8aec-4cbb08b811a1:94d0de15-1d6d-4890-8bcc-fa5a69950054",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 268,
+        "cached_tokens": 0,
+        "prompt_tokens": 252,
+        "usage_cost_usd": 3.16e-05,
+        "completion_tokens": 16,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 252,
+      "output_tokens": 16,
+      "total_tokens": 268,
+      "billable_unit": "token",
+      "billable_quantity": "268.000000",
+      "cost_amount": "0.00003160",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 726,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:32:01.390610+00:00",
+      "created_at": "2026-09-14 17:32:02.080218+00:00"
+    },
+    {
+      "id": "d0a6d106-e02b-43c0-b2f5-059316efb9bd",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "73ac6f15-0fa2-42f2-b22c-35d3a4976000",
+      "message_id": "98610405-2f12-4f63-8aec-4cbb08b811a1",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "41618236-d2b8-48c4-8e3e-33fab50e8b5d",
+      "request_id": null,
+      "correlation_id": "api_turn:73ac6f15-0fa2-42f2-b22c-35d3a4976000:98610405-2f12-4f63-8aec-4cbb08b811a1:41618236-d2b8-48c4-8e3e-33fab50e8b5d",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 294,
+        "cached_tokens": 0,
+        "prompt_tokens": 283,
+        "usage_cost_usd": 3.27e-05,
+        "completion_tokens": 11,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 283,
+      "output_tokens": 11,
+      "total_tokens": 294,
+      "billable_unit": "token",
+      "billable_quantity": "294.000000",
+      "cost_amount": "0.00003270",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 659,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:32:02.050502+00:00",
+      "created_at": "2026-09-14 17:32:02.093291+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 9,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.04973,
+        "latency_ms": 10464,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [],
+      "degraded": {
+        "code": "research_not_grounded"
+      },
+      "follow_up": {
+        "subjects": [],
+        "questions": [],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T17:31:59.223117+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "cd32a6a1-a024-4f7f-a714-eb64eb63f646",
+      "terminal": true,
+      "request_id": "d5ccbcb5-4041-46d3-a4ca-18684f5011c3"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

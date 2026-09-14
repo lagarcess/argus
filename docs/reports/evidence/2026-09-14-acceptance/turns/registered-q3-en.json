@@ -1,0 +1,1059 @@
+{
+  "label": "registered-q3-en",
+  "phase": "registered",
+  "question": "q3",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+  "message": "I owe 180,000 on the car at 14 percent, is paying extra worth it?",
+  "answer": {
+    "id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+    "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+    "role": "assistant",
+    "content": "To work this out, I need a few of your own figures.",
+    "created_at": "2026-09-14T16:50:28.518253Z",
+    "metadata": {
+      "clarification": {
+        "kind": "clarification",
+        "options": [],
+        "payload": {
+          "evidence": [],
+          "retrieved": [],
+          "calculations": [
+            {
+              "kind": "time_value",
+              "name": "extra_payment",
+              "inputs": [
+                {
+                  "name": "currency",
+                  "as_of": null,
+                  "value": "USD",
+                  "source": "user",
+                  "currency": "USD",
+                  "source_url": null
+                },
+                {
+                  "name": "direction",
+                  "as_of": null,
+                  "value": "borrow",
+                  "source": "user",
+                  "currency": null,
+                  "source_url": null
+                },
+                {
+                  "name": "present_value",
+                  "as_of": null,
+                  "value": 180000,
+                  "source": "user",
+                  "currency": "USD",
+                  "source_url": null
+                },
+                {
+                  "name": "payment",
+                  "as_of": null,
+                  "value": null,
+                  "source": "user",
+                  "currency": "USD",
+                  "source_url": null
+                },
+                {
+                  "name": "future_value",
+                  "as_of": null,
+                  "value": 0,
+                  "source": "user",
+                  "currency": "USD",
+                  "source_url": null
+                },
+                {
+                  "name": "annual_rate_pct",
+                  "as_of": null,
+                  "value": 14,
+                  "source": "user",
+                  "currency": null,
+                  "source_url": null
+                },
+                {
+                  "name": "periods",
+                  "as_of": null,
+                  "value": null,
+                  "source": "user",
+                  "currency": null,
+                  "source_url": null
+                },
+                {
+                  "name": "periods_per_year",
+                  "as_of": null,
+                  "value": 12,
+                  "source": "assumption",
+                  "currency": null,
+                  "source_url": null
+                },
+                {
+                  "name": "payment_timing",
+                  "as_of": null,
+                  "value": "end",
+                  "source": "assumption",
+                  "currency": null,
+                  "source_url": null
+                },
+                {
+                  "name": "start_date",
+                  "as_of": null,
+                  "value": null,
+                  "source": "user",
+                  "currency": null,
+                  "source_url": null
+                }
+              ],
+              "solve_for": "payment"
+            }
+          ],
+          "requested_field": "periods",
+          "requested_fields": [
+            "periods"
+          ],
+          "requested_by_calculation": {
+            "extra_payment": [
+              "periods"
+            ]
+          }
+        },
+        "reason_code": "calculation_input_missing",
+        "prompt_source": "degraded_fallback",
+        "missing_inputs": [
+          {
+            "name": "periods",
+            "label": {
+              "locale_key": "tools.calc.fields.periods",
+              "interpolation_args": {}
+            }
+          }
+        ],
+        "semantic_needs": [],
+        "requested_field": "periods",
+        "requested_fields": [
+          "periods"
+        ]
+      },
+      "conversation_mode": "setup",
+      "agent_runtime_turn": {
+        "turn_id": "bd98391b-1960-4462-9a04-85e47d24ffad",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "await_user_reply",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "await_user_reply"
+    },
+    {
+      "type": "token",
+      "content": "To work this out, I need a few of your own figures."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "await_user_reply",
+        "assistant_prompt": "To work this out, I need a few of your own figures.",
+        "assistant_response": "To work this out, I need a few of your own figures.",
+        "clarification": {
+          "kind": "clarification",
+          "reason_code": "calculation_input_missing",
+          "prompt_source": "degraded_fallback",
+          "requested_field": "periods",
+          "requested_fields": [
+            "periods"
+          ],
+          "missing_inputs": [
+            {
+              "name": "periods",
+              "label": {
+                "locale_key": "tools.calc.fields.periods",
+                "interpolation_args": {}
+              }
+            }
+          ],
+          "semantic_needs": [],
+          "payload": {
+            "calculations": [
+              {
+                "name": "extra_payment",
+                "kind": "time_value",
+                "solve_for": "payment",
+                "inputs": [
+                  {
+                    "name": "currency",
+                    "value": "USD",
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": "USD"
+                  },
+                  {
+                    "name": "direction",
+                    "value": "borrow",
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "present_value",
+                    "value": 180000,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": "USD"
+                  },
+                  {
+                    "name": "payment",
+                    "value": null,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": "USD"
+                  },
+                  {
+                    "name": "future_value",
+                    "value": 0,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": "USD"
+                  },
+                  {
+                    "name": "annual_rate_pct",
+                    "value": 14,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "periods",
+                    "value": null,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "periods_per_year",
+                    "value": 12,
+                    "source": "assumption",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "payment_timing",
+                    "value": "end",
+                    "source": "assumption",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  },
+                  {
+                    "name": "start_date",
+                    "value": null,
+                    "source": "user",
+                    "source_url": null,
+                    "as_of": null,
+                    "currency": null
+                  }
+                ]
+              }
+            ],
+            "requested_field": "periods",
+            "requested_fields": [
+              "periods"
+            ],
+            "requested_by_calculation": {
+              "extra_payment": [
+                "periods"
+              ]
+            },
+            "evidence": [],
+            "retrieved": []
+          },
+          "options": []
+        },
+        "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 17.562,
+  "screenshot": {
+    "file": "screenshots/registered-q3-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "To work this out, tell me periods."
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "f79de940-d65b-40e5-b0f4-50a180c4058e",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "run_id": null,
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 1084,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 812,
+        "cached_tokens": 128,
+        "prompt_tokens": 795,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 15.551,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "a1cd33993d2d0c5230c713ba600615496a26d51ff1a1e014d3f14ec60c72e82f",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 16:50:14.080400+00:00"
+    },
+    {
+      "id": "e50ac838-989a-4f24-94ca-59a0b18b6e1d",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "run_id": null,
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 7995,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 11652,
+        "cached_tokens": 192,
+        "prompt_tokens": 10776,
+        "completion_tokens": 876,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 15.551,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "a1cd33993d2d0c5230c713ba600615496a26d51ff1a1e014d3f14ec60c72e82f",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 16:50:22.077257+00:00"
+    },
+    {
+      "id": "5ca3779d-68f5-4202-96f8-a7da3e9f66f8",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "run_id": null,
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedStrategyExtraction",
+      "latency_ms": 2926,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3770,
+        "cached_tokens": 128,
+        "prompt_tokens": 3478,
+        "completion_tokens": 292,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "7d2a7a6580e2fdee4124cc7a9aec84531a40f6e83fb4801032a8056d69505aba",
+          "before_fingerprint": "7d2a7a6580e2fdee4124cc7a9aec84531a40f6e83fb4801032a8056d69505aba",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 15.551,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "a1cd33993d2d0c5230c713ba600615496a26d51ff1a1e014d3f14ec60c72e82f",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 16:50:25.005742+00:00"
+    },
+    {
+      "id": "b13a95fe-c098-4417-887c-b1b1bf3819ec",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "run_id": null,
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "task": "knowledge_voicing",
+      "tier": "chat",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "CalculatedVoicedAnswer",
+      "latency_ms": 3379,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3378,
+        "cached_tokens": 128,
+        "prompt_tokens": 3058,
+        "completion_tokens": 320,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "stage_outcome": "await_user_reply",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 15.551,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "a1cd33993d2d0c5230c713ba600615496a26d51ff1a1e014d3f14ec60c72e82f",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup"
+      },
+      "created_at": "2026-09-14 16:50:28.426255+00:00"
+    },
+    {
+      "id": "c31a1ad0-f569-4364-91dc-4f3faa7a5cac",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "run_id": null,
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 575,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 123,
+        "cached_tokens": 0,
+        "prompt_tokens": 109,
+        "completion_tokens": 14,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 16:50:29.131296+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "27e15284-ec53-4d66-ad5d-0b9612923059",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "f79de940-d65b-40e5-b0f4-50a180c4058e",
+      "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+      "correlation_id": "a656ec13-4eda-4181-8b08-fbf40852035d:29dc9295-3556-41ab-a066-24d420be3ff7:a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 812,
+        "cached_tokens": 128,
+        "prompt_tokens": 795,
+        "usage_cost_usd": 0.00090185,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 795,
+      "output_tokens": 17,
+      "total_tokens": 812,
+      "billable_unit": "token",
+      "billable_quantity": "812.000000",
+      "cost_amount": "0.00090185",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1084,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 15.551,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "a1cd33993d2d0c5230c713ba600615496a26d51ff1a1e014d3f14ec60c72e82f",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:50:14.080400+00:00",
+      "created_at": "2026-09-14 16:50:28.528322+00:00"
+    },
+    {
+      "id": "be0594fb-f4d0-4cb6-b1bf-f9a79ffd3971",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "e50ac838-989a-4f24-94ca-59a0b18b6e1d",
+      "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+      "correlation_id": "a656ec13-4eda-4181-8b08-fbf40852035d:29dc9295-3556-41ab-a066-24d420be3ff7:a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 11652,
+        "cached_tokens": 192,
+        "prompt_tokens": 10776,
+        "usage_cost_usd": 0.0154584,
+        "completion_tokens": 876,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10776,
+      "output_tokens": 876,
+      "total_tokens": 11652,
+      "billable_unit": "token",
+      "billable_quantity": "11652.000000",
+      "cost_amount": "0.01545840",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 7995,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 15.551,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "a1cd33993d2d0c5230c713ba600615496a26d51ff1a1e014d3f14ec60c72e82f",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:50:22.077257+00:00",
+      "created_at": "2026-09-14 16:50:28.533650+00:00"
+    },
+    {
+      "id": "7bc59941-8903-4368-855b-a8c1cd2922df",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "5ca3779d-68f5-4202-96f8-a7da3e9f66f8",
+      "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+      "correlation_id": "a656ec13-4eda-4181-8b08-fbf40852035d:29dc9295-3556-41ab-a066-24d420be3ff7:a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3770,
+        "cached_tokens": 128,
+        "prompt_tokens": 3478,
+        "usage_cost_usd": 0.0049431,
+        "completion_tokens": 292,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3478,
+      "output_tokens": 292,
+      "total_tokens": 3770,
+      "billable_unit": "token",
+      "billable_quantity": "3770.000000",
+      "cost_amount": "0.00494310",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 2926,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "schema_name": "FocusedStrategyExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "7d2a7a6580e2fdee4124cc7a9aec84531a40f6e83fb4801032a8056d69505aba",
+          "before_fingerprint": "7d2a7a6580e2fdee4124cc7a9aec84531a40f6e83fb4801032a8056d69505aba",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 15.551,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "a1cd33993d2d0c5230c713ba600615496a26d51ff1a1e014d3f14ec60c72e82f",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:50:25.005742+00:00",
+      "created_at": "2026-09-14 16:50:28.539015+00:00"
+    },
+    {
+      "id": "e5356617-1033-4ca3-8831-e1e67d2f9411",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "knowledge_voicing",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "b13a95fe-c098-4417-887c-b1b1bf3819ec",
+      "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+      "correlation_id": "a656ec13-4eda-4181-8b08-fbf40852035d:29dc9295-3556-41ab-a066-24d420be3ff7:a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3378,
+        "cached_tokens": 128,
+        "prompt_tokens": 3058,
+        "usage_cost_usd": 0.0044881,
+        "completion_tokens": 320,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3058,
+      "output_tokens": 320,
+      "total_tokens": 3378,
+      "billable_unit": "token",
+      "billable_quantity": "3378.000000",
+      "cost_amount": "0.00448810",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 3379,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d",
+        "schema_name": "CalculatedVoicedAnswer",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "await_user_reply",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "clarification",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 15.551,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "clarification",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "a1cd33993d2d0c5230c713ba600615496a26d51ff1a1e014d3f14ec60c72e82f",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "setup",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:50:28.426255+00:00",
+      "created_at": "2026-09-14 16:50:28.543703+00:00"
+    },
+    {
+      "id": "a21d2941-cc9e-4733-ad0b-b8b44e625cb5",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "29dc9295-3556-41ab-a066-24d420be3ff7",
+      "message_id": "a43cd671-e15d-4b86-adf9-23dd0e088572",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "c31a1ad0-f569-4364-91dc-4f3faa7a5cac",
+      "request_id": null,
+      "correlation_id": "api_turn:29dc9295-3556-41ab-a066-24d420be3ff7:a43cd671-e15d-4b86-adf9-23dd0e088572:c31a1ad0-f569-4364-91dc-4f3faa7a5cac",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 123,
+        "cached_tokens": 0,
+        "prompt_tokens": 109,
+        "usage_cost_usd": 1.65e-05,
+        "completion_tokens": 14,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 109,
+      "output_tokens": 14,
+      "total_tokens": 123,
+      "billable_unit": "token",
+      "billable_quantity": "123.000000",
+      "cost_amount": "0.00001650",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 575,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:50:29.131296+00:00",
+      "created_at": "2026-09-14 16:50:29.149261+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 11,
+  "stored_failure_metadata": {
+    "clarification": {
+      "kind": "clarification",
+      "options": [],
+      "payload": {
+        "evidence": [],
+        "retrieved": [],
+        "calculations": [
+          {
+            "kind": "time_value",
+            "name": "extra_payment",
+            "inputs": [
+              {
+                "name": "currency",
+                "as_of": null,
+                "value": "USD",
+                "source": "user",
+                "currency": "USD",
+                "source_url": null
+              },
+              {
+                "name": "direction",
+                "as_of": null,
+                "value": "borrow",
+                "source": "user",
+                "currency": null,
+                "source_url": null
+              },
+              {
+                "name": "present_value",
+                "as_of": null,
+                "value": 180000.0,
+                "source": "user",
+                "currency": "USD",
+                "source_url": null
+              },
+              {
+                "name": "payment",
+                "as_of": null,
+                "value": null,
+                "source": "user",
+                "currency": "USD",
+                "source_url": null
+              },
+              {
+                "name": "future_value",
+                "as_of": null,
+                "value": 0.0,
+                "source": "user",
+                "currency": "USD",
+                "source_url": null
+              },
+              {
+                "name": "annual_rate_pct",
+                "as_of": null,
+                "value": 14.0,
+                "source": "user",
+                "currency": null,
+                "source_url": null
+              },
+              {
+                "name": "periods",
+                "as_of": null,
+                "value": null,
+                "source": "user",
+                "currency": null,
+                "source_url": null
+              },
+              {
+                "name": "periods_per_year",
+                "as_of": null,
+                "value": 12.0,
+                "source": "assumption",
+                "currency": null,
+                "source_url": null
+              },
+              {
+                "name": "payment_timing",
+                "as_of": null,
+                "value": "end",
+                "source": "assumption",
+                "currency": null,
+                "source_url": null
+              },
+              {
+                "name": "start_date",
+                "as_of": null,
+                "value": null,
+                "source": "user",
+                "currency": null,
+                "source_url": null
+              }
+            ],
+            "solve_for": "payment"
+          }
+        ],
+        "requested_field": "periods",
+        "requested_fields": [
+          "periods"
+        ],
+        "requested_by_calculation": {
+          "extra_payment": [
+            "periods"
+          ]
+        }
+      },
+      "reason_code": "calculation_input_missing",
+      "prompt_source": "degraded_fallback",
+      "missing_inputs": [
+        {
+          "name": "periods",
+          "label": {
+            "locale_key": "tools.calc.fields.periods",
+            "interpolation_args": {}
+          }
+        }
+      ],
+      "semantic_needs": [],
+      "requested_field": "periods",
+      "requested_fields": [
+        "periods"
+      ]
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "bd98391b-1960-4462-9a04-85e47d24ffad",
+      "terminal": true,
+      "request_id": "a656ec13-4eda-4181-8b08-fbf40852035d"
+    },
+    "agent_runtime_stage_outcome": "await_user_reply"
+  }
+}

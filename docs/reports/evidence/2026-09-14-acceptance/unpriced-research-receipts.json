@@ -1,0 +1,17 @@
+[
+  {
+    "id": "f94ad2bf-dae4-426e-b6c5-e453ac4974e1",
+    "phase": "registered",
+    "provider": "perplexity_agent"
+  },
+  {
+    "id": "7aa0452a-29df-4020-85af-c2a1f54aa8d1",
+    "phase": "registered",
+    "provider": "perplexity_agent"
+  },
+  {
+    "id": "d503e844-a695-4289-90d2-5b9e5a880097",
+    "phase": "replay",
+    "provider": "perplexity_agent"
+  }
+]

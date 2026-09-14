@@ -1,0 +1,26 @@
+[
+  {
+    "phase": "registered",
+    "meter_before_usd": 0,
+    "estimate_usd": 4.5,
+    "basis": "2.93047 reported research baseline plus missing invoices, route costs and variability",
+    "hard_stop_usd": 9,
+    "admitted": true
+  },
+  {
+    "phase": "followups",
+    "meter_before_usd": 4.637989150000001,
+    "estimate_usd": 2.0,
+    "basis": "20 history-only turns: about 0.6 route spend plus 1.4 contingency for unexpected routing or missing invoices; no fresh lookup needed by any prompt",
+    "hard_stop_usd": 9,
+    "admitted": true
+  },
+  {
+    "phase": "guest",
+    "meter_before_usd": 5.404294496000001,
+    "estimate_usd": 2.0,
+    "basis": "Six Q1/Q7/Q9 repeats, using registered route/research evidence and contingency for an unpriced research failure",
+    "hard_stop_usd": 9,
+    "admitted": true
+  }
+]
