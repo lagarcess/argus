@@ -14,6 +14,8 @@ from typing import Any, Callable
 
 import yaml  # type: ignore[import-untyped]
 
+from tests.promotion_evidence_configuration import measured_release_configuration
+
 FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
 SCORECARD_DIR = Path("temp/argus_eval_scorecards")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -57,6 +59,7 @@ class EvalScorecardProvenance:
     fixture_sha256: str
     fixture_case_ids: tuple[str, ...]
     worktree_clean: bool
+    release_configuration: dict[str, str | None]
     live_market_data_probe: LiveMarketDataProbe | None = None
 
 
@@ -240,6 +243,9 @@ def build_scorecard_provenance(
         fixture_sha256=fixture_identity.sha256,
         fixture_case_ids=fixture_identity.case_ids,
         worktree_clean=worktree_clean,
+        release_configuration=measured_release_configuration(
+            candidate_sha, repository_root=repository_root
+        ),
         live_market_data_probe=live_probe,
     )
     validated_provenance_payload(provenance)
@@ -336,7 +342,7 @@ def scorecard_for_results(
         )
 
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "provenance": provenance_payload,
         "provider_usage": _provider_usage(results),
@@ -424,6 +430,7 @@ def validated_provenance_payload(
         "fixture_sha256": provenance.fixture_sha256,
         "fixture_case_ids": list(provenance.fixture_case_ids),
         "worktree_clean": provenance.worktree_clean,
+        "release_configuration": dict(provenance.release_configuration),
         "live_market_data_probe": live_probe_payload,
     }
 
@@ -443,6 +450,9 @@ def assert_provenance_matches_current_run(
         "fixture_sha256": fixture_identity.sha256,
         "fixture_case_ids": fixture_identity.case_ids,
         "worktree_clean": _worktree_is_clean(REPOSITORY_ROOT),
+        "release_configuration": measured_release_configuration(
+            _candidate_sha(REPOSITORY_ROOT), repository_root=REPOSITORY_ROOT
+        ),
     }
     for field_name, expected in expected_values.items():
         if getattr(provenance, field_name) != expected:

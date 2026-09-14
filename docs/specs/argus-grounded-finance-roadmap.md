@@ -363,15 +363,16 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-14 at integration `7701c980`, after production promotion
+**Updated 2026-09-14 at integration `25f82c3a`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Recovery replies state the current reason, and a stated date range survives "this year" | Building. Found on production 2026-09-14. Stops before its paid measurement. |
+| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, stopped on two Codex P1s that both come from a deterministic date check it added ("May I backtest" read as May, and a correction loop). Next: remove that check, keep the reply grounding and the date instruction, then its paid measurement. |
+| Sharing on | Built on the existing receipts in a local worktree and stopped before its PR on a one-word bug in its own footer fix (`research` instead of `research_answer`). Next: fix it, commit, open the PR, CI, one review. Migration `20260914120000_share_plain_answer_receipts.sql` pending. |
+| Ranked comparison leader gap (#622) | PR #627, stopped on a finding about cards stored before the change. Ranked comparisons have never shipped, so no production card has that shape. Next: decline with that and mark ready. |
 | Acceptance dry run | Running on `03918912`: the ten smoke questions in English and Spanish with follow-ups and a guest subset ($9 hard stop), then the August 12 transcript replay ($4 hard stop, founder approved). Fixes nothing; reports failures by cause. |
-| Menus follow the layout contract | Building. Menus and settings switch to sheets below 720px; only the run dossier follows 1024px. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1276,6 +1277,11 @@ preview, and make answers shareable by default, refusing only what is private.
 
 ### Teach the method  ·  ships in **Grounding**
 
+**Closed by the founder 2026-09-14.** The welcome line is not built. The problem it
+targeted, visitors with money questions being told about backtests on arrival, is
+gone: guests see the A mark and a neutral greeting, and what people bring is
+answered by the calculations. The unused `chat.welcome` strings are dead copy.
+
 **Founder, 2026-09-11.** The welcome line approach below, one line stating
 the method plus a rotating example, is rejected, and the current
 `chat.welcome` is too wordy; the welcome waits for a new direction. The
@@ -1446,7 +1452,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `7701c980`.
+shipped means live in production. Integration is `25f82c3a`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1525,7 +1531,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Home country per user | its own promotion | **LANDED** `65bc661b`, PR #593. A registered user picks a country in Settings, sees the currency it implies and can override it, in English and Spanish. Research sends that user's country on the inline path, thorough jobs and the research tool; a user with none sends no location. `ARGUS_RESEARCH_HOME_COUNTRY`, `home_location()`, `LOCAL_SOURCE_DOMAINS` and `local_sources` are gone. Its research-case live run sent no location on any call, matching the baseline. Apply `supabase/migrations/20260911120000_add_profile_home_country.sql` (additive) at promotion. A guest session pick is not built; the lane priced it at about a day. |
 | The conversation after a result | its own promotion | **LANDED** `f14c0dec`, PR #597, 2026-09-12. Questions after a result are answered by the model with one ordered list of next steps, runnable tests and questions together. One owner states the benchmark gap and cost drag as the difference of the shown returns. Runs record fee and slippage dollars, and a stored dollar cost is answered. A stated cost the audit cannot confirm is asked about, never shown at 0 bps, while a 0 only the model's read carries is dropped. New monthly-buy runs store the worst drop's dates; answers never invent a date, order or cause and carry no heading. A stored run fact is answered without research and the reply must state it, and an asset or benchmark reply must name each ticker. A moved start names the asset whose data sets it, from continuous history. Its live run was 64 passed and 7 failed against 67 and 4; the six new failures passed a rerun at the fix, and NVDA failed in both. The fingerprint is refrozen on that run. No migration. |
 | Any grounded math | The calculations | **LANDED** `8e9f40bc`, PR #607. Measured 69 of 71 at `dc8608c8` with the fingerprint refrozen and the browser walk done. Fourteen Codex rounds, then one final scoped review whose only finding is #622. #620 holds binding page-cited and finance-data inputs to their rows and the market test row for plans with a starting amount plus deposits. Its migration widens `public_excerpt_snapshots_kind_check` and is applied at the next promotion. |
-| Teach the method | Grounding | **Greetings LANDED** `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The welcome line is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math. |
+| Teach the method | Grounding | **Done.** Greetings LANDED `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The broad-question follow-ups moved into Any grounded math. The welcome line was closed by the founder 2026-09-14. |
 | Production promotion 2026-09-13 | its own promotion | **SHIPPED** `3d98057c`, PR #603. See the promotion paragraph above. |
 | Readout receipts admit every model tier | outside the releases | **LANDED** `6eb93d84`, PR #610, closing #605. `route_receipts` accepts the readout tier, and a test pins the check to the runtime's tier list. Its migration, classed destructive for its dropped and re-added check, ships at the next promotion. |
 | Stated money survives a timed-out interpretation | outside the releases | **LANDED** `b7c69b54`, PR #602, closing #600. Focused repair keeps a stated deposit, contribution, fees and slippage; 22 of 22 targeted live reruns passed. Ships at the next promotion. |
@@ -1535,6 +1541,9 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | One provenance policy for promotion evidence | outside the releases | **LANDED** `1bd2f8cb`, PR #616, closing #608. `tests/promotion_evidence_identity.py` owns whether evidence still stands: every file the eval could import or read counts, while `render.yaml`, `.env.example`, docs and dated evidence scripts do not. The eval refuses a tracked file as its environment. Model and flag identity in scorecards is #619. |
 | A confirmation card turn carries no prose | outside the releases | **LANDED** `14d4a870`, PR #618. A confirmation card no longer stores an English summary sentence. Card turns reach the model's history, naming and search as typed facts, and old rows are scrubbed on read. The chat-route live check passed in English and Spanish for $0.16. |
 | $10 minimum starting capital | outside the releases | **LANDED** `2cd359c8`, PR #621. One owner sets the minimum at $10 for every way capital is set or edited, and the recovery offers the minimum. A run under $1,000 shows cents, with decimals decided once per run and rounded half up. Capital in a stated currency, converted to dollars, is #623; a gain that subtracts rounded values is #624. |
+| Menus and settings follow docs/BREAKPOINTS.md | outside the releases | **LANDED** `22387583`, PR #630. Menus and settings keep the 1024px switch the design sets. The audit fixed auth settings, hidden account-deletion dialogs and undersized phone sheet controls. |
+| Promotion evidence records models and flags | outside the releases | **LANDED** `c2c08c99`, PR #629, closing #619. Scorecards record the model names and on/off flags the eval ran with, and the promotion gate compares them with the candidate's release contract. |
+| Result card gain from the run | outside the releases | **LANDED** `25f82c3a`, PR #628, closing #624. The card's gain is the run's own profit, rounded once, so the card and the readout agree. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
@@ -1808,7 +1817,6 @@ you, never prescribe what they should do" still stands.
 
 ### Still open
 
-- **The welcome line waits for a new direction.** Founder, 2026-09-11.
 - **The sharing redesign waits for the founder.** See Sharing on.
 - **Decision 9's interpreter-tier A/B is still owed.** See decision 9.
 - **The answer blueprint is proposed, not decided.** A small set of answer types the
@@ -1826,6 +1834,8 @@ you, never prescribe what they should do" still stands.
 
 Resolved:
 
+- **The welcome line is closed.** Founder, 2026-09-14: what users bring is already
+  known and answered by the calculations, so no arrival line is built.
 - **The minimum starting capital is 10 in the stated currency.** Founder,
   2026-09-14, for every way capital is set or edited. Capital has no currency today,
   so the $10 floor ships first and capital in the stated currency is specced before
@@ -1868,9 +1878,8 @@ Resolved:
   its fallback (`src/argus/domain/research/config.py`).
 - **Bugs are tracked as issues:** #598 a second tab never shows the reply, #599 the BTC forward research never publishes,
   #604 sharing refuses completed answers, #606 a result follow-up lists its next steps
-  twice, #609 research provider failures skip the retryable notice (fix ready,
-  PR #612), and #614 the canary fails on nearly every run. #596, #600, #605, #608 and
-  #614 are fixed on integration and ship at the next promotion.
+  twice, and #614 the canary fails on nearly every run. #596, #600, #605, #608, #609,
+  #614, #619 and #624 are fixed on integration and ship at the next promotion.
 - **The live measurement cannot see history building.** It gives each case its
   history directly and never loads saved turns, so a change to how saved turns
   become model history (PR #618) needs a live check through the chat route.
@@ -1880,9 +1889,6 @@ Resolved:
   reply writer reads the last six messages beside the stored reason. That earlier
   refusal came from reading "from August 16 to August 19 just a few days this year"
   as ending December 31.
-- **Menus turn into sheets at the wrong width.** The layout contract starts sheets
-  below 720px, but the chat header menu, guest settings and profile menu switch
-  below 1024px, so 720 to 1023px shows the desktop rail with phone sheets.
 - **The chat does not know who the person is.** Settings stores a preferred name,
   a country and a currency, but outside Settings the name reaches only the web
   greeting, and the country reaches only research as its search location. No answer

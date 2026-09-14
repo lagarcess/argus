@@ -42,10 +42,11 @@ function translator(language: "en" | "es-419"): TFunction {
 function resultWith(
   cashValue: string,
   totalReturn: string,
-  options: { digits?: number; series?: number[] } = {},
+  options: { digits?: number; profit?: number; series?: number[] } = {},
 ): StrategyResultPayload {
   return {
     title: "AAPL Buy and Hold",
+    profit: options.profit,
     metrics: [
       { key: "cash_value", label: "Ending value", value: cashValue },
       { key: "total_return_pct", label: "Total return", value: totalReturn },
@@ -123,7 +124,7 @@ describe("the $10 starting-capital floor", () => {
 describe("result money reads the precision stored on the card", () => {
   test("a $10 run's hero, change, and starting capital read in cents", () => {
     const view = heroDeltaEvidenceView(
-      resultWith("$10.00 -> $12.05", "+20.5%", { digits: 2, series: [10, 11.2, 12.05] }),
+      resultWith("$10.00 -> $12.05", "+20.5%", { digits: 2, profit: 2.05, series: [10, 11.2, 12.05] }),
     );
     expect(view.hero.value).toBe("$12.05");
     expect(view.hero.detail).toBe("+$2.05 gain · +20.5% total return");
@@ -131,13 +132,13 @@ describe("result money reads the precision stored on the card", () => {
   });
 
   test("the precision does not depend on the chart", () => {
-    const view = heroDeltaEvidenceView(resultWith("$10.00 -> $12.05", "+20.5%", { digits: 2 }));
+    const view = heroDeltaEvidenceView(resultWith("$10.00 -> $12.05", "+20.5%", { digits: 2, profit: 2.05 }));
     expect(view.hero.value).toBe("$12.05");
     expect(view.hero.detail).toBe("+$2.05 gain · +20.5% total return");
   });
 
   test("a change under a dollar is not rounded away", () => {
-    const view = heroDeltaEvidenceView(resultWith("$10.00 -> $10.40", "+4.0%", { digits: 2 }));
+    const view = heroDeltaEvidenceView(resultWith("$10.00 -> $10.40", "+4.0%", { digits: 2, profit: 0.40 }));
     expect(view.hero.detail).toBe("+$0.40 gain · +4.0% total return");
     expect(view.hero.tone).toBe("positive");
   });
@@ -181,7 +182,7 @@ describe("result money reads the precision stored on the card", () => {
 
   test("a run that reached $1,000 and a card stored before the field keep whole dollars", () => {
     const large = heroDeltaEvidenceView(
-      resultWith("$1,000 -> $1,350", "+35.0%", { digits: 0, series: [1000, 850.37, 1350] }),
+      resultWith("$1,000 -> $1,350", "+35.0%", { digits: 0, profit: 350, series: [1000, 850.37, 1350] }),
     );
     expect(large.hero.value).toBe("$1,350");
     expect(large.hero.detail).toBe("+$350 gain · +35.0% total return");

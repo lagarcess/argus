@@ -172,10 +172,10 @@ describe("result card playground", () => {
     ]);
   });
 
-  test("builds hero delta evidence from mapped fixture rows without new runtime fields", () => {
+  test("keeps legacy balances and returns without deriving gains from rounded rows", () => {
     const positive = heroDeltaEvidenceView(resultCardPlaygroundFixtures[0].result);
     expect(positive.hero.value).toBe("$1,560");
-    expect(positive.hero.detail).toBe("+$560 gain · +56.0% total return");
+    expect(positive.hero.detail).toBe("+56.0% total return");
     expect(positive.hero.tone).toBe("positive");
     expect(positive.benchmark.label).toBe("Compared with SPY");
     expect(positive.benchmark.value).toBe("Beat by 27.9 percentage points");
@@ -199,7 +199,7 @@ describe("result card playground", () => {
       )!.result,
     );
     expect(negative.hero.value).toBe("$820");
-    expect(negative.hero.detail).toBe("-$180 loss · -18.0% total return");
+    expect(negative.hero.detail).toBe("-18.0% total return");
     expect(negative.hero.tone).toBe("negative");
     expect(negative.benchmark.value).toBe("Lagged by 9.4 percentage points");
 
@@ -207,7 +207,7 @@ describe("result card playground", () => {
       resultCardPlaygroundFixtures.find((fixture) => fixture.id === "dca-result")!.result,
     );
     expect(dca.hero.value).toBe("$1,000");
-    expect(dca.hero.detail).toBe("$0 change · 0.0% return on contributions");
+    expect(dca.hero.detail).toBe("0.0% return on contributions");
     expect(dca.hero.tone).toBe("neutral");
     expect(dca.benchmark.value).toBe("In line with SPY");
     expect(dca.timeframeDisplay).toBe("Daily data");
@@ -252,7 +252,7 @@ describe("result card playground", () => {
     });
     expect(compactProductionShape.hero.value).toBe("$1,370");
     expect(compactProductionShape.hero.detail).toBe(
-      "+$370 gain · +37.1% total return",
+      "+37.1% total return",
     );
     expect(compactProductionShape.benchmark.value).toBe(
       "Beat by 8.4 percentage points",
@@ -438,6 +438,7 @@ describe("result card playground", () => {
     const spanish = heroDeltaEvidenceView(
       {
         ...resultCardPlaygroundFixtures[0].result,
+        profit: 560,
         assetClass: "crypto",
         dateRange: {
           start: "2024-01-01",

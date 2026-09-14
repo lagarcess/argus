@@ -90,7 +90,6 @@ type ProfileDetailsDialogProps = {
   isSavingLanguage: boolean;
   languageError: string | null;
 
-  deleteRequestDialog: React.ReactNode;
 };
 
 export default function ProfileDetailsDialog({
@@ -134,7 +133,6 @@ export default function ProfileDetailsDialog({
   handleLanguageSelect,
   isSavingLanguage,
   languageError,
-  deleteRequestDialog,
 }: ProfileDetailsDialogProps) {
   const { t } = useTranslation();
   const overlayId = useId();
@@ -567,7 +565,6 @@ export default function ProfileDetailsDialog({
         </div>
       </div>
     </div>
-    {deleteRequestDialog}
     </>
   );
 }
