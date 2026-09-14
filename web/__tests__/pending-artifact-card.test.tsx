@@ -23,9 +23,7 @@ function card(): StrategyConfirmationPayload {
     confirmation_state: "active",
     title: "AAPL",
     status: "ready_to_run",
-    statusLabel: "Ready to run",
-    summary: "Review this backtest before running it.",
-    strategy_type: "buy_and_hold",
+    statusLabel: "Ready to run",    strategy_type: "buy_and_hold",
     rows: [{ key: "assets", label: "Assets", value: "AAPL" }],
     actions: [{
       id: "run-backtest",

@@ -5,10 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 from uuid import uuid4
 
-from argus.api.chat.previews import (
-    is_degraded_clarification_compatibility_text,
-    plain_text_preview,
-)
+from argus.api.chat.previews import stored_message_preview
 from argus.api.schemas import Message, MessageRole
 from argus.domain.store import utcnow
 from supabase import Client
@@ -32,19 +29,7 @@ def _row_one(result: Any) -> dict[str, Any] | None:
     return cast(dict[str, Any], data)
 
 
-def _message_preview(
-    content: str,
-    max_length: int = 180,
-    *,
-    role: str = "assistant",
-    metadata: dict[str, Any] | None = None,
-) -> str | None:
-    if is_degraded_clarification_compatibility_text(
-        role=role,
-        metadata=metadata,
-    ):
-        return None
-    return plain_text_preview(content, max_length=max_length)
+_message_preview = stored_message_preview
 
 
 def _serialized_usage_limits(limits: list[Any]) -> list[dict[str, Any]]:

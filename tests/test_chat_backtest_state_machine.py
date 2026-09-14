@@ -823,9 +823,14 @@ def test_chat_stream_persists_confirmation_metadata_and_preview(
     assert conversations[0]["last_message_preview"] is None
     assert conversations[0]["preview"]["kind"] == "confirmation"
     assert conversations[0]["preview"]["symbols"] == ["AAPL"]
+    # A card turn stores no prose; the search index holds the card's typed facts.
+    assert raw_assistant.content == ""
+    date_range = raw_assistant.metadata["confirmation_card"]["date_range"]
+    stored_preview = api_state.store.conversations[
+        conversation["id"]
+    ].last_message_preview
     assert (
-        api_state.store.conversations[conversation["id"]].last_message_preview
-        == raw_assistant.content
+        stored_preview == f"AAPL buy_and_hold {date_range['start']} {date_range['end']}"
     )
 
 

@@ -1114,6 +1114,20 @@ machine-readable fields alongside display labels:
   non-presentational compatibility context and must never become a fallback.
 - `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
 
+A confirmation card composes no prose. Cards carry no `summary` field, and a
+card turn's message `content` is empty. Rows persisted before that carry the
+retired English `summary` sentence in both places; the reader boundary blanks
+the content and drops the field, so no reader receives it in any language.
+Every other consumer derives from the card's typed facts through
+`argus.domain.confirmation_turn_facts`, each fact from one owner with no
+fallback: `strategy_type` and the `date_range` start and end from the card, and
+`symbols` from `confirmation_payload.strategy.asset_universe`, since the card
+holds no symbol list. A legacy card missing a fact yields `null` for that fact,
+never a payload value. Model thread history and artifact naming receive
+them as `{"confirmation_card": {"strategy_type", "symbols", "date_range"}}`
+JSON, and the stored `last_message_preview` search text is the same facts
+joined by spaces.
+
 An assumptions answer has `response_intent.kind = artifact_assumptions` and
 `response_intent.facts = { artifact_kind, asset_class, display_facts }`.
 `artifact_kind` is `confirmation` or `current_idea`; the fact values come from

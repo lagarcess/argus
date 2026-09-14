@@ -32,7 +32,7 @@ async function renderConfirmationMessage(kind?: string, active = true) {
       confirmation_id: "confirmation-1",
       confirmation_state: active ? "active" : "superseded",
       title: "AAPL", status: active ? "ready_to_run" : "updated",
-      statusLabel: active ? "Ready to run" : "Updated", summary: "Review this test.",
+      statusLabel: active ? "Ready to run" : "Updated",
       rows: [{ key: "assets", label: "Assets", value: "AAPL" }],
       actions: [{ id: "run-backtest", type: "run_backtest", label: "Run backtest",
         payload: { confirmation_id: "confirmation-1" } }],

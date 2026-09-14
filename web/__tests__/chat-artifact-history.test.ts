@@ -40,9 +40,7 @@ function confirmationMessage(): Message {
       confirmation_id: "confirm-aapl",
       confirmation_state: "active",
       title: "AAPL buy and hold",
-      statusLabel: "Ready to run",
-      summary: "I read this as AAPL using a buy and hold approach.",
-      rows: [{ label: "Assets", value: "AAPL" }],
+      statusLabel: "Ready to run",      rows: [{ label: "Assets", value: "AAPL" }],
       actions: [
         {
           type: "run_backtest",

@@ -63,9 +63,7 @@ describe("chat send state", () => {
       confirmation: {
         confirmation_id: "confirmation-1",
         confirmation_state: "active",
-        title: "AAPL buy and hold",
-        summary: "Ready to test AAPL.",
-        status: "ready_to_run",
+        title: "AAPL buy and hold",        status: "ready_to_run",
         statusLabel: "Ready to run",
         strategy_type: "buy_and_hold",
         asset_class: "equity",

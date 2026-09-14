@@ -61,9 +61,7 @@ const indicator = {
 const confirmation = {
   confirmation_id: "ticker-mention-confirmation",
   confirmation_state: "active",
-  title: "AAPL relative-strength setup",
-  summary: "Buy AAPL when RSI reaches the selected threshold.",
-  status: "ready_to_run",
+  title: "AAPL relative-strength setup",  status: "ready_to_run",
   statusLabel: "Ready to run",
   strategy_type: "indicator_strategy",
   asset_class: "equity",

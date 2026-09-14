@@ -95,9 +95,7 @@ function confirmation(
   return {
     confirmation_id: confirmationId,
     confirmation_state: state,
-    title: "AAPL buy and hold",
-    summary: "Buy and hold AAPL and compare it with SPY.",
-    status,
+    title: "AAPL buy and hold",    status,
     statusLabel: status === "run_complete" ? "Run complete" : "Ready to run",
     strategy_type: "buy_and_hold",
     asset_class: "equity",
