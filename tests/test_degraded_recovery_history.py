@@ -303,3 +303,54 @@ def test_message_append_migration_backfills_legacy_degraded_previews() -> None:
     assert "set last_message_preview = null" in sql
     assert "metadata -> 'clarification' ->> 'prompt_source'" in sql
     assert "is distinct from 'llm_generated'" in sql
+
+
+def _failed_lookup(*, answered: bool) -> dict[str, Any]:
+    return {
+        "recovery": {
+            "code": "research_lookup_failed",
+            "retryable": True,
+            **({"under_answer": True} if answered else {}),
+        },
+        "research": {
+            "schema_version": "argus_research/v1",
+            "degraded": {"code": "research_unavailable_http_error", "status": 500},
+        },
+    }
+
+
+def test_a_reply_whose_lookup_failed_stays_durable_but_out_of_runtime_history() -> None:
+    user_id = "user-1"
+    conversation = memory_conversation(
+        title="AAPL",
+        title_source="system_default",
+        language="en",
+        user_id=user_id,
+    )
+    question = "What is Apple trading at right now?"
+    notice = "I couldn't finish looking that up just now. Try again in a moment."
+    no_lookup_answer = "From Argus market data, Apple last closed at $311.80."
+    looked_up = "Apple closed at $312.41 on 2026-08-06."
+    turns = [
+        ("user", question, {}),
+        ("assistant", notice, _failed_lookup(answered=False)),
+        ("user", question, {}),
+        ("assistant", no_lookup_answer, _failed_lookup(answered=True)),
+        ("user", question, {}),
+        ("assistant", looked_up, {"research": {"schema_version": "argus_research/v1"}}),
+    ]
+    for role, content, metadata in turns:
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation.id,
+            role=role,
+            content=content,
+            metadata=metadata,
+        )
+
+    persisted = [message.content for message in api_state.store.messages[conversation.id]]
+    assert persisted == [content for _, content, _ in turns]
+    history = load_runtime_thread_history(
+        user_id=user_id, conversation_id=conversation.id
+    )
+    assert [item.content for item in history] == [question, question, question, looked_up]

@@ -807,7 +807,6 @@ def load_runtime_thread_history(
     user_id: str,
     conversation_id: str,
     limit: int = 20,
-    drop_failed_lookups: bool = False,
 ) -> list[ConversationMessage]:
     messages: list[Message] = []
     if api_state.supabase_gateway is not None:
@@ -836,7 +835,9 @@ def load_runtime_thread_history(
             metadata=message.metadata,
         ):
             continue
-        if drop_failed_lookups and research_lookup_failed(message.metadata):
+        if research_lookup_failed(message.metadata):
+            # A failed lookup's reply, even an answer without it, is never model
+            # context, so a Retry asks the same question clean.
             continue
         history.append(ConversationMessage(role=message.role, content=message.content))
     return history
