@@ -64,8 +64,9 @@ def test_a_card_that_did_not_solve_compares_its_inputs_only() -> None:
     assert {item.section for item in differences} == {"input"}
 
 
-
-def _ranking(key_label: str = "Expense ratio", items: list[dict] | None = None):
+def _ranking(
+    key_label: str = "Expense ratio", items: list[dict] | None = None, **options
+):
     return run_calculation(
         "ranked_comparison",
         {
@@ -73,6 +74,7 @@ def _ranking(key_label: str = "Expense ratio", items: list[dict] | None = None):
             "key_label": key_label,
             "key_kind": "percent",
             "prefer": "lower",
+            **options,
             "items": items
             or [
                 {"label": "Fund A", "symbol": "AAAA", "value": 0.1},
@@ -104,11 +106,18 @@ def test_a_reordered_ranking_lines_each_item_up_with_itself() -> None:
         {"label": "Fund B", "symbol": "BBBB", "value": 0.25},
     ]
     differences = card_differences(_ranking(), _ranking(items=reordered))
-    pairs = {(item.left, item.right) for item in differences}
+    pairs = {
+        (item.left, item.right) for item in differences if item.name.startswith("rank_")
+    }
     assert pairs == {(0.1, 0.3), (0.2, 0.25)}
 
 
-def test_a_reordered_ranking_lines_each_gap_up_with_its_item() -> None:
+@pytest.mark.parametrize("count", [2, 3])
+@pytest.mark.parametrize("key_kind", ["percent", "money", "multiple", "count"])
+@pytest.mark.parametrize("prefer", ["lower", "higher"])
+def test_a_reordered_ranking_lines_each_gap_up_with_its_item(
+    count: int, key_kind: str, prefer: str
+) -> None:
     left = [
         {"label": "Fund A", "symbol": "AAAA", "value": 0.1},
         {"label": "Fund B", "symbol": "BBBB", "value": 0.2},
@@ -119,6 +128,20 @@ def test_a_reordered_ranking_lines_each_gap_up_with_its_item() -> None:
         {"label": "Fund B", "symbol": "BBBB", "value": 0.15},
         {"label": "Fund C", "symbol": "CCCC", "value": 0.35},
     ]
-    differences = card_differences(_ranking(items=left), _ranking(items=right))
+    sign = 1 if prefer == "lower" else -1
+    left, right = (
+        [{**item, "value": sign * item["value"]} for item in items[:count]]
+        for items in (left, right)
+    )
+    differences = card_differences(
+        _ranking(items=left, prefer=prefer, key_kind=key_kind),
+        _ranking(items=right, prefer=prefer, key_kind=key_kind),
+    )
     gaps = [item for item in differences if item.name.startswith("gap_")]
-    assert [(item.left, item.right) for item in gaps] == [(0.2, 0.2)]
+    assert len(gaps) == count
+    expected = [(0, 0.05, 0.05), (0.1, 0, -0.1), (0.2, 0.2, 0)]
+    for gap, item, values in zip(gaps, left, expected[:count], strict=True):
+        assert gap.label.interpolation_args["label"] == item["label"]
+        assert (gap.left, gap.right, gap.difference) == pytest.approx(
+            tuple(sign * value for value in values)
+        )
