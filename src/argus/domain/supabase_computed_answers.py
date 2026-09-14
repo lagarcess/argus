@@ -29,23 +29,31 @@ class SupabaseComputedAnswerReadMixin:
         ids = list(dict.fromkeys(str(value) for value in conversation_ids))
         if not ids:
             return {}
-        rows = (
-            self.client.table("messages")
-            .select(_MESSAGE_SELECT)
-            .eq("user_id", user_id)
-            .eq("role", "assistant")
-            .in_("conversation_id", ids)
-            .not_.is_("metadata->computation", "null")
-            .order("created_at", desc=True)
-            .order("id", desc=True)
-            .limit(_COMPUTED_ANSWER_LIMIT)
-            .execute()
-        )
         latest: dict[str, dict[str, Any]] = {}
-        for row in getattr(rows, "data", None) or []:
-            conversation_id = str(row.get("conversation_id") or "")
-            if conversation_id and conversation_id not in latest:
-                latest[conversation_id] = dict(row)
+        missing = ids
+        # A full page may hold one busy conversation alone, so the ones it left out
+        # are read again; each full page settles at least one of them.
+        while missing:
+            rows = (
+                self.client.table("messages")
+                .select(_MESSAGE_SELECT)
+                .eq("user_id", user_id)
+                .eq("role", "assistant")
+                .in_("conversation_id", missing)
+                .not_.is_("metadata->computation", "null")
+                .order("created_at", desc=True)
+                .order("id", desc=True)
+                .limit(_COMPUTED_ANSWER_LIMIT)
+                .execute()
+            )
+            found = getattr(rows, "data", None) or []
+            for row in found:
+                conversation_id = str(row.get("conversation_id") or "")
+                if conversation_id and conversation_id not in latest:
+                    latest[conversation_id] = dict(row)
+            if len(found) < _COMPUTED_ANSWER_LIMIT:
+                break
+            missing = [value for value in missing if value not in latest]
         return latest
 
     def question_before_message(

@@ -62,6 +62,9 @@ PENDING_REPLY_REASON_CODE = "calculation_pending_reply"
 # question already held: the stored calculation stands, and only the blanks it
 # owed take the reply's figures.
 PENDING_KEPT_REASON_CODE = "calculation_pending_reply_kept_stored"
+# A pending payload's map of each calculation's reference name to the fields that
+# calculation asked for; a reply fills a blank only on its own calculation.
+REQUESTED_BY_CALCULATION_KEY = "requested_by_calculation"
 INPUT_MISSING_REASON_CODE = "calculation_input_missing"
 # Recorded when a voiced answer only restated the user's question; it is never
 # published, and the caller's honest note stands in.
@@ -242,6 +245,9 @@ def answer_from_published(
                 ],
                 "requested_field": field,
                 "requested_fields": list(owed),
+                REQUESTED_BY_CALCULATION_KEY: {
+                    name: list(fields) for name, fields in published.owed_by_calculation
+                },
                 "evidence": [row.model_dump(mode="json") for row in evidence],
                 "retrieved": [source.model_dump(mode="json") for source in retrieved],
             },
@@ -439,6 +445,7 @@ def completed_pending(
     if not stored:
         return list(voiced)
     replied = dict(zip(calculation_names(voiced), voiced, strict=True))
+    by_calculation = pending.get(REQUESTED_BY_CALCULATION_KEY)
     requested = {
         str(name)
         for name in pending.get("requested_fields") or [pending.get("requested_field")]
@@ -456,7 +463,12 @@ def completed_pending(
         changed = changed or not same
         filled = {item.name: item for item in answer.inputs} if same and answer else {}
         inputs: list[AnswerCalculationInput] = []
-        asked = requested or {item.name for item in request.inputs if item.value is None}
+        scoped = by_calculation.get(name) if isinstance(by_calculation, Mapping) else None
+        asked = (
+            {str(field) for field in scoped}
+            if isinstance(scoped, list)
+            else requested or {item.name for item in request.inputs if item.value is None}
+        )
         for item in request.inputs:
             reply = filled.pop(item.name, None)
             if item.value is None:
@@ -471,8 +483,8 @@ def completed_pending(
             ):
                 changed = True
             inputs.append(item)
-        for name in [name for name in filled if name in requested]:
-            reply = filled.pop(name)
+        for field in [field for field in filled if field in asked]:
+            reply = filled.pop(field)
             if reply.value is not None and reply.source != "assumption":
                 inputs.append(reply)
         changed = changed or bool(filled)

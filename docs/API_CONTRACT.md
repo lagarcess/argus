@@ -5357,12 +5357,12 @@ lead as `assistant_prompt`, `requested_field` naming the first missing argument,
 no card, and `clarification = {kind: "clarification", reason_code:
 "calculation_input_missing", prompt_source: "degraded_fallback", requested_field,
 requested_fields, missing_inputs: [{name, label}], semantic_needs: [], payload:
-{calculations, requested_field, requested_fields, evidence, retrieved}, options:
+{calculations, requested_field, requested_fields, requested_by_calculation, evidence, retrieved}, options:
 []}`; a payload stored with one `calculation` reads as a list of one. Each missing input carries the declaration's `LocalizedText` label key and
 the app writes the question from them (`tools.calc.missing_inputs.ask`), so the
 question names exactly the figures only the user knows. `retrieved` keeps the
 pages the answer read and `evidence` the figures it cited from finance data, so
-the reply may still cite them (`calculation_pending_reply`). The stored calculations stand: the reply fills only the blanks they owed (a null input, or a requested field they never listed), with a figure that is not an assumption, and a voiced reply that changed a figure they held is recorded as `calculation_pending_reply_kept_stored`. That question belongs to the no-search
+the reply may still cite them (`calculation_pending_reply`). The stored calculations stand: the reply fills only the blanks each calculation asked for under `requested_by_calculation`, keyed by its reference name (a null input, or a requested field it never listed; a payload stored without that map applies `requested_fields` to every calculation), with a figure that is not an assumption, and a voiced reply that changed a figure they held is recorded as `calculation_pending_reply_kept_stored`. That question belongs to the no-search
 answer; a research turn whose lookup failed and whose fallback asks keeps its
 `research` sidecar, so the packet it read reaches the ledger, and a background
 job in that case stores the same `clarification` and `requested_field` on its
@@ -5374,7 +5374,7 @@ an input it already holds filled (a sentence or table row that leans on a result
 out, `offer_prose_results_dropped`; only prose with nothing left is not
 published: `calculation_inputs_not_found`), stores
 `metadata.calculation_offer = {calculations, requested_field, requested_fields,
-evidence, retrieved}` with the
+requested_by_calculation, evidence, retrieved}` with the
 cited inputs and the pages it read, records `calculation_offered`, and leads its
 `next_steps` with a `calculation_offer` row. Tapping the row sends the typed chat
 action `calculation_offer` with the row's label as its display text: the turn asks

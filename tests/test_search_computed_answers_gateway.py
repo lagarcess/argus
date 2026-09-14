@@ -234,3 +234,25 @@ def test_symbol_rows_read_past_answers_in_deleted_conversations(monkeypatch) -> 
         user_id="owner"
     )
     assert [row["conversation_id"] for row in found] == [live]
+
+
+def test_every_selected_conversation_gets_its_latest_answer(monkeypatch) -> None:
+    from argus.domain import supabase_computed_answers as reads
+
+    monkeypatch.setattr(reads, "_COMPUTED_ANSWER_LIMIT", 2)
+    busy, quiet = fake.uuid4(), fake.uuid4()
+    computation = {"kind": "time_value", "inputs": {}}
+    rows = [
+        _message(
+            busy, "assistant", f"2026-09-10T1{hour}:00:00+00:00", computation=computation
+        )
+        for hour in (2, 3, 4)
+    ]
+    rows.append(
+        _message(quiet, "assistant", "2026-09-10T09:00:00+00:00", computation=computation)
+    )
+    latest = _Reader(_Client(rows)).latest_computed_answers(
+        user_id="owner", conversation_ids=[busy, quiet]
+    )
+    assert set(latest) == {busy, quiet}
+    assert latest[busy]["created_at"] == "2026-09-10T14:00:00+00:00"

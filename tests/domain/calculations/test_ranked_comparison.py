@@ -46,3 +46,24 @@ def test_fewer_than_two_items_is_invalid() -> None:
         },
     )
     assert card.outcome.status == "invalid"
+
+
+def test_each_item_after_the_best_shows_its_gap() -> None:
+    card = run_calculation(
+        "ranked_comparison",
+        {
+            "currency": "DOP",
+            "key_label": "Annual rate",
+            "key_kind": "percent",
+            "prefer": "lower",
+            "items": [
+                {"label": "Card A", "value": 24.9},
+                {"label": "Card B", "value": 18.5},
+            ],
+        },
+    )
+    rows = [(fact.name, fact.value) for fact in card.presentation.rows]
+    assert rows == [("rank_1", 24.9), ("gap_1", 6.4)]
+    gap = card.presentation.rows[1]
+    assert gap.label.locale_key == "tools.calc.ranked_comparison.gap"
+    assert gap.unit.locale_key == "chat.tools.units.percent"

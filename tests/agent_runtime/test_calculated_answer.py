@@ -734,3 +734,73 @@ def test_a_reply_fills_only_the_blanks_the_question_asked_for(monkeypatch) -> No
     assert card["arguments"]["periods"] == 48
     assert card["arguments"]["start_date"] is None
     assert ca.PENDING_KEPT_REASON_CODE in reply.decision.reason_codes
+
+
+def test_a_reply_fills_a_blank_only_on_the_calculation_that_asked_for_it(
+    monkeypatch,
+) -> None:
+    def answer(lead, loan_periods, rate_periods):
+        loan = AnswerCalculation.model_validate(
+            {
+                "name": "loan",
+                "kind": "time_value",
+                "solve_for": "payment",
+                "inputs": [
+                    *LOAN,
+                    {"name": "periods", "value": loan_periods, "source": "user"},
+                ],
+            }
+        )
+        rate = AnswerCalculation.model_validate(
+            {
+                "name": "rate",
+                "kind": "effective_rate",
+                "inputs": [
+                    {"name": "nominal_rate_pct", "value": 10, "source": "user"},
+                    {"name": "periods", "value": rate_periods, "source": "user"},
+                ],
+            }
+        )
+        return ca.CalculatedVoicedAnswer(lead=lead, calculations=[loan, rate])
+
+    _voice(
+        monkeypatch,
+        [
+            answer("How many months are left on the loan?", None, None),
+            answer("The payment is {{loan.payment}}.", 48, 36),
+        ],
+    )
+    asked = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="What is my car payment, and the real rate at 10%?",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert asked is not None and asked.patch["requested_field"] == "periods"
+    payload = asked.patch["clarification"]["payload"]
+    assert payload["requested_by_calculation"] == {"loan": ["periods"], "rate": []}
+
+    class _Interpreter:
+        async def ainvoke(self, request):
+            return _read()
+
+    reply = asyncio.run(
+        interpret_stage_async(
+            state=RunState.new(current_user_message="48", recent_thread_history=[]),
+            user=USER,
+            latest_task_snapshot=None,
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "clarification": asked.patch["clarification"],
+            },
+            structured_interpreter=_Interpreter(),
+        )
+    )
+    assert reply.outcome == "ready_to_respond"
+    cards = reply.patch["final_response_payload"]["tool_result_cards"]
+    assert [card["arguments"]["periods"] for card in cards] == [48, 0]
+    assert ca.PENDING_KEPT_REASON_CODE in reply.decision.reason_codes

@@ -20,7 +20,10 @@ from argus.domain.calculations._shared import (
     UNIT_CURRENCY_KEY,
     UNIT_PERCENT_KEY,
 )
-from argus.domain.calculations.ranked_comparison import RANK_FACT_PREFIX
+from argus.domain.calculations.ranked_comparison import (
+    GAP_FACT_PREFIX,
+    RANK_FACT_PREFIX,
+)
 from argus.domain.tool_contracts import LocalizedText, ToolFact, ToolResultCard
 
 FactSection = Literal["answer", "row", "input"]
@@ -100,23 +103,31 @@ def _ranking(card: ToolResultCard) -> tuple[object, ...] | None:
 def _fact_key(
     card: ToolResultCard, section: FactSection, fact: ToolFact, *, ranked: bool
 ) -> tuple[object, ...]:
-    """Where a fact lines up: a ranked figure by its item, wherever the item
+    """Where a fact lines up: a ranked figure or gap by its item, wherever the item
     ranks, and every other fact by its section and name."""
     item = _ranked_item(card, fact.name) if ranked else None
     return ("item", *item) if item is not None else (section, fact.name)
 
 
-def _ranked_item(card: ToolResultCard, name: str) -> tuple[str, str] | None:
-    """The label and symbol of the item a ranked figure belongs to."""
-    position = name.removeprefix(RANK_FACT_PREFIX)
-    if position == name or not position.isdigit():
+def _ranked_item(card: ToolResultCard, name: str) -> tuple[str, str, str] | None:
+    """Which figure of a ranked item a fact is, with that item's label and symbol."""
+    prefix = next(
+        (
+            candidate
+            for candidate in (RANK_FACT_PREFIX, GAP_FACT_PREFIX)
+            if name.startswith(candidate) and name[len(candidate) :].isdigit()
+        ),
+        None,
+    )
+    if prefix is None:
         return None
     rows = (card.outcome.result or {}).get("rows") or []
-    index = int(position)
+    index = int(name[len(prefix) :])
     if index >= len(rows) or not isinstance(rows[index], dict):
         return None
     row = rows[index]
-    return str(row.get("label") or "").casefold(), str(row.get("symbol") or "").upper()
+    label = str(row.get("label") or "").casefold()
+    return prefix, label, str(row.get("symbol") or "").upper()
 
 
 def _facts(card: ToolResultCard) -> list[tuple[FactSection, ToolFact]]:

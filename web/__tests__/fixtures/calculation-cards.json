@@ -2369,6 +2369,24 @@
             {
               "label": {
                 "interpolation_args": {
+                  "label": "Card C"
+                },
+                "locale_key": "tools.calc.ranked_comparison.gap"
+              },
+              "name": "gap_1",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 0.0,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
                   "label": "Card A",
                   "rank": 3
                 },
@@ -2383,6 +2401,24 @@
                 "locale_key": "chat.tools.units.percent"
               },
               "value": 24.9,
+              "value_text": null
+            },
+            {
+              "label": {
+                "interpolation_args": {
+                  "label": "Card A"
+                },
+                "locale_key": "tools.calc.ranked_comparison.gap"
+              },
+              "name": "gap_2",
+              "source": {
+                "kind": "computed"
+              },
+              "unit": {
+                "interpolation_args": {},
+                "locale_key": "chat.tools.units.percent"
+              },
+              "value": 6.4,
               "value_text": null
             }
           ],

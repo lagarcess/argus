@@ -119,6 +119,8 @@ class PublishedCalculation:
     not_looked_up: tuple[str, ...]
     owed: tuple[str, ...] = ()
     assumptions: tuple[dict[str, str], ...] = ()
+    # Each calculation's reference name with the blanks that calculation owes.
+    owed_by_calculation: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 def publish_calculations(
@@ -162,6 +164,10 @@ def publish_calculations(
             question_field=owed[0] if owed else None,
             not_looked_up=not_looked_up,
             owed=tuple(owed),
+            owed_by_calculation=tuple(
+                (name, tuple(dict.fromkeys(one.user_owed)))
+                for name, one in zip(calculation_names(requests), resolved, strict=True)
+            ),
         )
     patches = [computed_answer_patch(one) for one in resolved]
     cards = dict(zip(calculation_names(requests), map(card_in, patches), strict=True))
@@ -276,7 +282,7 @@ def resolve_calculation(
                 (
                     page_source(page, item.as_of)
                     if page is not None
-                    else evidence_source(cited, item.as_of)
+                    else evidence_source(cited)
                 ),
             )
     if request.solve_for in declared:
@@ -560,7 +566,7 @@ def cited_page_inputs(
         if cited is not None:
             found[item.name] = (
                 item.value,
-                evidence_source(cited, item.as_of).model_dump(mode="json"),
+                evidence_source(cited).model_dump(mode="json"),
             )
     return found
 
@@ -753,17 +759,11 @@ def _evidenced(
     )
 
 
-def evidence_source(row: RetrievedRow | None, as_of: str | None) -> ToolFactSource:
-    """A figure cited from finance data names its subject and date, never a URL."""
+def evidence_source(row: RetrievedRow | None) -> ToolFactSource:
+    """A figure cited from finance data names its subject and its row's date,
+    never a URL."""
     assert row is not None
-    dated = next(
-        (
-            value[:10]
-            for value in (as_of, row.as_of)
-            if value and _ISO_DATE.fullmatch(value[:10])
-        ),
-        None,
-    )
+    dated = row.as_of[:10] if row.as_of and _ISO_DATE.fullmatch(row.as_of[:10]) else None
     title = f"{row.subject} {row.label}".strip()
     return ToolFactSource(kind="page", title=title[:300] or None, date=dated)
 

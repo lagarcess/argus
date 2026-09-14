@@ -48,6 +48,8 @@ class RankedComparisonArguments(CalculationArguments):
 
 # Each ranked figure's fact name: the prefix and its position from the best item.
 RANK_FACT_PREFIX = "rank_"
+# Each ranked item's gap to the best, named by its position like its figure.
+GAP_FACT_PREFIX = "gap_"
 
 
 class RankedRow(BaseModel):
@@ -123,10 +125,21 @@ def present_ranked_comparison(
         )
         for index, row in enumerate(result.rows)
     ]
+    rows: list[ToolFact] = []
+    for index, row in enumerate(result.rows[1:], start=1):
+        rows.append(facts[index])
+        rows.append(
+            ToolFact(
+                name=f"{GAP_FACT_PREFIX}{index}",
+                label=text("tools.calc.ranked_comparison.gap", label=row.label),
+                value=round(row.gap_to_best, 2),
+                unit=unit,
+            )
+        )
     return ToolCardPresentation(
         title=title,
         answer=facts[0],
-        rows=facts[1:],
+        rows=rows,
         inputs=inputs,
         notes=[text("tools.calc.notes.ranked_not_recommended")],
     )

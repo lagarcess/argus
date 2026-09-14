@@ -106,3 +106,19 @@ def test_a_reordered_ranking_lines_each_item_up_with_itself() -> None:
     differences = card_differences(_ranking(), _ranking(items=reordered))
     pairs = {(item.left, item.right) for item in differences}
     assert pairs == {(0.1, 0.3), (0.2, 0.25)}
+
+
+def test_a_reordered_ranking_lines_each_gap_up_with_its_item() -> None:
+    left = [
+        {"label": "Fund A", "symbol": "AAAA", "value": 0.1},
+        {"label": "Fund B", "symbol": "BBBB", "value": 0.2},
+        {"label": "Fund C", "symbol": "CCCC", "value": 0.3},
+    ]
+    right = [
+        {"label": "Fund A", "symbol": "AAAA", "value": 0.2},
+        {"label": "Fund B", "symbol": "BBBB", "value": 0.15},
+        {"label": "Fund C", "symbol": "CCCC", "value": 0.35},
+    ]
+    differences = card_differences(_ranking(items=left), _ranking(items=right))
+    gaps = [item for item in differences if item.name.startswith("gap_")]
+    assert [(item.left, item.right) for item in gaps] == [(0.2, 0.2)]

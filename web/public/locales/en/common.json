@@ -2048,7 +2048,8 @@
       "ranked_comparison": {
         "title": "Ranked by {{key}}",
         "progress": "Ranking by {{key_label}}",
-        "row": "{{rank}}. {{label}}"
+        "row": "{{rank}}. {{label}}",
+        "gap": "{{label}}, gap to the best"
       },
       "valuation_scenarios": {
         "title": "Valuation scenarios",
