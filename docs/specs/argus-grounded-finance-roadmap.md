@@ -1276,6 +1276,11 @@ preview, and make answers shareable by default, refusing only what is private.
 
 ### Teach the method  ·  ships in **Grounding**
 
+**Closed by the founder 2026-09-14.** The welcome line is not built. The problem it
+targeted, visitors with money questions being told about backtests on arrival, is
+gone: guests see the A mark and a neutral greeting, and what people bring is
+answered by the calculations. The unused `chat.welcome` strings are dead copy.
+
 **Founder, 2026-09-11.** The welcome line approach below, one line stating
 the method plus a rotating example, is rejected, and the current
 `chat.welcome` is too wordy; the welcome waits for a new direction. The
@@ -1525,7 +1530,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Home country per user | its own promotion | **LANDED** `65bc661b`, PR #593. A registered user picks a country in Settings, sees the currency it implies and can override it, in English and Spanish. Research sends that user's country on the inline path, thorough jobs and the research tool; a user with none sends no location. `ARGUS_RESEARCH_HOME_COUNTRY`, `home_location()`, `LOCAL_SOURCE_DOMAINS` and `local_sources` are gone. Its research-case live run sent no location on any call, matching the baseline. Apply `supabase/migrations/20260911120000_add_profile_home_country.sql` (additive) at promotion. A guest session pick is not built; the lane priced it at about a day. |
 | The conversation after a result | its own promotion | **LANDED** `f14c0dec`, PR #597, 2026-09-12. Questions after a result are answered by the model with one ordered list of next steps, runnable tests and questions together. One owner states the benchmark gap and cost drag as the difference of the shown returns. Runs record fee and slippage dollars, and a stored dollar cost is answered. A stated cost the audit cannot confirm is asked about, never shown at 0 bps, while a 0 only the model's read carries is dropped. New monthly-buy runs store the worst drop's dates; answers never invent a date, order or cause and carry no heading. A stored run fact is answered without research and the reply must state it, and an asset or benchmark reply must name each ticker. A moved start names the asset whose data sets it, from continuous history. Its live run was 64 passed and 7 failed against 67 and 4; the six new failures passed a rerun at the fix, and NVDA failed in both. The fingerprint is refrozen on that run. No migration. |
 | Any grounded math | The calculations | **LANDED** `8e9f40bc`, PR #607. Measured 69 of 71 at `dc8608c8` with the fingerprint refrozen and the browser walk done. Fourteen Codex rounds, then one final scoped review whose only finding is #622. #620 holds binding page-cited and finance-data inputs to their rows and the market test row for plans with a starting amount plus deposits. Its migration widens `public_excerpt_snapshots_kind_check` and is applied at the next promotion. |
-| Teach the method | Grounding | **Greetings LANDED** `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The welcome line is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math. |
+| Teach the method | Grounding | **Done.** Greetings LANDED `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The broad-question follow-ups moved into Any grounded math. The welcome line was closed by the founder 2026-09-14. |
 | Production promotion 2026-09-13 | its own promotion | **SHIPPED** `3d98057c`, PR #603. See the promotion paragraph above. |
 | Readout receipts admit every model tier | outside the releases | **LANDED** `6eb93d84`, PR #610, closing #605. `route_receipts` accepts the readout tier, and a test pins the check to the runtime's tier list. Its migration, classed destructive for its dropped and re-added check, ships at the next promotion. |
 | Stated money survives a timed-out interpretation | outside the releases | **LANDED** `b7c69b54`, PR #602, closing #600. Focused repair keeps a stated deposit, contribution, fees and slippage; 22 of 22 targeted live reruns passed. Ships at the next promotion. |
@@ -1808,7 +1813,6 @@ you, never prescribe what they should do" still stands.
 
 ### Still open
 
-- **The welcome line waits for a new direction.** Founder, 2026-09-11.
 - **The sharing redesign waits for the founder.** See Sharing on.
 - **Decision 9's interpreter-tier A/B is still owed.** See decision 9.
 - **The answer blueprint is proposed, not decided.** A small set of answer types the
@@ -1826,6 +1830,8 @@ you, never prescribe what they should do" still stands.
 
 Resolved:
 
+- **The welcome line is closed.** Founder, 2026-09-14: what users bring is already
+  known and answered by the calculations, so no arrival line is built.
 - **The minimum starting capital is 10 in the stated currency.** Founder,
   2026-09-14, for every way capital is set or edited. Capital has no currency today,
   so the $10 floor ships first and capital in the stated currency is specced before
