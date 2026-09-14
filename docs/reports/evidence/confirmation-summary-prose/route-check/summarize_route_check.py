@@ -1,10 +1,11 @@
 """Summarize a route check capture: per step, what the model read and what came back.
 
-Reads the server and driver captures in ROUTE_CHECK_OUT and writes
-route-check-report.json and route-check-report.md beside them. Steps and
-retries form one timeline; a step's window runs from its request until the next
-entry starts, so asynchronous artifact naming after a turn is attributed to
-that turn and a retry never borrows the first attempt's calls.
+Reads `steps.jsonl`, the step stream the driver writes (retries included), and
+the server captures in ROUTE_CHECK_OUT, then writes route-check-report.json and
+route-check-report.md beside them, so the committed captures alone rebuild the
+report. Steps form one timeline; a step's window runs from its request until
+the next step starts, so asynchronous artifact naming after a turn is
+attributed to that turn and a retry never borrows the first attempt's calls.
 """
 
 from __future__ import annotations
@@ -53,16 +54,10 @@ def _mentions(text: str, *needles: str) -> bool:
     return any(needle.lower() in lowered for needle in needles)
 
 
-def _conversation_id(entry: dict[str, Any]) -> str | None:
-    return next((m["conversation_id"] for m in entry.get("messages") or [] if m.get("conversation_id")), None)
-
-
 def main() -> None:
-    driver = _jsonl("driver")
-    steps = [row for row in driver if not row.get("stopped_for_cap")]
-    retries = [row for row in _jsonl("driver-retries") if not row.get("stopped_for_cap")]
-    stops = [row for row in [*driver, *_jsonl("driver-retries")] if row.get("stopped_for_cap")]
-    timeline = sorted([*steps, *retries], key=lambda row: row["started"])
+    stream = _jsonl("steps")
+    stops = [row for row in stream if row.get("stopped_for_cap")]
+    timeline = sorted((row for row in stream if not row.get("stopped_for_cap")), key=lambda row: row["started"])
     history = _jsonl("thread_history")
     naming_in = _jsonl("naming_input")
     naming_out = _jsonl("naming_output")
@@ -74,7 +69,8 @@ def main() -> None:
     for index, step in enumerate(timeline):
         start = step["started"]
         end = timeline[index + 1]["started"] if index + 1 < len(timeline) else float("inf")
-        conversation_id = _conversation_id(step)
+        conversation_id = step.get("conversation_id")
+        final = step.get("final") or {}
         window_requests = [r for r in requests if _in(r, start, end)]
         window_receipts = [
             {
@@ -85,6 +81,7 @@ def main() -> None:
             for r in receipts
             if _in(r, start, end)
         ]
+        run = final.get("run")
         report_steps.append(
             {
                 "language": step["language"],
@@ -95,9 +92,9 @@ def main() -> None:
                 "status": step.get("status"),
                 "stages": step.get("stages"),
                 "reply": step.get("reply"),
-                "recovery": (step.get("final") or {}).get("recovery"),
+                "recovery": final.get("recovery"),
                 "latest_card": step.get("latest_card"),
-                "result_run": _result_run(step),
+                "result_run": {key: run.get(key) for key in ("id", "status", "symbols")} if isinstance(run, dict) else None,
                 "title": step.get("title"),
                 "history_loaded": [
                     {"reader": h["reader"], "history": h["history"]}
@@ -135,6 +132,7 @@ def main() -> None:
     print(
         json.dumps(
             {
+                "steps": len(report_steps),
                 "checks": [{k: c[k] for k in ("language", "check", "pass")} for c in checks],
                 "stopped_for_cap": stops,
                 "final_spend": report["final_spend"],
@@ -144,13 +142,6 @@ def main() -> None:
             indent=2,
         )
     )
-
-
-def _result_run(step: dict[str, Any]) -> dict[str, Any] | None:
-    run = (step.get("final") or {}).get("run")
-    if isinstance(run, dict):
-        return {"id": run.get("id"), "status": run.get("status"), "symbols": run.get("symbols")}
-    return None
 
 
 def _answers_result(step: dict[str, Any] | None) -> bool:

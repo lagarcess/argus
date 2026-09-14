@@ -201,7 +201,7 @@ Model call to x-ai/grok-4.3 (status 200):
 ## es-419 / result_question_retry
 
 Retry reason: chat_composer TimeoutError on the first attempt; interpretation had routed correctly
-Request: None
+Request: ¿Cómo le fue frente a SPY?
 Reply: Esta prueba muestra que AAPL superó a SPY por 46.3 puntos porcentuales en rendimiento total durante el período completo. La prueba no almacena cómo se comportó mes a mes frente al referencia, solo la diferencia final. Si quieres ver cómo se compara en otros aspectos, podemos revisar la volatilidad o probar una estrategia diferente.
 History loaded by chat_route:
   - user: Haz un backtest de comprar y mantener Apple desde enero de 2023 hasta diciembre de 2024 con 10000 dólares.

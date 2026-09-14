@@ -119,12 +119,14 @@ All 40 pass at `e8925e04`.
 
 `route-check/` drove real turns through the chat route at `4e89d289`, in
 English and Spanish: create a card, change an input, run it, and ask about the
-result, with artifact naming running. Every card turn reached the model and
-naming as the card's typed facts, the retired sentence appeared in no model
-input, and no follow-up misread the card. The Spanish result question timed out
-once at the answer composer and answered correctly on one retry. Billed $0.162
-of the $0.50 cap. The full live measurement was skipped because it builds each
-case's history itself and cannot see this change.
+result, with artifact naming running. The history the chat route loaded held
+every card turn as the card's typed facts, every model call that received a
+card turn received that form, and naming, which ran once per conversation on
+the first card turn, read it the same way. The retired sentence appeared in no
+model input, and no follow-up misread the card. The Spanish result question
+timed out once at the answer composer and answered correctly on one retry.
+Billed $0.162 of the $0.50 cap. The full live measurement was skipped because
+it builds each case's history itself and cannot see this change.
 
 ## Limits
 

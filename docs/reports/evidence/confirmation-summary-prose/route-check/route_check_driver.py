@@ -3,6 +3,11 @@
 Talks to the route check server over HTTP. Before every step it compares the
 billed spend so far (each unpriced call counted at a conservative flat amount)
 plus that step's reserve against the cap, and stops before crossing it.
+
+Writes `steps.jsonl`, the step stream the summarizer reads, and keeps the full
+per-step payloads in `driver-debug.jsonl` for local inspection. A result
+question that returns a retryable typed recovery is asked once more and
+recorded as its own step; the first result is never replaced.
 """
 
 from __future__ import annotations
@@ -21,7 +26,14 @@ CAP_USD = float(os.environ.get("ROUTE_CHECK_CAP_USD", "0.50"))
 SPENT_BEFORE_USD = float(os.environ.get("ROUTE_CHECK_SPENT_BEFORE_USD", "0"))
 LANGUAGES = [code for code in os.environ.get("ROUTE_CHECK_LANGUAGES", "en,es-419").split(",") if code]
 UNPRICED_CALL_USD = 0.02
-RESERVE_USD = {"card": 0.06, "change": 0.06, "run": 0.06, "result_question": 0.10}
+RESERVE_USD = {
+    "card": 0.06,
+    "change": 0.06,
+    "run": 0.06,
+    "result_question": 0.10,
+    "result_question_retry": 0.10,
+}
+SLIM_FINAL_KEYS = ("stage_outcome", "recovery", "response_intent", "message_id", "artifact_presentation_kind", "confirmation")
 
 SCRIPTS = {
     "en": {
@@ -64,9 +76,25 @@ def spend() -> dict[str, Any]:
     }
 
 
-def record(entry: dict[str, Any]) -> None:
-    with (OUT / "driver.jsonl").open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+def _append(name: str, row: dict[str, Any]) -> None:
+    with (OUT / f"{name}.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
+
+
+def _slim_final(final: dict[str, Any] | None) -> dict[str, Any]:
+    final = final or {}
+    slim = {key: final[key] for key in SLIM_FINAL_KEYS if key in final}
+    if isinstance(final.get("run"), dict):
+        slim["run"] = {key: final["run"].get(key) for key in ("id", "status", "symbols", "benchmark_symbol")}
+    return slim
+
+
+def record_step(entry: dict[str, Any]) -> None:
+    _append("driver-debug", entry)
+    slim = {key: entry[key] for key in entry if key not in {"final", "messages"}}
+    if "final" in entry:
+        slim["final"] = _slim_final(entry["final"])
+    _append("steps", slim)
 
 
 def stream_turn(
@@ -160,26 +188,29 @@ def run_language(client: httpx.Client, language: str) -> dict[str, Any]:
     conversation_id = client.post(f"{API}/conversations", json={"language": language}).json()["conversation"]["id"]
     summary: dict[str, Any] = {"language": language, "conversation_id": conversation_id, "steps": {}}
 
-    def step(name: str, **turn: Any) -> dict[str, Any] | None:
+    def step(name: str, *, reason: str | None = None, **turn: Any) -> dict[str, Any] | None:
         allowed, before = within_cap(name)
         if not allowed:
             summary["stopped_for_cap"] = {"step": name, "spend": before}
-            record({"language": language, "step": name, "stopped_for_cap": True, "spend": before})
+            record_step({"conversation_id": conversation_id, "language": language, "step": name, "stopped_for_cap": True, "spend": before})
             return None
         result = stream_turn(client, conversation_id, language, **turn)
         items = messages(client, conversation_id)
         entry = {
+            "conversation_id": conversation_id,
             "language": language,
             "step": name,
+            **({"reason": reason} if reason else {}),
             "request": {key: value for key, value in turn.items() if key != "headers"},
             **result,
             "reply": reply_text(result.get("final"), items),
             "latest_card": card_facts(latest_card(items)),
             "title": title(client, conversation_id, wait_seconds=60 if name == "card" else 8),
             "messages": items,
+            "spend_before": before,
             "spend_after": spend(),
         }
-        record(entry)
+        record_step(entry)
         summary["steps"][name] = {key: entry[key] for key in ("status", "reply", "latest_card", "title", "spend_after")}
         return entry
 
@@ -206,7 +237,14 @@ def run_language(client: httpx.Client, language: str) -> dict[str, Any]:
     )
     if ran is None:
         return summary
-    step("result_question", message=script["result_question"])
+    asked = step("result_question", message=script["result_question"])
+    recovery = ((asked or {}).get("final") or {}).get("recovery") or {}
+    if asked is not None and recovery.get("retryable"):
+        step(
+            "result_question_retry",
+            reason=f"first attempt returned retryable recovery {recovery.get('code')}",
+            message=script["result_question"],
+        )
     return summary
 
 

@@ -1483,7 +1483,7 @@
       "retry": true,
       "retry_reason": "chat_composer TimeoutError on the first attempt; interpretation had routed correctly",
       "request": {
-        "message": null
+        "message": "¿Cómo le fue frente a SPY?"
       },
       "status": 200,
       "stages": [
