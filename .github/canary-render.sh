@@ -842,7 +842,7 @@ for name in browser_checks:
             f"{prefix}_{hashlib.sha256(value.encode('utf-8')).hexdigest()[:12]}"
         )
     evidence[name] = summary
-    if entry["status"] != "passed" and failed is None:
+    if entry["status"] != statuses["passed"] and failed is None:
         failed = (name, reason or f"check_{entry['status']}", entry)
 
 evidence_path.write_text(json.dumps(evidence), encoding="utf-8")

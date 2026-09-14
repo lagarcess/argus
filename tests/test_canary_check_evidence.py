@@ -398,6 +398,19 @@ def test_browser_check_import_reads_the_one_handoff_contract(
     assert "browser check handoff has an unsafe failure reason" in refused.stderr
     assert "browser check handoff contract is invalid" in foreign.stderr
 
+    # Status meanings come from the contract too: a renamed pass is still a pass.
+    relabeled = tmp_path / "relabeled-contract.json"
+    relabeled.write_text(
+        json.dumps({**CONTRACT, "statuses": {**CONTRACT["statuses"], "passed": "succeeded"}}),
+        encoding="utf-8",
+    )
+    passing = _passing_handoff(faker, user_id)
+    for entry in passing["checks"].values():
+        entry["status"] = "succeeded"
+    relabeled_run, _, _ = _run_import(tmp_path, passing, user_id=user_id, contract=relabeled)
+    assert relabeled_run.returncode == 0, relabeled_run.stderr
+    assert relabeled_run.stdout.strip() == "-|-|-|-"
+
 
 def test_session_tool_names_only_the_failures_it_raised() -> None:
     session = _source("web/e2e/support/private-alpha-canary-session.ts")
