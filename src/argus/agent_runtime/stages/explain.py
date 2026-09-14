@@ -30,6 +30,7 @@ from argus.domain.engine_launch.result_facts import (
     resolved_rule_summary as result_rule_summary,
 )
 from argus.domain.result_figures import shown_benchmark_gap
+from argus.domain.result_money import stored_currency_fraction_digits
 from argus.domain.result_readout_content import normalize_readout_language
 from argus.domain.result_readout_grounding import (
     READOUT_GROUNDING_INSTRUCTIONS,
@@ -296,6 +297,7 @@ async def _llm_explanation(
         benchmark_symbol=benchmark["benchmark_symbol"],
         date_range=result_payload.get("date_range", strategy.get("date_range")),
         chart=chart,
+        currency_fraction_digits=stored_currency_fraction_digits(result_card),
         comparison_metrics={
             "total_return_pct": returns.total_return,
             "benchmark_return_pct": returns.benchmark_return,

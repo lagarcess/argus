@@ -17,6 +17,7 @@ from argus.agent_runtime.artifact_edit_planner import (
     apply_edit_operations,
 )
 from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+from argus.agent_runtime.result_conversation import _run_sheet
 from argus.agent_runtime.stages import confirm as confirm_module
 from argus.agent_runtime.stages.clarify import clarify_stage
 from argus.agent_runtime.stages.confirm import confirm_stage
@@ -28,6 +29,7 @@ from argus.agent_runtime.stages.launch_validation_recovery import (
 )
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.api import state as api_state
+from argus.api.chat.breakdown import result_breakdown_context
 from argus.api.chat.confirmation import runtime_confirmation_card
 from argus.api.chat.persistence import build_runtime_backtest_run
 from argus.api.main import app
@@ -36,8 +38,16 @@ from argus.domain.backtesting.config import MAX_STARTING_CAPITAL, MIN_STARTING_C
 from argus.domain.dca_capital import DcaCapitalError, build_dca_capital_plan
 from argus.domain.engine_launch.adapter import run_launch_backtest
 from argus.domain.engine_launch.models import LaunchBacktestRequest
+from argus.domain.result_money import (
+    format_result_money,
+    stored_currency_fraction_digits,
+    with_currency_fraction_digits,
+)
 from argus.domain.result_readout_display_values import readout_display_value
-from argus.domain.result_readout_headlines import headline_request_lines
+from argus.domain.result_readout_headlines import (
+    headline_readout_facts,
+    headline_request_lines,
+)
 from argus.domain.result_readout_prompt_facts import readout_prompt_facts
 from babel.numbers import format_decimal
 from fastapi.testclient import TestClient
@@ -170,7 +180,7 @@ def test_a_ten_dollar_run_executes_and_nine_ninety_nine_is_refused(
     assert launch.envelope.execution_status == "succeeded", launch.envelope.failure_reason
     performance = launch.envelope.metrics["aggregate"]["performance"]
     rows = _rows(launch.result_card)
-    assert rows["cash_value"].startswith("$10 -> $")
+    assert rows["cash_value"].startswith("$10.00 -> $")
     assert rows["total_return_pct"] == f"{performance['total_return_pct']:+.1f}%"
 
     refused = run_launch_backtest(_launch_request(strategy_type, UNDER_THE_FLOOR))
@@ -179,67 +189,88 @@ def test_a_ten_dollar_run_executes_and_nine_ninety_nine_is_refused(
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
-def test_a_ten_dollar_result_reads_to_the_cent_and_a_large_one_does_not(
-    language: str,
-) -> None:
+def test_the_card_decides_and_stores_the_precision_once(language: str) -> None:
     small = run_launch_backtest(_launch_request("buy_and_hold", 10.0), language=language)
     performance = small.envelope.metrics["aggregate"]["performance"]
     ending = 10.0 + performance["profit"]
-    assert _rows(small.result_card)["cash_value"] == f"$10 -> ${ending:,.2f}"
-    assert re.fullmatch(r"\$10 -> \$\d+\.\d{2}", _rows(small.result_card)["cash_value"])
+    assert small.result_card["currency_fraction_digits"] == 2
+    assert _rows(small.result_card)["cash_value"] == (
+        f"$10.00 -> {format_result_money(ending, fraction_digits=2)}"
+    )
+    assert re.fullmatch(
+        r"\$10\.00 -> \$\d+\.\d{2}", _rows(small.result_card)["cash_value"]
+    )
 
     large = run_launch_backtest(
         _launch_request("buy_and_hold", 10_000.0), language=language
     )
+    assert large.result_card["currency_fraction_digits"] == 0
     assert re.fullmatch(r"\$10,000 -> \$[\d,]+", _rows(large.result_card)["cash_value"])
+
+    # A card stored before the decision existed reads whole dollars.
+    assert stored_currency_fraction_digits({}) == 0
+
+
+def test_every_backend_reader_rounds_half_up() -> None:
+    for value, digits, text in ((10.125, 2, "$10.13"), (12_048.5, 0, "$12,049")):
+        assert format_result_money(value, fraction_digits=digits) == text
+        shown = readout_display_value(
+            {"value": value, "unit": "currency", "currency": "USD"},
+            language="en",
+            currency_fraction_digits=digits,
+        )
+        assert shown is not None
+        assert shown["text"] == text
 
 
 @pytest.mark.parametrize("language", LANGUAGES)
-def test_readout_money_for_a_ten_dollar_run_keeps_its_cents(language: str) -> None:
+def test_the_readout_reads_the_stored_precision_without_a_series(language: str) -> None:
     money = {"value": 12.05, "unit": "currency", "currency": "USD"}
     expected = "$" + format_decimal(
         Decimal("12.05"), format="#,##0.00", locale=language.replace("-", "_")
     )
-    sheet = {
-        "symbols": ["AAPL"],
-        "benchmark_symbol": "SPY",
-        "facts": {"portfolio.ending_equity": dict(money)},
-        "series": {
-            "portfolio_equity": {
-                "unit": "currency",
-                "currency": "USD",
-                "points": [
-                    {"time": "2024-01-02", "value": 10.0},
-                    {"time": "2024-12-31", "value": 12.05},
-                ],
-            }
-        },
-    }
-    prompt_facts = readout_prompt_facts(sheet, language=language)
-    assert prompt_facts["facts"]["portfolio.ending_equity"]["display"] == expected
-
-    headline = headline_request_lines(
+    sheet = with_currency_fraction_digits(
         {
             "symbols": ["AAPL"],
             "benchmark_symbol": "SPY",
             "facts": {
-                "Highest portfolio value": dict(money),
-                "Ending portfolio value": dict(money),
+                "portfolio.ending_equity": dict(money),
+                "portfolio.peak_equity": dict(money),
             },
+            "series": {},
         },
-        language=language,
+        2,
     )
+
+    prompt_facts = readout_prompt_facts(sheet, language=language)
+    assert prompt_facts["facts"]["portfolio.ending_equity"]["display"] == expected
+    headline = headline_request_lines(headline_readout_facts(sheet), language=language)
     assert f"Ending portfolio value: {expected}" in headline
 
-    large = readout_display_value(
-        {"value": 12_048.4, "unit": "currency", "currency": "USD"},
-        language=language,
-        portfolio_peak=12_048.4,
+
+def test_breakdown_and_conversation_sheets_carry_the_card_precision() -> None:
+    launch = run_launch_backtest(_launch_request("buy_and_hold", 10.0))
+    run = build_runtime_backtest_run(
+        user_id="precision-owner",
+        conversation_id="precision-conversation",
+        result_card=launch.result_card,
+        envelope=launch.envelope.model_dump(mode="python"),
+        default_benchmark_func=lambda _asset_class, _symbols: "SPY",
+        run_id=SOURCE_RUN_ID,
     )
-    assert large is not None
-    assert large["text"] == "$" + format_decimal(
-        12_048, format="#,##0", locale=language.replace("-", "_")
+    assert run is not None
+    assert stored_currency_fraction_digits(run.conversation_result_card) == 2
+    assert stored_currency_fraction_digits(result_breakdown_context(run)) == 2
+    sheet = _run_sheet(
+        {
+            "result_card": run.conversation_result_card,
+            "metrics": run.metrics,
+            "config_snapshot": run.config_snapshot,
+            "symbols": run.symbols,
+            "benchmark_symbol": run.benchmark_symbol,
+        }
     )
+    assert stored_currency_fraction_digits(sheet) == 2
 
 
 # ── Chat ─────────────────────────────────────────────────────────────────────

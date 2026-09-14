@@ -27,12 +27,14 @@ import {
   type ResultChartRangeOption,
   type ResultChartSelection,
 } from "@/lib/result-chart-range";
-import { resultChartPeakValue, resultMoneyFractionDigits } from "@/lib/result-money";
+import { resultMoneyFormatOptions } from "@/lib/result-money";
 import ResultChartExploration from "./ResultChartExploration";
 import { type ResultChartMarker, type ResultChartPayload } from "./types";
 
 type ResultEquityChartProps = {
   chart: ResultChartPayload;
+  /** Money precision the backend stored on the result card. */
+  currencyFractionDigits?: number;
   presentation?: "default" | "heroDeltaEvidence";
   appearanceOverride?: "light" | "dark";
 };
@@ -129,6 +131,7 @@ function resultChartDataForWindow(
 export default function ResultEquityChart({
   chart,
   appearanceOverride,
+  currencyFractionDigits,
   presentation = "default",
 }: ResultEquityChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -164,10 +167,10 @@ export default function ResultEquityChart({
     }),
     [t],
   );
-  const portfolioPeak = useMemo(() => resultChartPeakValue(chart), [chart]);
   const currencyFormatter = useMemo(
-    () => chartCurrencyFormatter(chart.currency, chartLocale, portfolioPeak),
-    [chart.currency, chartLocale, portfolioPeak],
+    () =>
+      chartCurrencyFormatter(chart.currency, chartLocale, currencyFractionDigits),
+    [chart.currency, chartLocale, currencyFractionDigits],
   );
   const data = useMemo<BaselineData<Time>[]>(
     () =>
@@ -650,7 +653,7 @@ export default function ResultEquityChart({
         selection={selection}
         summary={visibleSummary}
         currency={chart.currency}
-        portfolioPeak={portfolioPeak}
+        currencyFractionDigits={currencyFractionDigits}
         locale={i18n.language}
         showTimes={intradayTimes}
         detailsOpen={detailsOpen}
@@ -806,34 +809,22 @@ function resolveChartLocale(locale?: string | null) {
 function chartCurrencyFormatter(
   currency: string | undefined,
   locale: string,
-  portfolioPeak?: number,
+  currencyFractionDigits?: number,
 ) {
-  const byDigits = new Map<number, Intl.NumberFormat>();
-  return {
-    format(value: number) {
-      const digits = resultMoneyFractionDigits(value, portfolioPeak);
-      let formatter = byDigits.get(digits);
-      if (!formatter) {
-        formatter = new Intl.NumberFormat(resolveChartLocale(locale), {
-          style: "currency",
-          currency: currency ?? "USD",
-          minimumFractionDigits: digits,
-          maximumFractionDigits: digits,
-        });
-        byDigits.set(digits, formatter);
-      }
-      return formatter.format(value);
-    },
-  };
+  return new Intl.NumberFormat(resolveChartLocale(locale), {
+    style: "currency",
+    currency: currency ?? "USD",
+    ...resultMoneyFormatOptions(currencyFractionDigits),
+  });
 }
 
 export function formatChartCurrency(
   value: number,
   currency = "USD",
   locale = "en-US",
-  portfolioPeak?: number,
+  currencyFractionDigits?: number,
 ) {
-  return chartCurrencyFormatter(currency, locale, portfolioPeak).format(value);
+  return chartCurrencyFormatter(currency, locale, currencyFractionDigits).format(value);
 }
 
 export function formatChartDateLabel(

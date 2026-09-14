@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
-import { resultMoneyFractionDigits } from "@/lib/result-money";
+import { resultMoneyFormatOptions } from "@/lib/result-money";
 import type {
   ResultChartCustomError,
   ResultChartRangeKey,
@@ -18,7 +18,7 @@ type ResultChartExplorationProps = {
   selection: ResultChartSelection;
   summary: VisibleResultChartSummary | null;
   currency?: string;
-  portfolioPeak?: number;
+  currencyFractionDigits?: number;
   locale: string;
   showTimes: boolean;
   detailsOpen: boolean;
@@ -59,7 +59,7 @@ export default function ResultChartExploration({
   selection,
   summary,
   currency,
-  portfolioPeak,
+  currencyFractionDigits,
   locale,
   showTimes,
   detailsOpen,
@@ -261,7 +261,7 @@ export default function ResultChartExploration({
                 {t("chat.result_chart.range.peak_label", "Highest visible value")}
                 {": "}
                 <span className="font-medium text-black/70 dark:text-white/70">
-                  {formatSummaryCurrency(summary.peak.value, currency, locale, portfolioPeak)}
+                  {formatSummaryCurrency(summary.peak.value, currency, locale, currencyFractionDigits)}
                 </span>
                 {" · "}
                 {formatSummaryTime(summary.peak.time, locale, showTimes)}
@@ -270,7 +270,7 @@ export default function ResultChartExploration({
                 {t("chat.result_chart.range.low_label", "Lowest visible value")}
                 {": "}
                 <span className="font-medium text-black/70 dark:text-white/70">
-                  {formatSummaryCurrency(summary.low.value, currency, locale, portfolioPeak)}
+                  {formatSummaryCurrency(summary.low.value, currency, locale, currencyFractionDigits)}
                 </span>
                 {" · "}
                 {formatSummaryTime(summary.low.time, locale, showTimes)}
@@ -379,13 +379,11 @@ function formatSummaryCurrency(
   value: number,
   currency: string | undefined,
   locale: string,
-  portfolioPeak: number | undefined,
+  currencyFractionDigits: number | undefined,
 ) {
-  const digits = resultMoneyFractionDigits(value, portfolioPeak);
   return new Intl.NumberFormat(resolveIntlLocale(locale), {
     style: "currency",
     currency: currency ?? "USD",
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
+    ...resultMoneyFormatOptions(currencyFractionDigits),
   }).format(value);
 }

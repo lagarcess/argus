@@ -181,6 +181,7 @@ export default function StrategyResultCard({
         <ResultEquityChart
           appearanceOverride={appearance}
           chart={result.chart}
+          currencyFractionDigits={result.currencyFractionDigits}
           presentation="heroDeltaEvidence"
         />
       )}

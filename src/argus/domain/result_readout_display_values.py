@@ -5,22 +5,15 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation
 from typing import Any, TypedDict
 
 from babel.dates import format_date
 from babel.numbers import format_decimal
 
 from argus.domain.display_figure import DISPLAY_DECIMALS, display_figure
-from argus.domain.result_money import (
-    RESULT_DISPLAY_POLICY,
-    result_money_fraction_digits,
-)
+from argus.domain.result_money import CURRENCY_FRACTION_DIGITS, CURRENCY_ROUNDING
 from argus.domain.result_readout_content import normalize_readout_language
-
-_CURRENCY_ROUNDING = {"halfExpand": ROUND_HALF_UP}[
-    RESULT_DISPLAY_POLICY["currency_rounding_mode"]
-]
 
 
 class ReadoutDisplayValue(TypedDict):
@@ -33,14 +26,13 @@ def readout_display_value(
     row: Mapping[str, Any],
     *,
     language: str,
-    portfolio_peak: float | None = None,
+    currency_fraction_digits: int = CURRENCY_FRACTION_DIGITS,
 ) -> ReadoutDisplayValue | None:
     """Match card precision, with unsigned drawdowns and the run's USD currency.
 
     ``value`` is the display-ready reference, not a replacement for the stored
     row's value. Date references keep ISO form while ``text`` is localized.
-    ``portfolio_peak`` is the run's highest portfolio value, which sets how
-    precisely its money reads.
+    ``currency_fraction_digits`` is the precision the run's result card stores.
     """
     normalized = normalize_readout_language(language)
     if normalized is None:
@@ -76,14 +68,10 @@ def readout_display_value(
         if row.get("currency", "USD") != "USD":
             return None
         # Modeled costs are small amounts whose parts must add up, so they keep cents.
-        digits = (
-            2
-            if "currency_cents" in presentation
-            else result_money_fraction_digits(value, peak_value=portfolio_peak)
-        )
+        digits = 2 if "currency_cents" in presentation else currency_fraction_digits
         try:
             amount = Decimal(str(value)).quantize(
-                Decimal(1).scaleb(-digits), rounding=_CURRENCY_ROUNDING
+                Decimal(1).scaleb(-digits), rounding=CURRENCY_ROUNDING
             )
         except InvalidOperation:
             return None

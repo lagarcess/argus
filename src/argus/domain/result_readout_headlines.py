@@ -5,6 +5,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from argus.domain.result_money import (
+    stored_currency_fraction_digits,
+    with_currency_fraction_digits,
+)
 from argus.domain.result_readout_display_values import readout_display_value
 
 _HEADLINES = {
@@ -76,11 +80,14 @@ def headline_readout_facts(sheet: dict[str, Any]) -> dict[str, Any]:
         ):
             label = "Money-weighted annual return"
         selected[label] = row
-    return {
-        "symbols": sheet.get("symbols"),
-        "benchmark_symbol": sheet.get("benchmark_symbol"),
-        "facts": selected,
-    }
+    return with_currency_fraction_digits(
+        {
+            "symbols": sheet.get("symbols"),
+            "benchmark_symbol": sheet.get("benchmark_symbol"),
+            "facts": selected,
+        },
+        stored_currency_fraction_digits(sheet),
+    )
 
 
 def headline_request_lines(sheet: dict[str, Any], *, language: str = "en") -> list[str]:
@@ -90,17 +97,12 @@ def headline_request_lines(sheet: dict[str, Any], *, language: str = "en") -> li
         f"Benchmark: {sheet.get('benchmark_symbol') or 'not available'}",
     ]
     facts = sheet["facts"]
-    peak = (facts.get(_HEADLINES["portfolio.peak_equity"]) or {}).get("value")
-    portfolio_peak = (
-        float(peak)
-        if isinstance(peak, int | float) and not isinstance(peak, bool)
-        else None
-    )
+    digits = stored_currency_fraction_digits(sheet)
 
     def line(label: str) -> str:
         row = facts[label]
         display = readout_display_value(
-            row, language=language, portfolio_peak=portfolio_peak
+            row, language=language, currency_fraction_digits=digits
         )
         return f"{label}: {display['text'] if display else row['value']}"
 

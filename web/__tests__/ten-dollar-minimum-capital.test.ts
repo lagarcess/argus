@@ -6,11 +6,13 @@ import type { TFunction } from "i18next";
 import { directEditErrorText } from "../components/chat/ConfirmationDirectEdit";
 import { formatChartCurrency } from "../components/chat/ResultEquityChart";
 import type { StrategyResultPayload } from "../components/chat/types";
+import { resultCardFromConversationCard } from "../lib/argus-api";
 import {
   recoveryDisplayFromMetadata,
   recoveryDisplayText,
 } from "../lib/chat-recovery-display";
 import { formatCurrency, heroDeltaEvidenceView } from "../lib/result-card-display";
+import { resultReadoutFacts } from "../lib/result-readout-facts";
 
 const root = join(import.meta.dir, "..");
 
@@ -40,7 +42,7 @@ function translator(language: "en" | "es-419"): TFunction {
 function resultWith(
   cashValue: string,
   totalReturn: string,
-  series: number[],
+  options: { digits?: number; series?: number[] } = {},
 ): StrategyResultPayload {
   return {
     title: "AAPL Buy and Hold",
@@ -48,13 +50,18 @@ function resultWith(
       { key: "cash_value", label: "Ending value", value: cashValue },
       { key: "total_return_pct", label: "Total return", value: totalReturn },
     ],
-    chart: {
-      kind: "portfolio_equity",
-      series: series.map((value, index) => ({
-        time: `2024-01-${String(index + 2).padStart(2, "0")}`,
-        value,
-      })),
-    },
+    ...(options.series
+      ? {
+          chart: {
+            kind: "portfolio_equity",
+            series: options.series.map((value, index) => ({
+              time: `2024-01-${String(index + 2).padStart(2, "0")}`,
+              value,
+            })),
+          },
+        }
+      : {}),
+    ...(options.digits === undefined ? {} : { currencyFractionDigits: options.digits }),
   } as unknown as StrategyResultPayload;
 }
 
@@ -113,27 +120,55 @@ describe("the $10 starting-capital floor", () => {
   }
 });
 
-describe("a $10 result reads in cents", () => {
-  test("the hero, its change, and the starting capital", () => {
-    const view = heroDeltaEvidenceView(resultWith("$10 -> $12.05", "+20.5%", [10, 11.2, 12.05]));
+describe("result money reads the precision stored on the card", () => {
+  test("a $10 run's hero, change, and starting capital read in cents", () => {
+    const view = heroDeltaEvidenceView(
+      resultWith("$10.00 -> $12.05", "+20.5%", { digits: 2, series: [10, 11.2, 12.05] }),
+    );
     expect(view.hero.value).toBe("$12.05");
     expect(view.hero.detail).toBe("+$2.05 gain · +20.5% total return");
-    expect(view.details).toContainEqual({ label: "Starting capital", value: "$10" });
+    expect(view.details).toContainEqual({ label: "Starting capital", value: "$10.00" });
+  });
+
+  test("the precision does not depend on the chart", () => {
+    const view = heroDeltaEvidenceView(resultWith("$10.00 -> $12.05", "+20.5%", { digits: 2 }));
+    expect(view.hero.value).toBe("$12.05");
+    expect(view.hero.detail).toBe("+$2.05 gain · +20.5% total return");
   });
 
   test("a change under a dollar is not rounded away", () => {
-    const view = heroDeltaEvidenceView(resultWith("$10 -> $10.40", "+4.0%", [10, 10.4]));
+    const view = heroDeltaEvidenceView(resultWith("$10.00 -> $10.40", "+4.0%", { digits: 2 }));
     expect(view.hero.detail).toBe("+$0.40 gain · +4.0% total return");
     expect(view.hero.tone).toBe("positive");
   });
 
-  test("the equity chart axis and tooltip", () => {
-    expect(formatChartCurrency(12.05, "USD", "en-US", 12.05)).toBe("$12.05");
-    expect(formatChartCurrency(10, "USD", "en-US", 12.05)).toBe("$10");
+  test("the stored value travels from the card to the result and its readout facts", () => {
+    const card = {
+      title: "AAPL Buy and Hold",
+      date_range: { start: "2024-01-02", end: "2024-12-31", display: "2024" },
+      status_label: "Simulation Complete",
+      rows: [],
+      assumptions: [],
+      actions: [],
+      currency_fraction_digits: 2,
+    };
+    expect(resultCardFromConversationCard(card).currencyFractionDigits).toBe(2);
+    expect(resultReadoutFacts({ symbols: ["AAPL"], result_card: card })?.currencyFractionDigits).toBe(2);
+  });
+
+  test("the equity chart reads the stored value", () => {
+    expect(formatChartCurrency(12.05, "USD", "en-US", 2)).toBe("$12.05");
+    expect(formatChartCurrency(10, "USD", "en-US", 2)).toBe("$10.00");
+  });
+
+  test("every reader rounds half up", () => {
+    expect(formatCurrency(10.125, "en-US", "USD", 2)).toBe("$10.13");
+    expect(formatChartCurrency(10.125, "USD", "en-US", 2)).toBe("$10.13");
+    expect(formatCurrency(12_048.5, "en-US", "USD", 0)).toBe("$12,049");
   });
 
   test("Spanish money keeps its cents with the viewer's separators", () => {
-    expect(formatCurrency(12.05, "es-419", "USD", 12.05)).toBe(
+    expect(formatCurrency(12.05, "es-419", "USD", 2)).toBe(
       new Intl.NumberFormat("es-419", {
         style: "currency",
         currency: "USD",
@@ -144,12 +179,15 @@ describe("a $10 result reads in cents", () => {
     );
   });
 
-  test("a run that reached $1,000 keeps whole dollars", () => {
-    const view = heroDeltaEvidenceView(
-      resultWith("$1,000 -> $1,350", "+35.0%", [1000, 850.37, 1350]),
+  test("a run that reached $1,000 and a card stored before the field keep whole dollars", () => {
+    const large = heroDeltaEvidenceView(
+      resultWith("$1,000 -> $1,350", "+35.0%", { digits: 0, series: [1000, 850.37, 1350] }),
     );
-    expect(view.hero.value).toBe("$1,350");
-    expect(view.hero.detail).toBe("+$350 gain · +35.0% total return");
-    expect(formatChartCurrency(850.37, "USD", "en-US", 1350)).toBe("$850");
+    expect(large.hero.value).toBe("$1,350");
+    expect(large.hero.detail).toBe("+$350 gain · +35.0% total return");
+
+    const legacy = heroDeltaEvidenceView(resultWith("$10 -> $12", "+20.5%"));
+    expect(legacy.hero.value).toBe("$12");
+    expect(formatChartCurrency(850.37, "USD", "en-US")).toBe("$850");
   });
 });
