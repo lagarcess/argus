@@ -21,6 +21,18 @@ privacy-safe labels from canary evidence.
 - Rollback target:
 - Decision record:
 
+## Live Eval Evidence
+
+Evidence stands for the build it names only when nothing the measurement can
+reach changed between them (`tests/promotion_evidence_identity.py`). Name the
+measured SHA beside each piece of evidence whenever it differs from that build.
+
+- Live eval scorecard:
+- Live eval measured SHA:
+- Baseline eval scorecard:
+- Baseline measured SHA:
+- Targeted A/B documents, each side's measured SHA and rate:
+
 ## Production Migration Gate
 
 - Gate command: `scripts/ops/production_migration_gate.py`

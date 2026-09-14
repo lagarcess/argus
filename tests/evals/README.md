@@ -107,8 +107,9 @@ Run the mocked suite everywhere; it is free and safe.
 Run the live suite at exactly three moments:
 
 1. Once pre-merge on any PR that changes runtime behavior.
-2. On every `main` promotion candidate, as a full run on the exact SHA with no
-   unexpected failures.
+2. On every `main` promotion candidate, as a full run with no unexpected
+   failures, measured at the candidate or at a commit the measurement cannot
+   tell apart from it (`tests/promotion_evidence_identity.py`).
 3. After any interpreter model or provider change.
 
 Live results can vary. If one failure is surprising, rerun once, then

@@ -1562,9 +1562,9 @@ and #612.
 
 The board does not wait for the vision to be complete. Each checkpoint is
 cohesive on its own, and cutting them small is cheaper as well as safer:
-`eval_measured_code_unchanged` in the promotion gate returns early when a change
-cannot reach the measured code, so a checkpoint that does not touch the
-interpreter promotes **without a $1.33 live eval run**.
+the promotion gate carries a scorecard forward across any change the eval cannot
+reach (`tests/promotion_evidence_identity.py`), so a checkpoint that touches
+nothing the eval imports promotes **without a new $1.33 live eval run**.
 
 | Release | Ships | What a user sees | Live eval |
 | --- | --- | --- | --- |
