@@ -13,6 +13,11 @@ cd web && PLAYWRIGHT_PORT=3609 ARGUS_EVIDENCE_DIR="$PWD/../docs/reports/evidence
 
 Result: 4 passed (5.5s).
 
+Re-validated at `78eaaae2`, after merging integration `cb81e494`, which brought
+#615's support-address web files: 4 passed (5.5s). The screenshots were
+captured at `d819b09d`; the merge changed the profile menu's support address
+and the legal pages, not the recovery notice.
+
 The screenshots show the founder's copy from 2026-09-13, which holds whether or
 not an answer appears above the notice: "I couldn't finish looking that up just
 now. Try again in a moment." and "I can't look that up right now.", with the
