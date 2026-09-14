@@ -38,6 +38,16 @@ for that gate.
 
 ## Free verification
 
+After the authorized removal and second reconciliation, runtime commit
+`c91859d5f7a26d99445e2eecb6f55abe58fa994b` passes the full provider-free suite:
+**8636 passed, 604 skipped, 1 expected prompt-freeze failure**. The local
+worktree's `.env` symlink was temporarily set aside and restored automatically
+so local feature flags did not contaminate the CI configuration. No provider
+credentials were available to the run. Repository lint, the merged-tree
+modularity budget, and both package builds pass. The only subsequent change
+before publishing is this evidence update.
+
+
 At reconciled runtime commit `948a085f0378aadcec064d75fa7bade07f670888`:
 
 - 53 new regression checks fail against source archived from original
@@ -95,6 +105,17 @@ it does not claim today's validator rejects $100.
 - Retained: original-source red proof. Revalidated: focused deterministic
   evidence on the merged tree. No paid or browser evidence exists to retain.
 
+A second one-way reconciliation merged current integration
+`fc3d1414ed8eb4c81fa3f5aedf7e68254f65df5f` as
+`c91859d5f7a26d99445e2eecb6f55abe58fa994b`, after removal commit `089866dd`.
+Incoming result-card and menu changes do not touch the reply/date owners;
+the API document edits remain in separate paragraphs. Incoming eval changes
+add schema-v3 model/flag provenance, which the paid measurement must now use.
+There is no lane migration, environment variable, or frontend state change.
+The full suite revalidates the shared eval acceptance surface, and the merged
+tree passes modularity. Original red evidence is retained; no paid evidence
+exists to invalidate.
+
 ## Proposed paid gate
 
 Proposed total spend ceiling: **US$5**, pending founder approval. Scope: the
@@ -109,7 +130,7 @@ not an all-in price guarantee. A bounded reservation must account for those
 unpriced routes before dispatch. Spend so far in this lane: $0.
 
 After approval: measure, compare every existing case, commit evidence and the
-new fingerprint, finish exact-head CI and Codex review, then report without
+new fingerprint with schema-v3 release configuration provenance, finish exact-head CI and Codex review, then report without
 merging. If Codex raises a second finding on the same mechanism, stop and
 report instead of applying another fix.
 
@@ -130,5 +151,6 @@ guard remain intact.
 The modal “May I … calendar year 2024?” regression fails at `cb7b4df8` and
 passes after removal. All 57 focused lane checks pass, including the updated
 three-turn replay, all reply kinds and both languages/writers, the partial-year
-guard, and the English/Spanish live fixture expectations. Full-suite and
-removal-only review results will be recorded at the final head.
+guard, and the English/Spanish live fixture expectations. The full-suite result is recorded above. The removal-only review and CI
+results will be recorded in a terminal PR comment at the final head; this
+progress document does not predate them as a terminal audit.
