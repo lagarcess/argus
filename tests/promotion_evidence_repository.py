@@ -1,0 +1,193 @@
+"""A git repository shaped like the live measurement, for evidence identity tests.
+
+It holds one file of each kind the identity policy separates, so a test changes
+one kind and asks whether evidence measured before the change still stands.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from collections.abc import Iterable, Mapping
+from pathlib import Path
+
+from tests.evals.measurement_eval_scorecard import (
+    measurement_fixture_identity_at_git_sha,
+)
+from tests.promotion_evidence_identity import MEASUREMENT_ENTRY
+
+PYTHON_VERSION = "3.10.20"
+MEASUREMENT_CASES = "tests/evals/measurement_cases/messy_english.yaml"
+
+# Each reaches the measurement, so changing it needs a new one.
+REACHED_BY_THE_EVAL = {
+    "imported-module": "src/argus/stages.py",
+    "lazily-imported-module": "src/argus/engine.py",
+    "package-named-by-a-string": "web/argus_display_contract/__init__.py",
+    "data-beside-measured-code": "web/argus_display_contract/policy.json",
+    "eval-harness": "tests/evals/measurement_eval_harness.py",
+    "conftest": "tests/conftest.py",
+    "eval-fixture": MEASUREMENT_CASES,
+    "dependency-lock": "poetry.lock",
+}
+
+# None reaches the measurement, so evidence survives changing them.
+UNREACHED_BY_THE_EVAL = {
+    "release-flags": ("render.yaml", ".github/private-alpha-release-profile.json"),
+    "migration": ("supabase/migrations/20260913000000_example.sql",),
+    "frontend": ("web/app/page.tsx",),
+    "docs": ("docs/release-manifests/notes.md",),
+    "module-the-eval-never-imports": ("src/argus/unmeasured.py",),
+    "test-the-eval-never-imports": ("tests/evals/test_unrelated.py",),
+}
+
+
+def commit_measured_repository(
+    repository_root: Path, *, case_ids: Iterable[str] = ("case-a", "case-b")
+) -> str:
+    """Initialise a repository holding every kind of file, and commit it."""
+
+    _git(repository_root, "init", "--quiet")
+    for relative, content in _layout(case_ids).items():
+        path = repository_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    return _commit(repository_root, "measured")
+
+
+def commit_changes(repository_root: Path, paths: Iterable[str]) -> str:
+    """Change each file by a trailing newline, which keeps every format valid."""
+
+    for relative in paths:
+        path = repository_root / relative
+        path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    return _commit(repository_root, "change")
+
+
+def live_eval_scorecard(repository_root: Path, *, measured_sha: str) -> dict[str, object]:
+    """A passing live scorecard, as the eval writes one at `measured_sha`."""
+
+    identity = measurement_fixture_identity_at_git_sha(
+        candidate_sha=measured_sha, repository_root=repository_root
+    )
+    return {
+        "schema_version": 2,
+        "provenance": {
+            "evaluation_mode": "live",
+            "market_data_provider_mode": "live_provider",
+            "asset_provider_mode": "live_provider",
+            "candidate_sha": measured_sha,
+            "python_version": PYTHON_VERSION,
+            "fixture_sha256": identity.sha256,
+            "fixture_case_ids": list(identity.case_ids),
+            "worktree_clean": True,
+            "live_market_data_probe": {
+                "requested_date_range": {"start": "2024-01-01", "end": "2024-01-10"},
+                "effective_date_range": {"start": "2024-01-02", "end": "2024-01-10"},
+                "adjustment_reason": "calendar_alignment",
+            },
+        },
+        "totals": {
+            "passed": len(identity.case_ids),
+            "failed": 0,
+            "expected_failed": 0,
+            "unexpected_pass": 0,
+            "skipped": 0,
+        },
+        "results": [
+            {"id": case_id, "category": "messy_english", "status": "passed"}
+            for case_id in identity.case_ids
+        ],
+    }
+
+
+def write_evidence(
+    repository_root: Path, name: str, document: Mapping[str, object]
+) -> str:
+    """Write durable evidence and return the path a manifest cites."""
+
+    relative = f"docs/reports/evidence/promotion/{name}"
+    path = repository_root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return relative
+
+
+def _layout(case_ids: Iterable[str]) -> dict[str, str]:
+    return {
+        "pyproject.toml": (
+            "[tool.poetry]\n"
+            "packages = [\n"
+            '    {include = "argus", from = "src"},\n'
+            '    {include = "argus_display_contract", from = "web"},\n'
+            "]\n\n"
+            "[tool.pytest.ini_options]\n"
+            'pythonpath = ["src", "."]\n'
+        ),
+        "poetry.lock": '[[package]]\nname = "pydantic"\nversion = "2.11.0"\n',
+        ".python-version": f"{PYTHON_VERSION}\n",
+        "tests/__init__.py": "",
+        "tests/conftest.py": "import pytest\n",
+        "tests/evals/__init__.py": "",
+        MEASUREMENT_ENTRY: (
+            "from tests.evals.measurement_eval_harness import run_eval_case\n"
+        ),
+        "tests/evals/measurement_eval_harness.py": (
+            "from argus.stages import interpret\n\n\n"
+            "def run_eval_case(case):\n"
+            "    from argus.engine import execute\n\n"
+            "    return execute(interpret(case))\n"
+        ),
+        "tests/evals/test_unrelated.py": "def test_unrelated():\n    assert True\n",
+        MEASUREMENT_CASES: json.dumps(
+            {
+                "category": "messy_english",
+                "cases": [{"id": case_id} for case_id in case_ids],
+            },
+            sort_keys=True,
+        ),
+        "src/argus/__init__.py": "",
+        "src/argus/stages.py": (
+            "from importlib.resources import files\n\n\n"
+            "def interpret(case):\n"
+            '    return files("argus_display_contract").joinpath("policy.json").read_text()\n'
+        ),
+        "src/argus/engine.py": "def execute(value):\n    return value\n",
+        "src/argus/unmeasured.py": "VALUE = 1\n",
+        "web/argus_display_contract/__init__.py": "",
+        "web/argus_display_contract/policy.json": "{}\n",
+        "web/app/page.tsx": "export default function Page() {\n  return null;\n}\n",
+        "render.yaml": "services: []\n",
+        ".github/private-alpha-release-profile.json": "{}\n",
+        "supabase/migrations/20260913000000_example.sql": "select 1;\n",
+        "docs/release-manifests/notes.md": "# Notes\n",
+    }
+
+
+def _commit(repository_root: Path, message: str) -> str:
+    _git(repository_root, "add", "--all")
+    _git(
+        repository_root,
+        "-c",
+        "user.name=Argus Release Test",
+        "-c",
+        "user.email=release-test@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "-m",
+        message,
+    )
+    return _git(repository_root, "rev-parse", "HEAD")
+
+
+def _git(repository_root: Path, *args: str) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=repository_root,
+        capture_output=True,
+        check=True,
+        text=True,
+    )
+    return completed.stdout.strip()
