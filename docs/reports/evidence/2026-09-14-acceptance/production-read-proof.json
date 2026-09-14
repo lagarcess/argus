@@ -1,0 +1,16 @@
+{
+  "approved": true,
+  "production_transaction": "BEGIN TRANSACTION READ ONLY; verified on; ROLLBACK",
+  "ssl": "verify-full with canonical CA",
+  "window_start": "2026-08-12T00:00:00+00:00",
+  "window_end": "2026-08-13T04:00:00+00:00",
+  "cohort_conversations": 15,
+  "ordered_user_turns": 38,
+  "identities_serialized": false,
+  "private_directory_mode": "0o700",
+  "private_input_mode": "0o600",
+  "input_written_at": "2026-09-14T17:38:10.494486+00:00",
+  "pull_driver_sha256": "778217d42b5b35728e697c2196a3dbe25756f12e0f08d60056d9287099e2d25e",
+  "counts_match_prior_promotion": true,
+  "customer_text_included": false
+}

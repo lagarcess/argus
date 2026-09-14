@@ -1,0 +1,2637 @@
+{
+  "label": "guest-q1-es-419",
+  "phase": "guest",
+  "question": "q1",
+  "language": "es-419",
+  "country": null,
+  "account_kind": "guest",
+  "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+  "message": "¿Cuánto debo ahorrar mensual si gano 38,000 pesos y quiero una iPad?",
+  "answer": {
+    "id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+    "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+    "role": "assistant",
+    "content": "Para un iPad básico comprado de contado, tendrías que ahorrar **MXN 708.25 al mes** durante 12 meses. Tomé como ejemplo el iPad estándar con precio inicial de **MXN 8,499**, publicado por Apple México y consultado en 2026-09-14.\n\n### Supuestos del cálculo\n\n- Moneda: pesos mexicanos.\n- Ahorro inicial: **MXN 0**.\n- Plazo asumido: **12 meses**, porque no indicaste una fecha límite.\n- Rendimiento del ahorro: **0%**.\n- Aportaciones al final de cada mes.\n- No se incluyeron accesorios, AppleCare+, envío ni posibles cambios de precio.\n\n### Fórmula\n\n**Ahorro mensual = precio del iPad ÷ meses disponibles**\n\nTu ingreso por sí solo no permite determinar cuánto puedes separar sin conocer tus gastos y compromisos mensuales; el cálculo únicamente distribuye el precio actual entre el plazo asumido. El modelo exacto y la fecha en que quieres comprarlo no fueron indicados.",
+    "created_at": "2026-09-14T17:36:01.580506Z",
+    "metadata": {
+      "research": {
+        "rows": [
+          {
+            "kind": "currency",
+            "unit": "MXN",
+            "as_of": null,
+            "label": "precio inicial de contado",
+            "value": 8499,
+            "symbol": null,
+            "subject": "iPad",
+            "source_url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+          }
+        ],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.12561,
+          "latency_ms": 31161,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://www.apple.com/mx/shop/buy-ipad/ipad",
+            "title": "Compra el iPad",
+            "domain": "www.apple.com",
+            "source_date": null
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "¿Cuánto tendría que ahorrar para un iPad Air o un iPad mini?",
+            "¿Cómo cambia la mensualidad si quiero comprarlo en menos tiempo?",
+            "¿Puedes calcularlo considerando cuánto gasto cada mes?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T17:36:01.422708+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "¿Cuánto tendría que ahorrar para un iPad Air o un iPad mini?",
+            "type": "question"
+          },
+          {
+            "text": "¿Cómo cambia la mensualidad si quiero comprarlo en menos tiempo?",
+            "type": "question"
+          },
+          {
+            "text": "¿Puedes calcularlo considerando cuánto gasto cada mes?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "computation": {
+        "kind": "time_value",
+        "inputs": {
+          "payment": null,
+          "periods": 12,
+          "sources": {
+            "periods": {
+              "kind": "assumption"
+            },
+            "direction": {
+              "kind": "assumption"
+            },
+            "start_date": {
+              "kind": "user"
+            },
+            "future_value": {
+              "url": "https://www.apple.com/mx/shop/buy-ipad/ipad",
+              "kind": "page",
+              "title": "Compra el iPad"
+            },
+            "present_value": {
+              "kind": "assumption"
+            },
+            "payment_timing": {
+              "kind": "assumption"
+            },
+            "annual_rate_pct": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
+            }
+          },
+          "currency": "MXN",
+          "direction": "save",
+          "start_date": "2026-09-14",
+          "future_value": 8499,
+          "present_value": 0,
+          "payment_timing": "end",
+          "annual_rate_pct": 0,
+          "periods_per_year": 12
+        }
+      },
+      "conversation_mode": "guide",
+      "tool_result_cards": [
+        {
+          "kind": "tool_result",
+          "call_id": "answer-89a2da02-26b3-4fd0-ad91-4cb6f779670f",
+          "outcome": {
+            "result": {
+              "notes": [],
+              "payment": 708.25,
+              "periods": 12,
+              "balances": [
+                708.25,
+                1416.5,
+                2124.75,
+                2833,
+                3541.25,
+                4249.5,
+                4957.75,
+                5666,
+                6374.25,
+                7082.5,
+                7790.75,
+                8499
+              ],
+              "future_value": 8499,
+              "solved_field": "payment",
+              "solved_value": 708.25,
+              "present_value": 0,
+              "total_interest": 0,
+              "total_payments": 8499,
+              "annual_rate_pct": 0
+            },
+            "status": "succeeded",
+            "failure": null
+          },
+          "arguments": {
+            "payment": null,
+            "periods": 12,
+            "sources": {
+              "periods": {
+                "kind": "assumption"
+              },
+              "direction": {
+                "kind": "assumption"
+              },
+              "start_date": {
+                "kind": "user"
+              },
+              "future_value": {
+                "url": "https://www.apple.com/mx/shop/buy-ipad/ipad",
+                "kind": "page",
+                "title": "Compra el iPad"
+              },
+              "present_value": {
+                "kind": "assumption"
+              },
+              "payment_timing": {
+                "kind": "assumption"
+              },
+              "annual_rate_pct": {
+                "kind": "assumption"
+              },
+              "periods_per_year": {
+                "kind": "assumption"
+              }
+            },
+            "currency": "MXN",
+            "direction": "save",
+            "start_date": "2026-09-14",
+            "future_value": 8499,
+            "present_value": 0,
+            "payment_timing": "end",
+            "annual_rate_pct": 0,
+            "periods_per_year": 12
+          },
+          "card_type": "time_value",
+          "tool_name": "time_value",
+          "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+          "card_version": 1,
+          "presentation": {
+            "rows": [
+              {
+                "name": "total_payments",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "MXN"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.total_payments",
+                  "interpolation_args": {}
+                },
+                "value": 8499,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              },
+              {
+                "name": "total_growth",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "MXN"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.total_growth",
+                  "interpolation_args": {}
+                },
+                "value": 0,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              },
+              {
+                "name": "future_value",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "MXN"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.future_value",
+                  "interpolation_args": {}
+                },
+                "value": 8499,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              }
+            ],
+            "notes": [],
+            "title": {
+              "locale_key": "tools.calc.time_value.title_save",
+              "interpolation_args": {}
+            },
+            "answer": {
+              "name": "payment",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "MXN"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.payment",
+                "interpolation_args": {}
+              },
+              "value": 708.25,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            "inputs": [
+              {
+                "name": "direction",
+                "unit": null,
+                "label": {
+                  "locale_key": "tools.calc.fields.direction",
+                  "interpolation_args": {}
+                },
+                "value": "save",
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": false,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "present_value",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "MXN"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.present_value",
+                  "interpolation_args": {}
+                },
+                "value": 0,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "payment",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "MXN"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.payment",
+                  "interpolation_args": {}
+                },
+                "value": null,
+                "source": {
+                  "kind": "computed"
+                },
+                "driving": false,
+                "unknown": true,
+                "editable": false,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "future_value",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "MXN"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.future_value",
+                  "interpolation_args": {}
+                },
+                "value": 8499,
+                "source": {
+                  "url": "https://www.apple.com/mx/shop/buy-ipad/ipad",
+                  "kind": "page",
+                  "title": "Compra el iPad"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "annual_rate_pct",
+                "unit": {
+                  "locale_key": "chat.tools.units.percent",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.annual_rate_pct",
+                  "interpolation_args": {}
+                },
+                "value": 0,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "periods",
+                "unit": {
+                  "locale_key": "tools.calc.units.months",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.periods",
+                  "interpolation_args": {}
+                },
+                "value": 12,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "periods_per_year",
+                "unit": null,
+                "label": {
+                  "locale_key": "tools.calc.fields.periods_per_year",
+                  "interpolation_args": {}
+                },
+                "value": 12,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": false,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "payment_timing",
+                "unit": null,
+                "label": {
+                  "locale_key": "tools.calc.fields.payment_timing",
+                  "interpolation_args": {}
+                },
+                "value": "end",
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": false,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              }
+            ],
+            "visual": {
+              "kind": "value_path",
+              "series": [
+                {
+                  "time": "2026-10-14",
+                  "value": 708.25
+                },
+                {
+                  "time": "2026-11-14",
+                  "value": 1416.5
+                },
+                {
+                  "time": "2026-12-14",
+                  "value": 2124.75
+                },
+                {
+                  "time": "2027-01-14",
+                  "value": 2833
+                },
+                {
+                  "time": "2027-02-14",
+                  "value": 3541.25
+                },
+                {
+                  "time": "2027-03-14",
+                  "value": 4249.5
+                },
+                {
+                  "time": "2027-04-14",
+                  "value": 4957.75
+                },
+                {
+                  "time": "2027-05-14",
+                  "value": 5666
+                },
+                {
+                  "time": "2027-06-14",
+                  "value": 6374.25
+                },
+                {
+                  "time": "2027-07-14",
+                  "value": 7082.5
+                },
+                {
+                  "time": "2027-08-14",
+                  "value": 7790.75
+                },
+                {
+                  "time": "2027-09-14",
+                  "value": 8499
+                }
+              ],
+              "currency": "MXN",
+              "base_value": 0
+            },
+            "sources": [],
+            "narrative": null
+          },
+          "artifact_state": "active",
+          "input_revision": 0,
+          "schema_version": 1
+        }
+      ],
+      "agent_runtime_turn": {
+        "turn_id": "8915b019-a5c7-4114-a70a-ecb6a2810336",
+        "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "answer_assumptions": [
+        {
+          "name": "direction",
+          "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c"
+        },
+        {
+          "name": "periods_per_year",
+          "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c"
+        },
+        {
+          "name": "payment_timing",
+          "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c"
+        }
+      ],
+      "answer_text_template": {
+        "text": "Para un iPad básico comprado de contado, tendrías que ahorrar **{{payment}} MXN al mes** durante {{periods}} meses. Tomé como ejemplo el iPad estándar con precio inicial de **{{future_value}} MXN**, publicado por Apple México y consultado en {{start_date}}.\n\n### Supuestos del cálculo\n\n- Moneda: pesos mexicanos.\n- Ahorro inicial: **{{present_value}} MXN**.\n- Plazo asumido: **{{periods}} meses**, porque no indicaste una fecha límite.\n- Rendimiento del ahorro: **{{annual_rate_pct}}%**.\n- Aportaciones al final de cada mes.\n- No se incluyeron accesorios, AppleCare+, envío ni posibles cambios de precio.\n\n### Fórmula\n\n**Ahorro mensual = precio del iPad ÷ meses disponibles**\n\nTu ingreso por sí solo no permite determinar cuánto puedes separar sin conocer tus gastos y compromisos mensuales; el cálculo únicamente distribuye el precio actual entre el plazo asumido. El modelo exacto y la fecha en que quieres comprarlo no fueron indicados.",
+        "cards": {
+          "ipad_basico": "4a5c48db-ce27-4a46-a596-dc4a3601698c"
+        },
+        "language": "es-419"
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "Para un iPad básico comprado de contado, tendrías que ahorrar **MXN 708.25 al mes** durante 12 meses. Tomé como ejemplo el iPad estándar con precio inicial de **MXN 8,499**, publicado por Apple México y consultado en 2026-09-14.\n\n### Supuestos del cálculo\n\n- Moneda: pesos mexicanos.\n- Ahorro inicial: **MXN 0**.\n- Plazo asumido: **12 meses**, porque no indicaste una fecha límite.\n- Rendimiento del ahorro: **0%**.\n- Aportaciones al final de cada mes.\n- No se incluyeron accesorios, AppleCare+, envío ni posibles cambios de precio.\n\n### Fórmula\n\n**Ahorro mensual = precio del iPad ÷ meses disponibles**\n\nTu ingreso por sí solo no permite determinar cuánto puedes separar sin conocer tus gastos y compromisos mensuales; el cálculo únicamente distribuye el precio actual entre el plazo asumido. El modelo exacto y la fecha en que quieres comprarlo no fueron indicados."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [
+          {
+            "artifact_kind": "tool_result",
+            "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+            "artifact_status": "active",
+            "metadata": {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "time_value",
+              "call_id": "answer-89a2da02-26b3-4fd0-ad91-4cb6f779670f",
+              "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+              "input_revision": 0,
+              "card_type": "time_value",
+              "card_version": 1,
+              "arguments": {
+                "currency": "MXN",
+                "sources": {
+                  "direction": {
+                    "kind": "assumption"
+                  },
+                  "present_value": {
+                    "kind": "assumption"
+                  },
+                  "future_value": {
+                    "kind": "page",
+                    "title": "Compra el iPad",
+                    "url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+                  },
+                  "annual_rate_pct": {
+                    "kind": "assumption"
+                  },
+                  "periods": {
+                    "kind": "assumption"
+                  },
+                  "periods_per_year": {
+                    "kind": "assumption"
+                  },
+                  "payment_timing": {
+                    "kind": "assumption"
+                  },
+                  "start_date": {
+                    "kind": "user"
+                  }
+                },
+                "direction": "save",
+                "present_value": 0,
+                "payment": null,
+                "future_value": 8499,
+                "annual_rate_pct": 0,
+                "periods": 12,
+                "periods_per_year": 12,
+                "payment_timing": "end",
+                "start_date": "2026-09-14"
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "payment",
+                  "solved_value": 708.25,
+                  "present_value": 0,
+                  "payment": 708.25,
+                  "future_value": 8499,
+                  "annual_rate_pct": 0,
+                  "periods": 12,
+                  "total_payments": 8499,
+                  "total_interest": 0,
+                  "balances": [
+                    708.25,
+                    1416.5,
+                    2124.75,
+                    2833,
+                    3541.25,
+                    4249.5,
+                    4957.75,
+                    5666,
+                    6374.25,
+                    7082.5,
+                    7790.75,
+                    8499
+                  ],
+                  "notes": []
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.time_value.title_save",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "payment",
+                  "label": {
+                    "locale_key": "tools.calc.fields.payment",
+                    "interpolation_args": {}
+                  },
+                  "value": 708.25,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "MXN"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": {
+                  "kind": "value_path",
+                  "currency": "MXN",
+                  "base_value": 0,
+                  "series": [
+                    {
+                      "time": "2026-10-14",
+                      "value": 708.25
+                    },
+                    {
+                      "time": "2026-11-14",
+                      "value": 1416.5
+                    },
+                    {
+                      "time": "2026-12-14",
+                      "value": 2124.75
+                    },
+                    {
+                      "time": "2027-01-14",
+                      "value": 2833
+                    },
+                    {
+                      "time": "2027-02-14",
+                      "value": 3541.25
+                    },
+                    {
+                      "time": "2027-03-14",
+                      "value": 4249.5
+                    },
+                    {
+                      "time": "2027-04-14",
+                      "value": 4957.75
+                    },
+                    {
+                      "time": "2027-05-14",
+                      "value": 5666
+                    },
+                    {
+                      "time": "2027-06-14",
+                      "value": 6374.25
+                    },
+                    {
+                      "time": "2027-07-14",
+                      "value": 7082.5
+                    },
+                    {
+                      "time": "2027-08-14",
+                      "value": 7790.75
+                    },
+                    {
+                      "time": "2027-09-14",
+                      "value": 8499
+                    }
+                  ]
+                },
+                "rows": [
+                  {
+                    "name": "total_payments",
+                    "label": {
+                      "locale_key": "tools.calc.fields.total_payments",
+                      "interpolation_args": {}
+                    },
+                    "value": 8499,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "total_growth",
+                    "label": {
+                      "locale_key": "tools.calc.fields.total_growth",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "future_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.future_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 8499,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "direction",
+                    "label": {
+                      "locale_key": "tools.calc.fields.direction",
+                      "interpolation_args": {}
+                    },
+                    "value": "save",
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "present_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.present_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "payment",
+                    "label": {
+                      "locale_key": "tools.calc.fields.payment",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "future_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.future_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 8499,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "Compra el iPad",
+                      "url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "annual_rate_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.annual_rate_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "periods",
+                    "label": {
+                      "locale_key": "tools.calc.fields.periods",
+                      "interpolation_args": {}
+                    },
+                    "value": 12,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.months",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "periods_per_year",
+                    "label": {
+                      "locale_key": "tools.calc.fields.periods_per_year",
+                      "interpolation_args": {}
+                    },
+                    "value": 12,
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "payment_timing",
+                    "label": {
+                      "locale_key": "tools.calc.fields.payment_timing",
+                      "interpolation_args": {}
+                    },
+                    "value": "end",
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          }
+        ],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "Para un iPad básico comprado de contado, tendrías que ahorrar **MXN 708.25 al mes** durante 12 meses. Tomé como ejemplo el iPad estándar con precio inicial de **MXN 8,499**, publicado por Apple México y consultado en 2026-09-14.\n\n### Supuestos del cálculo\n\n- Moneda: pesos mexicanos.\n- Ahorro inicial: **MXN 0**.\n- Plazo asumido: **12 meses**, porque no indicaste una fecha límite.\n- Rendimiento del ahorro: **0%**.\n- Aportaciones al final de cada mes.\n- No se incluyeron accesorios, AppleCare+, envío ni posibles cambios de precio.\n\n### Fórmula\n\n**Ahorro mensual = precio del iPad ÷ meses disponibles**\n\nTu ingreso por sí solo no permite determinar cuánto puedes separar sin conocer tus gastos y compromisos mensuales; el cálculo únicamente distribuye el precio actual entre el plazo asumido. El modelo exacto y la fecha en que quieres comprarlo no fueron indicados.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "¿Cuánto tendría que ahorrar para un iPad Air o un iPad mini?"
+            },
+            {
+              "type": "question",
+              "text": "¿Cómo cambia la mensualidad si quiero comprarlo en menos tiempo?"
+            },
+            {
+              "type": "question",
+              "text": "¿Puedes calcularlo considerando cuánto gasto cada mes?"
+            }
+          ]
+        },
+        "answer_text_template": {
+          "cards": {
+            "ipad_basico": "4a5c48db-ce27-4a46-a596-dc4a3601698c"
+          },
+          "text": "Para un iPad básico comprado de contado, tendrías que ahorrar **{{payment}} MXN al mes** durante {{periods}} meses. Tomé como ejemplo el iPad estándar con precio inicial de **{{future_value}} MXN**, publicado por Apple México y consultado en {{start_date}}.\n\n### Supuestos del cálculo\n\n- Moneda: pesos mexicanos.\n- Ahorro inicial: **{{present_value}} MXN**.\n- Plazo asumido: **{{periods}} meses**, porque no indicaste una fecha límite.\n- Rendimiento del ahorro: **{{annual_rate_pct}}%**.\n- Aportaciones al final de cada mes.\n- No se incluyeron accesorios, AppleCare+, envío ni posibles cambios de precio.\n\n### Fórmula\n\n**Ahorro mensual = precio del iPad ÷ meses disponibles**\n\nTu ingreso por sí solo no permite determinar cuánto puedes separar sin conocer tus gastos y compromisos mensuales; el cálculo únicamente distribuye el precio actual entre el plazo asumido. El modelo exacto y la fecha en que quieres comprarlo no fueron indicados.",
+          "language": "es-419"
+        },
+        "answer_assumptions": [
+          {
+            "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+            "name": "direction"
+          },
+          {
+            "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+            "name": "periods_per_year"
+          },
+          {
+            "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+            "name": "payment_timing"
+          }
+        ],
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "Compra el iPad",
+              "domain": "www.apple.com",
+              "url": "https://www.apple.com/mx/shop/buy-ipad/ipad",
+              "source_date": null
+            }
+          ],
+          "rows": [
+            {
+              "subject": "iPad",
+              "symbol": null,
+              "label": "precio inicial de contado",
+              "value": 8499,
+              "kind": "currency",
+              "unit": "MXN",
+              "as_of": null,
+              "source_url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+            }
+          ],
+          "retrieved_at": "2026-09-14T17:36:01.422708+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 31161,
+            "cost_usd": 0.12561,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "¿Cuánto tendría que ahorrar para un iPad Air o un iPad mini?",
+              "¿Cómo cambia la mensualidad si quiero comprarlo en menos tiempo?",
+              "¿Puedes calcularlo considerando cuánto gasto cada mes?"
+            ]
+          }
+        },
+        "final_response_payload": {
+          "tool_result_cards": [
+            {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "time_value",
+              "call_id": "answer-89a2da02-26b3-4fd0-ad91-4cb6f779670f",
+              "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+              "input_revision": 0,
+              "card_type": "time_value",
+              "card_version": 1,
+              "arguments": {
+                "currency": "MXN",
+                "sources": {
+                  "direction": {
+                    "kind": "assumption"
+                  },
+                  "present_value": {
+                    "kind": "assumption"
+                  },
+                  "future_value": {
+                    "kind": "page",
+                    "title": "Compra el iPad",
+                    "url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+                  },
+                  "annual_rate_pct": {
+                    "kind": "assumption"
+                  },
+                  "periods": {
+                    "kind": "assumption"
+                  },
+                  "periods_per_year": {
+                    "kind": "assumption"
+                  },
+                  "payment_timing": {
+                    "kind": "assumption"
+                  },
+                  "start_date": {
+                    "kind": "user"
+                  }
+                },
+                "direction": "save",
+                "present_value": 0,
+                "payment": null,
+                "future_value": 8499,
+                "annual_rate_pct": 0,
+                "periods": 12,
+                "periods_per_year": 12,
+                "payment_timing": "end",
+                "start_date": "2026-09-14"
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "payment",
+                  "solved_value": 708.25,
+                  "present_value": 0,
+                  "payment": 708.25,
+                  "future_value": 8499,
+                  "annual_rate_pct": 0,
+                  "periods": 12,
+                  "total_payments": 8499,
+                  "total_interest": 0,
+                  "balances": [
+                    708.25,
+                    1416.5,
+                    2124.75,
+                    2833,
+                    3541.25,
+                    4249.5,
+                    4957.75,
+                    5666,
+                    6374.25,
+                    7082.5,
+                    7790.75,
+                    8499
+                  ],
+                  "notes": []
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.time_value.title_save",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "payment",
+                  "label": {
+                    "locale_key": "tools.calc.fields.payment",
+                    "interpolation_args": {}
+                  },
+                  "value": 708.25,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "MXN"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": {
+                  "kind": "value_path",
+                  "currency": "MXN",
+                  "base_value": 0,
+                  "series": [
+                    {
+                      "time": "2026-10-14",
+                      "value": 708.25
+                    },
+                    {
+                      "time": "2026-11-14",
+                      "value": 1416.5
+                    },
+                    {
+                      "time": "2026-12-14",
+                      "value": 2124.75
+                    },
+                    {
+                      "time": "2027-01-14",
+                      "value": 2833
+                    },
+                    {
+                      "time": "2027-02-14",
+                      "value": 3541.25
+                    },
+                    {
+                      "time": "2027-03-14",
+                      "value": 4249.5
+                    },
+                    {
+                      "time": "2027-04-14",
+                      "value": 4957.75
+                    },
+                    {
+                      "time": "2027-05-14",
+                      "value": 5666
+                    },
+                    {
+                      "time": "2027-06-14",
+                      "value": 6374.25
+                    },
+                    {
+                      "time": "2027-07-14",
+                      "value": 7082.5
+                    },
+                    {
+                      "time": "2027-08-14",
+                      "value": 7790.75
+                    },
+                    {
+                      "time": "2027-09-14",
+                      "value": 8499
+                    }
+                  ]
+                },
+                "rows": [
+                  {
+                    "name": "total_payments",
+                    "label": {
+                      "locale_key": "tools.calc.fields.total_payments",
+                      "interpolation_args": {}
+                    },
+                    "value": 8499,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "total_growth",
+                    "label": {
+                      "locale_key": "tools.calc.fields.total_growth",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "future_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.future_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 8499,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "direction",
+                    "label": {
+                      "locale_key": "tools.calc.fields.direction",
+                      "interpolation_args": {}
+                    },
+                    "value": "save",
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "present_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.present_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "payment",
+                    "label": {
+                      "locale_key": "tools.calc.fields.payment",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "future_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.future_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 8499,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "MXN"
+                      }
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "Compra el iPad",
+                      "url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "annual_rate_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.annual_rate_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "periods",
+                    "label": {
+                      "locale_key": "tools.calc.fields.periods",
+                      "interpolation_args": {}
+                    },
+                    "value": 12,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.months",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "periods_per_year",
+                    "label": {
+                      "locale_key": "tools.calc.fields.periods_per_year",
+                      "interpolation_args": {}
+                    },
+                    "value": 12,
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "payment_timing",
+                    "label": {
+                      "locale_key": "tools.calc.fields.payment_timing",
+                      "interpolation_args": {}
+                    },
+                    "value": "end",
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          ],
+          "code": null,
+          "result": null,
+          "backtest_job": null,
+          "error": null,
+          "summary": null,
+          "result_card": null,
+          "explanation_context": null
+        },
+        "tool_result_cards": [
+          {
+            "kind": "tool_result",
+            "schema_version": 1,
+            "tool_name": "time_value",
+            "call_id": "answer-89a2da02-26b3-4fd0-ad91-4cb6f779670f",
+            "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+            "input_revision": 0,
+            "card_type": "time_value",
+            "card_version": 1,
+            "arguments": {
+              "currency": "MXN",
+              "sources": {
+                "direction": {
+                  "kind": "assumption"
+                },
+                "present_value": {
+                  "kind": "assumption"
+                },
+                "future_value": {
+                  "kind": "page",
+                  "title": "Compra el iPad",
+                  "url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+                },
+                "annual_rate_pct": {
+                  "kind": "assumption"
+                },
+                "periods": {
+                  "kind": "assumption"
+                },
+                "periods_per_year": {
+                  "kind": "assumption"
+                },
+                "payment_timing": {
+                  "kind": "assumption"
+                },
+                "start_date": {
+                  "kind": "user"
+                }
+              },
+              "direction": "save",
+              "present_value": 0,
+              "payment": null,
+              "future_value": 8499,
+              "annual_rate_pct": 0,
+              "periods": 12,
+              "periods_per_year": 12,
+              "payment_timing": "end",
+              "start_date": "2026-09-14"
+            },
+            "outcome": {
+              "status": "succeeded",
+              "result": {
+                "solved_field": "payment",
+                "solved_value": 708.25,
+                "present_value": 0,
+                "payment": 708.25,
+                "future_value": 8499,
+                "annual_rate_pct": 0,
+                "periods": 12,
+                "total_payments": 8499,
+                "total_interest": 0,
+                "balances": [
+                  708.25,
+                  1416.5,
+                  2124.75,
+                  2833,
+                  3541.25,
+                  4249.5,
+                  4957.75,
+                  5666,
+                  6374.25,
+                  7082.5,
+                  7790.75,
+                  8499
+                ],
+                "notes": []
+              },
+              "failure": null
+            },
+            "presentation": {
+              "title": {
+                "locale_key": "tools.calc.time_value.title_save",
+                "interpolation_args": {}
+              },
+              "answer": {
+                "name": "payment",
+                "label": {
+                  "locale_key": "tools.calc.fields.payment",
+                  "interpolation_args": {}
+                },
+                "value": 708.25,
+                "value_text": null,
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "MXN"
+                  }
+                },
+                "source": {
+                  "kind": "computed"
+                }
+              },
+              "narrative": null,
+              "sources": [],
+              "visual": {
+                "kind": "value_path",
+                "currency": "MXN",
+                "base_value": 0,
+                "series": [
+                  {
+                    "time": "2026-10-14",
+                    "value": 708.25
+                  },
+                  {
+                    "time": "2026-11-14",
+                    "value": 1416.5
+                  },
+                  {
+                    "time": "2026-12-14",
+                    "value": 2124.75
+                  },
+                  {
+                    "time": "2027-01-14",
+                    "value": 2833
+                  },
+                  {
+                    "time": "2027-02-14",
+                    "value": 3541.25
+                  },
+                  {
+                    "time": "2027-03-14",
+                    "value": 4249.5
+                  },
+                  {
+                    "time": "2027-04-14",
+                    "value": 4957.75
+                  },
+                  {
+                    "time": "2027-05-14",
+                    "value": 5666
+                  },
+                  {
+                    "time": "2027-06-14",
+                    "value": 6374.25
+                  },
+                  {
+                    "time": "2027-07-14",
+                    "value": 7082.5
+                  },
+                  {
+                    "time": "2027-08-14",
+                    "value": 7790.75
+                  },
+                  {
+                    "time": "2027-09-14",
+                    "value": 8499
+                  }
+                ]
+              },
+              "rows": [
+                {
+                  "name": "total_payments",
+                  "label": {
+                    "locale_key": "tools.calc.fields.total_payments",
+                    "interpolation_args": {}
+                  },
+                  "value": 8499,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "MXN"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "total_growth",
+                  "label": {
+                    "locale_key": "tools.calc.fields.total_growth",
+                    "interpolation_args": {}
+                  },
+                  "value": 0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "MXN"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "future_value",
+                  "label": {
+                    "locale_key": "tools.calc.fields.future_value",
+                    "interpolation_args": {}
+                  },
+                  "value": 8499,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "MXN"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                }
+              ],
+              "inputs": [
+                {
+                  "name": "direction",
+                  "label": {
+                    "locale_key": "tools.calc.fields.direction",
+                    "interpolation_args": {}
+                  },
+                  "value": "save",
+                  "value_text": null,
+                  "unit": null,
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "present_value",
+                  "label": {
+                    "locale_key": "tools.calc.fields.present_value",
+                    "interpolation_args": {}
+                  },
+                  "value": 0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "MXN"
+                    }
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "payment",
+                  "label": {
+                    "locale_key": "tools.calc.fields.payment",
+                    "interpolation_args": {}
+                  },
+                  "value": null,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "MXN"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  },
+                  "editable": false,
+                  "unknown": true,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "future_value",
+                  "label": {
+                    "locale_key": "tools.calc.fields.future_value",
+                    "interpolation_args": {}
+                  },
+                  "value": 8499,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "MXN"
+                    }
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "Compra el iPad",
+                    "url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "annual_rate_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.annual_rate_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "periods",
+                  "label": {
+                    "locale_key": "tools.calc.fields.periods",
+                    "interpolation_args": {}
+                  },
+                  "value": 12,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.months",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "periods_per_year",
+                  "label": {
+                    "locale_key": "tools.calc.fields.periods_per_year",
+                    "interpolation_args": {}
+                  },
+                  "value": 12,
+                  "value_text": null,
+                  "unit": null,
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "payment_timing",
+                  "label": {
+                    "locale_key": "tools.calc.fields.payment_timing",
+                    "interpolation_args": {}
+                  },
+                  "value": "end",
+                  "value_text": null,
+                  "unit": null,
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                }
+              ],
+              "notes": []
+            },
+            "artifact_state": "active"
+          }
+        ],
+        "message_id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 51.259,
+  "screenshot": {
+    "file": "screenshots/guest-q1-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Para un iPad básico comprado de contado, tendrías que ahorrar MXN 708.25 al mes durante 12 meses. Tomé como ejemplo el iPad estándar con precio inicial de MXN 8,499, publicado por Apple México y consultado en 2026-09-14.\n\nSupuestos del cálculo\nMoneda: pesos mexicanos.\nAhorro inicial: MXN 0.\nPlazo asumido: 12 meses, porque no indicaste una fecha límite.\nRendimiento del ahorro: 0%.\nAportaciones al final de cada mes.\nNo se incluyeron accesorios, AppleCare+, envío ni posibles cambios de precio.\nFórmula\n\nAhorro mensual = precio del iPad ÷ meses disponibles\n\nTu ingreso por sí solo no permite determinar cuánto puedes separar sin conocer tus gastos y compromisos mensuales; el cálculo únicamente distribuye el precio actual entre el plazo asumido. El modelo exacto y la fecha en que quieres comprarlo no fueron indicados.\n\nSupuestos de este cálculo: plan save, períodos por año 12 y momento del pago end.\n\nMXN 708.25\nPago por período\nVer los números\n1 fuente ›\nQUÉ PROBAR DESPUÉS\n↳\n¿Cuánto tendría que ahorrar para un iPad Air o un iPad mini?\n↳\n¿Cómo cambia la mensualidad si quiero comprarlo en menos tiempo?\n↳\n¿Puedes calcularlo considerando cuánto gasto cada mes?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "1723dfea-b864-4870-8b9c-9c44b2650fc1",
+      "user_id": "d616a0f7-b305-45bb-aaa5-3d062d46d7b6",
+      "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+      "run_id": null,
+      "message_id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 721,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 813,
+        "cached_tokens": 768,
+        "prompt_tokens": 796,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 49.197,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "469c2fbb6d043697b318af758cf7bb6392aa045e00cf20cae96e6b562c689cf2",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:35:13.152054+00:00"
+    },
+    {
+      "id": "c4d87665-f887-453a-8e5d-3e04b36978f9",
+      "user_id": "d616a0f7-b305-45bb-aaa5-3d062d46d7b6",
+      "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+      "run_id": null,
+      "message_id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 17076,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12422,
+        "cached_tokens": 10560,
+        "prompt_tokens": 10779,
+        "completion_tokens": 1643,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 49.197,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "469c2fbb6d043697b318af758cf7bb6392aa045e00cf20cae96e6b562c689cf2",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:35:30.229971+00:00"
+    },
+    {
+      "id": "d1067849-b3e2-48dd-93af-e8800c458685",
+      "user_id": "d616a0f7-b305-45bb-aaa5-3d062d46d7b6",
+      "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+      "run_id": null,
+      "message_id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 0,
+      "outcome": "skipped",
+      "failure_mode": "title_not_generated",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:36:01.619893+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "b7ae224d-7f12-4481-8ae6-bda112325d6e",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "d616a0f7-b305-45bb-aaa5-3d062d46d7b6",
+      "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+      "message_id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "1723dfea-b864-4870-8b9c-9c44b2650fc1",
+      "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+      "correlation_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa:1c59dac3-07f9-4629-947d-129d1ad67c36:8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 813,
+        "cached_tokens": 768,
+        "prompt_tokens": 796,
+        "usage_cost_usd": 0.0002311,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 796,
+      "output_tokens": 17,
+      "total_tokens": 813,
+      "billable_unit": "token",
+      "billable_quantity": "813.000000",
+      "cost_amount": "0.00023110",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 721,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 49.197,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "469c2fbb6d043697b318af758cf7bb6392aa045e00cf20cae96e6b562c689cf2",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:35:13.152054+00:00",
+      "created_at": "2026-09-14 17:36:01.606279+00:00"
+    },
+    {
+      "id": "cc2ee19b-1333-42ec-bd09-3df9bdf6cb58",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "d616a0f7-b305-45bb-aaa5-3d062d46d7b6",
+      "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+      "message_id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "c4d87665-f887-453a-8e5d-3e04b36978f9",
+      "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+      "correlation_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa:1c59dac3-07f9-4629-947d-129d1ad67c36:8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12422,
+        "cached_tokens": 10560,
+        "prompt_tokens": 10779,
+        "usage_cost_usd": 0.00649325,
+        "completion_tokens": 1643,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10779,
+      "output_tokens": 1643,
+      "total_tokens": 12422,
+      "billable_unit": "token",
+      "billable_quantity": "12422.000000",
+      "cost_amount": "0.00649325",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 17076,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 49.197,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "469c2fbb6d043697b318af758cf7bb6392aa045e00cf20cae96e6b562c689cf2",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:35:30.229971+00:00",
+      "created_at": "2026-09-14 17:36:01.612036+00:00"
+    },
+    {
+      "id": "a21943f4-2cfb-47de-ab63-206dadeb641e",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "d616a0f7-b305-45bb-aaa5-3d062d46d7b6",
+      "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+      "message_id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+      "correlation_id": "research:12c8dfe4-1487-4450-8391-ca2790f5b6aa",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.12561000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 31161,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 17:36:01.597532+00:00",
+      "created_at": "2026-09-14 17:36:01.597962+00:00"
+    },
+    {
+      "id": "a954a025-fbce-4e07-bb1f-9465fc0b861a",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "d616a0f7-b305-45bb-aaa5-3d062d46d7b6",
+      "conversation_id": "1c59dac3-07f9-4629-947d-129d1ad67c36",
+      "message_id": "8bddf9f8-e5af-46e5-8642-1c08b33f2c83",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "d1067849-b3e2-48dd-93af-e8800c458685",
+      "request_id": null,
+      "correlation_id": "api_turn:1c59dac3-07f9-4629-947d-129d1ad67c36:8bddf9f8-e5af-46e5-8642-1c08b33f2c83:d1067849-b3e2-48dd-93af-e8800c458685",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "skipped",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": "title_not_generated",
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:36:01.619893+00:00",
+      "created_at": "2026-09-14 17:36:01.625716+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 3,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [
+        {
+          "kind": "currency",
+          "unit": "MXN",
+          "as_of": null,
+          "label": "precio inicial de contado",
+          "value": 8499.0,
+          "symbol": null,
+          "subject": "iPad",
+          "source_url": "https://www.apple.com/mx/shop/buy-ipad/ipad"
+        }
+      ],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.12561,
+        "latency_ms": 31161,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://www.apple.com/mx/shop/buy-ipad/ipad",
+          "title": "Compra el iPad",
+          "domain": "www.apple.com",
+          "source_date": null
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "¿Cuánto tendría que ahorrar para un iPad Air o un iPad mini?",
+          "¿Cómo cambia la mensualidad si quiero comprarlo en menos tiempo?",
+          "¿Puedes calcularlo considerando cuánto gasto cada mes?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T17:36:01.422708+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "tool_result_cards": [
+      {
+        "kind": "tool_result",
+        "call_id": "answer-89a2da02-26b3-4fd0-ad91-4cb6f779670f",
+        "outcome": {
+          "result": {
+            "notes": [],
+            "payment": 708.25,
+            "periods": 12.0,
+            "balances": [
+              708.25,
+              1416.5,
+              2124.75,
+              2833.0,
+              3541.25,
+              4249.5,
+              4957.75,
+              5666.0,
+              6374.25,
+              7082.5,
+              7790.75,
+              8499.0
+            ],
+            "future_value": 8499.0,
+            "solved_field": "payment",
+            "solved_value": 708.25,
+            "present_value": 0.0,
+            "total_interest": 0.0,
+            "total_payments": 8499.0,
+            "annual_rate_pct": 0.0
+          },
+          "status": "succeeded",
+          "failure": null
+        },
+        "arguments": {
+          "payment": null,
+          "periods": 12,
+          "sources": {
+            "periods": {
+              "kind": "assumption"
+            },
+            "direction": {
+              "kind": "assumption"
+            },
+            "start_date": {
+              "kind": "user"
+            },
+            "future_value": {
+              "url": "https://www.apple.com/mx/shop/buy-ipad/ipad",
+              "kind": "page",
+              "title": "Compra el iPad"
+            },
+            "present_value": {
+              "kind": "assumption"
+            },
+            "payment_timing": {
+              "kind": "assumption"
+            },
+            "annual_rate_pct": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
+            }
+          },
+          "currency": "MXN",
+          "direction": "save",
+          "start_date": "2026-09-14",
+          "future_value": 8499.0,
+          "present_value": 0.0,
+          "payment_timing": "end",
+          "annual_rate_pct": 0.0,
+          "periods_per_year": 12
+        },
+        "card_type": "time_value",
+        "tool_name": "time_value",
+        "artifact_id": "4a5c48db-ce27-4a46-a596-dc4a3601698c",
+        "card_version": 1,
+        "presentation": {
+          "rows": [
+            {
+              "name": "total_payments",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "MXN"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.total_payments",
+                "interpolation_args": {}
+              },
+              "value": 8499.0,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            {
+              "name": "total_growth",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "MXN"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.total_growth",
+                "interpolation_args": {}
+              },
+              "value": 0.0,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            {
+              "name": "future_value",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "MXN"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.future_value",
+                "interpolation_args": {}
+              },
+              "value": 8499.0,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            }
+          ],
+          "notes": [],
+          "title": {
+            "locale_key": "tools.calc.time_value.title_save",
+            "interpolation_args": {}
+          },
+          "answer": {
+            "name": "payment",
+            "unit": {
+              "locale_key": "tools.calc.units.currency",
+              "interpolation_args": {
+                "code": "MXN"
+              }
+            },
+            "label": {
+              "locale_key": "tools.calc.fields.payment",
+              "interpolation_args": {}
+            },
+            "value": 708.25,
+            "source": {
+              "kind": "computed"
+            },
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "name": "direction",
+              "unit": null,
+              "label": {
+                "locale_key": "tools.calc.fields.direction",
+                "interpolation_args": {}
+              },
+              "value": "save",
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": false,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "present_value",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "MXN"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.present_value",
+                "interpolation_args": {}
+              },
+              "value": 0.0,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "payment",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "MXN"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.payment",
+                "interpolation_args": {}
+              },
+              "value": null,
+              "source": {
+                "kind": "computed"
+              },
+              "driving": false,
+              "unknown": true,
+              "editable": false,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "future_value",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "MXN"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.future_value",
+                "interpolation_args": {}
+              },
+              "value": 8499.0,
+              "source": {
+                "url": "https://www.apple.com/mx/shop/buy-ipad/ipad",
+                "kind": "page",
+                "title": "Compra el iPad"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "annual_rate_pct",
+              "unit": {
+                "locale_key": "chat.tools.units.percent",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.annual_rate_pct",
+                "interpolation_args": {}
+              },
+              "value": 0.0,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "periods",
+              "unit": {
+                "locale_key": "tools.calc.units.months",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.periods",
+                "interpolation_args": {}
+              },
+              "value": 12,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "periods_per_year",
+              "unit": null,
+              "label": {
+                "locale_key": "tools.calc.fields.periods_per_year",
+                "interpolation_args": {}
+              },
+              "value": 12,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": false,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "payment_timing",
+              "unit": null,
+              "label": {
+                "locale_key": "tools.calc.fields.payment_timing",
+                "interpolation_args": {}
+              },
+              "value": "end",
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": false,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "visual": {
+            "kind": "value_path",
+            "series": [
+              {
+                "time": "2026-10-14",
+                "value": 708.25
+              },
+              {
+                "time": "2026-11-14",
+                "value": 1416.5
+              },
+              {
+                "time": "2026-12-14",
+                "value": 2124.75
+              },
+              {
+                "time": "2027-01-14",
+                "value": 2833.0
+              },
+              {
+                "time": "2027-02-14",
+                "value": 3541.25
+              },
+              {
+                "time": "2027-03-14",
+                "value": 4249.5
+              },
+              {
+                "time": "2027-04-14",
+                "value": 4957.75
+              },
+              {
+                "time": "2027-05-14",
+                "value": 5666.0
+              },
+              {
+                "time": "2027-06-14",
+                "value": 6374.25
+              },
+              {
+                "time": "2027-07-14",
+                "value": 7082.5
+              },
+              {
+                "time": "2027-08-14",
+                "value": 7790.75
+              },
+              {
+                "time": "2027-09-14",
+                "value": 8499.0
+              }
+            ],
+            "currency": "MXN",
+            "base_value": 0.0
+          },
+          "sources": [],
+          "narrative": null
+        },
+        "artifact_state": "active",
+        "input_revision": 0,
+        "schema_version": 1
+      }
+    ],
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "8915b019-a5c7-4114-a70a-ecb6a2810336",
+      "terminal": true,
+      "request_id": "12c8dfe4-1487-4450-8391-ca2790f5b6aa"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

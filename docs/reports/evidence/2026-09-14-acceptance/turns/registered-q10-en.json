@@ -1,0 +1,645 @@
+{
+  "label": "registered-q10-en",
+  "phase": "registered",
+  "question": "q10",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+  "message": "Should I put my emergency fund in crypto?",
+  "answer": {
+    "id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+    "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+    "role": "assistant",
+    "content": "**Generally, crypto does not fit the purpose of an emergency fund.** Emergency money needs to remain safe and accessible when an unexpected bill or loss of income occurs, while crypto can lose value quickly and may be difficult to withdraw precisely when the money is needed.\n\n### Why the mismatch matters\n\nAn emergency fund is a cash reserve for unplanned expenses such as medical bills, repairs, or lost income. The Consumer Financial Protection Bureau says its location should be safe, accessible, and separate enough to discourage non-emergency spending.\n\nCrypto introduces risks that conflict with those requirements:\n\n- **Price risk:** Crypto investments can be exceptionally volatile and speculative, so the amount available during an emergency may be substantially less than the amount deposited.\n- **Access risk:** A crypto platform can suspend withdrawals, fail, or enter bankruptcy. Customers may not recover all their assets or receive them when needed.\n- **Custody risk:** Self-custody avoids some platform exposure but creates responsibility for private keys. Losing access credentials can mean losing access to the assets.\n- **Protection gap:** The FDIC explicitly lists crypto assets among products it does not insure. Investor protections associated with regulated securities accounts also may not apply to accounts at crypto entities.\n- **Conversion risk:** A bill denominated in USD generally requires selling or converting the crypto, adding an extra step between the reserve and the expense.\n\n### Comparing the roles\n\n| Consideration | Insured deposit account | Crypto holding |\n|---|---|---|\n| Principal stability | Deposit value does not fluctuate with crypto markets | Market value can change sharply |\n| Federal deposit insurance | Eligible checking, savings, money-market deposit accounts, and certificates of deposit at an FDIC-insured bank are covered under applicable rules | Crypto assets are not FDIC-insured |\n| Immediate usefulness for USD bills | Already held in USD | Usually must be sold or converted |\n| Access risks | Subject to the account’s transfer and withdrawal terms | May also face platform failure, frozen withdrawals, wallet errors, or lost keys |\n| Main role | Cash reserve and liquidity | Speculative investment exposure |\n\nA stablecoin can reduce some market-price movement, but it does not automatically eliminate issuer, reserve, platform, custody, redemption, or insurance risk. Calling an asset “stable” is not the same as having an insured USD deposit.\n\n### A useful way to separate the decision\n\nTreat **emergency reserves** and **speculative investments** as different buckets. For the emergency bucket, compare options by principal stability, federal insurance eligibility, withdrawal speed, transfer limits, fees, and availability outside normal business hours. For any crypto bucket, evaluate it only as money exposed to potentially significant or total loss, not as guaranteed cash for the next emergency.",
+    "created_at": "2026-09-14T16:58:04.025483Z",
+    "metadata": {
+      "research": {
+        "rows": [],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.26652,
+          "latency_ms": 27840,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://www.consumerfinance.gov/an-essential-guide-to-building-an-emergency-fund/",
+            "title": "An essential guide to building an emergency fund",
+            "domain": "www.consumerfinance.gov",
+            "source_date": null
+          },
+          {
+            "url": "https://www.fdic.gov/resources/deposit-insurance/",
+            "title": "Deposit Insurance | FDIC.gov",
+            "domain": "www.fdic.gov",
+            "source_date": null
+          },
+          {
+            "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins/crypto-asset-securities",
+            "title": "Exercise Caution with Crypto Asset Securities: Investor Alert",
+            "domain": "www.investor.gov",
+            "source_date": null
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "How can I compare savings accounts, money-market deposit accounts, and Treasury bills for emergency savings?",
+            "What should I check to confirm that an account is federally insured?",
+            "How can I estimate an emergency-fund target from my essential expenses?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T16:58:04.008805+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "How can I compare savings accounts, money-market deposit accounts, and Treasury bills for emergency savings?",
+            "type": "question"
+          },
+          {
+            "text": "What should I check to confirm that an account is federally insured?",
+            "type": "question"
+          },
+          {
+            "text": "How can I estimate an emergency-fund target from my essential expenses?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "e0ec76ea-59d5-454f-9243-fc69608cd6f6",
+        "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "**Generally, crypto does not fit the purpose of an emergency fund.** Emergency money needs to remain safe and accessible when an unexpected bill or loss of income occurs, while crypto can lose value quickly and may be difficult to withdraw precisely when the money is needed.\n\n### Why the mismatch matters\n\nAn emergency fund is a cash reserve for unplanned expenses such as medical bills, repairs, or lost income. The Consumer Financial Protection Bureau says its location should be safe, accessible, and separate enough to discourage non-emergency spending.\n\nCrypto introduces risks that conflict with those requirements:\n\n- **Price risk:** Crypto investments can be exceptionally volatile and speculative, so the amount available during an emergency may be substantially less than the amount deposited.\n- **Access risk:** A crypto platform can suspend withdrawals, fail, or enter bankruptcy. Customers may not recover all their assets or receive them when needed.\n- **Custody risk:** Self-custody avoids some platform exposure but creates responsibility for private keys. Losing access credentials can mean losing access to the assets.\n- **Protection gap:** The FDIC explicitly lists crypto assets among products it does not insure. Investor protections associated with regulated securities accounts also may not apply to accounts at crypto entities.\n- **Conversion risk:** A bill denominated in USD generally requires selling or converting the crypto, adding an extra step between the reserve and the expense.\n\n### Comparing the roles\n\n| Consideration | Insured deposit account | Crypto holding |\n|---|---|---|\n| Principal stability | Deposit value does not fluctuate with crypto markets | Market value can change sharply |\n| Federal deposit insurance | Eligible checking, savings, money-market deposit accounts, and certificates of deposit at an FDIC-insured bank are covered under applicable rules | Crypto assets are not FDIC-insured |\n| Immediate usefulness for USD bills | Already held in USD | Usually must be sold or converted |\n| Access risks | Subject to the account’s transfer and withdrawal terms | May also face platform failure, frozen withdrawals, wallet errors, or lost keys |\n| Main role | Cash reserve and liquidity | Speculative investment exposure |\n\nA stablecoin can reduce some market-price movement, but it does not automatically eliminate issuer, reserve, platform, custody, redemption, or insurance risk. Calling an asset “stable” is not the same as having an insured USD deposit.\n\n### A useful way to separate the decision\n\nTreat **emergency reserves** and **speculative investments** as different buckets. For the emergency bucket, compare options by principal stability, federal insurance eligibility, withdrawal speed, transfer limits, fees, and availability outside normal business hours. For any crypto bucket, evaluate it only as money exposed to potentially significant or total loss, not as guaranteed cash for the next emergency."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "**Generally, crypto does not fit the purpose of an emergency fund.** Emergency money needs to remain safe and accessible when an unexpected bill or loss of income occurs, while crypto can lose value quickly and may be difficult to withdraw precisely when the money is needed.\n\n### Why the mismatch matters\n\nAn emergency fund is a cash reserve for unplanned expenses such as medical bills, repairs, or lost income. The Consumer Financial Protection Bureau says its location should be safe, accessible, and separate enough to discourage non-emergency spending.\n\nCrypto introduces risks that conflict with those requirements:\n\n- **Price risk:** Crypto investments can be exceptionally volatile and speculative, so the amount available during an emergency may be substantially less than the amount deposited.\n- **Access risk:** A crypto platform can suspend withdrawals, fail, or enter bankruptcy. Customers may not recover all their assets or receive them when needed.\n- **Custody risk:** Self-custody avoids some platform exposure but creates responsibility for private keys. Losing access credentials can mean losing access to the assets.\n- **Protection gap:** The FDIC explicitly lists crypto assets among products it does not insure. Investor protections associated with regulated securities accounts also may not apply to accounts at crypto entities.\n- **Conversion risk:** A bill denominated in USD generally requires selling or converting the crypto, adding an extra step between the reserve and the expense.\n\n### Comparing the roles\n\n| Consideration | Insured deposit account | Crypto holding |\n|---|---|---|\n| Principal stability | Deposit value does not fluctuate with crypto markets | Market value can change sharply |\n| Federal deposit insurance | Eligible checking, savings, money-market deposit accounts, and certificates of deposit at an FDIC-insured bank are covered under applicable rules | Crypto assets are not FDIC-insured |\n| Immediate usefulness for USD bills | Already held in USD | Usually must be sold or converted |\n| Access risks | Subject to the account’s transfer and withdrawal terms | May also face platform failure, frozen withdrawals, wallet errors, or lost keys |\n| Main role | Cash reserve and liquidity | Speculative investment exposure |\n\nA stablecoin can reduce some market-price movement, but it does not automatically eliminate issuer, reserve, platform, custody, redemption, or insurance risk. Calling an asset “stable” is not the same as having an insured USD deposit.\n\n### A useful way to separate the decision\n\nTreat **emergency reserves** and **speculative investments** as different buckets. For the emergency bucket, compare options by principal stability, federal insurance eligibility, withdrawal speed, transfer limits, fees, and availability outside normal business hours. For any crypto bucket, evaluate it only as money exposed to potentially significant or total loss, not as guaranteed cash for the next emergency.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "How can I compare savings accounts, money-market deposit accounts, and Treasury bills for emergency savings?"
+            },
+            {
+              "type": "question",
+              "text": "What should I check to confirm that an account is federally insured?"
+            },
+            {
+              "type": "question",
+              "text": "How can I estimate an emergency-fund target from my essential expenses?"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "An essential guide to building an emergency fund",
+              "domain": "www.consumerfinance.gov",
+              "url": "https://www.consumerfinance.gov/an-essential-guide-to-building-an-emergency-fund/",
+              "source_date": null
+            },
+            {
+              "title": "Deposit Insurance | FDIC.gov",
+              "domain": "www.fdic.gov",
+              "url": "https://www.fdic.gov/resources/deposit-insurance/",
+              "source_date": null
+            },
+            {
+              "title": "Exercise Caution with Crypto Asset Securities: Investor Alert",
+              "domain": "www.investor.gov",
+              "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins/crypto-asset-securities",
+              "source_date": null
+            }
+          ],
+          "rows": [],
+          "retrieved_at": "2026-09-14T16:58:04.008805+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 27840,
+            "cost_usd": 0.26652,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "How can I compare savings accounts, money-market deposit accounts, and Treasury bills for emergency savings?",
+              "What should I check to confirm that an account is federally insured?",
+              "How can I estimate an emergency-fund target from my essential expenses?"
+            ]
+          }
+        },
+        "message_id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 55.796,
+  "screenshot": {
+    "file": "screenshots/registered-q10-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Generally, crypto does not fit the purpose of an emergency fund. Emergency money needs to remain safe and accessible when an unexpected bill or loss of income occurs, while crypto can lose value quickly and may be difficult to withdraw precisely when the money is needed.\n\nWhy the mismatch matters\n\nAn emergency fund is a cash reserve for unplanned expenses such as medical bills, repairs, or lost income. The Consumer Financial Protection Bureau says its location should be safe, accessible, and separate enough to discourage non-emergency spending.\n\nCrypto introduces risks that conflict with those requirements:\n\nPrice risk: Crypto investments can be exceptionally volatile and speculative, so the amount available during an emergency may be substantially less than the amount deposited.\nAccess risk: A crypto platform can suspend withdrawals, fail, or enter bankruptcy. Customers may not recover all their assets or receive them when needed.\nCustody risk: Self-custody avoids some platform exposure but creates responsibility for private keys. Losing access credentials can mean losing access to the assets.\nProtection gap: The FDIC explicitly lists crypto assets among products it does not insure. Investor protections associated with regulated securities accounts also may not apply to accounts at crypto entities.\nConversion risk: A bill denominated in USD generally requires selling or converting the crypto, adding an extra step between the reserve and the expense.\nComparing the roles\nCONSIDERATION\tINSURED DEPOSIT ACCOUNT\tCRYPTO HOLDING\nPrincipal stability\tDeposit value does not fluctuate with crypto markets\tMarket value can change sharply\nFederal deposit insurance\tEligible checking, savings, money-market deposit accounts, and certificates of deposit at an FDIC-insured bank are covered under applicable rules\tCrypto assets are not FDIC-insured\nImmediate usefulness for USD bills\tAlready held in USD\tUsually must be sold or converted\nAccess risks\tSubject to the account’s transfer and withdrawal terms\tMay also face platform failure, frozen withdrawals, wallet errors, or lost keys\nMain role\tCash reserve and liquidity\tSpeculative investment exposure\n\nA stablecoin can reduce some market-price movement, but it does not automatically eliminate issuer, reserve, platform, custody, redemption, or insurance risk. Calling an asset “stable” is not the same as having an insured USD deposit.\n\nA useful way to separate the decision\n\nTreat emergency reserves and speculative investments as different buckets. For the emergency bucket, compare options by principal stability, federal insurance eligibility, withdrawal speed, transfer limits, fees, and availability outside normal business hours. For any crypto bucket, evaluate it only as money exposed to potentially significant or total loss, not as guaranteed cash for the next emergency.\n\n3 sources ›\nTRY NEXT\n↳\nHow can I compare savings accounts, money-market deposit accounts, and Treasury bills for emergency savings?\n↳\nWhat should I check to confirm that an account is federally insured?\n↳\nHow can I estimate an emergency-fund target from my essential expenses?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "2569026c-5002-4e30-976f-c0ec42073d81",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "run_id": null,
+      "message_id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 1050,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 829,
+        "cached_tokens": 768,
+        "prompt_tokens": 784,
+        "completion_tokens": 45,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 53.797,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:57:11.313122+00:00"
+    },
+    {
+      "id": "e90f8d21-e583-4488-b791-faf69606c469",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "run_id": null,
+      "message_id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 14192,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12091,
+        "cached_tokens": 10624,
+        "prompt_tokens": 10765,
+        "completion_tokens": 1326,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 53.797,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:57:25.584778+00:00"
+    },
+    {
+      "id": "0cb41b98-d874-4d24-89ff-3254c15c6659",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "run_id": null,
+      "message_id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 579,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 234,
+        "cached_tokens": 0,
+        "prompt_tokens": 221,
+        "completion_tokens": 13,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 16:58:04.641557+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "bb63670e-c18c-4f37-b810-c0c918ba05e9",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "2569026c-5002-4e30-976f-c0ec42073d81",
+      "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485",
+      "correlation_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485:772021de-cc74-4f48-a89b-6fd98b0671de:8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 829,
+        "cached_tokens": 768,
+        "prompt_tokens": 784,
+        "usage_cost_usd": 0.0002861,
+        "completion_tokens": 45,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 784,
+      "output_tokens": 45,
+      "total_tokens": 829,
+      "billable_unit": "token",
+      "billable_quantity": "829.000000",
+      "cost_amount": "0.00028610",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1050,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 53.797,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:57:11.313122+00:00",
+      "created_at": "2026-09-14 16:58:04.041999+00:00"
+    },
+    {
+      "id": "e9bf1802-f648-4834-afbf-a85b86cc4d1e",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "e90f8d21-e583-4488-b791-faf69606c469",
+      "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485",
+      "correlation_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485:772021de-cc74-4f48-a89b-6fd98b0671de:8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12091,
+        "cached_tokens": 10624,
+        "prompt_tokens": 10765,
+        "usage_cost_usd": 0.00561605,
+        "completion_tokens": 1326,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10765,
+      "output_tokens": 1326,
+      "total_tokens": 12091,
+      "billable_unit": "token",
+      "billable_quantity": "12091.000000",
+      "cost_amount": "0.00561605",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 14192,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 53.797,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:57:25.584778+00:00",
+      "created_at": "2026-09-14 16:58:04.047853+00:00"
+    },
+    {
+      "id": "b920976e-c9d9-4baa-a75c-d8537c3db601",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485",
+      "correlation_id": "research:0d171f69-68e9-461b-a60b-5e0ce49bc485",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.26652000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 27840,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 16:58:04.035094+00:00",
+      "created_at": "2026-09-14 16:58:04.035560+00:00"
+    },
+    {
+      "id": "3c0868af-0e78-47c8-9541-c5edb4f536ac",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "772021de-cc74-4f48-a89b-6fd98b0671de",
+      "message_id": "8cd09525-ef1c-4364-9d15-9b3a6c2be967",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "0cb41b98-d874-4d24-89ff-3254c15c6659",
+      "request_id": null,
+      "correlation_id": "api_turn:772021de-cc74-4f48-a89b-6fd98b0671de:8cd09525-ef1c-4364-9d15-9b3a6c2be967:0cb41b98-d874-4d24-89ff-3254c15c6659",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 234,
+        "cached_tokens": 0,
+        "prompt_tokens": 221,
+        "usage_cost_usd": 2.73e-05,
+        "completion_tokens": 13,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 221,
+      "output_tokens": 13,
+      "total_tokens": 234,
+      "billable_unit": "token",
+      "billable_quantity": "234.000000",
+      "cost_amount": "0.00002730",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 579,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:58:04.641557+00:00",
+      "created_at": "2026-09-14 16:58:04.656137+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 8,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.26652,
+        "latency_ms": 27840,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://www.consumerfinance.gov/an-essential-guide-to-building-an-emergency-fund/",
+          "title": "An essential guide to building an emergency fund",
+          "domain": "www.consumerfinance.gov",
+          "source_date": null
+        },
+        {
+          "url": "https://www.fdic.gov/resources/deposit-insurance/",
+          "title": "Deposit Insurance | FDIC.gov",
+          "domain": "www.fdic.gov",
+          "source_date": null
+        },
+        {
+          "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins/investor-bulletins/crypto-asset-securities",
+          "title": "Exercise Caution with Crypto Asset Securities: Investor Alert",
+          "domain": "www.investor.gov",
+          "source_date": null
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "How can I compare savings accounts, money-market deposit accounts, and Treasury bills for emergency savings?",
+          "What should I check to confirm that an account is federally insured?",
+          "How can I estimate an emergency-fund target from my essential expenses?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T16:58:04.008805+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "e0ec76ea-59d5-454f-9243-fc69608cd6f6",
+      "terminal": true,
+      "request_id": "0d171f69-68e9-461b-a60b-5e0ce49bc485"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

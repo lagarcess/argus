@@ -1,0 +1,142 @@
+[
+  {
+    "case": "registered-q1-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q1-en.md",
+    "baseline_sha256": "03e688b1ba4937aa0b346d0a590daa177c4fccc4fb6c41b32ba9823070206bd9",
+    "current_answer": "turns/registered-q1-en.json",
+    "comparison": "Committed answer computed MXN 980.75 using assumed currency and deadline; current answer clarifies instead."
+  },
+  {
+    "case": "registered-q2-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q2-en.md",
+    "baseline_sha256": "c3f3df844a9f5214b73dec8f958ec2d1938d6126a9c47dd08e1d63a8adb6ee91",
+    "current_answer": "turns/registered-q2-en.json",
+    "comparison": "Retains cited lease-to-income computation; answer prose is now generic and leaves explanation to cards."
+  },
+  {
+    "case": "registered-q3-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q3-en.md",
+    "baseline_sha256": "be1081f4d722197118539ef9a4c045e99b79d2b44c617fbade59968087588c94",
+    "current_answer": "turns/registered-q3-en.json",
+    "comparison": "Committed English answer asked for payment; this run asks for term and has degraded_fallback copy. USD still carries user provenance despite being profile-derived."
+  },
+  {
+    "case": "registered-q4-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q4-en.md",
+    "baseline_sha256": "b25b054c6e2f91a7580d4999ede99ce3bbace50320a9b2d9f1a7e3921819772f",
+    "current_answer": "turns/registered-q4-en.json",
+    "comparison": "Retains cited coupon computation and explicitly identifies maturity and price uncertainty."
+  },
+  {
+    "case": "registered-q5-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q5-en.md",
+    "baseline_sha256": "a412a08a48adabc046d23c81ccd0b2dd8d94708847b26eb03bb3246a69b8e70f",
+    "current_answer": "turns/registered-q5-en.json",
+    "comparison": "Committed Q5 compared cards without selecting one. Current output singles out a closest fit."
+  },
+  {
+    "case": "registered-q6-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q6-en.md",
+    "baseline_sha256": "0b2c93433a116c2ac8e12baeaa71642c3c814dfe6e4b46ea00e6dc1b685f576c",
+    "current_answer": "turns/registered-q6-en.json",
+    "comparison": "Retains price_multiple grounding; current answer uses conditional valuation discussion instead of a scenario card."
+  },
+  {
+    "case": "registered-q7-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q7-en.md",
+    "baseline_sha256": "4ebbbe5b01e5b71fad22a33513e28f65bf0c7346dc576c61eec989d3576a79a8",
+    "current_answer": "turns/registered-q7-en.json",
+    "comparison": "Committed answer also required the peso identity. This answer explains the comparison and cites banking-protection sources but supplies no current exchange-rate figure."
+  },
+  {
+    "case": "registered-q8-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q8-en.md",
+    "baseline_sha256": "13b58e82f252feda40c71f050dcc48af822e0025103cb42eff72881b04afc7c6",
+    "current_answer": "turns/registered-q8-en.json",
+    "comparison": "Committed Q8 English failed for prose without calculation; current answer includes growth_projection. The phrase for 1 omits the period unit in prose."
+  },
+  {
+    "case": "registered-q9-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q9-en.md",
+    "baseline_sha256": "3b75d5f6d10ad55758612cffd3ab4e42fbd4114b57f39d4942c66b0ebb460828",
+    "current_answer": "turns/registered-q9-en.json",
+    "comparison": "Matches committed ready-to-test state; this initial question does not itself authorize the product confirmation button."
+  },
+  {
+    "case": "registered-q10-en",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q10-en.md",
+    "baseline_sha256": "cd2b14ebb085965bcaa76c628e1cdd2f5d2aca72e3ad01c8cfb6ae5a0375806c",
+    "current_answer": "turns/registered-q10-en.json",
+    "comparison": "Earlier evidence accepted a generic boundary answer. The active smoke table explicitly requires computing and showing drawdown, so this run fails that bar."
+  },
+  {
+    "case": "registered-q1-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q1-es-419.md",
+    "baseline_sha256": "ecf497a5a65e67f53f79faa6538d4d70af5572f87e0512d31de4ff27c0e76cc4",
+    "current_answer": "turns/registered-q1-es-419.json",
+    "comparison": "Committed Q1 Spanish also had a provider failure. This attempt records research_unavailable_timeout and a missing-invoice estimate."
+  },
+  {
+    "case": "registered-q2-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q2-es-419.md",
+    "baseline_sha256": "1e0d851d9df2ad91e3baf65b88de213b9e1744eaa9d621d18e3d40e4ba44d851",
+    "current_answer": "turns/registered-q2-es-419.json",
+    "comparison": "Committed answer computed three financing-income examples. Current run produces no money answer."
+  },
+  {
+    "case": "registered-q3-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q3-es-419.md",
+    "baseline_sha256": "2abbce42f68494fa36426097914acbd3aca26cb7ea48df1bc7a62732df0c5d99",
+    "current_answer": "turns/registered-q3-es-419.json",
+    "comparison": "Retains the missing-term clarification. Both current and baseline have fallback clarification prose."
+  },
+  {
+    "case": "registered-q4-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q4-es-419.md",
+    "baseline_sha256": "0f38dc7849604602c8e024ff9f0d95446769ea059d86a94c767929a9cc8cb867",
+    "current_answer": "turns/registered-q4-es-419.json",
+    "comparison": "Committed Spanish answer reached bond research and failed there. Current answer instead invents a backtest capability requirement; English Q4 computes the coupon."
+  },
+  {
+    "case": "registered-q5-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q5-es-419.md",
+    "baseline_sha256": "ab25b4bf0b118087c7c4896c8d82c7424ca7bf51c960fe86d06dd3601d3c63aa",
+    "current_answer": "turns/registered-q5-es-419.json",
+    "comparison": "Committed answer lacked comparable fee tables and asked for the already-known country. Current answer uses Dominican context and quotes Qik rewards while retaining cost limits."
+  },
+  {
+    "case": "registered-q6-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q6-es-419.md",
+    "baseline_sha256": "db88e1349efa47bae87faee820c04db1aae902421d411cda7711fbfb030e3100",
+    "current_answer": "turns/registered-q6-es-419.json",
+    "comparison": "Committed answer computed 38.06x from price/EPS. Current lookup times out and delivers an honest bounded answer instead."
+  },
+  {
+    "case": "registered-q7-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q7-es-419.md",
+    "baseline_sha256": "e1db58a85c54ed724afaa45d7d4860c56824bf6e06334bbc2a1c312ba4c03358",
+    "current_answer": "turns/registered-q7-es-419.json",
+    "comparison": "Retains the founder-approved currency-choice shape: DOP context, dated figures, conditional goal matching, and no forced math."
+  },
+  {
+    "case": "registered-q8-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q8-es-419.md",
+    "baseline_sha256": "1d3fc5e5fbfb2a7f22db614f365ca790b1669c30ac6afb5cfc25ed7ac8c5fe61",
+    "current_answer": "turns/registered-q8-es-419.json",
+    "comparison": "Retains the zero-interest illustration and calculation; current answer omits the earlier optional bank-rate comparison."
+  },
+  {
+    "case": "registered-q9-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q9-es-419.md",
+    "baseline_sha256": "dc8ec441ced99cbdca8d0be5ada269179215b7e04fd191adc7eff691c9d89bb9",
+    "current_answer": "turns/registered-q9-es-419.json",
+    "comparison": "Matches the committed ready-to-test state."
+  },
+  {
+    "case": "registered-q10-es-419",
+    "baseline_answer": "docs/reports/evidence/grounded-math/answers/q10-es-419.md",
+    "baseline_sha256": "e35ac6efa32307cefce4fecda0e4f2efa579ccecf4db018eee2119e0c7b0d2c6",
+    "current_answer": "turns/registered-q10-es-419.json",
+    "comparison": "Like the committed Spanish answer, it stays at qualitative risk discussion. The active smoke table requires historical drawdown evidence."
+  }
+]

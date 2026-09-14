@@ -1,0 +1,1243 @@
+{
+  "label": "registered-q5-en",
+  "phase": "registered",
+  "question": "q5",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+  "message": "Which credit card should I get?",
+  "answer": {
+    "id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+    "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+    "role": "assistant",
+    "content": "There is no single best card without knowing your credit profile, spending, travel habits, and whether you carry a balance. As of 2026-09-14, the closest general-purpose fit among these representative options is Citi Double Cash for uncomplicated cash back; Chase Sapphire Preferred or Capital One Venture X are travel-oriented alternatives, while Discover it Secured is designed for building or rebuilding credit.\n\n### Shortlist by use case\n\n| If your main goal is… | Representative card | Current terms that matter |\n|---|---|---|\n| Simple cash back | Citi Double Cash | Unlimited 2% cash back on purchases, earned partly when purchasing and partly when paying; no annual fee and no reward-category enrollment |\n| Travel rewards with a moderate fee | Chase Sapphire Preferred | $95 annual fee; 3x points on dining, 2x on other travel and 1x on other purchases; no foreign-transaction fee |\n| Premium travel and lounge access | Capital One Venture X | $395 annual fee; 2x miles on ordinary purchases; airport-lounge access and no foreign-transaction fee |\n| Building or rebuilding credit | Discover it Secured | No annual fee; refundable deposit as low as $49, with credit lines starting at $200; no credit score is required to apply, although an available score may be considered |\n\n### Important trade-offs\n\n**Citi Double Cash:** Its flat rewards and lack of category enrollment make it straightforward. The issuer’s live page did not display a verifiable purchase APR or foreign-transaction-fee figure, so those terms should be checked in the application disclosure.\n\n**Chase Sapphire Preferred:** The travel protections and transferable airline and hotel points add flexibility, but their value depends on how you redeem them. Its current purchase APR is 19.24%, 27.49% variable, depending on creditworthiness.\n\n**Capital One Venture X:** The fee supports premium travel features, including access to more than 1,300 participating Priority Pass lounges. Its current purchase APR is 19.49%, 28.49% variable, and Capital One labels the required credit level as excellent.\n\n**Discover it Secured:** The deposit is refundable under the issuer’s terms, and responsible use may help build credit. The deposit requirement ties up cash while the account remains secured.\n\n### If you might carry a balance\n\nRewards should be evaluated separately from borrowing costs. The Consumer Financial Protection Bureau says most issuers calculate interest daily, while a purchase grace period can let you avoid interest when the card provides one, you are not carrying a balance, and you pay the balance in full by the due date. Cash advances generally begin accruing interest from the transaction date.\n\nIn that situation, compare the disclosed APR, balance-transfer fee, promotional period, and post-promotional APR rather than relying only on rewards. The Citi page did not expose complete live promotional terms, and the Discover secured-card page did not expose a current APR, so those figures could not be verified here.",
+    "created_at": "2026-09-14T16:53:23.067046Z",
+    "metadata": {
+      "research": {
+        "rows": [
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-14",
+            "label": "cash-back rate on purchases",
+            "value": 2,
+            "symbol": null,
+            "subject": "Citi Double Cash Card",
+            "source_url": "https://www.citi.com/credit-cards/citi-double-cash-credit-card"
+          },
+          {
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-09-14",
+            "label": "annual fee",
+            "value": 95,
+            "symbol": null,
+            "subject": "Chase Sapphire Preferred Credit Card",
+            "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+          },
+          {
+            "kind": "multiple",
+            "unit": "x",
+            "as_of": "2026-09-14",
+            "label": "points per dollar on dining",
+            "value": 3,
+            "symbol": null,
+            "subject": "Chase Sapphire Preferred Credit Card",
+            "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+          },
+          {
+            "kind": "multiple",
+            "unit": "x",
+            "as_of": "2026-09-14",
+            "label": "points per dollar on other travel",
+            "value": 2,
+            "symbol": null,
+            "subject": "Chase Sapphire Preferred Credit Card",
+            "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+          },
+          {
+            "kind": "multiple",
+            "unit": "x",
+            "as_of": "2026-09-14",
+            "label": "points per dollar on other purchases",
+            "value": 1,
+            "symbol": null,
+            "subject": "Chase Sapphire Preferred Credit Card",
+            "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-14",
+            "label": "minimum variable purchase APR",
+            "value": 19.24,
+            "symbol": null,
+            "subject": "Chase Sapphire Preferred Credit Card",
+            "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-14",
+            "label": "maximum variable purchase APR",
+            "value": 27.49,
+            "symbol": null,
+            "subject": "Chase Sapphire Preferred Credit Card",
+            "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+          },
+          {
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-09-14",
+            "label": "annual fee",
+            "value": 395,
+            "symbol": null,
+            "subject": "Capital One Venture X Rewards",
+            "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+          },
+          {
+            "kind": "multiple",
+            "unit": "x",
+            "as_of": "2026-09-14",
+            "label": "miles per dollar on ordinary purchases",
+            "value": 2,
+            "symbol": null,
+            "subject": "Capital One Venture X Rewards",
+            "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+          },
+          {
+            "kind": "count",
+            "unit": "lounges",
+            "as_of": "2026-09-14",
+            "label": "participating Priority Pass lounges",
+            "value": 1300,
+            "symbol": null,
+            "subject": "Capital One Venture X Rewards",
+            "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-14",
+            "label": "minimum variable purchase APR",
+            "value": 19.49,
+            "symbol": null,
+            "subject": "Capital One Venture X Rewards",
+            "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-14",
+            "label": "maximum variable purchase APR",
+            "value": 28.49,
+            "symbol": null,
+            "subject": "Capital One Venture X Rewards",
+            "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+          },
+          {
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-09-14",
+            "label": "minimum refundable security deposit",
+            "value": 49,
+            "symbol": null,
+            "subject": "Discover it Secured Cash Back Credit Card",
+            "source_url": "https://www.discover.com/credit-cards/secured-credit-card/"
+          },
+          {
+            "kind": "currency",
+            "unit": "USD",
+            "as_of": "2026-09-14",
+            "label": "starting credit line",
+            "value": 200,
+            "symbol": null,
+            "subject": "Discover it Secured Cash Back Credit Card",
+            "source_url": "https://www.discover.com/credit-cards/secured-credit-card/"
+          }
+        ],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.36037,
+          "latency_ms": 90230,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://www.citi.com/credit-cards/citi-double-cash-credit-card",
+            "title": "Citi Double Cash® Card",
+            "domain": "www.citi.com",
+            "source_date": null
+          },
+          {
+            "url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred",
+            "title": "Explore Additional Benefits",
+            "domain": "creditcards.chase.com",
+            "source_date": null
+          },
+          {
+            "url": "https://www.capitalone.com/credit-cards/venture-x/",
+            "title": "Venture X Rewards | Capital One",
+            "domain": "www.capitalone.com",
+            "source_date": null
+          },
+          {
+            "url": "https://www.discover.com/credit-cards/secured-credit-card/",
+            "title": "Discover it Secured Cash Back Credit Card",
+            "domain": "www.discover.com",
+            "source_date": null
+          },
+          {
+            "url": "https://www.consumerfinance.gov/ask-cfpb/what-is-a-grace-period-for-a-credit-card-en-47/",
+            "title": "What is a grace period for a credit card? | Consumer Financial Protection Bureau",
+            "domain": "www.consumerfinance.gov",
+            "source_date": null
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "Can you narrow this down based on my credit score and monthly spending?",
+            "Which card fits me if I travel only a few times per year?",
+            "How do these options compare if I sometimes carry a balance?",
+            "Can you compare the welcome offers and eligibility rules?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T16:53:23.040675+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "Can you narrow this down based on my credit score and monthly spending?",
+            "type": "question"
+          },
+          {
+            "text": "Which card fits me if I travel only a few times per year?",
+            "type": "question"
+          },
+          {
+            "text": "How do these options compare if I sometimes carry a balance?",
+            "type": "question"
+          },
+          {
+            "text": "Can you compare the welcome offers and eligibility rules?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "34720212-864e-4d1b-888c-b7832062298e",
+        "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "There is no single best card without knowing your credit profile, spending, travel habits, and whether you carry a balance. As of 2026-09-14, the closest general-purpose fit among these representative options is Citi Double Cash for uncomplicated cash back; Chase Sapphire Preferred or Capital One Venture X are travel-oriented alternatives, while Discover it Secured is designed for building or rebuilding credit.\n\n### Shortlist by use case\n\n| If your main goal is… | Representative card | Current terms that matter |\n|---|---|---|\n| Simple cash back | Citi Double Cash | Unlimited 2% cash back on purchases, earned partly when purchasing and partly when paying; no annual fee and no reward-category enrollment |\n| Travel rewards with a moderate fee | Chase Sapphire Preferred | $95 annual fee; 3x points on dining, 2x on other travel and 1x on other purchases; no foreign-transaction fee |\n| Premium travel and lounge access | Capital One Venture X | $395 annual fee; 2x miles on ordinary purchases; airport-lounge access and no foreign-transaction fee |\n| Building or rebuilding credit | Discover it Secured | No annual fee; refundable deposit as low as $49, with credit lines starting at $200; no credit score is required to apply, although an available score may be considered |\n\n### Important trade-offs\n\n**Citi Double Cash:** Its flat rewards and lack of category enrollment make it straightforward. The issuer’s live page did not display a verifiable purchase APR or foreign-transaction-fee figure, so those terms should be checked in the application disclosure.\n\n**Chase Sapphire Preferred:** The travel protections and transferable airline and hotel points add flexibility, but their value depends on how you redeem them. Its current purchase APR is 19.24%, 27.49% variable, depending on creditworthiness.\n\n**Capital One Venture X:** The fee supports premium travel features, including access to more than 1,300 participating Priority Pass lounges. Its current purchase APR is 19.49%, 28.49% variable, and Capital One labels the required credit level as excellent.\n\n**Discover it Secured:** The deposit is refundable under the issuer’s terms, and responsible use may help build credit. The deposit requirement ties up cash while the account remains secured.\n\n### If you might carry a balance\n\nRewards should be evaluated separately from borrowing costs. The Consumer Financial Protection Bureau says most issuers calculate interest daily, while a purchase grace period can let you avoid interest when the card provides one, you are not carrying a balance, and you pay the balance in full by the due date. Cash advances generally begin accruing interest from the transaction date.\n\nIn that situation, compare the disclosed APR, balance-transfer fee, promotional period, and post-promotional APR rather than relying only on rewards. The Citi page did not expose complete live promotional terms, and the Discover secured-card page did not expose a current APR, so those figures could not be verified here."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "There is no single best card without knowing your credit profile, spending, travel habits, and whether you carry a balance. As of 2026-09-14, the closest general-purpose fit among these representative options is Citi Double Cash for uncomplicated cash back; Chase Sapphire Preferred or Capital One Venture X are travel-oriented alternatives, while Discover it Secured is designed for building or rebuilding credit.\n\n### Shortlist by use case\n\n| If your main goal is… | Representative card | Current terms that matter |\n|---|---|---|\n| Simple cash back | Citi Double Cash | Unlimited 2% cash back on purchases, earned partly when purchasing and partly when paying; no annual fee and no reward-category enrollment |\n| Travel rewards with a moderate fee | Chase Sapphire Preferred | $95 annual fee; 3x points on dining, 2x on other travel and 1x on other purchases; no foreign-transaction fee |\n| Premium travel and lounge access | Capital One Venture X | $395 annual fee; 2x miles on ordinary purchases; airport-lounge access and no foreign-transaction fee |\n| Building or rebuilding credit | Discover it Secured | No annual fee; refundable deposit as low as $49, with credit lines starting at $200; no credit score is required to apply, although an available score may be considered |\n\n### Important trade-offs\n\n**Citi Double Cash:** Its flat rewards and lack of category enrollment make it straightforward. The issuer’s live page did not display a verifiable purchase APR or foreign-transaction-fee figure, so those terms should be checked in the application disclosure.\n\n**Chase Sapphire Preferred:** The travel protections and transferable airline and hotel points add flexibility, but their value depends on how you redeem them. Its current purchase APR is 19.24%, 27.49% variable, depending on creditworthiness.\n\n**Capital One Venture X:** The fee supports premium travel features, including access to more than 1,300 participating Priority Pass lounges. Its current purchase APR is 19.49%, 28.49% variable, and Capital One labels the required credit level as excellent.\n\n**Discover it Secured:** The deposit is refundable under the issuer’s terms, and responsible use may help build credit. The deposit requirement ties up cash while the account remains secured.\n\n### If you might carry a balance\n\nRewards should be evaluated separately from borrowing costs. The Consumer Financial Protection Bureau says most issuers calculate interest daily, while a purchase grace period can let you avoid interest when the card provides one, you are not carrying a balance, and you pay the balance in full by the due date. Cash advances generally begin accruing interest from the transaction date.\n\nIn that situation, compare the disclosed APR, balance-transfer fee, promotional period, and post-promotional APR rather than relying only on rewards. The Citi page did not expose complete live promotional terms, and the Discover secured-card page did not expose a current APR, so those figures could not be verified here.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "Can you narrow this down based on my credit score and monthly spending?"
+            },
+            {
+              "type": "question",
+              "text": "Which card fits me if I travel only a few times per year?"
+            },
+            {
+              "type": "question",
+              "text": "How do these options compare if I sometimes carry a balance?"
+            },
+            {
+              "type": "question",
+              "text": "Can you compare the welcome offers and eligibility rules?"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "Citi Double Cash® Card",
+              "domain": "www.citi.com",
+              "url": "https://www.citi.com/credit-cards/citi-double-cash-credit-card",
+              "source_date": null
+            },
+            {
+              "title": "Explore Additional Benefits",
+              "domain": "creditcards.chase.com",
+              "url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred",
+              "source_date": null
+            },
+            {
+              "title": "Venture X Rewards | Capital One",
+              "domain": "www.capitalone.com",
+              "url": "https://www.capitalone.com/credit-cards/venture-x/",
+              "source_date": null
+            },
+            {
+              "title": "Discover it Secured Cash Back Credit Card",
+              "domain": "www.discover.com",
+              "url": "https://www.discover.com/credit-cards/secured-credit-card/",
+              "source_date": null
+            },
+            {
+              "title": "What is a grace period for a credit card? | Consumer Financial Protection Bureau",
+              "domain": "www.consumerfinance.gov",
+              "url": "https://www.consumerfinance.gov/ask-cfpb/what-is-a-grace-period-for-a-credit-card-en-47/",
+              "source_date": null
+            }
+          ],
+          "rows": [
+            {
+              "subject": "Citi Double Cash Card",
+              "symbol": null,
+              "label": "cash-back rate on purchases",
+              "value": 2,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-14",
+              "source_url": "https://www.citi.com/credit-cards/citi-double-cash-credit-card"
+            },
+            {
+              "subject": "Chase Sapphire Preferred Credit Card",
+              "symbol": null,
+              "label": "annual fee",
+              "value": 95,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-14",
+              "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+            },
+            {
+              "subject": "Chase Sapphire Preferred Credit Card",
+              "symbol": null,
+              "label": "points per dollar on dining",
+              "value": 3,
+              "kind": "multiple",
+              "unit": "x",
+              "as_of": "2026-09-14",
+              "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+            },
+            {
+              "subject": "Chase Sapphire Preferred Credit Card",
+              "symbol": null,
+              "label": "points per dollar on other travel",
+              "value": 2,
+              "kind": "multiple",
+              "unit": "x",
+              "as_of": "2026-09-14",
+              "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+            },
+            {
+              "subject": "Chase Sapphire Preferred Credit Card",
+              "symbol": null,
+              "label": "points per dollar on other purchases",
+              "value": 1,
+              "kind": "multiple",
+              "unit": "x",
+              "as_of": "2026-09-14",
+              "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+            },
+            {
+              "subject": "Chase Sapphire Preferred Credit Card",
+              "symbol": null,
+              "label": "minimum variable purchase APR",
+              "value": 19.24,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-14",
+              "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+            },
+            {
+              "subject": "Chase Sapphire Preferred Credit Card",
+              "symbol": null,
+              "label": "maximum variable purchase APR",
+              "value": 27.49,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-14",
+              "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+            },
+            {
+              "subject": "Capital One Venture X Rewards",
+              "symbol": null,
+              "label": "annual fee",
+              "value": 395,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-14",
+              "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+            },
+            {
+              "subject": "Capital One Venture X Rewards",
+              "symbol": null,
+              "label": "miles per dollar on ordinary purchases",
+              "value": 2,
+              "kind": "multiple",
+              "unit": "x",
+              "as_of": "2026-09-14",
+              "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+            },
+            {
+              "subject": "Capital One Venture X Rewards",
+              "symbol": null,
+              "label": "participating Priority Pass lounges",
+              "value": 1300,
+              "kind": "count",
+              "unit": "lounges",
+              "as_of": "2026-09-14",
+              "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+            },
+            {
+              "subject": "Capital One Venture X Rewards",
+              "symbol": null,
+              "label": "minimum variable purchase APR",
+              "value": 19.49,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-14",
+              "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+            },
+            {
+              "subject": "Capital One Venture X Rewards",
+              "symbol": null,
+              "label": "maximum variable purchase APR",
+              "value": 28.49,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-14",
+              "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+            },
+            {
+              "subject": "Discover it Secured Cash Back Credit Card",
+              "symbol": null,
+              "label": "minimum refundable security deposit",
+              "value": 49,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-14",
+              "source_url": "https://www.discover.com/credit-cards/secured-credit-card/"
+            },
+            {
+              "subject": "Discover it Secured Cash Back Credit Card",
+              "symbol": null,
+              "label": "starting credit line",
+              "value": 200,
+              "kind": "currency",
+              "unit": "USD",
+              "as_of": "2026-09-14",
+              "source_url": "https://www.discover.com/credit-cards/secured-credit-card/"
+            }
+          ],
+          "retrieved_at": "2026-09-14T16:53:23.040675+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 90230,
+            "cost_usd": 0.36037,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "Can you narrow this down based on my credit score and monthly spending?",
+              "Which card fits me if I travel only a few times per year?",
+              "How do these options compare if I sometimes carry a balance?",
+              "Can you compare the welcome offers and eligibility rules?"
+            ]
+          }
+        },
+        "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 115.763,
+  "screenshot": {
+    "file": "screenshots/registered-q5-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "There is no single best card without knowing your credit profile, spending, travel habits, and whether you carry a balance. As of 2026-09-14, the closest general-purpose fit among these representative options is Citi Double Cash for uncomplicated cash back; Chase Sapphire Preferred or Capital One Venture X are travel-oriented alternatives, while Discover it Secured is designed for building or rebuilding credit.\n\nShortlist by use case\nIF YOUR MAIN GOAL IS…\tREPRESENTATIVE CARD\tCURRENT TERMS THAT MATTER\nSimple cash back\tCiti Double Cash\tUnlimited 2% cash back on purchases, earned partly when purchasing and partly when paying; no annual fee and no reward-category enrollment\nTravel rewards with a moderate fee\tChase Sapphire Preferred\t$95 annual fee; 3x points on dining, 2x on other travel and 1x on other purchases; no foreign-transaction fee\nPremium travel and lounge access\tCapital One Venture X\t$395 annual fee; 2x miles on ordinary purchases; airport-lounge access and no foreign-transaction fee\nBuilding or rebuilding credit\tDiscover it Secured\tNo annual fee; refundable deposit as low as $49, with credit lines starting at $200; no credit score is required to apply, although an available score may be considered\nImportant trade-offs\n\nCiti Double Cash: Its flat rewards and lack of category enrollment make it straightforward. The issuer’s live page did not display a verifiable purchase APR or foreign-transaction-fee figure, so those terms should be checked in the application disclosure.\n\nChase Sapphire Preferred: The travel protections and transferable airline and hotel points add flexibility, but their value depends on how you redeem them. Its current purchase APR is 19.24%, 27.49% variable, depending on creditworthiness.\n\nCapital One Venture X: The fee supports premium travel features, including access to more than 1,300 participating Priority Pass lounges. Its current purchase APR is 19.49%, 28.49% variable, and Capital One labels the required credit level as excellent.\n\nDiscover it Secured: The deposit is refundable under the issuer’s terms, and responsible use may help build credit. The deposit requirement ties up cash while the account remains secured.\n\nIf you might carry a balance\n\nRewards should be evaluated separately from borrowing costs. The Consumer Financial Protection Bureau says most issuers calculate interest daily, while a purchase grace period can let you avoid interest when the card provides one, you are not carrying a balance, and you pay the balance in full by the due date. Cash advances generally begin accruing interest from the transaction date.\n\nIn that situation, compare the disclosed APR, balance-transfer fee, promotional period, and post-promotional APR rather than relying only on rewards. The Citi page did not expose complete live promotional terms, and the Discover secured-card page did not expose a current APR, so those figures could not be verified here.\n\n5 sources ›\nTRY NEXT\n↳\nCan you narrow this down based on my credit score and monthly spending?\n↳\nWhich card fits me if I travel only a few times per year?\n↳\nHow do these options compare if I sometimes carry a balance?\n↳\nCan you compare the welcome offers and eligibility rules?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "25ec924b-d45f-475d-99b7-05a3cdbf5943",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "run_id": null,
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 813,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 799,
+        "cached_tokens": 128,
+        "prompt_tokens": 782,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 113.636,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:51:30.296282+00:00"
+    },
+    {
+      "id": "2c1333a4-b41f-443a-8592-f2249e06827d",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "run_id": null,
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 6281,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 11259,
+        "cached_tokens": 192,
+        "prompt_tokens": 10763,
+        "completion_tokens": 496,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 113.636,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:51:36.578105+00:00"
+    },
+    {
+      "id": "44e08657-5f1d-426f-96c6-6792daccd12b",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "run_id": null,
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "ContextQuestionAudit",
+      "latency_ms": 6042,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 1246,
+        "cached_tokens": 192,
+        "prompt_tokens": 668,
+        "completion_tokens": 578,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 113.636,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 16:51:52.788631+00:00"
+    },
+    {
+      "id": "6a83c156-f26f-469a-a794-609b5018588a",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "run_id": null,
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 708,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 244,
+        "cached_tokens": 0,
+        "prompt_tokens": 231,
+        "completion_tokens": 13,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 16:53:23.837476+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "48c545da-8dee-4e8c-9ebc-d4fa4b02b891",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "25ec924b-d45f-475d-99b7-05a3cdbf5943",
+      "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+      "correlation_id": "f2486136-cd0f-4451-9744-6b19cd734d10:e57eb92c-184c-4d74-b47c-c6297c69192b:b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 799,
+        "cached_tokens": 128,
+        "prompt_tokens": 782,
+        "usage_cost_usd": 0.0008856,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 782,
+      "output_tokens": 17,
+      "total_tokens": 799,
+      "billable_unit": "token",
+      "billable_quantity": "799.000000",
+      "cost_amount": "0.00088560",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 813,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 113.636,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:51:30.296282+00:00",
+      "created_at": "2026-09-14 16:53:23.092524+00:00"
+    },
+    {
+      "id": "8708b7ce-ff8b-4858-880f-e7537b107fc1",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "2c1333a4-b41f-443a-8592-f2249e06827d",
+      "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+      "correlation_id": "f2486136-cd0f-4451-9744-6b19cd734d10:e57eb92c-184c-4d74-b47c-c6297c69192b:b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 11259,
+        "cached_tokens": 192,
+        "prompt_tokens": 10763,
+        "usage_cost_usd": 0.01449215,
+        "completion_tokens": 496,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10763,
+      "output_tokens": 496,
+      "total_tokens": 11259,
+      "billable_unit": "token",
+      "billable_quantity": "11259.000000",
+      "cost_amount": "0.01449215",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 6281,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 113.636,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:51:36.578105+00:00",
+      "created_at": "2026-09-14 16:53:23.101702+00:00"
+    },
+    {
+      "id": "e54a8a05-a2f0-4d1c-8c6c-a12524a12d8c",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "44e08657-5f1d-426f-96c6-6792daccd12b",
+      "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+      "correlation_id": "f2486136-cd0f-4451-9744-6b19cd734d10:e57eb92c-184c-4d74-b47c-c6297c69192b:b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 1246,
+        "cached_tokens": 192,
+        "prompt_tokens": 668,
+        "usage_cost_usd": 0.0020784,
+        "completion_tokens": 578,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 668,
+      "output_tokens": 578,
+      "total_tokens": 1246,
+      "billable_unit": "token",
+      "billable_quantity": "1246.000000",
+      "cost_amount": "0.00207840",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 6042,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+        "schema_name": "ContextQuestionAudit",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 3,
+          "elapsed_seconds": 113.636,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 3
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 3,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:51:52.788631+00:00",
+      "created_at": "2026-09-14 16:53:23.110269+00:00"
+    },
+    {
+      "id": "4b65be84-3bdf-4035-8d7a-a0bd0aef3384",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10",
+      "correlation_id": "research:f2486136-cd0f-4451-9744-6b19cd734d10",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.36037000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 90230,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 16:53:23.080645+00:00",
+      "created_at": "2026-09-14 16:53:23.081985+00:00"
+    },
+    {
+      "id": "25751f4e-b1e1-4782-a6d5-2e51476bd099",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "e57eb92c-184c-4d74-b47c-c6297c69192b",
+      "message_id": "b5cdf984-26c0-472c-82d7-9b3e4e745181",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "6a83c156-f26f-469a-a794-609b5018588a",
+      "request_id": null,
+      "correlation_id": "api_turn:e57eb92c-184c-4d74-b47c-c6297c69192b:b5cdf984-26c0-472c-82d7-9b3e4e745181:6a83c156-f26f-469a-a794-609b5018588a",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 244,
+        "cached_tokens": 0,
+        "prompt_tokens": 231,
+        "usage_cost_usd": 2.83e-05,
+        "completion_tokens": 13,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 231,
+      "output_tokens": 13,
+      "total_tokens": 244,
+      "billable_unit": "token",
+      "billable_quantity": "244.000000",
+      "cost_amount": "0.00002830",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 708,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 16:53:23.837476+00:00",
+      "created_at": "2026-09-14 16:53:23.851340+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 15,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-14",
+          "label": "cash-back rate on purchases",
+          "value": 2.0,
+          "symbol": null,
+          "subject": "Citi Double Cash Card",
+          "source_url": "https://www.citi.com/credit-cards/citi-double-cash-credit-card"
+        },
+        {
+          "kind": "currency",
+          "unit": "USD",
+          "as_of": "2026-09-14",
+          "label": "annual fee",
+          "value": 95.0,
+          "symbol": null,
+          "subject": "Chase Sapphire Preferred Credit Card",
+          "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+        },
+        {
+          "kind": "multiple",
+          "unit": "x",
+          "as_of": "2026-09-14",
+          "label": "points per dollar on dining",
+          "value": 3.0,
+          "symbol": null,
+          "subject": "Chase Sapphire Preferred Credit Card",
+          "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+        },
+        {
+          "kind": "multiple",
+          "unit": "x",
+          "as_of": "2026-09-14",
+          "label": "points per dollar on other travel",
+          "value": 2.0,
+          "symbol": null,
+          "subject": "Chase Sapphire Preferred Credit Card",
+          "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+        },
+        {
+          "kind": "multiple",
+          "unit": "x",
+          "as_of": "2026-09-14",
+          "label": "points per dollar on other purchases",
+          "value": 1.0,
+          "symbol": null,
+          "subject": "Chase Sapphire Preferred Credit Card",
+          "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-14",
+          "label": "minimum variable purchase APR",
+          "value": 19.24,
+          "symbol": null,
+          "subject": "Chase Sapphire Preferred Credit Card",
+          "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-14",
+          "label": "maximum variable purchase APR",
+          "value": 27.49,
+          "symbol": null,
+          "subject": "Chase Sapphire Preferred Credit Card",
+          "source_url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred"
+        },
+        {
+          "kind": "currency",
+          "unit": "USD",
+          "as_of": "2026-09-14",
+          "label": "annual fee",
+          "value": 395.0,
+          "symbol": null,
+          "subject": "Capital One Venture X Rewards",
+          "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+        },
+        {
+          "kind": "multiple",
+          "unit": "x",
+          "as_of": "2026-09-14",
+          "label": "miles per dollar on ordinary purchases",
+          "value": 2.0,
+          "symbol": null,
+          "subject": "Capital One Venture X Rewards",
+          "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+        },
+        {
+          "kind": "count",
+          "unit": "lounges",
+          "as_of": "2026-09-14",
+          "label": "participating Priority Pass lounges",
+          "value": 1300.0,
+          "symbol": null,
+          "subject": "Capital One Venture X Rewards",
+          "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-14",
+          "label": "minimum variable purchase APR",
+          "value": 19.49,
+          "symbol": null,
+          "subject": "Capital One Venture X Rewards",
+          "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-14",
+          "label": "maximum variable purchase APR",
+          "value": 28.49,
+          "symbol": null,
+          "subject": "Capital One Venture X Rewards",
+          "source_url": "https://www.capitalone.com/credit-cards/venture-x/"
+        },
+        {
+          "kind": "currency",
+          "unit": "USD",
+          "as_of": "2026-09-14",
+          "label": "minimum refundable security deposit",
+          "value": 49.0,
+          "symbol": null,
+          "subject": "Discover it Secured Cash Back Credit Card",
+          "source_url": "https://www.discover.com/credit-cards/secured-credit-card/"
+        },
+        {
+          "kind": "currency",
+          "unit": "USD",
+          "as_of": "2026-09-14",
+          "label": "starting credit line",
+          "value": 200.0,
+          "symbol": null,
+          "subject": "Discover it Secured Cash Back Credit Card",
+          "source_url": "https://www.discover.com/credit-cards/secured-credit-card/"
+        }
+      ],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.36037,
+        "latency_ms": 90230,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://www.citi.com/credit-cards/citi-double-cash-credit-card",
+          "title": "Citi Double Cash® Card",
+          "domain": "www.citi.com",
+          "source_date": null
+        },
+        {
+          "url": "https://creditcards.chase.com/rewards-credit-cards/sapphire/preferred",
+          "title": "Explore Additional Benefits",
+          "domain": "creditcards.chase.com",
+          "source_date": null
+        },
+        {
+          "url": "https://www.capitalone.com/credit-cards/venture-x/",
+          "title": "Venture X Rewards | Capital One",
+          "domain": "www.capitalone.com",
+          "source_date": null
+        },
+        {
+          "url": "https://www.discover.com/credit-cards/secured-credit-card/",
+          "title": "Discover it Secured Cash Back Credit Card",
+          "domain": "www.discover.com",
+          "source_date": null
+        },
+        {
+          "url": "https://www.consumerfinance.gov/ask-cfpb/what-is-a-grace-period-for-a-credit-card-en-47/",
+          "title": "What is a grace period for a credit card? | Consumer Financial Protection Bureau",
+          "domain": "www.consumerfinance.gov",
+          "source_date": null
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "Can you narrow this down based on my credit score and monthly spending?",
+          "Which card fits me if I travel only a few times per year?",
+          "How do these options compare if I sometimes carry a balance?",
+          "Can you compare the welcome offers and eligibility rules?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T16:53:23.040675+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "34720212-864e-4d1b-888c-b7832062298e",
+      "terminal": true,
+      "request_id": "f2486136-cd0f-4451-9744-6b19cd734d10"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

@@ -1,0 +1,881 @@
+{
+  "label": "registered-q5-es-419",
+  "phase": "registered",
+  "question": "q5",
+  "language": "es-419",
+  "country": "DO",
+  "account_kind": "registered",
+  "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+  "message": "¿Qué tarjeta de crédito debería sacar?",
+  "answer": {
+    "id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+    "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+    "role": "assistant",
+    "content": "No hay una tarjeta que pueda señalar responsablemente como “la mejor” sin conocer tus gastos y sin verificar sus tasas, membresías y cargos vigentes. Entre las opciones cuya información oficial sí pude confirmar, Qik Pro puede entrar en tu comparación si concentras gastos en categorías bonificadas, pero no es posible concluir que sea la más barata.\n\n### Opción con beneficios verificables\n\nLa información oficial disponible al 2026-09-11 indica que la tarjeta Qik Pro permite escoger entre un reembolso de 5% en una categoría o reembolsos de 2% y 3% en dos categorías alternas. Para consumos internacionales, publica 10% en transporte, 5% en restaurantes y 3% en alquiler de vehículos.\n\n| Tarjeta | Puede encajar si… | Información que falta verificar antes de compararla |\n|---|---|---|\n| Qik Pro | Tus gastos habituales coinciden con sus categorías de reembolso y pagarías el estado de cuenta completo | Tasa de financiamiento, membresía, límites mensuales del reembolso, comisión por mora, retiro de efectivo y conversión de moneda |\n| Otras tarjetas dominicanas | Ofrecen menores costos totales o beneficios mejor alineados con tus gastos | No pude verificar en las páginas oficiales recuperadas un conjunto comparable y vigente de tasas, cargos y recompensas |\n\n### Cómo reducir la lista sin asumir cuál te conviene\n\nCompara primero la tasa de financiamiento y los cargos si existe la posibilidad de dejar saldo pendiente. Si siempre pagarías el balance completo, compara membresía, cargos en moneda extranjera, límites y exclusiones del reembolso, y beneficios que realmente usarías. También conviene revisar que el ahorro potencial no dependa de promociones temporales.\n\n### Datos necesarios para una comparación en DOP\n\nPara calcular el valor neto de cada tarjeta hacen falta tu gasto mensual por categoría, cuánto gastarías fuera del país, si pagarías el balance completo y las tarifas oficiales vigentes de cada producto. Sin esos datos, cualquier selección concreta sería incompleta.",
+    "created_at": "2026-09-14T17:07:35.945146Z",
+    "metadata": {
+      "research": {
+        "rows": [
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-11",
+            "label": "reembolso en una categoría elegida",
+            "value": 5,
+            "symbol": null,
+            "subject": "Tarjeta de Crédito Qik Pro",
+            "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-11",
+            "label": "reembolso en primera categoría alterna",
+            "value": 2,
+            "symbol": null,
+            "subject": "Tarjeta de Crédito Qik Pro",
+            "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-11",
+            "label": "reembolso en segunda categoría alterna",
+            "value": 3,
+            "symbol": null,
+            "subject": "Tarjeta de Crédito Qik Pro",
+            "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-11",
+            "label": "reembolso en transporte internacional",
+            "value": 10,
+            "symbol": null,
+            "subject": "Tarjeta de Crédito Qik Pro",
+            "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-11",
+            "label": "reembolso en restaurantes internacionales",
+            "value": 5,
+            "symbol": null,
+            "subject": "Tarjeta de Crédito Qik Pro",
+            "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+          },
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-09-11",
+            "label": "reembolso en alquiler internacional de vehículos",
+            "value": 3,
+            "symbol": null,
+            "subject": "Tarjeta de Crédito Qik Pro",
+            "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+          }
+        ],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.31932,
+          "latency_ms": 103522,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx",
+            "title": "Qik lanza Qik Pro, nuevo ecosistema financiero para clientes ...",
+            "domain": "www.grupopopular.com",
+            "source_date": "2026-09-11"
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "¿Puedes compararlas según mis gastos mensuales por categoría?",
+            "¿Qué debo revisar en el tarifario antes de solicitar una tarjeta?",
+            "¿Cómo cambia la comparación si pago siempre el balance completo?",
+            "¿Puedes comparar tarjetas de bancos dominicanos específicos?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T17:07:35.924931+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "¿Puedes compararlas según mis gastos mensuales por categoría?",
+            "type": "question"
+          },
+          {
+            "text": "¿Qué debo revisar en el tarifario antes de solicitar una tarjeta?",
+            "type": "question"
+          },
+          {
+            "text": "¿Cómo cambia la comparación si pago siempre el balance completo?",
+            "type": "question"
+          },
+          {
+            "text": "¿Puedes comparar tarjetas de bancos dominicanos específicos?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "d9592f81-e152-497f-b893-4b11bcde8fa4",
+        "request_id": "542f1603-6a55-45c4-ace6-68f506454d43",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "No hay una tarjeta que pueda señalar responsablemente como “la mejor” sin conocer tus gastos y sin verificar sus tasas, membresías y cargos vigentes. Entre las opciones cuya información oficial sí pude confirmar, Qik Pro puede entrar en tu comparación si concentras gastos en categorías bonificadas, pero no es posible concluir que sea la más barata.\n\n### Opción con beneficios verificables\n\nLa información oficial disponible al 2026-09-11 indica que la tarjeta Qik Pro permite escoger entre un reembolso de 5% en una categoría o reembolsos de 2% y 3% en dos categorías alternas. Para consumos internacionales, publica 10% en transporte, 5% en restaurantes y 3% en alquiler de vehículos.\n\n| Tarjeta | Puede encajar si… | Información que falta verificar antes de compararla |\n|---|---|---|\n| Qik Pro | Tus gastos habituales coinciden con sus categorías de reembolso y pagarías el estado de cuenta completo | Tasa de financiamiento, membresía, límites mensuales del reembolso, comisión por mora, retiro de efectivo y conversión de moneda |\n| Otras tarjetas dominicanas | Ofrecen menores costos totales o beneficios mejor alineados con tus gastos | No pude verificar en las páginas oficiales recuperadas un conjunto comparable y vigente de tasas, cargos y recompensas |\n\n### Cómo reducir la lista sin asumir cuál te conviene\n\nCompara primero la tasa de financiamiento y los cargos si existe la posibilidad de dejar saldo pendiente. Si siempre pagarías el balance completo, compara membresía, cargos en moneda extranjera, límites y exclusiones del reembolso, y beneficios que realmente usarías. También conviene revisar que el ahorro potencial no dependa de promociones temporales.\n\n### Datos necesarios para una comparación en DOP\n\nPara calcular el valor neto de cada tarjeta hacen falta tu gasto mensual por categoría, cuánto gastarías fuera del país, si pagarías el balance completo y las tarifas oficiales vigentes de cada producto. Sin esos datos, cualquier selección concreta sería incompleta."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "No hay una tarjeta que pueda señalar responsablemente como “la mejor” sin conocer tus gastos y sin verificar sus tasas, membresías y cargos vigentes. Entre las opciones cuya información oficial sí pude confirmar, Qik Pro puede entrar en tu comparación si concentras gastos en categorías bonificadas, pero no es posible concluir que sea la más barata.\n\n### Opción con beneficios verificables\n\nLa información oficial disponible al 2026-09-11 indica que la tarjeta Qik Pro permite escoger entre un reembolso de 5% en una categoría o reembolsos de 2% y 3% en dos categorías alternas. Para consumos internacionales, publica 10% en transporte, 5% en restaurantes y 3% en alquiler de vehículos.\n\n| Tarjeta | Puede encajar si… | Información que falta verificar antes de compararla |\n|---|---|---|\n| Qik Pro | Tus gastos habituales coinciden con sus categorías de reembolso y pagarías el estado de cuenta completo | Tasa de financiamiento, membresía, límites mensuales del reembolso, comisión por mora, retiro de efectivo y conversión de moneda |\n| Otras tarjetas dominicanas | Ofrecen menores costos totales o beneficios mejor alineados con tus gastos | No pude verificar en las páginas oficiales recuperadas un conjunto comparable y vigente de tasas, cargos y recompensas |\n\n### Cómo reducir la lista sin asumir cuál te conviene\n\nCompara primero la tasa de financiamiento y los cargos si existe la posibilidad de dejar saldo pendiente. Si siempre pagarías el balance completo, compara membresía, cargos en moneda extranjera, límites y exclusiones del reembolso, y beneficios que realmente usarías. También conviene revisar que el ahorro potencial no dependa de promociones temporales.\n\n### Datos necesarios para una comparación en DOP\n\nPara calcular el valor neto de cada tarjeta hacen falta tu gasto mensual por categoría, cuánto gastarías fuera del país, si pagarías el balance completo y las tarifas oficiales vigentes de cada producto. Sin esos datos, cualquier selección concreta sería incompleta.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "¿Puedes compararlas según mis gastos mensuales por categoría?"
+            },
+            {
+              "type": "question",
+              "text": "¿Qué debo revisar en el tarifario antes de solicitar una tarjeta?"
+            },
+            {
+              "type": "question",
+              "text": "¿Cómo cambia la comparación si pago siempre el balance completo?"
+            },
+            {
+              "type": "question",
+              "text": "¿Puedes comparar tarjetas de bancos dominicanos específicos?"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "Qik lanza Qik Pro, nuevo ecosistema financiero para clientes ...",
+              "domain": "www.grupopopular.com",
+              "url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx",
+              "source_date": "2026-09-11"
+            }
+          ],
+          "rows": [
+            {
+              "subject": "Tarjeta de Crédito Qik Pro",
+              "symbol": null,
+              "label": "reembolso en una categoría elegida",
+              "value": 5,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-11",
+              "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+            },
+            {
+              "subject": "Tarjeta de Crédito Qik Pro",
+              "symbol": null,
+              "label": "reembolso en primera categoría alterna",
+              "value": 2,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-11",
+              "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+            },
+            {
+              "subject": "Tarjeta de Crédito Qik Pro",
+              "symbol": null,
+              "label": "reembolso en segunda categoría alterna",
+              "value": 3,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-11",
+              "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+            },
+            {
+              "subject": "Tarjeta de Crédito Qik Pro",
+              "symbol": null,
+              "label": "reembolso en transporte internacional",
+              "value": 10,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-11",
+              "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+            },
+            {
+              "subject": "Tarjeta de Crédito Qik Pro",
+              "symbol": null,
+              "label": "reembolso en restaurantes internacionales",
+              "value": 5,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-11",
+              "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+            },
+            {
+              "subject": "Tarjeta de Crédito Qik Pro",
+              "symbol": null,
+              "label": "reembolso en alquiler internacional de vehículos",
+              "value": 3,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-09-11",
+              "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+            }
+          ],
+          "retrieved_at": "2026-09-14T17:07:35.924931+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 103522,
+            "cost_usd": 0.31932,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "¿Puedes compararlas según mis gastos mensuales por categoría?",
+              "¿Qué debo revisar en el tarifario antes de solicitar una tarjeta?",
+              "¿Cómo cambia la comparación si pago siempre el balance completo?",
+              "¿Puedes comparar tarjetas de bancos dominicanos específicos?"
+            ]
+          }
+        },
+        "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 137.923,
+  "screenshot": {
+    "file": "screenshots/registered-q5-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "No hay una tarjeta que pueda señalar responsablemente como “la mejor” sin conocer tus gastos y sin verificar sus tasas, membresías y cargos vigentes. Entre las opciones cuya información oficial sí pude confirmar, Qik Pro puede entrar en tu comparación si concentras gastos en categorías bonificadas, pero no es posible concluir que sea la más barata.\n\nOpción con beneficios verificables\n\nLa información oficial disponible al 2026-09-11 indica que la tarjeta Qik Pro permite escoger entre un reembolso de 5% en una categoría o reembolsos de 2% y 3% en dos categorías alternas. Para consumos internacionales, publica 10% en transporte, 5% en restaurantes y 3% en alquiler de vehículos.\n\nTARJETA\tPUEDE ENCAJAR SI…\tINFORMACIÓN QUE FALTA VERIFICAR ANTES DE COMPARARLA\nQik Pro\tTus gastos habituales coinciden con sus categorías de reembolso y pagarías el estado de cuenta completo\tTasa de financiamiento, membresía, límites mensuales del reembolso, comisión por mora, retiro de efectivo y conversión de moneda\nOtras tarjetas dominicanas\tOfrecen menores costos totales o beneficios mejor alineados con tus gastos\tNo pude verificar en las páginas oficiales recuperadas un conjunto comparable y vigente de tasas, cargos y recompensas\nCómo reducir la lista sin asumir cuál te conviene\n\nCompara primero la tasa de financiamiento y los cargos si existe la posibilidad de dejar saldo pendiente. Si siempre pagarías el balance completo, compara membresía, cargos en moneda extranjera, límites y exclusiones del reembolso, y beneficios que realmente usarías. También conviene revisar que el ahorro potencial no dependa de promociones temporales.\n\nDatos necesarios para una comparación en DOP\n\nPara calcular el valor neto de cada tarjeta hacen falta tu gasto mensual por categoría, cuánto gastarías fuera del país, si pagarías el balance completo y las tarifas oficiales vigentes de cada producto. Sin esos datos, cualquier selección concreta sería incompleta.\n\n1 fuente ›\nQUÉ PROBAR DESPUÉS\n↳\n¿Puedes compararlas según mis gastos mensuales por categoría?\n↳\n¿Qué debo revisar en el tarifario antes de solicitar una tarjeta?\n↳\n¿Cómo cambia la comparación si pago siempre el balance completo?\n↳\n¿Puedes comparar tarjetas de bancos dominicanos específicos?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "88e36c06-8524-43cb-9cfb-0d065c719e9d",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "run_id": null,
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 8582,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 799,
+        "cached_tokens": 768,
+        "prompt_tokens": 782,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "542f1603-6a55-45c4-ace6-68f506454d43",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 135.911,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:05:28.653243+00:00"
+    },
+    {
+      "id": "f217b903-c241-404a-b905-dab0a8bf6a94",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "run_id": null,
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 10872,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 11890,
+        "cached_tokens": 192,
+        "prompt_tokens": 10765,
+        "completion_tokens": 1125,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "542f1603-6a55-45c4-ace6-68f506454d43",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 135.911,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:05:39.525765+00:00"
+    },
+    {
+      "id": "b3db3b94-5d04-4973-bf2e-6afc1220bab1",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "run_id": null,
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 600,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 253,
+        "cached_tokens": 0,
+        "prompt_tokens": 237,
+        "completion_tokens": 16,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:07:36.581583+00:00"
+    },
+    {
+      "id": "cb8e62f1-b21f-4d41-915f-19132bd4acd9",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "run_id": null,
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 632,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 278,
+        "cached_tokens": 0,
+        "prompt_tokens": 268,
+        "completion_tokens": 10,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:07:37.215755+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "b9053d9b-f86d-4cbc-bd9e-f716a312cd8a",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "88e36c06-8524-43cb-9cfb-0d065c719e9d",
+      "request_id": "542f1603-6a55-45c4-ace6-68f506454d43",
+      "correlation_id": "542f1603-6a55-45c4-ace6-68f506454d43:2b42cc4a-abf9-479c-a850-2f591d642ed2:f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 799,
+        "cached_tokens": 768,
+        "prompt_tokens": 782,
+        "usage_cost_usd": 0.0002136,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 782,
+      "output_tokens": 17,
+      "total_tokens": 799,
+      "billable_unit": "token",
+      "billable_quantity": "799.000000",
+      "cost_amount": "0.00021360",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 8582,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "542f1603-6a55-45c4-ace6-68f506454d43",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 135.911,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:28.653243+00:00",
+      "created_at": "2026-09-14 17:07:35.962136+00:00"
+    },
+    {
+      "id": "749ea8f8-bfbe-4a9a-b37a-1b0f10ad12d4",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "f217b903-c241-404a-b905-dab0a8bf6a94",
+      "request_id": "542f1603-6a55-45c4-ace6-68f506454d43",
+      "correlation_id": "542f1603-6a55-45c4-ace6-68f506454d43:2b42cc4a-abf9-479c-a850-2f591d642ed2:f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 11890,
+        "cached_tokens": 192,
+        "prompt_tokens": 10765,
+        "usage_cost_usd": 0.01606715,
+        "completion_tokens": 1125,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10765,
+      "output_tokens": 1125,
+      "total_tokens": 11890,
+      "billable_unit": "token",
+      "billable_quantity": "11890.000000",
+      "cost_amount": "0.01606715",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 10872,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "542f1603-6a55-45c4-ace6-68f506454d43",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 135.911,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:05:39.525765+00:00",
+      "created_at": "2026-09-14 17:07:35.968615+00:00"
+    },
+    {
+      "id": "ce275b76-8bb5-4ccb-b0c6-643aad5e3673",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "542f1603-6a55-45c4-ace6-68f506454d43",
+      "correlation_id": "research:542f1603-6a55-45c4-ace6-68f506454d43",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.31932000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 103522,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 17:07:35.954323+00:00",
+      "created_at": "2026-09-14 17:07:35.955182+00:00"
+    },
+    {
+      "id": "a895af7b-19b9-4a34-a617-ea18c7b8ac2a",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "b3db3b94-5d04-4973-bf2e-6afc1220bab1",
+      "request_id": null,
+      "correlation_id": "api_turn:2b42cc4a-abf9-479c-a850-2f591d642ed2:f7711b87-e984-40c7-9144-c2bf61fb0bc2:b3db3b94-5d04-4973-bf2e-6afc1220bab1",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 253,
+        "cached_tokens": 0,
+        "prompt_tokens": 237,
+        "usage_cost_usd": 3.01e-05,
+        "completion_tokens": 16,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 237,
+      "output_tokens": 16,
+      "total_tokens": 253,
+      "billable_unit": "token",
+      "billable_quantity": "253.000000",
+      "cost_amount": "0.00003010",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 600,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:07:36.581583+00:00",
+      "created_at": "2026-09-14 17:07:37.223953+00:00"
+    },
+    {
+      "id": "b415df86-3a8b-455e-8ff3-95732d242d64",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2b42cc4a-abf9-479c-a850-2f591d642ed2",
+      "message_id": "f7711b87-e984-40c7-9144-c2bf61fb0bc2",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "cb8e62f1-b21f-4d41-915f-19132bd4acd9",
+      "request_id": null,
+      "correlation_id": "api_turn:2b42cc4a-abf9-479c-a850-2f591d642ed2:f7711b87-e984-40c7-9144-c2bf61fb0bc2:cb8e62f1-b21f-4d41-915f-19132bd4acd9",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 278,
+        "cached_tokens": 0,
+        "prompt_tokens": 268,
+        "usage_cost_usd": 3.08e-05,
+        "completion_tokens": 10,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 268,
+      "output_tokens": 10,
+      "total_tokens": 278,
+      "billable_unit": "token",
+      "billable_quantity": "278.000000",
+      "cost_amount": "0.00003080",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 632,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:07:37.215755+00:00",
+      "created_at": "2026-09-14 17:07:37.232573+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 9,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-11",
+          "label": "reembolso en una categoría elegida",
+          "value": 5.0,
+          "symbol": null,
+          "subject": "Tarjeta de Crédito Qik Pro",
+          "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-11",
+          "label": "reembolso en primera categoría alterna",
+          "value": 2.0,
+          "symbol": null,
+          "subject": "Tarjeta de Crédito Qik Pro",
+          "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-11",
+          "label": "reembolso en segunda categoría alterna",
+          "value": 3.0,
+          "symbol": null,
+          "subject": "Tarjeta de Crédito Qik Pro",
+          "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-11",
+          "label": "reembolso en transporte internacional",
+          "value": 10.0,
+          "symbol": null,
+          "subject": "Tarjeta de Crédito Qik Pro",
+          "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-11",
+          "label": "reembolso en restaurantes internacionales",
+          "value": 5.0,
+          "symbol": null,
+          "subject": "Tarjeta de Crédito Qik Pro",
+          "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+        },
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-09-11",
+          "label": "reembolso en alquiler internacional de vehículos",
+          "value": 3.0,
+          "symbol": null,
+          "subject": "Tarjeta de Crédito Qik Pro",
+          "source_url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx"
+        }
+      ],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.31932,
+        "latency_ms": 103522,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://www.grupopopular.com/Noticias/Pages/Qik-lanza-Qik-Pro-nuevo-ecosistema-financiero-clientes-expertos.aspx",
+          "title": "Qik lanza Qik Pro, nuevo ecosistema financiero para clientes ...",
+          "domain": "www.grupopopular.com",
+          "source_date": "2026-09-11"
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "¿Puedes compararlas según mis gastos mensuales por categoría?",
+          "¿Qué debo revisar en el tarifario antes de solicitar una tarjeta?",
+          "¿Cómo cambia la comparación si pago siempre el balance completo?",
+          "¿Puedes comparar tarjetas de bancos dominicanos específicos?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T17:07:35.924931+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "d9592f81-e152-497f-b893-4b11bcde8fa4",
+      "terminal": true,
+      "request_id": "542f1603-6a55-45c4-ace6-68f506454d43"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

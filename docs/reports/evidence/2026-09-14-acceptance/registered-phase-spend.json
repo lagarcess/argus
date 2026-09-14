@@ -1,0 +1,58 @@
+{
+  "reported_usd": 2.6629891500000005,
+  "unpriced_estimate_usd": 1.975,
+  "receipts": 100,
+  "unpriced": [
+    {
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "estimated_usd": 0.02,
+      "basis": "unreported route receipt reserve; not provider-reported spend"
+    },
+    {
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "estimated_usd": 0.02,
+      "basis": "unreported route receipt reserve; not provider-reported spend"
+    },
+    {
+      "provider": "openrouter",
+      "model": "anthropic/claude-haiku-4.5",
+      "estimated_usd": 0.02,
+      "basis": "unreported route receipt reserve; not provider-reported spend"
+    },
+    {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "estimated_usd": 0.02,
+      "basis": "unreported route receipt reserve; not provider-reported spend"
+    },
+    {
+      "provider": "openrouter",
+      "model": "qwen/qwen3.5-9b",
+      "estimated_usd": 0.02,
+      "basis": "unreported route receipt reserve; not provider-reported spend"
+    },
+    {
+      "provider": "perplexity_agent",
+      "model": "",
+      "estimated_usd": 0.625,
+      "basis": "missing usage: assumed 30k input, 15k output, 20 finance searches; table-priced reserve"
+    },
+    {
+      "id": "f94ad2bf-dae4-426e-b6c5-e453ac4974e1",
+      "phase": "registered",
+      "provider": "perplexity_agent",
+      "estimated_usd": 0.625,
+      "basis": "missing usage: assumed 30k input, 15k output, 20 finance searches; table-priced reserve"
+    },
+    {
+      "id": "7aa0452a-29df-4020-85af-c2a1f54aa8d1",
+      "phase": "registered",
+      "provider": "perplexity_agent",
+      "estimated_usd": 0.625,
+      "basis": "missing usage: assumed 30k input, 15k output, 20 finance searches; table-priced reserve"
+    }
+  ],
+  "metered_usd": 4.637989150000001
+}

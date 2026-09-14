@@ -1,0 +1,860 @@
+{
+  "label": "followups-q4-en",
+  "phase": "followups",
+  "question": "q4",
+  "language": "en",
+  "country": "US",
+  "account_kind": "registered",
+  "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+  "message": "Keep that 10.5% coupon and the same at-par assumption. Change only the face value to DOP 500,000. What annual coupon income does that give, using only the cited figures already here?",
+  "answer": {
+    "id": "f6965978-4342-4313-b017-300ccffcc6e0",
+    "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+    "role": "assistant",
+    "content": "DOP **52,500** annual coupon income.",
+    "created_at": "2026-09-14T17:19:29.478616Z",
+    "metadata": {
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "6134e440-8aeb-4203-9b74-cdc523d7a061",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "DOP **52,500** annual coupon income."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [
+          {
+            "artifact_kind": "tool_result",
+            "artifact_id": "0ee09d32-2eed-4af1-8054-81ad181e2234",
+            "artifact_status": "active",
+            "metadata": {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "income_yield",
+              "call_id": "answer-14b35b0a-e7a3-47a4-8725-c5bddc2fa19f",
+              "artifact_id": "0ee09d32-2eed-4af1-8054-81ad181e2234",
+              "input_revision": 0,
+              "card_type": "income_yield",
+              "card_version": 1,
+              "arguments": {
+                "price": 1000000,
+                "symbol": "DO2000600521",
+                "sources": {
+                  "price": {
+                    "kind": "user"
+                  },
+                  "yield_pct": {
+                    "url": "https://www.rexi.do/emisiones-de-bonos/resultados/25664?p",
+                    "date": "2026-08-27",
+                    "kind": "page",
+                    "title": "SIVEM-101 3.ª Bonos de deuda Subordinada - Rexi Finanzas"
+                  }
+                },
+                "currency": "DOP",
+                "yield_pct": 10.5,
+                "annual_income": null
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "price": 1000000,
+                  "yield_pct": 10.5,
+                  "solved_field": "annual_income",
+                  "solved_value": 105000,
+                  "annual_income": 105000,
+                  "monthly_income": 8750
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.income_yield.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "annual_income",
+                  "label": {
+                    "locale_key": "tools.calc.fields.annual_income",
+                    "interpolation_args": {}
+                  },
+                  "value": 105000,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "monthly_income",
+                    "label": {
+                      "locale_key": "tools.calc.fields.monthly_income",
+                      "interpolation_args": {}
+                    },
+                    "value": 8750,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "symbol",
+                    "label": {
+                      "locale_key": "tools.calc.fields.symbol",
+                      "interpolation_args": {}
+                    },
+                    "value": "DO2000600521",
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "user"
+                    },
+                    "editable": false,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "annual_income",
+                    "label": {
+                      "locale_key": "tools.calc.fields.annual_income",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "price",
+                    "label": {
+                      "locale_key": "tools.calc.fields.price",
+                      "interpolation_args": {}
+                    },
+                    "value": 1000000,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "user"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "yield_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.yield_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 10.5,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "SIVEM-101 3.ª Bonos de deuda Subordinada - Rexi Finanzas",
+                      "url": "https://www.rexi.do/emisiones-de-bonos/resultados/25664?p",
+                      "date": "2026-08-27"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          }
+        ],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "DOP **52,500** annual coupon income.",
+        "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 22.303,
+  "screenshot": {
+    "file": "screenshots/followups-q4-en.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "DOP 52,500 annual coupon income."
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "7974e234-7f19-45bc-8f06-e0d36c4b2c47",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "run_id": null,
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 859,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 835,
+        "cached_tokens": 768,
+        "prompt_tokens": 818,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 20.267,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "6a8634795cc0b44be03f4c511e1920cce181dd07a7f604770ddc419bb01ac5da",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "ca04df7e0bb28c4314a58679cece424f8aaffe4f465e5ae7e978792a683e87d4",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:19:10.105036+00:00"
+    },
+    {
+      "id": "8d61416a-358e-4001-a725-143f43bc095f",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "run_id": null,
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 11699,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12464,
+        "cached_tokens": 10496,
+        "prompt_tokens": 11157,
+        "completion_tokens": 1307,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 20.267,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "6a8634795cc0b44be03f4c511e1920cce181dd07a7f604770ddc419bb01ac5da",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "ca04df7e0bb28c4314a58679cece424f8aaffe4f465e5ae7e978792a683e87d4",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:19:21.805464+00:00"
+    },
+    {
+      "id": "5a729afa-27a3-4b8a-87f1-fb74aeb73225",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "run_id": null,
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedStrategyExtraction",
+      "latency_ms": 6784,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3773,
+        "cached_tokens": 128,
+        "prompt_tokens": 3501,
+        "completion_tokens": 272,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "499066343eff51667470e8be6cc3a180cbfedcfbfc4f919f395f97bb465c6315",
+          "before_fingerprint": "499066343eff51667470e8be6cc3a180cbfedcfbfc4f919f395f97bb465c6315",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 20.267,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "6a8634795cc0b44be03f4c511e1920cce181dd07a7f604770ddc419bb01ac5da",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "ca04df7e0bb28c4314a58679cece424f8aaffe4f465e5ae7e978792a683e87d4",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:19:28.591942+00:00"
+    },
+    {
+      "id": "002cb7b5-3774-41a5-9b4a-4c5aca21f74c",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "run_id": null,
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "task": "knowledge_voicing",
+      "tier": "chat",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "CalculatedVoicedAnswer",
+      "latency_ms": 824,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3463,
+        "cached_tokens": 128,
+        "prompt_tokens": 3441,
+        "completion_tokens": 22,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 20.267,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "6a8634795cc0b44be03f4c511e1920cce181dd07a7f604770ddc419bb01ac5da",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "ca04df7e0bb28c4314a58679cece424f8aaffe4f465e5ae7e978792a683e87d4",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:19:29.461548+00:00"
+    },
+    {
+      "id": "f9a43cbb-e68e-4923-889b-e26ca2fa0a56",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "run_id": null,
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 0,
+      "outcome": "skipped",
+      "failure_mode": "title_not_generated",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:19:29.520470+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "24c63ce5-c0c4-4d2e-976e-61ac9641bb5b",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "7974e234-7f19-45bc-8f06-e0d36c4b2c47",
+      "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+      "correlation_id": "53edd137-39d2-4c32-940f-81c85b60834a:1d01222c-ab6e-410d-9c2e-f00a39dfa988:f6965978-4342-4313-b017-300ccffcc6e0",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 835,
+        "cached_tokens": 768,
+        "prompt_tokens": 818,
+        "usage_cost_usd": 0.0002586,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 818,
+      "output_tokens": 17,
+      "total_tokens": 835,
+      "billable_unit": "token",
+      "billable_quantity": "835.000000",
+      "cost_amount": "0.00025860",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 859,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 20.267,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "6a8634795cc0b44be03f4c511e1920cce181dd07a7f604770ddc419bb01ac5da",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "ca04df7e0bb28c4314a58679cece424f8aaffe4f465e5ae7e978792a683e87d4",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:19:10.105036+00:00",
+      "created_at": "2026-09-14 17:19:29.491644+00:00"
+    },
+    {
+      "id": "7fcb4ad7-4212-42c7-8141-08a371a878a3",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "8d61416a-358e-4001-a725-143f43bc095f",
+      "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+      "correlation_id": "53edd137-39d2-4c32-940f-81c85b60834a:1d01222c-ab6e-410d-9c2e-f00a39dfa988:f6965978-4342-4313-b017-300ccffcc6e0",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12464,
+        "cached_tokens": 10496,
+        "prompt_tokens": 11157,
+        "usage_cost_usd": 0.00619295,
+        "completion_tokens": 1307,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 11157,
+      "output_tokens": 1307,
+      "total_tokens": 12464,
+      "billable_unit": "token",
+      "billable_quantity": "12464.000000",
+      "cost_amount": "0.00619295",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 11699,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 20.267,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "6a8634795cc0b44be03f4c511e1920cce181dd07a7f604770ddc419bb01ac5da",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "ca04df7e0bb28c4314a58679cece424f8aaffe4f465e5ae7e978792a683e87d4",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:19:21.805464+00:00",
+      "created_at": "2026-09-14 17:19:29.499778+00:00"
+    },
+    {
+      "id": "6b20134f-9d8e-4fde-ab31-ca29060ad758",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "5a729afa-27a3-4b8a-87f1-fb74aeb73225",
+      "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+      "correlation_id": "53edd137-39d2-4c32-940f-81c85b60834a:1d01222c-ab6e-410d-9c2e-f00a39dfa988:f6965978-4342-4313-b017-300ccffcc6e0",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3773,
+        "cached_tokens": 128,
+        "prompt_tokens": 3501,
+        "usage_cost_usd": 0.00492185,
+        "completion_tokens": 272,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3501,
+      "output_tokens": 272,
+      "total_tokens": 3773,
+      "billable_unit": "token",
+      "billable_quantity": "3773.000000",
+      "cost_amount": "0.00492185",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 6784,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "schema_name": "FocusedStrategyExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "499066343eff51667470e8be6cc3a180cbfedcfbfc4f919f395f97bb465c6315",
+          "before_fingerprint": "499066343eff51667470e8be6cc3a180cbfedcfbfc4f919f395f97bb465c6315",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 20.267,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "6a8634795cc0b44be03f4c511e1920cce181dd07a7f604770ddc419bb01ac5da",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "ca04df7e0bb28c4314a58679cece424f8aaffe4f465e5ae7e978792a683e87d4",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:19:28.591942+00:00",
+      "created_at": "2026-09-14 17:19:29.507271+00:00"
+    },
+    {
+      "id": "70f265e2-b247-436a-8fe8-dac5cfbcc038",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "knowledge_voicing",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "002cb7b5-3774-41a5-9b4a-4c5aca21f74c",
+      "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+      "correlation_id": "53edd137-39d2-4c32-940f-81c85b60834a:1d01222c-ab6e-410d-9c2e-f00a39dfa988:f6965978-4342-4313-b017-300ccffcc6e0",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3463,
+        "cached_tokens": 128,
+        "prompt_tokens": 3441,
+        "usage_cost_usd": 0.00422185,
+        "completion_tokens": 22,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3441,
+      "output_tokens": 22,
+      "total_tokens": 3463,
+      "billable_unit": "token",
+      "billable_quantity": "3463.000000",
+      "cost_amount": "0.00422185",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 824,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "53edd137-39d2-4c32-940f-81c85b60834a",
+        "schema_name": "CalculatedVoicedAnswer",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 20.267,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": "6a8634795cc0b44be03f4c511e1920cce181dd07a7f604770ddc419bb01ac5da",
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "ca04df7e0bb28c4314a58679cece424f8aaffe4f465e5ae7e978792a683e87d4",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:19:29.461548+00:00",
+      "created_at": "2026-09-14 17:19:29.513928+00:00"
+    },
+    {
+      "id": "e71db745-a0f1-4cd4-a07d-f0fb1746dd3e",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "6f081eca-ad79-4e75-be95-cece30174d4c",
+      "conversation_id": "1d01222c-ab6e-410d-9c2e-f00a39dfa988",
+      "message_id": "f6965978-4342-4313-b017-300ccffcc6e0",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "f9a43cbb-e68e-4923-889b-e26ca2fa0a56",
+      "request_id": null,
+      "correlation_id": "api_turn:1d01222c-ab6e-410d-9c2e-f00a39dfa988:f6965978-4342-4313-b017-300ccffcc6e0:f9a43cbb-e68e-4923-889b-e26ca2fa0a56",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "skipped",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": "title_not_generated",
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:19:29.520470+00:00",
+      "created_at": "2026-09-14 17:19:29.524046+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 8,
+  "stored_failure_metadata": {
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "6134e440-8aeb-4203-9b74-cdc523d7a061",
+      "terminal": true,
+      "request_id": "53edd137-39d2-4c32-940f-81c85b60834a"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}
