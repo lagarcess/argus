@@ -26,10 +26,47 @@
     "env_file": "canonical integration .env, loaded in-process, not committed"
   },
   "stopped_for_cap": [],
+  "totals": {
+    "captured_model_requests": 29,
+    "captured_model_requests_by_host": {
+      "openrouter.ai": 29
+    },
+    "captured_model_requests_by_status": {
+      "200": 29
+    },
+    "captured_model_requests_containing_a_typed_card_turn": 4,
+    "captured_model_requests_containing_the_retired_sentence": 0,
+    "receipts": 37,
+    "receipts_by_task_and_outcome": {
+      "asset_mention_preflight: succeeded": 7,
+      "chat_composer: failed": 1,
+      "chat_composer: succeeded": 2,
+      "interpretation: succeeded": 16,
+      "name_suggestion: skipped": 7,
+      "name_suggestion: succeeded": 2,
+      "result_summary: succeeded": 2
+    },
+    "priced_receipts_usd": 0.161836,
+    "unpriced_receipts": 8,
+    "research_cost_records": 0,
+    "priced_research_costs_usd": 0,
+    "captured_history_loads_by_reader": {
+      "chat_route": 9,
+      "artifact_naming": 2
+    },
+    "captured_history_assistant_items": {
+      "total": 18,
+      "typed_card_facts": 14,
+      "empty": 0,
+      "containing_the_retired_sentence": 0
+    },
+    "naming_inputs": 2,
+    "naming_outputs": 2
+  },
   "checks": [
     {
       "language": "en",
-      "check": "card created with AAPL buy and hold at $10000",
+      "check": "card step: latest card has symbols [AAPL], strategy buy_and_hold and capital 10000",
       "pass": true,
       "observed": {
         "message_id": "f0ad726a-655c-4a52-ae68-2c966b6dad95",
@@ -48,7 +85,7 @@
     },
     {
       "language": "en",
-      "check": "input change keeps asset, strategy and dates and sets $5000",
+      "check": "change step: latest card is a new card turn with the same symbols, strategy and dates and capital 5000",
       "pass": true,
       "observed": {
         "message_id": "461d5fab-1ecd-4142-8911-23ff78c20e8a",
@@ -67,7 +104,7 @@
     },
     {
       "language": "en",
-      "check": "run produced a result",
+      "check": "run step: final payload carries a run",
       "pass": true,
       "observed": {
         "id": "b99d2137-8a30-5eb8-8b13-6e5e07232ee9",
@@ -79,17 +116,17 @@
     },
     {
       "language": "en",
-      "check": "result question answered about Apple against SPY",
+      "check": "result_question step: reply mentions SPY and Apple or AAPL, and the final payload carries no recovery",
       "pass": true,
       "observed": {
         "reply": "Compared with SPY, this test's results show Apple beat the benchmark by 46.3 percentage points over the full period. Apple's total return on the starting capital was 100.2%, while SPY's benchmark return was 53.9%. So the $5,000 grew to $10,010, and the extra gain over SPY came with a bumpier ride, as the worst drop from a prior high was 16.8%. That drop began December 14, 2023, and ended April 19, 2024, with the portfolio falling $1,326 from $7,917 to $6,591 before recovering. The test can show how this specific buy-and-hold strategy performed against SPY over those dates, but it does not explain why Apple moved that way or predict future performance.",
         "recovery": null,
-        "provider_failures": []
+        "receipts_not_succeeded_or_skipped": []
       }
     },
     {
       "language": "es-419",
-      "check": "card created with AAPL buy and hold at $10000",
+      "check": "card step: latest card has symbols [AAPL], strategy buy_and_hold and capital 10000",
       "pass": true,
       "observed": {
         "message_id": "fd225c69-6ab5-4afb-8eca-241da0f7d830",
@@ -108,7 +145,7 @@
     },
     {
       "language": "es-419",
-      "check": "input change keeps asset, strategy and dates and sets $5000",
+      "check": "change step: latest card is a new card turn with the same symbols, strategy and dates and capital 5000",
       "pass": true,
       "observed": {
         "message_id": "5687e882-7e5b-467b-a7c8-7ebc60326047",
@@ -127,7 +164,7 @@
     },
     {
       "language": "es-419",
-      "check": "run produced a result",
+      "check": "run step: final payload carries a run",
       "pass": true,
       "observed": {
         "id": "e8c27e96-db72-57fe-b7c5-3c23b8992021",
@@ -139,7 +176,7 @@
     },
     {
       "language": "es-419",
-      "check": "result question answered about Apple against SPY",
+      "check": "result_question step: reply mentions SPY and Apple or AAPL, and the final payload carries no recovery",
       "pass": false,
       "observed": {
         "reply": "I couldn’t answer that follow-up. Your result is still here.",
@@ -147,7 +184,7 @@
           "code": "latest_result_followup_unavailable",
           "retryable": true
         },
-        "provider_failures": [
+        "receipts_not_succeeded_or_skipped": [
           {
             "task": "chat_composer",
             "model": "deepseek/deepseek-v4-flash",
@@ -160,19 +197,19 @@
     },
     {
       "language": "es-419",
-      "check": "retry of the result question answered about Apple against SPY",
+      "check": "result_question_retry step: reply mentions SPY and Apple or AAPL, and the final payload carries no recovery",
       "pass": true,
       "observed": {
         "reply": "Esta prueba muestra que AAPL superó a SPY por 46.3 puntos porcentuales en rendimiento total durante el período completo. La prueba no almacena cómo se comportó mes a mes frente al referencia, solo la diferencia final. Si quieres ver cómo se compara en otros aspectos, podemos revisar la volatilidad o probar una estrategia diferente.",
         "recovery": null,
-        "provider_failures": []
+        "receipts_not_succeeded_or_skipped": []
       }
     }
   ],
   "failed_checks": [
     {
       "language": "es-419",
-      "check": "result question answered about Apple against SPY",
+      "check": "result_question step: reply mentions SPY and Apple or AAPL, and the final payload carries no recovery",
       "pass": false,
       "observed": {
         "reply": "I couldn’t answer that follow-up. Your result is still here.",
@@ -180,7 +217,7 @@
           "code": "latest_result_followup_unavailable",
           "retryable": true
         },
-        "provider_failures": [
+        "receipts_not_succeeded_or_skipped": [
           {
             "task": "chat_composer",
             "model": "deepseek/deepseek-v4-flash",
@@ -192,20 +229,11 @@
       }
     }
   ],
-  "retired_sentence_in_any_model_input": false,
-  "final_spend": {
-    "billed_usd": 0.161836,
-    "unpriced_receipts": 8,
-    "unpriced_research_calls": 0,
-    "ceiling_usd": 0.321836,
-    "spent_before_usd": 0.0
-  },
   "steps": [
     {
       "language": "en",
       "step": "card",
       "retry": false,
-      "retry_reason": null,
       "request": {
         "message": "Backtest buying and holding Apple from January 2023 through December 2024 with $10000."
       },
@@ -343,22 +371,14 @@
           "usage_cost_usd": 2.87e-05
         }
       ],
-      "provider_failures": [],
+      "receipts_not_succeeded_or_skipped": [],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.016286,
-        "unpriced_receipts": 0,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.016286,
-        "spent_before_usd": 0.0
-      }
+      "retired_sentence_in_captured_model_requests": false
     },
     {
       "language": "en",
       "step": "change",
       "retry": false,
-      "retry_reason": null,
       "request": {
         "message": "Actually, make it $5000 instead."
       },
@@ -484,22 +504,14 @@
           "usage_cost_usd": null
         }
       ],
-      "provider_failures": [],
+      "receipts_not_succeeded_or_skipped": [],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.044954,
-        "unpriced_receipts": 1,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.064954,
-        "spent_before_usd": 0.0
-      }
+      "retired_sentence_in_captured_model_requests": false
     },
     {
       "language": "en",
       "step": "run",
       "retry": false,
-      "retry_reason": null,
       "request": {
         "action": {
           "type": "run_backtest",
@@ -634,22 +646,14 @@
           "usage_cost_usd": null
         }
       ],
-      "provider_failures": [],
+      "receipts_not_succeeded_or_skipped": [],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.04987,
-        "unpriced_receipts": 2,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.08987,
-        "spent_before_usd": 0.0
-      }
+      "retired_sentence_in_captured_model_requests": false
     },
     {
       "language": "en",
       "step": "result_question",
       "retry": false,
-      "retry_reason": null,
       "request": {
         "message": "How did that do compared to SPY?"
       },
@@ -819,22 +823,14 @@
           "usage_cost_usd": null
         }
       ],
-      "provider_failures": [],
+      "receipts_not_succeeded_or_skipped": [],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.072045,
-        "unpriced_receipts": 3,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.132045,
-        "spent_before_usd": 0.0
-      }
+      "retired_sentence_in_captured_model_requests": false
     },
     {
       "language": "es-419",
       "step": "card",
       "retry": false,
-      "retry_reason": null,
       "request": {
         "message": "Haz un backtest de comprar y mantener Apple desde enero de 2023 hasta diciembre de 2024 con 10000 dólares."
       },
@@ -972,22 +968,14 @@
           "usage_cost_usd": 3.07e-05
         }
       ],
-      "provider_failures": [],
+      "receipts_not_succeeded_or_skipped": [],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.088859,
-        "unpriced_receipts": 3,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.148859,
-        "spent_before_usd": 0.0
-      }
+      "retired_sentence_in_captured_model_requests": false
     },
     {
       "language": "es-419",
       "step": "change",
       "retry": false,
-      "retry_reason": null,
       "request": {
         "message": "Mejor que sean 5000 dólares."
       },
@@ -1113,22 +1101,14 @@
           "usage_cost_usd": null
         }
       ],
-      "provider_failures": [],
+      "receipts_not_succeeded_or_skipped": [],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.119632,
-        "unpriced_receipts": 4,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.199632,
-        "spent_before_usd": 0.0
-      }
+      "retired_sentence_in_captured_model_requests": false
     },
     {
       "language": "es-419",
       "step": "run",
       "retry": false,
-      "retry_reason": null,
       "request": {
         "action": {
           "type": "run_backtest",
@@ -1263,22 +1243,14 @@
           "usage_cost_usd": null
         }
       ],
-      "provider_failures": [],
+      "receipts_not_succeeded_or_skipped": [],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.124702,
-        "unpriced_receipts": 5,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.224702,
-        "spent_before_usd": 0.0
-      }
+      "retired_sentence_in_captured_model_requests": false
     },
     {
       "language": "es-419",
       "step": "result_question",
       "retry": false,
-      "retry_reason": null,
       "request": {
         "message": "¿Cómo le fue frente a SPY?"
       },
@@ -1458,7 +1430,7 @@
           "usage_cost_usd": null
         }
       ],
-      "provider_failures": [
+      "receipts_not_succeeded_or_skipped": [
         {
           "task": "chat_composer",
           "model": "deepseek/deepseek-v4-flash",
@@ -1468,20 +1440,12 @@
         }
       ],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.151284,
-        "unpriced_receipts": 7,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.291284,
-        "spent_before_usd": 0.0
-      }
+      "retired_sentence_in_captured_model_requests": false
     },
     {
       "language": "es-419",
       "step": "result_question_retry",
       "retry": true,
-      "retry_reason": "chat_composer TimeoutError on the first attempt; interpretation had routed correctly",
       "request": {
         "message": "¿Cómo le fue frente a SPY?"
       },
@@ -1643,15 +1607,12 @@
           "usage_cost_usd": null
         }
       ],
-      "provider_failures": [],
+      "receipts_not_succeeded_or_skipped": [],
       "research_costs": [],
-      "retired_sentence_in_model_input": false,
-      "spend_after": {
-        "billed_usd": 0.161836,
-        "unpriced_receipts": 8,
-        "unpriced_research_calls": 0,
-        "ceiling_usd": 0.321836,
-        "spent_before_usd": 0.0
+      "retired_sentence_in_captured_model_requests": false,
+      "first_attempt_recovery": {
+        "code": "latest_result_followup_unavailable",
+        "retryable": true
       }
     }
   ]

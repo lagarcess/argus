@@ -1,10 +1,15 @@
-"""Live route check server: real chat turns through the chat route, captured.
+"""Live route check server: the chat route with capture wrappers.
 
-Memory persistence and mock auth, with real model and market-data providers
-from the env file named by ROUTE_CHECK_ENV_FILE, loaded in-process and never
-written. Captures every model request body (never headers), every OpenRouter
-cost receipt, priced research costs, the thread history the chat route and
-artifact naming loaded, and the naming input and output.
+Memory persistence and mock auth, with OpenRouter models and the `live_provider`
+market-data and asset modes. Provider keys load in-process from the env file
+named by ROUTE_CHECK_ENV_FILE, where values already set win; the file is never
+written. For httpx requests to openrouter.ai or perplexity.ai it records the
+request body (never headers) when the send returns or raises an ordinary
+exception; a request cancelled by an asyncio timeout is not recorded. It also
+records each receipt appended to OpenRouter's route receipt list, the result of
+each research cost validation, each thread history load made through the chat
+route and artifact naming modules, and each naming context and name that
+artifact naming builds.
 """
 
 from __future__ import annotations

@@ -1,11 +1,14 @@
-"""Summarize a route check capture: per step, what the model read and what came back.
+"""Build the route check report from the committed capture files.
 
-Reads `steps.jsonl`, the step stream the driver writes (retries included), and
-the server captures in ROUTE_CHECK_OUT, then writes route-check-report.json and
-route-check-report.md beside them, so the committed captures alone rebuild the
-report. Steps form one timeline; a step's window runs from its request until
-the next step starts, so asynchronous artifact naming after a turn is
-attributed to that turn and a retry never borrows the first attempt's calls.
+Reads `steps.jsonl` and the server captures in ROUTE_CHECK_OUT and writes
+route-check-report.json and route-check-report.md beside them. For each step the
+report shows what the step row recorded (request, reply, recovery, card facts,
+title), the history loads and naming records in the step's window, and the
+status, receipts and non-system messages of each captured model request in that
+window. A step's window runs from its request until the next step starts, by
+record write time; only history loads are matched to a conversation. Totals
+count the server's records over the whole capture. The report covers only what
+these files record.
 """
 
 from __future__ import annotations
@@ -13,11 +16,14 @@ from __future__ import annotations
 import json
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
 OUT = Path(os.environ.get("ROUTE_CHECK_OUT") or sys.argv[1]).resolve()
 RETIRED_SENTENCE = "Ready to test"
+TYPED_CARD_TURN = '{"confirmation_card":'
+MESSAGE_CHARACTERS_SHOWN = 600
 
 
 def _jsonl(name: str) -> list[dict[str, Any]]:
@@ -31,6 +37,12 @@ def _in(row: dict[str, Any], start: float, end: float) -> bool:
     return start <= row["ts"] < end
 
 
+def _content_text(content: Any) -> str:
+    if isinstance(content, list):
+        return " ".join(str(part.get("text", part)) for part in content if isinstance(part, dict))
+    return "" if content is None else str(content)
+
+
 def _history_messages(body: Any) -> dict[str, Any]:
     if not isinstance(body, dict):
         return {"shape": type(body).__name__}
@@ -42,11 +54,15 @@ def _history_messages(body: Any) -> dict[str, Any]:
     for message in raw:
         if not isinstance(message, dict) or message.get("role") == "system":
             continue
-        content = message.get("content")
-        if isinstance(content, list):
-            content = " ".join(str(part.get("text", part)) for part in content if isinstance(part, dict))
-        turns.append({"role": message.get("role"), "content": content})
+        turns.append({"role": message.get("role"), "content": _content_text(message.get("content"))})
     return {"model": model, "non_system_messages": turns}
+
+
+def _message_text(body: Any) -> str:
+    raw = body.get("messages") if isinstance(body, dict) else None
+    if not isinstance(raw, list):
+        return ""
+    return "\n".join(_content_text(message.get("content")) for message in raw if isinstance(message, dict))
 
 
 def _mentions(text: str, *needles: str) -> bool:
@@ -87,7 +103,6 @@ def main() -> None:
                 "language": step["language"],
                 "step": step["step"],
                 "retry": step["step"].endswith("_retry"),
-                "retry_reason": step.get("reason"),
                 "request": step.get("request") or {"message": None},
                 "status": step.get("status"),
                 "stages": step.get("stages"),
@@ -108,23 +123,34 @@ def main() -> None:
                     for r in window_requests
                 ],
                 "receipts": window_receipts,
-                "provider_failures": [r for r in window_receipts if r.get("outcome") not in {"succeeded", "skipped"}],
+                "receipts_not_succeeded_or_skipped": [
+                    r for r in window_receipts if r.get("outcome") not in {"succeeded", "skipped"}
+                ],
                 "research_costs": [r for r in research if _in(r, start, end)],
-                "retired_sentence_in_model_input": any(
+                "retired_sentence_in_captured_model_requests": any(
                     RETIRED_SENTENCE in json.dumps(r.get("body"), ensure_ascii=False) for r in window_requests
                 ),
-                "spend_after": step.get("spend_after"),
             }
         )
+    for step in report_steps:
+        if step["retry"]:
+            first_attempt = next(
+                (
+                    other
+                    for other in report_steps
+                    if other["language"] == step["language"] and other["step"] == step["step"].removesuffix("_retry")
+                ),
+                None,
+            )
+            step["first_attempt_recovery"] = (first_attempt or {}).get("recovery")
 
     checks = _checks(report_steps)
     report = {
         "server": json.loads((OUT / "server.json").read_text()) if (OUT / "server.json").exists() else None,
         "stopped_for_cap": stops,
+        "totals": _totals(requests, receipts, research, history, naming_in, naming_out),
         "checks": checks,
         "failed_checks": [c for c in checks if not c["pass"]],
-        "retired_sentence_in_any_model_input": any(s["retired_sentence_in_model_input"] for s in report_steps),
-        "final_spend": report_steps[-1]["spend_after"] if report_steps else None,
         "steps": report_steps,
     }
     (OUT / "route-check-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2, default=str))
@@ -135,13 +161,55 @@ def main() -> None:
                 "steps": len(report_steps),
                 "checks": [{k: c[k] for k in ("language", "check", "pass")} for c in checks],
                 "stopped_for_cap": stops,
-                "final_spend": report["final_spend"],
-                "retired_sentence_in_any_model_input": report["retired_sentence_in_any_model_input"],
+                "totals": report["totals"],
             },
             ensure_ascii=False,
             indent=2,
         )
     )
+
+
+def _totals(
+    requests: list[dict[str, Any]],
+    receipts: list[dict[str, Any]],
+    research: list[dict[str, Any]],
+    history: list[dict[str, Any]],
+    naming_in: list[dict[str, Any]],
+    naming_out: list[dict[str, Any]],
+) -> dict[str, Any]:
+    assistant_items = [
+        _content_text(item.get("content")) for load in history for item in load["history"] if item.get("role") == "assistant"
+    ]
+    priced = [r["receipt"]["usage_cost_usd"] for r in receipts if r["receipt"].get("usage_cost_usd") is not None]
+    research_priced = [r["cost_usd"] for r in research if r.get("cost_usd") is not None]
+    return {
+        "captured_model_requests": len(requests),
+        "captured_model_requests_by_host": dict(Counter(str(r.get("host")) for r in requests)),
+        "captured_model_requests_by_status": dict(Counter(str(r.get("status", r.get("error"))) for r in requests)),
+        "captured_model_requests_containing_a_typed_card_turn": sum(
+            1 for r in requests if TYPED_CARD_TURN in _message_text(r.get("body"))
+        ),
+        "captured_model_requests_containing_the_retired_sentence": sum(
+            1 for r in requests if RETIRED_SENTENCE in json.dumps(r.get("body"), ensure_ascii=False)
+        ),
+        "receipts": len(receipts),
+        "receipts_by_task_and_outcome": dict(
+            sorted(Counter(f"{r['receipt'].get('task')}: {r['receipt'].get('outcome')}" for r in receipts).items())
+        ),
+        "priced_receipts_usd": round(sum(priced), 6),
+        "unpriced_receipts": len(receipts) - len(priced),
+        "research_cost_records": len(research),
+        "priced_research_costs_usd": round(sum(research_priced), 6),
+        "captured_history_loads_by_reader": dict(Counter(str(load.get("reader")) for load in history)),
+        "captured_history_assistant_items": {
+            "total": len(assistant_items),
+            "typed_card_facts": sum(1 for text in assistant_items if text.startswith(TYPED_CARD_TURN)),
+            "empty": sum(1 for text in assistant_items if not text.strip()),
+            "containing_the_retired_sentence": sum(1 for text in assistant_items if RETIRED_SENTENCE in text),
+        },
+        "naming_inputs": len(naming_in),
+        "naming_outputs": len(naming_out),
+    }
 
 
 def _answers_result(step: dict[str, Any] | None) -> bool:
@@ -156,44 +224,66 @@ def _checks(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
         by_language.setdefault(step["language"], {})[step["step"]] = step
     for language, named in by_language.items():
         card = (named.get("card") or {}).get("latest_card")
-        checks.append({"language": language, "check": "card created with AAPL buy and hold at $10000", "pass": bool(card and card.get("symbols") == ["AAPL"] and card.get("strategy_type") == "buy_and_hold" and card.get("capital") == 10000), "observed": card})
+        checks.append(
+            {
+                "language": language,
+                "check": "card step: latest card has symbols [AAPL], strategy buy_and_hold and capital 10000",
+                "pass": bool(card and card.get("symbols") == ["AAPL"] and card.get("strategy_type") == "buy_and_hold" and card.get("capital") == 10000),
+                "observed": card,
+            }
+        )
         change = named.get("change")
         if change is not None:
             changed = change.get("latest_card")
             kept = bool(card and changed and all(changed.get(key) == card.get(key) for key in ("strategy_type", "symbols", "date_range")))
-            checks.append({"language": language, "check": "input change keeps asset, strategy and dates and sets $5000", "pass": bool(kept and changed.get("capital") == 5000 and changed.get("message_id") != card.get("message_id")), "observed": changed})
+            checks.append(
+                {
+                    "language": language,
+                    "check": "change step: latest card is a new card turn with the same symbols, strategy and dates and capital 5000",
+                    "pass": bool(kept and changed.get("capital") == 5000 and changed.get("message_id") != card.get("message_id")),
+                    "observed": changed,
+                }
+            )
         run = named.get("run")
         if run is not None:
-            checks.append({"language": language, "check": "run produced a result", "pass": run.get("result_run") is not None, "observed": run.get("result_run")})
-        for name, label in (("result_question", "result question"), ("result_question_retry", "retry of the result question")):
+            checks.append({"language": language, "check": "run step: final payload carries a run", "pass": run.get("result_run") is not None, "observed": run.get("result_run")})
+        for name in ("result_question", "result_question_retry"):
             question = named.get(name)
             if question is None:
                 continue
             checks.append(
                 {
                     "language": language,
-                    "check": f"{label} answered about Apple against SPY",
+                    "check": f"{name} step: reply mentions SPY and Apple or AAPL, and the final payload carries no recovery",
                     "pass": _answers_result(question),
-                    "observed": {"reply": question.get("reply"), "recovery": question.get("recovery"), "provider_failures": question.get("provider_failures")},
+                    "observed": {
+                        "reply": question.get("reply"),
+                        "recovery": question.get("recovery"),
+                        "receipts_not_succeeded_or_skipped": question.get("receipts_not_succeeded_or_skipped"),
+                    },
                 }
             )
     return checks
 
 
 def _markdown(report: dict[str, Any]) -> str:
-    lines = ["# Route check report", ""]
+    lines = [
+        "# Route check report",
+        "",
+        "Built by `summarize_route_check.py` from the committed capture files; figures cover only what those files record.",
+        "",
+    ]
     server = report.get("server") or {}
-    lines += [f"Source head `{server.get('source_head')}`, working tree changes under src or web: {server.get('working_tree_changes_under_src_or_web')}.", ""]
-    spend = report.get("final_spend") or {}
-    lines += [f"Billed ${spend.get('billed_usd')}; unpriced receipts {spend.get('unpriced_receipts')}; unpriced research calls {spend.get('unpriced_research_calls')}; cap ceiling ${spend.get('ceiling_usd')}.", ""]
-    lines += [f"Retired sentence in any model input: {report.get('retired_sentence_in_any_model_input')}.", ""]
-    lines += ["## Checks", ""]
+    lines += [f"Server source head `{server.get('source_head')}`; working tree changes under src or web: {server.get('working_tree_changes_under_src_or_web')}.", ""]
+    lines += ["## Totals", ""]
+    lines += [f"- {key}: {json.dumps(value, ensure_ascii=False)}" for key, value in (report.get("totals") or {}).items()]
+    lines += ["", "## Checks", ""]
     for check in report["checks"]:
-        lines.append(f"- {'PASS' if check['pass'] else 'FAIL'} ({check['language']}): {check['check']}")
+        lines.append(f"- {'PASS' if check['pass'] else 'FAIL'} ({check['language']}) {check['check']}")
     for step in report["steps"]:
         lines += ["", f"## {step['language']} / {step['step']}", ""]
-        if step.get("retry_reason"):
-            lines.append(f"Retry reason: {step['retry_reason']}")
+        if step.get("retry"):
+            lines.append(f"First attempt's recovery: {json.dumps(step.get('first_attempt_recovery'), ensure_ascii=False)}")
         request = step.get("request") or {}
         lines.append(f"Request: {request.get('message') or (request.get('action') or {}).get('type')}")
         if step.get("title"):
@@ -201,12 +291,12 @@ def _markdown(report: dict[str, Any]) -> str:
         lines.append(f"Reply: {step.get('reply')}")
         if step.get("recovery"):
             lines.append(f"Recovery: {json.dumps(step['recovery'], ensure_ascii=False)}")
-        for failure in step.get("provider_failures") or []:
-            lines.append(f"Provider failure: {json.dumps(failure, ensure_ascii=False)}")
+        for receipt in step.get("receipts_not_succeeded_or_skipped") or []:
+            lines.append(f"Receipt not succeeded or skipped: {json.dumps(receipt, ensure_ascii=False)}")
         if step.get("latest_card"):
             lines.append(f"Latest card: {json.dumps(step['latest_card'], ensure_ascii=False)}")
         if step.get("result_run"):
-            lines.append(f"Result: {json.dumps(step['result_run'], ensure_ascii=False)}")
+            lines.append(f"Run: {json.dumps(step['result_run'], ensure_ascii=False)}")
         for loaded in step["history_loaded"]:
             lines.append(f"History loaded by {loaded['reader']}:")
             for item in loaded["history"]:
@@ -220,10 +310,14 @@ def _markdown(report: dict[str, Any]) -> str:
             messages = call.get("non_system_messages")
             if messages is None:
                 continue
-            lines.append(f"Model call to {call.get('model')} (status {call.get('status')}):")
+            lines.append(
+                f"Captured model request to {call.get('model')} (status {call.get('status')}), "
+                f"non-system messages, first {MESSAGE_CHARACTERS_SHOWN} characters each:"
+            )
             for message in messages:
                 content = str(message.get("content"))
-                lines.append(f"  - {message.get('role')}: {content[:600]}{'...' if len(content) > 600 else ''}")
+                shown = content[:MESSAGE_CHARACTERS_SHOWN]
+                lines.append(f"  - {message.get('role')}: {shown}{'...' if len(content) > MESSAGE_CHARACTERS_SHOWN else ''}")
     return "\n".join(lines) + "\n"
 
 

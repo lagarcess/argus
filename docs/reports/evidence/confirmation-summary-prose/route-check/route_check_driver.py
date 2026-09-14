@@ -1,13 +1,15 @@
 """Drive the live route check: a card, an input change, a run, a result question.
 
-Talks to the route check server over HTTP. Before every step it compares the
-billed spend so far (each unpriced call counted at a conservative flat amount)
-plus that step's reserve against the cap, and stops before crossing it.
+Talks to the route check server over HTTP. Before each step it adds that step's
+reserve to ROUTE_CHECK_SPENT_BEFORE_USD, the priced receipts and research costs
+recorded so far, and a flat amount per unpriced receipt or unpriced research
+request, and stops the conversation there if the total would exceed the cap. A
+step can spend more than its reserve.
 
 Writes `steps.jsonl`, the step stream the summarizer reads, and keeps the full
 per-step payloads in `driver-debug.jsonl` for local inspection. A result
 question that returns a retryable typed recovery is asked once more and
-recorded as its own step; the first result is never replaced.
+recorded as its own step; the first attempt's row is kept.
 """
 
 from __future__ import annotations

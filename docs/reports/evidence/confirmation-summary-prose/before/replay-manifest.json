@@ -3,8 +3,6 @@
   "language": "es-419",
   "api_port": 8593,
   "web_origin": "http://127.0.0.1:3293",
-  "provider_calls": 0,
-  "hosted_database_reads_or_writes": 0,
   "conversations": [
     {
       "shape": "buy_and_hold",

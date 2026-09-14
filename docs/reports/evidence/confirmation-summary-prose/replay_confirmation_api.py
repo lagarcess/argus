@@ -1,10 +1,16 @@
 """Local-only replay: confirmation card turns built by the real card builder.
 
-Memory persistence only. No model, market-data provider, or hosted database is
-reached: provider keys are removed from this process before Argus imports.
-Card turns are persisted the way the chat route persists them at the running
-head; the legacy conversation stores what card turns persisted before, the
-English summary sentence as content and as `summary` on the card.
+Memory persistence, mock auth and the synthetic market-data fixture. Keys
+ending in `_API_KEY` or starting with OPENROUTER, PERPLEXITY, ALPACA or RESEND,
+DATABASE_URL and SUPABASE_SERVICE_ROLE_KEY are removed from this process before
+Argus imports; Argus still loads a repository-root `.env` at import without
+overriding set values. Provider and database access are not recorded.
+
+Card turns are seeded through `create_message` with empty content, as the chat
+route persists them at the running head, and with the card, its payload and one
+confirmation reference as both the active reference and the only artifact
+reference. The legacy conversation stores the English summary sentence as
+content, as `summary` on the card and inside that reference.
 """
 
 from __future__ import annotations
@@ -288,8 +294,6 @@ if __name__ == "__main__":
         "language": LANGUAGE,
         "api_port": API_PORT,
         "web_origin": WEB_ORIGIN,
-        "provider_calls": 0,
-        "hosted_database_reads_or_writes": 0,
         "conversations": MANIFEST,
     }
     (ROOT / "temp" / "replay-manifest.json").write_text(

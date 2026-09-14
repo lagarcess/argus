@@ -1,122 +1,71 @@
 # Live route check
 
-The full live measurement was skipped for this change: it builds each case's
-history itself, so it cannot see how card turns reach the model. This capped
-check drives real turns through the chat route instead.
+The figures for this run come from `route-check-report.md` and
+`route-check-report.json`, which `summarize_route_check.py` builds from the
+committed files in this directory.
 
 ## What ran
 
-- Head `4e89d289` with a clean tree (`server.json`). `route_check_api.py`
-  served the branch with memory persistence and mock auth, real OpenRouter
-  models, and live Alpaca market data and asset catalog. Provider keys came
-  from the canonical integration env file, loaded in-process and not committed.
-  Personalization memory and semantic recall were off, so no memory lookups ran.
-- `route_check_driver.py` drove two conversations through
-  `POST /api/v1/chat/stream`, one in English and one in Spanish, four steps
-  each: create a card (Apple buy and hold, January 2023 to December 2024,
-  $10000), change an input ("make it $5000"), run it with the card's own Run
-  action, and ask about the result ("How did that do compared to SPY?",
-  "¿Cómo le fue frente a SPY?"). Artifact naming was invoked after every turn
-  and named each conversation once; see Naming.
-- Retry rule: a result question that returns a retryable typed recovery is
-  asked once more, recorded as its own step, and never replaces the first
-  result. During this capture the Spanish retry was sent by hand under that
-  rule; the driver now encodes it.
-- Captured:
-  - `model_requests.jsonl`: request bodies sent to OpenRouter, never headers.
-    A request cancelled by a timeout is not recorded; see below.
-  - `receipts.jsonl`: every OpenRouter cost receipt, including skipped and
-    timed-out calls.
-  - `thread_history.jsonl`: the history the chat route and artifact naming loaded.
-  - `naming_input.jsonl`, `naming_output.jsonl`: the naming context and the
-    name, for each invocation that built its input.
-  - `steps.jsonl`: the step stream, retry included: conversation, request,
-    reply, card facts, title, spend, and a slim final payload per step. The
-    driver keeps full payloads in `driver-debug.jsonl`, which is not committed.
-  - `route-check-report.md` and `.json`, rebuilt by `summarize_route_check.py`
-    from the committed files above.
-  - A scan of every capture for credential-shaped strings found none.
+- `route_check_api.py` served the branch at the head recorded in `server.json`
+  through the real chat route, with memory persistence, mock auth, OpenRouter
+  models, and the `live_provider` market-data and asset modes. Personalization
+  memory and semantic recall were set off.
+- `route_check_driver.py` drove one conversation in `en` and one in `es-419`
+  through `POST /api/v1/chat/stream`, with the cap recorded in `summary.json`.
+  Each conversation sent a request to test buying and holding Apple with
+  $10000, a message changing the amount to $5000, the card's Run action, and a
+  question comparing the result with SPY. The messages are in the driver's
+  `SCRIPTS`.
+- The Spanish result question was asked once more in the same conversation,
+  sent by hand after the driver finished, under the retry rule the driver now
+  encodes.
 
-## Results
+## Files
 
-| Check | English | Spanish |
-| :--- | :--- | :--- |
-| Card created: AAPL buy and hold at $10000, dates resolved to `2023-01-03` through `2024-12-31` | Pass | Pass |
-| Input change keeps asset, strategy and dates and sets $5000 | Pass | Pass |
-| Run produced a result | Pass | Pass |
-| Result question answered about Apple against SPY | Pass | Provider timeout, then pass on one retry |
+- `server.json`: source head, whether `src` or `web` had working tree changes,
+  port, override names, and a fixed `env_file` label.
+- `model_requests.jsonl`: host, path, body, and status or exception name of
+  each captured model request.
+- `receipts.jsonl`: OpenRouter route receipts.
+- `thread_history.jsonl`: reader, conversation and items of each captured
+  thread history load.
+- `naming_input.jsonl`, `naming_output.jsonl`: the contexts and names artifact
+  naming built.
+- `steps.jsonl`: one row per step.
+- `summary.json`: the driver's summary.
+- `route-check-report.md`, `route-check-report.json`: the report.
 
-No follow-up misread the card, so no conversation was rerun on integration.
+The server writes `research_costs.jsonl` only when research cost validation
+runs; this capture has no such file.
 
-### The history the model received
+## Known gaps
 
-The history the chat route loaded held every card turn in the card's
-typed-facts form, and every captured model call that received a card turn
-received that form:
-
-```json
-{"confirmation_card":{"strategy_type":"buy_and_hold","symbols":["AAPL"],"date_range":{"start":"2023-01-03","end":"2024-12-31"}}}
-```
-
-The retired sentence appears in none of the captured model request bodies.
-Every captured interpretation call sent only the new message, because the
-interpreter reads the active card from its artifact context rather than from
-history. The result answer composer reads a recent-conversation window:
-
-- English: both card turns in the form above, then the run's result text.
-- Spanish retry: the second card turn in the form above, the run's result text,
-  and the first attempt's stored English fallback line. The first card turn was
-  outside the window.
-
-Both answered from the stored run facts (benchmark gap of 46.3 percentage
-points). The first Spanish attempt's composer request was cancelled at its
-25-second timeout; the capture wrapper records only requests that return or
-raise an ordinary error, so that body is not in `model_requests.jsonl`.
-
-### Naming
-
-Artifact naming was invoked after every turn: `receipts.jsonl` holds one
-`name_suggestion` receipt for each of the nine turns. It built its input and
-generated a title only after each conversation's first card turn, the two rows
-in `naming_input.jsonl` and `naming_output.jsonl`, and there it read that card
-turn in the same typed-facts form, as the history line and as
-`latest_assistant`. The titles were "Apple Buy and Hold Backtest" and "Backtest
-de Apple comprar y mantener". The other seven invocations, including those after
-the edited cards, skipped with `title_not_generated` because the conversations
-already had titles, so they read no history.
-
-### Replies to the result question
-
-- English: "Compared with SPY, this test's results show Apple beat the
-  benchmark by 46.3 percentage points over the full period. Apple's total return
-  on the starting capital was 100.2%, while SPY's benchmark return was 53.9%."
-- Spanish, first attempt: the answer composer (`deepseek/deepseek-v4-flash`)
-  timed out after 25 seconds, so the turn returned the typed retryable code
-  `latest_result_followup_unavailable`. Its stored English text is the
-  compatibility fallback that the Spanish interface renders from the code.
-  Interpretation had routed the question exactly as in English.
-- Spanish, one retry in the same conversation: "Esta prueba muestra que AAPL
-  superó a SPY por 46.3 puntos porcentuales en rendimiento total durante el
-  período completo."
-
-## Spend
-
-Billed $0.162 against the $0.50 cap: $0.151 for the two conversations and
-$0.011 for the retry. Eight receipts carried no price: the seven skipped naming
-invocations and the timed-out call. The driver counted each unpriced receipt at
-$0.02, a ceiling of $0.322, and checked the cap before every step. No research
-calls ran.
-
-## Limits
-
-- Memory persistence and mock auth, not Supabase. The chat route, runtime,
-  history loader and naming are the branch code.
-- Two conversations, one path each. A live check samples behavior; it does not
-  measure it.
-- The retry's history includes the first attempt's stored fallback line, as a
-  real retry would. A recovery turn's stored English fallback text reaching the
-  composer's history in a Spanish conversation predates this change and is
-  outside it.
+- A request body is recorded only for httpx requests to openrouter.ai or
+  perplexity.ai whose send returns or raises an ordinary exception. A request
+  cancelled by an asyncio timeout has no row. Responses and requests to other
+  hosts are not recorded.
+- The report shows only each captured request's non-system messages, and its
+  markdown cuts each message at 600 characters; system messages are in
+  `model_requests.jsonl`.
+- A receipt is recorded when it is appended to OpenRouter's route receipt list.
+  An unpriced receipt can be a skipped invocation that sent no request.
+- The report assigns records to a step by write time, from the step's request
+  until the next step starts. Only history loads are matched to a conversation.
+- `steps.jsonl` was assembled after the run from the driver's local output and
+  the hand-sent retry, and conversation ids were added later. The driver rows
+  have no spend before the step; the retry row has no card facts or title, and
+  its `reason` is a hand-typed note the report does not use. `summary.json` was
+  written before the retry. The driver was revised after the run to write
+  `steps.jsonl` and ask the retry itself.
+- The driver's cap check is an estimate made before each step; a step can
+  spend more than its reserve.
+- Provider keys were loaded in-process from the env file named by
+  `ROUTE_CHECK_ENV_FILE`, where values already set win, and Argus loads a
+  repository-root `.env` at import the same way.
+- The checks compare recorded card facts, look for a run in the final payload,
+  and look for words in the reply. They do not judge whether an answer is right.
+- Two conversations, one path each, on memory persistence. The steps include no
+  clarification, recurring plan, discovery, retest or in-place edit.
 
 ## Reproduce
 
