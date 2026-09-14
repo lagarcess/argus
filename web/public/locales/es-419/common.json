@@ -2097,7 +2097,8 @@
         "discount_below_terminal_growth": "La {{field}} debe ser mayor que la tasa de crecimiento terminal.",
         "fees_exceed_amount": "Las {{field}} superan el monto recibido.",
         "no_periods": "El dato {{field}} debe ser al menos uno.",
-        "periods_not_whole": "El dato {{field}} debe terminar en una fecha de cupón."
+        "periods_not_whole": "El dato {{field}} debe terminar en una fecha de cupón.",
+        "scenarios_out_of_order": "Los casos bajo, base y alto deben subir en orden; revisa el dato {{field}}."
       },
       "title": "Resultado",
       "solved_value": "Valor calculado",

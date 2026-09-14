@@ -11,6 +11,9 @@ def _card(arguments: dict) -> dict:
         "tool_name": "time_value",
         "arguments": {"direction": "save", **arguments},
         "outcome": {"status": "succeeded", "result": {}},
+        "presentation": {
+            "inputs": [{"name": name, "source": {"kind": "user"}} for name in arguments]
+        },
     }
 
 

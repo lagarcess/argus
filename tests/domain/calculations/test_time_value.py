@@ -187,3 +187,21 @@ def test_a_yearly_plan_solves_its_periods_in_years() -> None:
     answer = card.presentation.answer
     assert answer is not None and answer.value == pytest.approx(5.0)
     assert answer.unit is not None and answer.unit.locale_key == "tools.calc.units.years"
+
+
+def test_a_savings_target_already_met_takes_no_periods() -> None:
+    card = run_calculation(
+        "time_value",
+        {
+            "direction": "save",
+            "currency": "USD",
+            "present_value": 10_000,
+            "payment": 0,
+            "future_value": 10_000,
+            "annual_rate_pct": 5,
+            "periods": None,
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    assert answer_value(card) == pytest.approx(0.0)
+    assert card.outcome.result["notes"] == ["already_covered"]

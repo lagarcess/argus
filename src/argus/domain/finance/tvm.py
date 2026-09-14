@@ -69,6 +69,10 @@ def payment(
     return -(present_value_amount * _growth(rate, periods) + future_value_amount) / factor
 
 
+# A count this close to zero is a target already met, not one left behind.
+_AT_TARGET = 1e-9
+
+
 def periods(
     present_value_amount: float,
     payment_amount: float,
@@ -76,14 +80,19 @@ def periods(
     rate: float,
     timing: Timing = 0,
 ) -> float | NoSolution:
-    """How many periods the cash flows need; ``NoSolution`` when they never balance."""
+    """How many periods the cash flows need: zero when they already balance,
+    ``NoSolution`` when they never do."""
     if rate == 0:
         if payment_amount == 0:
+            if abs(present_value_amount + future_value_amount) <= _AT_TARGET * max(
+                1.0, abs(present_value_amount), abs(future_value_amount)
+            ):
+                return 0.0
             return NoSolution(field="payment", code="payment_never_balances")
         count = -(present_value_amount + future_value_amount) / payment_amount
-        if count <= 0:
+        if count < -_AT_TARGET:
             return NoSolution(field="payment", code="payment_never_balances")
-        return count
+        return count if count > 0 else 0.0
     if rate <= -1:
         return NoSolution(field="rate", code="rate_out_of_range")
     adjusted = payment_amount * (1.0 + rate * timing)
@@ -92,9 +101,9 @@ def periods(
     if denominator == 0 or numerator / denominator <= 0:
         return NoSolution(field="payment", code="payment_never_balances")
     count = math.log(numerator / denominator) / math.log(1.0 + rate)
-    if count <= 0:
+    if count < -_AT_TARGET:
         return NoSolution(field="payment", code="payment_never_balances")
-    return count
+    return count if count > 0 else 0.0
 
 
 def rate(

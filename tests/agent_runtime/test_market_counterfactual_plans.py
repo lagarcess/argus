@@ -132,3 +132,81 @@ def test_every_listed_kind_names_its_declared_money_fields() -> None:
         fields = declared[kind].arguments_type.model_fields
         assert start in fields, kind
         assert deposit is None or deposit in fields, kind
+
+
+@pytest.mark.parametrize(
+    ("kind", "arguments"),
+    [
+        (
+            "growth_projection",
+            {
+                "start_value": 1_000,
+                "contribution": 0,
+                "end_value": None,
+                "annual_rate_pct": 5,
+                "periods": 12,
+                "sources": {"start_value": {"kind": "assumption"}},
+            },
+        ),
+        (
+            "time_value",
+            {
+                "direction": "save",
+                "present_value": 0,
+                "payment": 100,
+                "future_value": None,
+                "annual_rate_pct": 5,
+                "periods": 12,
+                "sources": {"payment": {"kind": "assumption"}},
+            },
+        ),
+    ],
+)
+def test_an_amount_the_reader_did_not_state_offers_no_market_test(
+    kind, arguments
+) -> None:
+    assert _rows(kind, arguments) is None
+
+
+def test_the_market_test_names_the_cards_own_security() -> None:
+    card = run_calculation(
+        "valuation_scenarios",
+        {
+            "currency": "USD",
+            "symbol": "AAPL",
+            "price": 200,
+            "per_share": 8,
+            "growth_base_pct": 6,
+            "horizon_years": 5,
+            "amount": 10_000,
+        },
+    ).model_dump(mode="json")
+    growth = run_calculation(
+        "growth_projection",
+        {
+            "currency": "USD",
+            "start_value": 1_000,
+            "end_value": None,
+            "annual_rate_pct": 5,
+            "periods": 12,
+        },
+    ).model_dump(mode="json")
+    subjects = [
+        {"symbol": "MSFT", "name": "Microsoft"},
+        {"symbol": "AAPL", "name": "Apple"},
+    ]
+
+    alone = market_counterfactual_rows(card, language="en")
+    named = market_counterfactual_rows(card, language="en", subjects=subjects)
+    market = market_counterfactual_rows(growth, language="en", subjects=subjects)
+
+    assert alone is not None and named is not None and market is not None
+    assert alone["rows"][0]["send_text"] == (
+        "Test buying and holding AAPL with 10000 USD over the last 5 years"
+    )
+    assert named["rows"][0]["label"] == (
+        "Test Apple (AAPL) with 10,000 USD over the last 5 years"
+    )
+    assert market["rows"][0]["send_text"] == (
+        "Test buying and holding SPY with 1000 USD over the last year"
+    )

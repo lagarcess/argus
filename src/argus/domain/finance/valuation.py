@@ -71,4 +71,22 @@ def valuation_scenarios(
                 annual_return=annual,
             )
         )
+    out_of_order = _out_of_order(scenarios, growth)
+    if out_of_order is not None:
+        return NoSolution(field=out_of_order, code="scenarios_out_of_order")
     return scenarios
+
+
+def _out_of_order(
+    scenarios: list[Scenario], growth: tuple[float, float, float]
+) -> str | None:
+    """The input that breaks the low-to-high order of the projected prices, or
+    None when they rise from low to high."""
+    if len(scenarios) != 3:
+        return None
+    low, base, high = (scenario.price_at_horizon for scenario in scenarios)
+    if low > base:
+        return "multiple_low" if growth[0] <= growth[1] else "growth_low_pct"
+    if base > high:
+        return "multiple_high" if growth[2] >= growth[1] else "growth_high_pct"
+    return None

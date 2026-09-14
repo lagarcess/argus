@@ -739,9 +739,7 @@ def _with_market_counterfactual(
     if not cards or cards[0]["outcome"]["status"] != "succeeded":
         return rows
     counterfactual = market_counterfactual_rows(
-        cards[0],
-        language=language,
-        subject=subjects[0] if subjects else None,
+        cards[0], language=language, subjects=subjects
     )
     if counterfactual is None:
         return rows

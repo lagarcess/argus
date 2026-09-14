@@ -8,8 +8,9 @@ digits; the typed result keeps full precision.
 
 from __future__ import annotations
 
+from calendar import monthrange
 from collections.abc import Sequence
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated, Any
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
@@ -185,6 +186,10 @@ def pct(value: float) -> float:
     return value / 100.0
 
 
+# Frequencies a whole number of days apart: fortnightly, weekly and daily.
+_DAYS_PER_PERIOD = {26: 14, 52: 7, 365: 1}
+
+
 def dated_path(
     start: date,
     periods_per_year: int,
@@ -193,19 +198,24 @@ def dated_path(
     currency: str,
     base_value: float | None = None,
 ) -> ToolVisual | None:
-    """A value per period from ``start``, stepped by the period length."""
-    if len(values) < 2:
+    """A value per period from ``start``, stepped by the period length: whole
+    months for a frequency that divides the year into months, whole days for a
+    fortnightly, weekly or daily one. Any other frequency has no dated path."""
+    if len(values) < 2 or not periods_per_year:
         return None
-    months_per_period = 12 / periods_per_year if periods_per_year else 0
+    months = 12 // periods_per_year if 12 % periods_per_year == 0 else 0
+    days = _DAYS_PER_PERIOD.get(periods_per_year, 0)
+    if not months and not days:
+        return None
     series: list[ToolVisualPoint] = []
     for index, value in enumerate(values, start=1):
-        months = round(index * months_per_period)
-        year = start.year + (start.month - 1 + months) // 12
-        month = (start.month - 1 + months) % 12 + 1
-        day = min(start.day, 28)
-        series.append(
-            ToolVisualPoint(time=date(year, month, day).isoformat(), value=float(value))
-        )
+        if months:
+            total = start.month - 1 + index * months
+            year, month = start.year + total // 12, total % 12 + 1
+            when = date(year, month, min(start.day, monthrange(year, month)[1]))
+        else:
+            when = start + timedelta(days=index * days)
+        series.append(ToolVisualPoint(time=when.isoformat(), value=float(value)))
     return ToolVisual(
         kind="value_path", currency=currency, base_value=base_value, series=series
     )

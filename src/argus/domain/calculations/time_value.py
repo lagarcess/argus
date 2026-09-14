@@ -116,6 +116,9 @@ def compute_time_value(arguments: TimeValueArguments) -> TimeValueResult:
         count = tvm.periods(pv_s, pmt_s, fv_s, per_period, timing)
         if isinstance(count, NoSolution):
             raise no_solution(_periods_repair(count, pv_s, per_period, arguments))
+        if count == 0:
+            # The balance already meets the target: no period is needed.
+            notes.append("already_covered")
         periods = count
         solved_value = count
     else:

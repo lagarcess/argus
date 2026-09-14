@@ -2097,7 +2097,8 @@
         "discount_below_terminal_growth": "The {{field}} must be above the terminal growth rate.",
         "fees_exceed_amount": "The {{field}} exceed the amount received.",
         "no_periods": "The {{field}} must be at least one.",
-        "periods_not_whole": "The {{field}} must end on a coupon date."
+        "periods_not_whole": "The {{field}} must end on a coupon date.",
+        "scenarios_out_of_order": "The low, base and high cases must rise in order; check the {{field}}."
       },
       "title": "Result",
       "solved_value": "Solved value",

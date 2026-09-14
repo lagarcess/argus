@@ -18,7 +18,7 @@ pair, and the label states the rate and its date.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from loguru import logger
@@ -58,17 +58,19 @@ def market_counterfactual_rows(
     card: Mapping[str, Any],
     *,
     language: str,
-    subject: Mapping[str, str] | None = None,
+    subjects: Sequence[Mapping[str, str]] = (),
 ) -> dict[str, Any] | None:
     """One row when a computed card states the reader's own amount and a horizon
     in whole years.
 
     A starting amount becomes a buy-and-hold test; a monthly payment with no
-    starting amount becomes a monthly-buy test of the same payment. A loan offers
-    no row, and neither does a plan with both a starting amount and deposits,
-    stated or solved. The asset is the calculation's own subject when it has one,
-    else the market. The test runs in dollars: another currency is converted at
-    the pair's latest close, and with no close against the dollar there is no row."""
+    starting amount becomes a monthly-buy test of the same payment. The amount is
+    one the reader stated, never a looked-up or assumed figure. A loan offers no
+    row, and neither does a plan with both a starting amount and deposits, stated
+    or solved. The asset is the card's own symbol, named as the answer's subjects
+    name it, else the market. The test runs in dollars: another currency is
+    converted at the pair's latest close, and with no close against the dollar
+    there is no row."""
     arguments = card.get("arguments") or {}
     money = _READER_MONEY.get(str(card.get("tool_name") or ""))
     if money is None or arguments.get("direction") == "borrow":
@@ -88,6 +90,10 @@ def market_counterfactual_rows(
         return None
     years = _years(arguments)
     payment = _monthly_payment(arguments, deposit)
+    if amount is not None and not _stated(card, start):
+        amount = None
+    if payment is not None and deposit is not None and not _stated(card, deposit):
+        payment = None
     if years is None or (amount is None and payment is None):
         return None
     currency = str(arguments.get("currency") or "USD").strip().upper()
@@ -103,7 +109,7 @@ def market_counterfactual_rows(
         return None
     dollars = stated_amount * rate[0]
     spanish = language.startswith("es")
-    asset = dict(subject) if subject else MARKET_PROXY
+    asset = _asset(arguments, subjects)
     symbol = asset["symbol"]
     period = _last_years(years, spanish=spanish)
     stated = _money(dollars, "USD", grouped=True)
@@ -133,7 +139,7 @@ def market_counterfactual_rows(
         )
     parts = [
         {"type": "text", "value": "Probar " if spanish else "Test "},
-        *asset_label_parts([asset]),
+        *asset_label_parts([dict(asset)]),
         {"type": "text", "value": tail},
     ]
     return {
@@ -206,6 +212,33 @@ def _positive(value: Any) -> float | None:
     if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
         return float(value)
     return None
+
+
+def _stated(card: Mapping[str, Any], field: str) -> bool:
+    """Whether the card shows this input as a figure the reader stated."""
+    inputs = (card.get("presentation") or {}).get("inputs") or []
+    source = next(
+        (fact.get("source") or {} for fact in inputs if fact.get("name") == field), {}
+    )
+    return source.get("kind") == "user"
+
+
+def _asset(
+    arguments: Mapping[str, Any], subjects: Sequence[Mapping[str, str]]
+) -> Mapping[str, str]:
+    """The card's own security, named as the answer's subjects name it; the
+    market proxy when the card names none."""
+    symbol = str(arguments.get("symbol") or "").strip().upper()
+    if not symbol:
+        return MARKET_PROXY
+    return next(
+        (
+            subject
+            for subject in subjects
+            if str(subject.get("symbol") or "").strip().upper() == symbol
+        ),
+        {"symbol": symbol, "name": ""},
+    )
 
 
 def _years(arguments: Mapping[str, Any]) -> int | None:

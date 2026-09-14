@@ -137,3 +137,19 @@ def test_periods_are_labeled_by_their_frequency(per_year, unit) -> None:
     )
     periods = next(fact for fact in card.presentation.inputs if fact.name == "periods")
     assert (periods.unit.locale_key if periods.unit else None) == unit
+
+
+def test_a_goal_the_balance_already_meets_takes_no_periods() -> None:
+    card = run_calculation(
+        "growth_projection",
+        {
+            "currency": "USD",
+            "start_value": 10_000,
+            "contribution": 0,
+            "end_value": 10_000,
+            "annual_rate_pct": 5,
+            "periods": None,
+        },
+    )
+    assert card.outcome.status == "succeeded"
+    assert answer_value(card) == pytest.approx(0.0)

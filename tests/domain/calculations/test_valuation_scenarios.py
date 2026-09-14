@@ -87,3 +87,30 @@ def test_missing_bounds_fall_back_to_the_base_and_are_named_as_assumptions() -> 
     ]
     blank = next(fact for fact in card.presentation.inputs if fact.name == "growth_low_pct")
     assert blank.value is None and not blank.unknown
+
+
+def test_cases_out_of_low_to_high_order_name_the_input_that_breaks_it() -> None:
+    base = {
+        "currency": "USD",
+        "symbol": "AAPL",
+        "price": 200,
+        "per_share": 8,
+        "growth_low_pct": 3,
+        "growth_base_pct": 6,
+        "growth_high_pct": 9,
+        "multiple_low": 20,
+        "multiple_base": 25,
+        "multiple_high": 30,
+        "horizon_years": 5,
+    }
+    assert run_calculation("valuation_scenarios", base).outcome.status == "succeeded"
+    for changes, field in (
+        ({"growth_low_pct": 12}, "growth_low_pct"),
+        ({"multiple_low": 40}, "multiple_low"),
+        ({"growth_high_pct": 1}, "growth_high_pct"),
+        ({"multiple_high": 10}, "multiple_high"),
+    ):
+        card = run_calculation("valuation_scenarios", {**base, **changes})
+        assert card.outcome.status == "invalid"
+        assert card.outcome.failure.code == "scenarios_out_of_order"
+        assert card.outcome.failure.fields == [field]
