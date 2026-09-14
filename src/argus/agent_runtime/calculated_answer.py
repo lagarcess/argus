@@ -24,6 +24,7 @@ from argus.agent_runtime.answer_calculation import (
     ANSWER_TEMPLATE_KEY,
     MarketClose,
     PublishedCalculation,
+    calculation_names,
     latest_market_close,
     publish_calculations,
 )
@@ -437,7 +438,7 @@ def completed_pending(
         return list(voiced)
     if not stored:
         return list(voiced)
-    replied = {calculation.name: calculation for calculation in voiced}
+    replied = dict(zip(calculation_names(voiced), voiced, strict=True))
     requested = {
         str(name)
         for name in pending.get("requested_fields") or [pending.get("requested_field")]
@@ -445,8 +446,8 @@ def completed_pending(
     }
     changed = len(voiced) != len(stored)
     completed: list[AnswerCalculation] = []
-    for request in stored:
-        answer = replied.get(request.name)
+    for name, request in zip(calculation_names(stored), stored, strict=True):
+        answer = replied.get(name)
         same = (
             answer is not None
             and answer.kind == request.kind

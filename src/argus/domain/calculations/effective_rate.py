@@ -53,6 +53,15 @@ def compute_effective_rate(arguments: EffectiveRateArguments) -> EffectiveRateRe
     total_paid = 0.0
     total_cost = 0.0
     includes_fees = False
+    if arguments.fees > 0 and (arguments.amount <= 0 or arguments.periods <= 0):
+        # A fee changes the rate only over a loan's amount and term; without them
+        # it cannot be counted, and leaving it out would understate the rate.
+        raise no_solution(
+            NoSolution(
+                field="amount" if arguments.amount <= 0 else "periods",
+                code="fees_need_loan_terms",
+            )
+        )
     if arguments.amount > 0 and arguments.periods > 0:
         per_period = nominal / arguments.compounding_per_year
         level = tvm.payment(arguments.amount, 0.0, per_period, arguments.periods)

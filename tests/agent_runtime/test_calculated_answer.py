@@ -606,3 +606,74 @@ def test_a_reply_fills_a_requested_input_the_first_answer_left_out(monkeypatch) 
     card = reply.patch["final_response_payload"]["tool_result_cards"][0]
     assert card["arguments"]["periods"] == 48
     assert ca.PENDING_KEPT_REASON_CODE not in reply.decision.reason_codes
+
+
+def test_two_options_with_one_name_each_take_their_own_reply(monkeypatch) -> None:
+    def loans(first_periods, second_periods, lead):
+        options = []
+        for rate, periods in ((14, first_periods), (12, second_periods)):
+            inputs = [
+                {"name": "direction", "value": "borrow", "source": "user"},
+                {
+                    "name": "present_value",
+                    "value": 180000,
+                    "source": "user",
+                    "currency": "DOP",
+                },
+                {"name": "annual_rate_pct", "value": rate, "source": "user"},
+                {"name": "future_value", "value": 0, "source": "user"},
+                {"name": "periods", "value": periods, "source": "user"},
+            ]
+            options.append(
+                AnswerCalculation.model_validate(
+                    {
+                        "name": "loan",
+                        "kind": "time_value",
+                        "solve_for": "payment",
+                        "inputs": inputs,
+                    }
+                )
+            )
+        return ca.CalculatedVoicedAnswer(lead=lead, calculations=options)
+
+    _voice(
+        monkeypatch,
+        [
+            loans(None, None, "How many months are left on each loan?"),
+            loans(48, 60, "The payments are {{loan.payment}} and {{loan_2.payment}}."),
+        ],
+    )
+    asked = asyncio.run(
+        ca.calculated_answer_stage_result(
+            interpretation=_read(question_kind="none", scenario_question=True),
+            state=RunState.new(
+                current_user_message="Compare my two car loans at 14 and 12 percent.",
+                recent_thread_history=[],
+            ),
+            user=USER,
+        )
+    )
+    assert asked is not None and asked.outcome == "await_user_reply"
+
+    class _Interpreter:
+        async def ainvoke(self, request):
+            return _read()
+
+    reply = asyncio.run(
+        interpret_stage_async(
+            state=RunState.new(
+                current_user_message="48 and 60", recent_thread_history=[]
+            ),
+            user=USER,
+            latest_task_snapshot=None,
+            selected_thread_metadata={
+                "last_stage_outcome": "await_user_reply",
+                "clarification": asked.patch["clarification"],
+            },
+            structured_interpreter=_Interpreter(),
+        )
+    )
+    assert reply.outcome == "ready_to_respond"
+    cards = reply.patch["final_response_payload"]["tool_result_cards"]
+    assert [card["arguments"]["periods"] for card in cards] == [48, 60]
+    assert [card["arguments"]["annual_rate_pct"] for card in cards] == [14, 12]
