@@ -13,6 +13,7 @@ from typing import Any
 
 from argus.api import state as api_state
 from argus.api.decision_contract import DecisionActionAvailability, DecisionNote
+from argus.api.message_store import owned_conversation_message
 from argus.api.schemas import (
     SearchAssetDecisionCounts,
     SearchAssetRollup,
@@ -20,14 +21,16 @@ from argus.api.schemas import (
     User,
 )
 from argus.domain.answer_dossiers import (
+    ANSWER_REQUEST_MESSAGE_KEY,
     computed_answer_cards,
     computed_symbols,
     current_answer_decision,
     latest_computed_answer,
     project_answer_dossier,
     question_before,
+    question_text,
 )
-from argus.domain.run_dossiers import row_activity
+from argus.domain.run_dossiers import message_metadata, row_activity
 from argus.domain.search_text import normalize_search_symbol
 
 _DECISION_STATES = ("promising", "watching", "rejected", "revisit_later")
@@ -155,7 +158,16 @@ def _latest_answers(
 
 
 def question_for_answer(user: User, message: Mapping[str, Any]) -> str | None:
+    """The question an answer answers: the user message it records, when it landed
+    after later turns, else the owner's message just before it."""
     conversation_id = str(message.get("conversation_id") or "")
+    requested = message_metadata(message).get(ANSWER_REQUEST_MESSAGE_KEY)
+    if requested:
+        asked = owned_conversation_message(
+            user_id=user.id, conversation_id=conversation_id, message_id=str(requested)
+        )
+        if asked is not None and asked.role == "user":
+            return question_text(asked.content)
     if api_state.supabase_gateway is not None:
         created_at = message.get("created_at")
         stamp = (

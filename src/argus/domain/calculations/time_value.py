@@ -181,6 +181,10 @@ def compute_time_value(arguments: TimeValueArguments) -> TimeValueResult:
         balances = tvm.savings_path(present, per_period, payment, whole_periods, timing)
         total_payments = present + payment * periods
         total_interest = future - total_payments
+    if unknown == "periods" and whole_periods > periods:
+        # The target is reached partway through the last period, so the path
+        # ends at the reported balance rather than a whole period past it.
+        balances[-1] = future
     return TimeValueResult(
         solved_field=unknown,
         solved_value=solved_value,

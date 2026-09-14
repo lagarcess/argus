@@ -4395,7 +4395,7 @@ Contract rules:
   existing job lifecycle: the turn ends with a `backtest_job` sidecar whose
   `operation_scope` is `"chat.research"`, and the finalized answer arrives as
   a new assistant message referenced by the succeeded job's
-  `execution_metadata.research_result_message_id`. A succeeded research job
+  `execution_metadata.research_result_message_id`, and records `metadata.request_message_id`, the user message that started the job, so a computed answer's dossier and refresh read that question. A succeeded research job
   has a null `result_run_id` by design; the polling `GET /backtest-jobs/{job_id}`
   response carries that message as `result_message`, the way a backtest's
   carries `run`, and clients render it in place after the job card instead of

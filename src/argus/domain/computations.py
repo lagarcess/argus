@@ -157,13 +157,14 @@ def rerun_computation(
     """Re-run every calculation of ``computation``, in order, with ``overrides``
     merged over the stored inputs of the one at ``index``.
 
-    Raises :class:`InvalidComputationInputs` when overrides were supplied and
-    the edited calculation's merged inputs fail its kernel's typed model, or no
-    calculation sits at ``index``: that is the client's error. A calculation
+    Raises :class:`InvalidComputationInputs` when no calculation sits at
+    ``index``, whatever the overrides, or when overrides were supplied and the
+    edited calculation's merged inputs fail its kernel's typed model: that is the
+    client's error. A calculation
     whose stored inputs drifted re-runs as a typed unavailable state, because
     the row, not the request, is what drifted.
     """
-    if overrides and not 0 <= index < len(computation.calculations):
+    if not 0 <= index < len(computation.calculations):
         raise InvalidComputationInputs(
             computation.kinds[0],
             [{"type": "value_error", "msg": "No calculation at that index.", "loc": []}],

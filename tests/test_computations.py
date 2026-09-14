@@ -187,3 +187,14 @@ def _completed_run(run_id: str) -> dict[str, Any]:
             "idea_version_id": fake.uuid4(),
         },
     }
+
+
+def test_an_index_past_the_calculations_is_the_clients_error_even_with_no_edits(
+    harness_kernel: ComputationKernel,
+) -> None:
+    computation = DecisionComputation(kind=HARNESS_KIND, inputs={"monthly_amount": 5000})
+    for overrides in ({}, None):
+        with pytest.raises(InvalidComputationInputs):
+            rerun_computation(
+                computation, overrides=overrides, context=_context(), index=3
+            )

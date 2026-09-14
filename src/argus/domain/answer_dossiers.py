@@ -2,8 +2,8 @@
 
 Nothing here calls a model or retrieval: the card on the message already
 holds what Argus used, with its sources, and what came out; the decision
-comes from ``decision_notes``; the question is the owner's own user message
-just before the answer.
+comes from ``decision_notes``; the question is the user message the answer
+records it answers, else the owner's own user message just before it.
 """
 
 from __future__ import annotations
@@ -24,6 +24,9 @@ _DECISION_STATES: tuple[DecisionState, ...] = (
     "revisit_later",
 )
 _MAX_ASKED = 500
+# The user message a computed answer answers, recorded when the answer can land
+# after later turns, as a background research job's does.
+ANSWER_REQUEST_MESSAGE_KEY = "request_message_id"
 
 
 def computed_answer_cards(message: Mapping[str, Any]) -> list[ToolResultCard] | None:
@@ -90,7 +93,12 @@ def question_before(
     if not earlier:
         return None
     latest = max(earlier, key=lambda row: (row_activity(row), text(row.get("id")) or ""))
-    asked = text(latest.get("content"))
+    return question_text(latest.get("content"))
+
+
+def question_text(content: Any) -> str | None:
+    """The owner's question as a dossier shows it: their own words, bounded."""
+    asked = text(content)
     return asked[:_MAX_ASKED] if asked else None
 
 

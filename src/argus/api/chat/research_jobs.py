@@ -30,6 +30,7 @@ from argus.api.chat.research_tool_results import (
     research_tool_card_for_completion,
     with_research_tool_binding,
 )
+from argus.domain.answer_dossiers import ANSWER_REQUEST_MESSAGE_KEY
 
 # Re-exported: the scope literal is owned by the settlement rule the SQL is
 # rendered from.
@@ -289,6 +290,7 @@ def start_research_job(
         user_id=user_id,
         conversation_id=conversation_id,
         request_id=request_id,
+        request_message_id=request_message_id,
     )
     return public_backtest_job_payload(job), None
 
@@ -332,6 +334,7 @@ def _spawn_poller(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     retain_research_work(
         _poll_and_finalize(
@@ -341,6 +344,7 @@ def _spawn_poller(
             user_id=user_id,
             conversation_id=conversation_id,
             request_id=request_id,
+            request_message_id=request_message_id,
         ),
         name=f"research-job-{job_id}",
     )
@@ -354,6 +358,7 @@ async def _poll_and_finalize(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     from argus.agent_runtime.research_answer import retrieval_spec_for_job
 
@@ -400,6 +405,7 @@ async def _poll_and_finalize(
                         user_id=user_id,
                         conversation_id=conversation_id,
                         request_id=request_id,
+                        request_message_id=request_message_id,
                     )
                 else:
                     _fail_job(
@@ -455,6 +461,7 @@ async def _finalize_success(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     from argus.agent_runtime.research_answer import (
         compose_completed_research,
@@ -478,6 +485,10 @@ async def _finalize_success(
     for key in ("next_experiments", "next_steps", "calculation_offer"):
         if composed.get(key) is not None:
             metadata[key] = composed[key]
+    if request_message_id:
+        # The answer can land after later turns, so it names the message that
+        # asked instead of leaving readers to infer it from time.
+        metadata[ANSWER_REQUEST_MESSAGE_KEY] = request_message_id
     message = await persist_research_job_answer(
         job_id=job_id,
         user_id=user_id,

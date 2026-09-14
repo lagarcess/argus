@@ -269,3 +269,24 @@ def test_a_target_already_met_draws_no_schedule() -> None:
     assert card.outcome.status == "succeeded"
     assert card.outcome.result["balances"] == []
     assert card.presentation.visual is None
+
+
+def test_a_solved_fractional_period_chart_ends_at_the_reported_balance() -> None:
+    card = run_calculation(
+        "time_value",
+        {
+            "direction": "save",
+            "currency": "USD",
+            "present_value": 100,
+            "payment": 0,
+            "future_value": 200,
+            "annual_rate_pct": 120,
+            "periods": None,
+            "start_date": "2026-09-11",
+        },
+    )
+    assert answer_value(card) == pytest.approx(7.3, abs=0.05)
+    balances = card.outcome.result["balances"]
+    assert len(balances) == 8
+    assert balances[-1] == pytest.approx(200.0)
+    assert card.presentation.visual.series[-1].value == pytest.approx(200.0)
