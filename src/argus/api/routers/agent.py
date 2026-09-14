@@ -85,6 +85,7 @@ from argus.api.chat.request_admission import (
 from argus.api.chat.research_evidence import (
     claim_research_provider_attempt,
     guest_research_visitor_key,
+    release_research_provider_claim,
 )
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.result_link import apply_result_link_outcome
@@ -1217,9 +1218,9 @@ async def chat_stream(
                     or typed_artifact_answer
                     or lifecycle_hooks.turn_id is not None
                 ):
-                    retryable_recovery_code = chat_retry.discovery_recovery_code(recovery)
+                    retryable_recovery_code = chat_retry.durable_retry_code(recovery)
                     if retryable_recovery_code is not None:
-                        # Retryable discovery recovery: the lifecycle owns the
+                        # A retryable lookup recovery: the lifecycle owns the
                         # durable retry; completed turns strip it by design.
                         assistant_message = lifecycle_hooks.recoverable_failure(
                             content=persisted_text or "",
@@ -1421,7 +1422,10 @@ async def chat_stream(
             research_attempt_admission_context(
                 lambda: claim_research_provider_attempt(
                     guest_visitor_key=turn_guest_research_key
-                )
+                ),
+                release=lambda admission: release_research_provider_claim(
+                    admission, guest_visitor_key=turn_guest_research_key
+                ),
             ),
         ):
             workflow_input_error: Exception | None = None

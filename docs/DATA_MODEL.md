@@ -1382,6 +1382,10 @@ Current write hooks:
   success is independent of invoice reconciliation. Anomaly rows have unknown
   billable quantity and no cost amount; existing capability-class turn metering
   remains unchanged. Both records retain null cost for an unpriced call.
+  An attempt the provider may have billed without answering, after a read
+  timeout or a connection dropped mid-request, appends the same anomaly row
+  with `usage_metadata.reason = "unanswered_attempt"`, null usage counts and a
+  null provider response id.
   Tool invocation counts inside `usage_metadata` are null when the invoice did
   not establish them; a null count is unknown, not zero.
 - API chat turns append OpenRouter cost rows from persisted route receipts.
@@ -2021,7 +2025,20 @@ projected by `GET /me/usage`.
 - `claim_research_usage` locks the shared row and optional guest row in one
   transaction, checks both limits, and increments both or neither before
   provider work starts. This is the concurrency boundary: simultaneous turns
-  from one visitor cannot both consume one remaining slot.
+  from one visitor cannot both consume one remaining slot. An admitted claim
+  returns the `period_start` it charged.
+- When the provider work a claim admitted fails with no usable response, and
+  the turn's charge does not already stand, the backend calls
+  `release_research_usage` (service-role only, like the claim) with that
+  `period_start`. It decrements only the guest's own row for that day, never
+  below zero, and never touches the shared row, which keeps the attempt. It
+  returns `released`, and only a confirmed release lets a later provider path
+  in the same turn claim again. The charge stands for the rest of the turn once
+  provider work was served, was cancelled while it may still be billing, or
+  could not be released (the function failed or matched no charge), so one
+  turn never costs a guest more than one question. Migration
+  `20260913230000_release_research_guest_claim.sql` adds the release and the
+  claim's `period_start`.
 - Cache hits, ordinary chat turns, unconfigured-provider paths, and persisted
   thorough-job replays never call the claim. Claim failures degrade to the honest
   research-capacity response and do not enter the provider path.

@@ -39,6 +39,8 @@ export type RecoveryDisplay =
       kind: "recovery_code";
       code: string;
       values?: Record<string, string>;
+      /** The reply's content is an answer and this recovery its notice. */
+      underAnswer?: boolean;
     }
   | {
       kind: "coverage_recovery";
@@ -133,6 +135,33 @@ export function retryableAssistantRecoveryCode(value: unknown): string | null {
   return recovery?.retryable === true ? code : null;
 }
 
+/**
+ * Codes whose recovery replaced the answer and cannot be retried: the reply is
+ * a failure statement, so it wears the quiet notice. Every other non-retryable
+ * code keeps its treatment; the amber notice stays gated on retryable alone.
+ */
+const QUIET_NOTICE_RECOVERY_CODES = new Set(["research_lookup_unavailable"]);
+
+/** Whether a reply renders as the quiet failure notice (failure-treatment.ts). */
+export function wearsQuietFailureNotice(
+  display: RecoveryDisplay | null | undefined,
+): boolean {
+  if (display?.kind === "artifact_action_recovery") return true;
+  return (
+    display?.kind === "recovery_code" && QUIET_NOTICE_RECOVERY_CODES.has(display.code)
+  );
+}
+
+/**
+ * Whether the backend marked the reply's content as an answer with this
+ * recovery's notice under it (`recovery.under_answer`), rather than
+ * compatibility text standing in for the notice.
+ */
+export function recoveryNoticeUnderAnswer(
+  display: RecoveryDisplay | null | undefined,
+): boolean {
+  return display?.kind === "recovery_code" && display.underAnswer === true;
+}
 
 export function recoveryDisplayFromRecoveryState(
   value: unknown,
@@ -152,6 +181,7 @@ export function recoveryDisplayFromRecoveryState(
     kind: "recovery_code",
     code,
     values: stringValues(params),
+    ...(recovery?.under_answer === true ? { underAnswer: true } : {}),
   };
 }
 

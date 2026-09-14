@@ -305,3 +305,62 @@ def test_message_append_migration_backfills_legacy_degraded_previews() -> None:
     assert "set last_message_preview = null" in sql
     assert "metadata -> 'clarification' ->> 'prompt_source'" in sql
     assert "is distinct from 'llm_generated'" in sql
+
+
+def _degraded_research(code: str) -> dict[str, Any]:
+    return {
+        "research": {"schema_version": "argus_research/v1", "degraded": {"code": code}}
+    }
+
+
+def test_chat_history_keeps_degraded_replies_and_only_naming_drops_failed_lookups() -> (
+    None
+):
+    user_id = "user-1"
+    conversation = memory_conversation(
+        title="AAPL",
+        title_source="system_default",
+        language="en",
+        user_id=user_id,
+    )
+    question = "What is Apple trading at right now?"
+    follow_up = "Why did my strategy trail SPY?"
+    turns = [
+        ("user", question, {}),
+        (
+            "assistant",
+            "I couldn't finish looking that up just now. Try again in a moment.",
+            _degraded_research("research_unavailable_http_error"),
+        ),
+        ("user", question, {}),
+        (
+            "assistant",
+            "From Argus market data, Apple last closed at $311.80.",
+            _degraded_research("research_unavailable_http_error"),
+        ),
+        ("user", follow_up, {}),
+        (
+            "assistant",
+            "It sat in cash through most of the rally.",
+            _degraded_research("result_followup_research_unused"),
+        ),
+    ]
+    for role, content, metadata in turns:
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation.id,
+            role=role,
+            content=content,
+            metadata=metadata,
+        )
+
+    # Chat history keeps every reply, a valid degraded one included; only
+    # conversation naming leaves failed-lookup replies out.
+    chat = load_runtime_thread_history(user_id=user_id, conversation_id=conversation.id)
+    assert [item.content for item in chat] == [content for _, content, _ in turns]
+    naming = load_runtime_thread_history(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        drop_failed_lookups=True,
+    )
+    assert [item.content for item in naming] == [question, question, follow_up]
