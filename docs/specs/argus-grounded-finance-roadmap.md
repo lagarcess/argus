@@ -371,7 +371,7 @@ stands" below.
 | --- | --- |
 | Recovery replies state the current reason, and a stated date range survives "this year" | Building. Found on production 2026-09-14. Stops before its paid measurement. |
 | Acceptance dry run | Running on `03918912`: the ten smoke questions in English and Spanish with follow-ups and a guest subset ($9 hard stop), then the August 12 transcript replay ($4 hard stop, founder approved). Fixes nothing; reports failures by cause. |
-| Menus follow the layout contract | Building. Menus and settings switch to sheets below 720px; only the run dossier follows 1024px. |
+| Menus and settings follow docs/BREAKPOINTS.md | Redirected 2026-09-14. Settings and menus are sheets below 1024px and anchored menus from 1024px, as `docs/BREAKPOINTS.md` sets and the code already does; 720px is where the rails arrive. The lane audits every surface against that and fixes only real mismatches. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1886,9 +1886,9 @@ Resolved:
   reply writer reads the last six messages beside the stored reason. That earlier
   refusal came from reading "from August 16 to August 19 just a few days this year"
   as ending December 31.
-- **Menus turn into sheets at the wrong width.** The layout contract starts sheets
-  below 720px, but the chat header menu, guest settings and profile menu switch
-  below 1024px, so 720 to 1023px shows the desktop rail with phone sheets.
+- **Menu and settings consistency across widths is being audited.** The founder saw
+  an inconsistency on 2026-09-14 without a screenshot. The switch at 1024px is
+  correct per `docs/BREAKPOINTS.md`; the audit looks for surfaces that break it.
 - **The chat does not know who the person is.** Settings stores a preferred name,
   a country and a currency, but outside Settings the name reaches only the web
   greeting, and the country reaches only research as its search location. No answer
