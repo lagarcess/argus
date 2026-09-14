@@ -799,6 +799,7 @@ def load_runtime_thread_history(
     user_id: str,
     conversation_id: str,
     limit: int = 20,
+    drop_failed_lookups: bool = False,
 ) -> list[ConversationMessage]:
     messages: list[Message] = []
     if api_state.supabase_gateway is not None:
@@ -827,9 +828,7 @@ def load_runtime_thread_history(
             metadata=message.metadata,
         ):
             continue
-        if research_lookup_failed(message.metadata):
-            # A failed lookup's reply, even an answer without it, is never model
-            # context, so a Retry asks the same question clean.
+        if drop_failed_lookups and research_lookup_failed(message.metadata):
             continue
         # A card turn reaches the model as the card's typed facts, never prose.
         card_facts = (

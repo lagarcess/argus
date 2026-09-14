@@ -865,7 +865,7 @@ def test_an_answer_without_the_lookup_settles_with_its_notice_and_a_durable_retr
         "message": QUESTION,
     }
     assert metadata["recovery"] == live["recovery"]
-    # The degraded flag keeps the answer out of later model history and naming.
+    # The degraded flag keeps the answer out of conversation naming.
     assert metadata["research"]["degraded"] == {
         "code": "research_unavailable_http_error",
         "status": 500,
@@ -875,26 +875,11 @@ def test_an_answer_without_the_lookup_settles_with_its_notice_and_a_durable_retr
         artifact_naming_assistant_message(answered["content"], metadata=metadata) is None
     )
 
-    from argus.api.routers import agent as agent_router
-
-    histories: list[list[str]] = []
-    load_history = agent_router.load_runtime_thread_history
-
-    def _recorded_history(**kwargs: Any):
-        history = load_history(**kwargs)
-        histories.append([str(item.content) for item in history])
-        return history
-
-    monkeypatch.setattr(agent_router, "load_runtime_thread_history", _recorded_history)
-
     retried = _ask(api, conversation_id)
 
     assert "recovery" not in retried
     assert retried["assistant_response"].startswith("Apple closed")
     assert asked == [QUESTION, QUESTION]
-    # Retry asks the same question clean: the failed answer is not model history.
-    assert len(histories) == 1 and QUESTION in histories[0]
-    assert not any(content.startswith(NO_LOOKUP_ANSWER) for content in histories[0])
 
 
 # --- A registered call: its recovery speaks for its turn only when it is alone -

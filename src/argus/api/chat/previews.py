@@ -118,8 +118,8 @@ def _compact_preview_tokens(values: Iterable[str]) -> str:
 
 
 def research_lookup_failed(metadata: object) -> bool:
-    """A reply whose lookup failed, by its research sidecar's degraded code.
-    Such a reply never names a conversation or enters later model history."""
+    """An answer whose lookup failed, by its research sidecar's degraded code.
+    Such an answer never names a conversation."""
     if not isinstance(metadata, dict):
         return False
     research = metadata.get("research")

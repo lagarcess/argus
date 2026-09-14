@@ -305,21 +305,15 @@ def test_message_append_migration_backfills_legacy_degraded_previews() -> None:
     assert "is distinct from 'llm_generated'" in sql
 
 
-def _failed_lookup(*, answered: bool) -> dict[str, Any]:
+def _degraded_research(code: str) -> dict[str, Any]:
     return {
-        "recovery": {
-            "code": "research_lookup_failed",
-            "retryable": True,
-            **({"under_answer": True} if answered else {}),
-        },
-        "research": {
-            "schema_version": "argus_research/v1",
-            "degraded": {"code": "research_unavailable_http_error", "status": 500},
-        },
+        "research": {"schema_version": "argus_research/v1", "degraded": {"code": code}}
     }
 
 
-def test_a_reply_whose_lookup_failed_stays_durable_but_out_of_runtime_history() -> None:
+def test_chat_history_keeps_degraded_replies_and_only_naming_drops_failed_lookups() -> (
+    None
+):
     user_id = "user-1"
     conversation = memory_conversation(
         title="AAPL",
@@ -328,16 +322,26 @@ def test_a_reply_whose_lookup_failed_stays_durable_but_out_of_runtime_history() 
         user_id=user_id,
     )
     question = "What is Apple trading at right now?"
-    notice = "I couldn't finish looking that up just now. Try again in a moment."
-    no_lookup_answer = "From Argus market data, Apple last closed at $311.80."
-    looked_up = "Apple closed at $312.41 on 2026-08-06."
+    follow_up = "Why did my strategy trail SPY?"
     turns = [
         ("user", question, {}),
-        ("assistant", notice, _failed_lookup(answered=False)),
+        (
+            "assistant",
+            "I couldn't finish looking that up just now. Try again in a moment.",
+            _degraded_research("research_unavailable_http_error"),
+        ),
         ("user", question, {}),
-        ("assistant", no_lookup_answer, _failed_lookup(answered=True)),
-        ("user", question, {}),
-        ("assistant", looked_up, {"research": {"schema_version": "argus_research/v1"}}),
+        (
+            "assistant",
+            "From Argus market data, Apple last closed at $311.80.",
+            _degraded_research("research_unavailable_http_error"),
+        ),
+        ("user", follow_up, {}),
+        (
+            "assistant",
+            "It sat in cash through most of the rally.",
+            _degraded_research("result_followup_research_unused"),
+        ),
     ]
     for role, content, metadata in turns:
         create_message(
@@ -348,9 +352,13 @@ def test_a_reply_whose_lookup_failed_stays_durable_but_out_of_runtime_history() 
             metadata=metadata,
         )
 
-    persisted = [message.content for message in api_state.store.messages[conversation.id]]
-    assert persisted == [content for _, content, _ in turns]
-    history = load_runtime_thread_history(
-        user_id=user_id, conversation_id=conversation.id
+    # Chat history keeps every reply, a valid degraded one included; only
+    # conversation naming leaves failed-lookup replies out.
+    chat = load_runtime_thread_history(user_id=user_id, conversation_id=conversation.id)
+    assert [item.content for item in chat] == [content for _, content, _ in turns]
+    naming = load_runtime_thread_history(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        drop_failed_lookups=True,
     )
-    assert [item.content for item in history] == [question, question, question, looked_up]
+    assert [item.content for item in naming] == [question, question, follow_up]

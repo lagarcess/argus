@@ -5484,10 +5484,7 @@ reply completes the calculation with the cited inputs kept. A tap whose latest
 answer carries no offer answers with a short note and runs nothing. A background
 answer stores the same offer on its message.
 
-A failed lookup never becomes the answer, never names the conversation and
-never enters later interpreter history: a reply whose `research` sidecar is
-degraded, the answer without the lookup included, is left out of the runtime
-thread history, so a Retry asks the same question clean.
+A failed lookup never becomes the answer and never names the conversation.
 When research is unavailable, retrieves nothing (`research_not_grounded`),
 returns a scenario without a calculation (`scenario_inputs_uncited`) or a
 calculation whose inputs were not found (`calculation_inputs_not_found`), the
