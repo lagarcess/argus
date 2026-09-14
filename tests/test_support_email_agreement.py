@@ -1,4 +1,4 @@
-"""The web app and the API each hold the support address; these fail when they part."""
+"""The support address has one owner: argus_display_contract/support_contact.json."""
 
 from __future__ import annotations
 
@@ -14,7 +14,8 @@ from faker import Faker
 ROOT = Path(__file__).resolve().parents[1]
 WEB_ROOT = ROOT / "web"
 SUPPORT_EMAIL_ENV = "NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL"
-WEB_OWNER = "lib/support-email.ts"
+WEB_OWNER = "web/lib/support-email.ts"
+CODE_SUFFIXES = (".py", ".ts", ".tsx", ".js", ".jsx", ".mjs")
 fake = Faker()
 
 
@@ -27,7 +28,7 @@ def _web_support_email(configured: str | None) -> str:
             "bun",
             "--no-env-file",
             "--eval",
-            f'import {{ supportEmail }} from "./{WEB_OWNER}";'
+            f'import {{ supportEmail }} from "{(ROOT / WEB_OWNER).as_posix()}";'
             " console.log(JSON.stringify(supportEmail));",
         ],
         cwd=WEB_ROOT,
@@ -40,25 +41,26 @@ def _web_support_email(configured: str | None) -> str:
     return json.loads(evaluated.stdout)
 
 
-def _web_app_sources() -> list[Path]:
+def _app_code_containing(text: str, *roots: str) -> list[str]:
     listed = subprocess.run(
-        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "web"],
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", *roots],
         cwd=ROOT,
         capture_output=True,
         text=True,
         check=True,
     ).stdout.splitlines()
-    return [
-        ROOT / name
+    return sorted(
+        name
         for name in listed
-        if name.endswith((".ts", ".tsx", ".js", ".jsx", ".mjs"))
+        if name.endswith(CODE_SUFFIXES)
         and not name.startswith(("web/__tests__/", "web/e2e/"))
         and (ROOT / name).is_file()
-    ]
+        and text in (ROOT / name).read_text(encoding="utf-8")
+    )
 
 
 @pytest.mark.parametrize("configured", [None, "", "   "])
-def test_web_fallback_is_the_api_support_address(configured: str | None) -> None:
+def test_web_falls_back_to_the_api_support_address(configured: str | None) -> None:
     assert _web_support_email(configured) == SUPPORT_EMAIL_ADDRESS
 
 
@@ -76,9 +78,9 @@ def test_release_profile_pins_the_api_support_address() -> None:
 
 def test_only_the_web_owner_reads_the_support_address_setting() -> None:
     # Next inlines only the literal process.env name, so every working reader spells it.
-    readers = sorted(
-        path.relative_to(WEB_ROOT).as_posix()
-        for path in _web_app_sources()
-        if SUPPORT_EMAIL_ENV in path.read_text(encoding="utf-8")
-    )
-    assert readers == [WEB_OWNER]
+    assert _app_code_containing(SUPPORT_EMAIL_ENV, "web") == [WEB_OWNER]
+
+
+def test_no_app_code_spells_the_support_address() -> None:
+    # Both runtimes derive the address from the contract file instead of repeating it.
+    assert _app_code_containing(SUPPORT_EMAIL_ADDRESS, "src", "web") == []
