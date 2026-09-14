@@ -514,19 +514,25 @@ def assert_eval_env_file_outside_repository(
 
     Promotion evidence identity compares the repository's tree, never the eval's
     environment, so nothing the tree owns may feed that environment. An alias
-    lives at one of two layers: a name, where a path lies in the repository or
-    passes through it, or a file, where a hard link or mount opens a tracked
-    file's inode under another name. Both are refused.
+    lives at one of two layers, and every step of opening the file is checked at
+    both: a name, where a path lies in the repository or passes through it, and a
+    file, where an inode on the way is a tracked file or symlink under another
+    name, as with a hard link or mount.
     """
 
     root = repository_root.resolve()
-    if any(path.is_relative_to(root) for path in _paths_opened(env_file)):
+    visited = _paths_opened(env_file)
+    if any(path.is_relative_to(root) for path in visited):
         raise RuntimeError("scorecard_provenance:eval_env_file_inside_repository")
-    try:
-        opened = env_file.stat()
-    except FileNotFoundError:
-        return
-    if (opened.st_dev, opened.st_ino) in _tracked_file_identities(root):
+    # The walk ends on the real file, so each visited inode covers the target too.
+    identities = set()
+    for path in visited:
+        try:
+            status = path.lstat()
+        except OSError:
+            continue
+        identities.add((status.st_dev, status.st_ino))
+    if identities & _tracked_file_identities(root):
         raise RuntimeError("scorecard_provenance:eval_env_file_inside_repository")
 
 

@@ -15,9 +15,9 @@ from tests.evals import measurement_eval_scorecard as scorecards
 
 
 def _environment_sources(tmp_path: Path) -> Path:
-    """A repository tracking a template, holding a symlink out of it and a plain
+    """A repository tracking a template and a symlink out of it, holding a plain
     file, with links from outside that reach into it, pass through it, or hard
-    link its tracked template."""
+    link its tracked template or its tracked symlink."""
 
     repository = tmp_path / "repository"
     repository.mkdir()
@@ -27,9 +27,16 @@ def _environment_sources(tmp_path: Path) -> Path:
     outside.write_text(settings, encoding="utf-8")
     (tmp_path / "outside-link.env").symlink_to(outside)
     (repository / ".env.example").write_text(settings, encoding="utf-8")
-    subprocess.run(["git", "add", ".env.example"], cwd=repository, check=True)
-    os.link(repository / ".env.example", tmp_path / "hard-link.env")
     (repository / ".env.link").symlink_to(outside)
+    subprocess.run(
+        ["git", "add", ".env.example", ".env.link"], cwd=repository, check=True
+    )
+    os.link(repository / ".env.example", tmp_path / "hard-link.env")
+    os.link(
+        repository / ".env.link",
+        tmp_path / "symlink-hard-link.env",
+        follow_symlinks=False,
+    )
     (repository / ".env").write_text(settings, encoding="utf-8")
     (tmp_path / "via").symlink_to(repository)
     (tmp_path / "envdir").mkdir()
@@ -49,6 +56,9 @@ def _environment_sources(tmp_path: Path) -> Path:
         pytest.param("via/.env.example", True, id="link-into-the-repository"),
         pytest.param("hop/live.env", True, id="link-chain-through-the-repository"),
         pytest.param("hard-link.env", True, id="hard-link-to-a-tracked-file"),
+        pytest.param(
+            "symlink-hard-link.env", True, id="hard-link-to-a-tracked-symlink"
+        ),
         pytest.param("live-eval.env", False, id="file-outside-the-repository"),
         pytest.param("outside-link.env", False, id="link-outside-the-repository"),
     ],
