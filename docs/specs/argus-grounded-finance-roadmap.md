@@ -1530,6 +1530,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Readout receipts admit every model tier | outside the releases | **LANDED** `6eb93d84`, PR #610, closing #605. `route_receipts` accepts the readout tier, and a test pins the check to the runtime's tier list. Its migration, classed destructive for its dropped and re-added check, ships at the next promotion. |
 | Stated money survives a timed-out interpretation | outside the releases | **LANDED** `b7c69b54`, PR #602, closing #600. Focused repair keeps a stated deposit, contribution, fees and slippage; 22 of 22 targeted live reruns passed. Ships at the next promotion. |
 | Research provider failures take the retryable notice | outside the releases | **In review**, PR #612 for #609. Transient provider errors retry with backoff, a failure that persists shows the existing retryable notice, and a guest gets the research question back. Merges after Any grounded math. |
+| One owner for the support address | outside the releases | **LANDED** `9630ffe2`, PR #615, closing #596. The API constant and the web fallback both read `web/argus_display_contract/support_contact.json`, and a test fails if any code types the address again. Ships at the next promotion. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
@@ -1858,12 +1859,11 @@ Resolved:
 - **Resolved: research has a fallback chain.** Commit `02d1b03d` (#404, #545)
   sends the Agents API `models` list, and each research tier lists the other as
   its fallback (`src/argus/domain/research/config.py`).
-- **Bugs are tracked as issues:** #596 the support address has two owners, #598 a
-  second tab never shows the reply, #599 the BTC forward research never publishes,
+- **Bugs are tracked as issues:** #598 a second tab never shows the reply, #599 the BTC forward research never publishes,
   #604 sharing refuses completed answers, #606 a result follow-up lists its next steps
   twice, #609 research provider failures skip the retryable notice (fix in review,
-  PR #612), and #614 the canary fails on nearly every run. #600 and #605 are fixed on
-  integration and ship at the next promotion.
+  PR #612), and #614 the canary fails on nearly every run. #596, #600 and #605 are fixed
+  on integration and ship at the next promotion.
 - **The chat does not know who the person is.** Settings stores a preferred name,
   a country and a currency, but outside Settings the name reaches only the web
   greeting, and the country reaches only research as its search location. No answer

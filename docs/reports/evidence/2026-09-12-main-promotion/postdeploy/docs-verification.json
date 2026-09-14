@@ -1,0 +1,11 @@
+{
+  "verification": "passed",
+  "test_count": 283,
+  "duration_seconds": 14.74,
+  "coverage": "release-document tests and the complete README Mocked Run",
+  "paid_provider_calls": 0,
+  "evidence": "docs-and-mocked-tests.log",
+  "unchanged_paths_against_merge": [],
+  "secret_value_scan": "passed",
+  "native_canary_failure_retained": true
+}

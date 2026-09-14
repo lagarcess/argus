@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-09-13T22:44:16.785010+00:00",
+  "removed_only_link": "/private/tmp/argus-promotion-20260913-landed/web/.env.local",
+  "canonical_path": "/Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/web/.env.local",
+  "canonical_before": {
+    "size_bytes": 1095,
+    "mtime_ns": 1785873439166244436,
+    "device": 16777229,
+    "inode": 46717572
+  },
+  "canonical_after": {
+    "size_bytes": 1095,
+    "mtime_ns": 1785873439166244436,
+    "device": 16777229,
+    "inode": 46717572
+  },
+  "size_and_modification_time_unchanged": true,
+  "canonical_file_written": false,
+  "link_absent": true
+}

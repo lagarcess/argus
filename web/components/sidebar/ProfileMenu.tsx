@@ -73,6 +73,7 @@ import {
 } from "@/lib/language-features";
 import { memoryAvailable as fetchMemoryAvailable } from "@/lib/memory-privacy";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
+import { supportEmail } from "@/lib/support-email";
 import { navigateFromOverlay } from "@/lib/overlay-history";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
@@ -112,9 +113,6 @@ type ProfileQuickJumpItem = {
   id: string;
   onSelect: () => void;
 };
-
-const SUPPORT_EMAIL =
-  process.env.NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL ?? "support@argus.local";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -851,7 +849,7 @@ export default function ProfileMenu({
   }, [currentLanguage, deleteRequestState]);
 
   const accountHint = profile?.email ? ` (${profile.email})` : "";
-  const supportMailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+  const supportMailto = `mailto:${supportEmail}?subject=${encodeURIComponent(
     t(
       "settings.profile.request_deletion.email_subject",
       "Argus account deletion request",

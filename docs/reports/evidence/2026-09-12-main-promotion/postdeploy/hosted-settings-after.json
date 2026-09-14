@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-09-13T22:36:00.956563+00:00",
+  "merge_commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "phase": "after",
+  "autoDeployTrigger": {
+    "argus-api": "off",
+    "argus-app": "off",
+    "argus-backtests": "off"
+  },
+  "readout_values": {
+    "argus-backtests": {
+      "ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna",
+      "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna"
+    },
+    "argus-api": {
+      "ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna",
+      "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna"
+    }
+  },
+  "all_four_values_match": true,
+  "unrelated_env_values_unchanged": true,
+  "only_approved_four_puts_performed": true
+}

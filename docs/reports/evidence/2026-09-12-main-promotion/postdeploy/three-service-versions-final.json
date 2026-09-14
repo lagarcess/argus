@@ -1,0 +1,29 @@
+{
+  "checked_at": "2026-09-13T22:57:30.613566+00:00",
+  "target_sha": "3d98057c1e722317f0243fb96fb647771ddae484",
+  "services": [
+    {
+      "service": "argus-api",
+      "id": "dep-dajii17qj5pc73dp04rg",
+      "status": "live",
+      "commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "created_at": "2026-09-13T22:51:48.937365Z",
+      "finished_at": "2026-09-13T22:53:32.883509Z"
+    },
+    {
+      "service": "argus-app",
+      "id": "dep-dajiisnqj5pc73dp2uc0",
+      "status": "live",
+      "commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "created_at": "2026-09-13T22:53:38.434856Z",
+      "finished_at": "2026-09-13T22:55:27.413133Z"
+    },
+    {
+      "service": "argus-backtests",
+      "id": "wfv-dajijpbm8hqs738ed7i0",
+      "status": "ready",
+      "commit": "3d98057",
+      "created_at": "2026-09-13T22:55:33.646241Z"
+    }
+  ]
+}
