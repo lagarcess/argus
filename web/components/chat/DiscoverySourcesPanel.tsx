@@ -42,12 +42,14 @@ export default function DiscoverySourcesPanel({
   withheld = false,
 }: DiscoverySourcesPanelProps) {
   const { t, i18n } = useTranslation();
-  const { isBelowTablet } = useResponsiveLayout();
+  // The panel line, not the sidebar's: at tablet width the dossier beside
+  // this was already a sheet while this was not.
+  const { isBelowDesktop } = useResponsiveLayout();
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (isBelowTablet) {
+    if (isBelowDesktop) {
       // BottomSheet owns focus, Escape, and focus restore for the sheet form.
       panelRef.current
         ?.querySelector(`[data-source-index="${anchorIndex}"]`)
@@ -90,7 +92,7 @@ export default function DiscoverySourcesPanel({
       document.removeEventListener("keydown", handleKeyDown, true);
       restoreFocusRef.current?.focus?.();
     };
-  }, [onClose, anchorIndex, isBelowTablet]);
+  }, [onClose, anchorIndex, isBelowDesktop]);
 
   const display = researchSourcesDisplay(withheld);
   const title = t(display.titleKey, { defaultValue: display.titleFallback });
@@ -102,7 +104,7 @@ export default function DiscoverySourcesPanel({
   const sourceList = <ResearchSourcesList sources={sidecar.sources} locale={i18n.language} t={t} anchorIndex={anchorIndex} />;
 
   // Below the mobile threshold the evidence trail is a sheet, not a side panel.
-  if (isBelowTablet) {
+  if (isBelowDesktop) {
     return (
       <BottomSheet
         isOpen
@@ -131,7 +133,7 @@ export default function DiscoverySourcesPanel({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative flex max-h-full w-full max-w-[420px] flex-col self-stretch overflow-hidden rounded-s-2xl border-s border-black/10 bg-white shadow-none dark:border-white/10 dark:bg-[#1d2023]"
+        className="relative flex max-h-full w-full flex-col self-end overflow-hidden rounded-t-2xl border border-black/10 bg-white shadow-none dark:border-white/10 dark:bg-[#1d2023] sm:max-w-[420px] sm:self-stretch sm:rounded-none sm:rounded-s-2xl sm:border-y-0 sm:border-e-0"
       >
         <div className="flex items-start justify-between gap-3 border-b border-black/8 px-4 py-3 dark:border-white/8">
           <div className="min-w-0">

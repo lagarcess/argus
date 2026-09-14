@@ -28,11 +28,11 @@ export default function GuestSettingsMenu({
   placement?: GuestSettingsPlacement;
 }) {
   const isDrawerPlacement = placement === "drawer";
-  const { isBelowTablet } = useResponsiveLayout();
+  const { isBelowDesktop } = useResponsiveLayout();
   // The last floating panel inside the drawer, and the only surface still
   // shaped like the settings menu that moved to the sheet. Small, so it hugs
   // its content rather than taking the screen.
-  const asSheet = isBelowTablet;
+  const asSheet = isBelowDesktop;
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);

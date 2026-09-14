@@ -450,9 +450,10 @@ describe("omnisearch below threshold", () => {
     expect(sheet).toContain("min-h-11");
   });
 
-  test("row actions use mobile form below tablet and CSS preserves touch access", () => {
-    // Width owns form; pointerAffordances.module.css keeps wider touch rows usable.
-    expect(commandPalette).toContain("paletteRowActionVariant(isBelowTablet)");
+  test("row actions are explicit at every width a touch device is likely to use", () => {
+    // Hover reveal cannot be the only affordance where hover does not exist, so
+    // the whole band below the desktop stop gets the visible menu.
+    expect(commandPalette).toContain("paletteRowActionVariant(isBelowDesktop)");
     expect(paletteRowActionVariant(true)).toBe("menu");
     expect(paletteRowActionVariant(false)).toBe("hover");
   });
@@ -807,7 +808,7 @@ describe("omnisearch below threshold", () => {
       "ml-auto me-2 shrink-0 whitespace-nowrap",
     );
     expect(commandPalette).toContain('rowActionVariant !== "menu" && (');
-    expect(commandPalette).toContain("max-tablet:min-h-11 max-tablet:pe-12");
+    expect(commandPalette).toContain("max-desktop:min-h-11 max-desktop:pe-12");
   });
 });
 

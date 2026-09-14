@@ -17,12 +17,12 @@ export function effectivePaletteLayout(
 }
 
 /**
- * Below the tablet stop, rows get the explicit 44px menu. At wider widths,
- * CSS may reveal compact inline actions for a fine pointer while
+ * Every width below the desktop stop gets the explicit 44px menu. At the
+ * desktop stop, CSS may reveal compact inline actions for a fine pointer while
  * retaining that touch-safe menu whenever a coarse pointer is available.
  */
 export function paletteRowActionVariant(
-  isBelowTablet: boolean,
+  isBelowDesktop: boolean,
 ): RowActionVariant {
-  return isBelowTablet ? "menu" : "hover";
+  return isBelowDesktop ? "menu" : "hover";
 }

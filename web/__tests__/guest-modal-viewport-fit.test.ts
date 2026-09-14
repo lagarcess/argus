@@ -28,7 +28,7 @@ describe("guest modal viewport fit", () => {
       "utf8",
     );
 
-    expect(source).toContain("p-3 tablet:p-6");
+    expect(source).toContain("p-3 sm:p-6");
     expect(source).toContain("max-h-[calc(100dvh-1.5rem)]");
     expect(source).toContain("h-[78dvh] w-[94vw] max-w-6xl");
     expect(source).toContain("h-[60dvh] w-full max-w-lg");
