@@ -9,7 +9,7 @@ import BottomSheet from "@/components/ui/BottomSheet";
 /**
  * One panel, two presentations, one rule about which.
  *
- * Below the desktop stop a panel is a bottom sheet. Above it, the centred
+ * Below the tablet stop a panel is a bottom sheet. Above it, the centred
  * dialog it has always been. The rule lives here rather than in each surface,
  * because it was in each surface before: twelve dialogs drew the same centred
  * card at 390px as at 1440px, and the three that did adapt disagreed about the
@@ -66,7 +66,7 @@ export default function AdaptivePanel({
   initialFocusRef?: React.RefObject<HTMLElement | null>;
   children: ReactNode;
 }) {
-  const { isBelowDesktop } = useResponsiveLayout();
+  const { isBelowTablet } = useResponsiveLayout();
   const overlayId = useId();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -82,7 +82,7 @@ export default function AdaptivePanel({
     </button>
   ) : null;
 
-  if (isBelowDesktop) {
+  if (isBelowTablet) {
     return (
       <BottomSheet
         isOpen

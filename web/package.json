@@ -11,6 +11,7 @@
     "test:e2e": "playwright test",
     "test:e2e:guest-captcha-ux": "playwright test --config e2e/guest-auth-captcha-ux.playwright.config.ts",
     "test:e2e:breakpoints": "playwright test --config e2e/breakpoint-baselines.playwright.config.ts",
+    "test:e2e:menu-settings": "playwright test --config e2e/menu-settings-width.playwright.config.ts",
     "test:e2e:breakpoints:update": "playwright test --config e2e/breakpoint-baselines.playwright.config.ts --update-snapshots"
   },
   "dependencies": {

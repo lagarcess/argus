@@ -131,14 +131,9 @@ export default function ProfileMenu({
   placement = "rail",
 }: ProfileMenuProps) {
   const { t, i18n } = useTranslation();
-  const { isBelowDesktop } = useResponsiveLayout();
-  /*
-   * Below the panel line this menu is a sheet, whatever the sidebar is doing.
-   * Tying it to the sidebar's own 720 line left the tablet band showing a
-   * shrunken mouse menu whose submenus only opened on a hover that a tablet
-   * cannot produce.
-   */
-  const asSheet = isBelowDesktop;
+  const { isBelowTablet } = useResponsiveLayout();
+  // Menus follow the shell; the wider dossier threshold does not apply here.
+  const asSheet = isBelowTablet;
   const isDrawerPlacement = placement === "drawer";
   const handlePageLinkClick = useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>, href: string) => {

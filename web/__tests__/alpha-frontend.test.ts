@@ -1468,7 +1468,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain('"Select a result to preview its details."');
     expect(palette).toContain("const openSourceConversation = useCallback");
     expect(palette).toContain("MessageSquare");
-    expect(palette).toContain("md:flex-row");
+    expect(palette).toContain("desktop:flex-row");
     expect(palette).not.toContain("hidden w-[44%]");
     expect(palette).toContain('"command_palette.search_placeholder"');
     expect(palette).toContain('"Search Argus..."');

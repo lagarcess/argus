@@ -424,9 +424,9 @@ describe("command palette dossier integration", () => {
     expect(historyClasses).toContain("h-[68%]");
     expect(historyClasses).toContain("max-h-[68%]");
     expect(historyClasses).toContain("overflow-hidden");
-    expect(historyClasses).toContain("md:h-auto");
-    expect(historyClasses).toContain("md:max-h-none");
-    expect(historyClasses).toContain("md:overflow-visible");
+    expect(historyClasses).toContain("desktop:h-auto");
+    expect(historyClasses).toContain("desktop:max-h-none");
+    expect(historyClasses).toContain("desktop:overflow-visible");
     expect(historyClasses).not.toContain("max-h-[42%]");
 
     const dossierClasses = String(panelClassName("dossier")).split(/\s+/);

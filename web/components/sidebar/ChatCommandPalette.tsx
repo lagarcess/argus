@@ -131,7 +131,7 @@ type DateDisplayGroup = {
 const SEARCH_DEBOUNCE_MS = 200;
 const RECENTS_SEARCH_SIGNATURE = JSON.stringify(["", false, null]);
 export const commandPaletteDossierPanelClassName = (view: DossierPaneState["view"]) =>
-  `flex w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] md:h-auto md:max-h-none md:w-[44%] md:overflow-visible md:p-6 ${view === "history" ? "h-[68%] max-h-[68%] overflow-hidden" : "max-h-[42%] overflow-y-auto"}`;
+  `flex w-full shrink-0 flex-col bg-black/[0.02] p-5 dark:bg-white/[0.02] desktop:h-auto desktop:max-h-none desktop:w-[44%] desktop:overflow-visible desktop:p-6 ${view === "history" ? "h-[68%] max-h-[68%] overflow-hidden" : "max-h-[42%] overflow-y-auto"}`;
 
 function formatRelativeDate(
   value: string,
@@ -295,7 +295,7 @@ export default function ChatCommandPalette({
   const paletteRef = useRef<HTMLDivElement>(null);
   const [isDossierSheetOpen, setIsDossierSheetOpen] = useState(false);
   const effectiveLayoutMode = effectivePaletteLayout(layoutMode, isBelowTablet);
-  const rowActionVariant = paletteRowActionVariant(isBelowDesktop);
+  const rowActionVariant = paletteRowActionVariant(isBelowTablet);
   const shortcutLegend = useCommandPaletteShortcutLegend();
   const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
     DEFAULT_DOSSIER_PANE_STATE,
@@ -1268,7 +1268,7 @@ export default function ChatCommandPalette({
                   ) : (
                     <>
                       <div
-                        className="shrink-0 rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70 md:min-h-0 md:flex-1 md:shrink md:overflow-y-auto"
+                        className="shrink-0 rounded-[14px] border border-black/5 bg-white/70 p-4 dark:border-white/10 dark:bg-[#1f2225]/70 desktop:min-h-0 desktop:flex-1 desktop:shrink desktop:overflow-y-auto"
                         tabIndex={0}
                         role="region"
                         aria-label={t("command_palette.preview", "Preview")}
@@ -1331,7 +1331,7 @@ export default function ChatCommandPalette({
               );
 
   return (
-    <div ref={paletteRef} className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
+    <div ref={paletteRef} className="fixed inset-0 z-[60] flex items-center justify-center p-3 tablet:p-6">
       <button
         tabIndex={-1}
         type="button"
@@ -1453,11 +1453,11 @@ export default function ChatCommandPalette({
           </div>
         )}
 
-        <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
+        <div className="flex flex-1 flex-col overflow-hidden desktop:flex-row">
           <div
             className={`flex-1 overflow-y-auto ${
               effectiveLayoutMode === "expanded"
-                ? "border-b border-black/5 dark:border-white/5 tablet:border-b-0 tablet:border-r"
+                ? "border-b border-black/5 dark:border-white/5 desktop:border-b-0 desktop:border-r"
                 : ""
             }`}
             data-command-palette-action-region
@@ -1628,14 +1628,14 @@ export default function ChatCommandPalette({
                               role="button"
                               tabIndex={0}
                               aria-disabled={isNavigationDisabled}
-                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left outline-none transition-colors focus:ring-2 focus:ring-black/20 dark:focus:ring-white/25 max-desktop:min-h-11 max-desktop:pe-12 ${
+                              className={`group relative flex w-full items-start gap-2 rounded-[12px] px-3 py-2.5 text-left outline-none transition-colors focus:ring-2 focus:ring-black/20 dark:focus:ring-white/25 max-tablet:min-h-11 max-tablet:pe-12 ${
                                 selectedPreview?.id === item.id &&
                                 selectedPreview.type === item.type
                                   ? "bg-black/5 dark:bg-white/5"
                                   : "hover:bg-black/[0.03] dark:hover:bg-white/[0.03]"
                               }`}
                             >
-                              <div className="min-w-0 flex-1 pr-24 max-desktop:pr-0 max-desktop:self-center">
+                              <div className="min-w-0 flex-1 pr-24 max-tablet:pr-0 max-tablet:self-center">
                                 <div className="flex min-w-0 items-center gap-2 max-tablet:flex-wrap max-tablet:gap-y-1">
                                   {isEditing ? (
                                     <input

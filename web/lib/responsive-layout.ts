@@ -4,6 +4,11 @@
  * Two thresholds, never device sniffing: below 1024px the run dossier becomes
  * an overlay sheet, below 720px the full mobile treatment applies. Values match
  * the Tailwind stops in globals.css so CSS and behavior cannot drift.
+ *
+ * Menus, settings/feedback panels, discovery sources and Search row actions
+ * follow isBelowTablet. Only Search's shared dossier container (run, answer or
+ * conversation preview), its activation and pinned Open conversation action
+ * follow isBelowDesktop; they move together between the sheet and third pane.
  */
 
 export const TABLET_MIN_WIDTH_PX = 720;

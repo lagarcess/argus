@@ -1,0 +1,84 @@
+{"account":"guest","language":"en","name":"settings-root","width":390,"top":635,"overflow":false,"smallControls":[]}
+{"account":"guest","language":"en","name":"language","width":390,"top":659,"overflow":false,"smallControls":[]}
+{"account":"guest","language":"en","name":"feedback-general","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"guest","language":"en","name":"feedback-category-picker","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"guest","language":"en","name":"feedback-category-bug","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"guest","language":"en","name":"feedback-category-feature","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"guest","language":"en","name":"assistant-more","width":220,"top":159.59375,"overflow":false,"smallControls":[]}
+{"account":"guest","language":"en","name":"search-row-menu","width":220,"top":369.75,"overflow":false,"smallControls":[]}
+{"account":"guest","language":"es-419","name":"settings-root","width":390,"top":635,"overflow":false,"smallControls":[]}
+{"account":"guest","language":"es-419","name":"language","width":390,"top":659,"overflow":false,"smallControls":[]}
+{"account":"guest","language":"es-419","name":"feedback-general","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"guest","language":"es-419","name":"feedback-category-picker","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"guest","language":"es-419","name":"feedback-category-bug","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"guest","language":"es-419","name":"feedback-category-feature","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"guest","language":"es-419","name":"assistant-more","width":220,"top":159.59375,"overflow":false,"smallControls":[]}
+{"account":"guest","language":"es-419","name":"search-row-menu","width":220,"top":369.75,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"settings-root","width":390,"top":471,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"profile","width":358,"top":282.5,"overflow":false,"smallControls":[{"name":"Close profile","width":28,"height":28},{"name":"App language","width":27.265625,"height":23.5}]}
+{"account":"registered","language":"en","name":"data","width":390,"top":472.75,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"preferences","width":390,"top":633,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"help","width":390,"top":671,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"feedback-menu","width":390,"top":633,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"archived","width":390,"top":481,"overflow":false,"smallControls":[{"name":"Restore","width":36,"height":36},{"name":"Restore","width":36,"height":36},{"name":"Restore","width":36,"height":36}]}
+{"account":"registered","language":"en","name":"deleted","width":390,"top":455.5,"overflow":false,"smallControls":[{"name":"Restore","width":36,"height":36},{"name":"Restore","width":36,"height":36},{"name":"Restore","width":36,"height":36}]}
+{"account":"registered","language":"en","name":"usage","width":390,"top":440.5,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"delete-all-confirm","width":358,"top":351.8125,"overflow":false,"smallControls":[{"name":"Cancel","width":77.15625,"height":37.5},{"name":"Delete all conversations","width":180.328125,"height":37.5}]}
+{"account":"registered","language":"en","name":"appearance","width":390,"top":688,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"language","width":390,"top":615,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"country","width":390,"top":270,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"feedback-bug","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"registered","language":"en","name":"feedback-feature","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"registered","language":"en","name":"feedback-general","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"registered","language":"en","name":"feedback-category-picker","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"registered","language":"en","name":"feedback-category-bug","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"registered","language":"en","name":"feedback-category-feature","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Learn more","width":65.34375,"height":19.5}]}
+{"account":"registered","language":"en","name":"security","width":390,"top":0,"overflow":false,"smallControls":[{"name":"Back to Argus","width":93.3125,"height":17}]}
+{"account":"registered","language":"en","name":"terms","width":390,"top":0,"overflow":false,"smallControls":[{"name":"Back to Argus","width":73.0625,"height":27},{"name":"Privacy Policy","width":121.109375,"height":37.5},{"name":"support@get-argus.com","width":175.828125,"height":19},{"name":"Back to Argus","width":342,"height":19.5}]}
+{"account":"registered","language":"en","name":"privacy","width":390,"top":0,"overflow":false,"smallControls":[{"name":"Back to Argus","width":73.0625,"height":27},{"name":"Terms of Use","width":116.828125,"height":37.5},{"name":"Back to Argus","width":342,"height":19.5}]}
+{"account":"registered","language":"en","name":"currency","width":390,"top":270,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"display-name","width":358,"top":289,"overflow":false,"smallControls":[{"name":"Close profile","width":28,"height":28},{"name":"Save","width":22,"height":22},{"name":"Cancel","width":22,"height":22},{"name":"App language","width":27.265625,"height":23.5}]}
+{"account":"registered","language":"en","name":"preferred-name","width":358,"top":289,"overflow":false,"smallControls":[{"name":"Close profile","width":28,"height":28},{"name":"Save","width":22,"height":22},{"name":"Cancel","width":22,"height":22},{"name":"App language","width":27.265625,"height":23.5}]}
+{"account":"registered","language":"en","name":"avatar","width":358,"top":210.5,"overflow":false,"smallControls":[{"name":"Close profile","width":28,"height":28},{"name":"App language","width":27.265625,"height":23.5}]}
+{"account":"registered","language":"en","name":"profile-language","width":358,"top":282.5,"overflow":false,"smallControls":[{"name":"Close profile","width":28,"height":28},{"name":"App language","width":27.265625,"height":23.5},{"name":"English","width":134,"height":35.5},{"name":"Españoles","width":134,"height":35.5}]}
+{"account":"registered","language":"en","name":"header-menu","width":358,"top":635,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"header-rename","width":390,"top":673,"overflow":false,"smallControls":[{"name":"Save","width":154,"height":36},{"name":"Cancel","width":156,"height":36}]}
+{"account":"registered","language":"en","name":"header-delete","width":358,"top":351.8125,"overflow":false,"smallControls":[{"name":"Cancel","width":77.15625,"height":37.5},{"name":"Delete conversation","width":155.9375,"height":37.5}]}
+{"account":"registered","language":"en","name":"recents-menu","width":160,"top":327,"overflow":false,"smallControls":[{"name":"Mark as unread","width":150,"height":35.5},{"name":"Pin","width":150,"height":35.5},{"name":"Rename","width":150,"height":35.5},{"name":"Archive","width":150,"height":35.5},{"name":"Delete","width":150,"height":35.5}]}
+{"account":"registered","language":"en","name":"assistant-more","width":220,"top":159.59375,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"search-row-menu","width":220,"top":369.75,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"settings-root","width":390,"top":471,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"profile","width":358,"top":282.5,"overflow":false,"smallControls":[{"name":"Cerrar perfil","width":28,"height":28},{"name":"Idioma de la app","width":26.453125,"height":23.5}]}
+{"account":"registered","language":"es-419","name":"data","width":390,"top":472.75,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"preferences","width":390,"top":633,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"help","width":390,"top":671,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"feedback-menu","width":390,"top":633,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"archived","width":390,"top":481,"overflow":false,"smallControls":[{"name":"Restore","width":36,"height":36},{"name":"Restore","width":36,"height":36},{"name":"Restore","width":36,"height":36}]}
+{"account":"registered","language":"es-419","name":"deleted","width":390,"top":437.5,"overflow":false,"smallControls":[{"name":"Restaurar","width":36,"height":36},{"name":"Restaurar","width":36,"height":36},{"name":"Restaurar","width":36,"height":36}]}
+{"account":"registered","language":"es-419","name":"usage","width":390,"top":422.5,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"delete-all-confirm","width":358,"top":332.5,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"appearance","width":390,"top":688,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"language","width":390,"top":615,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"country","width":390,"top":270,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"feedback-bug","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"registered","language":"es-419","name":"feedback-feature","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"registered","language":"es-419","name":"feedback-general","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"registered","language":"es-419","name":"feedback-category-picker","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"registered","language":"es-419","name":"feedback-category-bug","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"registered","language":"es-419","name":"feedback-category-feature","width":390,"top":270,"overflow":false,"smallControls":[{"name":"Más información","width":95.84375,"height":19.5}]}
+{"account":"registered","language":"es-419","name":"security","width":390,"top":0,"overflow":false,"smallControls":[{"name":"Volver a Argus","width":97.78125,"height":17}]}
+{"account":"registered","language":"es-419","name":"terms","width":390,"top":0,"overflow":false,"smallControls":[{"name":"Volver a Argus","width":73.0625,"height":27},{"name":"Política de privacidad","width":167.421875,"height":37.5},{"name":"support@get-argus.com","width":175.828125,"height":19},{"name":"Volver a Argus","width":342,"height":19.5}]}
+{"account":"registered","language":"es-419","name":"privacy","width":390,"top":0,"overflow":false,"smallControls":[{"name":"Volver a Argus","width":73.0625,"height":27},{"name":"Términos de uso","width":137.078125,"height":37.5},{"name":"support@get-argus.com","width":175.828125,"height":19},{"name":"Volver a Argus","width":342,"height":19.5}]}
+{"account":"registered","language":"es-419","name":"currency","width":390,"top":270,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"display-name","width":358,"top":289,"overflow":false,"smallControls":[{"name":"Cerrar perfil","width":28,"height":28},{"name":"Guardar","width":22,"height":22},{"name":"Cancelar","width":22,"height":22},{"name":"Idioma de la app","width":26.453125,"height":23.5}]}
+{"account":"registered","language":"es-419","name":"preferred-name","width":358,"top":289,"overflow":false,"smallControls":[{"name":"Cerrar perfil","width":28,"height":28},{"name":"Guardar","width":22,"height":22},{"name":"Cancelar","width":22,"height":22},{"name":"Idioma de la app","width":26.453125,"height":23.5}]}
+{"account":"registered","language":"es-419","name":"avatar","width":358,"top":210.5,"overflow":false,"smallControls":[{"name":"Cerrar perfil","width":28,"height":28},{"name":"Idioma de la app","width":26.453125,"height":23.5}]}
+{"account":"registered","language":"es-419","name":"profile-language","width":358,"top":282.5,"overflow":false,"smallControls":[{"name":"Cerrar perfil","width":28,"height":28},{"name":"Idioma de la app","width":26.453125,"height":23.5},{"name":"Englishen","width":134,"height":35.5},{"name":"Español","width":134,"height":35.5}]}
+{"account":"registered","language":"es-419","name":"header-menu","width":358,"top":635,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"header-rename","width":390,"top":673,"overflow":false,"smallControls":[{"name":"Guardar","width":154,"height":36},{"name":"Cancelar","width":156,"height":36}]}
+{"account":"registered","language":"es-419","name":"header-delete","width":358,"top":351.8125,"overflow":false,"smallControls":[{"name":"Cancelar","width":89.5625,"height":37.5},{"name":"Eliminar conversación","width":168.59375,"height":37.5}]}
+{"account":"registered","language":"es-419","name":"recents-menu","width":192.46875,"top":327,"overflow":false,"smallControls":[{"name":"Marcar como no leída","width":182.46875,"height":35.5},{"name":"Anclar","width":182.46875,"height":35.5},{"name":"Renombrar","width":182.46875,"height":35.5},{"name":"Archivar","width":182.46875,"height":35.5},{"name":"Eliminar","width":182.46875,"height":35.5}]}
+{"account":"registered","language":"es-419","name":"assistant-more","width":220,"top":159.59375,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"es-419","name":"search-row-menu","width":220,"top":369.75,"overflow":false,"smallControls":[]}
+{"account":"registered","language":"en","name":"occluded-account-delete","width":358,"top":339,"overflow":false,"centerHitInside":false,"centerHitClass":"argus-sheet-scrim absolute inset-0 bg-black/25 backdrop-blur-sm dark:bg-black/60","centerHitZIndex":"auto","focusInside":true,"ancestorZIndices":["auto","80","auto"],"smallControls":[{"name":"Close deletion request","width":28,"height":28},{"name":"Cancel","width":67.15625,"height":35.5},{"name":"Contact support","width":124.890625,"height":35.5}]}
+{"account":"registered","language":"es-419","name":"occluded-account-delete","width":358,"top":328.4375,"overflow":false,"centerHitInside":false,"centerHitClass":"argus-sheet-scrim absolute inset-0 bg-black/25 backdrop-blur-sm dark:bg-black/60","centerHitZIndex":"auto","focusInside":true,"ancestorZIndices":["auto","80","auto"],"smallControls":[{"name":"Cerrar solicitud de eliminación","width":28,"height":28},{"name":"Cancelar","width":79.5625,"height":35.5},{"name":"Contactar soporte","width":136.875,"height":35.5}]}

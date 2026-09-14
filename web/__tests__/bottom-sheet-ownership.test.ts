@@ -187,10 +187,10 @@ describe("bottom sheet ownership", () => {
     expect(menu).toContain("<BottomSheet");
     expect(menu).toContain('height="auto"');
     // The panel line, shared with every other panel.
-    expect(menu).toContain("isBelowDesktop");
+    expect(menu).toContain("isBelowTablet");
     // Its own Escape and outside-tap handling must stand down where the sheet
     // owns them, or the two fight over focus restore.
-    expect(menu).toContain("if (isOpen && !isBelowDesktop) {");
+    expect(menu).toContain("if (isOpen && !isBelowTablet) {");
   });
 
   test("a menu-shaped sheet hugs its content instead of taking a detent", () => {

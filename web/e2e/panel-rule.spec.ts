@@ -1,17 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { installMobileShellFixture } from "./support/mobile-shell-fixture";
 
-/** Below 1024 every panel is a sheet; above it, the dialog it always was. */
+/** Below 720 adaptive menus is a sheet; above it, the dialog it always was. */
 const isSheet = (page: import("@playwright/test").Page) =>
   page.evaluate(() => !!document.querySelector("[class*='rounded-t-[28px]']"));
 
-for (const [w, band] of [[390, "phone"], [768, "tablet"], [1440, "desktop"]] as [number, string][]) {
+for (const [w, band] of [[390, "phone"], [719, "phone-edge"], [720, "tablet-start"], [1023, "tablet-edge"], [1024, "desktop-start"], [1280, "desktop"]] as [number, string][]) {
   test(`panels obey the rule at ${band}`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: 900 });
     await installMobileShellFixture(page, { account: "registered" });
     await page.goto("/chat");
     await page.waitForTimeout(1400);
-    const wantSheet = w < 1024;
+    const wantSheet = w < 720;
 
     // settings
     const trigger = page.getByTestId("chat-shell-menu-trigger");

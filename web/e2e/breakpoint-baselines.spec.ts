@@ -74,7 +74,7 @@ async function openSettings(page: Page, band: Band) {
 }
 
 /**
- * Below the desktop stop the settings menu is a sheet and the sheet is the
+ * Below the tablet stop the settings menu is a sheet and the sheet is the
  * panel; at desktop the menu surface is. Modals are a dialog at every band.
  */
 function settingsPanel(page: Page): Locator {
