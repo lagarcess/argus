@@ -149,7 +149,7 @@ verification_status=ready
             f"- Candidate SHA: `{measured_sha}`\n"
             f"- Live eval scorecard: `{relative}`\n"
         )
-    
+
 >       with pytest.raises(AssertionError, match=unmeasured_status):
 E       Failed: DID NOT RAISE <class 'AssertionError'>
 

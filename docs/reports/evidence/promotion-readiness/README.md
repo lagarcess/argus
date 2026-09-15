@@ -57,6 +57,11 @@ The CI backend command is `poetry run pytest tests -q --no-cov`; the standalone
 silently covered by that directory-level invocation. The final preparation PR
 also requires the real GitHub CI results at its final head.
 
+Local toolchain: Python 3.10.20 and Bun 1.3.14. The first commands used the
+Homebrew Poetry 2.4.1 launcher against the existing locked `.venv`; the final
+focused release run uses the installed Poetry 2.1.3 launcher and the same
+Python environment. GitHub CI installs the pinned Poetry 2.1.3 toolchain.
+
 ## Failures, causes and dispositions
 
 1. **Gate bug, fixed:** a scorecard could contain a skipped case or an
