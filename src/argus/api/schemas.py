@@ -280,6 +280,7 @@ class ConversationActivity(BaseModel):
 
     operation: ConversationOperation
     attention: ConversationAttention
+    latest_message_id: str | None = None
 
 
 class ConversationActivityMarkUnread(BaseModel):

@@ -131,10 +131,10 @@ class PostgresKeysetReader:
             with connection.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
                     """
-                    select c.id as conversation_id, latest.role, latest.content, latest.metadata
+                    select c.id as conversation_id, latest.id, latest.role, latest.content, latest.metadata
                     from public.conversations c
                     left join lateral (
-                        select m.role, m.content, m.metadata
+                        select m.id, m.role, m.content, m.metadata
                         from public.messages m
                         where m.user_id = c.user_id and m.conversation_id = c.id
                           and (m.role <> 'user' or (
@@ -153,7 +153,7 @@ class PostgresKeysetReader:
                     ),
                 )
                 return _stringify_uuid_fields(
-                    cursor.fetchall(), fields=("conversation_id",)
+                    cursor.fetchall(), fields=("conversation_id", "id"),
                 )
 
     def list_conversation_rows(

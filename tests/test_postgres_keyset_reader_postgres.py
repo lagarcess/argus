@@ -660,6 +660,28 @@ def test_keyset_reader_preserves_filters_deletion_stability_and_owner_scope() ->
             )
             == []
         )
+        # Freshness uses the last saved message, including an ordinary reply
+        # with no lifecycle/job row. It shares the message-page ordering.
+        latest = reader.read_conversation_preview_messages(
+            user_id=str(owner_id), conversation_ids=[str(conversation_id)]
+        )
+        assert latest[0]["id"] == str(message_ids[5])
+        reply_id = uuid4()
+        with psycopg.connect(DSN, autocommit=True) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "insert into public.messages"
+                    " (id, user_id, conversation_id, role, content, created_at)"
+                    " values (%s, %s, %s, 'assistant', 'Saved reply', %s)",
+                    (reply_id, owner_id, conversation_id, timestamp + timedelta(seconds=1)),
+                )
+        latest = reader.read_conversation_preview_messages(
+            user_id=str(owner_id), conversation_ids=[str(conversation_id)]
+        )
+        assert latest[0]["id"] == str(reply_id)
+        assert reader.read_conversation_preview_messages(
+            user_id=str(other_id), conversation_ids=[str(conversation_id)]
+        ) == []
     finally:
         with psycopg.connect(DSN, autocommit=True) as connection:
             with connection.cursor() as cursor:

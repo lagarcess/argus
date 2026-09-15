@@ -1,0 +1,221 @@
+$ playwright test conversation-transcript-freshness.spec.ts
+(node:35592) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:35595) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:35596) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 6 tests using 2 workers
+
+(node:35602) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35603) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35603) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:35602) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:35602) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35603) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:35652) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:35652) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+  ✘  1 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: hidden observer misses all working states (en) (14.7s)
+  ✘  2 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: visible observer misses all working states (en) (14.8s)
+(node:35695) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35696) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35695) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:35695) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35696) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:35696) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  4 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: hidden observer misses all working states (es-419) (10.8s)
+(node:35730) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35730) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:35730) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  3 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: anchor observer misses all working states (en) (11.4s)
+(node:35736) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:35736) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:35736) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  5 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: visible observer misses all working states (es-419) (10.7s)
+  ✘  6 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: anchor observer misses all working states (es-419) (11.5s)
+
+
+  1) [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: hidden observer misses all working states (en) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: 1
+    Received: 0
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      56 |       // loaded conversation. The active conversation always projects idle.
+      57 |       try {
+    > 58 |         await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+         |                                                                                           ^
+      59 |         expect(tabB.url()).toBe(beforeURL);
+      60 |         await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeCloseTo(scrollTop, 0);
+      61 |         expect({ total: fixture.messageRequests.length, newReads }).toEqual({ total: reads + 1, newReads: ["B"] });
+        at /private/tmp/argus-598-v2-baseline/web/e2e/conversation-transcript-freshness.spec.ts:58:91
+
+    Error Context: temp/playwright-results/1789444506590-35603/conversation-transcript-fr-66eb6-sses-all-working-states-en--chromium/error-context.md
+
+  2) [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: visible observer misses all working states (en) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: 1
+    Received: 0
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      56 |       // loaded conversation. The active conversation always projects idle.
+      57 |       try {
+    > 58 |         await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+         |                                                                                           ^
+      59 |         expect(tabB.url()).toBe(beforeURL);
+      60 |         await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeCloseTo(scrollTop, 0);
+      61 |         expect({ total: fixture.messageRequests.length, newReads }).toEqual({ total: reads + 1, newReads: ["B"] });
+        at /private/tmp/argus-598-v2-baseline/web/e2e/conversation-transcript-freshness.spec.ts:58:91
+
+    Error Context: temp/playwright-results/1789444506590-35602/conversation-transcript-fr-b5e7d-sses-all-working-states-en--chromium/error-context.md
+
+  3) [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: anchor observer misses all working states (en) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: 1
+    Received: 0
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      56 |       // loaded conversation. The active conversation always projects idle.
+      57 |       try {
+    > 58 |         await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+         |                                                                                           ^
+      59 |         expect(tabB.url()).toBe(beforeURL);
+      60 |         await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeCloseTo(scrollTop, 0);
+      61 |         expect({ total: fixture.messageRequests.length, newReads }).toEqual({ total: reads + 1, newReads: ["B"] });
+        at /private/tmp/argus-598-v2-baseline/web/e2e/conversation-transcript-freshness.spec.ts:58:91
+
+    Error Context: temp/playwright-results/1789444521631-35695/conversation-transcript-fr-78a6c-sses-all-working-states-en--chromium/error-context.md
+
+  4) [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: hidden observer misses all working states (es-419) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: 1
+    Received: 0
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      56 |       // loaded conversation. The active conversation always projects idle.
+      57 |       try {
+    > 58 |         await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+         |                                                                                           ^
+      59 |         expect(tabB.url()).toBe(beforeURL);
+      60 |         await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeCloseTo(scrollTop, 0);
+      61 |         expect({ total: fixture.messageRequests.length, newReads }).toEqual({ total: reads + 1, newReads: ["B"] });
+        at /private/tmp/argus-598-v2-baseline/web/e2e/conversation-transcript-freshness.spec.ts:58:91
+
+    Error Context: temp/playwright-results/1789444521657-35696/conversation-transcript-fr-cb19c--all-working-states-es-419--chromium/error-context.md
+
+  5) [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: visible observer misses all working states (es-419) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: 1
+    Received: 0
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      56 |       // loaded conversation. The active conversation always projects idle.
+      57 |       try {
+    > 58 |         await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+         |                                                                                           ^
+      59 |         expect(tabB.url()).toBe(beforeURL);
+      60 |         await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeCloseTo(scrollTop, 0);
+      61 |         expect({ total: fixture.messageRequests.length, newReads }).toEqual({ total: reads + 1, newReads: ["B"] });
+        at /private/tmp/argus-598-v2-baseline/web/e2e/conversation-transcript-freshness.spec.ts:58:91
+
+    Error Context: temp/playwright-results/1789444532745-35730/conversation-transcript-fr-ef2f4--all-working-states-es-419--chromium/error-context.md
+
+  6) [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: anchor observer misses all working states (es-419) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: 1
+    Received: 0
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      56 |       // loaded conversation. The active conversation always projects idle.
+      57 |       try {
+    > 58 |         await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+         |                                                                                           ^
+      59 |         expect(tabB.url()).toBe(beforeURL);
+      60 |         await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeCloseTo(scrollTop, 0);
+      61 |         expect({ total: fixture.messageRequests.length, newReads }).toEqual({ total: reads + 1, newReads: ["B"] });
+        at /private/tmp/argus-598-v2-baseline/web/e2e/conversation-transcript-freshness.spec.ts:58:91
+
+    Error Context: temp/playwright-results/1789444533383-35736/conversation-transcript-fr-abab2--all-working-states-es-419--chromium/error-context.md
+
+  6 failed
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: hidden observer misses all working states (en) 
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: visible observer misses all working states (en) 
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: anchor observer misses all working states (en) 
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: hidden observer misses all working states (es-419) 
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: visible observer misses all working states (es-419) 
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: anchor observer misses all working states (es-419) 
+error: script "test:e2e" exited with code 1

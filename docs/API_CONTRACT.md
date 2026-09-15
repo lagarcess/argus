@@ -3248,6 +3248,7 @@ Both endpoints return:
 
 ```json
 {
+  "latest_message_id": "saved-message-uuid-or-null",
   "operation": {
     "status": "idle | queued | running | checking",
     "kind": "chat_turn | backtest_job | null",
@@ -3259,6 +3260,16 @@ Both endpoints return:
   }
 }
 ```
+
+`latest_message_id` identifies the latest owner-scoped saved message in the
+canonical message ordering (`created_at`, then `id`), excluding legacy onboarding
+markers. It is null for an empty transcript. The same field appears in history
+and conversation-list activity projections. It changes for an ordinary saved
+reply even without a job or lifecycle row, and marking read does not clear it.
+Clients compare this opaque identity with the last raw API message they loaded
+and reload saved messages when it differs, including on focus/visibility
+refreshes. Neither operation timestamps nor attention cursors represent
+transcript freshness. A refresh preserves the current message anchor and scroll.
 
 Operation precedence is `running > queued > checking > idle`; equal states use
 the newest source timestamp, then prefer a backtest job. Accepted turns and

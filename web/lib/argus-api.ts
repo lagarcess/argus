@@ -85,6 +85,7 @@ export type ConversationAttention = {
 export type ConversationActivity = {
   operation: ConversationOperation;
   attention: ConversationAttention;
+  latest_message_id?: string | null;
 };
 export type ConversationActivityPatch =
   | { action: "mark_unread" }
