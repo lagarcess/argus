@@ -1,0 +1,178 @@
+=================================== FAILURES ===================================
+______________ test_measurement_live_eval_suite_writes_scorecard _______________
+
+client = <httpx.AsyncClient object at 0x14fef0940>
+request = <Request('POST', 'https://openrouter.ai/api/v1/chat/completions')>
+
+    async def asend(
+        client: httpx.AsyncClient, request: httpx.Request
+    ) -> httpx.Response:
+        pool = budget._pool(request)
+        if pool is None:
+            return await async_send(client, request)
+        send_id = budget.admit(pool, request)
+        try:
+            response = await async_send(client, request)
+>           await response.aread()
+
+tests/evals/measurement_budget.py:372: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.10/site-packages/httpx/_models.py:979: in aread
+    self._content = b"".join([part async for part in self.aiter_bytes()])
+.venv/lib/python3.10/site-packages/httpx/_models.py:979: in <listcomp>
+    self._content = b"".join([part async for part in self.aiter_bytes()])
+.venv/lib/python3.10/site-packages/httpx/_models.py:997: in aiter_bytes
+    async for raw_bytes in self.aiter_raw():
+.venv/lib/python3.10/site-packages/httpx/_models.py:1055: in aiter_raw
+    async for raw_stream_bytes in self.stream:
+.venv/lib/python3.10/site-packages/httpx/_client.py:176: in __aiter__
+    async for chunk in self._stream:
+.venv/lib/python3.10/site-packages/httpx/_transports/default.py:271: in __aiter__
+    async for part in self._httpcore_stream:
+.venv/lib/python3.10/site-packages/httpcore/_async/connection_pool.py:407: in __aiter__
+    raise exc from None
+.venv/lib/python3.10/site-packages/httpcore/_async/connection_pool.py:403: in __aiter__
+    async for part in self._stream:
+.venv/lib/python3.10/site-packages/httpcore/_async/http11.py:342: in __aiter__
+    raise exc
+.venv/lib/python3.10/site-packages/httpcore/_async/http11.py:334: in __aiter__
+    async for chunk in self._connection._receive_response_body(**kwargs):
+.venv/lib/python3.10/site-packages/httpcore/_async/http11.py:203: in _receive_response_body
+    event = await self._receive_event(timeout=timeout)
+.venv/lib/python3.10/site-packages/httpcore/_async/http11.py:217: in _receive_event
+    data = await self._network_stream.read(
+.venv/lib/python3.10/site-packages/httpcore/_backends/anyio.py:35: in read
+    return await self._stream.receive(max_bytes=max_bytes)
+.venv/lib/python3.10/site-packages/anyio/streams/tls.py:239: in receive
+    data = await self._call_sslobject_method(self._ssl_object.read, max_bytes)
+.venv/lib/python3.10/site-packages/anyio/streams/tls.py:182: in _call_sslobject_method
+    data = await self.transport_stream.receive()
+.venv/lib/python3.10/site-packages/anyio/_backends/_asyncio.py:1284: in receive
+    await self._protocol.read_event.wait()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <asyncio.locks.Event object at 0x14fef1f00 [set]>
+
+    async def wait(self):
+        """Block until the internal flag is true.
+    
+        If the internal flag is true on entry, return True
+        immediately.  Otherwise, block until another coroutine calls
+        set() to set the flag to true, then return True.
+        """
+        if self._value:
+            return True
+    
+        fut = self._get_loop().create_future()
+        self._waiters.append(fut)
+        try:
+>           await fut
+E           asyncio.exceptions.CancelledError
+
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/locks.py:214: CancelledError
+
+During handling of the above exception, another exception occurred:
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10eb3c340>
+
+    def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
+        if os.getenv("ARGUS_RUN_LIVE_EVALS") != "1":
+            pytest.skip("set ARGUS_RUN_LIVE_EVALS=1 to spend live LLM eval calls")
+        _assert_requested_live_eval_credentials()
+        budget_report = (os.getenv("ARGUS_EVAL_BUDGET_REPORT") or "").strip()
+        if not budget_report:
+            raise RuntimeError(
+                "ARGUS_EVAL_BUDGET_REPORT is required for the approved live measurement"
+            )
+    
+        if not (os.getenv("ARGUS_ASSET_PROVIDER_MODE") or "").strip():
+            asset_provider_mode = (
+                "recorded_provider_fixture"
+                if (os.getenv("ARGUS_ASSET_FIXTURE_PATH") or "").strip()
+                else "live_provider"
+            )
+            monkeypatch.setenv("ARGUS_ASSET_PROVIDER_MODE", asset_provider_mode)
+        if os.getenv("ARGUS_ASSET_PROVIDER_MODE") == "live_provider" and not all(
+            (os.getenv(name) or "").strip()
+            for name in ("ALPACA_API_KEY", "ALPACA_SECRET_KEY")
+        ):
+            pytest.fail(
+                "live eval company-name grounding requires Alpaca asset-catalog keys "
+                "or a recorded ARGUS_ASSET_FIXTURE_PATH"
+            )
+        clear_asset_cache()
+    
+        provenance = build_scorecard_provenance(evaluation_mode="live")
+        cases = load_eval_cases()
+        from tests.evals.measurement_budget import MeasurementBudget
+        from tests.evals.measurement_budget_runner import run_budgeted_cases
+    
+        report_path = Path(budget_report)
+        budget = MeasurementBudget(report_path, [case.id for case in cases])
+        budget.install(monkeypatch)
+>       results = run_budgeted_cases(
+            cases,
+            run_case=run_eval_case,
+            budget=budget,
+            provenance=provenance,
+            progress_path=report_path.with_suffix(".progress.json"),
+        )
+
+tests/evals/test_measurement_eval_live.py:75: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/evals/measurement_budget_runner.py:42: in run_budgeted_cases
+    result = run_case(case)
+tests/evals/measurement_eval_harness.py:265: in run_eval_case
+    clarify_result = clarify_stage(
+src/argus/agent_runtime/stages/clarify.py:60: in clarify_stage
+    return asyncio.run(
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/runners.py:44: in run
+    return loop.run_until_complete(main)
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/base_events.py:649: in run_until_complete
+    return future.result()
+src/argus/agent_runtime/stages/clarify.py:273: in clarify_stage_async
+    generated = await _generate_clarifying_question_result(
+src/argus/agent_runtime/stages/clarify.py:487: in _generate_clarifying_question_result
+    question = await result if inspect.isawaitable(result) else result
+src/argus/agent_runtime/llm_clarifier.py:97: in ainvoke
+    chunks = [chunk async for chunk in self.astream(request)]
+src/argus/agent_runtime/llm_clarifier.py:97: in <listcomp>
+    chunks = [chunk async for chunk in self.astream(request)]
+src/argus/agent_runtime/llm_clarifier.py:109: in astream
+    response = await invoke_openrouter_json_schema(
+src/argus/llm/openrouter.py:475: in invoke_openrouter_json_schema
+    if (response := await asyncio.wait_for(
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/asyncio/tasks.py:456: in wait_for
+    return fut.result()
+src/argus/llm/openrouter.py:931: in _post_openrouter_json_schema
+    response = await client.post(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1859: in post
+    return await self.request(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+.venv/lib/python3.10/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+.venv/lib/python3.10/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+tests/evals/measurement_budget.py:374: in asend
+    budget.uncertain(send_id)
+tests/evals/measurement_budget.py:238: in uncertain
+    self._stop("unresolved_invoice")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <tests.evals.measurement_budget.MeasurementBudget object at 0x11207e2c0>
+reason = 'unresolved_invoice'
+
+    def _stop(self, reason: str) -> None:
+        if self._stopped is None:
+            self._stopped = reason
+            self._event("stopped", reason=reason, **self.snapshot())
+>       raise MeasurementBudgetStop(self._stopped)
+E       tests.evals.measurement_budget.MeasurementBudgetStop: unresolved_invoice
+
+tests/evals/measurement_budget.py:108: MeasurementBudgetStop
+=========================== short test summary info ============================
+FAILED tests/evals/test_measurement_eval_live.py::test_measurement_live_eval_suite_writes_scorecard
+======================== 1 failed in 139.83s (0:02:19) =========================

@@ -1,0 +1,62 @@
+{"event": "started", "total_limit_usd": "15"}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 1}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "cost_usd": "0.00016875", "event": "invoice", "provider": "openrouter", "send_id": 1}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 2}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "cost_usd": "0.0009306", "event": "invoice", "provider": "openrouter", "send_id": 2}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 3}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "cost_usd": "0.0179659", "event": "invoice", "provider": "openrouter", "send_id": 3}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 4}
+{"case_id": "action_chip_change_asset_remove_aapl_issue_188", "cost_usd": "0.0047509", "event": "invoice", "provider": "openrouter", "send_id": 4}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 5}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "cost_usd": "0.000030424", "event": "invoice", "provider": "openrouter", "send_id": 5}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 6}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "cost_usd": "0.00017441", "event": "invoice", "provider": "openrouter", "send_id": 6}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 7}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "cost_usd": "0.00025235", "event": "invoice", "provider": "openrouter", "send_id": 7}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 8}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "cost_usd": "0.0183684", "event": "invoice", "provider": "openrouter", "send_id": 8}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 9}
+{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "cost_usd": "0.00167565", "event": "invoice", "provider": "openrouter", "send_id": 9}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 10}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "cost_usd": "0.000033712", "event": "invoice", "provider": "openrouter", "send_id": 10}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 11}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "cost_usd": "0.0001868", "event": "invoice", "provider": "openrouter", "send_id": 11}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 12}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "cost_usd": "0.00112185", "event": "invoice", "provider": "openrouter", "send_id": 12}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 13}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "cost_usd": "0.01857465", "event": "invoice", "provider": "openrouter", "send_id": 13}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 14}
+{"case_id": "action_chip_change_asset_compound_replace_issue_188", "cost_usd": "0.00544715", "event": "invoice", "provider": "openrouter", "send_id": 14}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 15}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "cost_usd": "0.00002688", "event": "invoice", "provider": "openrouter", "send_id": 15}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 16}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "cost_usd": "0.00017441", "event": "invoice", "provider": "openrouter", "send_id": 16}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 17}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "cost_usd": "0.0008856", "event": "invoice", "provider": "openrouter", "send_id": 17}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 18}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "cost_usd": "0.0178184", "event": "invoice", "provider": "openrouter", "send_id": 18}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 19}
+{"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "cost_usd": "0.0045859", "event": "invoice", "provider": "openrouter", "send_id": 19}
+{"case_id": "action_chip_change_asset_no_active_ref_remove_aapl_issue_188", "event": "attempt", "provider": "openrouter"}
+{"case_id": "action_chip_change_asset_no_active_ref_remove_aapl_issue_188", "event": "send", "provider": "openrouter", "reservation_usd": "0.10", "send_id": 20}
+{"event": "unresolved_invoice", "send_id": 20}
+{"attempts": [{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "count": 5, "provider": "openrouter"}, {"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "count": 5, "provider": "openrouter"}, {"case_id": "action_chip_change_asset_compound_replace_issue_188", "count": 5, "provider": "openrouter"}, {"case_id": "action_chip_change_asset_no_active_ref_remove_aapl_issue_188", "count": 1, "provider": "openrouter"}, {"case_id": "action_chip_change_asset_remove_aapl_issue_188", "count": 4, "provider": "openrouter"}], "event": "stopped", "outstanding_sends": 1, "reason": "unresolved_invoice", "sends": [{"case_id": "action_chip_change_asset_bare_ticker_append_issue_190", "count": 5, "provider": "openrouter"}, {"case_id": "action_chip_change_asset_changed_mind_capital_issue_188", "count": 5, "provider": "openrouter"}, {"case_id": "action_chip_change_asset_compound_replace_issue_188", "count": 5, "provider": "openrouter"}, {"case_id": "action_chip_change_asset_no_active_ref_remove_aapl_issue_188", "count": 1, "provider": "openrouter"}, {"case_id": "action_chip_change_asset_remove_aapl_issue_188", "count": 4, "provider": "openrouter"}], "settled_usd": {"agent": "0", "openrouter": "0.093172736", "search": "0"}, "stop_reason": "unresolved_invoice", "total_settled_usd": "0.093172736"}
