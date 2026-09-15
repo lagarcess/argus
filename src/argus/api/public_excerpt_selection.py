@@ -12,6 +12,7 @@ from typing import Any
 from argus.api import state as api_state
 from argus.api.public_excerpt_schemas import (
     PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT,
+    PublicExcerptAnswerTurn,
     PublicExcerptCandidate,
     PublicExcerptCandidates,
     PublicExcerptPreview,
@@ -115,7 +116,25 @@ def _job(context: SelectionContext, message: Message) -> dict[str, Any] | None:
             or execution.get("research_result_message_id") == message.id
         ):
             return job
+    # Inline run actions persist a result reference without a job id or an
+    # ordinary-turn envelope. The owned job's run is their completion identity.
+    # Follow-up questions may cite that run too, so only the typed run action
+    # inherits the original job's request message.
+    direct_run = _direct_run_id(message)
+    if not job_id and direct_run:
+        return next(
+            (job for job in context.jobs if job.get("result_run_id") == direct_run), None
+        )
     return None
+
+
+def _direct_run_id(message: Message) -> str | None:
+    action = (message.metadata or {}).get("chat_action")
+    return (
+        _run_id(message)
+        if isinstance(action, dict) and action.get("type") == "run_backtest"
+        else None
+    )
 
 
 def _question(
@@ -134,32 +153,43 @@ def _question(
     return next((m for m in reversed(context.messages[:index]) if m.role == "user"), None)
 
 
+def _intermediate(message: Message) -> bool:
+    metadata = message.metadata or {}
+    pending = metadata.get("pending_strategy")
+    if isinstance(pending, dict) and pending.get("requested_field"):
+        return True
+    return any(
+        key in metadata
+        for key in (
+            "confirmation",
+            "confirmation_card",
+            "clarification",
+            "clarification_request",
+        )
+    ) or metadata.get("conversation_mode") in {"confirmation", "clarification"}
+
+
 def _project(
     context: SelectionContext, message: Message, owner_note: str | None
 ) -> tuple[Any, Any | None, str | None]:
     from argus.api.public_excerpts import _owned_run
 
     metadata = message.metadata or {}
-    if (
-        message.role != "assistant"
-        or any(
-            key in metadata
-            for key in ("confirmation", "confirmation_card", "clarification")
-        )
-        or metadata.get("conversation_mode") in {"confirmation", "clarification"}
-    ):
+    if message.role != "assistant" or _intermediate(message):
         refuse("unsupported_turn")
-    if metadata.get("memory_recalls"):
-        refuse("memory_used")
     job = _job(context, message)
     terminal = metadata.get("agent_runtime_turn")
     terminal = terminal if isinstance(terminal, dict) else {}
     if job is None and (metadata.get("backtest_job_id") or metadata.get("backtest_job")):
         refuse("not_completed")
-    if job is not None:
-        from argus.api.conversation_activity import _memory_result_hydrateable
+    if job is not None or _direct_run_id(message):
+        from argus.api.conversation_activity import (
+            _memory_result_hydrateable,
+            _memory_run_result_readable,
+        )
 
-        job_run = _owned_run(user_id=context.user.id, run_id=job.get("result_run_id"))
+        completed_run_id = job.get("result_run_id") if job else _direct_run_id(message)
+        job_run = _owned_run(user_id=context.user.id, run_id=completed_run_id)
         observed = SimpleNamespace(
             backtest_runs={job_run.id: job_run} if job_run is not None else {},
             backtest_run_owners={job_run.id: context.user.id}
@@ -170,12 +200,22 @@ def _project(
             conversation_owners={context.conversation.id: context.user.id},
             messages={context.conversation.id: context.messages},
         )
-        if not _memory_result_hydrateable(
-            observed,
-            user_id=context.user.id,
-            conversation_id=context.conversation.id,
-            job=job,
-        ):
+        completed = (
+            _memory_result_hydrateable(
+                observed,
+                user_id=context.user.id,
+                conversation_id=context.conversation.id,
+                job=job,
+            )
+            if job is not None
+            else _memory_run_result_readable(
+                observed,
+                user_id=context.user.id,
+                conversation_id=context.conversation.id,
+                result_run_id=completed_run_id,
+            )
+        )
+        if not completed:
             refuse("not_completed")
     elif not (
         terminal.get("terminal") is True and terminal.get("status") == "completed"
@@ -192,6 +232,9 @@ def _project(
             *(m.id for m in context.messages),
             *(str(j["id"]) for j in context.jobs),
             *(a.id for a in context.artifacts),
+            *(a.idea_id for a in context.artifacts),
+            *(a.idea_version_id for a in context.artifacts),
+            *(a.source_run_id for a in context.artifacts if a.source_run_id),
         ]
     )
     audit_text(request.content, field="question", private_ids=private_ids)
@@ -227,8 +270,23 @@ def _project(
             None,
         )
     run_id = job.get("result_run_id") if job is not None else _run_id(message)
-    if not run_id:
-        refuse("unsupported_turn")
+    if not run_id or not isinstance(metadata.get("result_card"), dict):
+        return (
+            PublicExcerptAnswerTurn(
+                question=audit_text(
+                    request.content, field="question", private_ids=private_ids
+                ),
+                answer=audit_text(
+                    message.content, field="answer", private_ids=private_ids
+                ),
+                owner_note=audit_text(
+                    owner_note, field="owner_note", private_ids=private_ids
+                ),
+                content_language=language,
+            ),
+            None,
+            None,
+        )
     run = _owned_run(user_id=context.user.id, run_id=run_id)
     if run is None or run.conversation_id != context.conversation.id:
         refuse("unsupported_backtest")
@@ -245,6 +303,8 @@ def _project(
     leaf = project_backtest_turn(
         run=run,
         title=artifact.title,
+        question=request.content,
+        answer=message.content,
         owner_note=owner_note,
         language=language,
         private_ids=(*private_ids, run_id),
@@ -252,12 +312,35 @@ def _project(
     return leaf, artifact, run_id
 
 
+def _final_answers(context: SelectionContext) -> list[Message]:
+    """One final response per typed job/turn, shared by listing and publishing."""
+    final: dict[tuple[str, str], Message] = {}
+    for message in context.messages:
+        if message.role != "assistant" or _intermediate(message):
+            continue
+        job = _job(context, message)
+        metadata = message.metadata or {}
+        terminal = metadata.get("agent_runtime_turn")
+        request_id = terminal.get("request_id") if isinstance(terminal, dict) else None
+        question = _question(context, message, job)
+        key = (
+            ("job", str(job["id"]))
+            if job
+            else ("turn", request_id)
+            if isinstance(request_id, str) and request_id
+            else ("question", question.id)
+            if question
+            else ("message", message.id)
+        )
+        final[key] = message
+    wanted = {message.id for message in final.values()}
+    return [message for message in context.messages if message.id in wanted]
+
+
 def receipt_candidates(*, user: User, conversation_id: str) -> PublicExcerptCandidates:
     context = _context(user, conversation_id)
     candidates = []
-    for message in context.messages:
-        if message.role != "assistant":
-            continue
+    for message in _final_answers(context):
         request = _question(context, message, _job(context, message))
         values = dict(
             message_id=message.id, question=request.content if request else None
@@ -287,7 +370,7 @@ def _selection(
     ):
         refuse("invalid_selection")
     context = _context(user, conversation_id)
-    chosen = [m for m in context.messages if m.id in wanted]
+    chosen = [m for m in _final_answers(context) if m.id in wanted]
     if len(chosen) != len(message_ids):
         refuse("invalid_selection")
     leaves, artifacts, run_ids = [], [], []

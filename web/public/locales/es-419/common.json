@@ -1830,7 +1830,8 @@
       "calculation": "Cálculo",
       "backtest": "Prueba histórica",
       "research_answer": "Respuesta investigada",
-      "mixed": "Respuestas y pruebas"
+      "mixed": "Respuestas y pruebas",
+      "answer": "Respuesta"
     },
     "research": {
       "stamp": "Argus consultó esto el {{date}}",
@@ -1846,8 +1847,8 @@
     "selection": {
       "title": "Compartir conversación",
       "close": "Cerrar opciones para compartir",
-      "hint": "Elige las respuestas que quieres incluir. Verás la página pública exacta antes de crear un enlace. Cualquier persona con el enlace podrá leer el contenido elegido y la nota.",
-      "all": "Seleccionar todas las elegibles",
+      "hint": "Elige preguntas y respuestas para compartir.",
+      "all": "Seleccionar todo",
       "clear": "Borrar selección",
       "count": "{{selected}} de {{eligible}} seleccionados",
       "turn": "Turno {{count}}",
@@ -1882,7 +1883,14 @@
         "invalid_source": "El contenido original no está disponible o no se puede verificar.",
         "unsupported_backtest": "Esta prueba no tiene todos los datos necesarios para compartirla.",
         "private_inputs": "Este resultado muestra cifras que escribiste, así que se queda privado."
-      }
+      },
+      "choose_turn": "Seleccionar esta pregunta y respuesta",
+      "continue": "Continuar",
+      "cancel": "Cancelar"
+    },
+    "answer": {
+      "headline": "Respuestas compartidas, no consejos de inversión.",
+      "framing": "Una respuesta compartida por su autor. Es informativa, no asesoramiento de inversión."
     }
   },
   "tools": {

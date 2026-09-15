@@ -631,21 +631,26 @@ persisted solely to represent abandonment.
 
 #### Approved answer-sharing extension
 
-The Share the answer lane extends this same API and snapshot lifecycle under
-[`conversation-sharing.md`](specs/conversation-sharing.md) section 4.5, including
-the founder's 2026-09-09 selection decision. It does not introduce a second sharing
-system. Version 1 receipts retain their payload and rendering. Version 2 introduces
-typed receipt kinds and a closed `turns` wrapper, with one or more turns from
-one owned conversation in conversation order; nothing bounds the count but the
-conversation itself. The research payload is exactly the
-closed field list in that spec's section 4.2. Any grounded math adds the
-`calculation` kind: a computed answer (`metadata.computation` with its cards) is
-its own closed leaf, whatever else the turn carries, with one frozen calculation
-per card (`docs/DATA_MODEL.md` section 12.1.3). A declaration whose rows restate
-its inputs (`ranked_comparison`, receipt policy `cited_facts`) is eligible only
-when every input it holds was cited; otherwise the candidate's reason is
-`private_inputs`. Every card of an answer must be eligible, or the answer is
-refused.
+Founder decision 2026-09-14: sharing is enabled by owner selection and the exact
+preview, under [conversation-sharing.md](specs/conversation-sharing.md). The
+existing API and snapshot lifecycle support a user question plus its final answer,
+selected in the conversation thread. Backtests, research, calculations and plain
+answers qualify; confirmations and clarifications are not candidate units.
+
+Version 1 receipts retain their payload and rendering. Version 2 uses the existing
+closed `turns` wrapper in conversation order, with kinds `backtest`,
+`research_answer`, `calculation`, and `answer`. New backtest leaves freeze question
+and answer text beside the public run facts. Calculation leaves retain their
+closed public card projection and freeze the final answer too. Optional additions
+keep older version 2 documents readable. Plain answers have a closed leaf rather
+than masquerading as sourced research.
+
+There is no question/answer length cap, credential-shape scan, required source
+list, link/source membership check, or refusal based on degraded output or memory
+use. Sources and dates remain visible when present. Exact matching against private
+Argus identifiers remains, and the projection adds no account data, hidden memory
+records or unselected turns. User-written calculation inputs can be shared through
+the explicit preview; absent publisher sources alone do not make them private.
 
 The owner can read share candidates, preview a selection, and create its receipt
 under `/conversations/{conversation_id}/public-excerpt-candidates`,
@@ -676,7 +681,7 @@ Owner endpoints, authenticated, registered accounts only (`can_save_decision`):
 
 | Method   | Path                                               | Purpose |
 | :------- | :------------------------------------------------- | :------ |
-| `GET`    | `/conversations/{conversation_id}/public-excerpt-candidates` | List all assistant turns with server-owned eligibility |
+| `GET`    | `/conversations/{conversation_id}/public-excerpt-candidates` | List final answer units with server-owned eligibility |
 | `POST`   | `/conversations/{conversation_id}/public-excerpt-preview` | Validate selected turns and return their exact public rendering payload |
 | `POST`   | `/conversations/{conversation_id}/public-excerpt` | Recheck and freeze the previewed selection |
 | `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Compatibility adapter to the same single-message receipt |
@@ -697,8 +702,8 @@ transition emits `receipt_revoked`.
 
 Candidate reads return `{items}`, where each item is
 `{message_id, question, kind, eligible, reason, field}`; the client counts the
-eligible items, and no limit is part of the contract. Unsupported turns
-remain in the list with `eligible: false`. The reason is a closed language-neutral
+eligible items, and no limit is part of the contract. Confirmations, clarifications and intermediate messages are omitted; a final
+answer refused by the retained privacy/completion checks has `eligible: false`. The reason is a closed language-neutral
 enum, and the client displays it in the owner's language. The private message id
 is a selection input only; it never reaches a public snapshot payload.
 
@@ -731,7 +736,7 @@ acquisition funnel's creation stage.
 `PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range, kind,
 created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
 as ISO dates or null for research and calculations. `kind` is `backtest`,
-`research_answer`, `calculation`, or `mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
+`research_answer`, `calculation`, `answer`, or `mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
 `removed_by_argus`. It carries no source conversation, message, run, or artifact id. Clients
 compose the shareable url as `origin + path`, so the backend owns no origin
 configuration.
@@ -766,7 +771,7 @@ timestamps cannot drop or repeat a row across pages.
   from a message.
 
 `POST /public/receipt-funnel` takes
-`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "calculation" | "mixed"}`
+`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "calculation" | "answer" | "mixed"}`
 (kind defaults to `backtest` for compatible callers) and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
 rendered page rather than counted when the receipt is read, because that read also
@@ -783,8 +788,7 @@ and client identity, answering `429` with `Retry-After`. The funnel endpoint is 
 per hour per client identity.
 
 Error codes specific to this surface: `receipt_note_rejected` (422, the note carries
-an identifier, a credential-shaped value, or a value assigned to something that names
-a credential), `receipt_source_unsupported` (422, an ineligible turn or source),
+a private Argus identifier), `receipt_source_unsupported` (422, an ineligible turn or source),
 `receipt_preview_changed` (409, the exact preview must be shown again), and
 `receipt_sanitization_failed` (500, the payload could not be proven free of
 never-expose data, so nothing was published).
@@ -811,9 +815,10 @@ tested window will not project into that form answers
 would reopen this defect under a new name.
 
 Version 2 uses the closed `turns` wrapper, including for new singleton shares.
-Research leaves freeze exactly the question, answer, typed sources and dates,
+Research leaves freeze the question, answer, available typed sources and dates,
 retrieval date, symbols, asset class, typed offered next step, note, content
-language, framing and provenance listed in section 4.2 of the sharing spec. These
+language, framing and provenance. Sources are optional; links in the answer are
+not required to appear in that list. These
 audited author fields remain in the author's language. Labels, date and number
 formats remain in the reader's language. No usage, raw card, provider, model,
 memory, executable action text or private id is included.

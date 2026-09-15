@@ -58,6 +58,7 @@ class ReceiptRuleSpec(ClosedFacts):
 
 
 class ReceiptLegacyRule(ClosedFacts):
+    cadence: str | None = Field(default=None, exclude_if=lambda value: value is None)
     type: str | None = None
     indicator: str | None = None
     period: float | None = None

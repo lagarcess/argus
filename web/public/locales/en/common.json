@@ -1830,7 +1830,8 @@
       "calculation": "Calculation",
       "backtest": "Historical test",
       "research_answer": "Research answer",
-      "mixed": "Answers and tests"
+      "mixed": "Answers and tests",
+      "answer": "Answer"
     },
     "research": {
       "stamp": "Argus looked this up on {{date}}",
@@ -1846,8 +1847,8 @@
     "selection": {
       "title": "Share conversation",
       "close": "Close sharing",
-      "hint": "Choose the answers to include. You will see the exact public page before making a link. Anyone with the link can read the selected content and note.",
-      "all": "Select all eligible",
+      "hint": "Choose questions and answers to share.",
+      "all": "Select all",
       "clear": "Clear selection",
       "count": "{{selected}} of {{eligible}} selected",
       "turn": "Turn {{count}}",
@@ -1882,7 +1883,14 @@
         "invalid_source": "The source content is unavailable or cannot be verified.",
         "unsupported_backtest": "This test does not have all the facts needed for sharing.",
         "private_inputs": "This result shows figures you typed, so it stays private."
-      }
+      },
+      "choose_turn": "Select this question and answer",
+      "continue": "Continue",
+      "cancel": "Cancel"
+    },
+    "answer": {
+      "headline": "Shared answers, not advice.",
+      "framing": "An answer shared by its owner. For information, not investment advice."
     }
   },
   "tools": {
