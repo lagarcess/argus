@@ -360,10 +360,22 @@ def _peer_is_grounded(
             return bool(prebake_probe(peer))
         from datetime import date, timedelta
 
+        from argus.agent_runtime.resolution import resolve_asset_candidate
         from argus.domain import market_data
 
-        resolved = market_data.resolve_asset(peer)
-        if resolved is None or resolved.canonical_symbol.upper() != peer:
+        resolution = resolve_asset_candidate(
+            peer,
+            field="next_experiments.peer",
+            source="llm_extraction",
+            asset_class_hint=asset_class,
+        )
+        resolved = resolution.asset
+        if (
+            resolution.status != "resolved"
+            or resolved is None
+            or resolved.canonical_symbol.upper() != peer
+            or resolved.asset_class != asset_class
+        ):
             return False
         # One owner decides whether a tap gets bars; this probe only adds the
         # window-tail question on top of it.

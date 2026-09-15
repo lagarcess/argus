@@ -86,7 +86,13 @@ def resolve_asset_candidate(
     source: ResolutionSource,
     resolution_mode: AssetResolutionMode = "auto",
     asset_class_hint: str | None = None,
+    require_unambiguous_class: bool = False,
 ) -> AssetResolution:
+    """Resolve through provider identity, optionally rejecting cross-class tickers.
+
+    Research offers opt in because they cannot ask which instrument a bare
+    symbol means. Existing chat resolution keeps its interactive policy.
+    """
     raw_text = str(query or "").strip()
     if not raw_text:
         return _asset_resolution(
@@ -109,6 +115,19 @@ def resolve_asset_candidate(
     candidates: tuple[ResolvedAsset, ...] = ()
     try:
         asset = resolve_market_asset(raw_text)
+        if require_unambiguous_class and not normalized_hint:
+            matches = _unique_assets((asset, *search_market_assets(raw_text, limit=12)))
+            exact = [a for a in matches if _symbol_hint_match_score(raw_text, a) == 0]
+            if len({a.asset_class for a in exact}) > 1:
+                return _asset_resolution(
+                    status="ambiguous",
+                    raw_text=raw_text,
+                    field=field,
+                    source=source,
+                    asset=None,
+                    candidates=tuple(exact),
+                    confidence="high",
+                )
         if normalized_hint and asset.asset_class != normalized_hint:
             candidates = (asset, *_search_assets_safely(raw_text, limit=12))
             hinted_resolution = _symbol_hint_resolution(

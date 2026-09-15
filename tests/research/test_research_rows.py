@@ -35,7 +35,9 @@ def test_subjects_and_duplicates_are_excluded() -> None:
 def test_resolver_gate_uses_the_real_catalog_in_fixture_mode() -> None:
     # Synthetic fixture catalog: NFLX resolves as equity, a fake ticker never
     # resolves, and BTC resolves but is not equity, so neither becomes a row.
-    peers = verified_peers(_pairs("NFLX", "ZZZZFAKE", "BTC"), exclude=set())
+    peers = verified_peers(
+        _pairs("NFLX", "ZZZZFAKE", "BTC"), exclude=set(), asset_class_hint="equity"
+    )
     assert [p["symbol"] for p in peers] == ["NFLX"]
     assert peers[0]["asset_class"] == "equity"
 

@@ -36,14 +36,16 @@ def _conversation(client: TestClient) -> dict[str, Any]:
     return client.post("/api/v1/conversations", json={}).json()["conversation"]
 
 
-def _confirmation_payload(symbols: list[str]) -> dict[str, Any]:
+def _confirmation_payload(
+    symbols: list[str], asset_class: str = "equity"
+) -> dict[str, Any]:
     return {
         "confirmation_id": CONFIRMATION_ID,
         "artifact_id": CONFIRMATION_ID,
         "strategy": {
             "strategy_type": "buy_and_hold",
             "asset_universe": list(symbols),
-            "asset_class": "equity",
+            "asset_class": asset_class,
             "timeframe": "1D",
             "date_range": {"start": "2023-01-02", "end": "2023-06-30"},
             "sizing_mode": "capital_amount",
@@ -54,14 +56,14 @@ def _confirmation_payload(symbols: list[str]) -> dict[str, Any]:
             "strategy_type": "buy_and_hold",
             "symbol": symbols[0],
             "symbols": list(symbols),
-            "asset_class": "equity",
+            "asset_class": asset_class,
             "timeframe": "1D",
             "date_range": {"start": "2023-01-02", "end": "2023-06-30"},
             "sizing_mode": "capital_amount",
             "capital_amount": 10000,
             "parameters": {},
             "risk_rules": [],
-            "benchmark_symbol": "SPY",
+            "benchmark_symbol": "BTC" if asset_class == "crypto" else "SPY",
             "language": "en",
         },
         "validation": {"status": "ready_to_run", "executable": True},
@@ -84,8 +86,9 @@ def _plant_confirmation(
     *,
     symbols: list[str],
     peers: list[dict[str, str]],
+    asset_class: str = "equity",
 ) -> dict[str, Any]:
-    payload = _confirmation_payload(symbols)
+    payload = _confirmation_payload(symbols, asset_class)
     card = runtime_confirmation_card(
         {"stage_outcome": "await_approval", "confirmation_payload": payload},
         confirmation_id=CONFIRMATION_ID,
@@ -337,7 +340,9 @@ def test_add_peer_updates_in_place_without_narration_and_without_turn_spend() ->
     assert card["confirmation_id"] == CONFIRMATION_ID
     adjustment = card["assets_adjustment"]
     # The resolver owns display names; the row label is never trusted.
-    assert adjustment["added"] == [{"symbol": "AAPL", "name": "Apple Inc."}]
+    assert adjustment["added"] == [
+        {"symbol": PEERS[0]["symbol"], "name": PEERS[0]["name"]}
+    ]
     assert adjustment["previous_symbols"] == ["NFLX"]
     assert adjustment["symbols"] == ["NFLX", "AAPL"]
     payload = message["metadata"]["confirmation_payload"]
