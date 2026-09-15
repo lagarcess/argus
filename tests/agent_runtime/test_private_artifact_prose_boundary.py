@@ -107,7 +107,7 @@ def test_root_prose_has_only_exact_generic_transcript_readers() -> None:
             ): 1,
             (
                 "src/argus/api/conversation_previews.py",
-                "conversation_previews",
+                "latest_conversation_messages",
                 "message.content",
             ): 1,
             # One user-marker read and one input to the sole scrubber, whose output
