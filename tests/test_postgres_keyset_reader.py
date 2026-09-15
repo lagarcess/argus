@@ -59,12 +59,13 @@ def test_preview_read_uses_one_owner_scoped_latest_message_query():
     owner = "30000000-0000-0000-0000-000000000001"
     ids = ["20000000-0000-0000-0000-000000000001", "20000000-0000-0000-0000-000000000002"]
     pool = _RecordingPool(
-        [[{"conversation_id": UUID(ids[0]), "metadata": {"result_card": {}}}]]
+        [[{"conversation_id": UUID(ids[0]), "id": UUID(ids[1]), "metadata": {"result_card": {}}}]]
     )
     rows = reader_type(pool).read_conversation_preview_messages(
         user_id=owner, conversation_ids=ids
     )
     assert rows[0]["conversation_id"] == ids[0]
+    assert rows[0]["id"] == ids[1]
     assert len(pool.cursor.executions) == 1
     sql, params = pool.cursor.executions[0]
     assert "left join lateral" in sql

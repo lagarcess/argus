@@ -1,0 +1,85 @@
+$ playwright test conversation-transcript-freshness.spec.ts --grep "unanswered user keeps"
+(node:96413) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:96414) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:96415) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 2 workers
+
+(node:96417) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:96416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:96417) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:96416) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:96417) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:96416) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:96420) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:96420) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+  ✘  2 [chromium] › e2e/conversation-transcript-freshness.spec.ts:72:7 › unanswered user keeps the idle observer checking until the reply lands (en) (11.2s)
+  ✘  1 [chromium] › e2e/conversation-transcript-freshness.spec.ts:72:7 › unanswered user keeps the idle observer checking until the reply lands (es-419) (11.2s)
+
+
+  1) [chromium] › e2e/conversation-transcript-freshness.spec.ts:72:7 › unanswered user keeps the idle observer checking until the reply lands (en) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: 1
+    Received: 0
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      91 |     fixture.settleOrdinary("activity-a", "none");
+      92 |     try {
+    > 93 |       await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+         |                                                                                         ^
+      94 |       await expect(tabA.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1);
+      95 |       await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+      96 |       expect(fixture.messageRequests.length).toBeGreaterThan(readsAfterUser);
+        at /Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-transcript-freshness.spec.ts:93:89
+
+    Error Context: temp/playwright-results/1789447558691-96417/conversation-transcript-fr-9a5c0-g-until-the-reply-lands-en--chromium/error-context.md
+
+  2) [chromium] › e2e/conversation-transcript-freshness.spec.ts:72:7 › unanswered user keeps the idle observer checking until the reply lands (es-419) 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: 1
+    Received: 0
+    Timeout:  10000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+        14 × locator resolved to 0 elements
+           - unexpected value "0"
+
+
+      91 |     fixture.settleOrdinary("activity-a", "none");
+      92 |     try {
+    > 93 |       await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+         |                                                                                         ^
+      94 |       await expect(tabA.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1);
+      95 |       await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+      96 |       expect(fixture.messageRequests.length).toBeGreaterThan(readsAfterUser);
+        at /Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-transcript-freshness.spec.ts:93:89
+
+    Error Context: temp/playwright-results/1789447558691-96416/conversation-transcript-fr-0c6b3-til-the-reply-lands-es-419--chromium/error-context.md
+
+  2 failed
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:72:7 › unanswered user keeps the idle observer checking until the reply lands (en) 
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:72:7 › unanswered user keeps the idle observer checking until the reply lands (es-419) 
+error: script "test:e2e" exited with code 1

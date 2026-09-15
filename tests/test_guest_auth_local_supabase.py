@@ -24,13 +24,12 @@ from argus.api.routers import auth as auth_router
 from argus.api.schemas import GuestPendingAction, Message
 from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
 from argus.domain.store import utcnow
-from argus.domain.supabase_gateway import SupabaseGateway
 from argus.domain.username_signup import serialized_username_signup
 from argus.domain.visitor_usage import visitor_key_for
 from fastapi.testclient import TestClient
 from supabase_auth.errors import AuthApiError
 
-from supabase import create_client
+from tests.local_supabase_support import local_supabase_gateway as _gateway
 
 LOCAL_URL = os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip()
 LOCAL_ANON_KEY = os.getenv("ARGUS_LOCAL_SUPABASE_ANON_KEY", "").strip()
@@ -73,13 +72,6 @@ def test_postgrest_utc_timestamp_rejects_real_differences_and_invalid_input() ->
         _parse_postgrest_utc_timestamp("2026-07-26T07:57:19.593040-05:00")
     with pytest.raises(ValueError):
         _parse_postgrest_utc_timestamp("not-a-timestamp")
-
-
-def _gateway() -> SupabaseGateway:
-    return SupabaseGateway(
-        client=create_client(LOCAL_URL, LOCAL_SERVICE_KEY),
-        auth_client=create_client(LOCAL_URL, LOCAL_ANON_KEY),
-    )
 
 
 def _deterministic_launch_payload(language: str) -> dict[str, Any]:

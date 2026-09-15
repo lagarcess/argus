@@ -1,0 +1,102 @@
+bun test v1.3.14 (0d9b296a)
+
+__tests__/conversation-activity-transcript-reload.test.ts:
+(pass) saved transcript freshness > an idle-only activity update refreshes from a saved message id, then deduplicates [0.27ms]
+(pass) saved transcript freshness > only a successful API read advances the loaded identity; next focus/update retries a failed read [0.05ms]
+(pass) saved transcript freshness > does not overwrite a sender, including after its canonical final is visible [0.02ms]
+(pass) saved transcript freshness > rejects a late refresh after conversationId changes [0.05ms]
+(pass) saved transcript freshness > rejects a late refresh after accountId changes [0.02ms]
+(pass) saved transcript freshness > rejects a late refresh after requestId changes
+(pass) saved transcript freshness > rejects a late refresh after ready changes
+(pass) saved transcript freshness > a completion during the read is compared with the actual returned snapshot [0.04ms]
+(pass) saved transcript freshness > server identity absent or transcript not ready does not invent freshness [0.01ms]
+121 |     const clock = controlledClock();
+122 |     const h = harness(clock);
+123 |     h.update({ latestMessageId: "user", activityRevision: 2 });
+124 |     h.requests[0].result.resolve(unanswered("user", clock.now()));
+125 |     await drainMicrotasks(); await drainMicrotasks();
+126 |     expect(clock.hasTimer()).toBe(true);
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/conversation-activity-transcript-reload.test.ts:126:30)
+(fail) bounded unanswered user-message checks > an idle/new-user interleaving keeps reading saved messages until the reply arrives [0.15ms]
+141 |     const saved = unanswered("user", clock.now());
+142 |     h.runtime.recordLoaded("account", "conversation", saved);
+143 |     h.update({ latestMessageId: "user", visibleMessageIds: new Set(["user"]) });
+144 |     for (let second = 2; second < 180; second += 2) {
+145 |       clock.advance(2_000);
+146 |       expect(h.requests).toHaveLength(second / 2);
+                               ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/conversation-activity-transcript-reload.test.ts:146:26)
+(fail) bounded unanswered user-message checks > repeated reads of an unanswered turn stop at its original 180-second deadline [0.10ms]
+(pass) bounded unanswered user-message checks > an already expired saved user message does not start a fresh timeout window [0.01ms]
+169 |     test(`stops observer polling when ${Object.keys(change)[0]} changes`, () => {
+170 |       const clock = controlledClock();
+171 |       const h = harness(clock);
+172 |       h.runtime.recordLoaded("account", "conversation", unanswered("user", clock.now()));
+173 |       h.update({ latestMessageId: "user" });
+174 |       expect(clock.hasTimer()).toBe(true);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/conversation-activity-transcript-reload.test.ts:174:32)
+(fail) bounded unanswered user-message checks > stops observer polling when conversationId changes [0.03ms]
+169 |     test(`stops observer polling when ${Object.keys(change)[0]} changes`, () => {
+170 |       const clock = controlledClock();
+171 |       const h = harness(clock);
+172 |       h.runtime.recordLoaded("account", "conversation", unanswered("user", clock.now()));
+173 |       h.update({ latestMessageId: "user" });
+174 |       expect(clock.hasTimer()).toBe(true);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/conversation-activity-transcript-reload.test.ts:174:32)
+(fail) bounded unanswered user-message checks > stops observer polling when accountId changes [0.02ms]
+169 |     test(`stops observer polling when ${Object.keys(change)[0]} changes`, () => {
+170 |       const clock = controlledClock();
+171 |       const h = harness(clock);
+172 |       h.runtime.recordLoaded("account", "conversation", unanswered("user", clock.now()));
+173 |       h.update({ latestMessageId: "user" });
+174 |       expect(clock.hasTimer()).toBe(true);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/conversation-activity-transcript-reload.test.ts:174:32)
+(fail) bounded unanswered user-message checks > stops observer polling when requestId changes [0.02ms]
+169 |     test(`stops observer polling when ${Object.keys(change)[0]} changes`, () => {
+170 |       const clock = controlledClock();
+171 |       const h = harness(clock);
+172 |       h.runtime.recordLoaded("account", "conversation", unanswered("user", clock.now()));
+173 |       h.update({ latestMessageId: "user" });
+174 |       expect(clock.hasTimer()).toBe(true);
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/conversation-activity-transcript-reload.test.ts:174:32)
+(fail) bounded unanswered user-message checks > stops observer polling when ready changes [0.02ms]
+
+ 10 pass
+ 6 fail
+ 27 expect() calls
+Ran 16 tests across 1 file. [46.00ms]

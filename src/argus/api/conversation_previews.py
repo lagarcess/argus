@@ -1,6 +1,7 @@
 """One bounded, owner-scoped read supplies every conversation preview surface."""
 
 from collections.abc import Sequence
+from typing import Any
 
 from loguru import logger
 
@@ -13,9 +14,10 @@ from argus.domain.conversation_previews import (
 )
 
 
-def conversation_previews(
+def latest_conversation_messages(
     *, user_id: str, conversation_ids: Sequence[str]
-) -> dict[str, ConversationPreview]:
+) -> dict[str, dict[str, Any]]:
+    """The same latest saved message supplies preview and transcript freshness."""
     requested = list(dict.fromkeys(conversation_ids))
     if len(requested) > MAX_CONVERSATION_PREVIEWS:
         raise ValueError("At most 100 conversation previews may be read at once.")
@@ -23,42 +25,53 @@ def conversation_previews(
         return {}
     gateway = api_state.supabase_gateway
     if gateway is not None:
-        read = getattr(gateway, "read_conversation_preview_messages", None)
-        if read is None:
-            return {key: ConversationPreview(kind="unavailable") for key in requested}
-        try:
-            rows = read(user_id=user_id, conversation_ids=requested)
-        except Exception as exc:
-            logger.warning(
-                "Conversation preview batch unavailable",
-                error_type=type(exc).__name__,
-                conversation_count=len(requested),
-            )
-            return {key: ConversationPreview(kind="unavailable") for key in requested}
-        indexed = {str(row["conversation_id"]): row for row in rows}
-        return {
-            key: project_conversation_preview(indexed[key])
-            if key in indexed
-            else ConversationPreview(kind="unavailable")
-            for key in requested
-        }
+        rows = gateway.read_conversation_preview_messages(
+            user_id=user_id, conversation_ids=requested
+        )
+        return {str(row["conversation_id"]): row for row in rows}
     store = api_state.store
     result = {}
-    for key in requested:
-        if store.conversation_owners.get(key) != user_id:
-            result[key] = ConversationPreview(kind="unavailable")
-            continue
-        messages = [
-            message
-            for message in store.messages.get(key, [])
-            if not (
-                message.role == "user" and is_legacy_onboarding_marker(message.content)
+    with store.conversation_message_lock:
+        for key in requested:
+            if store.conversation_owners.get(key) != user_id:
+                continue
+            messages = [
+                message
+                for message in store.messages.get(key, [])
+                if not (
+                    message.role == "user"
+                    and is_legacy_onboarding_marker(message.content)
+                )
+            ]
+            latest = max(
+                messages,
+                key=lambda message: (message.created_at, message.id),
+                default=None,
             )
-        ]
-        latest = max(
-            messages, key=lambda message: (message.created_at, message.id), default=None
-        )
-        result[key] = project_conversation_preview(
-            latest.model_dump() if latest else None
-        )
+            result[key] = latest.model_dump() if latest else {}
     return result
+
+
+def conversation_previews(
+    *, user_id: str, conversation_ids: Sequence[str]
+) -> dict[str, ConversationPreview]:
+    requested = list(dict.fromkeys(conversation_ids))
+    if len(requested) > MAX_CONVERSATION_PREVIEWS:
+        raise ValueError("At most 100 conversation previews may be read at once.")
+    try:
+        indexed = latest_conversation_messages(
+            user_id=user_id, conversation_ids=requested
+        )
+    except Exception as exc:
+        logger.warning(
+            "Conversation preview batch unavailable",
+            error_type=type(exc).__name__,
+            conversation_count=len(requested),
+        )
+        indexed = {}
+    return {
+        key: project_conversation_preview(indexed[key])
+        if key in indexed
+        else ConversationPreview(kind="unavailable")
+        for key in requested
+    }

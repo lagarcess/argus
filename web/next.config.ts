@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { CHAT_RUNTIME_EVENT_TIMEOUT_MS } from "./lib/chat-runtime-timeout";
 
 // Device QA runs the dev server over a LAN address, which the cross-origin dev
 // guard blocks by default: the JS chunks never load and the phone shows a blank
@@ -10,6 +11,7 @@ const devOrigins = (process.env.NEXT_DEV_ALLOWED_ORIGINS ?? "")
   .filter(Boolean);
 
 const nextConfig: NextConfig = {
+  env: { ARGUS_RUNTIME_EVENT_TIMEOUT_SECONDS: String(CHAT_RUNTIME_EVENT_TIMEOUT_MS / 1_000) },
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   allowedDevOrigins: ["127.0.0.1", "localhost", ...devOrigins],
 };
