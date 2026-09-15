@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useEffect, useId, useRef, useState } from "react";
 import { Keyboard, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -49,7 +51,7 @@ function shortcutsForHelpGroup(group: KeyboardShortcutGroup) {
   );
 }
 
-export default function KeyboardShortcutsOverlay({
+export function KeyboardShortcutsOverlaySurface({
   onClose,
 }: KeyboardShortcutsOverlayProps) {
   const overlayId = useId();
@@ -189,3 +191,5 @@ export default function KeyboardShortcutsOverlay({
     </div>
   );
 }
+
+export default withViewportPortal(KeyboardShortcutsOverlaySurface);

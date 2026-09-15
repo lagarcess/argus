@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useId, useRef, useCallback } from "react";
 import { useModalSurface } from "@/components/layout/useModalSurface";
 import { KeyboardShortcutKeycap } from "@/components/keyboard/KeyboardShortcutKeycap";
@@ -41,7 +43,7 @@ export function confirmDialogKeyboardAction({
   return "none";
 }
 
-export function ConfirmDialog({
+function ConfirmDialogSurface({
   isOpen,
   title,
   description,
@@ -163,3 +165,5 @@ export function ConfirmDialog({
     </div>
   );
 }
+
+export const ConfirmDialog = withViewportPortal(ConfirmDialogSurface);

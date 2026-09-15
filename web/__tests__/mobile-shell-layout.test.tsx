@@ -317,9 +317,8 @@ describe("sidebar drawer", () => {
         <p>drawer</p>
       </SidebarShell>,
     );
-    expect(openDrawer).toContain('role="dialog"');
-    expect(openDrawer).toContain('aria-label="Navigation"');
-    expect(openDrawer).toContain("drawer");
+    // A viewport overlay is client-only; SSR must not put it inside the shell.
+    expect(openDrawer).toBe("");
   });
 });
 

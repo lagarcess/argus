@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import {
   useEffect,
   useId,
@@ -85,7 +87,7 @@ type BottomSheetProps = {
 };
 
 /** Bottom sheet primitive: swipe, scrim tap, or the close control dismisses. */
-export function BottomSheet({
+export function BottomSheetSurface({
   isOpen,
   onClose,
   title,
@@ -251,4 +253,7 @@ export function BottomSheet({
   );
 }
 
+
+
+export const BottomSheet = withViewportPortal(BottomSheetSurface);
 export default BottomSheet;
