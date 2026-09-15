@@ -878,9 +878,7 @@ export default function ProfileMenu({
   // A child dialog replaces the settings surface, just like the other panels.
   // Keeping both mounted puts the centered request beneath the tablet sheet.
   if (deleteRequestDialog) {
-    return typeof document !== "undefined"
-      ? createPortal(deleteRequestDialog, document.body)
-      : deleteRequestDialog;
+    return deleteRequestDialog;
   }
 
   // ── Active modal rendering ──────────────────────────────────────────────
@@ -1397,7 +1395,7 @@ export default function ProfileMenu({
         {menu}
       </AdaptivePanel>
     );
-    return createPortal(sheet, document.body);
+    return sheet;
   }
 
   return isDrawerPlacement ? menu : createPortal(menu, document.body);

@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { conversationPreviewText } from "@/lib/conversation-preview-display";
 
 import {
@@ -246,7 +248,7 @@ function ledgerDecisionChipClassName(state: DecisionState, selected: boolean) {
   }
 }
 
-export default function ChatCommandPalette({
+function ChatCommandPaletteSurface({
   onClose,
   onOpenConversation,
   onRetest,
@@ -1838,3 +1840,5 @@ export default function ChatCommandPalette({
     </div>
   );
 }
+
+export default withViewportPortal(ChatCommandPaletteSurface);
