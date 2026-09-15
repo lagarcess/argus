@@ -30,6 +30,7 @@ type QaCase = {
   viewport: Viewport;
   // The no-search answer ran: the reply is that answer, the notice under it.
   answered?: boolean;
+  frame?: "final" | "error";
 };
 
 const RECOVERY_CODE: Record<Outcome, string> = {
@@ -130,7 +131,7 @@ function researchSidecar(outcome: Outcome): Record<string, unknown> {
 }
 
 async function installFixture(page: Page, qaCase: QaCase) {
-  const { locale, outcome, theme, answered = false } = qaCase;
+  const { locale, outcome, theme, answered = false, frame = "final" } = qaCase;
   const text = copy[locale];
   const code = RECOVERY_CODE[outcome];
   const transient = outcome === "transient";
@@ -240,6 +241,22 @@ async function installFixture(page: Page, qaCase: QaCase) {
             research: researchSidecar(outcome),
           }),
         );
+        if (frame === "error") {
+          const error = {
+            type: "error",
+            message: failureContent,
+            message_id: "research-failure",
+            recovery,
+            retry_last_turn: {
+              request_message_id: "research-request",
+              message: text.prompt,
+            },
+          };
+          return route.fulfill({
+            contentType: "text/event-stream",
+            body: `data: ${JSON.stringify(error)}\n\ndata: [DONE]\n\n`,
+          });
+        }
         return sseFinal(route, {
           stage_outcome: "ready_to_respond",
           assistant_response: failureContent,
@@ -414,22 +431,24 @@ for (const qaCase of cases) {
 }
 
 // #625: exercise the actual click-to-fetch path for both reply identity sources.
-for (const reloaded of [false, true]) {
-  test(`Retry sends the failed reply ID ${reloaded ? "after reload" : "live"}`, async ({ page }) => {
-    const evidence = await installFixture(page, cases[0]);
-    const text = copy.en;
-    await page.goto(`/chat?conversation=${CONVERSATION_ID}`);
-    await page.getByTestId("chat-input").fill(text.prompt);
-    await page.getByTestId("chat-send").click();
-    const retry = page.getByRole("button", { name: text.retry, exact: true });
-    await expect(retry).toBeVisible();
-    if (reloaded) await page.reload();
-    await expect(page.getByTestId("chat-input")).toBeEnabled();
-    await retry.click();
-    await expect(page.getByText(text.answer, { exact: true })).toBeVisible();
-    expect(evidence.streamedMessages).toEqual([text.prompt, text.prompt]);
-    expect(evidence.failedAssistantIds).toEqual([undefined, "research-failure"]);
-    expect(evidence.unexpected).toEqual([]);
-    expect(evidence.consoleErrors).toEqual([]);
-  });
+for (const frame of ["final", "error"] as const) {
+  for (const reloaded of [false, true]) {
+    test(`Retry sends the failed reply ID ${reloaded ? "after reload" : "live"} (${frame})`, async ({ page }) => {
+      const evidence = await installFixture(page, { ...cases[0], frame });
+      const text = copy.en;
+      await page.goto(`/chat?conversation=${CONVERSATION_ID}`);
+      await page.getByTestId("chat-input").fill(text.prompt);
+      await page.getByTestId("chat-send").click();
+      const retry = page.getByRole("button", { name: text.retry, exact: true });
+      await expect(retry).toBeVisible();
+      if (reloaded) await page.reload();
+      await expect(page.getByTestId("chat-input")).toBeEnabled();
+      await retry.click();
+      await expect(page.getByText(text.answer, { exact: true })).toBeVisible();
+      expect(evidence.streamedMessages).toEqual([text.prompt, text.prompt]);
+      expect(evidence.failedAssistantIds).toEqual([undefined, "research-failure"]);
+      expect(evidence.unexpected).toEqual([]);
+      expect(evidence.consoleErrors).toEqual([]);
+    });
+  }
 }
