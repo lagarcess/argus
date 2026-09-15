@@ -4506,6 +4506,12 @@ Contract rules:
 - Runnable next steps ride the existing typed `next_experiments` surface.
   Provider identity is absent from prose and sidecars; route receipts and the
   cost ledger own provenance.
+  Research resolution preserves `asset_class_hint` through the shared class-aware
+  resolver. An unhinted ticker found in multiple asset classes earns no test row
+  and uses the existing honest no-next line. A comparison contains only the
+  anchor subject's asset class, including its verified peers; an unresolved
+  named subject is never replaced by a peer. Background research requests retain
+  the requested symbols and class hint for the same publication behavior.
 - Thorough-shape questions run in provider background mode through the
   existing job lifecycle: the turn ends with a `backtest_job` sidecar whose
   `operation_scope` is `"chat.research"`, and the finalized answer arrives as
