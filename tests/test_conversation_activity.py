@@ -556,6 +556,7 @@ def _store_terminal_turn(
 
 def _assert_idle(activity: dict[str, Any]) -> None:
     assert activity == {
+        "latest_message_id": None,
         "operation": {"status": "idle", "kind": None, "updated_at": None},
         "attention": {"status": "none", "cursor": None},
     }

@@ -343,13 +343,15 @@ def test_history_guest_single_workspace_behavior_is_unchanged(
                         "updated_at": None,
                     },
                     "attention": {"status": "none", "cursor": None},
+                    "latest_message_id": None,
                 },
             }
         ],
         "next_cursor": None,
     }
     gateway.list_history_rows.assert_not_called()
-    gateway.read_conversation_preview_messages.assert_called_once_with(
+    assert gateway.read_conversation_preview_messages.call_count == 2
+    gateway.read_conversation_preview_messages.assert_called_with(
         user_id=USER_ID, conversation_ids=[CONVERSATION_ID]
     )
 

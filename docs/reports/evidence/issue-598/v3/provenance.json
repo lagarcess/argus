@@ -1,0 +1,8 @@
+{
+  "red_reviewed_head": "0ce4b621b3f7d8b765e1462a4f5ef63d71bfab60",
+  "green_reconciled_commit": "d54894d194b769f62d081bc391a4e866497f74b6",
+  "integration": "73dc8b7f31bc1c829c3e40f8e85825b7b5631854",
+  "provider_calls": 0,
+  "red_result": "2 expected failures: observer shows only the user message",
+  "green_result": "19 passed; original 17 plus 2 interleaving cases"
+}
