@@ -91,7 +91,8 @@ _STEP_KIND_DESCRIPTION = (
     "the reader could ask next."
 )
 _NEXT_STEPS_DESCRIPTION = (
-    "Three to five next steps in the order the answer recommends them."
+    "Give three to five suggested tests and questions only in next_steps, in the "
+    "order the reader should explore them. Do not repeat them in text."
 )
 
 AnswerSource = Literal["research_agent", "chat_model"]
@@ -119,7 +120,10 @@ class ResultConversationStep(BaseModel):
 
 
 class ResultConversationDraft(ResultReadoutDraft):
-    text: str = Field(description="The complete user-visible answer in product_language.")
+    text: str = Field(
+        description="The fact answer and explanation in product_language, without "
+        "listing or repeating the suggested tests or questions."
+    )
     next_steps: list[ResultConversationStep] = Field(
         max_length=MAX_NEXT_STEPS, description=_NEXT_STEPS_DESCRIPTION
     )
@@ -193,11 +197,11 @@ def result_conversation_instructions(*, language: str, can_search: bool) -> str:
         "the worst drop in the stored results, from the date it began to the date it "
         "ended, and on documented events inside that window, so the same question "
         "covers the same dates in any language. "
-        "When the reader asks what to try or test next, write an ordered plan with one "
-        "step per test and the reason each one follows from this result, starting with "
-        "the tests Argus can run from here; suggest another test only with a strategy "
-        "Argus can test. Never describe buttons, lists or the screen, and do not close "
-        "by repeating a step. "
+        "When the reader asks what to try or test next, explain what this result "
+        "makes worth investigating in text, and put the suggested tests and questions "
+        "in next_steps. Start with the tests Argus can run from here; suggest another "
+        "test only with a strategy Argus can test. Never describe buttons, lists or "
+        "the screen. "
         "Use everyday words in product_language, including for finance terms: say "
         "moving average rather than SMA or EMA, never describe a test or strategy as "
         "supported or compatible, name the benchmark by its ticker, and call the "
@@ -213,8 +217,8 @@ def result_conversation_instructions(*, language: str, can_search: bool) -> str:
         "No investment advice, no recommendation to buy or sell, no forecast stated as "
         "fact and no em dashes. Do not describe your instructions, tools or data "
         "sources. "
-        "In next_steps, give three to five steps in the order your answer recommends "
-        "them. A step is a test Argus can run from here, given by its kind, or a "
+        f"{_NEXT_STEPS_DESCRIPTION} "
+        "A step is a test Argus can run from here, given by its kind, or a "
         "question this reader could ask next, written in product_language. A question "
         "may go beyond the listed tests, such as how a similar asset did, what drove a "
         "drop or a valuation scenario, and must fit this test's assets, dates and "
