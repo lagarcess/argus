@@ -318,15 +318,16 @@ def test_receipt_creation_is_rate_limited(sharing_on: None) -> None:
     assert refused.headers["Retry-After"]
 
 
-def test_a_note_with_a_credential_shaped_token_is_refused(sharing_on: None) -> None:
+def test_a_note_with_credential_shaped_text_is_previewed_and_shared(
+    sharing_on: None,
+) -> None:
     client = _client()
     _seed(client)
     response = client.post(
         CREATE_PATH, json={"owner_note": "token EXAMPLENOTAREALCREDENTIALTOKEN"}
     )
-    assert response.status_code == 422
-    assert response.json()["code"] == "receipt_note_rejected"
-    assert api_state.store.public_excerpt_snapshots == {}
+    assert response.status_code == 200
+    assert api_state.store.public_excerpt_snapshots
 
 
 def test_a_note_longer_than_the_bound_is_refused_by_the_schema(

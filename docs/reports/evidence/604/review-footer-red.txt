@@ -1,0 +1,57 @@
+bun test v1.3.14 (0d9b296a)
+
+__tests__/receipt-answer-sharing.test.tsx:
+(pass) plain answers and complete backtest prose survive the exact preview in en [20.58ms]
+(pass) plain answers and complete backtest prose survive the exact preview in es-419 [5.40ms]
+21 |       actual: value,
+22 |       expected: !0,
+23 |       message,
+24 |       operator: "==",
+25 |       stackStartFn: fn
+26 |     throw err.generatedMessage = generatedMessage, err;
+                                                           ^
+AssertionError: false == true
+      at innerOk (internal:assert/utils:26:55)
+      at ok (node:assert:79:10)
+      at <anonymous> (/Users/garces/.codex/worktrees/0968/private-alpha-next/web/__tests__/receipt-answer-sharing.test.tsx:31:14)
+(fail) public plain answer footer does not invent dated research in en [1.66ms]
+21 |       actual: value,
+22 |       expected: !0,
+23 |       message,
+24 |       operator: "==",
+25 |       stackStartFn: fn
+26 |     throw err.generatedMessage = generatedMessage, err;
+                                                           ^
+AssertionError: false == true
+      at innerOk (internal:assert/utils:26:55)
+      at ok (node:assert:79:10)
+      at <anonymous> (/Users/garces/.codex/worktrees/0968/private-alpha-next/web/__tests__/receipt-answer-sharing.test.tsx:31:14)
+(fail) public mixed answer footer does not invent dated research in en [1.85ms]
+21 |       actual: value,
+22 |       expected: !0,
+23 |       message,
+24 |       operator: "==",
+25 |       stackStartFn: fn
+26 |     throw err.generatedMessage = generatedMessage, err;
+                                                           ^
+AssertionError: false == true
+      at innerOk (internal:assert/utils:26:55)
+      at ok (node:assert:79:10)
+      at <anonymous> (/Users/garces/.codex/worktrees/0968/private-alpha-next/web/__tests__/receipt-answer-sharing.test.tsx:31:14)
+(fail) public plain answer footer does not invent dated research in es-419 [0.45ms]
+21 |       actual: value,
+22 |       expected: !0,
+23 |       message,
+24 |       operator: "==",
+25 |       stackStartFn: fn
+26 |     throw err.generatedMessage = generatedMessage, err;
+                                                           ^
+AssertionError: false == true
+      at innerOk (internal:assert/utils:26:55)
+      at ok (node:assert:79:10)
+      at <anonymous> (/Users/garces/.codex/worktrees/0968/private-alpha-next/web/__tests__/receipt-answer-sharing.test.tsx:31:14)
+(fail) public mixed answer footer does not invent dated research in es-419 [3.31ms]
+
+ 2 pass
+ 4 fail
+Ran 6 tests across 1 file. [113.00ms]

@@ -1,0 +1,433 @@
+{
+  "measured_head": "df7aee12955f667e31057464d62c72287fb12247",
+  "read_only_get_requests_enforced": true,
+  "share_dialog_opened": false,
+  "share_created": false,
+  "jobs": [
+    {
+      "scope": "chat.run_backtest",
+      "status": "succeeded",
+      "run_status": "completed",
+      "native_hydrateable": true,
+      "native_backtest_leaf": {
+        "eligible": false,
+        "reason": "unsupported_backtest",
+        "field": null,
+        "trace": [
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 327,
+            "function": "project_backtest_turn"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ],
+        "cause_type": "ValidationError",
+        "validation_errors": [
+          {
+            "type": "extra_forbidden",
+            "loc": [
+              "config_snapshot",
+              "resolved_strategy",
+              "entry_rule",
+              "cadence"
+            ],
+            "msg": "Extra inputs are not permitted"
+          }
+        ]
+      }
+    },
+    {
+      "scope": "chat.research",
+      "status": "succeeded",
+      "run_status": null,
+      "native_hydrateable": true
+    }
+  ],
+  "messages": [
+    {
+      "chronological_message_number": 2,
+      "raw_role": "assistant",
+      "metadata_keys": [
+        "active_confirmation_reference",
+        "agent_runtime_stage_outcome",
+        "agent_runtime_turn",
+        "artifact_references",
+        "confirmation_card",
+        "confirmation_payload",
+        "conversation_mode",
+        "pending_strategy",
+        "resolution_provenance"
+      ],
+      "hydration_changed_metadata": false,
+      "hydration_changed_content": false,
+      "job_scope": null,
+      "job_status": null,
+      "has_research": false,
+      "terminal_flag": true,
+      "terminal_status": "completed",
+      "hydrated": {
+        "eligible": false,
+        "reason": "unsupported_turn",
+        "field": null,
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 149,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      },
+      "raw": {
+        "eligible": false,
+        "reason": "unsupported_turn",
+        "field": null,
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 149,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      }
+    },
+    {
+      "chronological_message_number": 4,
+      "raw_role": "assistant",
+      "metadata_keys": [
+        "agent_runtime_stage_outcome",
+        "chat_action",
+        "context_packets",
+        "conversation_mode",
+        "latest_run_id",
+        "next_experiments",
+        "result_card",
+        "result_conversation_id",
+        "result_fact_bank",
+        "result_readout_content",
+        "result_readout_fallback_used",
+        "result_readout_source",
+        "result_run_id",
+        "result_strategy_id",
+        "tool_result_cards"
+      ],
+      "hydration_changed_metadata": false,
+      "hydration_changed_content": false,
+      "job_scope": null,
+      "job_status": null,
+      "has_research": false,
+      "terminal_flag": null,
+      "terminal_status": null,
+      "hydrated": {
+        "eligible": false,
+        "reason": "not_completed",
+        "field": null,
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 179,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      },
+      "raw": {
+        "eligible": false,
+        "reason": "not_completed",
+        "field": null,
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 179,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      }
+    },
+    {
+      "chronological_message_number": 6,
+      "raw_role": "assistant",
+      "metadata_keys": [
+        "agent_runtime_turn",
+        "artifact_presentation_kind",
+        "backtest_job",
+        "backtest_job_id",
+        "chat_action",
+        "conversation_mode"
+      ],
+      "hydration_changed_metadata": false,
+      "hydration_changed_content": false,
+      "job_scope": "chat.research",
+      "job_status": "succeeded",
+      "has_research": false,
+      "terminal_flag": true,
+      "terminal_status": "completed",
+      "native_job_hydrateable": true,
+      "hydrated": {
+        "eligible": false,
+        "reason": "unsafe_text",
+        "field": "answer",
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 193,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 72,
+            "function": "audit_text"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      },
+      "raw": {
+        "eligible": false,
+        "reason": "unsafe_text",
+        "field": "answer",
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 193,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 72,
+            "function": "audit_text"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      }
+    },
+    {
+      "chronological_message_number": 7,
+      "raw_role": "assistant",
+      "metadata_keys": [
+        "agent_runtime_stage_outcome",
+        "backtest_job_id",
+        "chat_action",
+        "conversation_mode",
+        "latest_run_id",
+        "research",
+        "response_intent",
+        "result_breakdown_fallback_used",
+        "result_breakdown_source",
+        "result_fact_bank",
+        "result_readout_content",
+        "result_readout_failure_mode",
+        "result_readout_fallback_used",
+        "result_readout_source",
+        "result_run_id",
+        "result_strategy_id"
+      ],
+      "hydration_changed_metadata": false,
+      "hydration_changed_content": false,
+      "job_scope": "chat.research",
+      "job_status": "succeeded",
+      "has_research": true,
+      "terminal_flag": null,
+      "terminal_status": null,
+      "native_job_hydrateable": true,
+      "hydrated": {
+        "eligible": false,
+        "reason": "unsafe_text",
+        "field": "answer",
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 193,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 76,
+            "function": "audit_text"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      },
+      "raw": {
+        "eligible": false,
+        "reason": "unsafe_text",
+        "field": "answer",
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 193,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 76,
+            "function": "audit_text"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      }
+    },
+    {
+      "chronological_message_number": 9,
+      "raw_role": "assistant",
+      "metadata_keys": [
+        "agent_runtime_stage_outcome",
+        "agent_runtime_turn",
+        "conversation_mode",
+        "next_experiments",
+        "next_steps",
+        "research"
+      ],
+      "hydration_changed_metadata": false,
+      "hydration_changed_content": false,
+      "job_scope": null,
+      "job_status": null,
+      "has_research": true,
+      "terminal_flag": true,
+      "terminal_status": "completed",
+      "hydrated": {
+        "eligible": false,
+        "reason": "missing_sources",
+        "field": "sources",
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 200,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 178,
+            "function": "project_research_turn"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      },
+      "raw": {
+        "eligible": false,
+        "reason": "missing_sources",
+        "field": "sources",
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 200,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 178,
+            "function": "project_research_turn"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      }
+    },
+    {
+      "chronological_message_number": 11,
+      "raw_role": "assistant",
+      "metadata_keys": [
+        "agent_runtime_stage_outcome",
+        "agent_runtime_turn",
+        "conversation_mode",
+        "next_experiments",
+        "research"
+      ],
+      "hydration_changed_metadata": false,
+      "hydration_changed_content": false,
+      "job_scope": null,
+      "job_status": null,
+      "has_research": true,
+      "terminal_flag": true,
+      "terminal_status": "completed",
+      "hydrated": {
+        "eligible": false,
+        "reason": "text_too_long",
+        "field": "answer",
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 193,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 74,
+            "function": "audit_text"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      },
+      "raw": {
+        "eligible": false,
+        "reason": "text_too_long",
+        "field": "answer",
+        "trace": [
+          {
+            "path": "src/argus/api/public_excerpt_selection.py",
+            "line": 193,
+            "function": "_project"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 74,
+            "function": "audit_text"
+          },
+          {
+            "path": "src/argus/domain/public_excerpt_turns.py",
+            "line": 50,
+            "function": "refuse"
+          }
+        ]
+      }
+    }
+  ]
+}

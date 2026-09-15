@@ -4993,6 +4993,43 @@ components:
       - synchronized
       - not_applicable
       - reconciliation_required
+    PublicExcerptAnswerTurn:
+      properties:
+        kind:
+          type: string
+          const: answer
+          default: answer
+        question:
+          type: string
+          minLength: 1
+        answer:
+          type: string
+          minLength: 1
+        owner_note:
+          anyOf:
+          - type: string
+            maxLength: 280
+          - type: 'null'
+        content_language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: en
+        framing:
+          type: string
+          const: answer_not_advice
+          default: answer_not_advice
+        provenance_mark:
+          type: string
+          const: tested_with_argus
+          default: tested_with_argus
+      additionalProperties: false
+      type: object
+      required:
+      - question
+      - answer
+      description: Only the selected question and final answer, with no runtime metadata.
     PublicExcerptAssumption:
       properties:
         key:
@@ -5038,6 +5075,14 @@ components:
           default: backtest
         idea_title:
           type: string
+        question:
+          anyOf:
+          - type: string
+          - type: 'null'
+        answer:
+          anyOf:
+          - type: string
+          - type: 'null'
         fact_bank:
           $ref: '#/components/schemas/PublicExcerptFactBank'
         visual:
@@ -5171,8 +5216,11 @@ components:
           default: calculation
         question:
           type: string
-          maxLength: 500
           minLength: 1
+        answer_text:
+          anyOf:
+          - type: string
+          - type: 'null'
         calculations:
           items:
             $ref: '#/components/schemas/PublicExcerptCalculation'
@@ -5216,9 +5264,9 @@ components:
 
         answers carried several, and more as ``calculations``; both shapes read
 
-        back alike. Inputs publish only when a public page stated them; an input
+        back alike. Public or user-written inputs are visible in the exact preview;
 
-        the user typed and the cards'' arguments stay in the account.'
+        hidden account inputs and raw tool arguments stay in the account.'
     PublicExcerptCandidate:
       properties:
         message_id:
@@ -5234,6 +5282,7 @@ components:
             - backtest
             - research_answer
             - calculation
+            - answer
           - type: 'null'
         eligible:
           type: boolean
@@ -5363,6 +5412,7 @@ components:
           - backtest
           - research_answer
           - calculation
+          - answer
           - mixed
           default: backtest
       additionalProperties: false
@@ -5399,6 +5449,7 @@ components:
           - backtest
           - research_answer
           - calculation
+          - answer
           - mixed
           default: backtest
         created_at:
@@ -5572,6 +5623,7 @@ components:
           - backtest
           - research_answer
           - calculation
+          - answer
           - mixed
         existing_receipt:
           anyOf:
@@ -5609,21 +5661,19 @@ components:
           default: research_answer
         question:
           type: string
-          maxLength: 500
           minLength: 1
         answer:
           type: string
-          maxLength: 4000
           minLength: 1
         sources:
           items:
             $ref: '#/components/schemas/PublicExcerptResearchSource'
           type: array
-          maxItems: 5
-          minItems: 1
         retrieved_at:
-          type: string
-          format: date-time
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
         anchor_symbols:
           items:
             type: string
@@ -5665,8 +5715,6 @@ components:
       required:
       - question
       - answer
-      - sources
-      - retrieved_at
     PublicExcerptRevokeResponse:
       properties:
         receipt:
@@ -5766,9 +5814,11 @@ components:
             - $ref: '#/components/schemas/PublicExcerptResearchTurn'
             - $ref: '#/components/schemas/PublicExcerptBacktestTurn'
             - $ref: '#/components/schemas/PublicExcerptCalculationTurn'
+            - $ref: '#/components/schemas/PublicExcerptAnswerTurn'
             discriminator:
               propertyName: kind
               mapping:
+                answer: '#/components/schemas/PublicExcerptAnswerTurn'
                 backtest: '#/components/schemas/PublicExcerptBacktestTurn'
                 calculation: '#/components/schemas/PublicExcerptCalculationTurn'
                 research_answer: '#/components/schemas/PublicExcerptResearchTurn'
@@ -5795,6 +5845,7 @@ components:
             - backtest
             - research_answer
             - calculation
+            - answer
             - mixed
           - type: 'null'
         indexing:
@@ -5970,6 +6021,10 @@ components:
       type: object
     ReceiptLegacyRule:
       properties:
+        cadence:
+          anyOf:
+          - type: string
+          - type: 'null'
         type:
           anyOf:
           - type: string

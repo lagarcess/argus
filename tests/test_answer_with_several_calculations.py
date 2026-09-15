@@ -365,7 +365,7 @@ def _shared(sharer, cards: list[ToolResultCard], *, index: int) -> Message:
     return answer
 
 
-def test_a_receipt_freezes_each_calculation_and_one_private_card_refuses_it(
+def test_receipt_freezes_user_inputs_but_unknown_private_card_inputs_refuse(
     sharer,
 ) -> None:
     user, conversation = sharer
@@ -386,7 +386,7 @@ def test_a_receipt_freezes_each_calculation_and_one_private_card_refuses_it(
     ]
     frozen = leaf.model_dump(mode="json")
     assert "title" not in frozen and len(frozen["calculations"]) == 2
-    assert "6.25" not in str(frozen), "the per-share figure the user typed stays private"
+    assert "6.25" in str(frozen), "the exact preview includes the input the owner wrote"
 
     mixed = _shared(
         sharer,
@@ -396,13 +396,21 @@ def test_a_receipt_freezes_each_calculation_and_one_private_card_refuses_it(
         ],
         index=1,
     )
+    selected = dict(
+        user=user,
+        conversation_id=conversation.id,
+        message_ids=[mixed.id],
+        owner_note=None,
+    )
+    accepted = receipts.preview_receipt_for_messages(**selected)
+    assert len(accepted.payload.turns[0].calculations) == 2
+    # The known user-written inputs qualify without page citations. If their
+    # provenance is absent, ranking rows must not publish private stored facts.
+    for fact in mixed.metadata["tool_result_cards"][1]["presentation"]["inputs"]:
+        fact["source"] = None
+        fact["visibility"] = "private"
     with pytest.raises(PublicExcerptSourceError) as refused:
-        receipts.preview_receipt_for_messages(
-            user=user,
-            conversation_id=conversation.id,
-            message_ids=[mixed.id],
-            owner_note=None,
-        )
+        receipts.preview_receipt_for_messages(**selected)
     assert refused.value.reason == "private_inputs"
 
 

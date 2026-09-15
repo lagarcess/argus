@@ -1,0 +1,54 @@
+$ playwright test "e2e/receipt-sharing-service.spec.ts" "--workers=1"
+(node:47207) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:47208) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:47210) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 5 tests using 1 worker
+
+(node:47211) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:47212) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:47212) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:47211) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:47211) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 390 (5.9s)
+  -  2 [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 720
+  -  3 [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 1024
+  -  4 [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 1280
+  -  5 [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle es-419 light 390
+
+
+  1) [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 390 ────
+
+    Error: expect(locator).toBeEnabled() failed
+
+    Locator: getByRole('dialog', { name: 'Share conversation', exact: true }).getByRole('button', { name: 'Make the link', exact: true })
+    Expected: enabled
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeEnabled" with timeout 5000ms
+      - waiting for getByRole('dialog', { name: 'Share conversation', exact: true }).getByRole('button', { name: 'Make the link', exact: true })
+
+
+      58 |     expect(preview.payload.turns).toHaveLength(5);
+      59 |     expect(preview.payload.turns.some((turn: { answer?: string }) => (turn.answer?.length ?? 0) > 4000)).toBe(true);
+    > 60 |     await expect(dialog.getByRole("button", { name: copy.owner.create, exact: true })).toBeEnabled();
+         |                                                                                        ^
+      61 |     await page.screenshot({ animations: "disabled", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-preview.png`) });
+      62 |     const createdResponse = page.waitForResponse(r => r.url().endsWith("/public-excerpt") && r.request().method() === "POST");
+      63 |     await dialog.getByRole("button", { name: copy.owner.create, exact: true }).click();
+        at /Users/garces/.codex/worktrees/0968/private-alpha-next/web/e2e/receipt-sharing-service.spec.ts:60:88
+
+    Error Context: temp/playwright-results/1789406890721-47211/receipt-sharing-service-real-receipt-lifecycle-en-dark-390-chromium/error-context.md
+
+  1 failed
+    [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 390 ─────
+  4 did not run
+error: script "test:e2e" exited with code 1
