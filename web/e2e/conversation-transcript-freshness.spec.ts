@@ -67,3 +67,38 @@ for (const language of ["en", "es-419"] as const) {
     });
   }
 }
+
+for (const language of ["en", "es-419"] as const) {
+  test(`unanswered user keeps the idle observer checking until the reply lands (${language})`, async ({ context, page: tabA }) => {
+    const fixture = await installActivityFixture(context, { language });
+    const tabB = await context.newPage();
+    fixture.hideWorkingFrom.add(tabB);
+    for (const tab of [tabA, tabB]) {
+      await tab.goto("/chat?conversation=activity-a");
+      await expect(tab.getByTestId("chat-input")).toBeVisible();
+      await expect(tab.getByText("Transcript activity-a message 0", { exact: true })).toHaveCount(1);
+    }
+    const prompt = language === "en" ? "What is compound interest?" : "¿Qué es el interés compuesto?";
+    await tabA.getByTestId("chat-input").fill(prompt);
+    await tabA.getByTestId("chat-send").click();
+    await expect.poll(() => fixture.pendingStreams.has("activity-a")).toBe(true);
+    // The split read sees idle operation followed by the newly persisted user.
+    fixture.persistOrdinaryUser("activity-a");
+    await refreshActivity(tabB, fixture);
+    await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+    const readsAfterUser = fixture.messageRequests.length;
+    // The normal activity loop is idle. No focus/activity event follows this save.
+    fixture.settleOrdinary("activity-a", "none");
+    try {
+      await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+      await expect(tabA.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1);
+      await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+      expect(fixture.messageRequests.length).toBeGreaterThan(readsAfterUser);
+      const settledReads = fixture.messageRequests.length;
+      await tabB.waitForTimeout(2_500);
+      expect(fixture.messageRequests.length).toBe(settledReads);
+    } finally {
+      await captureEvidence(tabB, `598-v3-interleaving-${language}.png`);
+    }
+  });
+}

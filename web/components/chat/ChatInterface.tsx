@@ -373,7 +373,7 @@ export default function ChatInterface() {
   const recordLoadedTranscript = useConversationTranscriptFreshness({
     inputs: () => {
       const record = conversationActivity.state.byConversationId[conversationId ?? ""];
-      return { accountId: account?.user.id ?? null, conversationId: currentView === "chat" ? conversationId : null, latestMessageId: record?.canonical?.latest_message_id ?? null, activityRevision: Math.max(historyActivityRevision, record?.serverRevision ?? 0), requestId: record?.request?.requestId ?? null, ready: !isHydratingConversation && readyTranscriptConversationIdRef.current === conversationId, visibleMessageIds: new Set(messages.map((message) => message.id)) };
+      return { accountId: account?.user.id ?? null, conversationId: currentView === "chat" ? conversationId : null, latestMessageId: record?.canonical?.latest_message_id ?? null, activityRevision: Math.max(historyActivityRevision, record?.serverRevision ?? 0), requestId: record?.request?.requestId ?? null, ready: !isHydratingConversation && readyTranscriptConversationIdRef.current === conversationId, visibleMessages: messages };
     },
     invalidate: (id) => invalidateTranscriptForMutation(id, "durable_job_completion"),
     readyTranscriptConversationIdRef, activityTranscriptReadiness, pendingScrollRestoreRef,

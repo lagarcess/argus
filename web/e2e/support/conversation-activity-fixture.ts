@@ -30,6 +30,7 @@ export type PendingStream = {
   message: string;
   resolve: () => void;
   promise: Promise<void>;
+  savedUserMessageId?: string;
 };
 
 export type ActivityFixtureOptions = {
@@ -62,6 +63,7 @@ export type ActivityFixture = {
     conversationId: ConversationId,
     next: ConversationActivity,
   ) => void;
+  persistOrdinaryUser: (conversationId: ConversationId) => void;
   settleOrdinary: (
     conversationId: ConversationId,
     attention?: ConversationActivity["attention"]["status"],
@@ -370,24 +372,32 @@ export async function installActivityFixture(
     setActivity: (conversationId, next) => {
       activities[conversationId] = next;
     },
+    persistOrdinaryUser: (conversationId) => {
+      const pending = fixture.pendingStreams.get(conversationId);
+      if (!pending) throw new Error(`No pending stream for ${conversationId}`);
+      if (pending.savedUserMessageId) return;
+      const saved = userMessage(conversationId, messages[conversationId].length, pending.message);
+      messages[conversationId].push(saved);
+      pending.savedUserMessageId = saved.id;
+    },
     settleOrdinary: (conversationId, attention = "new_activity") => {
       const pending = fixture.pendingStreams.get(conversationId);
       if (!pending) {
         throw new Error(`No pending stream for ${conversationId}`);
       }
+      fixture.persistOrdinaryUser(conversationId);
       const index = messages[conversationId].length;
       messages[conversationId].push(
-        userMessage(conversationId, index, pending.message),
         assistantMessage(
           conversationId,
-          index + 1,
+          index,
           `Terminal response for ${conversationId}`,
         ),
       );
       activities[conversationId] = activity(
         "idle",
         attention,
-        `chat_turn:${conversationId}-${index}`,
+        `chat_turn:${conversationId}-${index - 1}`,
       );
       pending.resolve();
     },
