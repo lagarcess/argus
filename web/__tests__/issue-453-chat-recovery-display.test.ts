@@ -148,7 +148,7 @@ for (const { minimum, maximum } of [
   test(`issue 453 rejects malformed starting-capital bound pair ${minimum} to ${maximum}`, () => {
     const metadata = startingCapitalMetadata(minimum, maximum);
 
-    assert.equal(recoveryText(metadata, en), "");
-    assert.equal(recoveryText(metadata, es), "");
+    assert.equal(recoveryText(metadata, en), en("chat.clarification.starting_capital_unavailable_bounds"));
+    assert.equal(recoveryText(metadata, es), es("chat.clarification.starting_capital_unavailable_bounds"));
   });
 }

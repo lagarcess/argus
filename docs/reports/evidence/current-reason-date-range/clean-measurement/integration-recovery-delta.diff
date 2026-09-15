@@ -1,0 +1,102 @@
+diff --git a/src/argus/agent_runtime/llm_interpreter.py b/src/argus/agent_runtime/llm_interpreter.py
+index 1e93779a..59a443f1 100644
+--- a/src/argus/agent_runtime/llm_interpreter.py
++++ b/src/argus/agent_runtime/llm_interpreter.py
+@@ -340,6 +340,7 @@ from argus.agent_runtime.interpreter.strategy_builder import (  # noqa: F401
+     _unsupported_from_llm,
+     _validate_indicator_rule_support,
+ )
++from argus.agent_runtime.interpreter.strategy_routing import STRATEGY_TURN_ACTS, route_owner
+ from argus.agent_runtime.interpreter.strategy_repair_predicates import (  # noqa: F401
+     _is_vague_strategy_start,
+     _is_vague_strategy_start_guidance,
+@@ -517,7 +518,7 @@ class OpenRouterStructuredInterpreter:
+                     )
+                     if not isinstance(response, LLMInterpretationResponse):
+                         continue
+-                    last_raw_response = response
++                    last_raw_response = response.model_copy(deep=True)
+                     response = await _response_ready_for_runtime(
+                         response=response,
+                         preferred_model=candidate_model,
+@@ -560,6 +561,7 @@ class OpenRouterStructuredInterpreter:
+                 request=request,
+                 preferred_model=candidate_models[0] if candidate_models else "",
+                 asset_resolution_context=asset_resolution_context,
++                failed_response=last_raw_response,
+             )
+             if repaired_response is not None:
+                 self.last_status = "fallback_used"
+@@ -583,7 +585,7 @@ class OpenRouterStructuredInterpreter:
+                     timeout=openrouter_task_timeout_seconds("interpretation"),
+                 )
+                 if isinstance(response, LLMInterpretationResponse):
+-                    last_raw_response = response
++                    last_raw_response = response.model_copy(deep=True)
+                     record_openrouter_route_receipt(
+                         task="interpretation",
+                         model_name=self.model_name,
+@@ -647,7 +649,7 @@ class OpenRouterStructuredInterpreter:
+                     timeout=openrouter_task_timeout_seconds("interpretation"),
+                 )
+                 if isinstance(response, LLMInterpretationResponse):
+-                    last_raw_response = response
++                    last_raw_response = response.model_copy(deep=True)
+                     record_openrouter_route_receipt(
+                         task="interpretation",
+                         model_name=fallback_model_name,
+@@ -702,6 +704,7 @@ class OpenRouterStructuredInterpreter:
+             request=request,
+             preferred_model=fallback_model_name or primary_model_name,
+             asset_resolution_context=asset_resolution_context,
++            failed_response=last_raw_response,
+         )
+         if repaired_response is not None:
+             self.last_status = "fallback_used"
+@@ -4888,33 +4891,30 @@ async def _focused_strategy_repair_after_candidate_failures(
+     request: InterpretationRequest,
+     preferred_model: str,
+     asset_resolution_context: str | None = None,
++    failed_response: LLMInterpretationResponse | None = None,
+ ) -> LLMInterpretationResponse | None:
++    # Only this turn's typed read can authorize strategy repair. Outages,
++    # numbers, tickers and pending tests cannot establish the question's intent.
++    if failed_response is None or route_owner(
++        intent=failed_response.intent,
++        semantic_turn_act=failed_response.semantic_turn_act,
++    ) != "strategy":
++        return None
++    if failed_response.semantic_turn_act not in (None, "retry_failed_action", *STRATEGY_TURN_ACTS):
++        return None
+     if _request_has_active_strategy_context(
+         request
+     ) and not _request_current_turn_has_material_execution_evidence(request):
+         return None
+-    # No model read the act; the owner decides it from the pending state.
+-    turn = repaired_turn_act(base_act=None, base_relation=None, request=request)
+-    seed_response = LLMInterpretationResponse(
+-        intent="strategy_drafting",
+-        task_relation=turn.task_relation,
+-        requires_clarification=True,
+-        user_goal_summary=request.current_user_message,
+-        candidate_strategy_draft=LLMStrategyDraft(
+-            raw_user_phrasing=request.current_user_message,
+-            strategy_thesis=request.current_user_message,
+-        ),
+-        reason_codes=["structured_interpretation_candidates_failed", *turn.reason_codes],
+-        semantic_turn_act=turn.semantic_turn_act,
+-    )
++    seed_response = failed_response.model_copy(deep=True)
++    seed_response.reason_codes.append("structured_interpretation_candidates_failed")
+     logger.bind(
+         llm_task=_INTERPRETATION_REPAIR_TASK,
+         preferred_model=preferred_model,
+         current_message_length=len(request.current_user_message),
+         reason_codes=list(seed_response.reason_codes),
+     ).info("Structured interpretation candidates failed; attempting focused repair")
+-    # Candidates plus their audits may have spent the whole turn allowance;
+-    # this is the only rescue left, so its first call holds a reserved slot.
++    # Preserve the existing last-resort call allowance for typed test repairs.
+     with turn_execution.last_resort_repair_scope():
+         return await _repair_incomplete_strategy_extraction(
+             failed_response=seed_response,

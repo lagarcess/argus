@@ -1,0 +1,66 @@
+{
+  "scope": "Six authored writer-boundary turns, not six full runtime or browser sessions. Current validation accepts $100; historical blockers are injected. These thin constraints omit real numeric/date bounds. Results remain probe observations, not production equivalence.",
+  "accepted": false,
+  "checks": [
+    {
+      "language": "en",
+      "turn": 1,
+      "assessment_method": "manual review of stored typed intent, visible output and route receipts; no extra paid judge",
+      "assistant_prompt": "MRNA only has price history starting from late July 2020, so an August 2026 window is beyond what's available. Would you like to pick a different date range?",
+      "findings": [
+        "Reply asks for a new date range, matching the current category.",
+        "Reply incorrectly uses the first-history date in 2020 to explain why an August 2026 date cannot be tested."
+      ]
+    },
+    {
+      "language": "en",
+      "turn": 2,
+      "assessment_method": "manual review of stored typed intent, visible output and route receipts; no extra paid judge",
+      "assistant_prompt": "MRNA's price history starts from July 2020, so the available data doesn't cover the full window you mentioned. Would you like to choose a different date range?",
+      "findings": [
+        "Reply asks for a new date range, matching the current category.",
+        "Reply incorrectly uses the first-history date in 2020 to explain why an August 2026 date cannot be tested."
+      ]
+    },
+    {
+      "language": "en",
+      "turn": 3,
+      "assessment_method": "manual review of stored typed intent, visible output and route receipts; no extra paid judge",
+      "assistant_prompt": "Got it \u2014 MRNA from Aug 16 to Aug 19, 2026. The starting capital you entered is outside the $500\u2013$1,000,000 range this test supports. Would you like to choose a different amount within that range?",
+      "findings": [
+        "Current capital reason replaces the previous date complaint.",
+        "Generated numeric limits were absent from the authored constraint. The probe omitted the production min/max fields, so this is not proof that production loses those fields."
+      ]
+    },
+    {
+      "language": "es-419",
+      "turn": 1,
+      "assessment_method": "manual review of stored typed intent, visible output and route receipts; no extra paid judge",
+      "assistant_prompt": "Argus can't run that rule directly yet for MRNA. Which supported direction should I use: Elegir otro valor?",
+      "findings": [
+        "Degraded fallback is English despite es-419.",
+        "Fallback describes an unsupported rule instead of the stored data-window reason. Primary response failed its contract and the fallback model raised ValidationError."
+      ]
+    },
+    {
+      "language": "es-419",
+      "turn": 2,
+      "assessment_method": "manual review of stored typed intent, visible output and route receipts; no extra paid judge",
+      "assistant_prompt": "La historia de precios de MRNA comienza el 27 de julio de 2020, as\u00ed que no podemos probar desde agosto de 2026. \u00bfQuieres elegir otro valor o cambiar las fechas a un per\u00edodo disponible?",
+      "findings": [
+        "Reply asks for a new date range, matching the current category.",
+        "Reply incorrectly uses the first-history date in 2020 to explain why an August 2026 date cannot be tested."
+      ]
+    },
+    {
+      "language": "es-419",
+      "turn": 3,
+      "assessment_method": "manual review of stored typed intent, visible output and route receipts; no extra paid judge",
+      "assistant_prompt": "Gracias por las fechas. Para probar esta estrategia, el capital inicial debe estar entre $1,000 y $100,000,000 USD. \u00bfQu\u00e9 monto te gustar\u00eda usar?",
+      "findings": [
+        "Current capital reason replaces the previous date complaint.",
+        "Generated numeric limits were absent from the authored constraint. The probe omitted the production min/max fields, so this is not proof that production loses those fields."
+      ]
+    }
+  ]
+}

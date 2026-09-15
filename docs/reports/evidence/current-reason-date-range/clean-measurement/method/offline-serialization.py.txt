@@ -1,0 +1,27 @@
+"""Offline scorecard serialization after an Apple Git launcher failure."""
+import json,os,sys,shutil,socket
+from pathlib import Path
+sys.path[:0]=[str(Path.cwd()),str(Path.cwd()/'src')]
+out=Path('temp/current-reason-clean-rerun');raw=json.loads((out/'provenance.json').read_text())
+for key in list(os.environ):
+ if key.startswith(('ARGUS_','SUPABASE_','OPENROUTER_','PERPLEXITY_','ALPACA_')) or key=='DATABASE_URL':os.environ.pop(key)
+os.environ.update({k:v for k,v in raw['release_configuration'].items() if v is not None})
+os.environ['ARGUS_MARKET_DATA_PROVIDER_MODE']=raw['market_data_provider_mode']
+os.environ['ARGUS_ASSET_PROVIDER_MODE']=raw['asset_provider_mode']
+os.environ['PATH']='/Library/Developer/CommandLineTools/usr/bin:'+os.environ['PATH']
+def refuse_network(*args,**kwargs):raise AssertionError('Offline finalization must not make network calls')
+socket.socket.connect=refuse_network
+backup=Path('/tmp/current-reason-finalize-dotenv-link');assert not backup.exists() and not backup.is_symlink()
+Path('.env').rename(backup)
+try:
+ from tests.evals.measurement_eval_scorecard import EvalScorecardProvenance,LiveMarketDataProbe,write_scorecard
+ raw['fixture_case_ids']=tuple(raw['fixture_case_ids'])
+ raw['live_market_data_probe']=LiveMarketDataProbe(**raw['live_market_data_probe'])
+ provenance=EvalScorecardProvenance(**raw)
+ results=json.loads((out/'partial-results.json').read_text());assert len(results)==73 and len({r['id'] for r in results})==73
+ result=write_scorecard(results,provenance=provenance,output_dir=out)
+ shutil.copyfile(result,out/'live-measurement.json')
+ (out/'completion.json').write_text(json.dumps({'candidate_sha':provenance.candidate_sha,'completed_cases':73,'expected_cases':73,'complete':True,'diagnostic_retries':0,'commits_during_run':0,'offline_serialization':'Original 73 results and captured provenance serialized with the canonical writer after /usr/bin/git hit an Xcode license error. Standalone Command Line Tools Git validated the same clean head, fixture hash, and release configuration. No network calls or result changes.'},indent=2)+'\n')
+ print(result)
+ print(json.dumps(json.loads(result.read_text())['totals'],indent=2))
+finally:backup.rename('.env')

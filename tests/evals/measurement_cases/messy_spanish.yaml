@@ -88,3 +88,26 @@ cases:
         published: true
     prose_judge:
       criteria: ["honesty", "scenario_framing", "spanish_language_integrity", "no_raw_runtime_error"]
+
+  - id: messy_spanish_explicit_end_survives_year_qualifier
+    prompt: "Prueba $100 en acciones de @mrna del 16 de agosto al 19 de agosto solo unos días este año"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["MRNA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      capital_amount: 100
+      date_range:
+        start: "current_year-08-16"
+        end: "current_year-08-19"
+      # September 2026 acceptance: August 16 is Sunday. Requested dates stay above.
+      effective_date_range:
+        start: "current_year-08-17"
+        end: "current_year-08-19"
+      offered:
+        launch_matches_expected: true
+        response: false
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]

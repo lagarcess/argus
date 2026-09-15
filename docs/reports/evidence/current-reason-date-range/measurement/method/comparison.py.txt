@@ -1,0 +1,33 @@
+import json,sys,subprocess
+from pathlib import Path
+import yaml
+root=Path.cwd()
+freeze=json.loads((root/'.agent/interpreter_prompt_fingerprint.json').read_text())
+baseline_path=freeze['last_measured']['scorecard']
+baseline=json.loads((root/baseline_path).read_text())
+current=json.loads(Path(sys.argv[1]).read_text())
+old={r['id']:r for r in baseline['results']};new={r['id']:r for r in current['results']}
+assert len(old)==71 and len(new)==73 and old.keys()<=new.keys()
+old_fixtures={};new_fixtures={}
+for p in (root/'tests/evals/measurement_cases').glob('*.yaml'):
+    oldtext=subprocess.check_output(['git','show',freeze['last_measured']['commit']+':'+p.relative_to(root).as_posix()],text=True)
+    for r in yaml.safe_load(oldtext)['cases']:old_fixtures[r['id']]=r
+    for r in yaml.safe_load(p.read_text())['cases']:new_fixtures[r['id']]=r
+rows=[]
+for case_id,n in new.items():
+    o=old.get(case_id)
+    if any(e.get('component')=='measurement_cost_guard' for e in n.get('infrastructure_errors',[])):classification='unmeasured_budget_guard'
+    elif o is None:classification='new_pass' if n['status']=='passed' else 'new_failure'
+    elif o['status']=='passed':classification='unchanged_pass' if n['status']=='passed' else 'regression'
+    elif n['status']=='passed':classification='improved'
+    elif o['status']==n['status'] and set(o['failed_checks'])==set(n['failed_checks']):classification='unchanged_failure'
+    else:classification='changed_failure'
+    rows.append({'id':case_id,'baseline_status':o['status'] if o else None,'current_status':n['status'],'classification':classification,
+      'fixture_semantics_unchanged':old_fixtures.get(case_id)==new_fixtures.get(case_id) if o else None,
+      'baseline_failed_checks':o['failed_checks'] if o else [],'current_failed_checks':n['failed_checks'],
+      'new_failed_checks':sorted(set(n['failed_checks'])-set(o['failed_checks'] if o else [])),
+      'current_infrastructure_errors':n.get('infrastructure_errors',[])})
+report={'baseline_scorecard':baseline_path,'baseline_commit':freeze['last_measured']['commit'],'candidate_commit':current['provenance']['candidate_sha'],
+ 'comparison_kind':'historical per-case comparison, not a paired causal A/B', 'baseline_totals':baseline['totals'],'current_totals':current['totals'],'cases':rows}
+Path(sys.argv[2]).write_text(json.dumps(report,indent=2))
+print(json.dumps({'classifications':{v:sum(r['classification']==v for r in rows) for v in sorted({r['classification'] for r in rows})},'changed_fixtures':[r['id'] for r in rows if r['fixture_semantics_unchanged'] is False]},indent=2))

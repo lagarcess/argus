@@ -1,0 +1,34 @@
+{
+  "runtime_head": "99ef6c48c821d273de944cf1c2335e1d610a8663",
+  "method": "Provider-free rendering through the same recoveryDisplayText used by ChatMessage, with real locale catalogs; not a browser or new model response",
+  "outputs": [
+    {
+      "language": "en",
+      "turn": 1,
+      "source": "original recorded degraded patch",
+      "reason": "data_window_unavailable",
+      "text": "That date range is outside the available market history. Choose another date range."
+    },
+    {
+      "language": "en",
+      "turn": 3,
+      "source": "authored degraded variant of recorded missing-bound capital patch",
+      "reason": "unsupported_starting_capital",
+      "text": "That starting amount cannot be used for this test. Choose another amount."
+    },
+    {
+      "language": "es-419",
+      "turn": 1,
+      "source": "original recorded degraded patch",
+      "reason": "data_window_unavailable",
+      "text": "Ese rango de fechas está fuera del historial de mercado disponible. Elige otro rango de fechas."
+    },
+    {
+      "language": "es-419",
+      "turn": 3,
+      "source": "authored degraded variant of recorded missing-bound capital patch",
+      "reason": "unsupported_starting_capital",
+      "text": "No se puede usar ese monto inicial para esta prueba. Elige otro monto."
+    }
+  ]
+}
