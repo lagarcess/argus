@@ -10,8 +10,9 @@ unchanged history. Issue #641 identifies the full-pagination cost in #635.
 
 ## Locked decisions
 
-1. Use the existing owner-scoped messages API with the last saved message as an
+1. Pending-reply checks use the existing owner-scoped messages API with the last saved message as an
    inclusive anchor. Follow cursors only through the new suffix, never old pages.
+   Ordinary activity refreshes retain full-history reconciliation.
 2. Keep the raw API snapshot alongside its derived display projection. Merge a
    returned suffix into that snapshot and use the canonical projection, preserving
    effects on earlier cards. Unchanged checks perform no projection or UI apply.

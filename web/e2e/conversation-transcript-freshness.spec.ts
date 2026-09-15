@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { activity, installActivityFixture, refreshActivity, captureEvidence } from "./support/conversation-activity-fixture";
+import { activity, installActivityFixture, refreshActivity, captureEvidence, assistantMessage } from "./support/conversation-activity-fixture";
 
 for (const language of ["en", "es-419"] as const) {
   for (const mode of ["hidden", "visible", "anchor"] as const) {
@@ -99,6 +99,77 @@ for (const language of ["en", "es-419"] as const) {
       expect(fixture.messageRequests.length).toBe(settledReads);
     } finally {
       await captureEvidence(tabB, `598-v3-interleaving-${language}.png`);
+    }
+  });
+}
+
+
+for (const language of ["en", "es-419"] as const) {
+  test(`long conversation reads only its saved tail while awaiting a reply (${language})`, async ({ context, page: tabA }) => {
+    test.setTimeout(60_000);
+    const fixture = await installActivityFixture(context, { language });
+    const historyLength = 1_000;
+    const historyStart = Date.now() - historyLength * 1_000;
+    fixture.messages["activity-a"] = Array.from({ length: historyLength }, (_, index) => ({
+      ...assistantMessage("activity-a", index),
+      created_at: new Date(historyStart + index * 1_000).toISOString(),
+    }));
+    const tabB = await context.newPage();
+    fixture.hideWorkingFrom.add(tabB);
+    const anchor = fixture.messages["activity-a"][3].id;
+    for (const tab of [tabA, tabB]) {
+      await tab.goto(`/chat?conversation=activity-a${tab === tabB ? `&message=${anchor}` : ""}`);
+      await expect(tab.getByTestId("chat-input")).toBeVisible();
+      await expect(tab.getByText(`Transcript activity-a message ${historyLength - 1}`, { exact: true })).toHaveCount(1);
+      const initialReads = fixture.messageRequests.filter((request) => request.page === tab);
+      expect(initialReads).toHaveLength(historyLength / 100);
+      expect(initialReads.every((request) => request.returnedCount === 100)).toBe(true);
+    }
+    const beforeURL = tabB.url();
+    const transcript = tabB.getByTestId("conversation-transcript-region");
+    const scrollTop = await transcript.evaluate((element) => {
+      element.scrollTop = 240;
+      element.dispatchEvent(new Event("scroll"));
+      return element.scrollTop;
+    });
+    const prompt = language === "en" ? "What is compound interest?" : "¿Qué es el interés compuesto?";
+    await tabA.getByTestId("chat-input").fill(prompt);
+    await tabA.getByTestId("chat-send").click();
+    await expect.poll(() => fixture.pendingStreams.has("activity-a")).toBe(true);
+    // Ordinary send snapshots saved ids before admission for transport recovery.
+    // From admission onward, the sender must render its stream without rereads.
+    const senderReads = fixture.messageRequests.filter((request) => request.page === tabA).length;
+    fixture.persistOrdinaryUser("activity-a");
+    const savedUser = fixture.messages["activity-a"].at(-1)!;
+    savedUser.created_at = new Date().toISOString();
+    await refreshActivity(tabB, fixture);
+    await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+    const beforeChecks = fixture.messageRequests.length;
+    await tabB.waitForTimeout(4_500);
+    const unchangedChecks = fixture.messageRequests.slice(beforeChecks).filter((request) => request.page === tabB);
+    const beforeReply = fixture.messageRequests.length;
+    fixture.settleOrdinary("activity-a", "none");
+    try {
+      await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+      await expect(tabA.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1);
+      await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+      const replyChecks = fixture.messageRequests.slice(beforeReply).filter((request) => request.page === tabB);
+      const summarize = (requests: typeof unchangedChecks) => requests.map(({ anchorMessageId, cursor, returnedCount }) => ({ anchorMessageId, cursor, returnedCount }));
+      console.log(JSON.stringify({ language, historyLength, unchangedChecks: summarize(unchangedChecks), replyChecks: summarize(replyChecks) }));
+      expect(unchangedChecks).toHaveLength(2);
+      expect(summarize(unchangedChecks)).toEqual(Array.from({ length: 2 }, () => ({
+        anchorMessageId: savedUser.id, cursor: null, returnedCount: 1,
+      })));
+      expect(summarize(replyChecks)).toEqual([{ anchorMessageId: savedUser.id, cursor: null, returnedCount: 2 }]);
+      expect(fixture.messageRequests.filter((request) => request.page === tabA)).toHaveLength(senderReads);
+      expect(tabB.url()).toBe(beforeURL);
+      await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeCloseTo(scrollTop, 0);
+      const settledReads = fixture.messageRequests.length;
+      await tabB.waitForTimeout(2_500);
+      expect(fixture.messageRequests).toHaveLength(settledReads);
+      expect(fixture.unexpectedRequests).toEqual([]);
+    } finally {
+      await captureEvidence(tabB, `641-long-conversation-${language}.png`);
     }
   });
 }
