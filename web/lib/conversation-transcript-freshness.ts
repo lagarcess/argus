@@ -1,10 +1,11 @@
 import { CHAT_RUNTIME_EVENT_TIMEOUT_MS } from "./chat-runtime-timeout";
-import type { ApiMessage } from "./argus-api";
+import type { ApiMessage, getConversationMessages } from "./argus-api";
 import { loadAllConversationMessagePages } from "./chat-message-hydration";
 import { hydrateMessagesFromApi } from "@/components/chat/chat-message-projection";
 import type { Message } from "@/components/chat/types";
 
 export type SavedConversationTranscript = {
+  apiMessages: ApiMessage[];
   messages: Message[];
   latestMessageId: string | null;
   unansweredUserMessage: { id: string; createdAt: string } | null;
@@ -13,11 +14,29 @@ export type SavedConversationTranscript = {
 export async function loadSavedConversationTranscript(
   conversationId: string,
   signal?: AbortSignal,
+  previous?: SavedConversationTranscript,
+  loadPage?: typeof getConversationMessages,
 ): Promise<SavedConversationTranscript> {
-  const items: ApiMessage[] = await loadAllConversationMessagePages(conversationId, undefined, { signal });
+  const anchor = previous?.apiMessages.at(-1);
+  const suffix = await loadAllConversationMessagePages(conversationId, loadPage, {
+    signal, anchorMessageId: anchor?.id,
+  });
+  if (anchor && suffix[0]?.id !== anchor.id) throw new Error("Saved message anchor was not returned");
+  // The inclusive anchor lets us see updates to the last saved message too.
+  // Preserve the snapshot itself on idle checks: no hydration or UI apply.
+  if (previous && (anchor
+    ? suffix.length === 1 && JSON.stringify(suffix[0]) === JSON.stringify(anchor)
+    : suffix.length === 0)) return previous;
+  const items = anchor ? [...previous!.apiMessages.slice(0, -1), ...suffix] : suffix;
+  const previousMessages = new Map(previous?.messages.map((message) => [message.id, message]));
+  const messages = hydrateMessagesFromApi(items).messages.map((message) => {
+    const prior = previousMessages.get(message.id);
+    return prior && JSON.stringify(prior) === JSON.stringify(message) ? prior : message;
+  });
   const last = items.at(-1);
   return {
-    messages: hydrateMessagesFromApi(items).messages,
+    apiMessages: items,
+    messages,
     latestMessageId: last?.id ?? null,
     unansweredUserMessage: last?.role === "user" ? { id: last.id, createdAt: last.created_at } : null,
   };
@@ -51,7 +70,7 @@ const browserReplyClock: TranscriptReplyClock = {
 
 /** Compares API identity with the snapshot actually loaded, independently of work/unread state. */
 export function createTranscriptFreshnessRuntime(options: {
-  load: (conversationId: string, signal: AbortSignal) => Promise<SavedConversationTranscript>;
+  load: (conversationId: string, signal: AbortSignal, previous?: SavedConversationTranscript) => Promise<SavedConversationTranscript>;
   apply: (conversationId: string, snapshot: SavedConversationTranscript) => void;
   clock?: TranscriptReplyClock;
 }) {
@@ -60,6 +79,7 @@ export function createTranscriptFreshnessRuntime(options: {
   let inputs: TranscriptFreshnessInputs | null = null;
   let loaded: {
     identity: string;
+    snapshot: SavedConversationTranscript;
     latestMessageId: string | null;
     unansweredUserId: string | null;
     replyDeadline: number | null;
@@ -104,6 +124,7 @@ export function createTranscriptFreshnessRuntime(options: {
     const sameUser = loaded?.identity === key && loaded.unansweredUserId === user?.id;
     loaded = {
       identity: key,
+      snapshot,
       latestMessageId: snapshot.latestMessageId,
       unansweredUserId: user?.id ?? null,
       // Re-reading the same unanswered message never extends its turn window.
@@ -135,8 +156,12 @@ export function createTranscriptFreshnessRuntime(options: {
     const request = { identity: key, controller, replyCheck };
     pending = request;
     const conversationId = next.conversationId;
-    void options.load(conversationId, controller.signal).then((snapshot) => {
+    // Only the bounded unanswered-turn checks use the saved tail. Ordinary
+    // activity refreshes retain their full-history reconciliation behavior.
+    const previous = replyCheck && loaded?.identity === key ? loaded.snapshot : undefined;
+    void options.load(conversationId, controller.signal, previous).then((snapshot) => {
       if (pending !== request || !inputs || identity(inputs) !== key || inputs.requestId || !inputs.ready) return;
+      if (snapshot === loaded?.snapshot) return;
       recordLoaded(inputs.accountId!, conversationId, snapshot);
       apply(conversationId, snapshot);
     }).catch(() => {

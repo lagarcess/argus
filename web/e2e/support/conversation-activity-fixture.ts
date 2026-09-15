@@ -54,6 +54,9 @@ export type ActivityFixture = {
   messageRequests: Array<{
     conversationId: ConversationId;
     anchorMessageId: string | null;
+    cursor: string | null;
+    returnedCount: number;
+    page: Page;
   }>;
   pendingStreams: Map<ConversationId, PendingStream>;
   unexpectedRequests: string[];
@@ -550,13 +553,31 @@ export async function installActivityFixture(
     );
     if (messageMatch && request.method() === "GET") {
       const conversationId = messageMatch[1] as ConversationId;
+      const anchorMessageId = url.searchParams.get("anchor_message_id");
+      const cursor = url.searchParams.get("cursor");
+      if (anchorMessageId && cursor) return json(route, { detail: "Choose an anchor or cursor." }, 400);
+      const ordered = [...messages[conversationId]].sort((left, right) =>
+        left.created_at.localeCompare(right.created_at) || left.id.localeCompare(right.id));
+      const anchor = anchorMessageId ? ordered.find((message) => message.id === anchorMessageId) : null;
+      if (anchorMessageId && !anchor) return json(route, { detail: "Message anchor not found." }, 404);
+      const pivot: [string, string] | null = cursor
+        ? JSON.parse(Buffer.from(cursor, "base64url").toString())
+        : anchor ? [anchor.created_at, anchor.id] : null;
+      const remaining = pivot ? ordered.filter((message) => {
+        const order = message.created_at.localeCompare(pivot[0]) || message.id.localeCompare(pivot[1]);
+        return cursor ? order > 0 : order >= 0;
+      }) : ordered;
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? 100), 100);
+      const items = remaining.slice(0, limit);
+      const last = items.at(-1);
       fixture.messageRequests.push({
-        conversationId,
-        anchorMessageId: url.searchParams.get("anchor_message_id"),
+        conversationId, anchorMessageId, cursor, returnedCount: items.length,
+        page: request.frame().page(),
       });
       return json(route, {
-        items: messages[conversationId],
-        next_cursor: null,
+        items,
+        next_cursor: remaining.length > limit && last
+          ? Buffer.from(JSON.stringify([last.created_at, last.id])).toString("base64url") : null,
       });
     }
 
