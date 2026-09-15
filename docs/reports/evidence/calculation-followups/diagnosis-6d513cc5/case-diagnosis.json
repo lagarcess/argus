@@ -1,0 +1,254 @@
+[
+  {
+    "case_id": "action_chip_change_asset_bare_ticker_append_issue_190",
+    "classification": "unresolved",
+    "evidence": "The committed trace has a primary interpreter timeout, then successful fallback interpretation and ArtifactAssumptionEditPlan receipts, but no TSLA in the final assets. The three earlier clarification failures are also retained. The raw plans are absent. The append owner is unchanged relative to bed233b0; that does not prove the shared prompt had no effect. Pair this case before changing its intent rules. Existing typed append tests remain in the free suite.",
+    "trace_line": 589,
+    "baseline_status": "passed",
+    "settled_usd": "0.02934292",
+    "reserved_usd": "0.20"
+  },
+  {
+    "case_id": "compound_benchmark_start_date_preserves_confirmation_issue_339",
+    "classification": "b: independent drift",
+    "evidence": "The final start stays March 2 instead of April 1. The founder reports the same failure at another head this week. The date-edit owner was not changed by this lane. This is evidence against attributing the failure to this PR, not a passing result.",
+    "trace_line": 2875,
+    "baseline_status": "passed",
+    "settled_usd": "0.03953620",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "asset_discovery_category_english_issue_244",
+    "classification": "unresolved",
+    "evidence": "The final act is educational_question, requires_new_facts is false, and the answer asks which cybersecurity stocks to test. No discovery payload or candidates reached the user. The new requires_new_facts description could have shifted this read, but the trace cannot prove that. The revised description distinguishes model memory from available conversation evidence and category discovery from recall. Pair the routing result; do not hardcode a cybersecurity phrase.",
+    "trace_line": 3723,
+    "baseline_status": "passed",
+    "settled_usd": "0.0216029",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "asset_discovery_comparison_anchor_english_issue_244",
+    "classification": "c: proposed judge correction",
+    "evidence": "Only honesty failed. The judge treats five resolver-verified catalog rows as proof that a fact-checking search found additional names. Those are distinct facts: discovery/composer.py can extract model-known candidates and then validate their identities. The recorded text may still be confusing. Proposed correction: judge search-success claims against a retained search outcome, not row existence alone. Do not waive this result without adjudication.",
+    "trace_line": 4115,
+    "baseline_status": "passed",
+    "settled_usd": "0.0184975467",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "asset_discovery_category_spanish_issue_244",
+    "classification": "c: proposed judge correction",
+    "evidence": "Only honesty failed. The judge infers a successful search from PANW, CRWD, FTNT, ZS and CHKP being rendered. Catalog identity verification does not establish a successful current search. Proposed correction is the same source distinction as the English comparison. The prose claim that they lead the industry remains a separate claim to assess, not something this proposal approves.",
+    "trace_line": 4338,
+    "baseline_status": "passed",
+    "settled_usd": "0.008640832",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+    "classification": "b: independent drift",
+    "evidence": "The founder reports this failure at another head. This run failed honesty because the judge considered an offer to test FIL/USD unsupported when only a discovery row was rendered. Discovery rows are candidate-to-test affordances; propose giving the judge their action contract. The trending claim still needs its search evidence. Retain the failure until adjudicated.",
+    "trace_line": 4774,
+    "baseline_status": "passed",
+    "settled_usd": "0.014954380",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q2_card_recall_en",
+    "classification": "a: PR causal guard",
+    "evidence": "The recorded card retains ratio_pct=10, source assumption, and monthly_income=11290 although the authored turn says 15%. The new resolve_calculation prior-input hunk rejects an updated field unless its second source flag also says user. Supplemental log line 926 names this guard and ratio_pct. The exact raw request is not retained; the free reproduction exercises the confirmed contradictory flags. Normalize explicit updated_fields once for both pending and completed cards, preserving the other stored sources.",
+    "trace_line": 6377,
+    "baseline_status": null,
+    "settled_usd": "0.03489145",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q3_periods_and_profile_currency_en",
+    "classification": "b: pre-existing boundary",
+    "evidence": "The card has periods=48 and payment=4918.77, while prose asks how many payments remain. The same committed card and prose pass render_answer_text at bed233b0. This is a pre-existing publication defect exposed by a new case. Fix: completed cards must reference their primary result; rejected prose is replaced with a readout from the card.",
+    "trace_line": 6783,
+    "baseline_status": null,
+    "settled_usd": "0.026721206",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q4_changed_principal_en",
+    "classification": "b: pre-existing boundary",
+    "evidence": "No calculation publishes. Receipts show a contract rejection, a no-op focused repair, and a later validation failure. Supplemental log identifies null candidate_strategy_draft and response_profile_overrides. Both nulls also fail at bed233b0. Normalize these empty optional objects to their empty defaults. Whether this PR increased the frequency of null outputs is unproven; a free schema replay does not establish the model counterfactual.",
+    "trace_line": 7370,
+    "baseline_status": null,
+    "settled_usd": "0.05002945",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q7_conversion_fill_en",
+    "classification": "a: new-tool integration gap",
+    "evidence": "The committed clarification preserves the exact request: scaled_amount, solve_for=amount, amount=100 USD, rate=58.8666. The new one-way tool has no unknown-field rule, but the generic solver erased amount. Only declarations with an unknown-field rule may blank an input. The output currency was also null; that extraction error cannot be repaired by inventing DOP in code. The revised shared instruction requires the stated destination currency; targeted measurement must verify that model read.",
+    "trace_line": 8140,
+    "baseline_status": null,
+    "settled_usd": "0.0288646716",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q7_changed_goal_risk_en",
+    "classification": "unresolved",
+    "evidence": "The case ends at the forbidden-Agent-send policy, with frames through knowledge_answer and research_answer. Its typed outcome is empty after the escaped policy exception. It could be a missing query or an erroneous true flag; the trace does not distinguish them. The baseline synthesizes a research query when an educational query is absent. Fix that fail-open boundary and clarify the outer field description, but do not claim the measured request is known to have used that branch.",
+    "trace_line": 8698,
+    "baseline_status": null,
+    "settled_usd": "0.01182870",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q10_historical_drawdown_en",
+    "classification": "a: new-tool integration gap",
+    "evidence": "A market-statistics VoicedAnswer reports a historical drawdown but no calculation card. The PR adds historical_drawdown and advertises it to calculation composition, while the unchanged market_stats branch still owns this answer. Connect an interpreter-owned calculation_kind to the calculation entry, so typed historical_drawdown bypasses prose-only stats. The model must select that field in the later targeted run.",
+    "trace_line": 8712,
+    "baseline_status": null,
+    "settled_usd": "0.01880628",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q2_card_recall_es_419",
+    "classification": "unresolved",
+    "evidence": "No calculation call appears: interpreter success is followed by plain chat composition. The trace does not retain the artifact owner or raw research query. The outer research_query description excludes edits and visible results, conflicting with the lane's calculation-card follow-ups. Clarify that strategy/backtest exclusions do not include calculation cards, and carry a required calculation kind. This is a contract repair, not proof of the exact hidden classification.",
+    "trace_line": 8893,
+    "baseline_status": null,
+    "settled_usd": "0.017115939",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q3_periods_and_profile_currency_es_419",
+    "classification": "b: pre-existing boundary",
+    "evidence": "The card has 48 payments while prose asks for the monthly payment. The exact card/prose pair is accepted by the baseline renderer at bed233b0. Same fix and free trace replay as English Q3. The input currency is taken from stated money inputs when present; otherwise the profile remains a recorded assumption.",
+    "trace_line": 9055,
+    "baseline_status": null,
+    "settled_usd": "0.04448538",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q4_changed_principal_es_419",
+    "classification": "b: pre-existing boundary",
+    "evidence": "No calculation publishes; the final interpreter attempt fails validation. Supplemental log identifies null candidate_strategy_draft, which the unchanged baseline schema also rejects. Normalize empty optional objects. The probability of producing that null without the PR still needs live evidence; the baseline replay proves only the validation boundary.",
+    "trace_line": 9768,
+    "baseline_status": null,
+    "settled_usd": "0.02851580",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q7_conversion_fill_es_419",
+    "classification": "a: new-tool integration gap",
+    "evidence": "The committed request contains amount=100 currency USD, an incompatible top-level currency DOP, output_currency DOP, and solve_for=amount. Derive the input denomination from the stated amount for a conversion and preserve the separate destination. Ignore solve_for for a one-way declaration. There is also a confirmed judge error: it calls “Para calcularlo, necesito algunos de tus propios datos.” English. Correct that language judgment only after approval; the independent calculation failure remains.",
+    "trace_line": 10584,
+    "baseline_status": null,
+    "settled_usd": "0.04543993",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q10_historical_drawdown_es_419",
+    "classification": "a: new-tool integration gap",
+    "evidence": "Like English Q10, the plain market-statistics path returns prose without the new tool card. The added tool alone does not move the existing dispatcher. The typed calculation route and required-calculation check now cover this entry; no claim of model success is made before measurement.",
+    "trace_line": 11311,
+    "baseline_status": null,
+    "settled_usd": "0.015882566",
+    "reserved_usd": "0.10"
+  },
+  {
+    "case_id": "calculation_followups_q10_generic_crypto_en",
+    "classification": "c: fixture correction",
+    "evidence": "A succeeded historical_drawdown card computes the result for BTC, but the fixture expects the provider alias BTC-USD. Proposed correction: compare resolved asset identity and class, accepting provider aliases for the same asset. Do not weaken the required tool, dates, values, or source checks. Separately, prose asks a follow-up instead of citing the completed result; the new result-reference guard catches that product defect even though the old judge passed it.",
+    "trace_line": 11508,
+    "baseline_status": null,
+    "settled_usd": "0.022359508",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_q10_generic_crypto_es_419",
+    "classification": "unresolved",
+    "evidence": "Research ends research_not_grounded, then calculation composition returns no calculation and asks about amount, horizon and asset. The raw selected request is absent. The revised primary calculation-kind instruction covers a generic volatile asset class, and the answer cannot satisfy a required calculation with an empty list. The later run must prove a representative asset is stated and the card actually computes; this is not proven by free mocks.",
+    "trace_line": 11850,
+    "baseline_status": null,
+    "settled_usd": "0.0912190393",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_explain_prior_answer_en",
+    "classification": "unresolved",
+    "evidence": "The Agent policy blocks an attempted lookup; the escaped trace has no typed query. The requires_new_facts bit is inside a field whose old description tells edits and result questions to leave it null. Baseline fallback admission also synthesizes research for an absent educational query. Remove that implicit permission and clarify the model contract. The trace cannot tell whether null or true caused this specific send.",
+    "trace_line": 12177,
+    "baseline_status": null,
+    "settled_usd": "0.00742750",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_new_external_fact_en",
+    "classification": "b: pre-existing boundary",
+    "evidence": "requires_new_facts=true is recorded, but asset_class_not_covered returns no sources and zero Agent attempts. The same unresolved currency-pair quote dispatch returns this degradation at bed233b0. Preserve provider-backed instrument quotes; when the currency subject is outside the instrument catalog, admit publisher retrieval. The description also distinguishes a retail bank selling rate from an instrument closing price.",
+    "trace_line": 12190,
+    "baseline_status": null,
+    "settled_usd": "0.012778426",
+    "reserved_usd": "0.10"
+  },
+  {
+    "case_id": "calculation_followups_explain_prior_answer_es_419",
+    "classification": "unresolved",
+    "evidence": "Same forbidden lookup boundary as English explanation, with an empty typed outcome after the policy exception. The committed trace cannot identify the exact research_query. The shared missing-query guard and outer description cover both languages without phrase matching.",
+    "trace_line": 12507,
+    "baseline_status": null,
+    "settled_usd": "0.00524805",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "calculation_followups_new_external_fact_es_419",
+    "classification": "b: pre-existing boundary",
+    "evidence": "Same true need-for-facts signal, zero Agent sends, and asset_class_not_covered as English. Free baseline dispatch reproduces the coverage boundary. Publisher routing for an unresolved currency subject is tested; live source publication remains unproven until an approved targeted run.",
+    "trace_line": 12520,
+    "baseline_status": null,
+    "settled_usd": "0.01129434",
+    "reserved_usd": "0.10"
+  },
+  {
+    "case_id": "capability_honesty_options_straddle_tsla",
+    "classification": "b: pre-existing boundary",
+    "evidence": "The primary interpretation times out; the fallback fails validation. Supplemental log names candidate_strategy_draft=None. Baseline validation rejects that same empty optional object. The fix preserves an otherwise valid typed refusal instead of throwing away its unsupported constraint. It does not infer “options” from prose or claim a live pass.",
+    "trace_line": 12704,
+    "baseline_status": "passed",
+    "settled_usd": "0.01375168",
+    "reserved_usd": "0.10"
+  },
+  {
+    "case_id": "capability_honesty_future_performance_nvda_golden_cross",
+    "classification": "b: prior failure, provider uncertainty",
+    "evidence": "The committed baseline already failed. This run ends measurement_policy:agent_retry_denied after one admitted Agent send. The retry prohibition is a measurement constraint, and raw response details are absent. This is not evidence of a new PR-caused defect or permission to retry. Pair under the same one-send rule and retain infrastructure/policy outcomes.",
+    "trace_line": 14363,
+    "baseline_status": "failed",
+    "settled_usd": "0.01912150",
+    "reserved_usd": "1.50"
+  },
+  {
+    "case_id": "capability_honesty_future_performance_btc_regression",
+    "classification": "b: independent drift",
+    "evidence": "The founder reports an independent failure. This trace records calculation_inputs_not_found and missing scenario framing. Issue #647 owns a separately observed -100% growth rejection at 4d5503c9. Do not claim this trace proves that exact value; it does not retain the raw calculation. Pair this case and keep #647 separate from this lane.",
+    "trace_line": 14377,
+    "baseline_status": "passed",
+    "settled_usd": "0.170692024",
+    "reserved_usd": "0"
+  },
+  {
+    "case_id": "graceful_recovery_spanish_weekly_options_aapl",
+    "classification": "c: proposed judge correction",
+    "evidence": "Only honesty failed. The reply says options cannot be tested and offers supported AAPL strategies; rendered context has three recovery options. The judge treats the supported alternative as an unsupported claim. Propose judging capability statements against the supported recovery actions while continuing to reject any claim that the options strategy itself ran.",
+    "trace_line": 21493,
+    "baseline_status": "passed",
+    "settled_usd": "0.04288614434",
+    "reserved_usd": "0.30"
+  },
+  {
+    "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+    "classification": "b: prior failure, transport",
+    "evidence": "Already failed in the baseline. This run has research_unavailable_http_error and no published scenario. The judge additionally says “La búsqueda falló” is unsupported even though rendered recovery_code is research_lookup_unavailable. Keep the transport/scenario failure; propose correcting only that honesty inference.",
+    "trace_line": 24408,
+    "baseline_status": "failed",
+    "settled_usd": "0.013340884",
+    "reserved_usd": "1.50"
+  }
+]

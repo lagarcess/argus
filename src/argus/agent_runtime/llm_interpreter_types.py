@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
@@ -298,6 +298,15 @@ class LLMAmbiguousField(BaseModel):
 
 
 class LLMInterpretationResponse(BaseModel):
+    @field_validator(
+        "candidate_strategy_draft", "response_profile_overrides", mode="before"
+    )
+    @classmethod
+    def _empty_optional_objects(cls, value: Any) -> Any:
+        # Null and omitted optional objects both mean no supplied fields, not
+        # failure of an otherwise usable typed question or refusal.
+        return {} if value is None else value
+
     intent: Literal[
         "beginner_guidance",
         "strategy_drafting",
@@ -326,9 +335,13 @@ class LLMInterpretationResponse(BaseModel):
             "including named comparisons and asset discovery. This primary "
             "interpretation owns the research route; no later model reclassifies "
             "the message. Leave candidate_strategy_draft empty for research. "
-            "Leave research_query null for build/run requests, replies to a pending "
-            "setup question, edits, approvals, and questions about a visible result "
-            "or confirmation. A named comparison is research unless the user asks "
+            "Populate it also for calculation-card edits, replies supplying requested "
+            "calculation inputs, and explanations of earlier money answers. Set "
+            "requires_new_facts false when the conversation suffices. Calculation "
+            "cards are not backtest results or strategy confirmations. Leave "
+            "research_query null for building or running a strategy, strategy-setup "
+            "replies, strategy edits and approvals, and backtest-result questions. "
+            "A named comparison is research unless the user asks "
             "to simulate an investment or strategy."
         ),
     )

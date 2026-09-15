@@ -1,0 +1,8 @@
+2026-09-15 16:47:45.252 | INFO     | argus.agent_runtime.interpreter.research_routing:_note_research_route:204 - Research answers a read the fact gate declined intent=conversation_followup act=educational_question code=research_answers_unkinded_question
+source: /Users/garces/.codex/worktrees/4aab/private-alpha-next/temp/diagnosis-baseline/src/argus/agent_runtime/answer_calculation.py
+null object candidate_strategy_draft rejected model_type
+null object response_profile_overrides rejected model_type
+calculation_followups_q3_periods_and_profile_currency_en ('How many monthly payments remain?', None)
+calculation_followups_q3_periods_and_profile_currency_es_419 ('¿Cuál es tu cuota mensual?', None)
+missing-query educational fallback: concept
+uncovered currency fact: {'code': 'asset_class_not_covered'} sources: 0

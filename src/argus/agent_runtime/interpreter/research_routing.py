@@ -89,7 +89,16 @@ def scenario_is_typed(query: Any, interpretation: Any) -> bool:
 def primary_read_needs_no_new_facts(interpretation: Any) -> bool:
     """The current typed question is answerable from the conversation alone."""
     query = getattr(interpretation, "research_query", None)
-    return query is not None and not query.requires_new_facts
+    return (
+        not query.requires_new_facts
+        if query is not None
+        else (
+            interpretation.semantic_turn_act == "educational_question"
+            and interpretation.intent in _QUESTION_INTENTS
+            and getattr(interpretation, "asset_discovery", None) is None
+            and not research_turn_has_conflicting_owner(interpretation)
+        )
+    )
 
 
 def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
@@ -127,11 +136,12 @@ def primary_read_is_arithmetic(interpretation: Any) -> bool:
     """
     query = getattr(interpretation, "research_query", None)
     return bool(
-        query is not None
-        and (
+        (
             primary_read_needs_no_new_facts(interpretation)
+            or (query is not None and query.calculation_kind == "historical_drawdown")
             or (
-                query.scenario_question
+                query is not None
+                and query.scenario_question
                 and not query.symbols
                 and query.question_kind == "none"
             )
@@ -186,7 +196,9 @@ def unsupported_verdict_research_query(
     ):
         return None
     _note_research_route(interpretation, UNSUPPORTED_VERDICT_REASON_CODE)
-    return ResearchQueryExtraction(question_kind="current_external")
+    return ResearchQueryExtraction(
+        question_kind="current_external", requires_new_facts=False
+    )
 
 
 def unkinded_question_research_query(
@@ -209,7 +221,7 @@ def unkinded_question_research_query(
     ):
         return None
     _note_research_route(interpretation, UNKINDED_QUESTION_REASON_CODE)
-    return ResearchQueryExtraction(question_kind="concept")
+    return ResearchQueryExtraction(question_kind="concept", requires_new_facts=False)
 
 
 def _note_research_route(interpretation: Any, code: str) -> None:

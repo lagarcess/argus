@@ -1,0 +1,22 @@
+{
+  "provenance": "Supplemental local pytest log, not part of the original committed scorecard. Only guard and null-validation diagnostics copied. The raw provider responses were not retained.",
+  "source_sha256": "298425f32bf8e352dd89b37f88b2ae337206a9e046f3be2fa91b4f0efe744765",
+  "entries": [
+    {
+      "source_line": 926,
+      "text": "2026-09-15 15:21:15.481 | INFO     | argus.agent_runtime.answer_calculation:_note:877 - Answer calculation guard calculation_input_change_not_stated {'name': 'ratio_pct'}"
+    },
+    {
+      "source_line": 969,
+      "text": "2026-09-15 15:22:16.909 | WARNING  | argus.llm.openrouter:log_openrouter_failure:1062 - Direct LLM interpretation candidate failed; trying next configured model task=interpretation model=anthropic/claude-haiku-4.5 max_tokens=3200 error_type=ValidationError error_origin=openrouter.py:492 error_detail=2 validation errors for LLMInterpretationResponse candidate_strategy_draft Input should be an object [type=model_type, input_value=None, input_type=NoneType] For further information visit https://errors.pydantic.dev/2.12/v/model_type response_profile_overrides Input should be an object [type=model_t...<truncated>"
+    },
+    {
+      "source_line": 1131,
+      "text": "2026-09-15 15:26:30.801 | WARNING  | argus.llm.openrouter:log_openrouter_failure:1062 - Direct LLM interpretation candidate failed; trying next configured model task=interpretation model=anthropic/claude-haiku-4.5 max_tokens=3200 error_type=ValidationError error_origin=openrouter.py:492 error_detail=2 validation errors for LLMInterpretationResponse candidate_strategy_draft Input should be an object [type=model_type, input_value=None, input_type=NoneType] For further information visit https://errors.pydantic.dev/2.12/v/model_type response_profile_overrides Input should be an object [type=model_t...<truncated>"
+    },
+    {
+      "source_line": 1311,
+      "text": "2026-09-15 15:32:39.339 | WARNING  | argus.llm.openrouter:log_openrouter_failure:1062 - Direct LLM interpretation candidate failed; trying next configured model task=interpretation model=anthropic/claude-haiku-4.5 max_tokens=3200 error_type=ValidationError error_origin=openrouter.py:492 error_detail=1 validation error for LLMInterpretationResponse candidate_strategy_draft Input should be an object [type=model_type, input_value=None, input_type=NoneType] For further information visit https://errors.pydantic.dev/2.12/v/model_type"
+    }
+  ]
+}

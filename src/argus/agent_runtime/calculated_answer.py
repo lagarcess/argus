@@ -28,6 +28,7 @@ from argus.agent_runtime.answer_calculation import (
     latest_market_close,
     publish_calculations,
 )
+from argus.agent_runtime.calculation_continuity import normalize_calculation_edits
 from argus.agent_runtime.calculation_rows import market_counterfactual_rows
 from argus.agent_runtime.knowledge_answer import VoicedAnswer
 from argus.agent_runtime.result_next_steps import next_steps_patch, offered_test_steps
@@ -159,6 +160,7 @@ def calculated_answer(
     lookup_failed: bool = False,
     offered: bool = False,
     evidence: Sequence[RetrievedRow] = (),
+    required_kind: str | None = None,
 ) -> CalculatedAnswer | None:
     """One voicing call and its computed calculation, or None when voicing failed."""
     if not resolve_openrouter_api_key():
@@ -173,6 +175,7 @@ def calculated_answer(
             pending=pending,
             lookup_failed=lookup_failed,
             offered=offered,
+            required_kind=required_kind,
         )
     )
     if voiced is None:
@@ -186,6 +189,11 @@ def calculated_answer(
         )
         return None
     prose = voiced.as_markdown()
+    if required_kind and not any(
+        item.kind == required_kind for item in voiced.calculations
+    ):
+        notes.append("required_calculation_missing")
+        return None
     if not voiced.calculations:
         return None if "{{" in prose else CalculatedAnswer(prose, {}, None, None, None)
     from argus.domain.capability_registry import get_tool_catalog
@@ -288,6 +296,11 @@ async def calculated_answer_stage_result(
         pending=pending,
         retrieved=retrieved,
         offered=offered,
+        required_kind=(
+            interpretation.research_query.calculation_kind
+            if interpretation.research_query
+            else None
+        ),
         evidence=[
             RetrievedRow.model_validate(row)
             for row in ((pending or {}).get("evidence") or [])
@@ -445,6 +458,7 @@ def completed_pending(
         return list(voiced)
     if not stored:
         return list(voiced)
+    voiced = [normalize_calculation_edits(request, notes) for request in voiced]
     replied = dict(zip(calculation_names(voiced), voiced, strict=True))
     by_calculation = pending.get(REQUESTED_BY_CALCULATION_KEY)
     requested = {
@@ -587,6 +601,7 @@ def _messages(
     pending: dict[str, Any] | None,
     lookup_failed: bool = False,
     offered: bool = False,
+    required_kind: str | None = None,
 ) -> list[dict[str, str]]:
     context = [
         NO_SEARCH_ANSWER_GUIDANCE,
@@ -594,6 +609,12 @@ def _messages(
         ANSWER_CALCULATION_INSTRUCTIONS,
         calculation_kinds_clause(),
     ]
+    if required_kind:
+        context.append(
+            f"The primary interpretation requires {required_kind}. Return that "
+            "calculation with its inputs and sources. Do not replace it with prose "
+            "or questions for inputs that this calculation does not use.\n"
+        )
     lines: list[str] = []
     for turn in list(history or [])[-_HISTORY_TURNS:]:
         role = str(

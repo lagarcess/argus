@@ -557,9 +557,11 @@ def test_a_concept_question_takes_the_grounded_balanced_path(monkeypatch) -> Non
     assert CONCEPT_QUESTION_REASON_CODE in result.decision.reason_codes
 
 
-def test_an_out_of_scope_verdict_with_nothing_to_run_is_researched(monkeypatch) -> None:
-    from argus.agent_runtime.interpreter.research_routing import (
-        UNSUPPORTED_VERDICT_REASON_CODE,
+def test_an_out_of_scope_verdict_needs_a_typed_external_fact_to_research(
+    monkeypatch,
+) -> None:
+    set_research_query(
+        monkeypatch, globals(), question_kind="current_external", requires_new_facts=True
     )
 
     transport = _wire_client(
@@ -575,7 +577,6 @@ def test_an_out_of_scope_verdict_with_nothing_to_run_is_researched(monkeypatch) 
     result = _run("Which credit card should I get?")
 
     assert result is not None and transport.requests
-    assert UNSUPPORTED_VERDICT_REASON_CODE in result.decision.reason_codes
 
 
 def test_an_out_of_scope_verdict_that_asks_or_can_run_keeps_its_route(
@@ -701,6 +702,9 @@ def test_a_research_answer_ends_with_the_questions_its_research_offered(
 def test_a_declined_request_keeps_its_plain_reply_and_offers_nothing(monkeypatch) -> None:
     from argus.agent_runtime.research_grounded import DECLINED_REASON_CODE
 
+    set_research_query(
+        monkeypatch, globals(), question_kind="current_external", requires_new_facts=True
+    )
     reply = "Argus does not place trades. It can test a trading idea on past data."
     _wire_client(
         monkeypatch,
@@ -755,16 +759,13 @@ def test_an_answer_stating_a_figure_with_no_source_is_recorded_not_replaced(
 
 
 @pytest.mark.parametrize("intent", ["conversation_followup", "beginner_guidance"])
-def test_an_educational_question_left_with_no_kind_is_researched_for_the_readers_country(
+def test_an_explicit_fact_question_is_researched_for_the_readers_country(
     monkeypatch, intent
 ) -> None:
-    """A question the primary read typed no kind for is research's, not the
-    interpreter's own prose: the reader's country and currency reach the
-    prompt, so the answer never assumes another country or asks for it."""
-    from argus.agent_runtime.interpreter.research_routing import (
-        UNKINDED_QUESTION_REASON_CODE,
+    """Profile context reaches explicitly admitted research; a missing query no longer admits it."""
+    set_research_query(
+        monkeypatch, globals(), question_kind="concept", requires_new_facts=True
     )
-
     original = globals()["_interpretation"]
     monkeypatch.setitem(
         globals(),
@@ -794,10 +795,12 @@ def test_an_educational_question_left_with_no_kind_is_researched_for_the_readers
         "Answer for that country unless the question names another, and never ask "
         "where the reader lives."
     ) in body["input"]
-    assert UNKINDED_QUESTION_REASON_CODE in result.decision.reason_codes
 
 
 def test_a_reader_with_no_country_is_never_placed_in_one(monkeypatch) -> None:
+    set_research_query(
+        monkeypatch, globals(), question_kind="concept", requires_new_facts=True
+    )
     original = globals()["_interpretation"]
     monkeypatch.setitem(
         globals(),
@@ -814,7 +817,7 @@ def test_a_reader_with_no_country_is_never_placed_in_one(monkeypatch) -> None:
         ],
     )
 
-    assert _run("Should I put my emergency fund in crypto?") is not None
+    assert _run("What is an emergency fund? Use published guidance.") is not None
 
     body = __import__("json").loads(transport.requests[0].content.decode())
     assert "The reader lives in" not in body["input"]

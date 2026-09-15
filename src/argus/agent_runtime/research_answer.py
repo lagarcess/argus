@@ -77,6 +77,12 @@ async def research_answer_stage_result(
     )
     if query is None:
         return None
+    if not query.requires_new_facts:
+        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
+
+        return await calculated_answer_stage_result(
+            interpretation=interpretation, state=state, user=user
+        )
     return await _dispatch(
         query,
         interpretation=interpretation,
@@ -239,7 +245,11 @@ async def _dispatch(
     subjects = _resolved_subjects(query)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]
     if off_coverage or query.asset_class_hint in ("crypto", "currency_pair"):
-        if not (grounded.requires_publisher_sources(query) or scenario):
+        if not (
+            grounded.requires_publisher_sources(query)
+            or scenario
+            or (not subjects and query.asset_class_hint == "currency_pair")
+        ):
             return await grounded.off_coverage_result(
                 query=query,
                 subjects=subjects,

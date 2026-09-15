@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+
+
+def _calculation_kind_schema(schema: dict[str, Any]) -> None:
+    # Keep calculation and engine imports out of API startup. The catalogue is
+    # needed only when producing a model's response schema.
+    from argus.domain.calculations.answer_request import calculation_kinds
+
+    schema["anyOf"] = [
+        {"type": "string", "enum": list(calculation_kinds())},
+        {"type": "null"},
+    ]
 
 
 class ResearchQueryExtraction(BaseModel):
@@ -28,7 +39,9 @@ class ResearchQueryExtraction(BaseModel):
         description=(
             "Shape of a finance question, not an execution request. live_quote: only "
             "a current price, quote, level, market cap, multiple or pre/after-hours "
-            "figure. A request also asking why, what changed, or growth drivers is "
+            "figure for a supported market instrument. A bank's retail buying or selling "
+            "rate is current_external and requires publisher sources, not an "
+            "instrument's closing price. A request also asking why, what changed, or growth drivers is "
             "not live_quote in any language. company_lookup: one company's history, "
             "fundamentals, financial statements, earnings, business model, peers or "
             "explanation, including forward-looking and valuation questions about "
@@ -50,6 +63,18 @@ class ResearchQueryExtraction(BaseModel):
             "are build requests, not market_stats."
         )
     )
+    calculation_kind: str | None = Field(
+        default=None,
+        json_schema_extra=_calculation_kind_schema,
+        description=(
+            "The calculation needed to answer this turn, or null when no calculation "
+            "is needed. For a reply filling a requested calculation input or changing "
+            "a computed card, keep that calculation's kind. For putting money in a "
+            "volatile asset, including a generic asset class such as crypto, select "
+            "historical_drawdown: Argus computes it from its own market data. "
+            "An explanation alone does not require a new calculation."
+        ),
+    )
     requires_new_facts: bool = Field(
         default=True,
         description=(
@@ -58,7 +83,9 @@ class ResearchQueryExtraction(BaseModel):
             "history, existing artifacts, and the user's stated inputs suffice, "
             "including recalculation with changed inputs or explanation of an "
             "earlier answer. A named asset or a follow-up alone does not require "
-            "new facts."
+            "new facts. Model memory is not conversation evidence. Finding new assets "
+            "by category requires new verified facts unless suitable candidates are "
+            "already present in the conversation."
         ),
     )
     symbols: list[str] = Field(

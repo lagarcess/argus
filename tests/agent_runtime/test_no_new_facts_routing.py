@@ -211,3 +211,80 @@ def test_thorough_packet_composition_does_not_block_the_event_loop(monkeypatch) 
         )
     )
     assert compose_threads and compose_threads[0] != main_thread
+
+
+@pytest.mark.parametrize("answer_available", [False, True])
+def test_missing_question_payload_never_synthesizes_permission_to_research(
+    monkeypatch, answer_available
+):
+    answer = StageResult(outcome="ready_to_respond") if answer_available else None
+    no_search = AsyncMock(return_value=answer)
+    research = AsyncMock(
+        side_effect=AssertionError("Missing evidence is not research permission")
+    )
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    monkeypatch.setattr(ca, "calculated_answer_stage_result", no_search)
+    monkeypatch.setattr(ra, "_dispatch", research)
+    result = asyncio.run(
+        ka.knowledge_answer_stage_result(
+            **_kwargs(_interpretation(research_query=None)),
+            snapshot=None,
+            selected_thread_metadata={},
+        )
+    )
+    assert result is answer
+    no_search.assert_awaited_once()
+    research.assert_not_awaited()
+
+
+def test_typed_drawdown_reaches_the_calculation_even_when_market_stats_needs_data(
+    monkeypatch,
+):
+    no_search = AsyncMock(return_value=StageResult(outcome="ready_to_respond"))
+    legacy = AsyncMock(side_effect=AssertionError("Drawdown must publish a tool card"))
+    monkeypatch.setattr(ca, "calculated_answer_stage_result", no_search)
+    monkeypatch.setattr(ra, "research_answer_stage_result", legacy)
+    interpretation = _interpretation(
+        research_query={
+            "question_kind": "market_stats",
+            "requires_new_facts": True,
+            "calculation_kind": "historical_drawdown",
+            "symbols": ["BTC"],
+        }
+    )
+    assert (
+        asyncio.run(
+            ka.knowledge_answer_stage_result(
+                **_kwargs(interpretation), snapshot=None, selected_thread_metadata={}
+            )
+        )
+        is not None
+    )
+    no_search.assert_awaited_once()
+    legacy.assert_not_awaited()
+
+
+def test_outside_currency_fact_reaches_publisher_retrieval(monkeypatch):
+    publish = AsyncMock(return_value=StageResult(outcome="ready_to_respond"))
+    decline = AsyncMock(
+        side_effect=AssertionError("Finance coverage does not own retail FX facts")
+    )
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    monkeypatch.setattr(ra, "_resolved_subjects", lambda query: [])
+    monkeypatch.setattr(ra.grounded, "grounded_result", publish)
+    monkeypatch.setattr(ra.grounded, "off_coverage_result", decline)
+    interpretation = _interpretation(
+        research_query={
+            "question_kind": "live_quote",
+            "requires_new_facts": True,
+            "asset_class_hint": "currency_pair",
+            "symbols": [],
+        }
+    )
+    assert (
+        asyncio.run(ra.research_answer_stage_result(**_kwargs(interpretation)))
+        is not None
+    )
+    assert publish.await_args.kwargs["provider_finance"] is False
+    assert publish.await_args.kwargs["shape"] == "balanced"
+    decline.assert_not_awaited()

@@ -1,0 +1,264 @@
+diff --git a/src/argus/agent_runtime/answer_calculation.py b/src/argus/agent_runtime/answer_calculation.py
+index d1b9ec33..6a4a7132 100644
+--- a/src/argus/agent_runtime/answer_calculation.py
++++ b/src/argus/agent_runtime/answer_calculation.py
+@@ -30,2 +30,6 @@ from pydantic import ValidationError
+-from argus.agent_runtime.stages.tool_execution import local_tool_call_patch
+-from argus.domain.calculations import is_free_calculation
++from argus.agent_runtime.calculation_continuity import prior_calculation_arguments
++from argus.agent_runtime.stages.tool_execution import (
++    local_tool_call_patch,
++    tool_outcome_patch,
++)
++from argus.domain.calculations import is_calculation
+@@ -52,0 +57 @@ from argus.domain.tool_declaration import ToolDeclaration, ToolInvocationError
++from argus.domain.tool_presentation_facts import presentation_reference_facts
+@@ -137,0 +143 @@ def publish_calculations(
++    history: Sequence[Any] = (),
+@@ -143,0 +150,4 @@ def publish_calculations(
++        prior = prior_calculation_arguments(request, history)
++        if request.prior_artifact_id and prior is None:
++            _note(notes, "calculation_prior_artifact_unavailable")
++            return None
+@@ -152,0 +163 @@ def publish_calculations(
++            prior_arguments=prior,
+@@ -224,0 +236 @@ def resolve_calculation(
++    prior_arguments: Mapping[str, Any] | None = None,
+@@ -227 +239 @@ def resolve_calculation(
+-    if declaration is None or not is_free_calculation(declaration):
++    if declaration is None or not is_calculation(declaration):
+@@ -232,3 +244,14 @@ def resolve_calculation(
+-    counted_in = _calculation_currency(request, currency, notes)
+-    arguments: dict[str, Any] = {CURRENCY_FIELD: counted_in}
+-    symbol = _stated_symbol(request) or subject_symbol
++    prior = dict(prior_arguments or {})
++    counted_in = (
++        str(prior[CURRENCY_FIELD])
++        if CURRENCY_FIELD in prior and CURRENCY_FIELD not in request.updated_fields
++        else _calculation_currency(request, currency, notes)
++    )
++    arguments: dict[str, Any] = dict(prior)
++    if CURRENCY_FIELD in declared:
++        arguments[CURRENCY_FIELD] = counted_in
++    symbol = (
++        prior[SYMBOL_FIELD]
++        if SYMBOL_FIELD in prior and SYMBOL_FIELD not in request.updated_fields
++        else _stated_symbol(request) or subject_symbol
++    )
+@@ -237 +260,11 @@ def resolve_calculation(
+-    sources: dict[str, ToolFactSource] = {}
++    sources = {
++        name: ToolFactSource.model_validate(value)
++        for name, value in (prior.get(TOOL_INPUT_SOURCES_FIELD) or {}).items()
++    }
++    currency_input = _explicit_currency(request)
++    if (
++        CURRENCY_FIELD in declared
++        and (CURRENCY_FIELD not in prior or CURRENCY_FIELD in request.updated_fields)
++        and currency_input is None
++    ):
++        sources[CURRENCY_FIELD] = ToolFactSource(kind="assumption")
+@@ -241 +274,3 @@ def resolve_calculation(
+-        if name in (CURRENCY_FIELD, SYMBOL_FIELD) or name == request.solve_for:
++        if name == SYMBOL_FIELD or name == request.solve_for:
++            continue
++        if name == CURRENCY_FIELD and item != currency_input:
+@@ -245,0 +281,9 @@ def resolve_calculation(
++        if (
++            name in prior
++            and prior[name] is not None
++            and name not in request.updated_fields
++        ):
++            continue
++        if name in prior and name in request.updated_fields and item.source != "user":
++            _note(notes, "calculation_input_change_not_stated", name=name)
++            continue
+@@ -287,0 +332,2 @@ def resolve_calculation(
++    if CURRENCY_FIELD in declared:
++        arguments[CURRENCY_FIELD] = counted_in
+@@ -308,0 +355,10 @@ def computed_answer_patch(resolved: ResolvedCalculation) -> dict[str, Any]:
++    if (
++        declaration.policy.execution == "provider"
++        and declaration.policy.confirmation == "never"
++    ):
++        return tool_outcome_patch(
++            declaration=declaration,
++            call=call,
++            outcome=declaration.invoke_sync(call.arguments),
++            artifact_id=str(uuid4()),
++        )
+@@ -313,0 +370,13 @@ def computed_answer_patch(resolved: ResolvedCalculation) -> dict[str, Any]:
++def calculation_ends_answer(patch: Mapping[str, Any] | None) -> bool:
++    """A terminal calculation shows its evidence without offering another task."""
++    from argus.domain.capability_registry import get_tool_catalog
++
++    catalog = get_tool_catalog()
++    return any(
++        card.outcome.status == "succeeded"
++        and (declaration := catalog.get(card.tool_name)) is not None
++        and declaration.policy.ends_answer
++        for card in cards_in(patch)
++    )
++
++
+@@ -575,8 +644 @@ def _reference_facts(card: ToolResultCard) -> dict[str, ToolFact]:
+-    presentation = card.presentation
+-    facts: dict[str, ToolFact] = {
+-        fact.name: fact for fact in presentation.inputs if fact.value is not None
+-    }
+-    facts.update({row.name: row for row in presentation.rows})
+-    if presentation.answer is not None:
+-        facts[presentation.answer.name] = presentation.answer
+-    return facts
++    return presentation_reference_facts(card.presentation)
+@@ -675 +737,10 @@ def _calculation_currency(
+-    stated = next(
++    stated = _explicit_currency(request)
++    if stated is not None:
++        return str(stated.value).strip().upper()
++    default = currency.strip().upper() if currency else DEFAULT_CURRENCY
++    _note(notes, CURRENCY_DEFAULTED_REASON_CODE, currency=default)
++    return default
++
++
++def _explicit_currency(request: AnswerCalculation):
++    return next(
+@@ -677 +748 @@ def _calculation_currency(
+-            str(item.value).strip().upper()
++            item
+@@ -679 +750,4 @@ def _calculation_currency(
+-            if item.name == CURRENCY_FIELD and isinstance(item.value, str)
++            if item.name == CURRENCY_FIELD
++            and item.source != "assumption"
++            and isinstance(item.value, str)
++            and item.value.strip().upper() in CURRENCY_CODES
+@@ -681 +755 @@ def _calculation_currency(
+-        "",
++        None,
+@@ -683,6 +756,0 @@ def _calculation_currency(
+-    if stated in CURRENCY_CODES:
+-        return stated
+-    if currency:
+-        return currency.strip().upper()
+-    _note(notes, CURRENCY_DEFAULTED_REASON_CODE, currency=DEFAULT_CURRENCY)
+-    return DEFAULT_CURRENCY
+@@ -797,0 +866,2 @@ def _blank_inputs(
++    if declaration.policy.execution != "local":
++        return []
+diff --git a/src/argus/agent_runtime/calculation_continuity.py b/src/argus/agent_runtime/calculation_continuity.py
+new file mode 100644
+index 00000000..851be903
+--- /dev/null
++++ b/src/argus/agent_runtime/calculation_continuity.py
+@@ -0,0 +1,65 @@
++"""Read prior calculation arguments only from assistant artifact history."""
++
++from __future__ import annotations
++
++import json
++from collections.abc import Mapping, Sequence
++from typing import Any
++
++from argus.domain.calculation_turn_facts import CALCULATION_HISTORY_KEY
++from argus.domain.calculations.answer_request import AnswerCalculation
++from argus.domain.capability_registry import get_tool_catalog
++
++
++def prior_calculation_arguments(
++    request: AnswerCalculation, history: Sequence[Any]
++) -> dict[str, Any] | None:
++    """An explicit artifact reference is scoped to the loaded conversation.
++
++    No positional or name fallback: two cards may compute the same primitive.
++    The latest revision of the referenced card owns its inputs.
++    """
++    if not request.prior_artifact_id:
++        return None
++    declaration = get_tool_catalog().get(request.kind)
++    supplied = {item.name for item in request.inputs if item.value is not None}
++    if (
++        declaration is None
++        or set(request.updated_fields) - set(declaration.policy.editable_fields)
++        or set(request.updated_fields) - supplied
++    ):
++        return None
++    for turn in reversed(history):
++        role = (
++            turn.get("role") if isinstance(turn, Mapping) else getattr(turn, "role", None)
++        )
++        content = (
++            turn.get("content")
++            if isinstance(turn, Mapping)
++            else getattr(turn, "content", None)
++        )
++        if role != "assistant" or not isinstance(content, str):
++            continue
++        try:
++            document = json.loads(content)
++        except (ValueError, TypeError):
++            continue
++        if not isinstance(document, dict):
++            continue
++        cards = document.get(CALCULATION_HISTORY_KEY)
++        if not isinstance(cards, list):
++            continue
++        for card in cards:
++            if (
++                not isinstance(card, dict)
++                or card.get("artifact_id") != request.prior_artifact_id
++            ):
++                continue
++            if card.get("kind") != request.kind or card.get("status") != "succeeded":
++                return None
++            result = card.get("result") or {}
++            if result.get("solved_field") != request.solve_for:
++                return None
++            arguments = card.get("arguments")
++            return dict(arguments) if isinstance(arguments, Mapping) else None
++    return None
+diff --git a/src/argus/agent_runtime/knowledge_answer.py b/src/argus/agent_runtime/knowledge_answer.py
+index e5d15647..57fc7e55 100644
+--- a/src/argus/agent_runtime/knowledge_answer.py
++++ b/src/argus/agent_runtime/knowledge_answer.py
+@@ -23,0 +24 @@ from argus.agent_runtime.interpreter.research_routing import (
++    primary_read_needs_no_new_facts,
+@@ -24,0 +26 @@ from argus.agent_runtime.interpreter.research_routing import (
++    research_turn_has_conflicting_owner,
+@@ -211,0 +214,11 @@ async def knowledge_answer_stage_result(
++    if primary_read_needs_no_new_facts(
++        interpretation
++    ) and research_turn_has_conflicting_owner(interpretation):
++        return None
++    if primary_read_is_arithmetic(interpretation):
++        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
++
++        # A failed no-search answer cannot become permission to buy new facts.
++        return await calculated_answer_stage_result(
++            interpretation=interpretation, state=state, user=user
++        )
+@@ -226,9 +238,0 @@ async def knowledge_answer_stage_result(
+-    if primary_read_is_arithmetic(interpretation):
+-        # The user's own numbers are enough: the no-search answer computes it.
+-        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
+-
+-        computed = await calculated_answer_stage_result(
+-            interpretation=interpretation, state=state, user=user
+-        )
+-        if computed is not None:
+-            return computed
+diff --git a/src/argus/agent_runtime/research_query.py b/src/argus/agent_runtime/research_query.py
+index baeec3e8..a1371032 100644
+--- a/src/argus/agent_runtime/research_query.py
++++ b/src/argus/agent_runtime/research_query.py
+@@ -52,0 +53,11 @@ class ResearchQueryExtraction(BaseModel):
++    requires_new_facts: bool = Field(
++        default=True,
++        description=(
++            "True when answering the current question requires external facts not "
++            "already available in the conversation. False when conversation "
++            "history, existing artifacts, and the user's stated inputs suffice, "
++            "including recalculation with changed inputs or explanation of an "
++            "earlier answer. A named asset or a follow-up alone does not require "
++            "new facts."
++        ),
++    )

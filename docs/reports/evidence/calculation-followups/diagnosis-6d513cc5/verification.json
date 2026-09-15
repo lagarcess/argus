@@ -1,0 +1,22 @@
+{
+  "paid_calls": 0,
+  "full_free_suite_before_final_currency_retention_fix": {
+    "passed": 8894,
+    "skipped": 605,
+    "expected_freeze_failures": 7
+  },
+  "final_focused_summary": "============================= 121 passed in 4.83s ==============================",
+  "runtime_sha256": {
+    "src/argus/agent_runtime/answer_calculation.py": "6e18bd15e36b0a4bdcf4b1cebd0c21aef940552b5222c745a5e88fb74e6b0979",
+    "src/argus/agent_runtime/calculated_answer.py": "f87ed91250840379e7efc29849869abe0597710d05db523b29d53ac9204ff7b6",
+    "src/argus/agent_runtime/calculation_continuity.py": "37ee4ba639662561a69bba4bf31d2d39e44aa2a14b3be285254ac054264f7406",
+    "src/argus/agent_runtime/interpreter/research_routing.py": "54db837d42952720d15e2df52acc2a5e39c8bcd4af6f3d7928475e7f24dffe69",
+    "src/argus/agent_runtime/llm_interpreter_types.py": "3044ca3c44dfd15cc32471b3947f6f4a5b20128210f514303fb938f35139a7bd",
+    "src/argus/agent_runtime/research_answer.py": "e39237c369e1dd71bdef8bf0ca04184f78307580655e9b067fb11b30af9ac179",
+    "src/argus/agent_runtime/research_query.py": "b686178abd595a962337fe9e75365f3fe19eace52a98a794884eb4a671a572fc",
+    "src/argus/domain/calculations/answer_request.py": "f3c40d03825c652ebf86e4bf73c565ebf91a54d256c427a4a4829979f1bfe0db"
+  },
+  "ruff": "passed",
+  "modularity": "passed",
+  "hosted_ci": "Pending push; terminal exact-head result will be reported on PR 634."
+}

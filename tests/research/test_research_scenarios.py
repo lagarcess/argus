@@ -15,10 +15,12 @@ import pytest
 from argus.agent_runtime import research_answer as ra
 from argus.agent_runtime import research_calculation
 from argus.agent_runtime import research_grounded as grounded
+from argus.agent_runtime.answer_calculation import figure_text
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.tool_contracts import ToolFact
 
 from tests.research.conftest import (
     RecordingTransport,
@@ -152,8 +154,11 @@ def test_a_scenario_publishes_its_calculation_and_argus_computes_it(
     sidecar = result.stage_patch["research"]
     assert "degraded" not in sidecar
     answer = result.stage_patch["assistant_response"]
-    assert "USD 218.36" in answer and "25%" in answer and "{{" not in answer
     card = _scenario_card(result)
+    # The old mocked prose references only inputs. The completed-card guard
+    # now replaces it with computed facts, without altering the provider fixture.
+    assert figure_text(ToolFact.model_validate(card["presentation"]["answer"])) in answer
+    assert "{{" not in answer
     assert card["tool_name"] == "valuation_scenarios"
     assert card["outcome"]["status"] == "succeeded"
     assert card["arguments"]["price"] == 218.36
@@ -459,7 +464,12 @@ def test_a_scenario_typed_as_market_stats_is_grounded_not_voiced_from_history(
     body = __import__("json").loads(transport.requests[0].content.decode())
     assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert result.stage_patch["research"]["shape"] == "balanced"
-    assert "Bear" in result.stage_patch["assistant_response"]
+    assert (
+        figure_text(
+            ToolFact.model_validate(_scenario_card(result)["presentation"]["answer"])
+        )
+        in result.stage_patch["assistant_response"]
+    )
 
 
 def test_a_scenario_about_named_subjects_is_a_fact_question_whatever_its_kind(
@@ -624,7 +634,12 @@ def test_a_scenario_typed_as_a_survey_is_not_handled_as_one(monkeypatch) -> None
     sidecar = result.stage_patch["research"]
     assert sidecar["capability_class"] == "balanced_lookup"
     assert "degraded" not in sidecar
-    assert "Bear" in result.stage_patch["assistant_response"]
+    assert (
+        figure_text(
+            ToolFact.model_validate(_scenario_card(result)["presentation"]["answer"])
+        )
+        in result.stage_patch["assistant_response"]
+    )
 
 
 def test_a_subjectless_scenario_reaches_research_only_when_a_page_supplies_a_figure(

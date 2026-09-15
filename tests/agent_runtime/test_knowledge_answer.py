@@ -107,7 +107,9 @@ def test_pending_reply_and_execution_turns_are_left_alone(monkeypatch) -> None:
 
     assert (
         _run(
-            _interpretation(intent="strategy_drafting", semantic_turn_act="answer_pending_need"),
+            _interpretation(
+                intent="strategy_drafting", semantic_turn_act="answer_pending_need"
+            ),
             metadata={"last_stage_outcome": "await_user_reply"},
         )
         is None
@@ -271,7 +273,7 @@ def test_unsupported_turn_with_unavailable_classifier_declines(
     assert _run(_interpretation()) is None
 
 
-def test_educational_turn_with_enriched_asset_uses_the_classifier(
+def test_educational_turn_with_enriched_asset_does_not_infer_new_facts(
     monkeypatch,
 ) -> None:
     # "What is SPY?" can arrive with SPY attached by provider enrichment; the
@@ -289,7 +291,7 @@ def test_educational_turn_with_enriched_asset_uses_the_classifier(
         semantic_turn_act="educational_question",
     )
     assert _run(educational, "¿Qué es SPY?") is None
-    assert calls == ["classified"]
+    assert calls == []
 
 
 def test_unsupported_request_describing_a_test_keeps_its_recovery_route(

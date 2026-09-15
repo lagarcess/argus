@@ -85,7 +85,7 @@ def test_the_users_own_numbers_reach_the_no_search_answer_and_a_published_figure
     assert not primary_read_is_arithmetic(
         _read(question_kind="concept", scenario_question=True)
     )
-    assert not primary_read_is_arithmetic(_read())
+    assert primary_read_is_arithmetic(_read())
 
 
 def test_a_calculated_answer_computes_its_card_under_the_prose(monkeypatch) -> None:

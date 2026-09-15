@@ -66,7 +66,8 @@ def test_a_changed_share_reuses_the_stored_payment_and_its_page(monkeypatch):
     assert updated["artifact_id"] != card.artifact_id
 
 
-def test_pending_reply_can_explicitly_change_a_known_input(monkeypatch):
+@pytest.mark.parametrize("source", ["user", "assumption"])
+def test_pending_reply_can_explicitly_change_a_known_input(monkeypatch, source):
     requests = [
         AnswerCalculation(
             kind="time_value",
@@ -84,7 +85,7 @@ def test_pending_reply_can_explicitly_change_a_known_input(monkeypatch):
             "solve_for": "payment",
             "updated_fields": ["present_value"],
             "inputs": [
-                {"name": "present_value", "value": 150000, "source": "user"},
+                {"name": "present_value", "value": 150000, "source": source},
                 {"name": "periods", "value": 48, "source": "user"},
             ],
         }

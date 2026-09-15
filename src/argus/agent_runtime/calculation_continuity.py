@@ -6,6 +6,8 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from loguru import logger
+
 from argus.domain.calculation_turn_facts import CALCULATION_HISTORY_KEY
 from argus.domain.calculations.answer_request import AnswerCalculation
 from argus.domain.capability_registry import get_tool_catalog
@@ -63,3 +65,40 @@ def prior_calculation_arguments(
             arguments = card.get("arguments")
             return dict(arguments) if isinstance(arguments, Mapping) else None
     return None
+
+
+def normalize_calculation_edits(
+    request: AnswerCalculation, notes: list[str]
+) -> AnswerCalculation:
+    """updated_fields owns which supplied values are explicit user changes.
+
+    Pending and completed cards must agree on that declaration. A second source
+    label cannot silently replace an explicit edit with the stored assumption.
+    """
+    changed = {
+        item.name
+        for item in request.inputs
+        if item.name in request.updated_fields
+        and item.value is not None
+        and item.source != "user"
+    }
+    if not changed:
+        return request
+    code = "calculation_edit_source_normalized"
+    if code not in notes:
+        notes.append(code)
+    logger.info(
+        "Calculation edit sources normalized", fields=sorted(changed), reason_code=code
+    )
+    return request.model_copy(
+        update={
+            "inputs": [
+                item.model_copy(
+                    update={"source": "user", "source_url": None, "as_of": None}
+                )
+                if item.name in changed
+                else item
+                for item in request.inputs
+            ]
+        }
+    )

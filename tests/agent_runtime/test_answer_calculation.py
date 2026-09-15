@@ -160,7 +160,7 @@ def test_an_input_the_model_left_out_is_owed_by_the_user() -> None:
     assert resolved.user_owed == ["future_value", "periods"]
 
 
-def test_a_money_input_in_another_currency_is_not_used() -> None:
+def test_a_stated_money_currency_overrides_the_profile_default() -> None:
     notes: list[str] = []
     inputs = [
         LOAN[0],
@@ -168,8 +168,9 @@ def test_a_money_input_in_another_currency_is_not_used() -> None:
         *LOAN[2:],
     ]
     resolved = _resolve(_request("time_value", inputs, solve_for="payment"), notes=notes)
-    assert resolved.not_looked_up == ["present_value"]
-    assert ac.CURRENCY_MISMATCH_REASON_CODE in notes
+    assert resolved.not_looked_up == []
+    assert resolved.arguments["currency"] == "USD"
+    assert resolved.arguments["sources"]["currency"] == {"kind": "user"}
 
 
 def test_an_unknown_kind_or_undeclared_name_is_dropped_on_record() -> None:
@@ -207,7 +208,10 @@ def test_the_prose_states_the_computed_payment_through_its_reference() -> None:
 def test_an_unknown_reference_hands_over_to_argus_lead_and_cited_digits_stand() -> None:
     notes: list[str] = []
     published = _published("It costs {{monthly_cost}}.", notes=notes)
-    assert published.answer_text == ac.fallback_answer_lead("en", succeeded=True)
+    assert all(
+        ac.figure_text(card.presentation.answer) in published.answer_text
+        for card in ac.cards_in(published.patch)
+    )
     assert published.template is None
     assert ac.FIGURE_CHECK_REASON_CODE in notes
     cited = _published(
@@ -237,14 +241,13 @@ def test_an_assumption_the_prose_does_not_name_is_listed_and_the_prose_stands() 
     )
     assert unnamed.assumptions == (
         {"artifact_id": card.artifact_id, "name": "future_value"},
-        {"artifact_id": card.artifact_id, "name": "currency"},
     )
     named = _published(
         "Assuming the loan ends at {{future_value}}, it costs {{payment}} a month.",
         inputs=inputs,
     )
     assert named.template is not None
-    assert [item["name"] for item in named.assumptions] == ["currency"]
+    assert named.assumptions == ()
 
 
 def test_a_plan_that_does_not_solve_keeps_its_card_under_argus_lead() -> None:
@@ -318,7 +321,6 @@ def test_every_unnamed_assumption_is_listed_and_only_a_driving_one_is_recorded()
     assert listed.template is not None
     assert [item["name"] for item in listed.assumptions] == [
         "periods_per_year",
-        "currency",
     ]
     assert ac.FIGURE_CHECK_REASON_CODE not in quiet
     rate = {"name": "annual_rate_pct", "value": 14, "source": "assumption"}
@@ -332,7 +334,6 @@ def test_every_unnamed_assumption_is_listed_and_only_a_driving_one_is_recorded()
     assert driving.template is not None, "the prose stands"
     assert [item["name"] for item in driving.assumptions] == [
         "annual_rate_pct",
-        "currency",
     ]
     assert ac.FIGURE_CHECK_REASON_CODE in recorded
 
@@ -489,7 +490,10 @@ def test_a_reference_two_options_both_hold_is_never_guessed() -> None:
         notes=notes,
     )
     assert published.template is None
-    assert published.answer_text == ac.fallback_answer_lead("en", succeeded=True)
+    assert all(
+        ac.figure_text(card.presentation.answer) in published.answer_text
+        for card in ac.cards_in(published.patch)
+    )
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 
