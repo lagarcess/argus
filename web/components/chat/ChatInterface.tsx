@@ -355,19 +355,18 @@ export default function ChatInterface() {
     },
     [account?.user.id, activityTranscriptReadiness, transcriptSessionCache],
   );
-  const invalidateInactiveActivityTranscript = useCallback(
-    (targetConversationId: string) =>
-      invalidateTranscriptForMutation(targetConversationId, "durable_job_completion"),
-    [invalidateTranscriptForMutation],
-  );
   const conversationActivity = useConversationActivity({
     historyItems,
     historyActivityRevision,
     activeConversationId: currentView === "chat" ? conversationId : null,
     accountScopeKey: account?.user.id ?? null,
     refreshHistory: refreshHistoryForActivity,
-    invalidateInactiveTranscript: invalidateInactiveActivityTranscript,
-    refreshActiveTranscript: (id) => { transcriptSessionCache.invalidateForMutation({ userId: account?.user.id ?? "", conversationId: id, mutation: "durable_job_completion" }); void navigateConversationTranscript(id); },
+    invalidateInactiveTranscript: (id) => invalidateTranscriptForMutation(id, "durable_job_completion"),
+    refreshActiveTranscript: (id) => {
+      // Keep the view refs until navigation saves the reader's scroll position.
+      transcriptSessionCache.invalidateForMutation({ userId: account?.user.id ?? "", conversationId: id, mutation: "durable_job_completion" });
+      void navigateConversationTranscript(id);
+    },
     onMutationNotice: (notice) => {
       const descriptor = conversationActivityMutationNoticeDescriptor(notice);
       showToast(t(descriptor.key, descriptor.defaultValue), descriptor.variant);
