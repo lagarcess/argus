@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -18,13 +19,16 @@ fake = Faker()
 @pytest.fixture
 def chat(monkeypatch: pytest.MonkeyPatch):
     calls: list[dict[str, Any]] = []
-    replies: list[dict[str, Any]] = []
+    replies: list[dict[str, Any] | None] = []
 
     async def stream(**kwargs: Any):
         calls.append(kwargs)
+        reply = replies.pop(0)
+        if reply is None:
+            raise asyncio.CancelledError()
         yield {
             "type": "final",
-            "payload": {"stage_outcome": "ready_to_respond", **replies.pop(0)},
+            "payload": {"stage_outcome": "ready_to_respond", **reply},
         }
 
     monkeypatch.setattr(agent_router, "stream_agent_turn_events", stream)
@@ -34,10 +38,17 @@ def chat(monkeypatch: pytest.MonkeyPatch):
             "conversation"
         ]["id"]
 
-        def ask(question: str, reply: dict[str, Any], **fields: Any):
+        def ask(
+            question: str,
+            reply: dict[str, Any] | None,
+            *,
+            expected_frame: str | None = "final",
+            **fields: Any,
+        ):
             replies.append(reply)
             response = api.post(
                 "/api/v1/chat/stream",
+                headers=fields.pop("headers", {}),
                 json={
                     "conversation_id": conversation_id,
                     "message": question,
@@ -46,8 +57,8 @@ def chat(monkeypatch: pytest.MonkeyPatch):
                 },
             )
             assert response.status_code == 200
-            assert any(
-                json.loads(line[6:]).get("type") == "final"
+            assert expected_frame is None or any(
+                json.loads(line[6:]).get("type") == expected_frame
                 for line in response.text.splitlines()
                 if line.startswith("data: {")
             )
@@ -146,3 +157,137 @@ def test_retry_identity_never_removes_other_roles_or_unidentified_replies(chat, 
     ask(fake.sentence(), {"assistant_response": fake.sentence()})
     assert ("assistant", failed) in history(calls[-1])
     assert ("user", question) in history(calls[-1])
+
+
+@pytest.mark.parametrize(
+    "target", ["valid_reply", "stale_failure", "nonretryable_failure", "foreign"]
+)
+def test_invalid_retry_target_keeps_current_and_later_history_whole(chat, target):
+    ask, calls = chat
+    question, content = fake.sentence(), fake.sentence()
+    reply = (
+        failure_reply(content)
+        if target != "valid_reply"
+        else {"assistant_response": content}
+    )
+    if target == "nonretryable_failure":
+        reply["recovery"]["retryable"] = False
+    messages = ask(question, reply)
+    target_id = messages[-1].id
+    if target == "stale_failure":
+        messages = ask(fake.sentence(), failure_reply(fake.sentence()))
+    elif target == "foreign":
+        from argus.api.message_store import memory_conversation, memory_message
+
+        foreign = memory_conversation(
+            title=fake.sentence(),
+            title_source="user_renamed",
+            language="en",
+            user_id=fake.uuid4(),
+        )
+        target_id = memory_message(
+            conversation_id=foreign.id,
+            role="assistant",
+            content=fake.sentence(),
+            metadata={"recovery": {"retryable": True}},
+        ).id
+    expected = [(item.role, item.content) for item in messages]
+    retry = ask(
+        fake.sentence(),
+        {"assistant_response": fake.sentence()},
+        failed_assistant_id=target_id,
+    )
+    assert history(calls[-1]) == expected
+    assert "failed_assistant_id" not in retry[-2].metadata
+    ask(fake.sentence(), {"assistant_response": fake.sentence()})
+    assert history(calls[-1])[: len(expected)] == expected
+
+
+@pytest.mark.parametrize("repeat_question", [False, True])
+def test_ordinary_turn_clears_an_interrupted_retry_retirement(chat, repeat_question):
+    ask, calls = chat
+    question, failure = fake.sentence(), fake.sentence()
+    messages = ask(question, failure_reply(failure))
+    failed_id = messages[-1].id
+    messages = ask(question, None, expected_frame=None, failed_assistant_id=failed_id)
+    assert messages[-1].role == "user"
+    assert messages[-1].metadata["failed_assistant_id"] == failed_id
+    assert ("assistant", failure) not in history(calls[-1])
+    ask(
+        question if repeat_question else fake.sentence(),
+        {"assistant_response": fake.sentence()},
+    )
+    assert ("assistant", failure) in history(calls[-1])
+    messages = ask(fake.sentence(), {"assistant_response": fake.sentence()})
+    assert ("assistant", failure) in history(calls[-1])
+    from argus.api.message_store import reconcile_reload_message_metadata
+
+    original = next(
+        item
+        for item in reconcile_reload_message_metadata(messages)
+        if item.id == failed_id
+    )
+    assert original.metadata["recovery"]["retryable"] is True
+    assert not original.metadata.get("agent_runtime_failure_superseded")
+
+
+def test_canonical_run_finalization_retry_persists_its_link_for_followups(
+    chat, monkeypatch
+):
+    from argus.api.chat import persistence
+    from argus.api.chat.actions import RuntimeFallbackContext
+    from argus.domain.backtest_finalization import BacktestFinalizationError
+
+    from tests.test_alpha_api_supabase import _runtime_success_result
+
+    ask, calls = chat
+    monkeypatch.setattr(
+        agent_router, "stale_confirmation_action_message", lambda **_: None
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "confirmation_metadata_fallback_context",
+        lambda **_: RuntimeFallbackContext(),
+    )
+    persist = persistence.persist_runtime_backtest_run
+    executions = []
+
+    def fail_first(**kwargs):
+        executions.append(kwargs["execution_identity"])
+        if len(executions) == 1:
+            raise BacktestFinalizationError("scripted finalization failure")
+        return persist(**kwargs)
+
+    monkeypatch.setattr(persistence, "persist_runtime_backtest_run", fail_first)
+    confirmation_id = fake.uuid4()
+    fields = {
+        "headers": {"Idempotency-Key": confirmation_id},
+        "action": {
+            "type": "run_backtest",
+            "label": "Run backtest",
+            "payload": {"confirmation_id": confirmation_id},
+            "presentation": "confirmation",
+        },
+    }
+    first = ask(
+        "Run backtest", _runtime_success_result(), expected_frame="error", **fields
+    )
+    original_request, failed = first[-2:]
+    assert failed.metadata["failure_code"] == "finalization_failed"
+    retried = ask(
+        "Run backtest", _runtime_success_result(), failed_assistant_id=failed.id, **fields
+    )
+    retry_request = next(
+        item
+        for item in retried
+        if item.role == "user" and item.metadata.get("failed_assistant_id") == failed.id
+    )
+    assert retry_request.id != original_request.id
+    assert retry_request.created_at > failed.created_at
+    assert (
+        retry_request.metadata["chat_action"] == original_request.metadata["chat_action"]
+    )
+    assert executions == [executions[0], executions[0]]
+    assert ("assistant", failed.content) not in history(calls[-1])
+    ask(fake.sentence(), {"assistant_response": fake.sentence()})
+    assert ("assistant", failed.content) not in history(calls[-1])

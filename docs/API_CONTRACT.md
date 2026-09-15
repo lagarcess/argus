@@ -3385,14 +3385,23 @@ stores nothing and makes no LLM, provider, or market-data call.
 `POST /chat/stream` accepts optional `failed_assistant_id: string | null`
 (1 to 128 characters when supplied). Retry sends the failed assistant reply's
 message ID alongside the original question or structured action, both live and
-after reload. The API stores it as `metadata.failed_assistant_id` on the new
-user message, preserving any original `chat_action` metadata.
+after reload. The API accepts the ID only when it identifies this conversation's
+latest assistant reply and that reply has `recovery.retryable: true`. Validation
+and history selection use the same message snapshot. Other IDs are ignored and
+are not persisted. The API stores an accepted ID as
+`metadata.failed_assistant_id` on the new user message, preserving any original
+`chat_action` metadata. This also applies to canonical `run_backtest` retries:
+their user-message ID is stable per confirmation and failed reply, so the retry
+is saved after the failure without changing the backtest execution identity.
 
 For that retry turn, runtime history omits only the assistant message with that
 ID from the owned conversation. The question and every other reply, including
-degraded answers, remain eligible for history. An absent or unmatched ID drops
-nothing. Once an assistant reply follows the persisted retry request, later
-turns omit that same failed reply through the durable retry link. The legacy
+degraded answers, remain eligible for history. An absent, unmatched, stale, or
+nonretryable ID drops nothing. Once an assistant reply follows the persisted
+retry request, later turns omit that same failed reply through the durable retry
+link, subject to the same validation against the preceding latest assistant.
+If the retry stream is interrupted, the next ordinary user turn clears its
+pending retirement; a later assistant cannot complete that abandoned link. The legacy
 `chat_action.type: retry_last_turn` / `payload.failed_assistant_id` link remains
 read-compatible. Matching repeated question text alone does not remove replies
 from model history; that compatibility behavior belongs to transcript display.

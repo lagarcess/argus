@@ -14,7 +14,7 @@ from argus.api.chat.previews import (
     stored_message_preview,
 )
 from argus.api.dependencies import dev_memory_fallback_enabled
-from argus.api.schemas import Conversation, Message, MessageRole
+from argus.api.schemas import ChatStreamRequest, Conversation, Message, MessageRole
 from argus.domain.chat_turn_lifecycle import (
     MemoryChatTurnLifecycleGateway,
     TransitionResult,
@@ -794,6 +794,26 @@ def reconcile_reload_message_metadata(messages: list[Message]) -> list[Message]:
     return list(reversed(reconciled_reversed))
 
 
+def load_chat_request_history(
+    *,
+    payload: ChatStreamRequest,
+    user_id: str,
+    conversation_id: str,
+) -> tuple[ChatStreamRequest, list[ConversationMessage]]:
+    """Normalize retry identity and history from the same owned message snapshot."""
+    messages = _load_runtime_thread_messages(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=20,
+    )
+    history, failed_id = _runtime_thread_history(
+        messages,
+        conversation_id=conversation_id,
+        failed_assistant_id=payload.failed_assistant_id,
+    )
+    return payload.model_copy(update={"failed_assistant_id": failed_id}), history
+
+
 def load_runtime_thread_history(
     *,
     user_id: str,
@@ -802,6 +822,26 @@ def load_runtime_thread_history(
     drop_failed_lookups: bool = False,
     failed_assistant_id: str | None = None,
 ) -> list[ConversationMessage]:
+    messages = _load_runtime_thread_messages(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        limit=limit,
+    )
+    history, _ = _runtime_thread_history(
+        messages,
+        conversation_id=conversation_id,
+        drop_failed_lookups=drop_failed_lookups,
+        failed_assistant_id=failed_assistant_id,
+    )
+    return history
+
+
+def _load_runtime_thread_messages(
+    *,
+    user_id: str,
+    conversation_id: str,
+    limit: int,
+) -> list[Message]:
     messages: list[Message] = []
     if api_state.supabase_gateway is not None:
         try:
@@ -820,8 +860,23 @@ def load_runtime_thread_history(
             )
     if not messages:
         messages = list(api_state.store.messages.get(conversation_id, []))[-limit:]
+    return sorted(messages, key=lambda item: (item.created_at, item.id))
+
+
+def _runtime_thread_history(
+    messages: list[Message],
+    *,
+    conversation_id: str,
+    drop_failed_lookups: bool = False,
+    failed_assistant_id: str | None = None,
+) -> tuple[list[ConversationMessage], str | None]:
     # Runtime history uses explicit retry identity, never repeated-question text.
     excluded_reply_ids = _retried_failed_assistant_ids(messages, explicit_only=True)
+    failed_assistant_id = _validated_retry_reply_id(
+        next((item for item in reversed(messages) if item.role == "assistant"), None),
+        failed_assistant_id,
+        conversation_id=conversation_id,
+    )
     if failed_assistant_id is not None:
         excluded_reply_ids.add(failed_assistant_id)
     history: list[ConversationMessage] = []
@@ -849,7 +904,7 @@ def load_runtime_thread_history(
             else message.content
         )
         history.append(ConversationMessage(role=message.role, content=content))
-    return history
+    return history, failed_assistant_id
 
 
 def _should_suppress_late_success_artifact(
@@ -985,6 +1040,23 @@ def _is_retryable_recovery_failure(metadata: dict[str, Any]) -> bool:
     return isinstance(recovery, dict) and recovery.get("retryable") is True
 
 
+def _validated_retry_reply_id(
+    latest_assistant: Message | None,
+    failed_id: Any,
+    *,
+    conversation_id: str,
+) -> str | None:
+    if (
+        latest_assistant is not None
+        and latest_assistant.conversation_id == conversation_id
+        and latest_assistant.id == failed_id
+        and isinstance(latest_assistant.metadata, dict)
+        and _is_retryable_recovery_failure(latest_assistant.metadata)
+    ):
+        return latest_assistant.id
+    return None
+
+
 def _retried_failed_assistant_ids(
     messages: list[Message], *, explicit_only: bool = False
 ) -> set[str]:
@@ -998,9 +1070,17 @@ def _retried_failed_assistant_ids(
     open_failures: dict[str, str] = {}
     pending_retirements: list[str] = []
     last_user_content: str | None = None
+    latest_assistant: Message | None = None
     for message in messages:
         metadata = message.metadata if isinstance(message.metadata, dict) else {}
         if message.role == "user":
+            if pending_retirements:
+                open_failures = {
+                    content: failure_id
+                    for content, failure_id in open_failures.items()
+                    if failure_id not in pending_retirements
+                }
+            pending_retirements = []
             content = " ".join((message.content or "").split()).casefold()
             action = metadata.get("chat_action")
             payload = action.get("payload") if isinstance(action, dict) else None
@@ -1013,13 +1093,19 @@ def _retried_failed_assistant_ids(
                     and action.get("type") == "retry_last_turn"
                     else None
                 )
-            if isinstance(failed_id, str) and failed_id.strip():
-                pending_retirements.append(failed_id.strip())
-            elif not explicit_only and content and content in open_failures:
+            validated_id = _validated_retry_reply_id(
+                latest_assistant,
+                failed_id,
+                conversation_id=message.conversation_id,
+            )
+            if validated_id is not None:
+                pending_retirements.append(validated_id)
+            elif failed_id is None and not explicit_only and content in open_failures:
                 pending_retirements.append(open_failures.pop(content))
             last_user_content = content or None
             continue
         if message.role == "assistant":
+            latest_assistant = message
             if pending_retirements:
                 retired.update(pending_retirements)
                 pending_retirements = []

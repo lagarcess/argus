@@ -277,6 +277,11 @@ def prepare_chat_request_admission(
                 extra_user_metadata=extra_user_metadata,
             )
         )
+    if candidate is not None and payload.failed_assistant_id is not None:
+        candidate.metadata = {
+            **(candidate.metadata or {}),
+            "failed_assistant_id": payload.failed_assistant_id,
+        }
     return ChatRequestAdmission(
         payload=payload,
         request=request,
@@ -312,12 +317,15 @@ def _canonical_run_action_message(
     content = chat_display_message(canonical_payload, language=language or "en")
     assert canonical_payload.action is not None
     canonical_payload.action.label = content
+    message_identity = confirmation_id
+    if payload.failed_assistant_id is not None:
+        message_identity = f"{confirmation_id}:retry:{payload.failed_assistant_id}"
     return prepare_message(
         conversation_id=conversation_id,
         role="user",
         content=content,
         metadata={"chat_action": persisted_chat_action(canonical_payload)},
-        message_id=str(uuid5(_RUN_ACTION_MESSAGE_NAMESPACE, confirmation_id)),
+        message_id=str(uuid5(_RUN_ACTION_MESSAGE_NAMESPACE, message_identity)),
     )
 
 
@@ -345,8 +353,6 @@ def _ordinary_request_message(
         ]
     if payload.action is not None:
         user_metadata["chat_action"] = persisted_chat_action(payload)
-    if payload.failed_assistant_id is not None:
-        user_metadata["failed_assistant_id"] = payload.failed_assistant_id
     if extra_user_metadata:
         user_metadata.update(extra_user_metadata)
     return prepare_message(
