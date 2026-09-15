@@ -193,6 +193,11 @@ cases:
       date_range:
         start: "current_year-08-16"
         end: "current_year-08-19"
+      # September 2026 acceptance: August 16 is Sunday. Requested dates stay above.
+      effective_date_range:
+        start: "current_year-08-17"
+        end: "current_year-08-19"
       offered:
         launch_matches_expected: true
+        response: false
       stage_outcomes: ["ready_for_confirmation", "await_approval"]

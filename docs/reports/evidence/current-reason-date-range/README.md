@@ -1,6 +1,9 @@
 # Current reply reason and stated date range
 
-Status: **live acceptance blocked; PR #626 remains draft**. The authorized
+Status: **follow-up fixes awaiting a paid rerun; PR #626 remains draft**.
+See [the follow-up diagnosis, fixture corrections, and $7 proposal](followup.md).
+
+The first bounded measurement below remains historical evidence. The authorized
 measurement stopped within its $5 cap. It recorded all 73 case dispositions,
 but six cases could not complete within a provable spend bound. The prompt
 fingerprint remains unchanged. No merge or deployment.

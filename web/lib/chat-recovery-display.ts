@@ -246,6 +246,9 @@ export function recoveryDisplayText(
     return t(`chat.coverage_recovery.${display.code}`);
   }
   if (display.kind === "unsupported_recovery") {
+    if (display.values.reasonCode === "data_window_unavailable") {
+      return t("chat.clarification.data_window_unavailable");
+    }
     if (display.values.reasonCode === "unsupported_time_granularity") {
       return display.values.rawValue
         ? t("chat.clarification.unsupported_timeframe_with_raw_value", {
@@ -284,7 +287,7 @@ export function recoveryDisplayText(
           minimum: formatUsdAmount(minimum),
         });
       }
-      return "";
+      return t("chat.clarification.starting_capital_unavailable_bounds");
     }
     const optionsText = joinLocalizedOptions(
       display.values.options.map((option) =>

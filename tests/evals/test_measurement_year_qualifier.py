@@ -34,3 +34,26 @@ def test_year_qualifier_cases_compare_actual_dates(freeze_new_york_clock, year):
             failures,
         )
         assert len(failures) == 1
+
+
+def test_september_2026_date_cases_expect_trading_window_and_no_prose(
+    freeze_new_york_clock,
+):
+    freeze_new_york_clock(datetime(2026, 9, 14, 12, tzinfo=EASTERN))
+    for case in load_eval_cases():
+        if not case.id.endswith("explicit_end_survives_year_qualifier"):
+            continue
+        assert case.expected.effective_date_range == {
+            "start": "2026-08-17",
+            "end": "2026-08-19",
+        }
+        assert case.expected.offered["response"] is False
+        assert case.prose_judge_criteria == ()
+
+
+def test_confirmation_expectation_rejects_unexpected_prose():
+    from tests.evals.measurement_outcome import compare_offered
+
+    failures = []
+    compare_offered({"response": False}, {"response": True}, failures)
+    assert failures == ["offered.response: confirmation turn unexpectedly carried prose"]
