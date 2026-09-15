@@ -2,15 +2,28 @@
 
 ## Candidate and integration
 
-- Product head captured: `0f6ceeca9dcf8d4b94e3f177b1535252d3d0de67`.
+- Product head captured: `bf15cc03`.
 - Original integration base: `350e3dca8f573f5dfd61f1f753d8ed16a2724c9e`.
-- Reconciled integration: `73dc8b7f31bc1c829c3e40f8e85825b7b5631854`.
-- One-way merge: `4a82a49653583873f8e90a4f5080326e20895fcb`.
+- Reconciled integration: `bed233b0cdc96366acc5fc9d5a8d9193723612af`.
+- One-way merge: `1c7080379667556345f8dab7578eb45b211ee8d0`.
 - No textual conflicts. Semantic overlap is PR #639's viewport portals in
   AdaptivePanel and the guest dialogs. Both sides retained. All five public and
   preview cases and seven receiver bridge cases passed after reconciliation.
-- Backend runtime and API contracts did not overlap integration changes;
-  prior backend evidence remains valid. Merged-tree modularity passes.
+- Latest reconciliation also includes PR #638, research asset identity through
+  confirmation. The new fork still imports no executable artifact state. The
+  affected research/confirmation/runtime checks were rerun: 67 passed, 14 hit a
+  local SciPy Mach-O loading error (zero-fill section offset), including the
+  clock-unavailable failure caused by that import. Linux CI owns the final
+  unaffected-environment check. OpenAPI compatibility: 23 pass. Merged-tree
+  modularity passes. No textual conflicts; both lanes retained.
+
+## Attribution
+
+ReceiptChart now enables the library logo and displays the TradingView notice
+and link in a visible footer, in both public and preview views. Label and URL
+derive from `web/lib/chart-attribution.ts`, also used by ResultEquityChart.
+The three new regression tests failed before the fix and pass afterward.
+The notice follows the [upstream NOTICE](https://github.com/tradingview/lightweight-charts/blob/master/NOTICE).
 
 ## Browser evidence
 
@@ -23,11 +36,11 @@ the development Next.js portal is hidden. All screenshots were inspected.
 
 | Language/theme | Width | Public | Preview |
 | --- | --- | --- | --- |
-| en dark | 390 | [Full](en-dark-390-public-390.png), [top](en-dark-390-public-top.png), [bottom](en-dark-390-public-bottom.png) | [Top](en-dark-390-preview.png), [bottom](en-dark-390-preview-bottom.png) |
-| en dark | 720 | [Full](en-dark-720-public-720.png), [top](en-dark-720-public-top.png), [bottom](en-dark-720-public-bottom.png) | [Top](en-dark-720-preview.png), [bottom](en-dark-720-preview-bottom.png) |
-| en dark | 1024 | [Full](en-dark-1024-public-1024.png), [top](en-dark-1024-public-top.png), [bottom](en-dark-1024-public-bottom.png) | [Top](en-dark-1024-preview.png), [bottom](en-dark-1024-preview-bottom.png) |
-| en dark | 1280 | [Full](en-dark-1280-public-1280.png), [top](en-dark-1280-public-top.png), [bottom](en-dark-1280-public-bottom.png) | [Top](en-dark-1280-preview.png), [bottom](en-dark-1280-preview-bottom.png) |
-| es-419 light | 390 | [Full](es-419-light-390-public-390.png), [top](es-419-light-390-public-top.png), [bottom](es-419-light-390-public-bottom.png) | [Top](es-419-light-390-preview.png), [bottom](es-419-light-390-preview-bottom.png) |
+| en dark | 390 | [Full](en-dark-390-public-390.png), [top](en-dark-390-public-top.png), [chart](en-dark-390-public-chart.png), [bottom](en-dark-390-public-bottom.png) | [Top](en-dark-390-preview.png), [chart](en-dark-390-preview-chart.png), [bottom](en-dark-390-preview-bottom.png) |
+| en dark | 720 | [Full](en-dark-720-public-720.png), [top](en-dark-720-public-top.png), [chart](en-dark-720-public-chart.png), [bottom](en-dark-720-public-bottom.png) | [Top](en-dark-720-preview.png), [chart](en-dark-720-preview-chart.png), [bottom](en-dark-720-preview-bottom.png) |
+| en dark | 1024 | [Full](en-dark-1024-public-1024.png), [top](en-dark-1024-public-top.png), [chart](en-dark-1024-public-chart.png), [bottom](en-dark-1024-public-bottom.png) | [Top](en-dark-1024-preview.png), [chart](en-dark-1024-preview-chart.png), [bottom](en-dark-1024-preview-bottom.png) |
+| en dark | 1280 | [Full](en-dark-1280-public-1280.png), [top](en-dark-1280-public-top.png), [chart](en-dark-1280-public-chart.png), [bottom](en-dark-1280-public-bottom.png) | [Top](en-dark-1280-preview.png), [chart](en-dark-1280-preview-chart.png), [bottom](en-dark-1280-preview-bottom.png) |
+| es-419 light | 390 | [Full](es-419-light-390-public-390.png), [top](es-419-light-390-public-top.png), [chart](es-419-light-390-public-chart.png), [bottom](es-419-light-390-public-bottom.png) | [Top](es-419-light-390-preview.png), [chart](es-419-light-390-preview-chart.png), [bottom](es-419-light-390-preview-bottom.png) |
 
 The six selected turns span DCA backtest, research with sources, research without
 sources, a long research answer, plain answer and calculation. The exact preview
@@ -39,7 +52,7 @@ existing guest consent/cancel, retry identity, reload, revoke and conversion.
 
 ## Deterministic verification
 
-- Frontend: 2,016 tests pass; production build passes; lint has zero errors
+- Frontend: 2,021 tests pass; production build passes; lint has zero errors
   (eight existing unused-variable warnings).
 - Backend fork/fixture/runtime final selection: 18 pass, including six real
   PostgreSQL tests using an isolated empty schema clone, with no new migration.
