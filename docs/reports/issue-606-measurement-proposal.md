@@ -60,7 +60,9 @@ There is no previous paid evidence to retain or invalidate.
 - Prompt-freeze suite: 1 expected failure, 2 passed. Only
   `src/argus/agent_runtime/result_conversation.py` reports surface drift.
 - Offline runner preview: all six fixture/language combinations build real
-  composer requests and sidecars, with zero provider calls.
+  composer requests and sidecars, with zero provider calls. Preview models derive
+  from the committed release profile. The regression clears local model settings
+  and credentials, reproducing the configuration-free CI environment.
 
 Authored responses prove the rendering contract, not live model compliance.
 The fingerprint is unchanged. Hosted CI is reported on the draft PR at its head.

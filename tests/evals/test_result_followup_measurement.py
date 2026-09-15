@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -91,9 +92,15 @@ def test_baseline_env_admission_uses_candidate_repository(monkeypatch, tmp_path)
         )
 
 
-def test_offline_preview_builds_actual_composer_requests_without_provider_calls() -> None:
+def test_offline_preview_builds_actual_composer_requests_without_provider_calls(
+    monkeypatch,
+) -> None:
     from tests.evals.result_followup_measurement_probe import compose_case
 
+    # CI deliberately has no model credentials or developer model configuration.
+    for key in tuple(os.environ):
+        if key.endswith("_MODEL") or key.endswith("_API_KEY"):
+            monkeypatch.delenv(key)
     fixtures = measurement.load_fixtures(measurement.FIXTURES)
     for case in fixtures["cases"]:
         for language in measurement.LANGUAGES:

@@ -110,6 +110,21 @@ def compose_case(case: dict[str, Any], *, language: str, live: bool) -> dict[str
             )
         )
         if not live:
+            from tests.evals.result_followup_measurement import ROOT, git
+            from tests.promotion_evidence_configuration import (
+                release_configuration_at_commit,
+            )
+
+            # Preview the committed configuration even on a credential-free CI
+            # host. Live evidence must still admit the real environment below.
+            stack.enter_context(
+                patch.dict(
+                    os.environ,
+                    release_configuration_at_commit(
+                        git("rev-parse", "HEAD"), repository_root=ROOT
+                    ),
+                )
+            )
             stack.enter_context(patch("httpx.Client.send", side_effect=network_refused))
             stack.enter_context(
                 patch("httpx.AsyncClient.send", side_effect=network_refused)
