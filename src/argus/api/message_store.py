@@ -800,6 +800,7 @@ def load_runtime_thread_history(
     conversation_id: str,
     limit: int = 20,
     drop_failed_lookups: bool = False,
+    drop_shared_turns: bool = False,
 ) -> list[ConversationMessage]:
     messages: list[Message] = []
     if api_state.supabase_gateway is not None:
@@ -821,6 +822,8 @@ def load_runtime_thread_history(
         messages = list(api_state.store.messages.get(conversation_id, []))[-limit:]
     history: list[ConversationMessage] = []
     for message in messages:
+        if drop_shared_turns and (message.metadata or {}).get("shared_conversation"):
+            continue
         if message.role not in {"user", "assistant", "system", "tool"}:
             continue
         if is_degraded_clarification_compatibility_text(

@@ -47,6 +47,7 @@ export type ChatRequestSessionController = Readonly<{
   begin: (
     conversationId: string,
     kind: ActiveOperationKind,
+    requestId?: string,
   ) => ChatRequestSession | null;
   authorize: (
     session: ChatRequestSession,
@@ -137,7 +138,7 @@ export function createChatRequestSessionController(options: Readonly<{
   };
 
   return {
-    begin: (conversationId, kind) => {
+    begin: (conversationId, kind, requestId) => {
       const target = conversationId.trim();
       if (
         !target ||
@@ -148,7 +149,7 @@ export function createChatRequestSessionController(options: Readonly<{
       }
       return createSession(
         target,
-        createRequestId(),
+        requestId ?? createRequestId(),
         kind,
         new AbortController(),
       );

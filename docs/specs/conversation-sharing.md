@@ -65,7 +65,7 @@ The owner note remains optional and bounded at 280 characters. It is part of
 the preview and frozen content. Rejected private identifiers are not silently
 redacted. Rendering treats Markdown and links as untrusted content.
 
-## 4. The public document
+## 4. The read-only public conversation
 
 ### 4.1 Eligible answers
 
@@ -104,7 +104,8 @@ a plain answer.
 ### 4.4 No hidden enrichment
 
 A share never queries a provider, rebuilds an answer, injects account data, adds
-other conversation turns or supplies executable continuation state. Public
+other conversation turns or supplies executable continuation state. Receiver copies carry only ordinary
+trimmed public history, under the follow-up contract below. Public
 reads use only the snapshot. Calculations are not recomputed for the reader.
 
 ### 4.5 Founder selection decision
@@ -128,8 +129,8 @@ and delete cascade. Restoring a chat does not restore a revoked link. Unknown
 and revoked links share the existing tombstone behavior.
 
 The public page is signed out, uncached for revocation, and always noindex and
-nofollow. Its public call to action continues to Argus without carrying source
-conversation ids or prompt state.
+nofollow. Its follow-up composer starts a receiver-owned copy without private source
+conversation ids or execution state. Copies already made survive revocation.
 
 ## 6. Owner experience and responsive behavior
 
@@ -159,8 +160,25 @@ apply a hosted migration as part of delivery.
 
 ## 8. Reader actions
 
-No public fork, rerun, live refresh, prefilled question or copied conversation.
-The existing Continue with Argus action remains.
+Founder-locked 2026-09-14 reverses the earlier no-fork clause. Anyone with the link
+can read without an access list or sign-in wall. A real follow-up box imports
+trimmed frozen public history into the receiver's own account or guest chat on
+first submit. Viewing creates nothing. The existing guest choice protects an
+already-started chat; guest caps, expiry and signup handoff are unchanged.
+
+The page and exact owner preview share Argus's read-only chat visuals: user
+question bubbles, Argus replies, frozen cards, sources and dates. Put the owner
+note at the top, and label the snapshot date and receiver-owned follow-ups.
+Carried turns keep their own dated provenance in the new chat. They cost nothing,
+never affect naming, interest greetings or memory, and carry no owner note or live
+run/calculation handles. New changes use normal receiver allowances and flows.
+
+History text is bounded at 64 KiB UTF-8; carried text and card metadata at 512 KiB.
+Trim long text fairly over selected turns without a model. Refuse oversized facts
+before writes. Revoke, deletion and tombstones prevent new forks; existing copies
+survive. Count-only followed_up and signed_up extend the existing funnel without
+viewer identifiers. The detailed route/storage and execution contract lives in
+API_CONTRACT.md, DATA_MODEL.md and the current lane spec.
 
 ## 9. Acceptance
 

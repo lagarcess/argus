@@ -38,7 +38,7 @@ for (const language of ["en", "es-419"] as const) {
     const payload: PublicReceiptDocument = { schema_version: 2, kind: "turns", turns: [{ ...researchTurn, content_language: language }] };
     const copy = receiptCopy(language);
     const markup = renderToStaticMarkup(<ReceiptBody payload={payload} createdAt={null} copy={copy} language={language} />);
-    assert.ok(markup.includes(copy.research.headline));
+    assert.ok(markup.includes(copy.research.framing));
     assert.ok(!markup.includes(copy.answer.headline));
   });
 }

@@ -44,8 +44,10 @@ from argus.api.schemas import Message
 from argus.domain.backtest_job_scopes import CHAT_RUN_SCOPE
 from argus.domain.backtest_message_projection import result_fact_bank
 from argus.domain.backtesting.cards import build_result_card as generate_result_card
+from argus.domain.computation_marker import computation_from_tool_card
 from fastapi import HTTPException
 
+from tests.domain.calculations.support import run_calculation
 from tests.public_excerpt_factories import (
     build_artifact,
     build_conversation,
@@ -76,7 +78,9 @@ def seed(language: str, index: int) -> None:
     )
     state.store.conversations[conversation_id] = conversation
     state.store.conversation_owners[conversation_id] = user.id
-    artifact = build_artifact(artifact_id=stable_uuid(index, prefix=605), title=conversation.title)
+    artifact = build_artifact(
+        artifact_id=stable_uuid(index, prefix=605), title=conversation.title
+    )
     run = build_run(run_id=stable_uuid(index, prefix=606))
     artifact.source_conversation_id = conversation_id
     artifact.source_run_id = run.id
@@ -145,6 +149,8 @@ def seed(language: str, index: int) -> None:
         "result_run_id": run.id,
         "operation_scope": CHAT_RUN_SCOPE,
         "status": "succeeded",
+        "updated_at": messages[-1].created_at.isoformat(),
+        "finished_at": messages[-1].created_at.isoformat(),
     }
     research = {
         "schema_version": "argus_research/v1",
@@ -199,6 +205,39 @@ def seed(language: str, index: int) -> None:
         if spanish
         else "It means spreading money across different investments.",
         completed,
+    )
+    calculation = run_calculation(
+        "price_multiple",
+        {
+            "currency": "USD",
+            "symbol": "AAPL",
+            "price": 150,
+            "per_share": 6.25,
+            "multiple": None,
+            "sources": {
+                "price": {
+                    "kind": "page",
+                    "title": "Apple quote",
+                    "url": "https://www.nasdaq.com/market-activity/stocks/aapl",
+                    "date": utc().date().isoformat(),
+                }
+            },
+        },
+    ).model_copy(update={"artifact_id": stable_uuid(index, prefix=609)})
+    pair(
+        "¿Cuál es el múltiplo a $150 y ganancias de $6.25 por acción?"
+        if spanish
+        else "What is the multiple at $150 and earnings of $6.25 per share?",
+        "El múltiplo es 24 veces las ganancias."
+        if spanish
+        else "The multiple is 24 times earnings.",
+        {
+            **completed,
+            "tool_result_cards": [calculation.model_dump(mode="json")],
+            "computation": computation_from_tool_card(calculation).model_dump(
+                mode="json"
+            ),
+        },
     )
     pair(
         "Cambia el aporte a $300." if spanish else "Change the contribution to $300.",

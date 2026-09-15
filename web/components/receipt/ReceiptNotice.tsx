@@ -19,16 +19,14 @@ type ReceiptNoticeProps = {
  * Both still offer Try Argus. Someone who followed a link has already shown
  * intent.
  *
- * Light on dark unconditionally, like every other component on this route. The
- * shell is one fixed colour by design, so a `dark:` variant here never applies:
- * this route runs no theme provider, and the tombstone rendered black on the dark
- * shell for anyone who opened it.
+ * The notice owns its existing dark surface, so its white copy stays readable
+ * when the surrounding conversation shell follows the receiver's light theme.
  */
 export default function ReceiptNotice({ kind, copy }: ReceiptNoticeProps) {
   const notice = kind === "revoked" ? copy.tombstone : copy.unavailable;
 
   return (
-    <>
+    <div className="min-h-dvh w-full bg-[#191c1f]">
       <main
         className={`mx-auto flex w-full max-w-[560px] flex-col gap-5 px-4 pt-7 sm:px-6 sm:pt-10 ${RECEIPT_ACTION_BAR_CLEARANCE}`}
       >
@@ -60,6 +58,6 @@ export default function ReceiptNotice({ kind, copy }: ReceiptNoticeProps) {
         framing={copy.framing.headline}
         action={copy.cta.action}
       />
-    </>
+    </div>
   );
 }

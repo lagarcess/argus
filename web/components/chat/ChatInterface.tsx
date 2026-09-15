@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useReceiptFollowup, readReceiptFollowup } from "./useReceiptFollowup";
 import { useProfileUpdates } from "@/components/chat/useProfileUpdates";
 import { useTranslation } from "react-i18next";
 import { readStored, writeStored } from "@/lib/browser-storage";
@@ -313,7 +314,7 @@ export default function ChatInterface() {
   const shouldAutoScrollRef = useRef(true);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const activeConversationIdRef = useRef<string | null>(null);
-  const hasAcceptedUserInputRef = useRef(false);
+  const hasAcceptedUserInputRef = useRef(Boolean(readReceiptFollowup()));
   const guestSendRef = useRef<GuestResumeSend | null>(null);
   const sendAdmissionInFlightRef = useRef(false);
   const guestSubmissionRetryRef = useRef<GuestPendingSubmission | null>(null);
@@ -1023,7 +1024,6 @@ export default function ChatInterface() {
   );
 
   // ── Send message ───────────────────────────────────────────────────────────
-
   const handleSend = async (
     text: string,
     mentionsOrAction?: SendSelection,
@@ -1049,7 +1049,6 @@ export default function ChatInterface() {
         : (mentionsOrAction as ChatActionOption | undefined);
     const isDeferredGuestSubmission =
       guestBootstrapRequired && !options?.bypassGuestGate;
-
     sendAdmissionInFlightRef.current = true;
     if (isDeferredGuestSubmission) {
       guestSubmissionRetryRef.current = {
@@ -1197,7 +1196,7 @@ export default function ChatInterface() {
       action?.type === "run_backtest" ? "backtest_job" : "chat_turn";
     const initialRequestSession = requestSessions.begin(
       targetConversationId,
-      requestKind,
+      requestKind, options?.requestId,
     );
     if (!initialRequestSession) return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     guestSubmissionRetryRef.current = null;
@@ -1792,6 +1791,7 @@ export default function ChatInterface() {
   };
 
   useGuestSendBridge(guestSendRef, handleSend);
+  const receiptFollowup = useReceiptFollowup({ profileState, account, conversationId, hydrating: isHydratingConversation, guest: guestExperience, refreshAccount, navigate: navigateConversationTranscript, send: (text, options) => handleSend(text, undefined, undefined, options) });
   // ── Action routing ─────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
@@ -2135,7 +2135,7 @@ export default function ChatInterface() {
     isHydratingConversation,
     hasConversationLoadFailure,
   });
-  const conversationComposerUnavailable =
+  const conversationComposerUnavailable = Boolean(readReceiptFollowup()) ||
     isStreamingResponse ||
     isHydratingConversation ||
     guestSubmissionPending ||
@@ -2419,7 +2419,7 @@ export default function ChatInterface() {
               <EmptyChatSurface
                 isGuest={isGuest}
                 expiresAt={account?.guest?.expires_at}
-                guestSubmissionPending={guestSubmissionPending}
+                guestSubmissionPending={guestSubmissionPending || Boolean(readReceiptFollowup())}
                 guestSubmissionError={guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
@@ -2583,7 +2583,7 @@ export default function ChatInterface() {
         rating={feedbackState.rating}
         context={feedbackState.context}
       />
-      <GuestExperienceSurfaces experience={guestExperience} />
+      {receiptFollowup}<GuestExperienceSurfaces experience={guestExperience} />
       {evidenceReceiptSharingEnabled && guestExperience.receiptSharing.target && <ShareReceiptPanel key={guestExperience.receiptSharing.target.conversationId} {...guestExperience.receiptSharing.target} onClose={guestExperience.receiptSharing.close} />}
       {isSidebarPreferenceModalOpen && (
         <SidebarPreferenceModal

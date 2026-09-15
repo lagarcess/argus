@@ -225,7 +225,36 @@ class GuestAccountPersistenceMixin:
             "new_account_signup",
         }:
             payload["handoff_kind"] = str(handoff["handoff_kind"])
+        if (
+            payload.get("handoff_kind") == "new_account_signup"
+            and payload.get("replayed") is not True
+        ):
+            self._capture_shared_signup(
+                destination_user_id, payload.get("conversation_id")
+            )
         return payload
+
+    def _capture_shared_signup(self, user_id: str, conversation_id: Any) -> None:
+        """Best-effort count on the canonical, nonreplayed signup handoff."""
+        from argus.observability.product_events import capture_product_event
+
+        try:
+            imported = _row_one(
+                self.client.table("messages")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("conversation_id", str(conversation_id))
+                .contains("metadata", {"shared_conversation": {}})
+                .limit(1)
+                .execute()
+            )
+            if imported:
+                capture_product_event(
+                    "receipt_signed_up", user_id=None, status="signed_up"
+                )
+        except Exception:
+            # Counts never change a completed ownership transfer.
+            pass
 
     def get_active_guest_workspace(
         self,

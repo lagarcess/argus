@@ -24,8 +24,10 @@ Sharing lane of the grounded-finance roadmap govern this work.
    ordinary guest flow. Later follow-ups use the resulting conversation.
 4. Carry each selected question, shortened final answer and bounded public
    facts as ordinary history. Never carry the owner note. Trim deterministically,
-   without a model call. The implementation contract records concrete byte and
-   per-turn limits before the fork ships.
+   without a model call. History text has a total 64 KiB UTF-8 bound, divided fairly across
+   selected questions and answers. Carried text plus card metadata is bounded
+   at 512 KiB; oversized public facts are refused before any write. No model
+   summary is generated.
 5. Carried backtests and calculations are frozen read-only cards, with no live
    run, artifact or execution state. Changes go through the receiver's normal
    interpretation, confirmation and allowances.

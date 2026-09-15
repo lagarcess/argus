@@ -25,6 +25,7 @@ from argus.api.routers import (
     personalization_memory,
     profile,
     public_receipts,
+    receipt_forks,
     search,
     tool_results,
 )
@@ -56,6 +57,7 @@ for api_router in (
     decisions.router,
     evidence_receipts.router,
     public_receipts.router,
+    receipt_forks.router,
     agent.router,
     history.router,
     search.router,
