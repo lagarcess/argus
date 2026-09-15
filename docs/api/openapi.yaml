@@ -3081,6 +3081,12 @@ components:
           anyOf:
           - $ref: '#/components/schemas/ChatActionPayload'
           - type: 'null'
+        failed_assistant_id:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
         mentions:
           items:
             $ref: '#/components/schemas/ChatMentionPayload'

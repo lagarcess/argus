@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createTranscriptFreshnessRuntime, type SavedConversationTranscript, type TranscriptFreshnessInputs } from "../lib/conversation-transcript-freshness";
 import { deferred, drainMicrotasks } from "./fixtures/conversation-activity-runtime";
 
-const snapshot = (id: string): SavedConversationTranscript => ({ messages: [], latestMessageId: id, unansweredUserMessage: null });
+const snapshot = (id: string): SavedConversationTranscript => ({ apiMessages: [], messages: [], latestMessageId: id, unansweredUserMessage: null });
 function harness(clock?: { now: () => number; schedule: (callback: () => void, delayMs: number) => () => void }) {
   const requests: { signal: AbortSignal; result: ReturnType<typeof deferred<SavedConversationTranscript>> }[] = [];
   const applied: string[] = [];
@@ -155,6 +155,7 @@ describe("bounded unanswered user-message checks", () => {
     h.update({ activityRevision: 3 });
     clock.advance(180_000);
     expect(h.requests).toHaveLength(reads);
+    expect(h.applied).toEqual([]);
   });
 
   test("an already expired saved user message does not start a fresh timeout window", () => {

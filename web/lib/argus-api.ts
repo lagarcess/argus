@@ -993,6 +993,7 @@ export async function getBacktestJob(jobId: string) {
 export type ChatStreamOptions = Readonly<{
   requestId?: string;
   signal?: AbortSignal;
+  failedAssistantId?: string;
 }>;
 
 export async function streamChatMessage(
@@ -1031,14 +1032,14 @@ export async function streamChatMessage(
     },
     body: JSON.stringify({
       conversation_id: conversationId,
+      ...(options.failedAssistantId
+        ? { failed_assistant_id: options.failedAssistantId }
+        : {}),
       ...(typeof input === "string" ? { message: input } : { action: input }),
-      // Callers decide which turns carry mentions; this layer only forwards
-      // them. Gating on a string input silently dropped the resolver identity
-      // that a discovery selection attaches to its action turn.
+      // Forward caller-owned mentions, including discovery action identity.
       ...(mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
-      // Temporary chat: only ever narrows behavior, so the transport layer
-      // owns it and ordinary conversations send an unchanged body.
+      // Temporary chat narrows behavior; ordinary requests stay unchanged.
       ...(isConversationMemoryOptOut(conversationId)
         ? { memory_opt_out: true }
         : {}),
