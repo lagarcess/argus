@@ -3331,6 +3331,14 @@ components:
             maxItems: 4
             minItems: 1
           - type: 'null'
+        peers:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ConfirmationPeerIdentity'
+            type: array
+            maxItems: 4
+            minItems: 1
+          - type: 'null'
         restore_previous:
           type: boolean
           default: false
@@ -3340,7 +3348,7 @@ components:
 
         Add mode: only symbols the active turn offered as research peer rows are
 
-        addable; the backend re-verifies each against the resolver and coverage
+        addable; the backend checks the stored identity and coverage
 
         gates. Restore mode undoes the latest add by re-materializing the exact
 
@@ -3352,6 +3360,21 @@ components:
       type: object
       required:
       - message
+    ConfirmationPeerIdentity:
+      properties:
+        symbol:
+          type: string
+          minLength: 1
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+      type: object
+      required:
+      - symbol
+      - asset_class
     ContinuedResultResponse:
       properties:
         conversation:
