@@ -15,6 +15,22 @@ import { createConversationActivityCausalClock } from "../lib/conversation-activ
 import { chat, ControlledEffects, deferred, drainMicrotasks, idleActivity, runtimeHarness, workingActivity } from "./fixtures/conversation-activity-runtime";
 
 describe("conversation activity refresh ownership", () => {
+  test("reads freshness for an idle open conversation omitted from the history page", async () => {
+    const reply = { ...idleActivity(), latest_message_id: "saved-plain-reply" };
+    const reads: string[] = [];
+    const harness = runtimeHarness({
+      historyItems: [], activeConversationId: "older-open-conversation",
+      refreshHistory: () => [chat("recent-conversation", idleActivity())],
+      getActivity: async (id) => { reads.push(id); return reply; },
+    });
+    harness.runtime.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(reads).toEqual(["older-open-conversation"]);
+    expect(harness.runtime.getState().byConversationId["older-open-conversation"]?.canonical).toEqual(reply);
+    expect(harness.effects.hasPoll()).toBe(false);
+    harness.runtime.dispose();
+  });
+
   test("settles a request from its canonical activity when the first-page refresh omits it", async () => {
     const firstPage = deferred<readonly HistoryItem[]>();
     const canonicalActivity = deferred<ConversationActivity>();
@@ -393,7 +409,7 @@ describe("conversation activity refresh ownership", () => {
     firstRefresh.resolve([
       chat("conversation-a", workingActivity("running")),
     ]);
-    await drainMicrotasks();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(harness.effects.hasPoll()).toBe(true);
 
     harness.effects.firePoll();
@@ -411,7 +427,7 @@ describe("conversation activity refresh ownership", () => {
     secondRefresh.resolve([
       chat("conversation-a", idleActivity("new_activity", "cursor-done")),
     ]);
-    await drainMicrotasks();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(harness.effects.hasPoll()).toBe(false);
     harness.effects.firePoll();

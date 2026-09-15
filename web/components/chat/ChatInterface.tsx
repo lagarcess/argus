@@ -29,6 +29,8 @@ import { useArchiveActiveConversation } from "@/components/chat/useArchiveActive
 import { toggleConversationUnread } from "@/components/chat/toggleConversationUnread";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { conversationActivityMutationNoticeDescriptor, useConversationActivity } from "@/components/chat/useConversationActivity";
+import { useConversationTranscriptFreshness } from "./useConversationTranscriptFreshness";
+import { loadSavedConversationTranscript, type SavedConversationTranscript } from "@/lib/conversation-transcript-freshness";
 import { chatFinalPayloadOwnsVisibleTerminalArtifact, clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
@@ -319,7 +321,7 @@ export default function ChatInterface() {
   const guestSubmissionRetryRef = useRef<GuestPendingSubmission | null>(null);
   const currentViewRef = useRef<View>("chat");
   const [transcriptSessionCache] = useState(
-    () => new TranscriptSessionCache<Message[]>(),
+    () => new TranscriptSessionCache<SavedConversationTranscript>(),
   );
   const coldRetrievalTimerRef = useRef<number | null>(null);
   const coldRetrievalConversationIdRef = useRef<string | null>(null);
@@ -362,16 +364,20 @@ export default function ChatInterface() {
     accountScopeKey: account?.user.id ?? null,
     refreshHistory: refreshHistoryForActivity,
     invalidateInactiveTranscript: (id) => invalidateTranscriptForMutation(id, "durable_job_completion"),
-    refreshActiveTranscript: (id) => {
-      // Keep the view refs until navigation saves the reader's scroll position.
-      transcriptSessionCache.invalidateForMutation({ userId: account?.user.id ?? "", conversationId: id, mutation: "durable_job_completion" });
-      void navigateConversationTranscript(id);
-    },
     onMutationNotice: (notice) => {
       const descriptor = conversationActivityMutationNoticeDescriptor(notice);
       showToast(t(descriptor.key, descriptor.defaultValue), descriptor.variant);
     },
     causalClock: activityCausalClock,
+  });
+  const recordLoadedTranscript = useConversationTranscriptFreshness({
+    inputs: () => {
+      const record = conversationActivity.state.byConversationId[conversationId ?? ""];
+      return { accountId: account?.user.id ?? null, conversationId: currentView === "chat" ? conversationId : null, latestMessageId: record?.canonical?.latest_message_id ?? null, activityRevision: Math.max(historyActivityRevision, record?.serverRevision ?? 0), requestId: record?.request?.requestId ?? null, ready: !isHydratingConversation && readyTranscriptConversationIdRef.current === conversationId, visibleMessageIds: new Set(messages.map((message) => message.id)) };
+    },
+    invalidate: (id) => invalidateTranscriptForMutation(id, "durable_job_completion"),
+    readyTranscriptConversationIdRef, activityTranscriptReadiness, pendingScrollRestoreRef,
+    scrollContainerRef, shouldAutoScrollRef, setMessages,
   });
   const [requestSessions] = useState(() =>
     createChatRequestSessionController({
@@ -590,13 +596,13 @@ export default function ChatInterface() {
   function stageTranscriptSnapshot(
     targetConversationId: string,
     userId: string,
-    snapshot: Message[],
+    snapshot: SavedConversationTranscript,
     scrollTopOverride?: number | null,
   ): void {
     clearColdTranscriptRetrieval();
     setFailedConversationId(null);
     setIsHydratingConversation(false);
-    if (snapshot.length === 0) {
+    if (snapshot.messages.length === 0) {
       resetToEmptyChatSurface();
       return;
     }
@@ -613,7 +619,8 @@ export default function ChatInterface() {
       scrollTop,
     };
     shouldAutoScrollRef.current = scrollTop === null;
-    setMessages(snapshot);
+    recordLoadedTranscript(userId, targetConversationId, snapshot);
+    setMessages(snapshot.messages);
   }
 
   function beginColdTranscriptRetrieval(targetConversationId: string): void {
@@ -667,12 +674,9 @@ export default function ChatInterface() {
           requestedMessageId,
         });
       try {
-        const items = await loadAllConversationMessagePages(
-          targetConversationId,
-        );
+        const snapshot = await loadSavedConversationTranscript(targetConversationId);
         if (!isCurrentRequest()) return;
-        const snapshot = hydrateMessagesFromApi(items).messages;
-        const anchorMessageId = projectedTranscriptAnchorId(snapshot, requestedMessageId);
+        const anchorMessageId = projectedTranscriptAnchorId(snapshot.messages, requestedMessageId);
         if (!anchorMessageId) throw new Error("Transcript anchor was not returned.");
         clearColdTranscriptRetrieval();
         setIsHydratingConversation(false);
@@ -684,7 +688,8 @@ export default function ChatInterface() {
           messageId: anchorMessageId,
         };
         shouldAutoScrollRef.current = false;
-        setMessages(snapshot);
+        recordLoadedTranscript(userId, targetConversationId, snapshot);
+        setMessages(snapshot.messages);
       } catch (error) {
         if (!isCurrentRequest()) return;
         clearColdTranscriptRetrieval();
@@ -705,15 +710,8 @@ export default function ChatInterface() {
     const handle = transcriptSessionCache.navigate({
       userId,
       conversationId: targetConversationId,
-      load: async (signal) => {
-        const items = await loadAllConversationMessagePages(
-          targetConversationId,
-          undefined,
-          { signal },
-        );
-        return hydrateMessagesFromApi(items).messages;
-      },
-      onState: (state: TranscriptNavigationState<Message[]>) => {
+      load: (signal) => loadSavedConversationTranscript(targetConversationId, signal),
+      onState: (state: TranscriptNavigationState<SavedConversationTranscript>) => {
         if (state.phase === "loading") {
           beginColdTranscriptRetrieval(targetConversationId);
           return;
@@ -752,7 +750,8 @@ export default function ChatInterface() {
         if (state.snapshot !== null) {
           readyTranscriptConversationIdRef.current = targetConversationId;
           activityTranscriptReadiness.stageCached(targetConversationId);
-          setMessages(state.snapshot);
+          recordLoadedTranscript(userId, targetConversationId, state.snapshot);
+          setMessages(state.snapshot.messages);
           return;
         }
         clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);

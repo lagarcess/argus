@@ -125,7 +125,6 @@ type ConversationActivityCallbacks = Readonly<{
     | void
     | Promise<ConversationActivityHistorySnapshot | readonly HistoryItem[] | void>;
   invalidateInactiveTranscript: (conversationId: string) => void;
-  refreshActiveTranscript?: (conversationId: string) => void;
   onMutationNotice: (notice: ConversationActivityMutationNotice) => void;
 }>;
 
@@ -225,6 +224,7 @@ const activitiesAreEqual = (
   left: ConversationActivity | null,
   right: ConversationActivity,
 ): boolean =>
+  left?.latest_message_id === right.latest_message_id &&
   left?.operation.status === right.operation.status &&
   left.operation.kind === right.operation.kind &&
   left.operation.updated_at === right.operation.updated_at &&
@@ -290,7 +290,6 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     this.callbacks = {
       refreshHistory: options.refreshHistory,
       invalidateInactiveTranscript: options.invalidateInactiveTranscript,
-      refreshActiveTranscript: options.refreshActiveTranscript,
       onMutationNotice: options.onMutationNotice,
     };
     if (this.accountScopeKey) {
@@ -589,9 +588,6 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     if (!settled && !requestSettled) return;
     if (conversationId !== this.currentActiveConversationId()) {
       this.callbacks.invalidateInactiveTranscript(conversationId);
-    } else if (!priorRecord?.request) {
-      // This tab did not own the turn's stream. Its saved transcript is stale.
-      this.callbacks.refreshActiveTranscript?.(conversationId);
     }
   }
 
@@ -606,12 +602,16 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
           : [],
       ),
     );
-    const omittedRequests = Object.entries(this.state.byConversationId).flatMap(
+    const omittedRequests: { conversationId: string; requestId: string | null }[] = Object.entries(this.state.byConversationId).flatMap(
       ([conversationId, record]) =>
         record.request && !projectedConversationIds.has(conversationId)
           ? [{ conversationId, requestId: record.request.requestId }]
           : [],
     );
+    const activeId = this.currentActiveConversationId();
+    if (activeId && !projectedConversationIds.has(activeId) && !omittedRequests.some((item) => item.conversationId === activeId)) {
+      omittedRequests.push({ conversationId: activeId, requestId: null });
+    }
     if (omittedRequests.length === 0) return undefined;
 
     return Promise.all(
@@ -625,7 +625,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
         }
         if (
           epoch !== this.accountEpoch ||
-          !this.isRequestCurrent(conversationId, requestId)
+          (requestId ? !this.isRequestCurrent(conversationId, requestId) : this.currentActiveConversationId() !== conversationId)
         ) {
           return;
         }
@@ -892,7 +892,6 @@ export function useConversationActivity(
       accountScopeKey: options.accountScopeKey,
       refreshHistory: options.refreshHistory,
       invalidateInactiveTranscript: options.invalidateInactiveTranscript,
-      refreshActiveTranscript: options.refreshActiveTranscript,
       onMutationNotice: options.onMutationNotice,
       patchActivity:
         options.testAdapters?.patchActivity ?? patchConversationActivity,
@@ -918,14 +917,12 @@ export function useConversationActivity(
     runtime.updateCallbacks({
       refreshHistory: options.refreshHistory,
       invalidateInactiveTranscript: options.invalidateInactiveTranscript,
-      refreshActiveTranscript: options.refreshActiveTranscript,
       onMutationNotice: options.onMutationNotice,
     });
   }, [
     runtime,
     options.refreshHistory,
     options.invalidateInactiveTranscript,
-    options.refreshActiveTranscript,
     options.onMutationNotice,
   ]);
 

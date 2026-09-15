@@ -130,7 +130,6 @@ export function runtimeHarness(options: Readonly<{
   const effects = new ControlledEffects();
   const refreshes: string[] = [];
   const invalidations: string[] = [];
-  const reloads: string[] = [];
   const notices: ConversationActivityMutationNotice[] = [];
   const runtime = createConversationActivityRuntime({
     historyItems: options.historyItems ?? [],
@@ -143,7 +142,6 @@ export function runtimeHarness(options: Readonly<{
     invalidateInactiveTranscript: (conversationId) => {
       invalidations.push(conversationId);
     },
-    refreshActiveTranscript: (conversationId) => reloads.push(conversationId),
     onMutationNotice: (notice) => {
       notices.push(notice);
     },
@@ -156,7 +154,7 @@ export function runtimeHarness(options: Readonly<{
     effects,
     causalClock: options.causalClock,
   });
-  return { runtime, effects, refreshes, invalidations, reloads, notices };
+  return { runtime, effects, refreshes, invalidations, notices };
 }
 
 export const drainMicrotasks = async (): Promise<void> => {

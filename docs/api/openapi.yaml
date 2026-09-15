@@ -3424,6 +3424,10 @@ components:
           $ref: '#/components/schemas/ConversationOperation'
         attention:
           $ref: '#/components/schemas/ConversationAttention'
+        latest_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
       type: object
       required:
       - operation

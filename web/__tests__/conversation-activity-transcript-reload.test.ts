@@ -1,92 +1,93 @@
 import { describe, expect, test } from "bun:test";
-import type { HistoryItem } from "../lib/argus-api";
-import { chat, deferred, drainMicrotasks, idleActivity, runtimeHarness, workingActivity } from "./fixtures/conversation-activity-runtime";
+import { createTranscriptFreshnessRuntime, type SavedConversationTranscript, type TranscriptFreshnessInputs } from "../lib/conversation-transcript-freshness";
+import { deferred, drainMicrotasks } from "./fixtures/conversation-activity-runtime";
 
-describe("remote completion transcript reload", () => {
-  for (const status of ["queued", "running", "checking"] as const) {
-    for (const source of ["history", "mutation"] as const) {
-      test(`${source} reloads the open transcript once after ${status} settles, even if already read`, async () => {
-        const harness = runtimeHarness({
-          activeConversationId: "conversation-a",
-          historyItems: [chat("conversation-a", workingActivity(status))],
-          patchActivity: async () => idleActivity(),
-        });
-        harness.runtime.start();
-        await drainMicrotasks();
-        const update = () => harness.runtime.updateInputs({
-          activeConversationId: "conversation-a", accountScopeKey: "account-a",
-          historyItems: [chat("conversation-a", idleActivity())],
-        });
-        if (source === "mutation") await harness.runtime.markRead("conversation-a", null);
-        else update();
-        update();
-        expect(harness.reloads).toEqual(["conversation-a"]);
-        expect(harness.invalidations).toEqual([]);
-        harness.runtime.dispose();
-      });
-    }
-  }
-
-  test("ignores a rejected stale idle projection and reloads only when canonical work settles", () => {
-    const harness = runtimeHarness({
-      activeConversationId: "conversation-a",
-      historyItems: [chat("conversation-a", workingActivity("running"))],
-      historyActivityRevision: 10,
-    });
-    const update = (revision: number) => harness.runtime.updateInputs({
-      activeConversationId: "conversation-a", accountScopeKey: "account-a",
-      historyItems: [chat("conversation-a", idleActivity())], historyActivityRevision: revision,
-    });
-    update(9);
-    expect(harness.reloads).toEqual([]);
-    update(11);
-    expect(harness.reloads).toEqual(["conversation-a"]);
+const snapshot = (id: string): SavedConversationTranscript => ({ messages: [], latestMessageId: id });
+function harness() {
+  const requests: { signal: AbortSignal; result: ReturnType<typeof deferred<SavedConversationTranscript>> }[] = [];
+  const applied: string[] = [];
+  const runtime = createTranscriptFreshnessRuntime({
+    load: (_id, signal) => {
+      const result = deferred<SavedConversationTranscript>();
+      requests.push({ signal, result });
+      return result.promise;
+    },
+    apply: (_id, saved) => applied.push(saved.latestMessageId!),
   });
+  const inputs: TranscriptFreshnessInputs = {
+    accountId: "account", conversationId: "conversation", latestMessageId: "old",
+    activityRevision: 1, requestId: null, ready: true, visibleMessageIds: new Set(),
+  };
+  runtime.recordLoaded("account", "conversation", snapshot("old"));
+  runtime.update(inputs);
+  const update = (patch: Partial<TranscriptFreshnessInputs>) => { Object.assign(inputs, patch); runtime.update({ ...inputs }); };
+  return { runtime, inputs, requests, applied, update };
+}
 
-  for (const finished of [false, true]) {
-    test(`leaves the sender's transcript alone when its transport is ${finished ? "finished" : "running"}`, async () => {
-      const harness = runtimeHarness({
-        activeConversationId: "conversation-a",
-        historyItems: [chat("conversation-a", workingActivity("running"))],
-      });
-      harness.runtime.startRequest("conversation-a", "local-turn", "running", "chat_turn");
-      if (finished) harness.runtime.finishTransport("conversation-a", "local-turn");
-      harness.runtime.updateInputs({
-        activeConversationId: "conversation-a", accountScopeKey: "account-a",
-        historyItems: [chat("conversation-a", idleActivity("new_activity", "terminal"))],
-      });
-      await drainMicrotasks();
-      expect(harness.reloads).toEqual([]);
-      expect(harness.invalidations).toEqual([]);
-    });
-  }
-
-  test("navigation invalidates the inactive transcript instead of reopening it", () => {
-    const harness = runtimeHarness({
-      activeConversationId: "conversation-a",
-      historyItems: [chat("conversation-a", workingActivity("running"))],
-    });
-    harness.runtime.updateActiveConversationId("conversation-b");
-    harness.runtime.updateInputs({
-      activeConversationId: "conversation-b", accountScopeKey: "account-a",
-      historyItems: [chat("conversation-a", idleActivity())],
-    });
-    expect(harness.reloads).toEqual([]);
-    expect(harness.invalidations).toEqual(["conversation-a"]);
-  });
-
-  test("does not reload from a previous account's late history response", async () => {
-    const response = deferred<readonly HistoryItem[]>();
-    const harness = runtimeHarness({
-      activeConversationId: "conversation-a",
-      historyItems: [chat("conversation-a", workingActivity("running"))],
-      refreshHistory: () => response.promise,
-    });
-    harness.runtime.start();
-    harness.runtime.synchronizeAccountScope(null);
-    response.resolve([chat("conversation-a", idleActivity())]);
+describe("saved transcript freshness", () => {
+  test("an idle-only activity update refreshes from a saved message id, then deduplicates", async () => {
+    const h = harness();
+    h.update({ latestMessageId: "reply", activityRevision: 2 });
+    h.update({ activityRevision: 3 });
+    expect(h.requests).toHaveLength(1);
+    h.requests[0].result.resolve(snapshot("reply"));
     await drainMicrotasks();
-    expect(harness.reloads).toEqual([]);
-    harness.runtime.dispose();
+    h.update({ activityRevision: 4 });
+    expect(h.requests).toHaveLength(1);
+    expect(h.applied).toEqual(["reply"]);
+  });
+
+  test("only a successful API read advances the loaded identity; next focus/update retries a failed read", async () => {
+    const h = harness();
+    h.update({ latestMessageId: "reply", activityRevision: 2 });
+    h.requests[0].result.reject(new Error("offline"));
+    await drainMicrotasks(); await drainMicrotasks();
+    h.update({});
+    expect(h.requests).toHaveLength(1);
+    h.update({ activityRevision: 3 });
+    expect(h.requests).toHaveLength(2);
+    expect(h.applied).toEqual([]);
+  });
+
+  test("does not overwrite a sender, including after its canonical final is visible", () => {
+    const h = harness();
+    h.update({ latestMessageId: "reply", activityRevision: 2, requestId: "local" });
+    expect(h.requests).toHaveLength(0);
+    h.update({ requestId: null, visibleMessageIds: new Set(["reply"]) });
+    expect(h.requests).toHaveLength(0);
+  });
+
+  for (const change of [
+    { conversationId: "other" }, { accountId: "other" }, { requestId: "new-local-turn" }, { ready: false },
+  ]) {
+    test(`rejects a late refresh after ${Object.keys(change)[0]} changes`, async () => {
+      const h = harness();
+      h.update({ latestMessageId: "reply", activityRevision: 2 });
+      h.update(change);
+      expect(h.requests[0].signal.aborted).toBe(true);
+      h.requests[0].result.resolve(snapshot("reply"));
+      await drainMicrotasks();
+      expect(h.applied).toEqual([]);
+      h.runtime.dispose();
+    });
+  }
+
+  test("a completion during the read is compared with the actual returned snapshot", async () => {
+    const h = harness();
+    h.update({ latestMessageId: "reply", activityRevision: 2 });
+    h.update({ latestMessageId: "newer-reply", activityRevision: 3 });
+    h.requests[0].result.resolve(snapshot("reply"));
+    await drainMicrotasks(); await drainMicrotasks();
+    expect(h.requests).toHaveLength(2);
+    h.requests[1].result.resolve(snapshot("newer-reply"));
+    await drainMicrotasks();
+    expect(h.applied).toEqual(["reply", "newer-reply"]);
+  });
+
+  test("server identity absent or transcript not ready does not invent freshness", () => {
+    const h = harness();
+    h.update({ latestMessageId: null });
+    h.update({ latestMessageId: "reply", ready: false });
+    expect(h.requests).toHaveLength(0);
   });
 });
