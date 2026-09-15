@@ -169,7 +169,7 @@ export default function SharedReceiptsView({
               <button
                 type="button"
                 onClick={load}
-                className="inline-flex min-h-9 items-center rounded-full border border-black/10 px-3.5 text-[12.5px] font-medium text-black/70 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.05]"
+                className="inline-flex min-h-11 items-center rounded-full border border-black/10 px-3.5 text-[12.5px] font-medium text-black/70 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.05]"
               >
                 {t("receipt.list.retry", "Try again")}
               </button>
@@ -227,7 +227,7 @@ export default function SharedReceiptsView({
                             const ok = await copyReceiptLink(receiptUrl(receipt));
                             setCopiedId(ok ? receipt.id : null);
                           }}
-                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 px-3 text-[12px] font-medium text-black/70 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.06]"
+                          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-black/10 px-3 text-[12px] font-medium text-black/70 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.06]"
                         >
                           {copiedId === receipt.id ? (
                             <Check className="h-3.5 w-3.5" />
@@ -242,7 +242,7 @@ export default function SharedReceiptsView({
                           href={receipt.path}
                           target="_blank"
                           rel="noreferrer noopener"
-                          className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-black/10 px-3 text-[12px] font-medium text-black/70 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.06]"
+                          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-black/10 px-3 text-[12px] font-medium text-black/70 transition-colors hover:bg-black/[0.04] dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.06]"
                         >
                           <ExternalLink className="h-3.5 w-3.5" />
                           {t("receipt.list.open", "Open it")}
@@ -257,7 +257,7 @@ export default function SharedReceiptsView({
                             }
                             setConfirmingId(receipt.id);
                           }}
-                          className="ml-auto inline-flex min-h-9 items-center rounded-full px-3 text-[12px] font-medium text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 disabled:opacity-55"
+                          className="ml-auto inline-flex min-h-11 items-center rounded-full px-3 text-[12px] font-medium text-[#d66d75] transition-colors hover:bg-[#d66d75]/10 disabled:opacity-55"
                         >
                           {revokingId === receipt.id
                             ? t("receipt.list.revoking", "Taking it down...")
@@ -279,7 +279,7 @@ export default function SharedReceiptsView({
                 type="button"
                 disabled={isLoadingMore}
                 onClick={() => void loadMore()}
-                className="inline-flex min-h-9 items-center rounded-full border border-black/10 px-3.5 text-[12.5px] font-medium text-black/70 transition-colors hover:bg-black/[0.03] disabled:opacity-55 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.05]"
+                className="inline-flex min-h-11 items-center rounded-full border border-black/10 px-3.5 text-[12.5px] font-medium text-black/70 transition-colors hover:bg-black/[0.03] disabled:opacity-55 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/[0.05]"
               >
                 {isLoadingMore
                   ? t("receipt.list.loading", "Loading your links...")

@@ -65,6 +65,17 @@ function Plan({ plan }: { plan: NonNullable<ReceiptFigures["plan"]> }) {
   );
 }
 
+function ReceiptAnswer({ answer, language }: { answer: string; language: ArgusLanguage }) {
+  return (
+                  <div lang={language} className={`mt-4 min-w-0 break-words pt-5 text-[15px] leading-relaxed text-white/90 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_h2]:my-4 [&_h2]:font-medium [&_h3]:my-3 [&_h3]:font-medium [&_a]:underline [&_a]:underline-offset-4 ${RULE}`}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml allowedElements={["p", "strong", "em", "ul", "ol", "li", "a", "blockquote", "h2", "h3", "br", "code", "table", "thead", "tbody", "tr", "th", "td"]} unwrapDisallowed components={{
+                      a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
+                      table: ({ children }) => <div className="my-4 max-w-full overflow-x-auto"><table className="w-full border-collapse text-left text-[13px] leading-relaxed [&_th]:border-b [&_th]:border-white/20 [&_th]:px-3 [&_th]:py-2 [&_th]:font-medium [&_td]:border-b [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">{children}</table></div>,
+                    }}>{answer}</ReactMarkdown>
+                  </div>
+  );
+}
+
 /** One receipt form, fed by the shared presentation projection for every kind. */
 export default function ReceiptBody({ payload, createdAt, copy, language, preview = false }: ReceiptBodyProps) {
   const entries = receiptPresentations(payload, createdAt, language);
@@ -84,7 +95,7 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
                 {entry.stamp && <span className={LABEL}>{entry.stamp}</span>}
               </div>
               <Heading lang={entry.language} className="font-display mt-4 text-[23px] font-medium leading-[1.16] tracking-[-0.5px] text-white sm:text-[30px] sm:tracking-[-0.8px]">{entry.title}</Heading>
-              {!entry.research && !entry.calculations && <div className={`mt-4 pt-5 ${RULE}`}><Figures figures={entry} /></div>}
+              {!entry.research && !entry.calculations && !entry.textOnly && <div className={`mt-4 pt-5 ${RULE}`}><Figures figures={entry} /></div>}
               {entry.calculations?.map((calculation, calculationIndex) => (
                 <Fragment key={calculationIndex}>
                   <section className={`mt-4 pt-5 ${RULE}`}>
@@ -94,15 +105,11 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
                   {calculation.plan && <Plan plan={calculation.plan} />}
                 </Fragment>
               ))}
+              {entry.answer && <ReceiptAnswer answer={entry.answer} language={entry.language} />}
               {entry.research && (
                 <>
-                  <div lang={entry.language} className={`mt-4 min-w-0 pt-5 text-[15px] leading-relaxed text-white/90 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-1 [&_h2]:my-4 [&_h2]:font-medium [&_h3]:my-3 [&_h3]:font-medium [&_a]:underline [&_a]:underline-offset-4 ${RULE}`}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml allowedElements={["p", "strong", "em", "ul", "ol", "li", "a", "blockquote", "h2", "h3", "br", "code", "table", "thead", "tbody", "tr", "th", "td"]} unwrapDisallowed components={{
-                      a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
-                      table: ({ children }) => <div className="my-4 max-w-full overflow-x-auto"><table className="w-full border-collapse text-left text-[13px] leading-relaxed [&_th]:border-b [&_th]:border-white/20 [&_th]:px-3 [&_th]:py-2 [&_th]:font-medium [&_td]:border-b [&_td]:border-white/10 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top">{children}</table></div>,
-                    }}>{entry.research.answer}</ReactMarkdown>
-                  </div>
-                  <section className={`mt-4 pt-5 ${RULE}`}>
+                  <ReceiptAnswer answer={entry.research.answer} language={entry.language} />
+                  {entry.research.sources.length > 0 && <section className={`mt-4 pt-5 ${RULE}`}>
                     <h2 className={LABEL}>{copy.research.sources}</h2>
                     <ul className="mt-3">
                       {entry.research.sources.map((source) => <li key={source.url} className={`py-3 ${RULE}`}>
@@ -110,7 +117,7 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
                         <p className="mt-1 text-[12px] text-white/45">{[source.domain, formatReceiptDay(source.source_date, language)].filter(Boolean).join(" · ")}</p>
                       </li>)}
                     </ul>
-                  </section>
+                  </section>}
                   {entry.research.nextStep && <section className={`mt-4 pt-5 ${RULE}`}><h2 className={LABEL}>{copy.research.next_step}</h2><p className="mt-2 text-[14px] leading-relaxed text-white/70">{entry.research.nextStep}</p></section>}
                 </>
               )}
@@ -122,7 +129,7 @@ export default function ReceiptBody({ payload, createdAt, copy, language, previe
           );
         })}
       </main>
-      {!preview && <ReceiptActionBar kind={kind} framing={kind === "backtest" ? copy.framing.headline : kind === "calculation" ? copy.calculation.headline : copy.research.headline} action={copy.cta.action} />}
+      {!preview && <ReceiptActionBar kind={kind} framing={kind === "backtest" ? copy.framing.headline : kind === "calculation" ? copy.calculation.headline : kind === "research_answer" ? copy.research.headline : copy.answer.headline} action={copy.cta.action} />}
     </>
   );
 }
