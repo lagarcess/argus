@@ -22,6 +22,7 @@ from argus.domain.research.perplexity_agent import (
     PerplexityAgentClient,
     _usage_from_response,
 )
+from argus.domain.research.pricing import MODEL_RATE_TABLE_USD_PER_MILLION
 from argus.domain.research.search.perplexity_direct import (
     DOCUMENTED_PERPLEXITY_SEARCH_COST_USD,
 )
@@ -141,7 +142,44 @@ class MeasurementBudget:
             if self._agent_applications[case] > 1:
                 self._stop("agent_application_retry_denied")
 
-    def admit(self, pool: str) -> int:
+    def agent_reservation(self, body: dict) -> Decimal:
+        """Estimate every fallback at its highest rate; retain the approved floor.
+
+        Four bytes per token estimates the initial request, repeated per step.
+        Retrieved context and internal tool work are not bounded by that estimate.
+        The response invoice, never this reservation, owns actual spend.
+        """
+        models = body.get("models")
+        if not isinstance(models, list) or not models:
+            self._stop("invalid_agent_request_models")
+        if any(
+            not isinstance(model, str) or model not in MODEL_RATE_TABLE_USD_PER_MILLION
+            for model in models
+        ):
+            self._stop("unpriced_agent_request_model")
+        steps, output = body.get("max_steps"), body.get("max_output_tokens")
+        if any(
+            not isinstance(value, int) or isinstance(value, bool) or value <= 0
+            for value in (steps, output)
+        ):
+            self._stop("invalid_agent_request_limits")
+        input_tokens = Decimal(len(json.dumps(body).encode("utf-8"))) / 4
+        estimates = [
+            Decimal(steps)
+            * (
+                input_tokens
+                * max(
+                    rate.input_usd_per_million, rate.cache_creation_input_usd_per_million
+                )
+                + Decimal(output) * rate.output_usd_per_million
+            )
+            / 1_000_000
+            for model in models
+            for rate in MODEL_RATE_TABLE_USD_PER_MILLION[model]
+        ]
+        return max(RESERVATIONS["agent"], *estimates)
+
+    def admit(self, pool: str, request: httpx.Request | None = None) -> int:
         with self._lock:
             self.check()
             case = self._case.get()
@@ -167,6 +205,14 @@ class MeasurementBudget:
                 self._stop("agent_request_still_outstanding")
             reserved = sum(v for _, p, v in self._pending.values() if p == pool)
             reservation = RESERVATIONS[pool]
+            if pool == "agent" and request is not None:
+                try:
+                    body = json.loads(request.content)
+                except (ValueError, UnicodeError):
+                    self._stop("invalid_agent_request_body")
+                if not isinstance(body, dict):
+                    self._stop("invalid_agent_request_body")
+                reservation = self.agent_reservation(body)
             if self._settled[pool] + reserved + reservation > LIMITS[pool]:
                 self._stop("provider_admission_budget")
             total = sum(self._settled.values()) + sum(
@@ -210,7 +256,7 @@ class MeasurementBudget:
                 provider=pool,
                 cost_usd=str(amount),
             )
-            if pool == "agent" and amount > reservation:
+            if pool == "agent" and amount > RESERVATIONS["agent"]:
                 self._stop("agent_invoice_exceeds_reservation")
             if (
                 self._settled[pool] >= LIMITS[pool]
@@ -304,7 +350,7 @@ class MeasurementBudget:
             pool = budget._pool(request)
             if pool is None:
                 return sync_send(client, request)
-            send_id = budget.admit(pool)
+            send_id = budget.admit(pool, request)
             try:
                 response = sync_send(client, request)
                 response.read()
@@ -320,7 +366,7 @@ class MeasurementBudget:
             pool = budget._pool(request)
             if pool is None:
                 return await async_send(client, request)
-            send_id = budget.admit(pool)
+            send_id = budget.admit(pool, request)
             try:
                 response = await async_send(client, request)
                 await response.aread()

@@ -33,7 +33,12 @@ These observations do not guarantee the next request's cost.
   before dispatch. Record a retry-budget failure and stop; never count that case
   as a model-quality pass or silently substitute a cheaper execution path.
 - Run serially, with at most one possibly billing Agent request outstanding.
-- Reserve $1.50 before each Agent send; settle using the response-owned invoice.
+- Reserve at least $1.50 before each Agent send. Read the actual `models` fallback
+  list and reserve the largest estimate across every candidate's highest priced
+  tier, using the request size, step count and output allowance. Reject an
+  unpriced candidate before dispatch. This estimate covers initial request and
+  output tokens, not an upper bound on retrieved context or tool work.
+  Settle using the response-owned invoice.
   Stop if the case's actual bill exceeds $1.50, or settled/reserved Agent spend
   reaches $8. Reservations are estimates and can be exceeded by the active call.
 - Stop the entire measurement on missing or unpriced usage, or an uncertain

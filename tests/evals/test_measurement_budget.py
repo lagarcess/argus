@@ -6,10 +6,12 @@ import asyncio
 import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
 import pytest
+from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.perplexity_agent import (
     PerplexityAgentClient,
     _usage_from_response,
@@ -21,6 +23,78 @@ from tests.evals.measurement_eval_harness import load_eval_cases
 AGENT_URL = "https://api.perplexity.ai/v1/agent"
 OR_URL = "https://openrouter.ai/api/v1/chat/completions"
 SEARCH_URL = "https://api.perplexity.ai/search"
+
+
+def agent_body(spec=None):
+    return PerplexityAgentClient(api_key="offline-test")._request_body(
+        "What is Apple's price?", spec or RESEARCH_CONFIG_SPECS["fast"]
+    )
+
+
+@pytest.mark.parametrize("shape", RESEARCH_CONFIG_SPECS)
+def test_real_agent_fallback_list_reaches_transport(budget, agent_invoice, shape):
+    calls = []
+    body = agent_body(RESEARCH_CONFIG_SPECS[shape])
+    assert "models" in body and "model" not in body
+    client = PerplexityAgentClient(
+        api_key="offline-test",
+        transport=httpx.MockTransport(
+            lambda req: calls.append(json.loads(req.content))
+            or httpx.Response(200, json=agent_invoice)
+        ),
+    )
+    with budget.case(agent_case(budget)):
+        client._post(body, timeout_seconds=1)
+    assert calls == [body]
+    budget.assert_complete()
+
+
+@pytest.mark.parametrize("unknown_index", [0, 1])
+def test_unpriced_fallback_is_rejected_before_dispatch(budget, unknown_index):
+    spec = RESEARCH_CONFIG_SPECS["fast"]
+    models = list(spec.models)
+    models[unknown_index] = "unpriced-model"
+    body = agent_body(spec.model_copy(update={"models": tuple(models)}))
+    calls = []
+    client = PerplexityAgentClient(
+        api_key="offline-test",
+        transport=httpx.MockTransport(lambda req: calls.append(req)),
+    )
+    with pytest.raises(MeasurementBudgetStop, match="unpriced_agent_request_model"):
+        with budget.case(agent_case(budget)):
+            client._post(body, timeout_seconds=1)
+    assert calls == []
+    assert budget.snapshot()["sends"] == []
+
+
+def test_reservation_uses_most_expensive_fallback_independent_of_order(budget):
+    spec = RESEARCH_CONFIG_SPECS["fast"].model_copy(
+        update={"max_output_tokens": 100_000, "max_steps": 1}
+    )
+    body = agent_body(spec)
+    reserve = budget.agent_reservation(body)
+    assert reserve >= Decimal("4.5")
+    body["models"].reverse()
+    assert budget.agent_reservation(body) == reserve
+    body["models"] = ["openai/gpt-5.6-luna"]
+    assert budget.agent_reservation(body) < reserve
+
+
+def test_highest_fallback_reservation_controls_real_dispatch(budget):
+    spec = RESEARCH_CONFIG_SPECS["fast"].model_copy(
+        update={"max_output_tokens": 100_000, "max_steps": 1}
+    )
+    budget._settled["agent"] = Decimal("4")
+    calls = []
+    client = PerplexityAgentClient(
+        api_key="offline-test",
+        transport=httpx.MockTransport(lambda req: calls.append(req)),
+    )
+    with pytest.raises(MeasurementBudgetStop, match="provider_admission_budget"):
+        with budget.case(agent_case(budget)):
+            client._post(agent_body(spec), timeout_seconds=1)
+    assert calls == []
+    assert budget.snapshot()["sends"] == []
 
 
 @pytest.fixture
@@ -63,7 +137,10 @@ def test_prices_raw_invoice_even_when_answer_is_malformed(budget, agent_invoice)
         budget.case(agent_case(budget)),
         httpx.Client(transport=httpx.MockTransport(handler)) as client,
     ):
-        assert client.post(AGENT_URL).json()["output"] == agent_invoice["output"]
+        assert (
+            client.post(AGENT_URL, json=agent_body()).json()["output"]
+            == agent_invoice["output"]
+        )
     budget.assert_complete()
     assert len(calls) == 1
     assert float(budget.snapshot()["total_settled_usd"]) == expected
@@ -99,8 +176,8 @@ def test_agent_second_http_send_never_reaches_transport(budget, agent_invoice):
     )
     with pytest.raises(MeasurementBudgetStop, match="agent_retry_denied"):
         with budget.case(agent_case(budget)), httpx.Client(transport=transport) as client:
-            client.post(AGENT_URL)
-            client.post(AGENT_URL)
+            client.post(AGENT_URL, json=agent_body())
+            client.post(AGENT_URL, json=agent_body())
     assert len(calls) == 1
 
 
@@ -112,8 +189,8 @@ def test_second_agent_application_stops_before_second_http_send(budget, agent_in
     client = PerplexityAgentClient(api_key="offline-test", transport=transport)
     with pytest.raises(MeasurementBudgetStop, match="agent_application_retry_denied"):
         with budget.case(agent_case(budget)):
-            client._post({}, timeout_seconds=1)
-            client._post({}, timeout_seconds=1)
+            client._post(agent_body(), timeout_seconds=1)
+            client._post(agent_body(), timeout_seconds=1)
     assert len(calls) == 1
 
 
@@ -146,7 +223,7 @@ def test_unknown_agent_model_is_unpriced_not_zero(budget, agent_invoice):
                 )
             ) as client,
         ):
-            client.post(AGENT_URL)
+            client.post(AGENT_URL, json=agent_body())
     assert budget.snapshot()["outstanding_sends"] == 1
 
 
@@ -163,7 +240,7 @@ def test_timeout_cannot_be_swallowed_by_production_exception_recovery(budget):
             httpx.Client(transport=httpx.MockTransport(handler)) as client,
         ):
             try:
-                client.post(AGENT_URL)
+                client.post(AGENT_URL, json=agent_body())
             except Exception:
                 pytest.fail("production fallback swallowed budget stop")
     assert len(calls) == 1
@@ -182,7 +259,7 @@ async def test_async_and_thread_offload_share_one_ledger_and_replay_body(
                     lambda _: httpx.Response(200, json=agent_invoice)
                 )
             ) as client:
-                return client.post(AGENT_URL).json()
+                return client.post(AGENT_URL, json=agent_body()).json()
 
         assert (await asyncio.to_thread(sync_call))["usage"] == agent_invoice["usage"]
         async with httpx.AsyncClient(
@@ -212,7 +289,7 @@ def test_outstanding_agent_blocks_other_case_before_second_send(budget, agent_in
             budget.case(cases[0]),
             httpx.Client(transport=httpx.MockTransport(handler)) as client,
         ):
-            client.post(AGENT_URL)
+            client.post(AGENT_URL, json=agent_body())
 
     with ThreadPoolExecutor() as executor:
         future = executor.submit(pending_call)
