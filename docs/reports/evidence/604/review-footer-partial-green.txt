@@ -1,0 +1,13 @@
+bun test v1.3.14 (0d9b296a)
+
+web/__tests__/receipt-answer-sharing.test.tsx:
+(pass) plain answers and complete backtest prose survive the exact preview in en [15.53ms]
+(pass) plain answers and complete backtest prose survive the exact preview in es-419 [4.29ms]
+(pass) public plain answer footer does not invent dated research in en [0.99ms]
+(pass) public mixed answer footer does not invent dated research in en [1.42ms]
+(pass) public plain answer footer does not invent dated research in es-419 [0.30ms]
+(pass) public mixed answer footer does not invent dated research in es-419 [1.69ms]
+
+ 6 pass
+ 0 fail
+Ran 6 tests across 1 file. [99.00ms]

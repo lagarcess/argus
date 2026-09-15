@@ -13,7 +13,7 @@ export const initialReceiptSelection: ReceiptSelectionState = { page: null, sele
 type Action =
   | { type: "loaded"; page: ReceiptCandidates; messageId?: string }
   | { type: "toggle"; messageId: string }
-  | { type: "select_all" | "clear" | "edit" }
+  | { type: "select_all" | "clear" | "edit" | "reset" }
   | { type: "note"; note: string }
   | { type: "busy"; phase: "previewing" | "creating" }
   | { type: "previewed"; preview: ReceiptPreview; revision: number }
@@ -39,6 +39,7 @@ export async function publishReceiptSelection(conversationId: string, state: Rec
 export function receiptSelectionReducer(state: ReceiptSelectionState, action: Action): ReceiptSelectionState {
   const invalidate = (change: Partial<ReceiptSelectionState>) => ({ ...state, ...change, preview: null, receipt: null, error: null, revision: state.revision + 1, phase: "selecting" as const });
   switch (action.type) {
+    case "reset": return initialReceiptSelection;
     case "loaded": return { ...initialReceiptSelection, page: action.page, phase: "selecting", selected: action.page.items.some((item) => item.message_id === action.messageId && item.eligible) ? [action.messageId!] : [] };
     case "toggle": {
       if (!state.page?.items.some((item) => item.message_id === action.messageId && item.eligible)) return state;

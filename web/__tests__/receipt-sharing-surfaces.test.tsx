@@ -3,14 +3,15 @@ import { isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import { createInstance } from "i18next";
-import ShareReceiptAction, { ReceiptCandidateChoices } from "../components/chat/ShareReceiptAction";
+import ShareReceiptAction from "../components/chat/ShareReceiptAction";
+import { ReceiptTurnChoice } from "../components/chat/ReceiptConversationSelection";
 import ReceiptBody from "../components/receipt/ReceiptBody";
 import ReceiptViewBeacon from "../components/receipt/ReceiptViewBeacon";
 import ReceiptNotice from "../components/receipt/ReceiptNotice";
 import ReceiptActionBar from "../components/receipt/ReceiptActionBar";
-import { initialReceiptSelection, receiptSelectionReducer } from "../lib/receipt-selection";
 import { reportReceiptFunnelStage } from "../lib/receipt-funnel";
 import { receiptCopy } from "../lib/receipt-copy";
+import { normalizeEnabledLanguage } from "../lib/language-features";
 import type { ReceiptKind } from "../lib/public-receipt-turns";
 import { backtestTurn, researchTurn, turnDocument } from "./fixtures/receipt-turns";
 import en from "../public/locales/en/common.json";
@@ -20,26 +21,16 @@ const noop = () => {};
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 
-describe.each(["en", "es-419"] as const)("share surfaces in %s", (language) => {
-  test("unsupported candidate stays visible with a named checkbox, reason and turn fallback", () => {
-    const state = receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page: { items: [{ message_id: "unsupported", eligible: false, question: null, reason: "unsafe_text", field: "answer" }] } });
-    const markup = renderToStaticMarkup(<ReceiptCandidateChoices state={state} copy={receiptCopy(language)} id="selection" onToggle={noop} onSelectAll={noop} onClear={noop} />);
+describe.each(["en", "es-419"] as const)("share surfaces in %s", (languageValue) => {
+  const language = languageValue as "en" | "es-419";
+  test("the transcript choice names the question and answer, with private turns disabled", async () => {
+    const i18n = createInstance();
+    await i18n.init({ lng: language, resources: { en: { translation: en }, "es-419": { translation: es } } });
+    const markup = renderToStaticMarkup(<I18nextProvider i18n={i18n}><ReceiptTurnChoice candidate={{ message_id: "private", eligible: false, reason: "unsafe_text", field: "answer" }} selected={false} onToggle={noop} /></I18nextProvider>);
     expect(markup).toContain('type="checkbox"');
     expect(markup).toContain('disabled=""');
-    expect(markup).toContain('aria-describedby="selection-reason-0"');
-    expect(markup).toContain(receiptCopy(language).selection.reasons.unsafe_text);
-    expect(markup).toContain(receiptCopy(language).selection.fields.answer);
-    expect(markup).toContain(language === "en" ? "Turn 1" : "Turno 1");
-  });
-
-  test("select all takes every eligible answer and the count says how many there are, never a limit", () => {
-    const page = { items: Array.from({ length: 6 }, (_, index) => ({ message_id: String(index), eligible: index !== 2, question: `Question ${index}` })) };
-    const state = receiptSelectionReducer(receiptSelectionReducer(initialReceiptSelection, { type: "loaded", page }), { type: "select_all" });
-    expect(state.selected).toHaveLength(5);
-    const markup = renderToStaticMarkup(<ReceiptCandidateChoices state={state} copy={receiptCopy(language)} id="selection" onToggle={noop} onSelectAll={noop} onClear={noop} />);
-    expect(markup).toContain(language === "en" ? "5 of 5 selected" : "5 de 5 seleccionados");
-    expect(markup).not.toContain(language === "en" ? "up to" : "hasta");
-    expect(markup.match(/disabled=""/g) ?? []).toHaveLength(1);
+    expect(markup).toContain(receiptCopy(normalizeEnabledLanguage(language)).selection.choose_turn);
+    expect(markup).toContain(receiptCopy(normalizeEnabledLanguage(language)).selection.reasons.unsafe_text);
   });
 
   test("header shortcut announces sharing the conversation, not creating a link", async () => {
@@ -78,7 +69,7 @@ test("an unknown link CTA does not invent a backtest funnel event", () => {
   expect(requests).toEqual([]);
 });
 test.each([1, 4])("%s turns mount one public beacon and zero preview beacons", (count) => {
-  const payload = turnDocument(...Array.from({ length: count }, (_, index) => index % 2 ? backtestTurn : researchTurn));
+  const payload = turnDocument(...Array.from({ length: Number(count) }, (_, index) => index % 2 ? backtestTurn : researchTurn));
   const props = { payload, createdAt: null, copy: receiptCopy("en"), language: "en" as const };
   expect(beaconCount(ReceiptBody(props))).toBe(1);
   expect(beaconCount(ReceiptBody({ ...props, preview: true }))).toBe(0);

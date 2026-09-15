@@ -33,7 +33,9 @@ describe.each(["en", "es-419"] as const)("a calculation receipt in %s", (languag
     expect(entry.neutralHeadline).toBe(true);
     expect(entry.plan?.heading).toBe(copy.calculation.used);
     expect(entry.plan?.rows).toHaveLength(turn.inputs.length);
-    expect(entry.plan?.rows[0].exact).toContain("Apple quote");
+    for (const input of turn.inputs.filter((item) => item.source?.title)) {
+      expect(entry.plan?.rows.some((row) => row.exact?.includes(input.source!.title!))).toBe(true);
+    }
     expect(entry.plan?.assumptions).toHaveLength(turn.notes.length);
     expect(entry.framing).toBe(copy.calculation.framing);
   });
@@ -47,7 +49,11 @@ describe.each(["en", "es-419"] as const)("a calculation receipt in %s", (languag
     expect(markup).toContain("Apple quote");
     expect(markup).toContain(copy.calculation.headline);
     expect(markup).not.toContain("<input");
-    expect(markup).not.toContain("6.25");
+    // Owner-written inputs are part of the selected preview, even without a publisher source.
+    for (const input of turn.inputs.filter((item) => !item.source && item.value != null)) {
+      expect(markup).toContain(String(input.value));
+    }
+    expect(markup).toContain(turn.answer_text!);
     expect(markup.match(/href="\/"/g)).toHaveLength(1);
     expect(markup).not.toContain("—");
   });

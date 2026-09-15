@@ -363,14 +363,13 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-14 at integration `6be3d58c`, after production promotion
+**Updated 2026-09-14 at integration `c8e05b4f`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
 | Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, measured: no measured regression, both date phrases keep August 16 to 19, and the reply moves to the real reason. Fixing the English case that asks for an asset already resolved, an English fallback in Spanish and its own Spanish fixture, then a full rerun with the six research cases bounded, refreeze and merge. |
-| Sharing on | PR #632 reconciled with integration, CI green, merge review clean. Waiting on the founder's call on the declined internal-metadata finding. Migration `20260914120000_share_plain_answer_receipts.sql` runs at promotion; flags stay off. |
 | Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Stopped on one catalogue finding; its 93-case measurement runs after the recovery replies lane lands. |
 | Acceptance dry run | Done on `03918912`: 30 of 46 smoke answers passed (guests 6 of 6), replay 14 of 14 with 24 turns left for the final run. Its failures drove the failure paths and calculation follow-ups lanes. The final acceptance reruns everything on the candidate. |
 
@@ -1452,7 +1451,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `6be3d58c`.
+shipped means live in production. Integration is `c8e05b4f`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1514,7 +1513,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. Labels approved by the founder 2026-09-12 and shipped 2026-09-13. |
 | Decisions | Plumbing | **Landed** `67facaf5`. |
 | Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569, answered by PR #571: a turn now reports what it paid rather than what it published, so a discarded packet, a retry either kept or thrown away, and a response rejected after its invoice all reach the ledger. Eleven inline degraded turns between 2026-08-13 and 2026-09-02 recorded zero spend, under about $1.50 and not worth a backfill; the three thorough `missing_public_sources` turns on 2026-09-08 were already correct, and no research job has ever failed in production. |
-| Sharing on | Sharing | **Held back 2026-09-13.** The live walk found no completed answer eligible to share (#604), so the promotion shipped with sharing off. A redesign waits for the founder; see the item. |
+| Sharing on | Sharing | **LANDED, switched off** `c8e05b4f`, PR #632, closing #604. Answers are shareable by default: selection happens inside the conversation, a question and its final answer are one unit, and the owner's choice and exact preview are the privacy boundary. Argus's own ids and account data never reach the page. The founder turns the flags on at promotion, and migration `20260914120000_share_plain_answer_receipts.sql` runs then. |
 | Share the answer | The calculations | **LANDED** `ba5a9fb7`, PR #574, 2026-09-09. Answers are shared from a header turn selection, behind `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, which is off in production. Calculations become eligible turns in Any grounded math. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
@@ -1879,10 +1878,11 @@ Resolved:
 - **Resolved: research has a fallback chain.** Commit `02d1b03d` (#404, #545)
   sends the Agents API `models` list, and each research tier lists the other as
   its fallback (`src/argus/domain/research/config.py`).
-- **Bugs are tracked as issues:** #598 a second tab never shows the reply, #599 the BTC forward research never publishes,
-  #604 sharing refuses completed answers, #606 a result follow-up lists its next steps
-  twice, and #614 the canary fails on nearly every run. #596, #600, #605, #608, #609,
-  #614, #619 and #624 are fixed on integration and ship at the next promotion.
+- **Bugs are tracked as issues:** #598 a second tab never shows the reply, #606 a result
+  follow-up lists its next steps twice, #611 a Bitcoin follow-up names the wrong
+  instrument, and #614 the canary fails on main until the next promotion. #596, #599,
+  #600, #604, #605, #608, #609, #614, #619, #622 and #624 are fixed on integration and
+  ship at the next promotion.
 - **The live measurement cannot see history building.** It gives each case its
   history directly and never loads saved turns, so a change to how saved turns
   become model history (PR #618) needs a live check through the chat route.

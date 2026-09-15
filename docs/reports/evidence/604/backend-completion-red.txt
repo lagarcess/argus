@@ -1,0 +1,95 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/0968/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 17 items
+
+tests/test_public_excerpt_sharing_604.py ...........FFF...               [100%]
+
+=================================== FAILURES ===================================
+________________ test_only_final_answer_in_a_turn_is_selectable ________________
+
+owner = (User(id='00000000-0000-0000-0000-000000000001', email='developer@argus.local', username='mock-developer', display_nam..., 8, 7, 12, 0, tzinfo=datetime.timezone.utc), last_message_preview='AAPL', preview=None, language='en', activity=None))
+
+    def test_only_final_answer_in_a_turn_is_selectable(owner):
+        _, intermediate = add_pair(owner)
+        final = intermediate.model_copy(update={"id": api_state.store.new_id(), "content": "The final answer."})
+        from tests.public_excerpt_factories import utc
+    
+        final.created_at = utc(2)
+        api_state.store.messages[owner[1].id].append(final)
+        candidates = service.receipt_candidates(user=owner[0], conversation_id=owner[1].id)
+>       assert [candidate.message_id for candidate in candidates.items] == [final.id]
+E       AssertionError: assert ['b45e2a0d-75...e5f655c96c9b'] == ['597b97bb-21...e5f655c96c9b']
+E         
+E         At index 0 diff: 'b45e2a0d-754e-4a08-b6a9-2026dc5004f9' != '597b97bb-2178-4782-b531-e5f655c96c9b'
+E         Left contains one more item: '597b97bb-2178-4782-b531-e5f655c96c9b'
+E         Use -v to get more diff
+
+tests/test_public_excerpt_sharing_604.py:100: AssertionError
+____ test_direct_finished_result_uses_its_canonical_completed_job[buy_hold] ____
+
+owner = (User(id='00000000-0000-0000-0000-000000000001', email='developer@argus.local', username='mock-developer', display_nam..., 8, 7, 12, 0, tzinfo=datetime.timezone.utc), last_message_preview='AAPL', preview=None, language='en', activity=None))
+dca = False
+
+    @pytest.mark.parametrize("dca", [False, True], ids=["buy_hold", "dca"])
+    def test_direct_finished_result_uses_its_canonical_completed_job(owner, dca):
+        run, answer = seed_direct_backtest(owner, dca=dca)
+>       shown = preview(owner, [answer])
+
+tests/test_public_excerpt_sharing_604.py:148: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_public_excerpt_turns.py:80: in preview
+    return service.preview_receipt_for_messages(
+src/argus/api/public_excerpt_selection.py:351: in preview_receipt_for_messages
+    _, _, leaves, artifacts, _, key = _selection(
+src/argus/api/public_excerpt_selection.py:320: in _selection
+    leaf, artifact, run_id = _project(context, message, owner_note)
+src/argus/api/public_excerpt_selection.py:189: in _project
+    refuse("not_completed")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+reason = 'not_completed', field = None
+
+    def refuse(reason: str, field: str | None = None) -> None:
+>       raise PublicExcerptSourceError(reason, reason=reason, field=field)
+E       argus.domain.public_excerpts.PublicExcerptSourceError: not_completed
+
+src/argus/domain/public_excerpt_turns.py:48: PublicExcerptSourceError
+______ test_direct_finished_result_uses_its_canonical_completed_job[dca] _______
+
+owner = (User(id='00000000-0000-0000-0000-000000000001', email='developer@argus.local', username='mock-developer', display_nam..., 8, 7, 12, 0, tzinfo=datetime.timezone.utc), last_message_preview='AAPL', preview=None, language='en', activity=None))
+dca = True
+
+    @pytest.mark.parametrize("dca", [False, True], ids=["buy_hold", "dca"])
+    def test_direct_finished_result_uses_its_canonical_completed_job(owner, dca):
+        run, answer = seed_direct_backtest(owner, dca=dca)
+>       shown = preview(owner, [answer])
+
+tests/test_public_excerpt_sharing_604.py:148: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/test_public_excerpt_turns.py:80: in preview
+    return service.preview_receipt_for_messages(
+src/argus/api/public_excerpt_selection.py:351: in preview_receipt_for_messages
+    _, _, leaves, artifacts, _, key = _selection(
+src/argus/api/public_excerpt_selection.py:320: in _selection
+    leaf, artifact, run_id = _project(context, message, owner_note)
+src/argus/api/public_excerpt_selection.py:189: in _project
+    refuse("not_completed")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+reason = 'not_completed', field = None
+
+    def refuse(reason: str, field: str | None = None) -> None:
+>       raise PublicExcerptSourceError(reason, reason=reason, field=field)
+E       argus.domain.public_excerpts.PublicExcerptSourceError: not_completed
+
+src/argus/domain/public_excerpt_turns.py:48: PublicExcerptSourceError
+=========================== short test summary info ============================
+FAILED tests/test_public_excerpt_sharing_604.py::test_only_final_answer_in_a_turn_is_selectable
+FAILED tests/test_public_excerpt_sharing_604.py::test_direct_finished_result_uses_its_canonical_completed_job[buy_hold]
+FAILED tests/test_public_excerpt_sharing_604.py::test_direct_finished_result_uses_its_canonical_completed_job[dca]
+========================= 3 failed, 14 passed in 1.64s =========================
