@@ -2,13 +2,13 @@
 
 ## Candidate and integration
 
-- Product head captured: `bf15cc03`.
+- Product head captured: `cd49e68e`.
 - Original integration base: `350e3dca8f573f5dfd61f1f753d8ed16a2724c9e`.
 - Reconciled integration: `bed233b0cdc96366acc5fc9d5a8d9193723612af`.
 - One-way merge: `1c7080379667556345f8dab7578eb45b211ee8d0`.
 - No textual conflicts. Semantic overlap is PR #639's viewport portals in
   AdaptivePanel and the guest dialogs. Both sides retained. All five public and
-  preview cases and seven receiver bridge cases passed after reconciliation.
+  preview cases and fourteen receiver bridge cases passed after reconciliation.
 - Latest reconciliation also includes PR #638, research asset identity through
   confirmation. The new fork still imports no executable artifact state. The
   affected research/confirmation/runtime checks were rerun: 67 passed, 14 hit a
@@ -50,9 +50,30 @@ records count-only try_argus, creates a different conversation and imports twelv
 messages without the owner's note. Separate bridge tests exercise guest/account,
 existing guest consent/cancel, retry identity, reload, revoke and conversion.
 
+## Review fixes at this capture
+
+- Keep the submitted text and request identity until an authorized terminal result
+  or canonical reconciliation. Reload and transient admission failures reuse the
+  same fork and turn. Verified guest signup can resume the pending follow-up;
+  unrelated account changes cannot.
+- Resolve fork replay through current-owner message metadata, so the existing
+  guest handoff preserves idempotency after ownership changes.
+- Read every selected carried turn independently of ordinary recent-message
+  windows. One bounded history selector preserves shared context through runtime,
+  checkpoints and provider adapters. Provider inputs remain ordinary role/content
+  turns, without new model instructions or provenance fields.
+- All 19 browser cases pass at the captured product head. The motion-on five-cell
+  public/preview matrix was refreshed; representative mobile frames were inspected.
+- Focused backend history/replay checks: 57 pass. Real PostgreSQL checks: nine
+  pass, including signup replay and complete 12- and 500-turn histories. Prompt
+  and OpenAPI checks: 32 pass. Merged-tree modularity passes.
+- Broader local runtime rerun: 96 pass; 34 encounter the independently reproduced
+  SciPy native-library loading error. Two additional local research-flag failures
+  pass with that fixture flag disabled. Fresh Linux CI remains the full gate.
+
 ## Deterministic verification
 
-- Frontend: 2,021 tests pass; production build passes; lint has zero errors
+- Frontend: 2,027 tests pass; production build passes; lint has zero errors
   (eight existing unused-variable warnings).
 - Backend fork/fixture/runtime final selection: 18 pass, including six real
   PostgreSQL tests using an isolated empty schema clone, with no new migration.
