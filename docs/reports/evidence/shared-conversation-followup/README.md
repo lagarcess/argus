@@ -84,6 +84,19 @@ existing guest consent/cancel, retry identity, reload, revoke and conversion.
   SciPy native-library loading error. Two additional local research-flag failures
   pass with that fixture flag disabled. Fresh Linux CI remains the full gate.
 
+### Result follow-up review correction
+
+The next completed review found the result-answer adapter still used a local
+six-message tail. It now uses the same shared history selector as the other
+model adapters, preserving the full already-bounded imported text. Ordinary
+messages retain their six-message window and 1,200-character limit. Four
+search/no-search payload cases with 12 and 500 selected turns failed before
+the fix. The focused result/history suite passes 68 tests; final composer,
+wording, history and prompt checks pass 45 tests after simplifying the typed
+adapter. No model instruction or response schema changed. The public/preview
+renderer and frontend tree are unchanged, so the committed visual evidence is
+retained. Current-head CI and the next review remain required.
+
 ## Deterministic verification
 
 - Frontend: 2,047 tests pass; production build passes; lint has zero errors
