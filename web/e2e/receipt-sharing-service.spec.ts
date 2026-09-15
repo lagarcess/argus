@@ -65,6 +65,8 @@ for (const cell of cells) {
     await expect(dialog.getByRole("textbox", { name: copy.followup.label })).toBeDisabled();
     await expect(dialog.getByRole("button", { name: copy.owner.create, exact: true })).toBeEnabled();
     await page.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-preview.png`) });
+    await dialog.getByTestId("receipt-chart-attribution").scrollIntoViewIfNeeded();
+    await page.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-preview-chart.png`) });
     await dialog.getByRole("textbox", { name: copy.followup.label }).scrollIntoViewIfNeeded();
     await page.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-preview-bottom.png`) });
     const createdResponse = page.waitForResponse(r => r.url().endsWith("/public-excerpt") && r.request().method() === "POST");
@@ -109,6 +111,8 @@ for (const cell of cells) {
       expect(viewWrites).toEqual([]);
       await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-${publicWidth}.png`), fullPage: true });
       await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-top.png`) });
+      await publicPage.getByTestId("receipt-chart-attribution").scrollIntoViewIfNeeded();
+      await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-chart.png`) });
       await publicPage.getByRole("textbox", { name: copy.followup.label }).scrollIntoViewIfNeeded();
       await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-bottom.png`) });
     }
