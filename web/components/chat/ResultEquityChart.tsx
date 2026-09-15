@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { useTranslation } from "react-i18next";
+import { CHART_ATTRIBUTION_LABEL as RESULT_CHART_ATTRIBUTION_FALLBACK, CHART_ATTRIBUTION_URL as RESULT_CHART_ATTRIBUTION_URL } from "@/lib/chart-attribution";
+export { CHART_ATTRIBUTION_URL as RESULT_CHART_ATTRIBUTION_URL } from "@/lib/chart-attribution";
 import {
   BaselineSeries,
   ColorType,
@@ -73,12 +75,10 @@ const BUY_POSITIVE_MARKER_COLOR = "#70a38d";
 const SELL_NEGATIVE_MARKER_COLOR = "#b85c5c";
 const BUY_RESTRAINED_MARKER_COLOR = "rgba(112, 163, 141, 0.42)";
 const SELL_RESTRAINED_MARKER_COLOR = "rgba(184, 92, 92, 0.38)";
-const RESULT_CHART_ATTRIBUTION_FALLBACK = "TradingView Lightweight Charts";
 const DEFAULT_MARKER_LABELS: MarkerLabelSet = {
   entry: "Buy",
   exit: "Sell",
 };
-export const RESULT_CHART_ATTRIBUTION_URL = "https://www.tradingview.com/";
 export const RESULT_CHART_ATTRIBUTION_FOOTER_CLASS =
   "border-t border-black/[0.04] px-3 pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.06] dark:text-white/45";
 const RESULT_CHART_ATTRIBUTION_HERO_FOOTER_CLASS =

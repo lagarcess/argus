@@ -615,7 +615,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).not.toContain("attributionLogo: false");
     expect(chart).toContain('data-testid="result-equity-chart-attribution"');
     expect(chart).toContain("RESULT_CHART_ATTRIBUTION_URL");
-    expect(chart).toContain("https://www.tradingview.com/");
+    expect(chart).toContain('from "@/lib/chart-attribution"');
     const launchAttributionDebt =
       "TO" +
       "DO(launch): Provide correct TradingView attribution before launch.";

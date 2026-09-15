@@ -60,6 +60,8 @@ for (const cell of cells) {
     expect(preview.payload.turns).toHaveLength(6);
     expect(preview.payload.turns.some((turn: { answer?: string }) => (turn.answer?.length ?? 0) > 4000)).toBe(true);
     expect(new Set(preview.payload.turns.map((turn: { kind: string }) => turn.kind))).toEqual(new Set(["backtest", "calculation", "research_answer", "answer"]));
+    await expect(dialog.getByTestId("receipt-chart-attribution").getByRole("link")).toHaveAttribute("href", "https://www.tradingview.com/");
+    await expect(dialog.getByTestId("receipt-chart-attribution")).toBeVisible();
     await expect(dialog.getByRole("textbox", { name: copy.followup.label })).toBeDisabled();
     await expect(dialog.getByRole("button", { name: copy.owner.create, exact: true })).toBeEnabled();
     await page.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-preview.png`) });
@@ -102,6 +104,8 @@ for (const cell of cells) {
       expect(await publicPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await expect(publicPage.getByRole("textbox", { name: copy.followup.label })).toBeEnabled();
       await expect(publicPage.locator("[data-receipt-question]")).toHaveCount(6);
+      await expect(publicPage.getByTestId("receipt-chart-attribution").getByRole("link")).toHaveAttribute("href", "https://www.tradingview.com/");
+      await expect(publicPage.getByTestId("receipt-chart-attribution")).toBeVisible();
       expect(viewWrites).toEqual([]);
       await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-${publicWidth}.png`), fullPage: true });
       await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-top.png`) });
