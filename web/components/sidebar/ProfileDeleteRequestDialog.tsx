@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useCallback, useId, useRef, type RefObject } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -16,7 +18,7 @@ import { useModalSurface } from "../layout/useModalSurface";
 
 export type DeleteRequestState = "idle" | "submitting" | "success" | "error";
 
-export default function ProfileDeleteRequestDialog({
+function ProfileDeleteRequestDialogSurface({
   state,
   supportMailto,
   onClose,
@@ -173,3 +175,5 @@ export default function ProfileDeleteRequestDialog({
     </div>
   );
 }
+
+export default withViewportPortal(ProfileDeleteRequestDialogSurface);

@@ -9,7 +9,7 @@ import ForgotPasswordPage from "../app/auth/forgot-password/page";
 import AuthForm from "../components/auth/AuthForm";
 import RequestAccess from "../components/auth/RequestAccess";
 import ExpiredGuestSession from "../components/guest/ExpiredGuestSession";
-import GuestConversionModal from "../components/guest/GuestConversionModal";
+import { GuestConversionModalSurface as GuestConversionModal } from "../components/guest/GuestConversionModal";
 import en from "../public/locales/en/common.json";
 
 async function renderLocalized(element: ReactElement): Promise<string> {
