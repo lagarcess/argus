@@ -1,0 +1,177 @@
+bun test v1.3.14 (0d9b296a)
+
+__tests__/use-conversation-activity.test.tsx:
+(pass) conversation activity refresh ownership > settles a request from its canonical activity when the first-page refresh omits it [0.84ms]
+(pass) conversation activity refresh ownership > does not settle from an omitted-request activity read started before transport completion [0.17ms]
+(pass) conversation activity refresh ownership > bootstraps and polls only while loaded canonical or local work is unresolved [0.16ms]
+(pass) conversation activity refresh ownership > does not invent working state or idle polling when cold activity refresh fails [0.08ms]
+(pass) conversation activity refresh ownership > contains an async refresh failure and keeps unresolved polling recoverable [0.07ms]
+(pass) conversation activity refresh ownership > refreshes on focus and only on a visible-document resume [0.06ms]
+(pass) conversation activity refresh ownership > refreshes bounded history when navigation changes the active conversation [0.03ms]
+(pass) conversation activity refresh ownership > keeps transport completion checking until strictly newer canonical idle [0.14ms]
+(pass) conversation activity refresh ownership > keeps an inactive Run locked through failed refresh after transport done [0.08ms]
+(pass) conversation activity refresh ownership > coalesces polling, focus, and visibility into one refresh with no idle tail [0.09ms]
+(pass) conversation activity mutations > optimistically marks read with the exact cursor and refreshes canonical truth [0.18ms]
+(pass) conversation activity mutations > silences automatic read success but still reports localized rollback [0.13ms]
+(pass) conversation activity mutations > retires stale pending state so a newer canonical cursor can be marked read [0.19ms]
+(pass) conversation activity mutations > scopes stale success, stale failure, and current rollback to mutation identity [0.13ms]
+(pass) conversation activity mutations > keeps local response revisions increasing after a successful mutation [0.09ms]
+(pass) conversation activity mutations > keeps an optimistic mutation current across identical navigation replays [0.07ms]
+(pass) conversation activity mutations > does not let an older in-flight history response supersede a newer mutation [0.08ms]
+(pass) conversation activity mutations > orders external history request issuance against later mutations [0.10ms]
+(pass) conversation activity mutations > invalidates one inactive transcript when a mutation response settles canonical work [0.07ms]
+(pass) conversation activity account and presentation ownership > aborts registered transports and ignores late mutation settlement on logout [0.15ms]
+(pass) conversation activity account and presentation ownership > preserves the passive navigation refresh after a layout-synchronous account reset [0.04ms]
+(pass) conversation activity account and presentation ownership > uses layout-synchronous active identity before passive inputs settle [0.04ms]
+(pass) conversation activity account and presentation ownership > exposes request, unread, cursor, guard, aggregate, and announcement accessors [0.18ms]
+1077 |           historyItems: [chat("conversation-a", idleActivity())],
+1078 |         });
+1079 |         if (source === "mutation") await harness.runtime.markRead("conversation-a", null);
+1080 |         else update();
+1081 |         update();
+1082 |         expect(harness.reloads).toEqual(["conversation-a"]);
+                                       ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "conversation-a",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/use-conversation-activity.test.tsx:1082:33)
+(fail) remote completion transcript reload > history reloads the open transcript once after queued settles, even if already read [0.20ms]
+1077 |           historyItems: [chat("conversation-a", idleActivity())],
+1078 |         });
+1079 |         if (source === "mutation") await harness.runtime.markRead("conversation-a", null);
+1080 |         else update();
+1081 |         update();
+1082 |         expect(harness.reloads).toEqual(["conversation-a"]);
+                                       ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "conversation-a",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/use-conversation-activity.test.tsx:1082:33)
+(fail) remote completion transcript reload > mutation reloads the open transcript once after queued settles, even if already read [0.08ms]
+1077 |           historyItems: [chat("conversation-a", idleActivity())],
+1078 |         });
+1079 |         if (source === "mutation") await harness.runtime.markRead("conversation-a", null);
+1080 |         else update();
+1081 |         update();
+1082 |         expect(harness.reloads).toEqual(["conversation-a"]);
+                                       ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "conversation-a",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/use-conversation-activity.test.tsx:1082:33)
+(fail) remote completion transcript reload > history reloads the open transcript once after running settles, even if already read [0.04ms]
+1077 |           historyItems: [chat("conversation-a", idleActivity())],
+1078 |         });
+1079 |         if (source === "mutation") await harness.runtime.markRead("conversation-a", null);
+1080 |         else update();
+1081 |         update();
+1082 |         expect(harness.reloads).toEqual(["conversation-a"]);
+                                       ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "conversation-a",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/use-conversation-activity.test.tsx:1082:33)
+(fail) remote completion transcript reload > mutation reloads the open transcript once after running settles, even if already read [0.05ms]
+1077 |           historyItems: [chat("conversation-a", idleActivity())],
+1078 |         });
+1079 |         if (source === "mutation") await harness.runtime.markRead("conversation-a", null);
+1080 |         else update();
+1081 |         update();
+1082 |         expect(harness.reloads).toEqual(["conversation-a"]);
+                                       ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "conversation-a",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/use-conversation-activity.test.tsx:1082:33)
+(fail) remote completion transcript reload > history reloads the open transcript once after checking settles, even if already read [0.04ms]
+1077 |           historyItems: [chat("conversation-a", idleActivity())],
+1078 |         });
+1079 |         if (source === "mutation") await harness.runtime.markRead("conversation-a", null);
+1080 |         else update();
+1081 |         update();
+1082 |         expect(harness.reloads).toEqual(["conversation-a"]);
+                                       ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "conversation-a",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/use-conversation-activity.test.tsx:1082:33)
+(fail) remote completion transcript reload > mutation reloads the open transcript once after checking settles, even if already read [0.04ms]
+1097 |       historyItems: [chat("conversation-a", idleActivity())], historyActivityRevision: revision,
+1098 |     });
+1099 |     update(9);
+1100 |     expect(harness.reloads).toEqual([]);
+1101 |     update(11);
+1102 |     expect(harness.reloads).toEqual(["conversation-a"]);
+                                   ^
+error: expect(received).toEqual(expected)
+
+- [
+-   "conversation-a",
+- ]
++ []
+
+- Expected  - 3
++ Received  + 1
+
+      at <anonymous> (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/__tests__/use-conversation-activity.test.tsx:1102:29)
+(fail) remote completion transcript reload > ignores a rejected stale idle projection and reloads only when canonical work settles [0.06ms]
+(pass) remote completion transcript reload > leaves the sender's transcript alone when its transport is running [0.05ms]
+(pass) remote completion transcript reload > leaves the sender's transcript alone when its transport is finished [0.02ms]
+(pass) remote completion transcript reload > navigation invalidates the inactive transcript instead of reopening it [0.02ms]
+(pass) remote completion transcript reload > does not reload from a previous account's late history response [0.06ms]
+
+7 tests failed:
+(fail) remote completion transcript reload > history reloads the open transcript once after queued settles, even if already read [0.20ms]
+(fail) remote completion transcript reload > mutation reloads the open transcript once after queued settles, even if already read [0.08ms]
+(fail) remote completion transcript reload > history reloads the open transcript once after running settles, even if already read [0.04ms]
+(fail) remote completion transcript reload > mutation reloads the open transcript once after running settles, even if already read [0.05ms]
+(fail) remote completion transcript reload > history reloads the open transcript once after checking settles, even if already read [0.04ms]
+(fail) remote completion transcript reload > mutation reloads the open transcript once after checking settles, even if already read [0.04ms]
+(fail) remote completion transcript reload > ignores a rejected stale idle projection and reloads only when canonical work settles [0.06ms]
+
+ 27 pass
+ 7 fail
+ 130 expect() calls
+Ran 34 tests across 1 file. [46.00ms]

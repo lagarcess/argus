@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronUp, Edit2, X } from "lucide-react";
@@ -92,7 +94,7 @@ type ProfileDetailsDialogProps = {
 
 };
 
-export default function ProfileDetailsDialog({
+function ProfileDetailsDialogSurface({
   profile,
   accountKind,
   closeProfileModal,
@@ -568,3 +570,5 @@ export default function ProfileDetailsDialog({
     </>
   );
 }
+
+export default withViewportPortal(ProfileDetailsDialogSurface);

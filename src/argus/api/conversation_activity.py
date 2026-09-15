@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, cast
 
 from argus.api import state as api_state
+from argus.api.conversation_previews import latest_conversation_messages
 from argus.api.schemas import ConversationActivity
 from argus.domain.conversation_activity import (
     ActivityReadState,
@@ -324,6 +325,9 @@ class ConversationActivityService:
                 user_id=user_id,
                 conversation_ids=requested,
             )
+            latest = latest_conversation_messages(
+                user_id=user_id, conversation_ids=requested
+            )
             indexed = {str(row.get("conversation_id") or ""): row for row in rows}
             if set(indexed) != set(requested):
                 raise RuntimeError("Conversation activity projection was incomplete.")
@@ -344,6 +348,10 @@ class ConversationActivityService:
                         if isinstance(raw, dict)
                     ],
                     read_state=_read_state_from_row(raw_read_state),
+                ).model_copy(
+                    update={
+                        "latest_message_id": latest.get(conversation_id, {}).get("id")
+                    }
                 )
             return result
 
@@ -354,6 +362,7 @@ class ConversationActivityService:
             user_id=user_id,
             conversation_ids=requested_set,
         )
+        latest = latest_conversation_messages(user_id=user_id, conversation_ids=requested)
         return {
             conversation_id: project_conversation_activity(
                 conversation_id=conversation_id,
@@ -361,6 +370,8 @@ class ConversationActivityService:
                 read_state=_read_state_from_row(
                     store.conversation_read_states.get((user_id, conversation_id))
                 ),
+            ).model_copy(
+                update={"latest_message_id": latest.get(conversation_id, {}).get("id")}
             )
             for conversation_id in requested
         }

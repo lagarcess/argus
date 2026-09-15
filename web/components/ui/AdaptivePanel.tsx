@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useId, useRef, type ReactNode } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
@@ -102,7 +104,7 @@ export default function AdaptivePanel({
   return <DesktopDialog {...{ title, titleId, overlayId, panelRef, onClose, closeLabel, width, desktopMaxHeight, footer, returnFocusRef, initialFocusRef, back, children }} />;
 }
 
-function DesktopDialog({
+function DesktopDialogSurface({
   title,
   titleId,
   overlayId,
@@ -188,3 +190,5 @@ function DesktopDialog({
     </div>
   );
 }
+
+const DesktopDialog = withViewportPortal(DesktopDialogSurface);

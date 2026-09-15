@@ -1,0 +1,55 @@
+unit-all
+(pass) chat mention display provenance > uses browser UTF-16 positions when an emoji precedes a selected ticker [0.02ms]
+(pass) chat mention display provenance > hydrates valid persisted mention ranges without changing the user message [0.09ms]
+(pass) chat mention display provenance > keeps a legacy mention when malformed display metadata is dropped [0.02ms]
+(pass) chat mention display provenance > finds the token immediately beside a collapsed composer caret [0.04ms]
+
+__tests__/dev-mode-badge-placement.test.ts:
+(pass) dev mode badge placement > keeps mock auth controls away from chat header and composer hit targets [0.05ms]
+
+ 1998 pass
+ 0 fail
+ 2 snapshots, 16438 expect() calls
+Ran 1998 tests across 189 files. [3.03s]
+
+lint
+  16:3   warning  'X' is defined but never used                           @typescript-eslint/no-unused-vars
+  19:10  warning  'useState' is defined but never used                    @typescript-eslint/no-unused-vars
+  44:3   warning  'inlineEditControlClassName' is defined but never used  @typescript-eslint/no-unused-vars
+  45:3   warning  'inlineEditFieldClassName' is defined but never used    @typescript-eslint/no-unused-vars
+  49:10  warning  'inlineFailureTextClass' is defined but never used      @typescript-eslint/no-unused-vars
+
+/Users/garces/.codex/worktrees/e176/private-alpha-next/web/components/sidebar/ChatSidebar.tsx
+  147:3  warning  'currentView' is defined but never used  @typescript-eslint/no-unused-vars
+  158:3  warning  'onNavigate' is defined but never used   @typescript-eslint/no-unused-vars
+
+✖ 8 problems (0 errors, 8 warnings)
+
+
+build
+├ ○ /privacy
+├ ƒ /r/[receiptId]
+├ ƒ /r/-/opengraph-image
+├ ○ /signup
+└ ○ /terms
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+mocked-evals
+                                                                         [ 24%]
+tests/evals/test_chat_runtime_eval_manifest.py ............              [ 28%]
+tests/evals/test_chat_runtime_trajectory_harness.py .................... [ 35%]
+...............                                                          [ 41%]
+tests/evals/test_measurement_availability.py ..........                  [ 45%]
+tests/evals/test_measurement_delivery.py ............................... [ 56%]
+...............................................                          [ 74%]
+tests/evals/test_measurement_outcome.py .............                    [ 78%]
+tests/evals/test_prose_evidence.py ..................................... [ 92%]
+....................                                                     [100%]
+
+============================= 270 passed in 10.19s =============================

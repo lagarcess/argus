@@ -2,7 +2,7 @@ import { parseToolProgress, type ToolProgress, type ToolResultCard, type ToolSca
 import { getSupabaseClient } from "./supabase-client";
 import i18next from "i18next";
 import { localizeArtifactFinalPayload } from "./artifact-response-transport";
-import type { AssetClass } from "./argus-types";
+import type { AssetClass, ConfirmationPeerSelection } from "./argus-types";
 import type { ConversationPreview } from "./conversation-preview-display";
 import type { ChatFinalResponsePayload } from "./chat-final-response-payload";
 import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
@@ -49,7 +49,7 @@ export { apiFetch, unauthenticatedApiFetch } from "./argus-api-transport";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
-export type { AssetClass } from "./argus-types";
+export type { AssetClass, ConfirmationPeerIdentity, ConfirmationPeerSelection } from "./argus-types";
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
 export type BacktestJobStatus =
   | "queued"
@@ -84,6 +84,7 @@ export type ConversationAttention = {
 export type ConversationActivity = {
   operation: ConversationOperation;
   attention: ConversationAttention;
+  latest_message_id?: string | null;
 };
 export type ConversationActivityPatch =
   | { action: "mark_unread" }
@@ -772,7 +773,7 @@ export async function getConversationMessages(
 export async function addConfirmationPeerAssets(
   conversationId: string,
   confirmationId: string,
-  symbols: string[],
+  selection: ConfirmationPeerSelection,
 ) {
   // Deterministic basket growth: no chat turn, no allowance spend. The
   // backend re-validates every symbol against the active turn's peer rows.
@@ -781,7 +782,7 @@ export async function addConfirmationPeerAssets(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbols }),
+      body: JSON.stringify(selection),
     },
   );
   return response.message;

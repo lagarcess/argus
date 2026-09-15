@@ -1350,7 +1350,7 @@ describe("Argus Alpha frontend contract", () => {
       "await navigateConversationTranscript(activeConversationId, userId, {",
     );
     expect(chat).toContain(
-      "loadAllConversationMessagePages(\n          targetConversationId,",
+      "loadSavedConversationTranscript(targetConversationId)",
     );
     expect(chat).toContain(
       "const routeState = readActiveConversationRouteState();",
@@ -1506,7 +1506,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     expect(chat).toContain(
-      "loadAllConversationMessagePages(\n          targetConversationId,",
+      "loadSavedConversationTranscript(targetConversationId)",
     );
     expect(chat).toContain("data-message-id={msg.id}");
     expect(chat).toContain("useTranscriptTurnAnchor({");
@@ -1523,7 +1523,7 @@ describe("Argus Alpha frontend contract", () => {
       "{ anchorMessageId: requestedMessageId }",
     );
     expect(anchoredNavigation).toContain(
-      "loadAllConversationMessagePages(\n          targetConversationId,\n        )",
+      "loadSavedConversationTranscript(targetConversationId)",
     );
     expect(anchoredNavigation).toContain(
       "isCurrentAnchoredConversationRequest({",

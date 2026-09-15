@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import BottomSheet, {
+import { BottomSheetSurface as BottomSheet,
   bottomSheetDragOutcome,
   bottomSheetHeightClass,
 } from "../components/ui/BottomSheet";

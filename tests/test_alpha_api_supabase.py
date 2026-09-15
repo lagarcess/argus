@@ -3995,6 +3995,7 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
     assert final_page.status_code == 200
     expected_final = conversations[4].model_dump(mode="json")
     expected_final["activity"] = {
+        "latest_message_id": None,
         "operation": {"status": "idle", "kind": None, "updated_at": None},
         "attention": {"status": "none", "cursor": None},
     }
@@ -4044,7 +4045,7 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
     assert [
         call.kwargs["conversation_ids"]
         for call in mock_gateway.read_conversation_preview_messages.call_args_list
-    ] == projected_pages
+    ] == [page for page in projected_pages for _ in range(2)]
     assert all(
         call.kwargs["user_id"] == "00000000-0000-0000-0000-000000000001"
         for call in mock_gateway.read_conversation_preview_messages.call_args_list
