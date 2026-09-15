@@ -149,6 +149,11 @@ def assert_main_promotion_live_eval_evidence(
     )
     assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
     assert totals.get("unexpected_pass") == 0
+    for status in ("skipped", "infrastructure_error"):
+        assert totals[status] == 0, (
+            f"{manifest_path.name}: live eval has {totals[status]} {status} "
+            "case(s); missing measurements cannot clear promotion."
+        )
 
     # A red candidate is gated by comparison against the deployed build, never
     # by its own score. Runbook: "Live eval is a comparison, not a scoreboard".

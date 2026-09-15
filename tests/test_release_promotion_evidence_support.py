@@ -183,3 +183,25 @@ def test_runbook_makes_founder_browser_acceptance_the_stronger_gate() -> None:
         runbook
     )
     assert "post-deploy checklist decides whether the promotion succeeded" in runbook
+
+
+@pytest.mark.parametrize("unmeasured_status", ["infrastructure_error", "skipped"])
+def test_promotion_rejects_a_case_with_no_live_measurement(
+    tmp_path: Path, unmeasured_status: str
+) -> None:
+    measured_sha = commit_measured_repository(tmp_path)
+    scorecard = live_eval_scorecard(tmp_path, measured_sha=measured_sha)
+    # Keep a complete fixture set and internally consistent totals: the gate
+    # must reject missing measurement, not just missing rows or bad arithmetic.
+    scorecard["results"][0]["status"] = unmeasured_status
+    scorecard["totals"]["passed"] -= 1
+    scorecard["totals"][unmeasured_status] = 1
+    relative = write_evidence(tmp_path, "unmeasured-case.json", scorecard)
+    manifest = tmp_path / "next-candidate.md"
+    manifest.write_text(
+        f"- Candidate SHA: `{measured_sha}`\n"
+        f"- Live eval scorecard: `{relative}`\n"
+    )
+
+    with pytest.raises(AssertionError, match=unmeasured_status):
+        assert_main_promotion_live_eval_evidence(manifest, repository_root=tmp_path)

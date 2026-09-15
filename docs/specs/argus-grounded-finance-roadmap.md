@@ -363,14 +363,15 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-14 at integration `c8e05b4f`, after production promotion
+**Updated 2026-09-14 at integration `1797e42a`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, measured: no measured regression, both date phrases keep August 16 to 19, and the reply moves to the real reason. Fixing the English case that asks for an asset already resolved, an English fallback in Spanish and its own Spanish fixture, then a full rerun with the six research cases bounded, refreeze and merge. |
-| Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Stopped on one catalogue finding; its 93-case measurement runs after the recovery replies lane lands. |
+| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, measured: no measured regression, both date phrases keep August 16 to 19, and the reply moves to the real reason. Fixing the English case that asks for an asset already resolved, an English fallback in Spanish and its own Spanish fixture, then a full rerun with the six research cases bounded, refreeze and merge. Fixes pushed; the 73-case rerun is approved under a $7 stop. |
+| Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Its 93-case measurement is approved under a $15 stop and runs after the recovery replies lane lands, since both change model-facing text. |
+| Replies reach an open second tab | PR #635 for #598. A second tab refreshes when the saved conversation is newer than what it shows, not only after it saw the reply being written, and keeps a message link. Redesign after two findings on the same mechanism. |
 | Acceptance dry run | Done on `03918912`: 30 of 46 smoke answers passed (guests 6 of 6), replay 14 of 14 with 24 turns left for the final run. Its failures drove the failure paths and calculation follow-ups lanes. The final acceptance reruns everything on the candidate. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
@@ -1451,7 +1452,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `c8e05b4f`.
+shipped means live in production. Integration is `1797e42a`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1546,6 +1547,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Ranked comparison leader gap | outside the releases | **LANDED** `0893c27e`, PR #627, closing #622. A ranked comparison's leader carries its gap, so a changed leader compares; the card hides the redundant row and shared receipts drop it. |
 | Acceptance dry run evidence | outside the releases | **LANDED** `6ec36797`, PR #631. Drivers, phone screenshots, findings and replay verdicts from the 03918912 run, with no customer text. |
 | Failure paths keep the money question | outside the releases | **LANDED** `6be3d58c`, PR #633. A failed interpreter no longer turns a money question into a test, a pending card no longer captures an unrelated follow-up, research gets only the turn's remaining time and falls back to the answer without the lookup, and recovery copy names what failed. |
+| Promotion readiness checklist | outside the releases | **LANDED** `1797e42a`, PR #636. `docs/release-manifests/NEXT-PROMOTION-CHECKLIST.md` lists the founder decisions, live runs and costs for the next promotion; the gate no longer accepts a skipped or unavailable live measurement. The four pending migrations rehearsed clean, three classify destructive, and none of the 44 existing scorecards qualify, so the candidate needs fresh live evidence. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
