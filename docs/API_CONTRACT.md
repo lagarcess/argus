@@ -3387,7 +3387,8 @@ stores nothing and makes no LLM, provider, or market-data call.
 message ID alongside the original question or structured action, both live and
 after reload. The API accepts the ID only when it identifies this conversation's
 latest assistant reply and that reply has `recovery.retryable: true`. Validation
-and history selection use the same message snapshot. Other IDs are ignored and
+and history selection use the same newest 20-message snapshot in chronological
+order, including in Supabase-backed conversations. Other IDs are ignored and
 are not persisted. The API stores an accepted ID as
 `metadata.failed_assistant_id` on the new user message, preserving any original
 `chat_action` metadata. This also applies to canonical `run_backtest` retries:

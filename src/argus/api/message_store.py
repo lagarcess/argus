@@ -849,6 +849,7 @@ def _load_runtime_thread_messages(
                 user_id=user_id,
                 conversation_id=conversation_id,
                 limit=limit,
+                newest_first_window=True,
             )
         except Exception as exc:
             if not dev_memory_fallback_enabled():
