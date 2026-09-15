@@ -207,6 +207,7 @@ configuration before import; do not rely on dotenv to override existing values.
 
 ```bash
 ARGUS_RUN_LIVE_EVALS=1 ARGUS_EVAL_ENV_FILE="$LIVE_ENV_FILE" \
+ARGUS_EVAL_BUDGET_REPORT="$(mktemp -d temp/promotion-eval.XXXXXX)/costs.jsonl" \
 ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider ARGUS_ASSET_PROVIDER_MODE=live_provider \
 poetry run pytest tests/evals/test_measurement_eval_live.py -q --no-cov
 ```
