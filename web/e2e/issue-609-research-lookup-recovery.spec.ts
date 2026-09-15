@@ -146,6 +146,7 @@ async function installFixture(page: Page, qaCase: QaCase) {
     message("greeting-answer", "assistant", text.greetingAnswer, 1),
   ];
   const streamedMessages: string[] = [];
+  const failedAssistantIds: (string | undefined)[] = [];
   const consoleErrors: string[] = [];
   const unexpected: string[] = [];
 
@@ -211,7 +212,8 @@ async function installFixture(page: Page, qaCase: QaCase) {
       return json(route, { items: [], next_cursor: null });
     }
     if (path.endsWith("/api/v1/chat/stream")) {
-      const body = request.postDataJSON() as { message?: string };
+      const body = request.postDataJSON() as { message?: string; failed_assistant_id?: string };
+      failedAssistantIds.push(body.failed_assistant_id);
       streamedMessages.push(String(body.message ?? ""));
       if (streamedMessages.length === 1) {
         messages.push(
@@ -280,7 +282,7 @@ async function installFixture(page: Page, qaCase: QaCase) {
     return json(route, { detail: "Unexpected issue #609 QA request" }, 501);
   });
 
-  return { consoleErrors, streamedMessages, unexpected };
+  return { consoleErrors, streamedMessages, failedAssistantIds, unexpected };
 }
 
 async function screenshot(page: Page, name: string, outputPath: string) {
@@ -408,5 +410,26 @@ for (const qaCase of cases) {
       expect(evidence.unexpected).toEqual([]);
       expect(evidence.consoleErrors).toEqual([]);
     });
+  });
+}
+
+// #625: exercise the actual click-to-fetch path for both reply identity sources.
+for (const reloaded of [false, true]) {
+  test(`Retry sends the failed reply ID ${reloaded ? "after reload" : "live"}`, async ({ page }) => {
+    const evidence = await installFixture(page, cases[0]);
+    const text = copy.en;
+    await page.goto(`/chat?conversation=${CONVERSATION_ID}`);
+    await page.getByTestId("chat-input").fill(text.prompt);
+    await page.getByTestId("chat-send").click();
+    const retry = page.getByRole("button", { name: text.retry, exact: true });
+    await expect(retry).toBeVisible();
+    if (reloaded) await page.reload();
+    await expect(page.getByTestId("chat-input")).toBeEnabled();
+    await retry.click();
+    await expect(page.getByText(text.answer, { exact: true })).toBeVisible();
+    expect(evidence.streamedMessages).toEqual([text.prompt, text.prompt]);
+    expect(evidence.failedAssistantIds).toEqual([undefined, "research-failure"]);
+    expect(evidence.unexpected).toEqual([]);
+    expect(evidence.consoleErrors).toEqual([]);
   });
 }

@@ -345,6 +345,8 @@ def _ordinary_request_message(
         ]
     if payload.action is not None:
         user_metadata["chat_action"] = persisted_chat_action(payload)
+    if payload.failed_assistant_id is not None:
+        user_metadata["failed_assistant_id"] = payload.failed_assistant_id
     if extra_user_metadata:
         user_metadata.update(extra_user_metadata)
     return prepare_message(

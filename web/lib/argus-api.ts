@@ -988,6 +988,7 @@ export async function getBacktestJob(jobId: string) {
 export type ChatStreamOptions = Readonly<{
   requestId?: string;
   signal?: AbortSignal;
+  failedAssistantId?: string;
 }>;
 
 export async function streamChatMessage(
@@ -1026,6 +1027,9 @@ export async function streamChatMessage(
     },
     body: JSON.stringify({
       conversation_id: conversationId,
+      ...(options.failedAssistantId
+        ? { failed_assistant_id: options.failedAssistantId }
+        : {}),
       ...(typeof input === "string" ? { message: input } : { action: input }),
       // Callers decide which turns carry mentions; this layer only forwards
       // them. Gating on a string input silently dropped the resolver identity

@@ -1587,16 +1587,15 @@ export default function ChatInterface() {
           runStreamFinalSeen ||= event.event === "final";
           handleStreamEvent(event);
         },
-        // Action turns drop composer mentions, but a discovery selection has no
-        // composer input to drop -- its mention *is* the resolver identity the
-        // candidate already earned, and dropping it is what forces the
-        // interpreter to re-derive the asset from the chip text.
+        // Discovery selections retain their resolver identity; other action
+        // turns drop composer mentions.
         action?.type && action.type !== "select_discovery_candidate"
           ? []
           : mentions,
         {
           requestId: requestSession.identity.requestId,
           signal: requestSession.controller.signal,
+          failedAssistantId: replacementAssistantId,
         },
       );
       throwIfAmbiguousRunStreamTermination(

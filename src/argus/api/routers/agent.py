@@ -355,6 +355,7 @@ async def chat_stream(
     recent_thread_history = load_runtime_thread_history(
         user_id=user.id,
         conversation_id=conversation.id,
+        failed_assistant_id=payload.failed_assistant_id,
     )
     confirmation_action_messages = recent_confirmation_messages(
         payload=payload,
@@ -1220,8 +1221,7 @@ async def chat_stream(
                 ):
                     retryable_recovery_code = chat_retry.durable_retry_code(recovery)
                     if retryable_recovery_code is not None:
-                        # A retryable lookup recovery: the lifecycle owns the
-                        # durable retry; completed turns strip it by design.
+                        # The lifecycle owns durable retries on failed lookups.
                         assistant_message = lifecycle_hooks.recoverable_failure(
                             content=persisted_text or "",
                             metadata=metadata,
