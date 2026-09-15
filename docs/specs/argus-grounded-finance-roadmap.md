@@ -1240,8 +1240,10 @@ phone. Enabling is a separate founder decision from any merge.
 
 **Surface.** Flags and QA. Little or no code.
 
-**Do not touch.** Guest sharing and forking stay out of scope per the sharing
-spec.
+**Scope update, founder-locked 2026-09-14.** Guest creation of shared links stays
+out of scope. Receiver follow-ups may fork frozen selected turns into the
+receiver's account or guest chat under
+`docs/superpowers/specs/2026-09-14-conversation-sharing-604.md`.
 
 **Proof.** Browser evidence of a shared receipt at mobile and desktop widths.
 The responsive shell shipped 2026-08-08 in PR #393 and is unconditional, so this

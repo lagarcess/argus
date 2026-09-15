@@ -278,7 +278,7 @@ describe("the receipt shell supports the receiver theme", () => {
 
   test("the thread and preview render legible foregrounds in both themes", () => {
     const props = { payload: PAYLOAD, createdAt: null, language: "en" as const, copy: receiptCopy("en") };
-    const layout = renderToStaticMarkup(createElement(PublicReceiptLayout, { children: "Thread" }));
+    const layout = renderToStaticMarkup(createElement(PublicReceiptLayout, null, "Thread"));
     expect(layout).toContain("bg-white text-black dark:bg-[#191c1f] dark:text-white");
     const body = renderToStaticMarkup(createElement(ReceiptBody, props));
     const preview = renderToStaticMarkup(createElement(ReceiptBody, { ...props, preview: true }));

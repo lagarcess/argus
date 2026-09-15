@@ -13,6 +13,7 @@ import {
   receiptLanguageFromAcceptLanguage,
 } from "@/lib/receipt-copy";
 import { notFound } from "next/navigation";
+import { receiptDocumentKind } from "@/lib/public-receipt-turns";
 import { receiptPreviewFacts } from "@/lib/receipt-preview-facts";
 
 // Revocation has to take effect on the next request, so nothing here is cached
@@ -120,7 +121,7 @@ export default async function PublicReceiptPage({ params }: ReceiptPageProps) {
         createdAt={result.createdAt}
         copy={copy}
         language={language}
-        footer={<ReceiptFollowup publicId={receiptId} copy={copy} language={language} />}
+        footer={<ReceiptFollowup publicId={receiptId} copy={copy} language={language} kind={receiptDocumentKind(result.payload)} />}
       />
     </div>
   );

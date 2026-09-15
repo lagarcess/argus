@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { receiptCopy } from "../lib/receipt-copy";
+import { receiptDocumentKind } from "../lib/public-receipt-turns";
 import { installMobileShellFixture } from "./support/mobile-shell-fixture";
 
 // Run the isolated scripts/qa/sharing_604_fixture.py first. These requests use
@@ -103,6 +104,9 @@ for (const cell of cells) {
       await expect(publicPage.locator("[data-receipt-question]")).toHaveCount(6);
       expect(viewWrites).toEqual([]);
       await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-${publicWidth}.png`), fullPage: true });
+      await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-top.png`) });
+      await publicPage.getByRole("textbox", { name: copy.followup.label }).scrollIntoViewIfNeeded();
+      await publicPage.screenshot({ animations: "allow", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-public-bottom.png`) });
     }
     if (width === 390 && language === "en") {
       const followup = "Why use monthly contributions?";
@@ -113,8 +117,10 @@ for (const cell of cells) {
         await route.fulfill({ status: 200, contentType: "text/event-stream", body: `data: ${JSON.stringify({ type: "final", payload: { conversation_id: body.conversation_id, assistant_response: "Fixture follow-up accepted.", message_id: "fixture-followup" } })}\n\ndata: [DONE]\n\n` });
       });
       const forkResponse = publicPage.waitForResponse(r => r.url().endsWith("/fork") && r.request().method() === "POST");
+      const tryArgusRequest = publicPage.waitForRequest(r => r.url().endsWith("/receipt-funnel") && r.postDataJSON()?.stage === "try_argus");
       await publicPage.getByRole("textbox", { name: copy.followup.label }).fill(followup);
       await publicPage.getByRole("button", { name: copy.followup.send, exact: true }).click();
+      expect((await tryArgusRequest).postDataJSON()).toEqual({ stage: "try_argus", kind: receiptDocumentKind(preview.payload) });
       const fork = await (await forkResponse).json();
       expect(fork.created).toBe(true);
       expect(fork.conversation.id).not.toBe(conversationId);
