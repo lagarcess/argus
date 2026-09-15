@@ -28,6 +28,7 @@ from argus.domain.tool_contracts import (
     ToolRepair,
     ToolResultCard,
 )
+from argus.domain.tool_fact_projection import ResultProjection
 
 
 class ToolInvocationError(ValueError):
@@ -99,6 +100,7 @@ class ToolPolicy:
     driving_fields: tuple[str, ...] = ()
     retain_unknown: bool = True
     public_receipt: PublicReceiptPolicy = "disabled"
+    ends_answer: bool = False
 
     def __post_init__(self) -> None:
         if self.execution not in {"local", "workflow", "provider"}:
@@ -135,6 +137,7 @@ class ToolCardBinding:
     card_type: str
     version: int
     presenter: Callable[[Any, ToolOutcome], ToolCardPresentation]
+    result_projection: ResultProjection | None = None
 
     def __post_init__(self) -> None:
         if not self.card_type or self.version < 1 or not callable(self.presenter):
@@ -519,6 +522,11 @@ class ToolDeclaration:
             presentation = ToolCardPresentation.model_validate(
                 self.card.presenter(arguments, outcome)
             )
+            if outcome.status == "succeeded" and self.card.result_projection is not None:
+                answer, rows = self.card.result_projection.render(arguments, returned)
+                presentation = presentation.model_copy(
+                    update={"answer": answer, "rows": rows}
+                )
             # Editability, unknown identity, units and provenance derive from the
             # declaration, never from a second policy hand-maintained per presenter.
             input_units = {
@@ -528,6 +536,23 @@ class ToolDeclaration:
                 unit.field: unit.unit for unit in self.units if unit.source == "result"
             }
             input_sources = _input_sources(original)
+            if "currency" in input_sources and not any(
+                fact.name == "currency" for fact in presentation.inputs
+            ):
+                presentation = presentation.model_copy(
+                    update={
+                        "inputs": [
+                            *presentation.inputs,
+                            ToolInputFact(
+                                name="currency",
+                                value=original.get("currency"),
+                                label=LocalizedText(
+                                    locale_key="tools.calc.fields.currency"
+                                ),
+                            ),
+                        ]
+                    }
+                )
             driving = [
                 name
                 for name in self.policy.driving_fields

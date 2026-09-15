@@ -38,6 +38,9 @@ def _correct_routing(case: harness.EvalCase) -> dict[str, Any]:
 
 @pytest.mark.parametrize("case", SWEEP_CASES, ids=lambda case: case.id)
 def test_each_case_rejects_a_turn_that_delivers_nothing(case: harness.EvalCase) -> None:
+    # This sweep removes the ordinary offered surface. Calculation delivery has
+    # its own real-card fault injections in test_measurement_calculations.py.
+    case = replace(case, expected=replace(case.expected, calculations=None))
     outcome = _correct_routing(case)
     outcome["offered"] = offered_to_user(
         final_patch={},

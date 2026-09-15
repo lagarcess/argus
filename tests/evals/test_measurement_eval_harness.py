@@ -24,6 +24,7 @@ EXPECTED_LOCKED_CATEGORIES = {
     "asset_discovery_routing",
     "dca_capital_semantics",
     "ordinary_conversation",
+    "calculation_followups",
 }
 
 PHRASE_ASSERTION_KEYS = {
@@ -84,9 +85,10 @@ def test_measurement_fixtures_do_not_assert_expected_prose() -> None:
                 offending_keys.append(f"{case.id}:{key}")
 
     assert offending_keys == []
-    # v2 hands the judge the surface rendered beside the reply (issue #516);
-    # the discrimination evidence lives in docs/reports/evidence/issue-516/.
-    assert PROSE_JUDGE_RUBRIC_VERSION == "argus-prose-quality-v3"
+    assert f"Version: {PROSE_JUDGE_RUBRIC_VERSION}" in harness.PROSE_JUDGE_RUBRIC
+    for case in cases:
+        for criterion in case.prose_judge_criteria:
+            assert f"- {criterion}:" in harness.PROSE_JUDGE_RUBRIC
 
 
 def test_expected_fail_baselines_are_issue_tagged() -> None:
@@ -1131,7 +1133,7 @@ def test_prose_judge_route_receipt_is_included_in_case_cost_evidence(
             intent="conversation_followup",
             capability_verdict="answer_only",
         ),
-        prose_judge_criteria=("plain_language",),
+        prose_judge_criteria=("honesty",),
     )
     active_receipts: list[SimpleNamespace] | None = None
 

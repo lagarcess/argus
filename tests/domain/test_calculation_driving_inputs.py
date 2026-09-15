@@ -4,7 +4,7 @@ and a source names market data or an assumption without a citation."""
 from __future__ import annotations
 
 import pytest
-from argus.domain.calculations import get_calculation_declarations
+from argus.domain.calculations import get_calculation_declarations, is_free_calculation
 from argus.domain.tool_contracts import LocalizedText, ToolFactSource, ToolInputFact
 from argus.domain.tool_declaration import MAX_DRIVING_INPUTS, ToolPolicy
 
@@ -14,6 +14,8 @@ from tests.domain.calculations.support import run_calculation
 
 def test_every_declaration_names_editable_driving_inputs() -> None:
     for declaration in get_calculation_declarations():
+        if not is_free_calculation(declaration):
+            continue
         policy = declaration.policy
         assert set(policy.driving_fields) <= set(policy.editable_fields)
         if declaration.name != "ranked_comparison":

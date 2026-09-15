@@ -27,6 +27,7 @@ from argus.domain.tool_declaration import (
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection
 
 KeyKind = Literal["percent", "money", "multiple", "count"]
 
@@ -39,11 +40,14 @@ class ComparisonItem(BaseModel):
     value: float
 
 
+MAX_COMPARISON_ITEMS = 12
+
+
 class RankedComparisonArguments(CalculationArguments):
     key_label: str = Field(min_length=1, max_length=120)
     key_kind: KeyKind = "percent"
     prefer: Literal["higher", "lower"] = "lower"
-    items: list[ComparisonItem] = Field(min_length=2, max_length=12)
+    items: list[ComparisonItem] = Field(min_length=2, max_length=MAX_COMPARISON_ITEMS)
 
 
 # Each ranked figure's fact name: the prefix and its position from the best item.
@@ -102,6 +106,48 @@ def _unit(kind: KeyKind, currency: str) -> LocalizedText | None:
     return None
 
 
+def _ranked_projection() -> ResultProjection:
+    facts = []
+    for index in range(MAX_COMPARISON_ITEMS):
+        facts.extend(
+            (
+                ResultFact(
+                    f"{RANK_FACT_PREFIX}{index}",
+                    lambda name, a, r, position=index: ToolFact(
+                        name=name,
+                        label=text(
+                            "tools.calc.ranked_comparison.row",
+                            rank=r.rows[position].rank,
+                            label=r.rows[position].label,
+                        ),
+                        value=round(r.rows[position].value, 2),
+                        unit=_unit(a.key_kind, a.currency),
+                    ),
+                    placement="answer" if index == 0 else "row",
+                    when=lambda a, r, position=index: position < len(r.rows),
+                ),
+                ResultFact(
+                    f"{GAP_FACT_PREFIX}{index}",
+                    lambda name, a, r, position=index: ToolFact(
+                        name=name,
+                        label=text(
+                            "tools.calc.ranked_comparison.gap",
+                            label=r.rows[position].label,
+                        ),
+                        value=round(r.rows[position].gap_to_best, 2),
+                        unit=_unit(a.key_kind, a.currency),
+                        comparison_only=position == 0,
+                    ),
+                    when=lambda a, r, position=index: position < len(r.rows),
+                ),
+            )
+        )
+    return ResultProjection(tuple(facts))
+
+
+RESULT_PROJECTION = _ranked_projection()
+
+
 def present_ranked_comparison(
     arguments: RankedComparisonArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -112,36 +158,8 @@ def present_ranked_comparison(
     title = text("tools.calc.ranked_comparison.title", key=arguments.key_label)
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
-    result = RankedComparisonResult.model_validate(outcome.result)
-    unit = _unit(arguments.key_kind, arguments.currency)
-    facts = [
-        ToolFact(
-            name=f"{RANK_FACT_PREFIX}{index}",
-            label=text(
-                "tools.calc.ranked_comparison.row", rank=row.rank, label=row.label
-            ),
-            value=round(row.value, 2),
-            unit=unit,
-        )
-        for index, row in enumerate(result.rows)
-    ]
-    rows: list[ToolFact] = []
-    for index, row in enumerate(result.rows):
-        if index > 0:
-            rows.append(facts[index])
-        rows.append(
-            ToolFact(
-                name=f"{GAP_FACT_PREFIX}{index}",
-                label=text("tools.calc.ranked_comparison.gap", label=row.label),
-                value=round(row.gap_to_best, 2),
-                unit=unit,
-                comparison_only=index == 0,
-            )
-        )
     return ToolCardPresentation(
         title=title,
-        answer=facts[0],
-        rows=rows,
         inputs=inputs,
         notes=[text("tools.calc.notes.ranked_not_recommended")],
     )
@@ -165,7 +183,10 @@ def get_ranked_comparison_declaration() -> ToolDeclaration:
             argument_fields=("key_label",),
         ),
         card=ToolCardBinding(
-            card_type="ranked_comparison", version=1, presenter=present_ranked_comparison
+            result_projection=RESULT_PROJECTION,
+            card_type="ranked_comparison",
+            version=1,
+            presenter=present_ranked_comparison,
         ),
         domain=("Ranked by the stated key only; ties share a rank (decision 6).",),
     )

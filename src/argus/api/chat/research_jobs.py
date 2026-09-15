@@ -484,7 +484,9 @@ async def _finalize_success(
         store_research_packet_for_job,
     )
 
-    composed = compose_completed_research(job_request=job_request, packet=packet)
+    composed = await asyncio.to_thread(
+        compose_completed_research, job_request=job_request, packet=packet
+    )
     store_research_packet_for_job(job_request, packet, composed)
     metadata: dict[str, Any] = {
         "conversation_mode": "guide",

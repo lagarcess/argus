@@ -29,8 +29,14 @@ from pydantic import BaseModel, Field
 
 from tests.evals.measurement_assertions import (
     _compare,
+    _compare_asset_discovery,
     _compare_date_range,
     _compare_subset,
+)
+from tests.evals.measurement_calculations import (
+    compare_calculations,
+    delivered_calculations,
+    stored_calculation_history,
 )
 from tests.evals.measurement_eval_scorecard import (
     FIXTURE_DIR,
@@ -48,6 +54,12 @@ from tests.evals.measurement_prose import (
     retain_prose_context,
     unavailable_prose_result,
 )
+from tests.evals.measurement_research_calls import (
+    ObservedInterpreter,
+    _compare_research,
+    _research_outcome,
+    capture_research_attempts,
+)
 
 LOCKED_EVAL_CATEGORIES = {
     "messy_english",
@@ -60,6 +72,7 @@ LOCKED_EVAL_CATEGORIES = {
     "asset_discovery_routing",
     "dca_capital_semantics",
     "ordinary_conversation",
+    "calculation_followups",
 }
 
 
@@ -120,6 +133,9 @@ class TypedExpectations:
     # carried. A research turn that withheld its answer still reaches
     # ready_to_respond, so nothing above can see the refusal this pins.
     research: dict[str, Any] | None = None
+    calculations: list[dict[str, Any]] | None = None
+    requires_new_facts: bool | None = None
+    research_provider_attempts: int | None = None
 
 
 @dataclass(frozen=True)
@@ -136,6 +152,8 @@ class EvalCase:
     confirmation_payload: dict[str, Any] | None = None
     recent_thread_history: tuple[dict[str, Any], ...] = ()
     thread_metadata: dict[str, Any] = field(default_factory=dict)
+    profile: dict[str, Any] = field(default_factory=dict)
+    stored_history: tuple[dict[str, Any], ...] = ()
     degraded_mode: dict[str, Any] = field(default_factory=dict)
     expected_fail: ExpectedFail | None = None
     prose_judge_criteria: tuple[str, ...] = ()
@@ -166,10 +184,21 @@ def run_eval_case(
     *,
     run_prose_judge: bool = True,
 ) -> dict[str, Any]:
+    if run_prose_judge:
+        unsupported = [
+            criterion
+            for criterion in case.prose_judge_criteria
+            if f"- {criterion}:" not in PROSE_JUDGE_RUBRIC
+        ]
+        if unsupported:
+            raise ValueError(f"unapproved prose rubric criteria: {unsupported}")
     contract = build_default_capability_contract()
     state = RunState.new(
         current_user_message=case.prompt,
-        recent_thread_history=[dict(turn) for turn in case.recent_thread_history],
+        recent_thread_history=[
+            *[dict(turn) for turn in case.recent_thread_history],
+            *stored_calculation_history(list(case.stored_history)),
+        ],
         action_context=_action_payload(case.action),
     )
     if case.confirmation_payload is not None:
@@ -179,8 +208,10 @@ def run_eval_case(
         user_id="argus-eval",
         language_preference=case.user_language,
         expertise_level="beginner",
+        country=case.profile.get("country"),
+        currency=case.profile.get("currency"),
     )
-    interpreter = OpenRouterStructuredInterpreter(contract=contract)
+    interpreter = ObservedInterpreter(OpenRouterStructuredInterpreter(contract=contract))
     clarifier = (
         None
         if case.degraded_mode.get("clarifier") == "offline"
@@ -190,69 +221,70 @@ def run_eval_case(
     confirm_result = None
     clarify_result = None
     followup_result = None
-    try:
-        interpret_result = interpret_stage(
-            state=state,
-            user=user,
-            latest_task_snapshot=case.snapshot,
-            selected_thread_metadata={
-                "ui_language": case.ui_language,
-                "last_stage_outcome": "await_approval",
-                **case.thread_metadata,
-            },
-            structured_interpreter=interpreter,
-        )
-        if interpret_result.outcome == "ready_for_confirmation":
-            confirm_state = _state_for_confirmation(
-                case=case,
-                interpret_patch=interpret_result.patch,
+    with capture_research_attempts() as research_attempts:
+        try:
+            interpret_result = interpret_stage(
+                state=state,
+                user=user,
+                latest_task_snapshot=case.snapshot,
+                selected_thread_metadata={
+                    "ui_language": case.ui_language,
+                    "last_stage_outcome": "await_approval",
+                    **case.thread_metadata,
+                },
+                structured_interpreter=interpreter,
             )
-            confirm_result = confirm_stage(
-                state=confirm_state,
-                contract=contract,
-                language=case.user_language,
-            )
-            if confirm_result.outcome == "needs_clarification":
+            if interpret_result.outcome == "ready_for_confirmation":
+                confirm_state = _state_for_confirmation(
+                    case=case,
+                    interpret_patch=interpret_result.patch,
+                )
+                confirm_result = confirm_stage(
+                    state=confirm_state,
+                    contract=contract,
+                    language=case.user_language,
+                )
+                if confirm_result.outcome == "needs_clarification":
+                    clarify_result = clarify_stage(
+                        state=_state_from_interpret_patch(
+                            case=case,
+                            interpret_patch={
+                                **interpret_result.patch,
+                                **confirm_result.patch,
+                            },
+                        ),
+                        contract=contract,
+                        clarification_generator=clarifier,
+                        language=case.user_language,
+                    )
+            elif interpret_result.outcome == "needs_clarification":
+                clarify_state = _state_from_interpret_patch(
+                    case=case,
+                    interpret_patch=interpret_result.patch,
+                )
                 clarify_result = clarify_stage(
-                    state=_state_from_interpret_patch(
-                        case=case,
-                        interpret_patch={
-                            **interpret_result.patch,
-                            **confirm_result.patch,
-                        },
-                    ),
+                    state=clarify_state,
                     contract=contract,
                     clarification_generator=clarifier,
                     language=case.user_language,
+                    prefilled_assistant_prompt=(
+                        interpret_result.patch.get("assistant_response")
+                        or interpret_result.patch.get("assistant_prompt")
+                    ),
                 )
-        elif interpret_result.outcome == "needs_clarification":
-            clarify_state = _state_from_interpret_patch(
+            followup_result = _run_followup_turn_if_needed(
                 case=case,
-                interpret_patch=interpret_result.patch,
-            )
-            clarify_result = clarify_stage(
-                state=clarify_state,
+                user=user,
                 contract=contract,
+                interpret_result=interpret_result,
+                clarify_result=clarify_result,
                 clarification_generator=clarifier,
-                language=case.user_language,
-                prefilled_assistant_prompt=(
-                    interpret_result.patch.get("assistant_response")
-                    or interpret_result.patch.get("assistant_prompt")
-                ),
             )
-        followup_result = _run_followup_turn_if_needed(
-            case=case,
-            user=user,
-            contract=contract,
-            interpret_result=interpret_result,
-            clarify_result=clarify_result,
-            clarification_generator=clarifier,
-        )
-    finally:
-        route_receipts = [
-            receipt.as_dict()
-            for receipt in end_openrouter_route_receipt_capture(route_token)
-        ]
+        finally:
+            route_receipts = [
+                receipt.as_dict()
+                for receipt in end_openrouter_route_receipt_capture(route_token)
+            ]
 
     typed_outcome = _typed_outcome(
         case=case,
@@ -261,8 +293,15 @@ def run_eval_case(
         clarify_result=clarify_result,
         followup_result=followup_result,
     )
+    typed_outcome["requires_new_facts"] = interpreter.research_need()
+    typed_outcome["research_provider_attempts"] = len(research_attempts)
     failed_checks = typed_expectation_failures(case=case, outcome=typed_outcome)
-    infrastructure_errors = composer_unavailability(route_receipts)
+    unavailability = composer_unavailability(route_receipts)
+    infrastructure_errors = [
+        item for item in unavailability if item["code"] != "runtime_timeout"
+    ]
+    if any(item["code"] == "runtime_timeout" for item in unavailability):
+        failed_checks.append("runtime_timeout")
     judge_result = None
     if run_prose_judge and case.prose_judge_criteria:
         judged_final_patch = _final_patch(
@@ -275,7 +314,7 @@ def run_eval_case(
             final_patch=judged_final_patch,
             interpret_patch=interpret_result.patch,
         )
-        if infrastructure_errors:
+        if unavailability:
             judge_result = unavailable_prose_result(
                 "runtime composer did not return prose"
             )
@@ -494,6 +533,20 @@ def typed_expectation_failures(
             failures,
             expected_fields=vars(expected),
         )
+    _compare(
+        "requires_new_facts",
+        expected.requires_new_facts,
+        outcome.get("requires_new_facts"),
+        failures,
+    )
+    _compare(
+        "research_provider_attempts",
+        expected.research_provider_attempts,
+        outcome.get("research_provider_attempts"),
+        failures,
+    )
+    if expected.calculations is not None:
+        compare_calculations(expected.calculations, outcome.get("calculations"), failures)
     if expected.research is not None:
         _compare_research(expected.research, outcome.get("research"), failures)
     return failures
@@ -719,6 +772,10 @@ async def _judge_prose_quality_async(
         "assistant_text": assistant_text,
         "rendered_beside_reply": rendered_beside_reply,
     }
+    if case.stored_history:
+        payload["prior_conversation"] = stored_calculation_history(
+            list(case.stored_history)
+        )
     result = await invoke_openrouter_json_schema(
         task="chat_composer",
         messages=[
@@ -782,6 +839,9 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             asset_discovery=expected.get("asset_discovery"),
             offered=expected.get("offered"),
             research=expected.get("research"),
+            calculations=expected.get("calculations"),
+            requires_new_facts=expected.get("requires_new_facts"),
+            research_provider_attempts=expected.get("research_provider_attempts"),
         ),
         action=(
             None
@@ -804,6 +864,8 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             dict(turn) for turn in (raw_case.get("recent_thread_history") or ())
         ),
         thread_metadata=dict(raw_case.get("thread_metadata") or {}),
+        profile=dict(raw_case.get("profile") or {}),
+        stored_history=tuple(raw_case.get("stored_history") or ()),
         degraded_mode=dict(raw_case.get("degraded_mode") or {}),
         expected_fail=(
             None
@@ -1034,6 +1096,7 @@ def _typed_outcome(
         "semantic_turn_act": interpret_patch.get("semantic_turn_act"),
         "asset_discovery": interpret_patch.get("asset_discovery"),
         "research": _research_outcome(final_patch),
+        "calculations": delivered_calculations(final_patch),
         "offered": offered_to_user(
             final_patch=final_patch,
             interpret_patch=interpret_patch,
@@ -1041,40 +1104,6 @@ def _typed_outcome(
             assistant_text=_assistant_text(final_patch),
         ),
     }
-
-
-def _research_outcome(patch: dict[str, Any]) -> dict[str, Any] | None:
-    """The typed research sidecar as the eval reads it, or None when the turn
-    took no rail: published is the absence of a degraded code, rows and
-    sources are counts of what the sidecar carries."""
-    sidecar = patch.get("research")
-    if not isinstance(sidecar, dict):
-        return None
-    degraded = sidecar.get("degraded")
-    return {
-        "published": not degraded,
-        "degraded_code": degraded.get("code") if isinstance(degraded, dict) else None,
-        "shape": sidecar.get("shape"),
-        "rows": len(sidecar.get("rows") or []),
-        "sources": len(sidecar.get("sources") or []),
-    }
-
-
-def _compare_research(expected: dict[str, Any], actual: Any, failures: list[str]) -> None:
-    if not isinstance(actual, dict):
-        failures.append(f"research: expected a research sidecar, got {actual!r}")
-        return
-    _compare(
-        "research.published", expected.get("published"), actual.get("published"), failures
-    )
-    _compare("research.shape", expected.get("shape"), actual.get("shape"), failures)
-    # An expected row count is a floor: a green case promises at least that
-    # many typed figures, and the provider is free to state more.
-    rows = expected.get("rows")
-    if rows is not None and (actual.get("rows") or 0) < rows:
-        failures.append(
-            f"research.rows: expected at least {rows}, got {actual.get('rows')!r}"
-        )
 
 
 def _final_patch(
@@ -1152,54 +1181,6 @@ def _compare_intent(
             failures.append(f"intent: expected one of {list(expected)!r}, got {actual!r}")
         return
     _compare("intent", expected, actual, failures)
-
-
-def _compare_asset_discovery(
-    expected: dict[str, Any],
-    actual: Any,
-    failures: list[str],
-) -> None:
-    if not isinstance(actual, dict):
-        failures.append(f"asset_discovery: expected payload {expected!r}, got {actual!r}")
-        return
-    _compare(
-        "asset_discovery.relationship",
-        expected.get("relationship"),
-        actual.get("relationship"),
-        failures,
-    )
-    _compare(
-        "asset_discovery.asset_class_hint",
-        expected.get("asset_class_hint"),
-        actual.get("asset_class_hint"),
-        failures,
-    )
-    if "needs_current_facts" in expected:
-        _compare(
-            "asset_discovery.needs_current_facts",
-            expected["needs_current_facts"],
-            actual.get("needs_current_facts"),
-            failures,
-        )
-    expected_anchors = expected.get("anchor_symbols")
-    if expected_anchors is not None:
-        actual_anchors = sorted(
-            str(symbol).upper() for symbol in (actual.get("anchor_symbols") or [])
-        )
-        _compare(
-            "asset_discovery.anchor_symbols",
-            sorted(str(symbol).upper() for symbol in expected_anchors),
-            actual_anchors,
-            failures,
-        )
-    include_terms = expected.get("category_description_includes_any")
-    if include_terms:
-        description = str(actual.get("category_description") or "").lower()
-        if not any(str(term).lower() in description for term in include_terms):
-            failures.append(
-                "asset_discovery.category_description: expected any of "
-                f"{list(include_terms)!r} in {description!r}"
-            )
 
 
 def _last_stage_outcome(

@@ -1,8 +1,8 @@
-"""Free calculations: each is a declaration, a compute function, tests and a presenter.
+"""Answer calculations: declarations, compute functions, tests and presenters.
 
-Assembled here for the catalog and for the decision kernels; nothing else
-enumerates them. A calculation is local, never confirmed, and recomputes
-instantly through the same compute function wherever it is re-run.
+This registry owns the catalog. Free local calculations also become editable
+decision kernels; provider-backed calculations preserve their provider policy
+and do not fetch again automatically when a decision is opened.
 """
 
 from __future__ import annotations
@@ -21,11 +21,15 @@ def get_calculation_declarations() -> tuple[ToolDeclaration, ...]:
     from argus.domain.calculations.growth_projection import (
         get_growth_projection_declaration,
     )
+    from argus.domain.calculations.historical_drawdown import (
+        get_historical_drawdown_declaration,
+    )
     from argus.domain.calculations.income_yield import get_income_yield_declaration
     from argus.domain.calculations.price_multiple import get_price_multiple_declaration
     from argus.domain.calculations.ranked_comparison import (
         get_ranked_comparison_declaration,
     )
+    from argus.domain.calculations.scaled_amount import get_scaled_amount_declaration
     from argus.domain.calculations.time_value import get_time_value_declaration
     from argus.domain.calculations.valuation_scenarios import (
         get_valuation_scenarios_declaration,
@@ -33,6 +37,7 @@ def get_calculation_declarations() -> tuple[ToolDeclaration, ...]:
 
     return (
         get_time_value_declaration(),
+        get_scaled_amount_declaration(),
         get_growth_projection_declaration(),
         get_bond_value_declaration(),
         get_discounted_cash_flow_declaration(),
@@ -43,15 +48,23 @@ def get_calculation_declarations() -> tuple[ToolDeclaration, ...]:
         get_expense_ratio_declaration(),
         get_ranked_comparison_declaration(),
         get_valuation_scenarios_declaration(),
+        get_historical_drawdown_declaration(),
     )
 
 
 def is_free_calculation(declaration: ToolDeclaration) -> bool:
-    """The declaration shape a computed answer, a kernel and a rail result share."""
+    """Whether a declaration can be recomputed instantly without provider calls."""
     policy = declaration.policy
     return (
         policy.execution == "local"
         and policy.confirmation == "never"
         and policy.external_calls == 0
         and bool(policy.editable_fields)
+    )
+
+
+def is_calculation(declaration: ToolDeclaration) -> bool:
+    """The calculation registry owns answer admission, history and markers."""
+    return is_free_calculation(declaration) or any(
+        item.name == declaration.name for item in get_calculation_declarations()
     )

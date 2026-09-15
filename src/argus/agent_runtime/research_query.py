@@ -50,6 +50,17 @@ class ResearchQueryExtraction(BaseModel):
             "are build requests, not market_stats."
         )
     )
+    requires_new_facts: bool = Field(
+        default=True,
+        description=(
+            "True when answering the current question requires external facts not "
+            "already available in the conversation. False when conversation "
+            "history, existing artifacts, and the user's stated inputs suffice, "
+            "including recalculation with changed inputs or explanation of an "
+            "earlier answer. A named asset or a follow-up alone does not require "
+            "new facts."
+        ),
+    )
     symbols: list[str] = Field(
         default_factory=list,
         description=(

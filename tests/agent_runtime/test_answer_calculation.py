@@ -237,12 +237,14 @@ def test_an_assumption_the_prose_does_not_name_is_listed_and_the_prose_stands() 
     )
     assert unnamed.assumptions == (
         {"artifact_id": card.artifact_id, "name": "future_value"},
+        {"artifact_id": card.artifact_id, "name": "currency"},
     )
     named = _published(
         "Assuming the loan ends at {{future_value}}, it costs {{payment}} a month.",
         inputs=inputs,
     )
-    assert named.template is not None and named.assumptions == ()
+    assert named.template is not None
+    assert [item["name"] for item in named.assumptions] == ["currency"]
 
 
 def test_a_plan_that_does_not_solve_keeps_its_card_under_argus_lead() -> None:
@@ -314,7 +316,10 @@ def test_every_unnamed_assumption_is_listed_and_only_a_driving_one_is_recorded()
     timing = {"name": "payment_timing", "value": "end", "source": "user"}
     listed = _published(stated, inputs=[*LOAN, detail, timing], notes=quiet)
     assert listed.template is not None
-    assert [item["name"] for item in listed.assumptions] == ["periods_per_year"]
+    assert [item["name"] for item in listed.assumptions] == [
+        "periods_per_year",
+        "currency",
+    ]
     assert ac.FIGURE_CHECK_REASON_CODE not in quiet
     rate = {"name": "annual_rate_pct", "value": 14, "source": "assumption"}
     unstated = (
@@ -325,7 +330,10 @@ def test_every_unnamed_assumption_is_listed_and_only_a_driving_one_is_recorded()
     per_year = {"name": "periods_per_year", "value": 12, "source": "user"}
     driving = _published(unstated, inputs=[*loan, rate, per_year, timing], notes=recorded)
     assert driving.template is not None, "the prose stands"
-    assert [item["name"] for item in driving.assumptions] == ["annual_rate_pct"]
+    assert [item["name"] for item in driving.assumptions] == [
+        "annual_rate_pct",
+        "currency",
+    ]
     assert ac.FIGURE_CHECK_REASON_CODE in recorded
 
 

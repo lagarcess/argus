@@ -5355,6 +5355,49 @@ unless the conversation also has an evidence-backed run, and
 `GET /conversations/{conversation_id}/run-dossiers` is unchanged: it projects
 runs, so only backtest decisions appear there.
 
+### Calculation continuity and historical observations
+
+Runtime history projects persisted assistant `tool_result_cards` through
+`calculation_turn_facts`: `{calculation_cards: [{artifact_id, name, kind,
+input_revision, arguments, status, result, failure}], answer_text}`. Arguments
+and scalar results come from validated active cards; visual paths and schedules
+are omitted. The qualitative answer remains available, but does not own the
+calculation's values or provenance. The projection does not change stored prose.
+
+`AnswerCalculation` adds `prior_artifact_id: string | null` and
+`updated_fields: string[]`. A prior reference must resolve to a successful card
+in this conversation's assistant history with the same kind and solved field.
+The new call starts from that card's arguments and sources; only explicitly
+updated editable fields change. Unknown references compute nothing and record
+`calculation_prior_artifact_unavailable`. A new artifact records the recompute;
+the old card remains unchanged. These fields are model-facing and require the
+lane's approved live measurement before prompt refreeze.
+
+`ResearchQueryExtraction.requires_new_facts` is a typed routing fact, defaulting
+to true for older readers. False bypasses research for recalculation and
+explanation, even with named subjects, through the existing no-search answer.
+A failure there cannot fall through to research. Execution and artifact actions
+retain their own owners. No text matching decides this boundary.
+
+`scaled_amount` multiplies or divides a monetary `amount` by `rate`, expressed as
+`percent` or `multiple`, without a time assumption. `currency` is the input
+amount's currency; optional `output_currency` is the result's. Currency ratios
+show their quotation direction. Missing values and zero divisors use existing
+structured failures; recompute and decisions use the same pure calculation.
+
+`historical_drawdown` is a provider calculation taking `symbol` and optional
+`start_date`/`end_date`, never model-supplied prices or profile currency. It
+fetches Argus daily closes and uses the backtest engine's drawdown math. Omitted
+dates use five years ending yesterday in New York, labeled as an assumption.
+The result records requested and actual windows, peak/trough dates, observation
+count, source, price basis and negative maximum-drawdown percentage. Missing or
+invalid data produces an unavailable outcome rather than synthetic history.
+Its read-only generic card and computation marker persist normally; opening a
+decision cannot fetch another series automatically (`kernel_unavailable`).
+`ToolPolicy.ends_answer` suppresses follow-up actions after a successful terminal
+calculation. Historical observations set it; model prose is separately measured
+for the requirement to show the historical result and stop.
+
 ### Free calculations
 
 A free calculation is a declared tool that is local, never confirmed, makes no
@@ -5456,8 +5499,7 @@ calculation feeds nothing (`calculation_input_currency_mismatch`); an
 undeclared name is dropped (`answer_input_undeclared`); an unknown kind or a
 malformed request computes nothing (`answer_calculation_kind_unknown`,
 `answer_calculation_malformed`); and money counts in the currency the request
-names, else the profile's resolved currency, else `USD`
-(`calculation_currency_defaulted`).
+explicitly sources, else the profile's resolved currency, else `USD`. A model-selected currency assumption does not override the profile. Defaults record `calculation_currency_defaulted` and `sources.currency.kind=assumption`; the generic input presenter exposes the currency so `answer_assumptions` can label it. Non-monetary tools declare no currency.
 
 The prose states each calculation's figures only as references to its card's
 answer, rows and inputs, `{{name}}` with one calculation or
@@ -5502,7 +5544,7 @@ requested_fields, missing_inputs: [{name, label}], semantic_needs: [], payload:
 the app writes the question from them (`tools.calc.missing_inputs.ask`), so the
 question names exactly the figures only the user knows. `retrieved` keeps the
 pages the answer read and `evidence` the figures it cited from finance data, so
-the reply may still cite them (`calculation_pending_reply`). The stored calculations stand: the reply fills only the blanks each calculation asked for under `requested_by_calculation`, keyed by its reference name (a null input, or a requested field it never listed; a payload stored without that map applies `requested_fields` to every calculation), with a figure that is not an assumption, and a voiced reply that changed a figure they held is recorded as `calculation_pending_reply_kept_stored`. That question belongs to the no-search
+the reply may still cite them (`calculation_pending_reply`). The reply fills the blanks each calculation asked for under `requested_by_calculation`, keyed by its reference name (a null input, or a requested field it never listed; a payload stored without that map applies `requested_fields` to every calculation), with a figure that is not an assumption. A known input changes only when the model names it in `updated_fields` and supplies a non-null user-sourced value. Other changes are ignored and recorded as `calculation_pending_reply_kept_stored`. That question belongs to the no-search
 answer; a research turn whose lookup failed and whose fallback asks keeps its
 `research` sidecar, so the packet it read reaches the ledger, and a background
 job in that case stores the same `clarification` and `requested_field` on its

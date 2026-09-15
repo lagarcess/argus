@@ -34,15 +34,18 @@ from tests.evals.measurement_eval_harness import (
 
 def _assert_requested_live_eval_credentials() -> None:
     if not (os.getenv("OPENROUTER_API_KEY") or "").strip():
-        raise RuntimeError(
-            "OPENROUTER_API_KEY is required for requested live evals"
-        )
+        raise RuntimeError("OPENROUTER_API_KEY is required for requested live evals")
 
 
 def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
     if os.getenv("ARGUS_RUN_LIVE_EVALS") != "1":
         pytest.skip("set ARGUS_RUN_LIVE_EVALS=1 to spend live LLM eval calls")
     _assert_requested_live_eval_credentials()
+    budget_report = (os.getenv("ARGUS_EVAL_BUDGET_REPORT") or "").strip()
+    if not budget_report:
+        raise RuntimeError(
+            "ARGUS_EVAL_BUDGET_REPORT is required for the approved live measurement"
+        )
 
     if not (os.getenv("ARGUS_ASSET_PROVIDER_MODE") or "").strip():
         asset_provider_mode = (
@@ -62,7 +65,22 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
     clear_asset_cache()
 
     provenance = build_scorecard_provenance(evaluation_mode="live")
-    results = [run_eval_case(case) for case in load_eval_cases()]
+    cases = load_eval_cases()
+    from tests.evals.measurement_budget import PRIOR_LEDGER, MeasurementBudget
+    from tests.evals.measurement_budget_runner import run_budgeted_cases
+
+    report_path = Path(budget_report)
+    budget = MeasurementBudget(
+        report_path, [case.id for case in cases], prior_ledger=PRIOR_LEDGER
+    )
+    budget.install(monkeypatch)
+    results = run_budgeted_cases(
+        cases,
+        run_case=run_eval_case,
+        budget=budget,
+        provenance=provenance,
+        progress_path=report_path.with_suffix(".progress.json"),
+    )
     scorecard_path = write_scorecard(results, provenance=provenance)
     failures = [
         {

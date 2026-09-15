@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock
 
+import httpx
 import pytest
 from argus.agent_runtime.stages import interpret
 from argus.llm import openrouter
@@ -46,13 +47,17 @@ def capability_run(monkeypatch: Any) -> Any:
     monkeypatch.setattr(harness, "judge_prose_quality", judge)
 
     def run(
-        *, language: str = "en", fallback_text: str = "", bad_route: bool = False
+        *,
+        language: str = "en",
+        fallback_text: str = "",
+        bad_route: bool = False,
+        error: type[Exception] = TimeoutError,
     ) -> Any:
         active_case = replace(case, user_language=language, ui_language=language)
 
         async def post(**kwargs: Any) -> Any:
             if kwargs["payload"]["model"] == "fixture/primary":
-                raise TimeoutError("fixture timeout")
+                raise error("fixture timeout")
             return SimpleNamespace(
                 json=lambda: {
                     "choices": [{"message": {"content": fallback_text}}],
@@ -92,12 +97,14 @@ def capability_run(monkeypatch: Any) -> Any:
 
 
 @pytest.mark.parametrize("language", ["en", "es-419"])
-def test_timeout_then_empty_fallback_is_unavailable_not_dishonest(
-    capability_run: Any, language: str
+@pytest.mark.parametrize("error", [TimeoutError, httpx.ConnectError])
+def test_timeout_is_product_failure_and_transport_is_infrastructure(
+    capability_run: Any, language: str, error: type[Exception]
 ) -> None:
-    result, judge = capability_run(language=language)
-    assert result["status"] == "infrastructure_error"
-    assert result["failed_checks"] == []
+    result, judge = capability_run(language=language, error=error)
+    runtime_timeout = error is TimeoutError
+    assert result["status"] == ("failed" if runtime_timeout else "infrastructure_error")
+    assert result["failed_checks"] == (["runtime_timeout"] if runtime_timeout else [])
     judge.assert_not_called()
     assert result["prose_judge"]["pass"] is None
     assert result["prose_judge"]["failed_criteria"] == []
@@ -109,11 +116,14 @@ def test_timeout_then_empty_fallback_is_unavailable_not_dishonest(
         language=language,
     )
     assert [r["failure_mode"] for r in result["route_receipts"]] == [
-        "TimeoutError",
+        error.__name__,
         "empty_response",
     ]
     assert result["route_receipts"][-1]["usage_cost_usd"] == 0.001
-    assert result["infrastructure_errors"][0]["component"] == "runtime_composer"
+    if runtime_timeout:
+        assert result["infrastructure_errors"] == []
+    else:
+        assert result["infrastructure_errors"][0]["component"] == "runtime_composer"
     assert harness.blocking_eval_results([result]) == [result]
 
 
@@ -126,7 +136,7 @@ def test_available_fallback_still_fails_real_honesty_rubric(capability_run: Any)
 
 
 def test_outage_does_not_mask_a_typed_route_failure(capability_run: Any) -> None:
-    result, judge = capability_run(bad_route=True)
+    result, judge = capability_run(bad_route=True, error=httpx.ConnectError)
     assert result["status"] == "failed"
     assert any(
         check.startswith("semantic_turn_act:") for check in result["failed_checks"]

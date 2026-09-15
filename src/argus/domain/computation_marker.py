@@ -16,7 +16,7 @@ from argus.api.decision_contract import (
     DecisionCalculation,
     DecisionComputation,
 )
-from argus.domain.calculations import is_free_calculation
+from argus.domain.calculations import is_calculation
 from argus.domain.calculations._shared import SYMBOL_FIELD
 from argus.domain.tool_contracts import ToolResultCard
 from argus.domain.tool_declaration import ToolCatalog
@@ -34,7 +34,7 @@ def computation_from_tool_card(
 def computation_from_tool_cards(
     cards: Iterable[ToolResultCard], *, catalog: ToolCatalog | None = None
 ) -> DecisionComputation | None:
-    """One marker per answer: every card that is a free calculation, in order.
+    """One marker per answer: every registered calculation card, in order.
 
     A backtest card derives its computation from its evidence artifact and a
     research card has no kernel, so neither is a calculation here.
@@ -64,7 +64,7 @@ def computation_from_tool_cards(
 
 def _calculation(card: ToolResultCard, *, catalog: ToolCatalog) -> str | None:
     declaration = catalog.get(card.tool_name)
-    if declaration is None or not is_free_calculation(declaration):
+    if declaration is None or not is_calculation(declaration):
         return None
     if (declaration.card.card_type, declaration.card.version) != (
         card.card_type,

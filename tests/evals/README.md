@@ -33,6 +33,7 @@ poetry run pytest tests/evals/test_measurement_eval_harness.py \
   tests/evals/test_measurement_delivery.py \
   tests/evals/test_measurement_outcome.py \
   tests/evals/test_prose_evidence.py \
+  tests/evals/test_measurement_calculations.py \
   -q
 ```
 
@@ -79,10 +80,26 @@ Run the live harness with:
 ```bash
 ARGUS_RUN_LIVE_EVALS=1 \
 ARGUS_EVAL_ENV_FILE=<path> \
+ARGUS_EVAL_BUDGET_REPORT=temp/calculation-measurement-costs.jsonl \
 ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
 ARGUS_ASSET_PROVIDER_MODE=live_provider \
 poetry run pytest tests/evals/test_measurement_eval_live.py -q
 ```
+
+`ARGUS_EVAL_BUDGET_REPORT` is mandatory and must name a new, ignored JSONL
+file. The sanctioned suite refuses missing or blank budget configuration before
+provider work. The current approved scope is $15 total, including $8 for Agent
+and at most 16 Agent sends, one per eligible case; see the
+[approved budget and case allowlists](../../docs/reports/evidence/calculation-followups/measurement-budget-proposal.md).
+Interrupted runs retain a sibling `.progress.json` file and never write a
+passing scorecard. Do not delete an existing ledger to reuse its path.
+A cancelled or unbilled call retains its reservation and does not stop later
+cases. The runner preserves ordinary runtime scoring; an escaped deadline is a
+product failure and an escaped transport failure is `infrastructure_error`.
+Admission includes all settled and reserved spend, including the approved
+stopped-run ledger ($0.093172736 settled plus $0.10 reserved). The only spend
+caps are $15 total, $8 Agent, and 16 Agent sends. The next paid run waits for the
+founder to free the slot.
 
 `ARGUS_EVAL_ENV_FILE` must name a file no tracked file feeds, such as the
 gitignored `.env`. The harness refuses the file when it, or any step on the way
@@ -377,3 +394,27 @@ fragment of the secret survives rather than that a marker appears.
 Live scorecards land in gitignored `temp/`, but they are routinely promoted into
 `docs/reports/evidence/` as durable acceptance evidence. Treat the bound and the
 redaction pass as requirements of that committed path, not as local hygiene.
+
+### Calculation follow-ups and money-answer goalpost
+
+`calculation_followups.yaml` adds 22 bilingual cases from the PR #631 failures:
+stored-card recall, 48-payment completion, profile currency assumptions, changed
+bond principal, rewards and conversion arithmetic, personal comparison bounds,
+changed spending-goal risk, and historical drawdown (named asset and generic
+crypto). It also covers the `requires_new_facts` boundary with earlier-answer
+explanation and positive fresh-fact controls.
+
+The normal live runner executes these cases. Each is a new turn with authored
+prior context, not a claim that a preceding live turn was persisted. Calculation
+seeds are produced by registered declarations and passed through the production
+history loader; pending inputs use the stored clarification contract. Typed
+checks read actual delivered cards, including arguments, sources, result and
+presentation. Drawdown checks require Argus market-data provenance and the
+observed window on the displayed card. Provider calls are observed at the actual
+Perplexity client send method; absent citations are not proof of no lookup.
+
+Substantive prose criteria remain proposed in
+`calculation_followup_rubric_proposal.md`. A case refuses unsupported criteria
+before invoking a model. Only the founder-approved rubric and sanctioned live
+measurement can establish prose quality; free tests establish fixture and
+assertion behavior. No extra paid driver or automatic rerun is introduced.

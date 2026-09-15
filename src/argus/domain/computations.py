@@ -87,10 +87,15 @@ def _calculation_kernels() -> dict[str, ComputationKernel]:
     Built on first use so this module stays importable from the API schemas
     without loading the catalog.
     """
-    from argus.domain.calculations import get_calculation_declarations
+    from argus.domain.calculations import (
+        get_calculation_declarations,
+        is_free_calculation,
+    )
 
     kernels: dict[str, ComputationKernel] = {}
     for declaration in get_calculation_declarations():
+        if not is_free_calculation(declaration):
+            continue
         kernels[declaration.name] = calculation_kernel(declaration)
     return kernels
 

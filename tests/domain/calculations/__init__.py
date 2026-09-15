@@ -5,6 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 WORKED_ARGUMENTS: dict[str, dict[str, Any]] = {
+    "scaled_amount": {
+        "currency": "USD",
+        "amount": 1000,
+        "rate": 2,
+        "rate_unit": "percent",
+        "operation": "multiply",
+    },
     "time_value": {
         "direction": "borrow",
         "currency": "USD",

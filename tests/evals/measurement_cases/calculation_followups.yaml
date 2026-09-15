@@ -1,0 +1,945 @@
+# Authored bilingual regression contexts from PR #631; not prior live evidence.
+category: calculation_followups
+cases:
+- id: calculation_followups_q2_card_recall_en
+  regression: q2_card_recall
+  prompt: For the Macan calculation, change only the assumed income share from 10% to 15%. Keep the
+    same quoted lease payment and use no new lookup. What monthly income does that give?
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: debt_to_income
+        arguments: &id001
+          currency: USD
+          monthly_debt_payments: 1129
+          monthly_income: null
+          ratio_pct: 15
+          sources:
+            monthly_debt_payments: &id002
+              kind: page
+              url: https://www.porsche.com/usa/accessoriesandservices/porschefinancialservices/leasing/
+              date: '2026-09-14'
+            ratio_pct:
+              kind: user
+            currency: &id003
+              kind: user
+      reference:
+        tool_name: debt_to_income
+        arguments: *id001
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+  stored_history:
+  - role: user
+    content: How much income do I need for a Macan?
+  - role: assistant
+    content: The card shows the income at the assumed share.
+    calculation:
+      tool_name: debt_to_income
+      arguments:
+        currency: USD
+        monthly_debt_payments: 1129
+        monthly_income: null
+        ratio_pct: 10
+        sources:
+          monthly_debt_payments: *id002
+          ratio_pct:
+            kind: assumption
+          currency: *id003
+- id: calculation_followups_q3_periods_and_profile_currency_en
+  regression: q3_periods_and_profile_currency
+  prompt: There are 48 monthly payments remaining. Use that term with the balance and rate already
+    in this chat, without a new lookup. What is the regular monthly payment?
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: time_value
+        arguments: &id004
+          currency: USD
+          direction: borrow
+          present_value: 180000
+          payment: null
+          future_value: 0
+          annual_rate_pct: 14
+          periods: 48
+          periods_per_year: 12
+          sources:
+            currency:
+              kind: assumption
+            periods:
+              kind: user
+      reference:
+        tool_name: time_value
+        arguments: *id004
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+  stored_history:
+  - role: user
+    content: I owe 180,000 at 14% annual interest. What is my monthly payment?
+  - role: assistant
+    content: How many monthly payments remain?
+  thread_metadata:
+    last_stage_outcome: await_user_reply
+    clarification:
+      kind: clarification
+      requested_field: periods
+      payload:
+        calculations:
+        - name: loan
+          kind: time_value
+          solve_for: payment
+          inputs:
+          - name: direction
+            value: borrow
+            source: user
+          - name: present_value
+            value: 180000
+            source: user
+          - name: future_value
+            value: 0
+            source: user
+          - name: annual_rate_pct
+            value: 14
+            source: user
+          - name: periods
+            value: null
+            source: user
+          - name: periods_per_year
+            value: 12
+            source: user
+        requested_field: periods
+        requested_fields:
+        - periods
+        requested_by_calculation:
+          loan:
+          - periods
+        retrieved: []
+        evidence: []
+- id: calculation_followups_q4_changed_principal_en
+  regression: q4_changed_principal
+  prompt: Keep that 10.5% coupon and the same at-par assumption. Change only the face value to DOP
+    500,000. What annual coupon income does that give, using only the figures already here?
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: income_yield
+        arguments: &id005
+          currency: DOP
+          annual_income: null
+          price: 500000
+          yield_pct: 10.5
+          sources: &id006
+            currency:
+              kind: user
+            price:
+              kind: user
+            yield_pct:
+              kind: user
+      reference:
+        tool_name: income_yield
+        arguments: *id005
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+  stored_history:
+  - role: user
+    content: Calculate annual coupon income on DOP 1,000,000 at 10.5%, assuming par.
+  - role: assistant
+    content: See the computed annual coupon income.
+    calculation:
+      tool_name: income_yield
+      arguments:
+        currency: DOP
+        annual_income: null
+        price: 1000000
+        yield_pct: 10.5
+        sources: *id006
+- id: calculation_followups_q5_rewards_fill_en
+  regression: q5_rewards_fill
+  prompt: Using only the 2% cash-back rate you quoted, how much would USD 1,000 of purchases earn
+    if paid in full? No new card lookup.
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card: &id007
+        tool_name: scaled_amount
+        arguments:
+          amount: 1000
+          rate: 2
+          rate_unit: percent
+          operation: multiply
+          currency: USD
+      reference: *id007
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+  stored_history:
+  - role: user
+    content: Calculate cash back at 2%.
+  - role: assistant
+    content: How much eligible spending? The cash-back rate is 2%; assume paid in full.
+- id: calculation_followups_q5_no_personal_product_pick_en
+  regression: q5_no_personal_product_pick
+  prompt: Which credit card should I get?
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - comparison_without_selection
+- id: calculation_followups_q7_conversion_fill_en
+  regression: q7_conversion_fill
+  prompt: Using the quoted selling rate of DOP 58.8666 per USD, how many pesos would USD 100 cost
+    before fees? Keep that rate, without a new lookup.
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card: &id008
+        tool_name: scaled_amount
+        arguments:
+          currency: USD
+          output_currency: DOP
+          amount: 100
+          rate: 58.8666
+          rate_unit: multiple
+          operation: multiply
+      reference: *id008
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+  stored_history:
+  - role: user
+    content: How many pesos will I need to buy dollars?
+  - role: assistant
+    content: At DOP 58.8666 per USD, how many dollars will you buy?
+- id: calculation_followups_q7_changed_goal_risk_en
+  regression: q7_changed_goal_risk
+  prompt: 'Change only the goal: these dollar savings are for a fixed expense priced in Dominican
+    pesos, rather than US expenses. Which adverse currency move would matching the savings to that
+    peso expense protect against? Use only this chat, with no new lookup.'
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - goal_currency_risk
+  stored_history:
+  - role: user
+    content: I save dollars for US expenses. What if I kept pesos instead?
+  - role: assistant
+    content: If you hold pesos for a fixed dollar bill, peso depreciation means you need more pesos.
+- id: calculation_followups_q10_historical_drawdown_en
+  regression: q10_historical_drawdown
+  prompt: Should I put my emergency fund in Bitcoin? Show its historical drawdown over 2021 through
+    2024.
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: historical_drawdown
+        arguments:
+          symbol: BTC
+          start_date: '2021-01-01'
+          end_date: '2024-12-31'
+        outcome:
+          result:
+            asset_class: crypto
+            source: argus_market_data
+            timeframe: 1D
+      historical_drawdown: true
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - drawdown_then_stop
+- id: calculation_followups_q2_card_recall_es_419
+  regression: q2_card_recall
+  prompt: Para el cálculo del Macan, cambia solo la proporción supuesta de ingresos del 10% al 15%.
+    Mantén la misma cuota citada, sin otra búsqueda. ¿Qué ingreso mensual da?
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: debt_to_income
+        arguments: &id009
+          currency: USD
+          monthly_debt_payments: 1129
+          monthly_income: null
+          ratio_pct: 15
+          sources:
+            monthly_debt_payments: *id002
+            ratio_pct:
+              kind: user
+            currency: &id010
+              kind: user
+      reference:
+        tool_name: debt_to_income
+        arguments: *id009
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+    - spanish_language_integrity
+  stored_history:
+  - role: user
+    content: ¿Qué ingreso necesito para un Macan?
+  - role: assistant
+    content: La tarjeta muestra el ingreso con la proporción supuesta.
+    calculation:
+      tool_name: debt_to_income
+      arguments:
+        currency: USD
+        monthly_debt_payments: 1129
+        monthly_income: null
+        ratio_pct: 10
+        sources:
+          monthly_debt_payments: *id002
+          ratio_pct:
+            kind: assumption
+          currency: *id010
+- id: calculation_followups_q3_periods_and_profile_currency_es_419
+  regression: q3_periods_and_profile_currency
+  prompt: Quedan 48 pagos mensuales. Usa ese plazo con el saldo y la tasa que ya están en el chat,
+    sin otra búsqueda. ¿Cuál sería la cuota mensual normal?
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: time_value
+        arguments: &id011
+          currency: DOP
+          direction: borrow
+          present_value: 180000
+          payment: null
+          future_value: 0
+          annual_rate_pct: 14
+          periods: 48
+          periods_per_year: 12
+          sources:
+            currency:
+              kind: assumption
+            periods:
+              kind: user
+      reference:
+        tool_name: time_value
+        arguments: *id011
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+    - spanish_language_integrity
+  stored_history:
+  - role: user
+    content: Debo 180,000 al 14% anual. ¿Cuál es mi cuota mensual?
+  - role: assistant
+    content: ¿Cuántos pagos mensuales quedan?
+  thread_metadata:
+    last_stage_outcome: await_user_reply
+    clarification:
+      kind: clarification
+      requested_field: periods
+      payload:
+        calculations:
+        - name: loan
+          kind: time_value
+          solve_for: payment
+          inputs:
+          - name: direction
+            value: borrow
+            source: user
+          - name: present_value
+            value: 180000
+            source: user
+          - name: future_value
+            value: 0
+            source: user
+          - name: annual_rate_pct
+            value: 14
+            source: user
+          - name: periods
+            value: null
+            source: user
+          - name: periods_per_year
+            value: 12
+            source: user
+        requested_field: periods
+        requested_fields:
+        - periods
+        requested_by_calculation:
+          loan:
+          - periods
+        retrieved: []
+        evidence: []
+- id: calculation_followups_q4_changed_principal_es_419
+  regression: q4_changed_principal
+  prompt: Mantén el cupón de 10.5% y el supuesto de compra a la par. Cambia solo el valor nominal
+    a DOP 500,000. ¿Cuánto ingreso anual por cupón da, usando solo los datos del chat?
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: income_yield
+        arguments: &id012
+          currency: DOP
+          annual_income: null
+          price: 500000
+          yield_pct: 10.5
+          sources: &id013
+            currency:
+              kind: user
+            price:
+              kind: user
+            yield_pct:
+              kind: user
+      reference:
+        tool_name: income_yield
+        arguments: *id012
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+    - spanish_language_integrity
+  stored_history:
+  - role: user
+    content: Calcula el ingreso anual por cupón de DOP 1,000,000 al 10.5%, suponiendo compra a la
+      par.
+  - role: assistant
+    content: La tarjeta muestra el ingreso anual por cupón.
+    calculation:
+      tool_name: income_yield
+      arguments:
+        currency: DOP
+        annual_income: null
+        price: 1000000
+        yield_pct: 10.5
+        sources: *id013
+- id: calculation_followups_q5_rewards_fill_es_419
+  regression: q5_rewards_fill
+  prompt: Con el reembolso de 5% que citaste, ¿cuánto sería el reembolso bruto sobre DOP 6,000 de
+    compras elegibles, antes de topes y cargos? Usa solo esa tasa, sin otra búsqueda.
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card: &id014
+        tool_name: scaled_amount
+        arguments:
+          amount: 6000
+          rate: 5
+          rate_unit: percent
+          operation: multiply
+          currency: DOP
+      reference: *id014
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+    - spanish_language_integrity
+  stored_history:
+  - role: user
+    content: Calcula el reembolso al 5%.
+  - role: assistant
+    content: ¿Cuánto gastarías en compras elegibles? La tasa de reembolso es 5%, antes de topes y
+      cargos.
+- id: calculation_followups_q5_no_personal_product_pick_es_419
+  regression: q5_no_personal_product_pick
+  prompt: ¿Qué tarjeta de crédito me conviene?
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - comparison_without_selection
+    - spanish_language_integrity
+- id: calculation_followups_q7_conversion_fill_es_419
+  regression: q7_conversion_fill
+  prompt: Con la tasa de venta de DOP 58.8666 por USD que citaste, ¿cuántos pesos costarían USD 100
+    antes de comisiones? Usa esa misma tasa, sin buscar una nueva.
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card: &id015
+        tool_name: scaled_amount
+        arguments:
+          currency: USD
+          output_currency: DOP
+          amount: 100
+          rate: 58.8666
+          rate_unit: multiple
+          operation: multiply
+      reference: *id015
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - calculation_consistency
+    - spanish_language_integrity
+  stored_history:
+  - role: user
+    content: ¿Cuántos pesos necesito para comprar dólares?
+  - role: assistant
+    content: A DOP 58.8666 por USD, ¿cuántos dólares comprarás?
+- id: calculation_followups_q7_changed_goal_risk_es_419
+  regression: q7_changed_goal_risk
+  prompt: 'Cambia solo la meta: estos ahorros en dólares son para un gasto fijo en pesos dominicanos,
+    no para gastos en EE. UU. ¿Contra qué movimiento cambiario adverso me protege ahorrar en la moneda
+    de ese gasto? Usa solo este chat, sin otra búsqueda.'
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - goal_currency_risk
+    - spanish_language_integrity
+  stored_history:
+  - role: user
+    content: Ahorro dólares para gastos en EE. UU. ¿Y si guardara pesos?
+  - role: assistant
+    content: Si guardas pesos para un gasto fijo en dólares, la depreciación del peso significa que
+      necesitas más pesos.
+- id: calculation_followups_q10_historical_drawdown_es_419
+  regression: q10_historical_drawdown
+  prompt: ¿Pongo mi fondo de emergencia en Bitcoin? Muéstrame su caída histórica máxima de 2021 a
+    2024.
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: historical_drawdown
+        arguments:
+          symbol: BTC
+          start_date: '2021-01-01'
+          end_date: '2024-12-31'
+        outcome:
+          result:
+            asset_class: crypto
+            source: argus_market_data
+            timeframe: 1D
+      historical_drawdown: true
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - drawdown_then_stop
+    - spanish_language_integrity
+- id: calculation_followups_q10_generic_crypto_en
+  regression: q10_generic_crypto
+  prompt: Should I put my emergency fund in crypto?
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: historical_drawdown
+        arguments: {}
+        outcome:
+          result:
+            asset_class: crypto
+            source: argus_market_data
+            timeframe: 1D
+      historical_drawdown: true
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - drawdown_then_stop
+- id: calculation_followups_q10_generic_crypto_es_419
+  regression: q10_generic_crypto
+  prompt: ¿Pongo mi fondo de emergencia en cripto?
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    calculations:
+    - card:
+        tool_name: historical_drawdown
+        arguments: {}
+        outcome:
+          result:
+            asset_class: crypto
+            source: argus_market_data
+            timeframe: 1D
+      historical_drawdown: true
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - drawdown_then_stop
+    - spanish_language_integrity
+- id: calculation_followups_explain_prior_answer_en
+  regression: explain_prior_answer
+  prompt: Explain that currency mismatch in simpler words using only your earlier answer. Do not
+    look up anything new.
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - prior_answer_explanation
+  stored_history:
+  - role: user
+    content: I save dollars for US expenses. What if I kept pesos instead?
+  - role: assistant
+    content: If you hold pesos for a fixed dollar bill, peso depreciation means you need more pesos.
+- id: calculation_followups_new_external_fact_en
+  regression: new_external_fact
+  prompt: Now find the current USD/DOP selling exchange rate and compare it with the earlier 58.8666
+    pesos per dollar.
+  user_language: en
+  profile:
+    country: US
+    currency: USD
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    requires_new_facts: true
+    research:
+      published: true
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+  stored_history:
+  - role: user
+    content: 'Previously recorded rate: DOP 58.8666 per USD.'
+- id: calculation_followups_explain_prior_answer_es_419
+  regression: explain_prior_answer
+  prompt: Explica ese desajuste de monedas con palabras más simples usando solo tu respuesta anterior.
+    No busques nada nuevo.
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    requires_new_facts: false
+    research_provider_attempts: 0
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - spanish_language_integrity
+    - prior_answer_explanation
+  stored_history:
+  - role: user
+    content: Ahorro dólares para gastos en EE. UU. ¿Y si guardara pesos?
+  - role: assistant
+    content: Si guardas pesos para un gasto fijo en dólares, la depreciación del peso significa que
+      necesitas más pesos.
+- id: calculation_followups_new_external_fact_es_419
+  regression: new_external_fact
+  prompt: Ahora busca la tasa de venta actual de USD/DOP y compárala con los 58.8666 pesos por dólar
+    anteriores.
+  user_language: es-419
+  profile:
+    country: DO
+    currency: DOP
+  expected:
+    intent:
+    - conversation_followup
+    - beginner_guidance
+    - unsupported_or_out_of_scope
+    capability_verdict: answer_only
+    stage_outcomes:
+    - ready_to_respond
+    offered:
+      response: true
+    requires_new_facts: true
+    research:
+      published: true
+  prose_judge:
+    criteria:
+    - honesty
+    - no_raw_runtime_error
+    - spanish_language_integrity
+  stored_history:
+  - role: user
+    content: 'Tasa registrada antes: DOP 58.8666 por USD.'

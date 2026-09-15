@@ -27,8 +27,12 @@ from uuid import uuid4
 from loguru import logger
 from pydantic import ValidationError
 
-from argus.agent_runtime.stages.tool_execution import local_tool_call_patch
-from argus.domain.calculations import is_free_calculation
+from argus.agent_runtime.calculation_continuity import prior_calculation_arguments
+from argus.agent_runtime.stages.tool_execution import (
+    local_tool_call_patch,
+    tool_outcome_patch,
+)
+from argus.domain.calculations import is_calculation
 from argus.domain.calculations._shared import (
     MISSING_INPUT_CODE,
     SYMBOL_FIELD,
@@ -50,6 +54,7 @@ from argus.domain.tool_contracts import (
     ToolResultCard,
 )
 from argus.domain.tool_declaration import ToolDeclaration, ToolInvocationError
+from argus.domain.tool_presentation_facts import presentation_reference_facts
 
 DEFAULT_CURRENCY = "USD"
 CURRENCY_FIELD = "currency"
@@ -135,12 +140,17 @@ def publish_calculations(
     market_close: MarketClose,
     notes: list[str],
     evidence: Sequence[RetrievedRow] = (),
+    history: Sequence[Any] = (),
 ) -> PublishedCalculation | None:
     """The cards and prose for an answer's calculations, or None when one names an
     unknown kind. Nothing publishes until every calculation computes: an option
     left out would change what the answer lays side by side."""
     resolved: list[ResolvedCalculation] = []
     for request in requests:
+        prior = prior_calculation_arguments(request, history)
+        if request.prior_artifact_id and prior is None:
+            _note(notes, "calculation_prior_artifact_unavailable")
+            return None
         one = resolve_calculation(
             request,
             catalog=catalog,
@@ -150,6 +160,7 @@ def publish_calculations(
             market_close=market_close,
             notes=notes,
             evidence=evidence,
+            prior_arguments=prior,
         )
         if one is None:
             return None
@@ -222,26 +233,59 @@ def resolve_calculation(
     market_close: MarketClose,
     notes: list[str],
     evidence: Sequence[RetrievedRow] = (),
+    prior_arguments: Mapping[str, Any] | None = None,
 ) -> ResolvedCalculation | None:
     declaration = catalog.get(request.kind)
-    if declaration is None or not is_free_calculation(declaration):
+    if declaration is None or not is_calculation(declaration):
         _note(notes, KIND_UNKNOWN_REASON_CODE, kind=request.kind)
         return None
     declared = set(declaration.arguments_type.model_fields) - RUNTIME_ARGUMENTS
     pages = {source.url: source for source in retrieved}
-    counted_in = _calculation_currency(request, currency, notes)
-    arguments: dict[str, Any] = {CURRENCY_FIELD: counted_in}
-    symbol = _stated_symbol(request) or subject_symbol
+    prior = dict(prior_arguments or {})
+    counted_in = (
+        str(prior[CURRENCY_FIELD])
+        if CURRENCY_FIELD in prior and CURRENCY_FIELD not in request.updated_fields
+        else _calculation_currency(request, currency, notes)
+    )
+    arguments: dict[str, Any] = dict(prior)
+    if CURRENCY_FIELD in declared:
+        arguments[CURRENCY_FIELD] = counted_in
+    symbol = (
+        prior[SYMBOL_FIELD]
+        if SYMBOL_FIELD in prior and SYMBOL_FIELD not in request.updated_fields
+        else _stated_symbol(request) or subject_symbol
+    )
     if SYMBOL_FIELD in declared and symbol:
         arguments[SYMBOL_FIELD] = symbol
-    sources: dict[str, ToolFactSource] = {}
+    sources = {
+        name: ToolFactSource.model_validate(value)
+        for name, value in (prior.get(TOOL_INPUT_SOURCES_FIELD) or {}).items()
+    }
+    currency_input = _explicit_currency(request)
+    if (
+        CURRENCY_FIELD in declared
+        and (CURRENCY_FIELD not in prior or CURRENCY_FIELD in request.updated_fields)
+        and currency_input is None
+    ):
+        sources[CURRENCY_FIELD] = ToolFactSource(kind="assumption")
     resolved = ResolvedCalculation(declaration=declaration, arguments=arguments)
     for item in request.inputs:
         name = item.name
-        if name in (CURRENCY_FIELD, SYMBOL_FIELD) or name == request.solve_for:
+        if name == SYMBOL_FIELD or name == request.solve_for:
+            continue
+        if name == CURRENCY_FIELD and item != currency_input:
             continue
         if name not in declared:
             _note(notes, INPUT_UNDECLARED_REASON_CODE, name=name)
+            continue
+        if (
+            name in prior
+            and prior[name] is not None
+            and name not in request.updated_fields
+        ):
+            continue
+        if name in prior and name in request.updated_fields and item.source != "user":
+            _note(notes, "calculation_input_change_not_stated", name=name)
             continue
         if item.currency and item.currency.strip().upper() != counted_in:
             resolved.not_looked_up.append(name)
@@ -285,6 +329,8 @@ def resolve_calculation(
                     else evidence_source(cited)
                 ),
             )
+    if CURRENCY_FIELD in declared:
+        arguments[CURRENCY_FIELD] = counted_in
     if request.solve_for in declared:
         arguments[request.solve_for] = None
     if sources:
@@ -306,8 +352,31 @@ def computed_answer_patch(resolved: ResolvedCalculation) -> dict[str, Any]:
         call_id=f"answer-{uuid4()}",
         arguments=resolved.arguments,
     )
+    if (
+        declaration.policy.execution == "provider"
+        and declaration.policy.confirmation == "never"
+    ):
+        return tool_outcome_patch(
+            declaration=declaration,
+            call=call,
+            outcome=declaration.invoke_sync(call.arguments),
+            artifact_id=str(uuid4()),
+        )
     return local_tool_call_patch(
         declaration=declaration, call=call, artifact_id=str(uuid4())
+    )
+
+
+def calculation_ends_answer(patch: Mapping[str, Any] | None) -> bool:
+    """A terminal calculation shows its evidence without offering another task."""
+    from argus.domain.capability_registry import get_tool_catalog
+
+    catalog = get_tool_catalog()
+    return any(
+        card.outcome.status == "succeeded"
+        and (declaration := catalog.get(card.tool_name)) is not None
+        and declaration.policy.ends_answer
+        for card in cards_in(patch)
     )
 
 
@@ -572,14 +641,7 @@ def cited_page_inputs(
 
 
 def _reference_facts(card: ToolResultCard) -> dict[str, ToolFact]:
-    presentation = card.presentation
-    facts: dict[str, ToolFact] = {
-        fact.name: fact for fact in presentation.inputs if fact.value is not None
-    }
-    facts.update({row.name: row for row in presentation.rows})
-    if presentation.answer is not None:
-        facts[presentation.answer.name] = presentation.answer
-    return facts
+    return presentation_reference_facts(card.presentation)
 
 
 def _money_code(fact: ToolFact | None) -> str | None:
@@ -672,20 +734,26 @@ def _number(value: float, *, money: bool = False) -> str:
 def _calculation_currency(
     request: AnswerCalculation, currency: str | None, notes: list[str]
 ) -> str:
-    stated = next(
+    stated = _explicit_currency(request)
+    if stated is not None:
+        return str(stated.value).strip().upper()
+    default = currency.strip().upper() if currency else DEFAULT_CURRENCY
+    _note(notes, CURRENCY_DEFAULTED_REASON_CODE, currency=default)
+    return default
+
+
+def _explicit_currency(request: AnswerCalculation):
+    return next(
         (
-            str(item.value).strip().upper()
+            item
             for item in request.inputs
-            if item.name == CURRENCY_FIELD and isinstance(item.value, str)
+            if item.name == CURRENCY_FIELD
+            and item.source != "assumption"
+            and isinstance(item.value, str)
+            and item.value.strip().upper() in CURRENCY_CODES
         ),
-        "",
+        None,
     )
-    if stated in CURRENCY_CODES:
-        return stated
-    if currency:
-        return currency.strip().upper()
-    _note(notes, CURRENCY_DEFAULTED_REASON_CODE, currency=DEFAULT_CURRENCY)
-    return DEFAULT_CURRENCY
 
 
 def _stated_symbol(request: AnswerCalculation) -> str | None:
@@ -794,6 +862,8 @@ def _blank_inputs(
             if error.get("type") == "missing" and error.get("loc")
         ]
     except (ValueError, TypeError):
+        return []
+    if declaration.policy.execution != "local":
         return []
     outcome = declaration.invoke_sync(arguments)
     if outcome.failure is not None and outcome.failure.code == MISSING_INPUT_CODE:

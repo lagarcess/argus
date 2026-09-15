@@ -28,6 +28,7 @@ from argus.domain.tool_declaration import (
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection, solved_facts
 
 UNKNOWN_FIELDS = ("price", "yield_to_maturity_pct")
 
@@ -100,6 +101,28 @@ def compute_bond_value(arguments: BondArguments) -> BondResult:
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        *solved_facts(
+            UNKNOWN_FIELDS,
+            lambda name, a, r: money_fact(name, r.price, a.currency)
+            if name == "price"
+            else percent_fact(name, pct(r.yield_to_maturity_pct)),
+        ),
+        ResultFact(
+            "current_yield_pct",
+            lambda name, a, r: percent_fact(name, pct(r.current_yield_pct)),
+        ),
+        *(
+            ResultFact(
+                field, lambda name, a, r: money_fact(name, getattr(r, name), a.currency)
+            )
+            for field in ("annual_coupon", "total_coupons", "total_return")
+        ),
+    )
+)
+
+
 def present_bond_value(
     arguments: BondArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -116,19 +139,7 @@ def present_bond_value(
     title = text("tools.calc.bond_value.title")
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
-    result = BondResult.model_validate(outcome.result)
-    answer = (
-        money_fact("price", result.price, currency)
-        if result.solved_field == "price"
-        else percent_fact("yield_to_maturity_pct", pct(result.yield_to_maturity_pct))
-    )
-    rows = [
-        percent_fact("current_yield_pct", pct(result.current_yield_pct)),
-        money_fact("annual_coupon", result.annual_coupon, currency),
-        money_fact("total_coupons", result.total_coupons, currency),
-        money_fact("total_return", result.total_return, currency),
-    ]
-    return ToolCardPresentation(title=title, answer=answer, rows=rows, inputs=inputs)
+    return ToolCardPresentation(title=title, inputs=inputs)
 
 
 def get_bond_value_declaration() -> ToolDeclaration:
@@ -150,7 +161,10 @@ def get_bond_value_declaration() -> ToolDeclaration:
         ),
         progress=ToolProgressTemplate(locale_key="tools.calc.bond_value.progress"),
         card=ToolCardBinding(
-            card_type="bond_value", version=1, presenter=present_bond_value
+            result_projection=RESULT_PROJECTION,
+            card_type="bond_value",
+            version=1,
+            presenter=present_bond_value,
         ),
         rules=(ExactlyOneUnknown(fields=UNKNOWN_FIELDS),),
         domain=("Coupons are paid evenly over the year and held to maturity.",),

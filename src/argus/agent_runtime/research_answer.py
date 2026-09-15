@@ -17,9 +17,12 @@ symbol, strategy, action, or ask.
 
 from __future__ import annotations
 
+import asyncio
+
 from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.interpreter.research_routing import (
     concept_research_query,
+    primary_read_needs_no_new_facts,
     primary_research_query,
     research_turn_has_conflicting_owner,
     scenario_is_typed,
@@ -64,7 +67,7 @@ async def research_answer_stage_result(
 
     Returns None without a supported primary-interpreter question payload.
     """
-    if not research_rail_enabled():
+    if primary_read_needs_no_new_facts(interpretation) or not research_rail_enabled():
         return None
     query = (
         primary_research_query(interpretation)
@@ -100,6 +103,14 @@ async def discovery_turn_stage_result(
     """
     from argus.agent_runtime.discovery import discovery_stage_result_for
 
+    if primary_read_needs_no_new_facts(interpretation):
+        if research_turn_has_conflicting_owner(interpretation):
+            return None
+        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
+
+        return await calculated_answer_stage_result(
+            interpretation=interpretation, state=state, user=user
+        )
     if not research_rail_enabled():
         return await discovery_stage_result_for(
             interpretation=interpretation, decision=decision, state=state, user=user
@@ -259,7 +270,8 @@ async def _dispatch(
         # retrieved inputs on that path alone.
         shape = "balanced"
     if shape == "thorough":
-        return grounded.thorough_job_result(
+        return await asyncio.to_thread(
+            grounded.thorough_job_result,
             query=query,
             subjects=subjects,
             interpretation=interpretation,

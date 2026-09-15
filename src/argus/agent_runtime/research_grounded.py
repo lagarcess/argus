@@ -446,7 +446,8 @@ async def grounded_result(
         # does, so the spend it cost reaches the sidecar and the ledger. It
         # is still never stored; a withheld-for-want-of-a-publisher packet
         # has nothing a later identical question could be served from.
-        return _packet_stage_result(
+        return await asyncio.to_thread(
+            _packet_stage_result,
             packet=packet.model_copy(update={"usage": spend.reported(packet.usage)}),
             subjects=subjects,
             shape=shape,
@@ -465,7 +466,8 @@ async def grounded_result(
             survey=survey,
             message=state.current_user_message,
         )
-    result = _packet_stage_result(
+    result = await asyncio.to_thread(
+        _packet_stage_result,
         packet=packet.model_copy(update={"usage": spend.reported(packet.usage)}),
         subjects=subjects,
         shape=shape,
@@ -711,17 +713,29 @@ def _packet_stage_result(
         # first verified name keeps every answer one tap from a test.
         subjects = peers[:1]
         peers = peers[1:]
-    rows = research_next_experiment_rows(
-        subjects=subjects,
-        peers=peers,
-        language=language,
-        entry_rule=getattr(interpretation.candidate_strategy_draft, "entry_rule", None),
+    from argus.agent_runtime.answer_calculation import calculation_ends_answer
+
+    terminal = answered is not None and calculation_ends_answer(answered.patch)
+    if terminal:
+        packet = packet.model_copy(update={"follow_up_questions": ()})
+    rows = (
+        None
+        if terminal
+        else research_next_experiment_rows(
+            subjects=subjects,
+            peers=peers,
+            language=language,
+            entry_rule=getattr(
+                interpretation.candidate_strategy_draft, "entry_rule", None
+            ),
+        )
     )
     if offer is not None:
         rows = with_calculation_offer(rows, language=language)
     suffix = (
         f"\n\n{honest_no_next_line(language)}"
-        if not rows
+        if not terminal
+        and not rows
         and (subjects or getattr(interpretation.research_query, "symbols", None))
         else ""
     )
@@ -1466,7 +1480,9 @@ def _cache_ttl(
     evidence about the model and not about the world, and the shared cache
     holds provider packets about public markets, never one turn's prose for
     every other user."""
-    if not _retrieval_happened(packet):
+    if not _retrieval_happened(packet) or any(
+        calculation.get("prior_artifact_id") for calculation in packet.calculations
+    ):
         return None
     return ttl_for_packet(
         question_kind=question_kind,
@@ -2083,8 +2099,17 @@ def compose_completed_research(
         # first verified name keeps every answer one tap from a test.
         subjects = peers[:1]
         peers = peers[1:]
-    rows = research_next_experiment_rows(
-        subjects=subjects, peers=peers, language=language
+    from argus.agent_runtime.answer_calculation import calculation_ends_answer
+
+    terminal = answered is not None and calculation_ends_answer(answered.patch)
+    if terminal:
+        packet = packet.model_copy(update={"follow_up_questions": ()})
+    rows = (
+        None
+        if terminal
+        else research_next_experiment_rows(
+            subjects=subjects, peers=peers, language=language
+        )
     )
     if offer is not None:
         rows = with_calculation_offer(rows, language=language)
@@ -2098,7 +2123,9 @@ def compose_completed_research(
         answer = published_answer(packet, language)
     suffix = (
         f"\n\n{honest_no_next_line(language)}"
-        if not rows and (subjects or job_request.get("requested_symbols"))
+        if not terminal
+        and not rows
+        and (subjects or job_request.get("requested_symbols"))
         else ""
     )
     answer = f"{answer}{suffix}"

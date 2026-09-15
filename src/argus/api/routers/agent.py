@@ -116,7 +116,7 @@ from argus.api.chat.streaming import (
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.chat.tool_results import (
     computation_marker,
-    prepare_runtime_tool_publication,
+    prepare_runtime_tool_publication_async,
     runtime_tool_result_cards,
 )
 from argus.api.chat.turn_metering import settle_metered_turn
@@ -930,7 +930,7 @@ async def chat_stream(
                     assistant_text = None
                     runtime_result.pop("assistant_response", None)
                     runtime_result.pop("assistant_prompt", None)
-                tool_publication = prepare_runtime_tool_publication(
+                tool_publication = await prepare_runtime_tool_publication_async(
                     runtime_result,
                     runtime_event.get("_tool_effects"),
                     assistant_text=assistant_text,

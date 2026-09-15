@@ -21,13 +21,14 @@ from argus.domain.calculations._shared import (
 )
 from argus.domain.finance import ratios
 from argus.domain.finance.outcomes import NoSolution
-from argus.domain.tool_contracts import ToolCardPresentation, ToolFact, ToolOutcome
+from argus.domain.tool_contracts import ToolCardPresentation, ToolOutcome
 from argus.domain.tool_declaration import (
     ExactlyOneUnknown,
     ToolCardBinding,
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection, solved_facts
 
 UNKNOWN_FIELDS = ("annual_fee", "ratio_pct")
 
@@ -87,6 +88,24 @@ def compute_expense_ratio(arguments: ExpenseRatioArguments) -> ExpenseRatioResul
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        *solved_facts(
+            UNKNOWN_FIELDS,
+            lambda name, a, r: percent_fact(name, pct(r.ratio_pct))
+            if name == "ratio_pct"
+            else money_fact(name, r.annual_fee, a.currency),
+        ),
+        *(
+            ResultFact(
+                field, lambda name, a, r: money_fact(name, getattr(r, name), a.currency)
+            )
+            for field in ("cost_over_years", "ending_with_fee", "ending_without_fee")
+        ),
+    )
+)
+
+
 def present_expense_ratio(
     arguments: ExpenseRatioArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -102,18 +121,7 @@ def present_expense_ratio(
     title = text("tools.calc.expense_ratio.title")
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
-    result = ExpenseRatioResult.model_validate(outcome.result)
-    answer: ToolFact = (
-        percent_fact("ratio_pct", pct(result.ratio_pct))
-        if result.solved_field == "ratio_pct"
-        else money_fact("annual_fee", result.annual_fee, currency)
-    )
-    rows = [
-        money_fact("cost_over_years", result.cost_over_years, currency),
-        money_fact("ending_with_fee", result.ending_with_fee, currency),
-        money_fact("ending_without_fee", result.ending_without_fee, currency),
-    ]
-    return ToolCardPresentation(title=title, answer=answer, rows=rows, inputs=inputs)
+    return ToolCardPresentation(title=title, inputs=inputs)
 
 
 def get_expense_ratio_declaration() -> ToolDeclaration:
@@ -134,7 +142,10 @@ def get_expense_ratio_declaration() -> ToolDeclaration:
         ),
         progress=ToolProgressTemplate(locale_key="tools.calc.expense_ratio.progress"),
         card=ToolCardBinding(
-            card_type="expense_ratio", version=1, presenter=present_expense_ratio
+            result_projection=RESULT_PROJECTION,
+            card_type="expense_ratio",
+            version=1,
+            presenter=present_expense_ratio,
         ),
         rules=(ExactlyOneUnknown(fields=UNKNOWN_FIELDS),),
         domain=("The growth rate is an input, never a forecast Argus makes.",),

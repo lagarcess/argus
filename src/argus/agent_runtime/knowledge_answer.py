@@ -21,7 +21,9 @@ from argus.agent_runtime.interpreter.draft_shape import (
 )
 from argus.agent_runtime.interpreter.research_routing import (
     primary_read_is_arithmetic,
+    primary_read_needs_no_new_facts,
     primary_research_query,
+    research_turn_has_conflicting_owner,
 )
 from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENT_ACTION_LABELS,
@@ -209,6 +211,17 @@ async def knowledge_answer_stage_result(
         # The current interpretation, not the previous question's existence,
         # decides whether this turn answers that pending need.
         return None
+    if primary_read_needs_no_new_facts(
+        interpretation
+    ) and research_turn_has_conflicting_owner(interpretation):
+        return None
+    if primary_read_is_arithmetic(interpretation):
+        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
+
+        # A failed no-search answer cannot become permission to buy new facts.
+        return await calculated_answer_stage_result(
+            interpretation=interpretation, state=state, user=user
+        )
     if getattr(interpretation, "asset_discovery", None) is not None:
         return None
     if interpretation.unsupported_constraints:
@@ -223,15 +236,6 @@ async def knowledge_answer_stage_result(
             categories=[item.category for item in interpretation.unsupported_constraints],
         )
         return None
-    if primary_read_is_arithmetic(interpretation):
-        # The user's own numbers are enough: the no-search answer computes it.
-        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
-
-        computed = await calculated_answer_stage_result(
-            interpretation=interpretation, state=state, user=user
-        )
-        if computed is not None:
-            return computed
     rail_claim = (
         research_rail_enabled() and primary_research_query(interpretation) is not None
     )

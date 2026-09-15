@@ -1936,9 +1936,14 @@
         "currency": "{{code}}",
         "months": "meses",
         "years": "años",
-        "multiple": "x"
+        "multiple": "x",
+        "currency_ratio": "{{numerator}}/{{denominator}}"
       },
       "fields": {
+        "currency": "Moneda",
+        "rate": "Tasa",
+        "output_currency": "Moneda del resultado",
+        "scaled_amount": "Monto resultante",
         "direction": "Plan",
         "present_value": "Monto inicial",
         "payment": "Pago por período",
@@ -2004,19 +2009,35 @@
         "multiple_low": "Múltiplo, caso bajo",
         "multiple_base": "Múltiplo, caso base",
         "multiple_high": "Múltiplo, caso alto",
-        "horizon_years": "Horizonte"
+        "horizon_years": "Horizonte",
+        "start_date": "Fecha inicial",
+        "end_date": "Fecha final",
+        "max_drawdown_pct": "Mayor caída histórica",
+        "observed_start_date": "Primer cierre observado",
+        "observed_end_date": "Último cierre observado",
+        "observations": "Cierres diarios",
+        "peak_date": "Máximo antes de la caída",
+        "trough_date": "Punto más bajo de la caída"
       },
       "notes": {
+        "scaled_multiply": "Monto multiplicado por la tasa.",
+        "scaled_divide": "Monto dividido entre la tasa.",
         "already_covered": "Los otros datos ya cubren esto, así que no hace falta nada más.",
         "single_growth_forecast": "Solo se dio un pronóstico de crecimiento, así que los casos bajo y alto también lo usan.",
         "current_multiple_held": "No se dio un múltiplo, así que cada caso mantiene el múltiplo de hoy.",
         "single_multiple": "Solo se dio un múltiplo, así que los casos bajo y alto también lo usan.",
         "includes_fees": "La tasa efectiva incluye las comisiones.",
         "ranked_not_recommended": "Ordenado solo por la cifra indicada. Nada aquí es una recomendación.",
-        "scenarios_not_forecasts": "Los escenarios son aritmética sobre los datos indicados, no pronósticos."
+        "scenarios_not_forecasts": "Los escenarios son aritmética sobre los datos indicados, no pronósticos.",
+        "historical_daily_closes": "Calculado con precios de cierre diarios del período observado. Las pérdidas intradía pueden ser mayores. El historial no limita las pérdidas futuras.",
+        "historical_default_window": "Período histórico supuesto: {{start}} a {{end}}."
       },
       "repairs": {
         "payment_below_interest": "Usar un pago que sí amortice el saldo"
+      },
+      "scaled_amount": {
+        "title": "Monto calculado",
+        "progress": "Calculando el monto"
       },
       "time_value": {
         "title_save": "Plan de ahorro",
@@ -2073,6 +2094,10 @@
         "value_at_horizon_base": "Valor del monto en el horizonte, caso base",
         "value_at_horizon_high": "Valor del monto en el horizonte, caso alto",
         "annual_return_high": "Retorno anual, caso alto"
+      },
+      "historical_drawdown": {
+        "title": "Caída histórica",
+        "progress": "Calculando la caída histórica"
       }
     },
     "progress": {

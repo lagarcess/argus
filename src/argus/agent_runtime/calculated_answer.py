@@ -206,6 +206,7 @@ def calculated_answer(
         market_close=market_close,
         notes=notes,
         evidence=evidence,
+        history=history,
     )
     return answer_from_published(
         calculations,
@@ -471,6 +472,15 @@ def completed_pending(
         )
         for item in request.inputs:
             reply = filled.pop(item.name, None)
+            if (
+                answer is not None
+                and item.name in answer.updated_fields
+                and reply is not None
+                and reply.value is not None
+                and reply.source == "user"
+            ):
+                inputs.append(reply)
+                continue
             if item.value is None:
                 stated = reply is not None and reply.value is not None
                 if stated and item.name not in asked:
