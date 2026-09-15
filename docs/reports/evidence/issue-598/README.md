@@ -1,81 +1,91 @@
-# Issue #598: second-tab reply refresh
+# Issue #598: saved transcript freshness
 
-## Cause and change
+## Current design
 
-The activity runtime already learned that remote work moved to `idle`, but it
-invalidated transcripts only for conversations outside the active view. The open
-second tab was deliberately skipped. Both history and activity-mutation responses
-now use one settlement handler, reading only accepted reducer state. An open
-conversation without a local request asks the existing API transcript loader for
-saved messages. The sender retains its stream-owned transcript. Navigation owns
-message replacement, account/navigation cancellation, hydration and scroll restore.
-No new message store, activity transport, API contract, or model-facing text.
+The API owns `activity.latest_message_id`, selected from saved messages in the
+same `(created_at, id)` order as the message API. The owner-scoped, bounded query
+also supplies conversation previews. A plain reply advances this identity even
+without a job or chat-turn lifecycle row. Job timestamps and read cursors cannot
+supply this fact; marking read leaves the message identity intact.
 
-## Browser proof
+The web records the last raw API message id alongside each loaded transcript,
+before message projection. On activity updates and focus/visibility recovery it
+compares that snapshot with the backend identity. A mismatch loads and replaces
+the transcript from the saved-message API. The sending tab keeps its active
+request and already-delivered canonical reply. Refreshes coalesce, cancel across
+account/conversation changes, and retry on a later activity update after failure.
 
-Chromium 1.59.1 Playwright runner, two pages in one browser context, one shared
-intercepted API fixture. All API requests are fulfilled locally; unexpected API
-requests fail. No providers or paid runs. This is browser/UI proof, not live backend
-persistence proof. Saved reply text is deliberately fixture-authored in both locales.
+Refresh uses a transcript-only path. It keeps the current URL/message anchor and
+restores the reader's scroll offset. It does not navigate or infer assistant text.
+An open conversation omitted from the first history page receives the existing
+single-conversation activity read.
 
-- Red: unchanged integration `edeaffa9f6565e4750fa0685a050f10aefd6d718`.
-  Both `en` and `es-419` see working activity, then the sender sees the reply;
-  the observing tab still lacks it after ten seconds.
-- Green: both tabs contain exactly one saved reply and one user message. Observer
-  makes one new saved-message request; sender makes none. A repeated activity
-  projection does not load or append again. No reload or focus injection after
-  completion: the existing activity poll discovers settlement.
-- Existing scroll-position acceptance passes: a reader above the latest activity
-  keeps their position and the Jump control still reaches the new activity.
-- Eleven activity browser cases pass. Four pre-existing suite failures reproduce
-  on the unchanged integration code: result-card heading, mobile Recents opener,
-  clarification rail count in English, clarification rail count in Spanish.
-  These remain outside #598; `baseline-browser.txt` records all four plus the two
-  expected #598 failures. No acceptance assertion was weakened.
+## Red/green browser acceptance
 
-| Locale | Before, observer | After, observer | After, sender |
-| --- | --- | --- | --- |
-| English | [red](red/598-en-tab-b.png) | [green](green/598-en-tab-b.png) | [sender](green/598-en-tab-a.png) |
-| Spanish | [red](red/598-es-419-tab-b.png) | [green](green/598-es-419-tab-b.png) | [sender](green/598-es-419-tab-a.png) |
+The same six regression cases fail on unchanged current integration
+`350e3dca8f573f5dfd61f1f753d8ed16a2724c9e`, then pass on reconciled commit
+`39a2e5135e741ebf3a20122004cb95587843a0c7`.
+
+Each case uses two Chromium tabs and one shared intercepted API fixture. All
+responses are local fixtures; no providers or paid runs. This proves browser
+behavior, while backend tests cover the persisted-message projection separately.
+The test deliberately uses a plain assistant reply, no job, no unread cursor,
+and no working projection delivered to the observer.
+
+| Observer scenario | English before / after | Spanish before / after |
+| --- | --- | --- |
+| Hidden for the entire turn, then visible/focused | [red](v2/red/598-v2-hidden-en.png) / [green](v2/green/598-v2-hidden-en.png) | [red](v2/red/598-v2-hidden-es-419.png) / [green](v2/green/598-v2-hidden-es-419.png) |
+| Visible, receives only idle activity on the next poll | [red](v2/red/598-v2-visible-en.png) / [green](v2/green/598-v2-visible-en.png) | [red](v2/red/598-v2-visible-es-419.png) / [green](v2/green/598-v2-visible-es-419.png) |
+| Same idle-only update while reading a message deep link | [red](v2/red/598-v2-anchor-en.png) / [green](v2/green/598-v2-anchor-en.png) | [red](v2/red/598-v2-anchor-es-419.png) / [green](v2/green/598-v2-anchor-es-419.png) |
+
+Assertions cover exactly one reply in each tab, exactly one observer message
+reload after completion, no sender reload after completion, unchanged URL and
+scroll offset, and no extra reload after another focus/activity update. The
+anchor screenshots remain above the new reply intentionally; the DOM assertion
+checks that the saved reply is present without moving the reader.
+
+[Red log](v2/browser-red.txt), [green log](v2/browser-green.txt), and
+[commit/test provenance](v2/provenance.json) are committed with the images.
+The six cases join eleven accepted existing activity cases: **17 passed**.
+Four older activity-suite failures were reproduced on unchanged original
+integration and remain outside this issue: result-card heading, mobile Recents
+opener, and clarification rail count in both locales. Their original proof is
+in [baseline-browser.txt](baseline-browser.txt). No acceptance was weakened.
 
 ## Deterministic verification
 
-- Reload unit tests first failed (7 expected failures), then passed.
-- Frontend suite after reconciliation: 1,998 passed.
-- Frontend lint: zero errors, eight existing warnings outside this change.
-- Production frontend build: passed.
-- Required free mocked evaluation harness: 270 passed; retained through integration
-  because no evaluator, runtime interpretation or model-facing surface overlaps.
-- Shared modularity budget: passed on the reconciled tree.
+- [33 reload/activity unit cases](v2/reload-unit.txt), including idle-only updates,
+  sender deduplication, cancellation, failed reads, and an omitted open conversation.
+- [195 focused backend cases](v2/backend-focused.txt), including a no-job plain reply,
+  owner scoping, and message-id normalization at the query boundary.
+- A real-PostgreSQL keyset test now verifies that an ordinary saved reply changes
+  the latest id and a foreign owner receives no row. The CI database matrix runs it.
+- [1,997 frontend tests](v2/frontend-unit.txt) pass.
+- Frontend lint has zero errors and eight existing unrelated warnings; production
+  build passes. The free mocked evaluation harness passes 270 cases.
+- [Modularity budget](v2/modularity.txt) passes on the reconciled tree.
 
-Reproduce from the repository root:
+Reproduce the provider-free acceptance:
 
 ```sh
 bun test --cwd web __tests__/conversation-activity-transcript-reload.test.ts __tests__/use-conversation-activity.test.tsx
-PLAYWRIGHT_PORT=3198 bun run --cwd web test:e2e conversation-activity-ui.spec.ts --grep 'second tab|completion while scrolled'
+PLAYWRIGHT_PORT=3198 bun run --cwd web test:e2e conversation-activity-ui.spec.ts conversation-transcript-freshness.spec.ts --grep-invert 'durable backtest stays|coarse pointer|resolved clarification'
 ```
 
-## Integration and evidence provenance
+## Integration and review provenance
 
-- Original integration base: `edeaffa9f6565e4750fa0685a050f10aefd6d718`.
-- Reconciled integration: `a4a183138aadf1cff8268d0ce169e444732116fe`.
-- One-way merge: `08caf9863aadf679d969bbea1cd6bceaae5cb4d2`.
-- Overlap: #604 adds sharing providers around ChatInterface messages/composer and
-  changes receipt-only API/data contracts, receipt migration and locales. It does
-  not change activity projection, message loading, request ownership or our tests.
-  No environment variable changes. Shared rendering-owner overlap warrants the
-  repeated 11-case activity browser acceptance, full frontend suite and build.
-- Red evidence remains valid for the original integration baseline. Green images
-  and accepted log were recaptured after reconciliation with the callback cleanup
-  below. The final PR audit will explicitly revalidate these committed images at
-  the exact PR head after CI and the requested Codex review return.
-- Review and CI are pending at evidence commit time; this is not a terminal audit.
-
-Tested web file blobs (before the evidence-only commit):
-
-- `web/__tests__/conversation-activity-transcript-reload.test.ts`: `672d362e84307d87bfcfb9ebe676a664a14bf5ae`
-- `web/__tests__/fixtures/conversation-activity-runtime.ts`: `45fa9e9842d4ffc026ed3ff0f0659d21c9f0ecba`
-- `web/__tests__/use-conversation-activity.test.tsx`: `e94f337fe02050fba07c8a4b473393d9eda10df7`
-- `web/components/chat/ChatInterface.tsx`: `d178847e684592278c6c0b32479fe1a9ac0e30d8`
-- `web/components/chat/useConversationActivity.ts`: `1a29cc3e7a61fc3c84acca1046d2aed99578b584`
-- `web/e2e/conversation-activity-ui.spec.ts`: `ca72733c2fbeeda2d15f8dbf7c42e7c49dadf431`
+- Original lane base: `edeaffa9f6565e4750fa0685a050f10aefd6d718`.
+- Previous integration merge: `08caf9863aadf679d969bbea1cd6bceaae5cb4d2`, incorporating
+  `a4a183138aadf1cff8268d0ce169e444732116fe`.
+- Current integration: `350e3dca8f573f5dfd61f1f753d8ed16a2724c9e`.
+- Current one-way merge: `39a2e5135e741ebf3a20122004cb95587843a0c7`.
+- Intervening integration changes concern promotion documents and scorecard
+  validation. No shared chat runtime, API/data contract, UI state, migration,
+  environment, or directly affected test owner changed. Browser evidence remains
+  valid and was recaptured after reconciliation. No release contract or
+  `render.yaml` change is authored by this PR.
+- The first working-transition implementation was rejected. Its report is
+  preserved as [superseded history](original-working-transition.md).
+- This report precedes the single requested redesign review. The terminal PR
+  comment will record the final head, CI, review outcome, zero unresolved threads,
+  and explicit final-head revalidation of these committed images.
