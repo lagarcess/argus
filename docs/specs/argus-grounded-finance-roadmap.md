@@ -363,7 +363,7 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-15 at integration `46ec72a8`, after production promotion
+**Updated 2026-09-15 at integration `0044d79a`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
@@ -372,7 +372,6 @@ stands" below.
 | Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, measured: no measured regression, both date phrases keep August 16 to 19, and the reply moves to the real reason. Fixing the English case that asks for an asset already resolved, an English fallback in Spanish and its own Spanish fixture, then a full rerun with the six research cases bounded, refreeze and merge. The clean 73-case rerun finished 65 passed and 8 failed, so nothing was refrozen: two monthly-buying replies and a benchmark date edit regressed, both new date cases read the year as 2024 instead of 2026, and two research answers never published. Diagnosing the causes before another measurement. |
 | Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Its 93-case measurement is approved under a $15 stop and runs after the recovery replies lane lands, since both change model-facing text. One checklist command must name the new budget setting first. |
 | One list of next steps under a result follow-up | #606. The composer asked for a prose plan and structured next steps; the fix gives next steps sole ownership. Model-facing, so its measurement ($12.50 cap) waits its turn after the two lanes above that change model-facing text. |
-| Shared links open as an Argus conversation | The shared page becomes a read-only Argus thread with a follow-up box. The first follow-up forks into the receiver's own chat (guest if signed out) with trimmed context; backtests and calculations do not come along as live runs; guest caps unchanged. Founder-locked 2026-09-14. |
 | Acceptance dry run | Done on `03918912`: 30 of 46 smoke answers passed (guests 6 of 6), replay 14 of 14 with 24 turns left for the final run. Its failures drove the failure paths and calculation follow-ups lanes. The final acceptance reruns everything on the candidate. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
@@ -1455,7 +1454,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `46ec72a8`.
+shipped means live in production. Integration is `0044d79a`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1556,6 +1555,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Replies reach an open second tab | outside the releases | **LANDED** `0714aafa`, PR #635, closing #598. A second tab shows the reply when it lands, including hidden tabs, idle-only updates and plain replies with no job, and keeps message links. It keeps checking while its conversation ends in an unanswered message, up to the turn timeout. Deferred: #640 (focus before the turn is accepted) and #641. |
 | A second tab reads only what changed | outside the releases | **LANDED** `d018075b`, PR #645, closing #641. While a second tab waits for a reply, unchanged checks read only the newest messages instead of the whole conversation. |
 | Retry leaves the failed reply out of history | outside the releases | **LANDED** `46ec72a8`, PR #637, closing #625 and #642. Retry sends the failed reply's id, the API checks it is the conversation's latest retryable failure, and only that reply leaves the retry turn's history, in long conversations too. Every other reply stays. |
+| Shared links open as an Argus conversation | Sharing | **LANDED, switched off** `0044d79a`, PR #643. The shared page is a read-only Argus thread with the owner's note, dated snapshot and TradingView attribution, and a follow-up box. The first follow-up forks into the receiver's own chat (guest if signed out) with trimmed, labeled context; carried backtests and calculations stay read-only; guest caps unchanged. The $1 live check did not run (the lane's approval review blocked the provider call), so the enabled-surface walk at promotion carries it. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
