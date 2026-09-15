@@ -6,7 +6,7 @@ import { I18nextProvider } from "react-i18next";
 import {
   ConversationActivityPresentationProvider,
 } from "../components/chat/ConversationActivityIndicator";
-import RecentsQuickPeek from "../components/sidebar/RecentsQuickPeek";
+import { RecentsQuickPeekSurface as RecentsQuickPeek } from "../components/sidebar/RecentsQuickPeek";
 import type { HistoryItem } from "../lib/argus-api";
 import type { ConversationActivityPresentation } from "../lib/conversation-activity-state";
 import type { ConversationActivityOperationLabel } from "../lib/conversation-activity-state";

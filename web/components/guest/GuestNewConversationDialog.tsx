@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { newConversationConversionMode } from "@/lib/guest-conversion";
@@ -16,7 +18,7 @@ type GuestNewConversationDialogProps = {
 const focusableSelector =
   'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function GuestNewConversationDialog({
+function GuestNewConversationDialogSurface({
   isOpen,
   isReplacing,
   publicAccountAccessEnabled,
@@ -127,3 +129,5 @@ export default function GuestNewConversationDialog({
     </div>
   );
 }
+
+export default withViewportPortal(GuestNewConversationDialogSurface);

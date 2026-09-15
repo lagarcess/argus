@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import {
   useEffect,
   useId,
@@ -56,7 +58,7 @@ type SidebarDrawerProps = {
  * and dismisses by scrim tap, leftward swipe, Escape, or system back. The close
  * control lives in the sidebar header, which owns the drawer chrome.
  */
-export default function SidebarDrawer({
+function SidebarDrawerSurface({
   isOpen,
   onClose,
   label,
@@ -170,3 +172,5 @@ export default function SidebarDrawer({
     </div>
   );
 }
+
+export default withViewportPortal(SidebarDrawerSurface);
