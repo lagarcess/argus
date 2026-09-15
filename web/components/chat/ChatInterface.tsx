@@ -1311,7 +1311,8 @@ export default function ChatInterface() {
         finishRequestTransport(requestSession);
       }
       if (event.event === "final") {
-        if (!requestSessions.authorize(requestSession, "final")) return;
+        const identityAuthorized = requestSessions.authorize(requestSession, "final");
+        if (!identityAuthorized) return;
         options?.onTerminal?.();
         clearNeutralGuestSubmission();
         setStreamStatus(null);
@@ -1541,7 +1542,7 @@ export default function ChatInterface() {
             }),
           );
         }
-        terminalReadiness.accept(event.data, true);
+        terminalReadiness.accept(event.data, identityAuthorized);
       }
       if (event.event === "title") {
         if (
