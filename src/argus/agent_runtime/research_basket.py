@@ -225,8 +225,8 @@ def peer_add_rows(
     """Peer adds as ordinary typed Try-next rows below the card's turn.
 
     Same component, same position, same behavior as every other row; the
-    ``why`` payload carries the resolver-verified symbols the tap adds, so
-    the frontend never derives identity from the label. Naming is the shared
+    ``why`` payload carries stored peer identities and a legacy symbol
+    projection, so the tap never derives identity from a label or new lookup. Naming is the shared
     short-name-plus-ticker-part vocabulary.
     """
     offers = remaining_peer_offers(
@@ -262,7 +262,7 @@ def peer_add_rows(
                 "label_key": _DYNAMIC_LABEL_KEY,
                 "why": {
                     "code": "research_add_peer",
-                    "params": {"symbols": [offer["symbol"]]},
+                    "params": {"symbols": [offer["symbol"]], "peers": [offer]},
                 },
             }
         )
@@ -286,7 +286,10 @@ def peer_add_rows(
                 "label_key": _DYNAMIC_LABEL_KEY,
                 "why": {
                     "code": "research_add_peer",
-                    "params": {"symbols": [offer["symbol"] for offer in offers]},
+                    "params": {
+                        "symbols": [offer["symbol"] for offer in offers],
+                        "peers": offers,
+                    },
                 },
             }
         )

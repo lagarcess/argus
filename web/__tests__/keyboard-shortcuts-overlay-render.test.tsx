@@ -3,7 +3,7 @@ import i18next from "i18next";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 
-import KeyboardShortcutsOverlay from "../components/sidebar/KeyboardShortcutsOverlay";
+import { KeyboardShortcutsOverlaySurface as KeyboardShortcutsOverlay } from "../components/sidebar/KeyboardShortcutsOverlay";
 
 async function renderOverlay(): Promise<string> {
   const i18n = i18next.createInstance();

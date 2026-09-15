@@ -299,9 +299,18 @@ def _resolved_subjects(query: ResearchQueryExtraction) -> list[dict[str, str]]:
         if not candidate or candidate in seen:
             continue
         try:
-            from argus.domain.market_data.assets import resolve_asset
+            from argus.agent_runtime.resolution import resolve_asset_candidate
 
-            resolved = resolve_asset(candidate)
+            resolution = resolve_asset_candidate(
+                candidate,
+                field="research_query.symbols",
+                source="llm_extraction",
+                asset_class_hint=query.asset_class_hint,
+                require_unambiguous_class=True,
+            )
+            resolved = resolution.asset
+            if resolution.status != "resolved" or resolved is None:
+                continue
         except Exception:  # noqa: BLE001
             continue
         symbol = resolved.canonical_symbol.upper()

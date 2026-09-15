@@ -4506,6 +4506,12 @@ Contract rules:
 - Runnable next steps ride the existing typed `next_experiments` surface.
   Provider identity is absent from prose and sidecars; route receipts and the
   cost ledger own provenance.
+  Research resolution preserves `asset_class_hint` through the shared class-aware
+  resolver. An unhinted ticker found in multiple asset classes earns no test row
+  and uses the existing honest no-next line. A comparison contains only the
+  anchor subject's asset class, including its verified peers; an unresolved
+  named subject is never replaced by a peer. Background research requests retain
+  the requested symbols and class hint for the same publication behavior.
 - Thorough-shape questions run in provider background mode through the
   existing job lifecycle: the turn ends with a `backtest_job` sidecar whose
   `operation_scope` is `"chat.research"`, and the finalized answer arrives as
@@ -4536,8 +4542,11 @@ Contract rules:
 - Researched peers still outside the active basket ride the ordinary
   `next_experiments` surface of the card-bearing message as
   `research_add_peer` / `research_add_peer_set` rows, bounded by free asset
-  slots; each row's `why.params.symbols` carries the resolver-verified
-  identity the tap adds. The card itself never grows a peer section.
+  slots; each row's `why.params.peers` carries the stored resolver-verified
+  `{symbol, name, asset_class}` identities. `why.params.symbols` remains a
+  legacy projection. The tap forwards symbol and class; the server selects
+  the stored identity, including its name, without resolving the ticker
+  again. The card itself never grows a peer section.
 - The superseding card carries typed `assets_adjustment` data
   (`{code: "assets_added" | "assets_restored", added, previous_symbols,
   symbols, period_change?}`). Clients render it as motion on the freshly
@@ -4555,9 +4564,14 @@ are both on (404 otherwise; the in-place surface ships default off until
 the run-consumption guard lane closes).
 
 **Request:** exactly one mode.
-- Add: `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must appear in the
-  active turn's `research_add_peer` rows, so nothing outside the
-  resolver-verified offer set is addable, whoever asks).
+- Add: `{"peers": [{"symbol": "BTC", "asset_class": "crypto"}]}` (1-4
+  identities; each must match a stored `research_add_peer` offer in the
+  active confirmation's class). The client cannot replace the stored name
+  or change the offered asset class.
+- Legacy add: `{"symbols": ["DIS"]}` remains accepted against stored offers.
+  For older rows containing only symbols, the owning confirmation supplies
+  the asset class. No add, remaining-offer, or undo path resolves a ticker
+  again.
 - Undo: `{"restore_previous": true}` re-materializes the exact previous
   asset set from the active card's own `assets_adjustment` data.
 
@@ -4569,7 +4583,7 @@ offer set is consumed). No turn was spent, so nothing new appears in the
 transcript; see the record-creation rule under the direct-edit endpoint.
 
 **Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
-non-active confirmation, non-offered symbols, and restore with nothing to
+non-active confirmation, non-offered identities, and restore with nothing to
 restore; `409 confirmation_changed` when a concurrent writer changed the
 card between this request's read and its write (nothing was applied; a
 retry re-reads the current card); `422 asset_maximum_reached |

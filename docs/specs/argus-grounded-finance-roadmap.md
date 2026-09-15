@@ -363,15 +363,18 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-14 at integration `1797e42a`, after production promotion
+**Updated 2026-09-15 at integration `6e79366a`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, measured: no measured regression, both date phrases keep August 16 to 19, and the reply moves to the real reason. Fixing the English case that asks for an asset already resolved, an English fallback in Spanish and its own Spanish fixture, then a full rerun with the six research cases bounded, refreeze and merge. Fixes pushed; the 73-case rerun is approved under a $7 stop. |
-| Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Its 93-case measurement is approved under a $15 stop and runs after the recovery replies lane lands, since both change model-facing text. |
-| Replies reach an open second tab | PR #635 for #598. A second tab refreshes when the saved conversation is newer than what it shows, not only after it saw the reply being written, and keeps a message link. Redesign after two findings on the same mechanism. |
+| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, measured: no measured regression, both date phrases keep August 16 to 19, and the reply moves to the real reason. Fixing the English case that asks for an asset already resolved, an English fallback in Spanish and its own Spanish fixture, then a full rerun with the six research cases bounded, refreeze and merge. The clean 73-case rerun finished 65 passed and 8 failed, so nothing was refrozen: two monthly-buying replies and a benchmark date edit regressed, both new date cases read the year as 2024 instead of 2026, and two research answers never published. Diagnosing the causes before another measurement. |
+| Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Its 93-case measurement is approved under a $15 stop and runs after the recovery replies lane lands, since both change model-facing text. One checklist command must name the new budget setting first. |
+| Replies reach an open second tab | PR #635 for #598. A second tab refreshes when the saved conversation is newer than what it shows, not only after it saw the reply being written, and keeps a message link. The redesign drew a third finding: activity and the latest message are read separately, so a turn accepted between them can leave the tab stale. Proposed fix keeps the tab checking while its transcript ends in an unanswered message, up to the turn timeout. |
+| Retry leaves the failed reply out of history | PR #637 for #625. Built; the ready review raised three gaps (validate the excluded id, clear abandoned retirements, cover backtest retries), fixed in one pass before merge. |
+| One list of next steps under a result follow-up | #606. The composer asked for a prose plan and structured next steps; the fix gives next steps sole ownership. Model-facing, so its measurement ($12.50 cap) waits its turn after the two lanes above that change model-facing text. |
+| Shared links open as an Argus conversation | The shared page becomes a read-only Argus thread with a follow-up box. The first follow-up forks into the receiver's own chat (guest if signed out) with trimmed context; backtests and calculations do not come along as live runs; guest caps unchanged. Founder-locked 2026-09-14. |
 | Acceptance dry run | Done on `03918912`: 30 of 46 smoke answers passed (guests 6 of 6), replay 14 of 14 with 24 turns left for the final run. Its failures drove the failure paths and calculation follow-ups lanes. The final acceptance reruns everything on the candidate. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
@@ -1452,7 +1455,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `1797e42a`.
+shipped means live in production. Integration is `6e79366a`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1548,6 +1551,8 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Acceptance dry run evidence | outside the releases | **LANDED** `6ec36797`, PR #631. Drivers, phone screenshots, findings and replay verdicts from the 03918912 run, with no customer text. |
 | Failure paths keep the money question | outside the releases | **LANDED** `6be3d58c`, PR #633. A failed interpreter no longer turns a money question into a test, a pending card no longer captures an unrelated follow-up, research gets only the turn's remaining time and falls back to the answer without the lookup, and recovery copy names what failed. |
 | Promotion readiness checklist | outside the releases | **LANDED** `1797e42a`, PR #636. `docs/release-manifests/NEXT-PROMOTION-CHECKLIST.md` lists the founder decisions, live runs and costs for the next promotion; the gate no longer accepts a skipped or unavailable live measurement. The four pending migrations rehearsed clean, three classify destructive, and none of the 44 existing scorecards qualify, so the candidate needs fresh live evidence. |
+| Sheets and dialogs from the phone drawer fill the screen | outside the releases | **LANDED** `9fea7efb`, PR #639. The drawer's slide-in animation left a transform that sized every sheet and dialog opened from it to the drawer (307px on a 375px phone). Shared overlays now render outside the drawer, animation transforms expire, and the settings audit runs with motion on. |
+| A Bitcoin question offers a Bitcoin test | outside the releases | **LANDED** `6e79366a`, PR #638, closing #611. Research subjects, Try next rows and add-peer taps carry the asset class, so Bitcoin is never offered as the BTC stock, and comparison rows stay within one asset class. Its caller audit lists classless lookups still left in backtest normalization, admission and result saving. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes

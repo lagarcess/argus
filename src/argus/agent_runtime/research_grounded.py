@@ -591,6 +591,11 @@ def _packet_stage_result(
         peers = verified_peers(
             candidates,
             exclude={s["symbol"] for s in subjects},
+            asset_class_hint=(
+                subjects[0]["asset_class"]
+                if subjects
+                else getattr(interpretation.research_query, "asset_class_hint", None)
+            ),
             # Surveys name many assets and lead with whatever moved most,
             # which is often untradable here; look past those before giving
             # up.
@@ -702,7 +707,7 @@ def _packet_stage_result(
             )
         )
         return question
-    if not subjects and peers:
+    if not subjects and peers and survey:
         # A survey names no subject: what the provider found, once the
         # resolver verifies it, is what the user can test. Promoting the
         # first verified name keeps every answer one tap from a test.
@@ -729,7 +734,9 @@ def _packet_stage_result(
         rows = with_calculation_offer(rows, language=language)
     suffix = (
         f"\n\n{honest_no_next_line(language)}"
-        if not terminal and not rows and subjects
+        if not terminal
+        and not rows
+        and (subjects or getattr(interpretation.research_query, "symbols", None))
         else ""
     )
     answer = f"{answer}{suffix}"
@@ -900,6 +907,8 @@ def thorough_job_result(
                 "question": message,
                 "currency": user.currency,
                 "subjects": subjects,
+                "requested_symbols": list(query.symbols),
+                "asset_class_hint": query.asset_class_hint,
                 "period_of_interest": query.period_of_interest,
                 "period_is_closed_window": query.period_is_closed_window,
                 "period_start_date": (
@@ -2074,9 +2083,17 @@ def compose_completed_research(
     peers = (
         []
         if degraded_code is not None
-        else verified_peers(packet.name_pairs, exclude={s["symbol"] for s in subjects})
+        else verified_peers(
+            packet.name_pairs,
+            exclude={s["symbol"] for s in subjects},
+            asset_class_hint=(
+                subjects[0]["asset_class"]
+                if subjects
+                else job_request.get("asset_class_hint")
+            ),
+        )
     )
-    if not subjects and peers:
+    if not subjects and peers and survey:
         # A survey names no subject: what the provider found, once the
         # resolver verifies it, is what the user can test. Promoting the
         # first verified name keeps every answer one tap from a test.
@@ -2106,7 +2123,9 @@ def compose_completed_research(
         answer = published_answer(packet, language)
     suffix = (
         f"\n\n{honest_no_next_line(language)}"
-        if not terminal and not rows and subjects
+        if not terminal
+        and not rows
+        and (subjects or job_request.get("requested_symbols"))
         else ""
     )
     answer = f"{answer}{suffix}"
