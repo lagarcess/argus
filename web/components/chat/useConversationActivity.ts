@@ -125,6 +125,7 @@ type ConversationActivityCallbacks = Readonly<{
     | void
     | Promise<ConversationActivityHistorySnapshot | readonly HistoryItem[] | void>;
   invalidateInactiveTranscript: (conversationId: string) => void;
+  refreshActiveTranscript?: (conversationId: string) => void;
   onMutationNotice: (notice: ConversationActivityMutationNotice) => void;
 }>;
 
@@ -289,6 +290,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     this.callbacks = {
       refreshHistory: options.refreshHistory,
       invalidateInactiveTranscript: options.invalidateInactiveTranscript,
+      refreshActiveTranscript: options.refreshActiveTranscript,
       onMutationNotice: options.onMutationNotice,
     };
     if (this.accountScopeKey) {
@@ -565,8 +567,6 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       activity.operation.status === "idle",
     );
     if (activitiesAreEqual(priorActivity, activity) && !canSettleRequest) return;
-    const settled =
-      isUnresolvedOperation(priorActivity) && !isUnresolvedOperation(activity);
     this.dispatch({
       type: "server_projection_merged",
       conversationId,
@@ -574,15 +574,24 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       revision,
       activeView: conversationId === this.currentActiveConversationId(),
     });
-    const requestSettled = Boolean(
-      priorRecord?.request &&
-      !this.state.byConversationId[conversationId]?.request,
-    );
-    if (
-      (settled || requestSettled) &&
-      conversationId !== this.currentActiveConversationId()
-    ) {
+    this.reconcileSettledTranscript(conversationId, priorRecord);
+  }
+
+  private reconcileSettledTranscript(
+    conversationId: string,
+    priorRecord: ConversationActivityState["byConversationId"][string] | undefined,
+  ): void {
+    // Read the accepted reducer state: stale responses cannot trigger a load.
+    const record = this.state.byConversationId[conversationId];
+    if (record?.canonical?.operation.status !== "idle") return;
+    const settled = isUnresolvedOperation(priorRecord?.canonical ?? null);
+    const requestSettled = Boolean(priorRecord?.request && !record.request);
+    if (!settled && !requestSettled) return;
+    if (conversationId !== this.currentActiveConversationId()) {
       this.callbacks.invalidateInactiveTranscript(conversationId);
+    } else if (!priorRecord?.request) {
+      // This tab did not own the turn's stream. Its saved transcript is stale.
+      this.callbacks.refreshActiveTranscript?.(conversationId);
     }
   }
 
@@ -664,23 +673,14 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     return request.then(
       (activity) => {
         if (!this.mutationIsCurrent(conversationId, mutationId, epoch)) return;
-        const priorActivity =
-          this.state.byConversationId[conversationId]?.canonical ?? null;
+        const priorRecord = this.state.byConversationId[conversationId];
         this.dispatch({
           type: "mutation_succeeded",
           conversationId,
           mutationId,
           activity,
         });
-        const nextActivity =
-          this.state.byConversationId[conversationId]?.canonical ?? null;
-        if (
-          isUnresolvedOperation(priorActivity) &&
-          !isUnresolvedOperation(nextActivity) &&
-          conversationId !== this.currentActiveConversationId()
-        ) {
-          this.callbacks.invalidateInactiveTranscript(conversationId);
-        }
+        this.reconcileSettledTranscript(conversationId, priorRecord);
         if (options.notifySuccess !== false) {
           this.callbacks.onMutationNotice({
             conversationId,
@@ -892,6 +892,7 @@ export function useConversationActivity(
       accountScopeKey: options.accountScopeKey,
       refreshHistory: options.refreshHistory,
       invalidateInactiveTranscript: options.invalidateInactiveTranscript,
+      refreshActiveTranscript: options.refreshActiveTranscript,
       onMutationNotice: options.onMutationNotice,
       patchActivity:
         options.testAdapters?.patchActivity ?? patchConversationActivity,
@@ -917,12 +918,14 @@ export function useConversationActivity(
     runtime.updateCallbacks({
       refreshHistory: options.refreshHistory,
       invalidateInactiveTranscript: options.invalidateInactiveTranscript,
+      refreshActiveTranscript: options.refreshActiveTranscript,
       onMutationNotice: options.onMutationNotice,
     });
   }, [
     runtime,
     options.refreshHistory,
     options.invalidateInactiveTranscript,
+    options.refreshActiveTranscript,
     options.onMutationNotice,
   ]);
 

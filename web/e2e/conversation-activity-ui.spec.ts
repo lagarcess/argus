@@ -1,6 +1,7 @@
 import {
   expect,
   test,
+  type BrowserContext,
   type Locator,
   type Page,
   type Route,
@@ -334,7 +335,7 @@ function recoveredClarificationRailTranscript(
 }
 
 async function installActivityFixture(
-  page: Page,
+  page: Page | BrowserContext,
   options: ActivityFixtureOptions = {},
 ): Promise<ActivityFixture> {
   const accountKind = options.accountKind ?? "registered";
@@ -439,6 +440,10 @@ async function installActivityFixture(
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
+
+    if (url.pathname.endsWith("/api/v1/memory/availability")) {
+      return json(route, { enabled: false });
+    }
 
     if (url.pathname.endsWith("/api/v1/me")) {
       return json(route, {
@@ -1291,3 +1296,49 @@ test("Spanish desktop exposes the complete typed activity vocabulary", async ({
   await captureEvidence(page, "21-es-desktop-activity-labels.png");
   expect(fixture.unexpectedRequests).toEqual([]);
 });
+
+for (const language of ["en", "es-419"] as const) {
+  test(`second tab loads the saved reply on completion without duplicating the sender (${language})`, async ({ context, page: tabA }) => {
+    const fixture = await installActivityFixture(context, { language });
+    const tabB = await context.newPage();
+    const reply = "Terminal response for activity-a";
+    const prompt = language === "en" ? "Explain compound interest" : "Explica el interés compuesto";
+    const reads = { a: 0, b: 0 };
+    for (const [tab, key] of [[tabA, "a"], [tabB, "b"]] as const) {
+      tab.on("request", (request) => {
+        if (request.url().includes("/conversations/activity-a/messages")) reads[key] += 1;
+      });
+      await tab.goto("/chat?conversation=activity-a");
+      await expect(tab.getByText("Transcript activity-a message 0", { exact: true })).toBeVisible();
+    }
+    await tabA.getByTestId("chat-input").fill(prompt);
+    await tabA.getByTestId("chat-send").click();
+    await expect.poll(() => fixture.pendingStreams.has("activity-a")).toBe(true);
+    // Use the existing focus refresh to learn that work started, then let its
+    // ordinary activity poll discover completion. No message reload or focus
+    // event is injected after settlement.
+    await refreshActivity(tabB, fixture);
+    await expect(tabB.getByTestId("conversation-activity-announcement")).toContainText(
+      language === "en" ? "Argus is working" : "Argus está trabajando",
+    );
+    const before = { ...reads };
+    fixture.settleOrdinary("activity-a");
+    try {
+      await expect(tabA.getByText(reply, { exact: true })).toHaveCount(1);
+      await expect(tabB.getByText(reply, { exact: true })).toBeVisible({ timeout: 10_000 });
+      for (const tab of [tabA, tabB]) {
+        await expect(tab.getByText(reply, { exact: true })).toHaveCount(1);
+        await expect(tab.getByText(prompt, { exact: true })).toHaveCount(1);
+      }
+      expect(reads.a).toBe(before.a);
+      expect(reads.b).toBe(before.b + 1);
+      // A repeated canonical projection must not load or append again.
+      await refreshActivity(tabB, fixture);
+      expect(reads.b).toBe(before.b + 1);
+      expect(fixture.unexpectedRequests).toEqual([]);
+    } finally {
+      await captureEvidence(tabA, `598-${language}-tab-a.png`);
+      await captureEvidence(tabB, `598-${language}-tab-b.png`);
+    }
+  });
+}

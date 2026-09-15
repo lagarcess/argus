@@ -366,6 +366,7 @@ export default function ChatInterface() {
     accountScopeKey: account?.user.id ?? null,
     refreshHistory: refreshHistoryForActivity,
     invalidateInactiveTranscript: invalidateInactiveActivityTranscript,
+    refreshActiveTranscript: (id) => { transcriptSessionCache.invalidateForMutation({ userId: account?.user.id ?? "", conversationId: id, mutation: "durable_job_completion" }); void navigateConversationTranscript(id); },
     onMutationNotice: (notice) => {
       const descriptor = conversationActivityMutationNoticeDescriptor(notice);
       showToast(t(descriptor.key, descriptor.defaultValue), descriptor.variant);
