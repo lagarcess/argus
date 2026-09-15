@@ -1,0 +1,72 @@
+"""Approved 73-case rerun, no diagnostic retry or extra paid probes."""
+import os,sys,json,subprocess,asyncio,time
+from pathlib import Path
+from dataclasses import asdict
+sys.path.insert(0,str(Path.cwd()));sys.path.insert(0,str(Path.cwd()/'src'));sys.path.insert(0,'/tmp')
+from dotenv import dotenv_values
+from current_reason_clean_budget import Budget,SpendStop
+
+ROOT=Path.cwd(); OUT=ROOT/'temp/current-reason-clean-rerun';OUT.mkdir(exist_ok=False)
+START_SHA=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+assert START_SHA=='4c4e7a001150740dddef4e97fc13b99f2b0c823b'
+assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip()
+secrets=dotenv_values('.env')
+profile=json.loads((ROOT/'.github/private-alpha-release-profile.json').read_text())['services']['api']['env']
+env={k:v for k,v in profile.items() if k.endswith('_MODEL') or v in ('true','false')}
+for key in ('OPENROUTER_API_KEY','PERPLEXITY_API_KEY','ALPACA_API_KEY','ALPACA_SECRET_KEY'):
+    assert secrets.get(key), f'missing credential {key}'
+    env[key]=secrets[key]
+env.update(ARGUS_RUN_LIVE_EVALS='1',ARGUS_MARKET_DATA_PROVIDER_MODE='live_provider',ARGUS_ASSET_PROVIDER_MODE='live_provider',ARGUS_DISCOVERY_SEARCH_PROVIDER=profile['ARGUS_DISCOVERY_SEARCH_PROVIDER'])
+envpath=OUT/'measurement.env'
+envpath.touch(mode=0o600,exist_ok=False)
+envpath.write_text('\n'.join(k+'='+json.dumps(v) for k,v in env.items())+'\n')
+for key in list(os.environ):
+    if key.startswith(('ARGUS_','SUPABASE_','ALPACA_','OPENROUTER_','PERPLEXITY_')) or key=='DATABASE_URL':
+        del os.environ[key]
+os.environ.update(env);os.environ['ARGUS_EVAL_ENV_FILE']=str(envpath)
+# Keep local product/database credentials out of the isolated measurement process.
+for key in ('SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_ANON_KEY','DATABASE_URL','ARGUS_WORKFLOW_DATABASE_URL'):
+    os.environ.pop(key,None)
+backup=Path('/tmp/current-reason-clean-dotenv-link')
+assert not backup.exists() and not backup.is_symlink()
+(ROOT/'.env').rename(backup)
+guard=Budget(OUT/'budget.json',json.loads(Path('/tmp/current-reason-clean-prices.json').read_text()))
+try:
+    from loguru import logger
+    logger.remove();logger.add(str(OUT/'runtime.log'),level='INFO',rotation='20 MB')
+    from tests.evals.measurement_eval_scorecard import build_scorecard_provenance,write_scorecard,validated_provenance_payload
+    from tests.promotion_evidence_configuration import assert_release_configuration_matches
+    from tests.evals.measurement_eval_harness import load_eval_cases,run_eval_case
+    from argus.domain.market_data.assets import clear_asset_cache
+    guard.install();clear_asset_cache()
+    provenance=build_scorecard_provenance(evaluation_mode='live')
+    assert_release_configuration_matches(provenance.release_configuration,shipped_sha=START_SHA,repository_root=ROOT,evidence='live measurement')
+    (OUT/'provenance.json').write_text(json.dumps(validated_provenance_payload(provenance),indent=2))
+    cases=load_eval_cases();assert len(cases)==73
+    results=[]
+    print('LIVE START',START_SHA,'cases',len(cases),flush=True)
+    for index,case in enumerate(cases,1):
+        guard.label=case.id
+        try:
+            result=run_eval_case(case)
+        except SpendStop as exc:
+            (OUT/'stop.json').write_text(json.dumps({'case_id':case.id,'completed_cases':len(results),'reason':str(exc),'not_completed':[c.id for c in cases[index-1:]]},indent=2))
+            print('ADMISSION STOP',case.id,str(exc),flush=True)
+            break
+        results.append(result)
+        (OUT/'partial-results.json').write_text(json.dumps(results,indent=2))
+        print(index,case.id,result['status'],result['failed_checks'],'accounted',round(guard.total(),6),flush=True)
+    if len(results)==73:
+        scorecard=write_scorecard(results,provenance=provenance,output_dir=OUT)
+        print('SCORECARD',scorecard,flush=True)
+    else:
+        (OUT/'partial-measurement.json').write_text(json.dumps({'artifact_kind':'incomplete_live_measurement_not_a_scorecard','provenance':validated_provenance_payload(provenance),'totals':{'expected_cases':73,'completed_cases':len(results),'passed':sum(r['status']=='passed' for r in results),'failed':sum(r['status']=='failed' for r in results),'not_completed':73-len(results)},'results':results},indent=2))
+    (OUT/'completion.json').write_text(json.dumps({'candidate_sha':START_SHA,'completed_cases':len(results),'expected_cases':73,'complete':len(results)==73,'diagnostic_retries':0},indent=2))
+    print('LIVE ENDED',len(results),'cases; accounted',round(guard.total(),6),flush=True)
+finally:
+    guard.save()
+    backup.rename(ROOT/'.env')
+    envpath.unlink()
+    assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==START_SHA
+    assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip()
+    print('CHECKOUT UNCHANGED; dotenv restored; private env deleted',flush=True)

@@ -1,0 +1,8 @@
+{
+  "method": "Read captured judged assistant text only, no new model call. Raw text is preserved, not rewritten.",
+  "em_dash_case_ids": [
+    "asset_discovery_trending_crypto_exact_issue_344",
+    "asset_discovery_not_capability_question_issue_244"
+  ],
+  "changes_to_scorecard_verdicts": false
+}

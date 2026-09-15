@@ -1,0 +1,22 @@
+{
+  "README.md": "c82eac42bb13a5e85078ecb6fe4955790afcb2c5343fe30d1a13ec8a943747cd",
+  "budget.json": "8aaec18087c3fd144af7a1be9f4245581fbbec02fc3e1d1cef30c73b08cb3d30",
+  "comparison.json": "305da11d89318c7fb4e81541ebbacf269a1137ff9dc08e4a790b020925409423",
+  "comparison.md": "13f6c30dedba91dc3c78e9361bcb9955267b8313a82291f47c447631c65f8df0",
+  "completion.json": "eabb8019fbdf739d6628b032ff6fdff44750ca4c6f76809124b1ed5cef7388fc",
+  "integration-recovery-delta.diff": "97530db424e3ea4b0983b04bd46976a53eb07db51a573ed79d66e74615b49b9a",
+  "live-measurement.json": "a7bbff57ea24e88e95b973d90c0cc1583e2b6fbe3bfdf48b5e3cb7a6715c9263",
+  "method/budget.py.txt": "222ee4e5e7fd6595bcbf6a3cfe15150e8aabcf0b4542959d0d377d97752b7ab8",
+  "method/comparison.py.txt": "ca80b2ab5f20835478f742ed3a9c2facf122fd50b9de0f45efd3a6c028bf8187",
+  "method/driver.py.txt": "9654871f3720dfdef9da1b9111fb37cb14b905d5c6b33b61f4c36d34f97c656a",
+  "method/guard-green.txt": "d9c5ed0c294f0846e98c7f691919aca03cb0408fb17e557cfdd119666eaa834f",
+  "method/guard-red.txt": "32874a2fbec3a7462bd8e40d1f3e811d11257d2e156b75e8e850c9c4c7e9597f",
+  "method/guard-tests.py.txt": "510acc67462b65c445b6ec29dc777363a1ed4c400b7e925e2364be7b15d33f93",
+  "method/offline-serialization.py.txt": "3959ab6e2843f32ab7bf41a54c383f60627ca5cf6c9edce8f35893cd7fe37c70",
+  "method/openrouter-endpoint-prices.json": "9bfcc50973edff39d2aa4a8096ce8d7c1d24342fb30e8664b21591fc0c5b6675",
+  "provenance.json": "7c82cf20ef78af9240399ec39d0dbe1febee45463a88f6ee2b822286bbafe1c6",
+  "runtime.log": "3748e146aa2dc868c8d1abaf715452af3d0a0e2e7d76b89198633d2abfc2371c",
+  "same-head-prior-observations.json": "1ef938ace22d6aacf02016819a07604e2ebbee1da9c1a06aff4837b003cc4a51",
+  "style-observations.json": "754cb2c130e2da2d7911346a3dffc63104e83130d1ce4d214811ccd4341b8ca6",
+  "terminal-summary.json": "96ccf8431795285b06dcdd5b6d421ab438a172d20e9087d77904cac5841866ba"
+}

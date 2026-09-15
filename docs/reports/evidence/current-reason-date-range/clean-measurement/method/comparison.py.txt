@@ -1,0 +1,51 @@
+"""Historical per-case comparison; no paid calls or changes to assertions."""
+import json,subprocess,sys,collections
+from pathlib import Path
+import yaml
+root=Path.cwd();out=Path(sys.argv[1]);current=json.loads(Path(sys.argv[2]).read_text());budget=json.loads((out/'budget.json').read_text())
+freeze=json.loads((root/'.agent/interpreter_prompt_fingerprint.json').read_text())
+baselines={
+ 'last_measured':('docs/reports/evidence/current-reason-date-range/measurement/live-measurement.json','c861d95cf0e69003e99d935ffe57c16269e9172b'),
+ 'fingerprint':(freeze['last_measured']['scorecard'],freeze['last_measured']['commit'])}
+new={r['id']:r for r in current['results']}
+newfixtures={r['id']:r for p in (root/'tests/evals/measurement_cases').glob('*.yaml') for r in yaml.safe_load(p.read_text())['cases']}
+reports={}
+for name,(path,sha) in baselines.items():
+ baseline=json.loads((root/path).read_text());old={r['id']:r for r in baseline['results']};oldfixtures={}
+ for p in (root/'tests/evals/measurement_cases').glob('*.yaml'):
+  raw=subprocess.check_output(['git','show',sha+':'+p.relative_to(root).as_posix()],text=True)
+  oldfixtures.update({r['id']:r for r in yaml.safe_load(raw)['cases']})
+ rows=[]
+ for case_id,fixture in newfixtures.items():
+  o=old.get(case_id);n=new.get(case_id)
+  if n is None:classification='not_completed'
+  elif o is None:classification='new_pass' if n['status']=='passed' else 'new_failure'
+  elif any(e.get('component')=='measurement_cost_guard' for e in o.get('infrastructure_errors',[])):
+   classification='previously_unmeasured_now_'+n['status']
+  elif o['status']=='passed':classification='unchanged_pass' if n['status']=='passed' and not n.get('infrastructure_errors') else 'regression'
+  elif n['status']=='passed':classification='improved'
+  elif o['status']==n['status'] and set(o['failed_checks'])==set(n['failed_checks']):classification='unchanged_failure'
+  else:classification='changed_failure'
+  costs=[r for r in budget['calls'] if r['label']==case_id]
+  rows.append({'id':case_id,'baseline_status':o['status'] if o else None,'current_status':n['status'] if n else 'not_completed','classification':classification,
+   'fixture_semantics_unchanged':oldfixtures.get(case_id)==fixture if o else None,
+   'baseline_failed_checks':o['failed_checks'] if o else [],'current_failed_checks':n['failed_checks'] if n else [],
+   'new_failed_checks':sorted(set(n['failed_checks'] if n else [])-set(o['failed_checks'] if o else [])),
+   'current_infrastructure_errors':n.get('infrastructure_errors',[]) if n else [],
+   'cost':{'attempts':len(costs),'reported_usd':sum(r.get('reported_cost_usd',0) for r in costs),'accounted_usd':sum(r['accounted_usd'] for r in costs),'unknown_reserved_usd':sum(r['accounted_usd'] for r in costs if 'reported_cost_usd' not in r)}})
+ reports[name]={'baseline_scorecard':path,'baseline_commit':sha,'candidate_commit':current['provenance']['candidate_sha'],'comparison_kind':'Historical case-by-case comparison, not a paired causal A/B','baseline_totals':baseline['totals'],'current_totals':current['totals'],'classifications':dict(collections.Counter(r['classification'] for r in rows)),'cases':rows}
+(out/'comparison.json').write_text(json.dumps(reports,indent=2)+'\n')
+lines=['# Case-by-case rerun comparison','','Candidate: `'+current['provenance']['candidate_sha']+'`.','',
+ 'Both new date fixtures were corrected before this run: August 16, 2026 is Sunday, so requested August 16 to 19 maps to the August 17 to 19 trading window. Confirmation carries no prose. These changes are disclosed, not attributed to a product improvement.','',
+ 'The last measured scorecard is the primary comparison; the fingerprint baseline is also retained. Historical comparison does not establish that a code change caused any observed difference.','']
+for name,report in reports.items():
+ lines += ['## '+name,'','Baseline: `'+report['baseline_scorecard']+'`.','','| Case | Prior | Current | Comparison | Accounted USD |','| --- | --- | --- | --- | ---: |']
+ for r in report['cases']:
+  lines += [f"| `{r['id']}` | {r['baseline_status'] or 'new'} | {r['current_status']} | {r['classification']} | {r['cost']['accounted_usd']:.6f} |"]
+ lines += ['','### Non-passing and changed-check details','']
+ for r in report['cases']:
+  if r['current_status']=='passed':continue
+  lines += ['- `'+r['id']+'`: '+r['classification']+'. Prior checks: '+json.dumps(r['baseline_failed_checks'])+'. Current checks: '+json.dumps(r['current_failed_checks'])+'. New checks: '+json.dumps(r['new_failed_checks'])+'.']
+ lines += ['']
+(out/'comparison.md').write_text('\n'.join(lines)+'\n')
+print(json.dumps({name:r['classifications'] for name,r in reports.items()},indent=2))

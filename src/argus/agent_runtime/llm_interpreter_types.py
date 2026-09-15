@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr
 
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
@@ -14,6 +14,15 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import ResponseProfileOverrides
 from argus.domain.capability_registry import RegisteredStrategyTemplate
+
+
+def _without_null_endpoints(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: endpoint for key, endpoint in value.items() if endpoint is not None}
+    return value
+
+
+LLMDateEndpoints = Annotated[dict[str, str], BeforeValidator(_without_null_endpoints)]
 
 
 class InterpretationContractError(ValueError):
@@ -122,11 +131,11 @@ class LLMDateRangeIntent(BaseModel):
     )
     start: str | None = Field(
         default=None,
-        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+        description="ISO date, YYYY-MM-DD; --MM-DD with year_reference=current_year; or 'today'.",
     )
     end: str | None = Field(
         default=None,
-        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+        description="ISO date, YYYY-MM-DD; --MM-DD with year_reference=current_year; or 'today'.",
     )
     day_offset: int | None = Field(
         default=None,
@@ -148,6 +157,15 @@ class LLMDateRangeIntent(BaseModel):
     unit: Literal["day", "week", "month", "quarter", "year"] | None = None
     anchor: Literal["today", "current_date"] | None = "today"
     year: int | None = Field(default=None, ge=1900, le=2100)
+    year_reference: Literal["current_year"] | None = Field(
+        default=None,
+        description=(
+            "Use current_year for month/day endpoints when the user omits the "
+            "year or qualifies them as this year. Return explicit_range or endpoint_patch with "
+            "month/day endpoints as --MM-DD; Argus supplies the year from its "
+            "New York clock. Leave null for a user-stated historical year."
+        ),
+    )
     endpoint: Literal["start", "end"] | None = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     evidence: str | None = Field(
@@ -223,7 +241,7 @@ class LLMStrategyDraft(BaseModel):
     indicator_period: int | None = None
     entry_threshold: float | None = None
     exit_threshold: float | None = None
-    date_range: str | dict[str, str] | None = None
+    date_range: str | LLMDateEndpoints | None = None
     date_range_raw_text: str | None = Field(
         default=None,
         description=(
@@ -342,7 +360,10 @@ class LLMInterpretationResponse(BaseModel):
     reason_codes: list[str] = Field(default_factory=list)
     ambiguous_fields: list[LLMAmbiguousField] = Field(default_factory=list)
     unsupported_constraints: list[LLMUnsupportedConstraint] = Field(default_factory=list)
-    response_profile_overrides: ResponseProfileOverrides = Field(
+    response_profile_overrides: Annotated[
+        ResponseProfileOverrides,
+        BeforeValidator(lambda value: {} if value is None else value),
+    ] = Field(
         default_factory=ResponseProfileOverrides
     )
     semantic_turn_act: (
@@ -442,7 +463,7 @@ class FocusedStrategyExtraction(BaseModel):
             "or 1D for daily candles. Leave null only when the user did not state it."
         ),
     )
-    date_range: str | dict[str, str] | None = Field(
+    date_range: str | LLMDateEndpoints | None = Field(
         default=None,
         description=(
             "User-stated test window. Preserve today/current as 'today' or the runtime "
@@ -545,7 +566,7 @@ class FocusedDateWindowExtraction(BaseModel):
             "for relative windows."
         ),
     )
-    date_range: dict[str, str] | None = Field(
+    date_range: LLMDateEndpoints | None = Field(
         default=None,
         description=(
             "Use only when the user explicitly states calendar endpoints. Values "

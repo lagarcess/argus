@@ -1,7 +1,10 @@
 # Current reply reason and stated date range
 
-Status: **follow-up fixes awaiting a paid rerun; PR #626 remains draft**.
-See [the follow-up diagnosis, fixture corrections, and $7 proposal](followup.md).
+Status: **eight saved failures investigated; free fixes await new paid approval; PR #626 remains draft**.
+See the [failure classification, exact instruction changes, and two paid gates](failure-analysis.md).
+The [complete clean run at 4c4e7a00](clean-measurement/README.md) recorded 65 passes
+and 8 failures. Its scorecard is retained unchanged. The [earlier follow-up](followup.md)
+records the asset/recovery fixes and fixture corrections before that run.
 
 The first bounded measurement below remains historical evidence. The authorized
 measurement stopped within its $5 cap. It recorded all 73 case dispositions,
