@@ -58,7 +58,25 @@ for (const cell of cells) {
         expect(box!.x + box!.width / 2).toBeCloseTo(cell.width / 2, 0);
         expect(box!.y + box!.height / 2).toBeCloseTo(450, 0);
       }
-      if (cell.width < 720) await expect(page.locator(".argus-drawer-panel")).toHaveCSS("transform", "none");
+      if (cell.width < 720) {
+        const drawer = page.locator(".argus-drawer-panel");
+        await expect(drawer).toHaveCSS("transform", "none");
+        // Prove the portal independently of the animation fix, including while
+        // an ancestor is transformed by a drag or future visual treatment.
+        for (const trap of ["transform: translateX(24px)", "filter: blur(0px)", "will-change: transform", "contain: paint"]) {
+          await drawer.evaluate((node, style) => node.setAttribute("style", style), trap);
+          expect(await panel.boundingBox(), trap).toEqual(box);
+        }
+        await drawer.evaluate((node) => node.removeAttribute("style"));
+      }
+      // Portal placement must preserve the shared focus and Escape ownership.
+      for (let index = 0; index < 3; index += 1) {
+        await page.keyboard.press("Tab");
+        await expect.poll(() => panel.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+      }
+      const openedPanel = await panel.elementHandle();
+      await page.keyboard.press("Escape");
+      await expect.poll(() => openedPanel!.evaluate((node) => node.isConnected)).toBe(false);
     });
   }
 }

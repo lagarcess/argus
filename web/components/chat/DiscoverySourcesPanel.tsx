@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -35,7 +37,7 @@ type DiscoverySourcesPanelProps = {
  * in a new tab, and the visible domain always comes from the href being opened
  * so an untrusted provider title cannot disguise the destination.
  */
-export default function DiscoverySourcesPanel({
+export function DiscoverySourcesPanelSurface({
   onClose,
   sidecar,
   anchorIndex = null,
@@ -160,3 +162,5 @@ export default function DiscoverySourcesPanel({
     </div>
   );
 }
+
+export default withViewportPortal(DiscoverySourcesPanelSurface);
