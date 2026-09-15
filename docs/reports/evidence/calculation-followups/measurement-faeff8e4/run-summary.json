@@ -1,0 +1,13 @@
+{
+  "case_count": 93,
+  "elapsed_seconds": "3087.47",
+  "measured_sha": "faeff8e448a22032989895426b06b3a32af781ed",
+  "no_commits_during_run": true,
+  "pytest_exit_code": 1,
+  "ready": false,
+  "refrozen": false,
+  "scorecard_sha256": "fc477bb990960300b506257651ca37982160442b66636849c8b447f9a5740a4c",
+  "scorecard_source": "temp/argus_eval_scorecards/argus-eval-scorecard-20260915T205927Z.json",
+  "status": "completed",
+  "worktree_clean": true
+}
