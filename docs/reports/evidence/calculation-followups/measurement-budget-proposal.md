@@ -1,9 +1,9 @@
 # Proposed 93-case measurement budget
 
-Status: proposal only. No live call is authorized yet. The budget guard described
-below is not implemented in the current runner and must be tested before any
-paid dispatch after founder go. This follow-up changes the catalogue and judge
-wording only; it does not change production retries or start measurement.
+Status: founder-approved budget. The measurement-only guard now enforces the
+limits below at the HTTP-send boundary when `ARGUS_EVAL_BUDGET_REPORT` is set.
+It leaves production retries unchanged. Live execution still requires its
+explicit go and a clean reconciled head; enabling the guard alone starts no call.
 
 ## Spending proposal
 
@@ -45,14 +45,15 @@ These observations do not guarantee the next request's cost.
 - Nine discovery cases may use the separate Search API. Permit only those case
   IDs, retain separate request/cost accounting, and include their spend in $15.
 
-The current sanctioned runner has neither a case budget ledger nor a no-retry
-switch: [live runner](../../../../tests/evals/test_measurement_eval_live.py),
-[Agent transport](../../../../src/argus/domain/research/perplexity_agent.py).
-Admission must happen at the send owner using a shared thread-safe ledger, with
-all retries counted. The normal scorecard's OpenRouter totals alone are not the
-whole bill. The guard must retain Agent and Search invoices separately and
-include all of them in the total. Budget exhaustion yields an incomplete
-measurement and durable partial evidence, never a green scorecard.
+The [sanctioned live runner](../../../../tests/evals/test_measurement_eval_live.py)
+installs the [budget guard](../../../../tests/evals/measurement_budget.py) before
+case execution. It uses a shared thread-safe ledger below HTTP retries, plus an
+Agent application-request guard. Sync and async sends, streamed usage, judges
+and fallback calls are counted. Raw Agent invoices are settled even when the
+answer cannot be parsed. Search charges remain separately identified at their
+documented per-request rate. The normal scorecard's OpenRouter totals alone are
+not the whole bill. Budget exhaustion writes durable partial evidence and
+aborts before the ordinary scorecard writer; it never yields a green scorecard.
 
 ## Scope
 

@@ -60,9 +60,7 @@ def _environment_sources(tmp_path: Path) -> Path:
         pytest.param("via/.env.example", True, id="link-to-a-tracked-file"),
         pytest.param("hop/live.env", True, id="link-through-a-tracked-symlink"),
         pytest.param("hard-link.env", True, id="hard-link-to-a-tracked-file"),
-        pytest.param(
-            "symlink-hard-link.env", True, id="hard-link-to-a-tracked-symlink"
-        ),
+        pytest.param("symlink-hard-link.env", True, id="hard-link-to-a-tracked-symlink"),
         pytest.param("repository/.env", False, id="gitignored-file-in-the-checkout"),
         pytest.param("live-eval.env", False, id="file-outside-the-checkout"),
         pytest.param("outside-link.env", False, id="link-to-an-untracked-file"),
@@ -410,3 +408,74 @@ def test_explicit_live_suite_fails_when_openrouter_key_is_missing(
         match="OPENROUTER_API_KEY is required for requested live evals",
     ):
         live_suite._assert_requested_live_eval_credentials()
+
+
+def test_live_measurement_keeps_its_declared_runtime_flags(monkeypatch) -> None:
+    from tests.conftest import mock_auth_env
+
+    flags = {
+        "ARGUS_DEV_MEMORY_FALLBACK": "false",
+        "ARGUS_CONTEXT_PACKETS_ENABLED": "true",
+        "NEXT_PUBLIC_MOCK_AUTH": "false",
+    }
+    monkeypatch.setenv("ARGUS_RUN_LIVE_EVALS", "1")
+    for key, value in flags.items():
+        monkeypatch.setenv(key, value)
+    mock_auth_env.__wrapped__(monkeypatch)
+    assert {key: os.environ[key] for key in flags} == flags
+
+
+def test_budgeted_live_suite_cannot_write_scorecard_after_denied_send(
+    monkeypatch, tmp_path
+) -> None:
+    from dataclasses import dataclass
+
+    import httpx
+
+    from tests.evals import test_measurement_eval_live as live_suite
+    from tests.evals.measurement_budget import MeasurementBudgetStop
+
+    @dataclass
+    class Provenance:
+        candidate_sha: str = "offline-budget-test"
+
+    report = tmp_path / "costs.jsonl"
+    monkeypatch.setenv("ARGUS_RUN_LIVE_EVALS", "1")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fixture-only-key")
+    monkeypatch.setenv("ARGUS_ASSET_PROVIDER_MODE", "recorded_provider_fixture")
+    monkeypatch.setenv("ARGUS_EVAL_BUDGET_REPORT", str(report))
+    monkeypatch.setattr(live_suite, "clear_asset_cache", lambda: None)
+    monkeypatch.setattr(
+        live_suite, "build_scorecard_provenance", lambda **_: Provenance()
+    )
+    cases = live_suite.load_eval_cases()
+    # This authored no-new-facts case must be rejected before research transport.
+    denied = next(c for c in cases if c.id == "calculation_followups_q2_card_recall_en")
+    monkeypatch.setattr(
+        live_suite,
+        "load_eval_cases",
+        lambda: [denied, *[c for c in cases if c != denied]],
+    )
+    sent, scorecards_written = [], []
+
+    def run_case(case):
+        with httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: sent.append(request) or httpx.Response(200, json={})
+            )
+        ) as client:
+            client.post("https://api.perplexity.ai/v1/agent")
+        return {"id": case.id, "status": "passed"}
+
+    monkeypatch.setattr(live_suite, "run_eval_case", run_case)
+    monkeypatch.setattr(
+        live_suite, "write_scorecard", lambda *a, **k: scorecards_written.append(a)
+    )
+    with pytest.raises(MeasurementBudgetStop, match="no_new_facts_research_attempt"):
+        live_suite.test_measurement_live_eval_suite_writes_scorecard(monkeypatch)
+    assert sent == []
+    assert scorecards_written == []
+    partial = json.loads(report.with_suffix(".progress.json").read_text())
+    assert partial["status"] == "incomplete"
+    assert partial["interrupted_case_id"] == denied.id
+    assert partial["results"] == []

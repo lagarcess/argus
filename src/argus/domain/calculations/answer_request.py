@@ -107,7 +107,11 @@ class AnswerCalculationInput(BaseModel):
     )
     currency: str | None = Field(
         default=None,
-        description="For a money amount, its ISO 4217 code; otherwise null.",
+        description=(
+            "For a money amount, the ISO 4217 currency explicitly stated by "
+            "the user or its cited page; null when no currency was stated, or "
+            "for a non-money input."
+        ),
     )
 
 
@@ -116,8 +120,22 @@ class AnswerCalculation(BaseModel):
 
     model_config = ConfigDict(frozen=True, json_schema_extra=all_properties_required)
 
-    prior_artifact_id: str | None = None
-    updated_fields: list[str] = Field(default_factory=list)
+    prior_artifact_id: str | None = Field(
+        default=None,
+        description=(
+            "For a follow-up changing a computed card, its artifact_id from "
+            "calculation_cards in conversation history; null for a new "
+            "calculation or a pending question. Never invent an artifact id."
+        ),
+    )
+    updated_fields: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Names of inputs explicitly changed by the current user message. "
+            "Omitted known inputs retain their stored values and sources. Filling "
+            "a requested blank does not require listing it here."
+        ),
+    )
 
     name: str = Field(
         default="",
@@ -168,29 +186,57 @@ class AnswerCalculation(BaseModel):
 # fingerprint and, for research, by the recorded retrieval probe.
 ANSWER_CALCULATION_INSTRUCTIONS = (
     "Fill calculations only when the answer computes on specific figures, such as "
-    "what a plan, loan or purchase costs, what an amount earns or grows to, "
-    "how many years a sum takes to double, which option costs less or what "
-    "a dividend yields at today's price, each with the one kind listed below that "
-    "computes it. When the reader weighs options, fill one calculation for each "
-    "option under its own short name, with the same kind when one kind computes "
-    "them all, and never say which option to choose. Argus computes each one: never "
-    "compute a figure yourself, such as a change, a percentage, a ratio or a total; "
-    "state each figure as its source gives it, or let a calculation produce it. "
-    "List every input the kind needs with its "
-    "source: page for a figure read from a page retrieved for this answer, with "
-    "that page's URL and date; market_data for the current price of the named "
-    "asset, which Argus fills from its own market data; user for a figure the user "
-    "stated; assumption for any other figure you choose, which the answer must "
-    "state plainly as an assumption. Count every money input in one currency, give "
-    "its ISO 4217 code, and add that code as the currency input. A figure only the "
-    "user knows that the user did not state is listed with source user and a null "
-    "value. Only when you fill calculations, write each figure a calculation uses or "
-    "produces as {{name}}, with its input or result name, or as "
-    "{{calculation_name.name}} when there is more than one calculation, never as "
-    "digits, including in a worked example; Argus fills each one from the computed "
-    "result. Every other figure is written in digits and is never a reference. "
-    "Leave calculations empty when the answer computes nothing. Kinds, their inputs "
-    "and their results:\n"
+    "what a plan, loan or purchase costs, what an amount earns or grows to, how "
+    "many years a sum takes to double, which option costs less or what a dividend "
+    "yields at today's price, each with the one kind listed below that computes "
+    "it. When the reader weighs options, fill one calculation for each option "
+    "under its own short name, with the same kind when one kind computes them "
+    "all, and never say which option to choose. Argus computes each one: never "
+    "compute a figure yourself, such as a change, a percentage, a ratio or a "
+    "total; state each figure as its source gives it, or let a calculation "
+    "produce it. List every input the kind needs with its source: page for a "
+    "figure read from a page retrieved for this answer, with that page's URL and "
+    "date; market_data for the current price of the named asset, which Argus "
+    "fills from its own market data; user for a figure the user stated; "
+    "assumption for any other figure you choose, which the answer must state "
+    "plainly as an assumption. When the reader states a currency, add its ISO "
+    "4217 code as the currency input with source user. When a retrieved page "
+    "states the currency, preserve that currency and source. When no currency is "
+    "stated, omit the currency input and leave each unstated money-input currency "
+    "null: Argus uses the resolved profile currency and records it as an "
+    "assumption. Never choose USD or infer a currency from the response language. "
+    "A currency conversion uses the input amount's currency and a separate "
+    "output_currency, with the rate in the quotation direction declared by the "
+    "calculation. A figure only the user knows that the user did not state is "
+    "listed with source user and a null value. Only when you fill calculations, "
+    "write each figure a calculation uses or produces as {{name}}, with its input "
+    "or result name, or as {{calculation_name.name}} when there is more than one "
+    "calculation, never as digits, including in a worked example; Argus fills "
+    "each one from the computed result. Every other figure is written in digits "
+    "and is never a reference. Leave calculations empty when the answer computes "
+    "nothing. Calculation cards in conversation history own their inputs, sources "
+    "and results; the accompanying answer_text is qualitative context, not a "
+    "competing source of numbers. A reply supplying a requested input or changing "
+    "an input must return the calculation that computes the new result, even for "
+    "simple arithmetic. For an existing card, use its prior_artifact_id and list "
+    "only explicitly changed inputs in updated_fields; keep its kind and "
+    "solve_for. For a pending calculation, keep its name, kind and solve_for, "
+    "fill the supplied blanks, and list any explicitly changed known inputs in "
+    "updated_fields. Once the inputs suffice, state what the card computed and do "
+    "not ask again for an input already supplied. When a product comparison needs "
+    "personal facts that are missing, name what to compare and which facts are "
+    "missing, and select nothing. Do not call any named product the best choice, "
+    "closest fit or general recommendation for this reader. Reason about currency "
+    "risk from the spending goal as it stands in the current turn. Savings in "
+    "currency A funding a fixed expense in currency B lose purchasing power when "
+    "B appreciates against A, equivalently when A depreciates against B. Matching "
+    "the savings to B removes that currency mismatch; do not carry forward a "
+    "replaced spending goal. When asked about putting money in a volatile asset, "
+    "request historical_drawdown for that asset. If only an asset class is named, "
+    "identify the asset used as a representative example. State the computed "
+    "historical drawdown and actual observation window, distinguish history from "
+    "a forecast, then stop. Do not replace the result with a risk essay, a "
+    "product choice or further questions. Kinds, their inputs and their results:\n"
 )
 
 

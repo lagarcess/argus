@@ -1,6 +1,6 @@
 # Exact model-facing text for founder review
 
-This is the pre-measurement checkpoint. No live measurement has run. The new tool declarations and `requires_new_facts` schema are implemented but unmeasured. The answer instruction replacement, field descriptions, and judge additions are approved in shape for measurement, with the requested general A/B currency-risk rule below. They remain proposed, not active, pending measurement go. No fingerprint has been refrozen.
+The founder approved this text and gave measurement go. The answer instruction replacement, field descriptions, and judge additions below are now active exactly as shown, including the general A/B currency-risk rule. The judge is version 4. No fingerprint has been refrozen; measurement results must establish acceptance. The approved budget is enforced by the measurement-only transport guard.
 
 ## ResearchQueryExtraction.requires_new_facts
 

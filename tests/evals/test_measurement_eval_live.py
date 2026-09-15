@@ -34,9 +34,7 @@ from tests.evals.measurement_eval_harness import (
 
 def _assert_requested_live_eval_credentials() -> None:
     if not (os.getenv("OPENROUTER_API_KEY") or "").strip():
-        raise RuntimeError(
-            "OPENROUTER_API_KEY is required for requested live evals"
-        )
+        raise RuntimeError("OPENROUTER_API_KEY is required for requested live evals")
 
 
 def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
@@ -62,7 +60,24 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
     clear_asset_cache()
 
     provenance = build_scorecard_provenance(evaluation_mode="live")
-    results = [run_eval_case(case) for case in load_eval_cases()]
+    cases = load_eval_cases()
+    budget_report = os.getenv("ARGUS_EVAL_BUDGET_REPORT")
+    if budget_report:
+        from tests.evals.measurement_budget import MeasurementBudget
+        from tests.evals.measurement_budget_runner import run_budgeted_cases
+
+        report_path = Path(budget_report)
+        budget = MeasurementBudget(report_path, [case.id for case in cases])
+        budget.install(monkeypatch)
+        results = run_budgeted_cases(
+            cases,
+            run_case=run_eval_case,
+            budget=budget,
+            provenance=provenance,
+            progress_path=report_path.with_suffix(".progress.json"),
+        )
+    else:
+        results = [run_eval_case(case) for case in cases]
     scorecard_path = write_scorecard(results, provenance=provenance)
     failures = [
         {
