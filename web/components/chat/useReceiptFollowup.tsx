@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import GuestNewConversationDialog from '@/components/guest/GuestNewConversationDialog';
 import type { GuestExperience } from '@/components/guest/useGuestExperience';
 import type { ProfileState } from './useInitialChatSession';
 import type { SendOptions } from './chat-send-selection';
-import { clearReceiptFollowup, readReceiptFollowup, runReceiptFork, saveReceiptFollowup, settleReceiptFollowup, bindReceiptFollowupAccount, type ReceiptFollowupIntent } from '@/lib/receipt-followup';
+import { clearReceiptFollowup, readReceiptFollowup, runReceiptFork, saveReceiptFollowup, settleReceiptFollowup, bindReceiptFollowupAccount, createReceiptFollowupLifecycle, type ReceiptFollowupIntent } from '@/lib/receipt-followup';
 import { getMe, listConversations } from '@/lib/argus-api';
 import { newConversationConversionMode } from '@/lib/guest-conversion';
 
@@ -19,16 +19,15 @@ type Options = {
 };
 export { readReceiptFollowup } from '@/lib/receipt-followup';
 
-type Phase = 'initial' | 'working' | 'choice' | 'conversion' | 'hydrating' | 'error' | 'unavailable' | 'done';
-
 export function useReceiptFollowup(options: Options) {
   const { t } = useTranslation();
   const latest = useRef(options);
   useEffect(() => { latest.current = options; });
   const [intent, setIntent] = useState<ReceiptFollowupIntent | null>(null);
-  const [phase, setPhase] = useState<Phase>('initial');
+  const [lifecycle] = useState(createReceiptFollowupLifecycle);
+  const phase = useSyncExternalStore(lifecycle.subscribe, lifecycle.getSnapshot, lifecycle.getSnapshot);
+  const setPhase = lifecycle.set;
   const [choiceId, setChoiceId] = useState<string | null>(null);
-  const busy = useRef(false);
   const conversionSeen = useRef(false);
   const reconciliation = useRef<AbortController | null>(null);
   useEffect(() => { reconciliation.current = new AbortController(); return () => reconciliation.current?.abort(); }, []);
@@ -36,9 +35,7 @@ export function useReceiptFollowup(options: Options) {
   const cancel = () => { clearReceiptFollowup(); setIntent(null); setPhase('done'); };
 
   const begin = useCallback(async (replacementId?: string) => {
-    if (!intent || busy.current) return;
-    busy.current = true;
-    setPhase('working');
+    if (!intent || !lifecycle.claim(phase, 'working')) return;
     try {
       const current = latest.current;
       if (!(await current.guest.admitSend({ text: intent.text, mentions: [], language: intent.language }))) {
@@ -67,28 +64,27 @@ export function useReceiptFollowup(options: Options) {
           setPhase(existingId ? 'choice' : 'error');
         } catch { setPhase('error'); }
       } else setPhase(code === 'receipt_unavailable' ? 'unavailable' : 'error');
-    } finally { busy.current = false; }
-  }, [intent]);
+    }
+  }, [intent, lifecycle, phase, setPhase]);
 
   useEffect(() => {
-    if (!intent || busy.current) return;
+    if (!intent || phase !== lifecycle.getSnapshot()) return;
     if (phase === 'initial' && ['established', 'bootstrap_required'].includes(options.profileState)) void begin();
     if (phase === 'conversion') {
       if (options.account && options.account.account_kind !== 'guest') void begin();
       else if (options.guest.conversion.isOpen) conversionSeen.current = true;
       else if (conversionSeen.current) { conversionSeen.current = false; setPhase('choice'); }
     }
-    if (phase === 'hydrating' && !options.hydrating && options.conversationId === intent.conversationId) {
-      busy.current = true;
+    if (phase === 'hydrating' && !options.hydrating && options.conversationId === intent.conversationId && lifecycle.claim('hydrating', 'working')) {
       void settleReceiptFollowup(intent, {
         send: (text, sendOptions) => latest.current.conversationId === intent.conversationId ? latest.current.send(text, sendOptions) : Promise.resolve(false),
         reconciliation: { signal: reconciliation.current?.signal },
       }).then(async reconciled => {
         if (reconciled) await latest.current.navigate(intent.conversationId!);
         clearReceiptFollowup(intent.requestId); setIntent(null); setPhase('done');
-      }).catch(() => setPhase('error')).finally(() => { busy.current = false; });
+      }).catch(() => setPhase('error'));
     }
-  }, [intent, phase, options, begin]);
+  }, [intent, phase, options, begin, lifecycle, setPhase]);
 
   if (!intent || phase === 'done') return null;
   return <>

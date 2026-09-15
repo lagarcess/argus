@@ -164,6 +164,7 @@ for (const refusal of [429, 404]) test(`pre-admission ${refusal} and reload reus
   const { calls, requestId, receiver } = await installBridge(page, { rejectFirstSend: refusal });
   await page.goto('/chat');
   await expect(page.getByRole('button', { name: /Try again|Retry/, exact: true })).toBeVisible();
+  expect(calls.sends).toHaveLength(1);
   expect(await savedFollowup(page)).toMatchObject({ requestId, conversationId: receiver, text: 'Change it to $300' });
   await page.reload();
   await expect.poll(() => savedFollowup(page)).toBeNull();

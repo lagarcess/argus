@@ -3,6 +3,29 @@ import { apiFetch } from './argus-api-transport';
 import type { ReceiptFollowupIntent } from './receipt-followup-storage';
 export { createReceiptFollowup, saveReceiptFollowup, readReceiptFollowup, clearReceiptFollowup, type ReceiptFollowupIntent } from './receipt-followup-storage';
 
+type ReceiptFollowupPhase = 'initial' | 'working' | 'choice' | 'conversion' | 'hydrating' | 'error' | 'unavailable' | 'done';
+
+/** One synchronous owner for effect admission and React's phase projection. */
+export function createReceiptFollowupLifecycle() {
+  let phase: ReceiptFollowupPhase = 'initial';
+  const listeners = new Set<() => void>();
+  const set = (next: ReceiptFollowupPhase) => {
+    if (phase === next) return;
+    phase = next;
+    listeners.forEach(listener => listener());
+  };
+  return {
+    getSnapshot: () => phase,
+    subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    set,
+    claim: (expected: ReceiptFollowupPhase, next: ReceiptFollowupPhase) => {
+      if (phase !== expected) return false;
+      set(next);
+      return true;
+    },
+  };
+}
+
 export type ForkRequest = { request_id: string; language: string; replace_guest_conversation_id?: string };
 type ForkResponse = { conversation: { id: string }; created: boolean };
 export const forkReceipt = (publicId: string, body: ForkRequest) => apiFetch<ForkResponse>(

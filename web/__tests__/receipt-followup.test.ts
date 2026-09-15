@@ -1,5 +1,39 @@
 import { describe, expect, test } from 'bun:test';
-import { createReceiptFollowup, runReceiptFork, settleReceiptFollowup, bindReceiptFollowupAccount } from '../lib/receipt-followup';
+import { createReceiptFollowup, runReceiptFork, settleReceiptFollowup, bindReceiptFollowupAccount, createReceiptFollowupLifecycle } from '../lib/receipt-followup';
+
+test('queued hydration effects cannot send again after rejection or completion', () => {
+  for (const outcome of ['error', 'done'] as const) {
+    const lifecycle = createReceiptFollowupLifecycle();
+    let sends = 0;
+    const effect = () => { if (lifecycle.claim('hydrating', 'working')) sends++; };
+    lifecycle.set('hydrating');
+    effect();
+    // Render effects may have captured hydrating before this promise settles.
+    lifecycle.set(outcome);
+    effect();
+    expect(sends).toBe(1);
+    expect(lifecycle.getSnapshot()).toBe(outcome);
+    if (outcome === 'error') {
+      expect(lifecycle.claim('error', 'working')).toBe(true);
+      lifecycle.set('hydrating');
+      effect();
+      expect(sends).toBe(2);
+    }
+  }
+});
+
+test('the rendered phase reads the same owner that admits effects', () => {
+  const lifecycle = createReceiptFollowupLifecycle();
+  const rendered: string[] = [];
+  const unsubscribe = lifecycle.subscribe(() => rendered.push(lifecycle.getSnapshot()));
+  expect(lifecycle.claim('initial', 'working')).toBe(true);
+  expect(lifecycle.claim('initial', 'working')).toBe(false);
+  lifecycle.set('hydrating');
+  expect(rendered).toEqual(['working', 'hydrating']);
+  unsubscribe();
+  lifecycle.set('done');
+  expect(rendered).toHaveLength(2);
+});
 
 describe('receiver follow-up admission', () => {
   test('stores only the receiver text and public link with one retry identity', () => {
