@@ -43,6 +43,7 @@ def verified_peers(
     name_pairs: Iterable[ResearchNamePair],
     *,
     exclude: set[str],
+    asset_class_hint: str | None = None,
     probe: Callable[[str], bool] | None = None,
     scan_limit: int = MAX_PEER_PAIRS,
 ) -> list[dict[str, str]]:
@@ -62,11 +63,15 @@ def verified_peers(
         candidate = pair.symbol.strip().upper()
         if not candidate or candidate in seen:
             continue
-        resolved = _resolve_bounded(candidate, probe=probe)
+        resolved = _resolve_bounded(
+            candidate, probe=probe, asset_class_hint=asset_class_hint
+        )
         if resolved is None:
             continue
         symbol = resolved["symbol"]
-        if symbol in seen or resolved["asset_class"] != "equity":
+        if symbol in seen or (
+            asset_class_hint and resolved["asset_class"] != asset_class_hint
+        ):
             continue
         seen.add(candidate)
         seen.add(symbol)
@@ -77,7 +82,10 @@ def verified_peers(
 
 
 def _resolve_bounded(
-    candidate: str, *, probe: Callable[[str], bool] | None
+    candidate: str,
+    *,
+    probe: Callable[[str], bool] | None,
+    asset_class_hint: str | None = None,
 ) -> dict[str, str] | None:
     """Answer-paints-first: peer verification runs under a hard budget and
     degrades to fewer rows when the provider is slow."""
@@ -89,10 +97,18 @@ def _resolve_bounded(
                 if probe(candidate)
                 else None
             )
+        from argus.agent_runtime.resolution import resolve_asset_candidate
         from argus.domain import market_data
 
-        resolved = market_data.resolve_asset(candidate)
-        if resolved is None:
+        resolution = resolve_asset_candidate(
+            candidate,
+            field="research.peers",
+            source="llm_extraction",
+            asset_class_hint=asset_class_hint,
+            require_unambiguous_class=True,
+        )
+        resolved = resolution.asset
+        if resolution.status != "resolved" or resolved is None:
             return None
         if resolved.canonical_symbol.upper() != candidate:
             return None
@@ -236,6 +252,8 @@ def research_next_experiment_rows(
     if not testable:
         return None
     anchor = testable[0]
+    testable = [s for s in testable if s["asset_class"] == anchor["asset_class"]]
+    peers = [p for p in peers if p.get("asset_class") == anchor["asset_class"]]
     crossover = _crossover_rule(entry_rule)
     if crossover is not None and len(testable) == 1:
         rule_window = row_window([anchor], probe=coverage_probe)
