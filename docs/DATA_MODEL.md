@@ -1435,6 +1435,10 @@ migration is needed. Receipt rows and their source deletion/revocation lifecycle
 are unchanged. The transaction serializes fork admission with revocation and uses
 receiver/request retry identity to create exactly one copy. A receiver copy has
 no source-conversation foreign key, so later revoke/delete keeps its copied text.
+Replay matches the imported request id within current message and conversation
+ownership. It does not derive replay identity from the current owner's user id:
+the existing guest handoff transfers ownership without changing message IDs or
+the imported request metadata, so the permanent account reuses the same copy.
 
 Imported message metadata uses `shared_conversation` with `snapshot_at`, public
 receipt id, request id, turn index, and the assistant's frozen public `card` where
@@ -1444,6 +1448,9 @@ including notes on individual turns. Normal history readers include the carried
 user/assistant content; naming excludes imported messages. No runs, interests,
 memory records, usage records, or owner activity are imported. Cards render only
 frozen public fields and cannot be edited or recomputed in place.
+Runtime history derives internal carried-context provenance from this metadata.
+One selection rule retains that bounded context alongside the normal recent
+receiver turns; provider messages still contain ordinary roles and content only.
 
 Total ordinary history text is bounded at 64 KiB UTF-8, and total carried text and
 card metadata at 512 KiB. Oversized public facts fail before any write or guest

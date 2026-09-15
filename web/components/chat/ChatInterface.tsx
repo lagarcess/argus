@@ -1312,8 +1312,8 @@ export default function ChatInterface() {
         finishRequestTransport(requestSession);
       }
       if (event.event === "final") {
-        const identityAuthorized = requestSessions.authorize(requestSession, "final");
-        if (!identityAuthorized) return;
+        if (!requestSessions.authorize(requestSession, "final")) return;
+        options?.onTerminal?.();
         clearNeutralGuestSubmission();
         setStreamStatus(null);
         if (recoverQuotaRejectedRun(event.data.final_response_payload?.code ?? event.data.code)) return;
@@ -1542,7 +1542,7 @@ export default function ChatInterface() {
             }),
           );
         }
-        terminalReadiness.accept(event.data, identityAuthorized);
+        terminalReadiness.accept(event.data, true);
       }
       if (event.event === "title") {
         if (
@@ -1605,7 +1605,7 @@ export default function ChatInterface() {
     };
 
     guestSubmissionHandedToStream = true;
-    void (async () => {
+    const transport = (async () => {
       try {
         await streamToConversation(targetConversationId);
       } catch (err: unknown) {
@@ -1613,7 +1613,7 @@ export default function ChatInterface() {
         if (
           err instanceof ChatStreamError &&
           err.status === 404 &&
-          !action?.type
+          !action?.type && !options?.awaitCompletion
         ) {
           try {
             const retryWasVisible = canApplyVisibleStreamUpdate();
@@ -1769,7 +1769,7 @@ export default function ChatInterface() {
         finishRequestTransport(requestSession);
       }
     })();
-    return true;
+    return options?.awaitCompletion ? transport.then(() => true) : true;
     } finally {
       sendAdmissionInFlightRef.current = false;
       if (isDeferredGuestSubmission && !guestSubmissionHandedToStream) {

@@ -86,17 +86,23 @@ answer kind and an explicit recurring-contribution backtest. Commit evidence.
 
 Merge latest integration into the worker, preserving both sides' intent in any
 conflict. Report semantic overlap, retained/invalidated evidence and merged-tree
-modularity check. One Codex review round, CI green and zero unresolved threads.
+modularity check. Founder update 2026-09-15: PR #643 stays ready throughout
+review. Validate every finding against these locked decisions; fix confirmed
+findings at their owner with pattern-wide coverage and tests, or decline with
+the reason. Reply on and resolve every thread, push, wait for green CI, then
+request the next Codex review. Repeat until the current head is clean with zero
+unresolved threads. Never return this PR to draft.
 When other gates are green, propose a live check capped at $1.00: signed-out
 receiver opens link, asks one plain follow-up and one fresh-figure question;
-report actual per-follow-up cost. Wait for founder go before spending. Mark
-ready only after required acceptance is complete, then stop. Founder merges.
+report actual per-follow-up cost. Wait for founder go before spending. Keep
+the already-ready PR ready throughout; after approved acceptance, stop. Founder merges.
 
 ## 6. Stop conditions
 
 - New model instructions or changed prompt fingerprint are needed.
 - Rendering requires anything beyond selected frozen public turn fields.
-- A second review finding on the same mechanism occurs.
+- A finding requires changing a locked decision, a migration, render.yaml or a
+  release contract. Repeated findings alone no longer stop this review loop.
 - Live calls lack explicit approval under the proposed maximum $1.00 cap.
 
 ## Sources

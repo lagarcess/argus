@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
@@ -11,6 +12,7 @@ from argus.api.public_excerpt_schemas import (
     PublicExcerptDocument,
     PublicExcerptTurnsPayload,
 )
+from argus.api.schemas import Conversation
 
 FORK_TEXT_BYTES = 64 * 1024
 FORK_PAYLOAD_BYTES = 512 * 1024
@@ -24,7 +26,36 @@ class ForkError(ValueError):
 
 
 def fork_marker(user_id: str, request_id: str) -> str:
+    """Unique message storage ID; request metadata owns replay after transfer."""
     return str(uuid5(NAMESPACE_URL, f"argus:shared-fork:{user_id}:{request_id}"))
+
+
+def resolve_fork_replay(
+    candidates: Iterable[tuple[Conversation, dict[str, Any] | None]],
+    *,
+    request_id: str,
+    public_id: str,
+) -> Conversation | None:
+    """Resolve an already owner-scoped request, including transferred copies.
+
+    A handoff can bring the same request UUID from two previously separate
+    owners. Refuse conflicting links rather than selecting whichever row won
+    query order. Existing copies of the same link deterministically reuse the
+    first copy. Message IDs and metadata remain untouched by ownership transfer.
+    """
+    replay = None
+    for conversation, metadata in candidates:
+        provenance = (metadata or {}).get("shared_conversation")
+        if not isinstance(provenance, dict) or (
+            provenance.get("request_id") != request_id
+            or provenance.get("public_id") != public_id
+        ):
+            raise ForkError("receipt_request_conflict")
+        if replay is None:
+            replay = conversation
+    if replay is not None and replay.deleted_at is not None:
+        raise ForkError("receipt_fork_deleted", 410)
+    return replay
 
 
 def _without_notes(value: Any) -> Any:

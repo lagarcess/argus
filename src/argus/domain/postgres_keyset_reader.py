@@ -223,6 +223,24 @@ class PostgresKeysetReader:
                 rows = cursor.fetchall()
         return _stringify_uuid_fields(rows, fields=("id",))
 
+    def list_shared_message_rows(
+        self, *, user_id: str, conversation_id: str
+    ) -> list[dict[str, Any]]:
+        with self.pool.connection(timeout=_KEYSET_ACQUIRE_TIMEOUT_SECONDS) as connection:
+            with connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """select id,conversation_id,role,content,metadata,created_at
+                    from public.messages where user_id=%s and conversation_id=%s
+                    and metadata @> '{"shared_conversation":{}}'::jsonb
+                    order by created_at,id""",
+                    (
+                        _uuid(user_id, label="Message owner id"),
+                        _uuid(conversation_id, label="Message conversation id"),
+                    ),
+                )
+                rows = cursor.fetchall()
+        return _stringify_uuid_fields(rows, fields=("id", "conversation_id"))
+
     def list_message_rows(
         self,
         *,

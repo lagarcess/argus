@@ -10,7 +10,12 @@ from psycopg.types.json import Jsonb
 
 from argus.api.public_excerpt_schemas import PUBLIC_EXCERPT_DOCUMENT_ADAPTER
 from argus.api.schemas import Conversation
-from argus.domain.public_excerpt_forks import ForkError, carried_messages, fork_marker
+from argus.domain.public_excerpt_forks import (
+    ForkError,
+    carried_messages,
+    fork_marker,
+    resolve_fork_replay,
+)
 
 
 def fork_public_excerpt(
@@ -29,24 +34,44 @@ def fork_public_excerpt(
         conn.transaction(),
         conn.cursor(row_factory=dict_row) as cur,
     ):
-        # Same receiver/request serializes even across app workers. The marker is
-        # receiver-owned, so a replay survives owner revocation or deletion.
+        # Serialize receiver/request admission; message ownership follows signup.
+        # The persisted request UUID survives that transfer, unlike the marker
+        # derived from the guest's old owner ID. Keep the marker collision check
+        # for existing rows, but never use it as the sole replay identity.
         cur.execute("select pg_advisory_xact_lock(hashtextextended(%s, 0))", (marker,))
         cur.execute(
             """select c.*, m.metadata as fork_metadata from public.messages m
             join public.conversations c on c.id=m.conversation_id
-            where m.id=%s and m.user_id=%s and c.user_id=%s""",
-            (marker, user_id, user_id),
+            where m.user_id=%s and c.user_id=%s
+              and (m.id=%s or (m.role='user' and m.metadata @> %s))
+            order by m.created_at, m.id""",
+            (
+                user_id,
+                user_id,
+                marker,
+                Jsonb(
+                    {
+                        "shared_conversation": {
+                            "request_id": request_id,
+                            "turn_index": 0,
+                        }
+                    }
+                ),
+            ),
         )
-        replay = cur.fetchone()
-        if replay:
-            if (replay.get("fork_metadata") or {}).get("shared_conversation", {}).get(
-                "public_id"
-            ) != public_id:
-                raise ForkError("receipt_request_conflict")
-            if replay.get("deleted_at") is not None:
-                raise ForkError("receipt_fork_deleted", 410)
-            return Conversation.model_validate({**replay, "id": str(replay["id"])}), False
+        replay = resolve_fork_replay(
+            (
+                (
+                    Conversation.model_validate({**row, "id": str(row["id"])}),
+                    row["fork_metadata"],
+                )
+                for row in cur.fetchall()
+            ),
+            request_id=request_id,
+            public_id=public_id,
+        )
+        if replay is not None:
+            return replay, False
         # Source lock precedes snapshot lock, matching the delete/revoke trigger.
         cur.execute(
             "select source_conversation_id from public.public_excerpt_snapshots where public_id=%s",

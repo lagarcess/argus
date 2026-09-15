@@ -17,6 +17,7 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.interpreter.discovery_act_guard import (
     response_shape_open_to_discovery,
 )
@@ -166,9 +167,9 @@ def _read_messages(request: Any) -> list[dict[str, str]]:
 
 def _history_lines(request: Any) -> str:
     lines: list[str] = []
-    for turn in list(getattr(request, "recent_thread_history", []) or [])[
-        -_HISTORY_TURNS:
-    ]:
+    for turn in select_thread_history(
+        getattr(request, "recent_thread_history", []) or [], recent_limit=_HISTORY_TURNS
+    ):
         if isinstance(turn, dict):
             role = str(turn.get("role") or "")
             content = str(turn.get("content") or "")

@@ -19,7 +19,12 @@ from argus.api.public_excerpts import (
 from argus.api.rate_limits import SlidingWindowLimiter
 from argus.api.schemas import Conversation, Language, User
 from argus.domain.postgres_public_excerpt_forks import fork_public_excerpt
-from argus.domain.public_excerpt_forks import ForkError, carried_messages, fork_marker
+from argus.domain.public_excerpt_forks import (
+    ForkError,
+    carried_messages,
+    fork_marker,
+    resolve_fork_replay,
+)
 from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1/public", tags=["public-receipts"])
@@ -42,19 +47,27 @@ class PublicExcerptForkResponse(BaseModel):
 def _memory_fork(*, user: User, public_id: str, payload: PublicExcerptForkRequest):
     with _MEMORY_LOCK:
         marker = fork_marker(user.id, str(payload.request_id))
+        candidates = []
         for conversation_id, messages in api_state.store.messages.items():
             if api_state.store.conversation_owners.get(conversation_id) != user.id:
                 continue
             for message in messages:
-                if message.id == marker:
-                    if (message.metadata or {}).get("shared_conversation", {}).get(
-                        "public_id"
-                    ) != public_id:
-                        raise ForkError("receipt_request_conflict")
-                    conversation = api_state.store.conversations[conversation_id]
-                    if conversation.deleted_at is not None:
-                        raise ForkError("receipt_fork_deleted", 410)
-                    return conversation, False
+                provenance = (message.metadata or {}).get("shared_conversation")
+                matches_request = (
+                    message.role == "user"
+                    and isinstance(provenance, dict)
+                    and provenance.get("request_id") == str(payload.request_id)
+                    and provenance.get("turn_index") == 0
+                )
+                if message.id == marker or matches_request:
+                    candidates.append(
+                        (api_state.store.conversations[conversation_id], message.metadata)
+                    )
+        replay = resolve_fork_replay(
+            candidates, request_id=str(payload.request_id), public_id=public_id
+        )
+        if replay is not None:
+            return replay, False
         view = public_excerpt_reader().read_public_excerpt_view(public_id=public_id)
         if view.status != "available" or view.payload is None or view.created_at is None:
             raise ForkError("receipt_unavailable", 410)

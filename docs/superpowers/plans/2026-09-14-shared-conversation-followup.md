@@ -14,7 +14,10 @@ paths own the receiver's next turn.
 
 No paid calls without founder go; no prompt/fingerprint changes; no render.yaml
 or release contracts; no stash, founder-owned PR merge or deploy. No hidden source data or live
-cards. One Codex review, stop on second finding on the same mechanism.
+cards. Founder update 2026-09-15: keep PR #643 ready, validate/fix/reply/resolve
+every finding, push, wait for CI and re-request Codex review until clean at the
+head with zero unresolved threads. Stop for required locked-decision,
+migration, render.yaml or release-contract changes. No repeated ready toggles.
 
 ## Work and ownership
 
@@ -34,7 +37,7 @@ cards. One Codex review, stop on second finding on the same mechanism.
   screenshot matrix for public and preview, read frames, no private IDs or writes
   on view. Focused tests, mocked eval, fingerprint and merged-tree modularity.
 - [ ] Reconcile latest integration one-way, record semantic overlap and exact
-  evidence head. Publish PR, one Codex review, resolve bounded findings, check CI
+  evidence head. Publish PR, complete the ready-state review loop, check CI
   and unresolved threads. Offer capped $1 live acceptance and wait for go.
 
 Each worker supplies red/green evidence and a bounded final report; the captain

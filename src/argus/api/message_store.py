@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from loguru import logger
 
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.state.models import ConversationMessage
 from argus.api import state as api_state
 from argus.api.chat.previews import (
@@ -809,7 +810,17 @@ def load_runtime_thread_history(
                 user_id=user_id,
                 conversation_id=conversation_id,
                 limit=limit,
+                newest_first_window=True,
             )
+            if not drop_shared_turns:
+                imported = api_state.supabase_gateway.list_shared_messages(
+                    user_id=user_id,
+                    conversation_id=conversation_id,
+                )
+                messages = sorted(
+                    {message.id: message for message in [*imported, *messages]}.values(),
+                    key=lambda message: (message.created_at, message.id),
+                )
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
@@ -818,8 +829,11 @@ def load_runtime_thread_history(
                 error=str(exc),
                 conversation_id=conversation_id,
             )
-    if not messages:
-        messages = list(api_state.store.messages.get(conversation_id, []))[-limit:]
+    if (
+        not messages
+        and api_state.store.conversation_owners.get(conversation_id) == user_id
+    ):
+        messages = list(api_state.store.messages.get(conversation_id, []))
     history: list[ConversationMessage] = []
     for message in messages:
         if drop_shared_turns and (message.metadata or {}).get("shared_conversation"):
@@ -844,8 +858,16 @@ def load_runtime_thread_history(
             if card_facts is not None
             else message.content
         )
-        history.append(ConversationMessage(role=message.role, content=content))
-    return history
+        history.append(
+            ConversationMessage(
+                role=message.role,
+                content=content,
+                shared_context=isinstance(
+                    (message.metadata or {}).get("shared_conversation"), dict
+                ),
+            )
+        )
+    return select_thread_history(history, recent_limit=limit)
 
 
 def _should_suppress_late_success_artifact(

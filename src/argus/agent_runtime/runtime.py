@@ -9,6 +9,7 @@ from loguru import logger
 from argus.agent_runtime.artifact_action_recovery import (
     artifact_action_recovery_message,
 )
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.next_experiments import (
     detect_next_experiment_acceptance,
     offered_kinds_from_thread_metadata,
@@ -554,7 +555,9 @@ def _bounded_recent_thread_history(
     message_history: list[ConversationMessage | dict[str, Any]],
 ) -> list[ConversationMessage]:
     bounded: list[ConversationMessage] = []
-    for message in message_history[-MAX_RECENT_THREAD_HISTORY:]:
+    for message in select_thread_history(
+        message_history, recent_limit=MAX_RECENT_THREAD_HISTORY
+    ):
         if isinstance(message, ConversationMessage):
             bounded.append(message.model_copy(deep=True))
         else:

@@ -194,3 +194,84 @@ def test_signup_count_comes_only_from_new_completed_handoff(
         destination_user_id=str(uuid4()),
     )
     assert capture.call_count == expected
+
+
+@pytest.mark.parametrize("revoked", [False, True])
+def test_memory_replay_follows_transferred_ownership(monkeypatch, revoked):
+    from types import SimpleNamespace
+
+    from argus.api import state
+    from argus.api.public_excerpt_schemas import PublicExcerptView
+    from argus.api.routers.receipt_forks import PublicExcerptForkRequest, _memory_fork
+    from argus.domain.public_excerpt_forks import fork_marker
+
+    state.store.reset()
+    guest = state.store.get_or_create_dev_user()
+    receiver = guest.model_copy(update={"id": str(uuid4())})
+    request = PublicExcerptForkRequest(request_id=uuid4())
+    view = PublicExcerptView(
+        public_id="frozen",
+        status="available",
+        created_at=datetime.now(timezone.utc),
+        payload=PublicExcerptTurnsPayload(
+            turns=[PublicExcerptAnswerTurn(question="Question", answer="Answer")]
+        ),
+    )
+    monkeypatch.setattr(
+        "argus.api.routers.receipt_forks.public_excerpt_reader",
+        lambda: SimpleNamespace(read_public_excerpt_view=lambda **_: view),
+    )
+    chat, _ = _memory_fork(user=guest, public_id="frozen", payload=request)
+    before = list(state.store.messages[chat.id])
+    assert before[0].id == fork_marker(guest.id, str(request.request_id))
+    state.store.conversation_owners[chat.id] = receiver.id
+    if revoked:
+        view = view.model_copy(update={"status": "revoked", "payload": None})
+    replay, created = _memory_fork(user=receiver, public_id="frozen", payload=request)
+    assert replay.id == chat.id and not created
+    assert state.store.messages[chat.id] == before
+    assert len(state.store.conversations) == 1
+    with pytest.raises(ForkError, match="receipt_request_conflict"):
+        _memory_fork(user=receiver, public_id="different", payload=request)
+
+
+def test_memory_request_collision_stays_owner_scoped_and_fails_closed_after_transfer(
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from argus.api import state
+    from argus.api.public_excerpt_schemas import PublicExcerptView
+    from argus.api.routers.receipt_forks import PublicExcerptForkRequest, _memory_fork
+
+    state.store.reset()
+    guest = state.store.get_or_create_dev_user()
+    receiver = guest.model_copy(update={"id": str(uuid4())})
+    request = PublicExcerptForkRequest(request_id=uuid4())
+    payload = PublicExcerptTurnsPayload(
+        turns=[PublicExcerptAnswerTurn(question="Question", answer="Answer")]
+    )
+    monkeypatch.setattr(
+        "argus.api.routers.receipt_forks.public_excerpt_reader",
+        lambda: SimpleNamespace(
+            read_public_excerpt_view=lambda public_id: PublicExcerptView(
+                public_id=public_id,
+                status="available",
+                created_at=datetime.now(timezone.utc),
+                payload=payload,
+            )
+        ),
+    )
+    first, _ = _memory_fork(user=guest, public_id="first", payload=request)
+    second, created = _memory_fork(user=receiver, public_id="second", payload=request)
+    assert created and second.id != first.id
+    assert _memory_fork(user=guest, public_id="first", payload=request)[0].id == first.id
+    assert (
+        _memory_fork(user=receiver, public_id="second", payload=request)[0].id
+        == second.id
+    )
+    state.store.conversation_owners[first.id] = receiver.id
+    for public_id in ("first", "second"):
+        with pytest.raises(ForkError, match="receipt_request_conflict"):
+            _memory_fork(user=receiver, public_id=public_id, payload=request)
+    assert len(state.store.conversations) == 2

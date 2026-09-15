@@ -792,8 +792,11 @@ events; they never guess that the missing document was a backtest.
 or guest). It takes `{request_id: UUID, language?: "en" | "es-419",
 replace_guest_conversation_id?: UUID}` and returns
 `{conversation: Conversation, created: boolean}`. The request id is retry identity,
-not a viewer identifier. The client retains it through an interrupted submission.
-The server reuses that receiver-owned fork on replay. Creating the fork performs
+not a viewer identifier. The client retains the text, destination and request id
+until the normal chat stream reaches a terminal frame or canonical reconciliation
+proves completion. Reload reconciles the same request before resending.
+The server reuses that receiver-owned fork on replay, including after the existing
+guest signup handoff transfers ownership. Creating the fork performs
 no model, provider, calculation, simulation or allowance operation; the submitted
 follow-up uses the existing normal chat endpoint after canonical hydration.
 
@@ -814,6 +817,9 @@ across questions and final answers; text plus carried card metadata is at most
 Imported messages are excluded from naming, interest and memory, and charge no
 usage. New backtests and calculations follow the receiver's normal flow and
 allowances. Existing guest signup handoff retains the conversation and its copy.
+The bounded carried context is preserved through runtime history selection;
+normal recent-message limits apply to the receiver's own turns, not to the
+selected snapshot turns. Internal provenance is not sent as model instructions.
 No model-facing instruction or prompt fingerprint changes are part of this route.
 
 Fork admission is limited to 60 requests per client identity per hour, with the

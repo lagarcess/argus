@@ -1,3 +1,4 @@
+import { rememberReceiptFollowupClaim } from './receipt-followup-storage';
 import { parseToolProgress, type ToolProgress, type ToolResultCard, type ToolScalar } from "./tool-result-card";
 import { getSupabaseClient } from "./supabase-client";
 import i18next from "i18next";
@@ -573,12 +574,15 @@ export async function persistBrowserSession(payload: AuthResponsePayload) {
   if (!supabase) {
     return;
   }
-  const { error } = await supabase.auth.setSession({
+  const { data, error } = await supabase.auth.setSession({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
   });
   if (error) {
     throw error;
+  }
+  if (payload.guest_claim && data?.session?.user.id) {
+    rememberReceiptFollowupClaim(data.session.user.id, payload.guest_claim.conversation_id);
   }
 }
 

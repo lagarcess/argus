@@ -65,6 +65,6 @@ existing guest consent/cancel, retry identity, reload, revoke and conversion.
 - All costs in this build: $0. Live acceptance is pending founder go for a
   maximum $1 total, one plain and one fresh-figures follow-up.
 
-This is acceptance evidence, not a terminal readiness audit. CI and the single
-Codex review must finish before that audit. The evidence-only commit preserves
+This is acceptance evidence, not a terminal readiness audit. Current-head CI and the
+founder-directed Codex review loop must finish before that audit. The evidence-only commit preserves
 the captured product tree; any runtime change requires affected revalidation.

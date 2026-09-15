@@ -119,6 +119,8 @@ def thaw_state_payload(value: Any) -> Any:
 class ConversationMessage(BaseModel):
     role: MessageRole
     content: str
+    # Internal checkpoint provenance. Provider adapters emit role/content only.
+    shared_context: bool = Field(default=False, exclude_if=lambda value: not value)
 
 
 class StrategySummary(BaseModel):

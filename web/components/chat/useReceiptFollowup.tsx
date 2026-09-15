@@ -6,7 +6,7 @@ import GuestNewConversationDialog from '@/components/guest/GuestNewConversationD
 import type { GuestExperience } from '@/components/guest/useGuestExperience';
 import type { ProfileState } from './useInitialChatSession';
 import type { SendOptions } from './chat-send-selection';
-import { clearReceiptFollowup, readReceiptFollowup, runReceiptFork, saveReceiptFollowup, type ReceiptFollowupIntent } from '@/lib/receipt-followup';
+import { clearReceiptFollowup, readReceiptFollowup, runReceiptFork, saveReceiptFollowup, settleReceiptFollowup, bindReceiptFollowupAccount, type ReceiptFollowupIntent } from '@/lib/receipt-followup';
 import { getMe, listConversations } from '@/lib/argus-api';
 import { newConversationConversionMode } from '@/lib/guest-conversion';
 
@@ -30,6 +30,8 @@ export function useReceiptFollowup(options: Options) {
   const [choiceId, setChoiceId] = useState<string | null>(null);
   const busy = useRef(false);
   const conversionSeen = useRef(false);
+  const reconciliation = useRef<AbortController | null>(null);
+  useEffect(() => { reconciliation.current = new AbortController(); return () => reconciliation.current?.abort(); }, []);
   useEffect(() => { setIntent(readReceiptFollowup()); }, []);
   const cancel = () => { clearReceiptFollowup(); setIntent(null); setPhase('done'); };
 
@@ -45,8 +47,8 @@ export function useReceiptFollowup(options: Options) {
       const account = await current.refreshAccount();
       if (!account) throw Error('receipt_account_unavailable');
       // Persist the receiver binding before a request can cross the network.
-      if (intent.accountId && intent.accountId !== account.user.id) throw Error('receipt_account_changed');
-      const bound = { ...intent, accountId: account.user.id };
+      const stored = readReceiptFollowup();
+      const bound = await bindReceiptFollowupAccount(stored?.requestId === intent.requestId ? stored : intent, account.user.id);
       saveReceiptFollowup(bound);
       setIntent(bound);
       const forked = await runReceiptFork(bound, account.user.id, undefined, replacementId);
@@ -78,9 +80,12 @@ export function useReceiptFollowup(options: Options) {
     }
     if (phase === 'hydrating' && !options.hydrating && options.conversationId === intent.conversationId) {
       busy.current = true;
-      void options.send(intent.text, { requestId: intent.requestId }).then(accepted => {
-        if (accepted) { clearReceiptFollowup(); setIntent(null); setPhase('done'); }
-        else setPhase('error');
+      void settleReceiptFollowup(intent, {
+        send: (text, sendOptions) => latest.current.conversationId === intent.conversationId ? latest.current.send(text, sendOptions) : Promise.resolve(false),
+        reconciliation: { signal: reconciliation.current?.signal },
+      }).then(async reconciled => {
+        if (reconciled) await latest.current.navigate(intent.conversationId!);
+        clearReceiptFollowup(intent.requestId); setIntent(null); setPhase('done');
       }).catch(() => setPhase('error')).finally(() => { busy.current = false; });
     }
   }, [intent, phase, options, begin]);
