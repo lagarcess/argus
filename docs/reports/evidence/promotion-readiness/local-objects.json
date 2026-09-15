@@ -1,0 +1,32 @@
+{
+  "evidence_kind": "local_catalog_readback",
+  "production_access": "none",
+  "constraints": [
+    {
+      "name": "public_excerpt_snapshots_kind_check",
+      "definition": "CHECK ((kind = ANY (ARRAY['backtest'::text, 'research_answer'::text, 'calculation'::text, 'answer'::text, 'mixed'::text])))"
+    },
+    {
+      "name": "route_receipts_tier_check",
+      "definition": "CHECK ((tier = ANY (ARRAY['utility'::text, 'chat'::text, 'structured'::text, 'context'::text, 'readout'::text])))"
+    }
+  ],
+  "functions": [
+    {
+      "name": "claim_research_usage",
+      "arguments": "p_guest_visitor_key text, p_resource text, p_global_visitor_key text, p_global_limit integer, p_guest_limit integer",
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    },
+    {
+      "name": "release_research_usage",
+      "arguments": "p_guest_visitor_key text, p_resource text, p_global_visitor_key text, p_period_start timestamp with time zone",
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true
+    }
+  ]
+}

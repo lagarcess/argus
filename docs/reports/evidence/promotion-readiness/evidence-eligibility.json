@@ -1,0 +1,845 @@
+{
+  "candidate_sha": "a4a183138aadf1cff8268d0ce169e444732116fe",
+  "eligible_scorecards": 0,
+  "examined_scorecards": 44,
+  "production_access": "none",
+  "provider_calls": 0,
+  "scorecards": [
+    {
+      "configuration": "docs/reports/evidence/2026-08-13-api-domain/baseline-eval-scorecard-4d3e203f.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "7c843f364833ad16cf1c7b5a69ed3e703df085e5",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-13-api-domain/baseline-eval-scorecard-4d3e203f.json",
+      "reachable_change_count": 719,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "361bd71b1ee2ecbdf263e6f1678c616bce7364232c955065f0e5a45065363fd3",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-13-api-domain/live-eval-scorecard.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "07c4f4ab1733d9de2fcfca1f9044e9102c6bc03f",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-13-api-domain/live-eval-scorecard.json",
+      "reachable_change_count": 719,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "361bd71b1ee2ecbdf263e6f1678c616bce7364232c955065f0e5a45065363fd3",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-13-guest-signup-hotfix/baseline-eval-scorecard-5f8b372b.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "d4d2ac14e83be892747200fde313b3cda64f811d",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-13-guest-signup-hotfix/baseline-eval-scorecard-5f8b372b.json",
+      "reachable_change_count": 719,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "361bd71b1ee2ecbdf263e6f1678c616bce7364232c955065f0e5a45065363fd3",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-13-guest-signup-hotfix/live-eval-scorecard.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "7c843f364833ad16cf1c7b5a69ed3e703df085e5",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-13-guest-signup-hotfix/live-eval-scorecard.json",
+      "reachable_change_count": 719,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "361bd71b1ee2ecbdf263e6f1678c616bce7364232c955065f0e5a45065363fd3",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-13-main-promotion/live-eval-scorecard.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "d4d2ac14e83be892747200fde313b3cda64f811d",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-13-main-promotion/live-eval-scorecard.json",
+      "reachable_change_count": 719,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "361bd71b1ee2ecbdf263e6f1678c616bce7364232c955065f0e5a45065363fd3",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-category-discovery-payload-routing/live-eval-scorecard-run1.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "9586a78d9707acea556541b922b4de144440aa5b",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-category-discovery-payload-routing/live-eval-scorecard-run1.json",
+      "reachable_change_count": 687,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "3d25f9e19de9481fbbd7291301e511d3b05885dedff16d6321254fbbee77b42c",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-category-discovery-payload-routing/live-eval-scorecard-run2.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "9586a78d9707acea556541b922b4de144440aa5b",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-category-discovery-payload-routing/live-eval-scorecard-run2.json",
+      "reachable_change_count": 687,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "3d25f9e19de9481fbbd7291301e511d3b05885dedff16d6321254fbbee77b42c",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-discovery-asset-blockers/live-eval-scorecard.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "9409599a6c5f753e5295c561f3811fb181d00e6a",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-discovery-asset-blockers/live-eval-scorecard.json",
+      "reachable_change_count": 697,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "91693de2cd89a16ccf81c74fb30278d9164b8ec471c119da7739820fae48b97f",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-interpreter-prompt-freeze/live-eval-scorecard.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "eaf5d52b9f29266ee98af9458d061ad04d577e49",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-interpreter-prompt-freeze/live-eval-scorecard.json",
+      "reachable_change_count": 701,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "b5953982978bf4b4faae74d0bb0f8dc48c94ea266df416f88f6d98ccc315691c",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-merged-promotion-candidate/live-eval-scorecard.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "c2dbddd77889b300afc4983b8435c2b7fdb34b23",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-merged-promotion-candidate/live-eval-scorecard.json",
+      "reachable_change_count": 691,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "526b69f544fb28ba7af995f7a1cb86b4ecedb2b717d8a84756c3ba8ec199ace8",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-recognition-contract/live-eval-scorecard-run1.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "f2a06a4b96a82b54eb7c66be9ace86c0fb72618c",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-recognition-contract/live-eval-scorecard-run1.json",
+      "reachable_change_count": 686,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "2e0e01c1c965b9e81822fa719e5f6100c335ea9367f95fcc13faed37fe7b5fc0",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-recognition-contract/live-eval-scorecard-run2.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "6e7d52e6a385431613cd159748decc207750d88b",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-recognition-contract/live-eval-scorecard-run2.json",
+      "reachable_change_count": 684,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "b886cd0df344dea075c7a537db4d6c7ef56b856dc9b7cbf1a8b18ea1688a3f4b",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-recognition-contract/superseded/live-eval-scorecard-9ebe8791-regression-catch.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "9ebe87914f1ee47d24ff6d224ee6ca8ca022747f",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-recognition-contract/superseded/live-eval-scorecard-9ebe8791-regression-catch.json",
+      "reachable_change_count": 686,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "2e0e01c1c965b9e81822fa719e5f6100c335ea9367f95fcc13faed37fe7b5fc0",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-recognition-contract/superseded/live-eval-scorecard-run1-b0c2623f.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "b0c2623fe51592dea3cd64ea3a8cea4acf0772bc",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-recognition-contract/superseded/live-eval-scorecard-run1-b0c2623f.json",
+      "reachable_change_count": 687,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "3d25f9e19de9481fbbd7291301e511d3b05885dedff16d6321254fbbee77b42c",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-15-recognition-contract/superseded/live-eval-scorecard-run2-69805356.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "698053568f0ebc3d6dda5bf3255598333aaee6a4",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-15-recognition-contract/superseded/live-eval-scorecard-run2-69805356.json",
+      "reachable_change_count": 687,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "3d25f9e19de9481fbbd7291301e511d3b05885dedff16d6321254fbbee77b42c",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-16-dead-end-invention/live-eval-scorecard-run1.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "577099f625e50a4a2c0a69941131f687f92ea6a3",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-16-dead-end-invention/live-eval-scorecard-run1.json",
+      "reachable_change_count": 666,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "a2d2393a8b487f5b50931574e56c91150e7f7feaa709a041d7518188c9572da0",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-16-dead-end-invention/live-eval-scorecard-run2.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "577099f625e50a4a2c0a69941131f687f92ea6a3",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-16-dead-end-invention/live-eval-scorecard-run2.json",
+      "reachable_change_count": 666,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "a2d2393a8b487f5b50931574e56c91150e7f7feaa709a041d7518188c9572da0",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-16-main-promotion/baseline-eval-scorecard-78c2d6c2.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "78c2d6c264c660483ab5deb8ea197077945a7755",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-16-main-promotion/baseline-eval-scorecard-78c2d6c2.json",
+      "reachable_change_count": 719,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "361bd71b1ee2ecbdf263e6f1678c616bce7364232c955065f0e5a45065363fd3",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-16-main-promotion/live-eval-scorecard.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "6e7d52e6a385431613cd159748decc207750d88b",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-16-main-promotion/live-eval-scorecard.json",
+      "reachable_change_count": 684,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "b886cd0df344dea075c7a537db4d6c7ef56b856dc9b7cbf1a8b18ea1688a3f4b",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-21-main-promotion/baseline-eval-scorecard-811dcbcb.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "811dcbcb96edbc8b392e80f981a6c73ed252ffe6",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-21-main-promotion/baseline-eval-scorecard-811dcbcb.json",
+      "reachable_change_count": 684,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "b886cd0df344dea075c7a537db4d6c7ef56b856dc9b7cbf1a8b18ea1688a3f4b",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-21-main-promotion/candidate-eval-scorecard-run1.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "a5f1139bb686d44053adf7b4fdf0e1c8b76598ce",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-21-main-promotion/candidate-eval-scorecard-run1.json",
+      "reachable_change_count": 663,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "b4c75aab834f479f593e7dcdbd4f391e1946f285a65aaad05bb352d9c7b10175",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-21-main-promotion/candidate-eval-scorecard-run2.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "a5f1139bb686d44053adf7b4fdf0e1c8b76598ce",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-21-main-promotion/candidate-eval-scorecard-run2.json",
+      "reachable_change_count": 663,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "b4c75aab834f479f593e7dcdbd4f391e1946f285a65aaad05bb352d9c7b10175",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-24-main-promotion/baseline-eval-scorecard-25105bfe.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "25105bfe2e6e3afb8881532b6ff6f0eec95b44b0",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-24-main-promotion/baseline-eval-scorecard-25105bfe.json",
+      "reachable_change_count": 663,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "b4c75aab834f479f593e7dcdbd4f391e1946f285a65aaad05bb352d9c7b10175",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-08-24-main-promotion/candidate-eval-scorecard-6aa8187e.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "6aa8187e081e8c00aeada7c1bd559f2b5ce9b59e",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-08-24-main-promotion/candidate-eval-scorecard-6aa8187e.json",
+      "reachable_change_count": 653,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "70354c22300a30a32bb6137526389ebb74f23b6aad9df61067d3781748f3f7b1",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-03-main-promotion/baseline-eval-scorecard-c7802b37.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "c7802b37f39772a1216514e37fb6ff2b63142181",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-03-main-promotion/baseline-eval-scorecard-c7802b37.json",
+      "reachable_change_count": 653,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "70354c22300a30a32bb6137526389ebb74f23b6aad9df61067d3781748f3f7b1",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-03-main-promotion/candidate-eval-scorecard-db88a5fe.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "db88a5fe416093450171c6318e3e6edc24d5829e",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-03-main-promotion/candidate-eval-scorecard-db88a5fe.json",
+      "reachable_change_count": 638,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "ae5f0fdd4b6934d8fb4f20c7d18b0f904748da2bcdc59860e094aad51116531d",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-7d8ace45.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "7d8ace45e4ac717ffbfaf222cf66544c3355df6f",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-7d8ace45.json",
+      "reachable_change_count": 637,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "137393c5d7587a45039232ec4d586588680bb128ff7226e89765c8bd82526263",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-c7802b37.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "c7802b37f39772a1216514e37fb6ff2b63142181",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-05-main-promotion/baseline-eval-scorecard-c7802b37.json",
+      "reachable_change_count": 653,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "70354c22300a30a32bb6137526389ebb74f23b6aad9df61067d3781748f3f7b1",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-05-main-promotion/candidate-eval-scorecard-e3b98690.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "e3b98690b238bb292e161a9a25554cd9cfdbc19d",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-05-main-promotion/candidate-eval-scorecard-e3b98690.json",
+      "reachable_change_count": 571,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_chat_final_response_type.py"
+      ],
+      "reachable_changes_sha256": "48b0d9178be8952dd953516d880f2becbf3b96b6a154b6dbf8c007add32877b1",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-12-main-promotion/baseline-eval-scorecard-ee9c3491.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-12-main-promotion/baseline-eval-scorecard-ee9c3491.json",
+      "reachable_change_count": 570,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_chat_final_response_type.py"
+      ],
+      "reachable_changes_sha256": "ad281e988469ad2f003fa9f72b009dbbaf0ef91f06bf069c884c732e30be2a31",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-12-main-promotion/candidate-eval-scorecard-df7aee12.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "df7aee12955f667e31057464d62c72287fb12247",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-12-main-promotion/candidate-eval-scorecard-df7aee12.json",
+      "reachable_change_count": 251,
+      "reachable_change_examples": [
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py",
+        "src/argus/agent_runtime/calculation_rows.py",
+        "src/argus/agent_runtime/capabilities/contract.py",
+        "src/argus/agent_runtime/discovery/composer.py",
+        "src/argus/agent_runtime/graph/workflow.py"
+      ],
+      "reachable_changes_sha256": "c70fe16842566679213ee1881ccdde677dc3ab1c8fb4db5973e8839b73804fab",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/baseline-eval-scorecard-ee9c3491.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "ee9c3491fa6219502f1e94abc5d9e661a06839d9",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/baseline-eval-scorecard-ee9c3491.json",
+      "reachable_change_count": 570,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_chat_final_response_type.py"
+      ],
+      "reachable_changes_sha256": "ad281e988469ad2f003fa9f72b009dbbaf0ef91f06bf069c884c732e30be2a31",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/candidate-eval-scorecard-4fd587bf.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "4fd587bf24ce39b794c2228d61f94693826d0da2",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/2026-09-12-main-promotion/sharing-off/eval/candidate-eval-scorecard-4fd587bf.json",
+      "reachable_change_count": 251,
+      "reachable_change_examples": [
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py",
+        "src/argus/agent_runtime/calculation_rows.py",
+        "src/argus/agent_runtime/capabilities/contract.py",
+        "src/argus/agent_runtime/discovery/composer.py",
+        "src/argus/agent_runtime/graph/workflow.py"
+      ],
+      "reachable_changes_sha256": "c70fe16842566679213ee1881ccdde677dc3ab1c8fb4db5973e8839b73804fab",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/411/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "9fec4bf70c95383f4afa536674ceac4f38104787",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/411/live-measurement.json",
+      "reachable_change_count": 650,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "064db9da2615f81ca634a4158f9d6af91d83f3a049fe6c5ed58c3e4d5c00eb7d",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/531/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "79c8d78eee3af878b9cc52247bb1da28e7dc90a5",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/531/live-measurement.json",
+      "reachable_change_count": 597,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/benchmarks/interpret_stage_ab.py",
+        "scripts/benchmarks/public_alpha_render_load.py",
+        "scripts/benchmarks/run_turn_latency.py",
+        "scripts/benchmarks/summarize_turn_latency.py",
+        "scripts/benchmarks/turn_latency.py",
+        "scripts/dump_calculation_fixtures.py"
+      ],
+      "reachable_changes_sha256": "178bef9912679ca9c9ebc3fe5d0fe50a70468f7b18dd9b740c4ff4a56100ed8a",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/565/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "4af15b308ec0f4c89e2a668f1619220f364f95dc",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/565/live-measurement.json",
+      "reachable_change_count": 519,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_chat_final_response_type.py",
+        "scripts/generate_home_country_codes.py",
+        "scripts/generate_openapi_artifact.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "scripts/qa/write-local-env.sh"
+      ],
+      "reachable_changes_sha256": "bc6a7147788f26528289e99fb5f9441cd2e2306423325897b7aa431381e0c4a8",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/clarification-retention/live-measurement-6ed5d458.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "6ed5d458dcb1fbc49cf49c65e4f8714d101a6a67",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/clarification-retention/live-measurement-6ed5d458.json",
+      "reachable_change_count": 391,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_home_country_codes.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "scripts/qa/write-local-env.sh",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py"
+      ],
+      "reachable_changes_sha256": "25bc4f2539adafe659b0df3d922f866e80396f9d3bdd2637fc355c3ee5eac5d5",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/clarification-retention/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "ee15a3491e8e77ec857caeb22441389bdbe17869",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/clarification-retention/live-measurement.json",
+      "reachable_change_count": 397,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_home_country_codes.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "scripts/qa/write-local-env.sh",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py"
+      ],
+      "reachable_changes_sha256": "7412124a1ab2f02e266ef4fe031a30fa33aa56f481e77b5fe2a87d9ee7c9e60f",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/conversation-after-result/final-measurement/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "36086097c2608f5b51e14d9f7387be7738a75348",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/conversation-after-result/final-measurement/live-measurement.json",
+      "reachable_change_count": 264,
+      "reachable_change_examples": [
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py",
+        "src/argus/agent_runtime/calculation_rows.py",
+        "src/argus/agent_runtime/capabilities/contract.py",
+        "src/argus/agent_runtime/discovery/composer.py",
+        "src/argus/agent_runtime/graph/workflow.py"
+      ],
+      "reachable_changes_sha256": "acce4c553e1b4c5d28ecc04261bba3721f434fc91387f352694678c6010784fb",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/conversation-after-result/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "aef7d1c2a381c685752d90a33c803f84b726f25e",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/conversation-after-result/live-measurement.json",
+      "reachable_change_count": 287,
+      "reachable_change_examples": [
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py",
+        "src/argus/agent_runtime/calculation_rows.py",
+        "src/argus/agent_runtime/capabilities/contract.py",
+        "src/argus/agent_runtime/discovery/composer.py",
+        "src/argus/agent_runtime/graph/workflow.py"
+      ],
+      "reachable_changes_sha256": "0360a4c29f5a8dca994007dd0d092c68bc7d758a1c08457be8598f64c5bb455a",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/decision-10/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "60e7c0ec25c7a7e84ceb402fa14db3a710cee2ae",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/decision-10/live-measurement.json",
+      "reachable_change_count": 404,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_home_country_codes.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "scripts/qa/write-local-env.sh",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py"
+      ],
+      "reachable_changes_sha256": "2625c1753ee42d4d8fe83e73e3816a24787296bd362c2073ac8fea2230e86bcd",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/grounded-math/measurement/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "dc8608c8a09252ff8c51ef077f32d449bb0b6e8b",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/grounded-math/measurement/live-measurement.json",
+      "reachable_change_count": 162,
+      "reachable_change_examples": [
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py",
+        "src/argus/agent_runtime/calculation_rows.py",
+        "src/argus/agent_runtime/capabilities/contract.py",
+        "src/argus/agent_runtime/discovery/composer.py",
+        "src/argus/agent_runtime/knowledge_answer.py"
+      ],
+      "reachable_changes_sha256": "70b50b16650441696d787886aa1b46c33ce03d097c544fe3c266d78701a52593",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/issue-590/measurement/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "b7bdca4e9335131b85d43acdb97a543f9fc3c357",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/issue-590/measurement/live-measurement.json",
+      "reachable_change_count": 400,
+      "reachable_change_examples": [
+        "poetry.lock",
+        "pyproject.toml",
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_home_country_codes.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "scripts/qa/write-local-env.sh",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py"
+      ],
+      "reachable_changes_sha256": "426e05bd526d3bad4a4ecdd0da19e0b17ce8de12a2b7470ac87a2f06493d347d",
+      "schema_version": 2
+    },
+    {
+      "configuration": "docs/reports/evidence/model-result-readouts/live-measurement.json: missing release_configuration; new promotions need configuration-bearing evidence (measurement scorecard schema v3).",
+      "measured_sha": "7d7ea88bbe0b2b66119c249069fb647bd7170fa7",
+      "new_candidate_gate": "release_configuration: new promotions require measurement scorecard schema v3",
+      "path": "docs/reports/evidence/model-result-readouts/live-measurement.json",
+      "reachable_change_count": 353,
+      "reachable_change_examples": [
+        "scripts/dump_calculation_fixtures.py",
+        "scripts/generate_home_country_codes.py",
+        "scripts/qa/sharing_604_fixture.py",
+        "src/argus/agent_runtime/answer_calculation.py",
+        "src/argus/agent_runtime/calculated_answer.py",
+        "src/argus/agent_runtime/calculation_rows.py",
+        "src/argus/agent_runtime/capabilities/contract.py",
+        "src/argus/agent_runtime/confirmation_revalidation.py"
+      ],
+      "reachable_changes_sha256": "b087619aa436d2c6900d1a232a27a3f2e079d071df084a1e7e4e45da3e909b56",
+      "schema_version": 2
+    }
+  ]
+}
