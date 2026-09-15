@@ -1261,14 +1261,12 @@ export default function ChatInterface() {
         );
         const durableRetry = durableRetryLastTurnFromStreamError(errorPayload);
         const durableRetryAction = durableRetry?.action ?? null;
-        const metadataRetryAction = durableRetryAction
-          ? null
+        const visibleRetryAction = durableRetryAction
+          ? (renderUserMessage ? null : durableRetryAction)
           : retryLastTurnActionFromMetadata(errorPayload, {
               assistantMessageId: persistedErrorMessageId,
               messageRole: "assistant",
-            });
-        const visibleRetryAction =
-          metadataRetryAction ??
+            }) ??
           (retryLastTurnAction && persistedErrorMessageId
             ? retryLastTurnActionFromMessage(trimmed, {
                 assistantMessageId: persistedErrorMessageId,
@@ -1299,7 +1297,7 @@ export default function ChatInterface() {
                         strategyPathContext: errorStrategyPathContext,
                         assistantRecoveryCode: errorAssistantRecoveryCode,
                         actions:
-                          visibleRetryAction && !durableRetryAction
+                          visibleRetryAction
                             ? [visibleRetryAction]
                             : m.actions,
                       }

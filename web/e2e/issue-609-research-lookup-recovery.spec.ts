@@ -31,6 +31,7 @@ type QaCase = {
   // The no-search answer ran: the reply is that answer, the notice under it.
   answered?: boolean;
   frame?: "final" | "error";
+  failures?: number;
 };
 
 const RECOVERY_CODE: Record<Outcome, string> = {
@@ -131,7 +132,7 @@ function researchSidecar(outcome: Outcome): Record<string, unknown> {
 }
 
 async function installFixture(page: Page, qaCase: QaCase) {
-  const { locale, outcome, theme, answered = false, frame = "final" } = qaCase;
+  const { locale, outcome, theme, answered = false, frame = "final", failures = 1 } = qaCase;
   const text = copy[locale];
   const code = RECOVERY_CODE[outcome];
   const transient = outcome === "transient";
@@ -216,12 +217,16 @@ async function installFixture(page: Page, qaCase: QaCase) {
       const body = request.postDataJSON() as { message?: string; failed_assistant_id?: string };
       failedAssistantIds.push(body.failed_assistant_id);
       streamedMessages.push(String(body.message ?? ""));
-      if (streamedMessages.length === 1) {
+      if (streamedMessages.length <= failures) {
+        const attempt = streamedMessages.length;
+        const suffix = attempt === 1 ? "" : `-${attempt}`;
+        const requestId = `research-request${suffix}`;
+        const failureId = `research-failure${suffix}`;
         messages.push(
-          message("research-request", "user", text.prompt, 2),
-          message("research-failure", "assistant", failureContent, 3, {
+          message(requestId, "user", text.prompt, attempt * 2),
+          message(failureId, "assistant", failureContent, attempt * 2 + 1, {
             agent_runtime_turn: {
-              turn_id: "research-request",
+              turn_id: requestId,
               request_id: "correlation-609",
               status: transient ? "recoverable_failed" : "completed",
               terminal: true,
@@ -233,7 +238,7 @@ async function installFixture(page: Page, qaCase: QaCase) {
             ...(transient
               ? {
                   retry_last_turn: {
-                    request_message_id: "research-request",
+                    request_message_id: requestId,
                     message: text.prompt,
                   },
                 }
@@ -245,10 +250,10 @@ async function installFixture(page: Page, qaCase: QaCase) {
           const error = {
             type: "error",
             message: failureContent,
-            message_id: "research-failure",
+            message_id: failureId,
             recovery,
             retry_last_turn: {
-              request_message_id: "research-request",
+              request_message_id: requestId,
               message: text.prompt,
             },
           };
@@ -260,7 +265,7 @@ async function installFixture(page: Page, qaCase: QaCase) {
         return sseFinal(route, {
           stage_outcome: "ready_to_respond",
           assistant_response: failureContent,
-          message_id: "research-failure",
+          message_id: failureId,
           recovery,
           ...(transient ? { retry_last_turn: { message: text.prompt } } : {}),
           research: researchSidecar(outcome),
@@ -268,8 +273,7 @@ async function installFixture(page: Page, qaCase: QaCase) {
       }
       // The retry: the failure it replaces is superseded, the same question
       // is asked again, and this time the lookup answers.
-      const failure = messages.find((item) => item.id === "research-failure");
-      if (failure) {
+      for (const failure of messages.filter((item) => item.id.startsWith("research-failure"))) {
         failure.metadata = {
           ...failure.metadata,
           agent_runtime_failure_superseded: true,
@@ -278,8 +282,8 @@ async function installFixture(page: Page, qaCase: QaCase) {
         delete failure.metadata.retry_last_turn;
       }
       messages.push(
-        message("retry-request", "user", text.prompt, 4),
-        message("retry-answer", "assistant", text.answer, 5, {
+        message("retry-request", "user", text.prompt, failures * 2 + 2),
+        message("retry-answer", "assistant", text.answer, failures * 2 + 3, {
           agent_runtime_turn: {
             turn_id: "retry-request",
             request_id: "correlation-609-retry",
@@ -451,4 +455,31 @@ for (const frame of ["final", "error"] as const) {
       expect(evidence.consoleErrors).toEqual([]);
     });
   }
+}
+
+// A replacement assistant must own the next durable Retry if no new user row exists.
+for (const reloaded of [false, true]) {
+  test(`Retry remains available after a repeated error ${reloaded ? "after reload" : "live"}`, async ({ page }) => {
+    const evidence = await installFixture(page, { ...cases[0], frame: "error", failures: 2 });
+    const text = copy.en;
+    await page.goto(`/chat?conversation=${CONVERSATION_ID}`);
+    await page.getByTestId("chat-input").fill(text.prompt);
+    await page.getByTestId("chat-send").click();
+    const retry = page.getByRole("button", { name: text.retry, exact: true });
+    await expect(retry).toBeVisible();
+    if (reloaded) await page.reload();
+    await expect(page.getByTestId("chat-input")).toBeEnabled();
+    await retry.click();
+    await expect.poll(() => evidence.streamedMessages.length).toBe(2);
+    await expect(page.getByTestId("chat-input")).toBeEnabled();
+    await expect(retry).toHaveCount(1);
+    await expect(retry).toBeVisible();
+    await retry.click();
+    await expect(page.getByText(text.answer, { exact: true })).toBeVisible();
+    expect(evidence.streamedMessages).toEqual([text.prompt, text.prompt, text.prompt]);
+    expect(evidence.failedAssistantIds).toEqual([undefined, "research-failure", "research-failure-2"]);
+    await expect(page.getByText(text.prompt, { exact: true })).toHaveCount(1);
+    expect(evidence.unexpected).toEqual([]);
+    expect(evidence.consoleErrors).toEqual([]);
+  });
 }
