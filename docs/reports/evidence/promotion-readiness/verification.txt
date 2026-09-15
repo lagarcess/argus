@@ -1,0 +1,160 @@
+## backend-clean.log
+
+  /Users/garces/.codex/worktrees/d0a9/private-alpha-next/.venv/lib/python3.10/site-packages/starlette/testclient.py:445: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+tests/test_auth_sessions.py::test_auth_session_verifier_accepts_matching_active_session
+tests/test_auth_sessions.py::test_auth_session_verifier_rejects_revoked_session
+tests/test_auth_sessions.py::test_auth_session_verifier_rejects_missing_or_mismatched_claims
+tests/test_auth_sessions.py::test_auth_session_timeout_maps_to_verification_unavailable
+  /Users/garces/.codex/worktrees/d0a9/private-alpha-next/.venv/lib/python3.10/site-packages/jwt/api_jwt.py:147: InsecureKeyLengthWarning: The HMAC key is 11 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    return self._jws.encode(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========== 8622 passed, 605 skipped, 5 warnings in 206.37s (0:03:26) ===========
+
+## frontend-final-lint.log
+
+$ eslint
+
+/private/tmp/argus-promotion-readiness-checks-d0a9/web/components/chat/StrategyConfirmationCard.tsx
+   3:3   warning  'Check' is defined but never used                       @typescript-eslint/no-unused-vars
+  16:3   warning  'X' is defined but never used                           @typescript-eslint/no-unused-vars
+  19:10  warning  'useState' is defined but never used                    @typescript-eslint/no-unused-vars
+  44:3   warning  'inlineEditControlClassName' is defined but never used  @typescript-eslint/no-unused-vars
+  45:3   warning  'inlineEditFieldClassName' is defined but never used    @typescript-eslint/no-unused-vars
+  49:10  warning  'inlineFailureTextClass' is defined but never used      @typescript-eslint/no-unused-vars
+
+/private/tmp/argus-promotion-readiness-checks-d0a9/web/components/sidebar/ChatSidebar.tsx
+  147:3  warning  'currentView' is defined but never used  @typescript-eslint/no-unused-vars
+  158:3  warning  'onNavigate' is defined but never used   @typescript-eslint/no-unused-vars
+
+✖ 8 problems (0 errors, 8 warnings)
+
+
+## frontend-final-tests.log
+
+(pass) chat mention display provenance > uses browser UTF-16 positions when an emoji precedes a selected ticker [0.03ms]
+(pass) chat mention display provenance > hydrates valid persisted mention ranges without changing the user message [0.08ms]
+(pass) chat mention display provenance > keeps a legacy mention when malformed display metadata is dropped [0.02ms]
+(pass) chat mention display provenance > finds the token immediately beside a collapsed composer caret [0.04ms]
+
+__tests__/dev-mode-badge-placement.test.ts:
+(pass) dev mode badge placement > keeps mock auth controls away from chat header and composer hit targets [0.04ms]
+
+ 1987 pass
+ 0 fail
+ 2 snapshots, 16417 expect() calls
+Ran 1987 tests across 188 files. [3.06s]
+
+## frontend-final-build.log
+
+├ ○ /privacy
+├ ƒ /r/[receiptId]
+├ ƒ /r/-/opengraph-image
+├ ○ /signup
+└ ○ /terms
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+
+## mocked-evals.log
+
+                                                                         [ 24%]
+tests/evals/test_chat_runtime_eval_manifest.py ............              [ 28%]
+tests/evals/test_chat_runtime_trajectory_harness.py .................... [ 35%]
+...............                                                          [ 41%]
+tests/evals/test_measurement_availability.py ..........                  [ 45%]
+tests/evals/test_measurement_delivery.py ............................... [ 56%]
+...............................................                          [ 74%]
+tests/evals/test_measurement_outcome.py .............                    [ 78%]
+tests/evals/test_prose_evidence.py ..................................... [ 92%]
+....................                                                     [100%]
+
+============================= 270 passed in 44.44s =============================
+
+## free-release-gates-green.log
+
+tests/test_canary_capture_sanitizer.py ..                                [ 69%]
+tests/test_canary_check_evidence.py ................                     [ 74%]
+tests/test_canary_deployed_sha.py ......                                 [ 75%]
+tests/test_canary_requested_signup_denial.py .......                     [ 77%]
+tests/test_private_alpha_canary_split.py ......................          [ 84%]
+tests/test_render_canary_script.py ..................................... [ 94%]
+...................                                                      [100%]
+
+=========================== short test summary info ============================
+SKIPPED [1] scripts/ops/tests/test_production_migration_gate.py:1007: disposable PostgreSQL is not configured
+SKIPPED [1] scripts/ops/tests/test_production_migration_gate.py:1033: disposable PostgreSQL is not configured
+================== 348 passed, 2 skipped in 62.86s (0:01:02) ===================
+
+## migration-gate-tests.log
+
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/d0a9/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 49 items
+
+scripts/ops/tests/test_production_migration_gate.py .................... [ 40%]
+.............................                                            [100%]
+
+============================== 49 passed in 2.23s ==============================
+
+## local-matrix-final.log
+
+postgres pytest_exit 0
+required pytest gate passed: 386 tests, zero skips
+auth pytest_exit 0
+required pytest gate passed: 12 tests, zero skips
+
+## local-smoke-green.log
+
+workflow_probe=ready
+Starting local API on http://127.0.0.1:58100
+Starting local web on http://127.0.0.1:53100
+Checking api_health: http://127.0.0.1:58100/health
+curl: (7) Failed to connect to 127.0.0.1 port 58100 after 0 ms: Couldn't connect to server
+  waiting for api_health... attempt 1
+api_health=ready
+readiness_status=degraded
+api_smoke=ready
+Checking web: http://127.0.0.1:53100
+web=ready
+verification_status=ready
+
+## browser-storage-final.log
+
+(node:86840) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:86841) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:86850) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[WebServer] (Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:86851) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+[WebServer] (Use `node --trace-deprecation ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/browser-storage-disclosure.spec.ts:114:5 › every cookie a real session leaves is a disclosed cookie (3.1s)
+  ✓  2 [chromium] › e2e/browser-storage-disclosure.spec.ts:28:5 › every key a real session keeps is a disclosed key (3.6s)
+
+  2 passed (4.3s)
+
+## unmeasured-red.log
+
+            f"- Candidate SHA: `{measured_sha}`\n"
+            f"- Live eval scorecard: `{relative}`\n"
+        )
+    
+>       with pytest.raises(AssertionError, match=unmeasured_status):
+E       Failed: DID NOT RAISE <class 'AssertionError'>
+
+tests/test_release_promotion_evidence_support.py:206: Failed
+=========================== short test summary info ============================
+FAILED tests/test_release_promotion_evidence_support.py::test_promotion_rejects_a_case_with_no_live_measurement[infrastructure_error]
+FAILED tests/test_release_promotion_evidence_support.py::test_promotion_rejects_a_case_with_no_live_measurement[skipped]
+======================= 2 failed, 8 deselected in 1.11s ========================
