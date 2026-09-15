@@ -1,0 +1,15 @@
+{
+  "width": 390,
+  "account": "registered",
+  "language": "es-419",
+  "theme": "light",
+  "motion": "on",
+  "surface": "archived",
+  "box": {
+    "x": 0,
+    "y": 475,
+    "width": 319.796875,
+    "height": 425
+  },
+  "reducedMotion": false
+}
