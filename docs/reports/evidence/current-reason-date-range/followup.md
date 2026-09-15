@@ -123,3 +123,24 @@ mechanism, stop and report instead of applying another fix.
   and was stopped before the successful host-permission build. Exact published
   head and hosted CI/review outcomes will be recorded in
   the PR comment after those checks return.
+
+A second refresh before publication found integration
+`a4a183138aadf1cff8268d0ce169e444732116fe`, which adds the default-off sharing lane.
+It was merged as `99ef6c48c821d273de944cf1c2335e1d610a8663` after fix commit
+`5c54088b`. Its API/data-contract and migration changes concern selected-answer
+receipts; its chat and locale edits concern sharing controls and receipt copy.
+No asset resolver or clarification-reason owner changed. The common locale files
+merged in separate sections. Both complete deterministic suites and the web
+build were repeated on this reconciled runtime. The paid proposal applies to
+the final published evidence head, with no later runtime changes assumed.
+
+[Rendered follow-up evidence](followup-rendered.json) records the actual display
+function's English and Spanish output using the committed raw probe. It makes
+no browser-session or new model-call claim. The capital entries explicitly mark
+their authored degraded variant.
+
+Final reconciled local verification at runtime `99ef6c48`: **8686 passed,
+605 skipped, one expected prompt-freeze failure** in the full backend suite;
+**1991 passed** in the frontend suite. Frontend production build, Ruff, and the
+merged-tree modularity budget pass. The subsequent evidence publication changes
+only this report and the rendered JSON; it does not change runtime or fixtures.
