@@ -54,6 +54,7 @@ from argus.domain.tool_contracts import (
     ToolResultCard,
 )
 from argus.domain.tool_declaration import ToolDeclaration, ToolInvocationError
+from argus.domain.tool_presentation_facts import presentation_reference_facts
 
 DEFAULT_CURRENCY = "USD"
 CURRENCY_FIELD = "currency"
@@ -640,14 +641,7 @@ def cited_page_inputs(
 
 
 def _reference_facts(card: ToolResultCard) -> dict[str, ToolFact]:
-    presentation = card.presentation
-    facts: dict[str, ToolFact] = {
-        fact.name: fact for fact in presentation.inputs if fact.value is not None
-    }
-    facts.update({row.name: row for row in presentation.rows})
-    if presentation.answer is not None:
-        facts[presentation.answer.name] = presentation.answer
-    return facts
+    return presentation_reference_facts(card.presentation)
 
 
 def _money_code(fact: ToolFact | None) -> str | None:

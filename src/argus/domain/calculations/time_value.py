@@ -41,6 +41,7 @@ from argus.domain.tool_declaration import (
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection, solved_facts
 
 UNKNOWN_FIELDS = (
     "present_value",
@@ -228,6 +229,42 @@ def _periods_repair(
     return outcome
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        *solved_facts(
+            UNKNOWN_FIELDS,
+            lambda name, a, r: _fact(
+                name, r.solved_value, a.currency, a.periods_per_year
+            ),
+        ),
+        ResultFact(
+            "total_payments",
+            lambda name, a, r: money_fact(name, r.total_payments, a.currency),
+        ),
+        ResultFact(
+            "total_interest",
+            lambda name, a, r: money_fact(name, r.total_interest, a.currency),
+            when=lambda a, r: a.direction == "borrow",
+        ),
+        ResultFact(
+            "total_growth",
+            lambda name, a, r: money_fact(name, r.total_interest, a.currency),
+            when=lambda a, r: a.direction != "borrow",
+        ),
+        ResultFact(
+            "future_value",
+            lambda name, a, r: money_fact(name, r.future_value, a.currency),
+            when=lambda a, r: r.solved_field != "future_value",
+        ),
+        ResultFact(
+            "annual_rate_pct",
+            lambda name, a, r: percent_fact(name, pct(r.annual_rate_pct)),
+            when=lambda a, r: r.solved_field == "future_value",
+        ),
+    )
+)
+
+
 def present_time_value(
     arguments: TimeValueArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -246,20 +283,6 @@ def present_time_value(
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
     result = TimeValueResult.model_validate(outcome.result)
-    answer = _fact(
-        result.solved_field, result.solved_value, currency, arguments.periods_per_year
-    )
-    rows: list[ToolFact] = [
-        money_fact("total_payments", result.total_payments, currency),
-        money_fact(
-            "total_interest" if arguments.direction == "borrow" else "total_growth",
-            result.total_interest,
-            currency,
-        ),
-        money_fact("future_value", result.future_value, currency)
-        if result.solved_field != "future_value"
-        else percent_fact("annual_rate_pct", pct(result.annual_rate_pct)),
-    ]
     visual = (
         dated_path(
             arguments.start_date,
@@ -273,8 +296,6 @@ def present_time_value(
     )
     return ToolCardPresentation(
         title=title,
-        answer=answer,
-        rows=rows,
         inputs=inputs,
         visual=visual,
         notes=[note(code) for code in result.notes],
@@ -310,7 +331,10 @@ def get_time_value_declaration() -> ToolDeclaration:
             locale_key="tools.calc.time_value.progress", argument_fields=("direction",)
         ),
         card=ToolCardBinding(
-            card_type="time_value", version=1, presenter=present_time_value
+            result_projection=RESULT_PROJECTION,
+            card_type="time_value",
+            version=1,
+            presenter=present_time_value,
         ),
         rules=(ExactlyOneUnknown(fields=UNKNOWN_FIELDS),),
         domain=(

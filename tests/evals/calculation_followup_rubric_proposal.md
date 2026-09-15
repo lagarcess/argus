@@ -17,11 +17,10 @@ The harness refuses these cases before any model call while criteria are absent.
   reader, even after acknowledging uncertainty. Examples of dimensions are fees,
   eligibility, spending categories, repayment behavior and usable rewards.
 - goal_currency_risk: reason from the spending goal stated in the current prompt.
-  For dollar savings funding a fixed Dominican-peso expense, peso appreciation
-  against the dollar is adverse: each dollar buys fewer pesos. Holding the pesos
-  needed for that fixed expense removes this mismatch. Do not describe peso
-  depreciation as the adverse move for this goal, or keep the previous dollar
-  spending goal after the reader changed it.
+  Savings in currency A funding a fixed expense in currency B lose purchasing
+  power when B appreciates against A, equivalently when A depreciates against B.
+  Matching the savings to B removes that currency mismatch. Do not reverse the
+  adverse move or carry forward a replaced spending goal.
 - drawdown_then_stop: present the asset's historical maximum drawdown and its
   actual observed window from the displayed Argus calculation. If the user named
   only a broad asset class such as crypto, identify the asset used and explicitly

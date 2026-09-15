@@ -35,6 +35,7 @@ from argus.domain.tool_declaration import (
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection
 
 SINGLE_GROWTH_FORECAST = "single_growth_forecast"
 CURRENT_MULTIPLE_HELD = "current_multiple_held"
@@ -127,6 +128,72 @@ def compute_valuation_scenarios(arguments: ValuationArguments) -> ValuationResul
     )
 
 
+def _scenario(result: ValuationResult, label: str) -> ScenarioRow:
+    return next(row for row in result.scenarios if row.label == label)
+
+
+def _scenario_projection() -> ResultProjection:
+    facts = [
+        ResultFact(
+            "base_annual_return_pct",
+            lambda name, a, r: percent_fact_named(
+                name,
+                text("tools.calc.valuation_scenarios.annual_return_base"),
+                _scenario(r, "base").annual_return_pct,
+            ),
+            placement="answer",
+            when=lambda a, r: _scenario(r, "base").value_at_horizon is None,
+        ),
+        ResultFact(
+            "current_multiple",
+            lambda name, a, r: ToolFact(
+                name=name,
+                label=text("tools.calc.fields.multiple"),
+                value=round(r.current_multiple, 2),
+                unit=text(UNIT_MULTIPLE_KEY),
+            ),
+        ),
+    ]
+    for label in valuation.SCENARIO_LABELS:
+        facts.extend(
+            (
+                ResultFact(
+                    f"value_at_horizon_{label}",
+                    lambda name, a, r, key=label: ToolFact(
+                        name=name,
+                        label=text(f"tools.calc.valuation_scenarios.{name}"),
+                        value=round(_scenario(r, key).value_at_horizon, 2),
+                        unit=text("tools.calc.units.currency", code=a.currency),
+                    ),
+                    placement="answer_and_row" if label == "base" else "row",
+                    when=lambda a, r, key=label: _scenario(r, key).value_at_horizon
+                    is not None,
+                ),
+                ResultFact(
+                    f"price_at_horizon_{label}",
+                    lambda name, a, r, key=label: ToolFact(
+                        name=name,
+                        label=text(f"tools.calc.valuation_scenarios.{name}"),
+                        value=round(_scenario(r, key).price_at_horizon, 2),
+                        unit=text("tools.calc.units.currency", code=a.currency),
+                    ),
+                ),
+                ResultFact(
+                    f"annual_return_pct_{label}",
+                    lambda name, a, r, key=label: percent_fact_named(
+                        name,
+                        text(f"tools.calc.valuation_scenarios.annual_return_{key}"),
+                        _scenario(r, key).annual_return_pct,
+                    ),
+                ),
+            )
+        )
+    return ResultProjection(tuple(facts))
+
+
+RESULT_PROJECTION = _scenario_projection()
+
+
 def present_valuation_scenarios(
     arguments: ValuationArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -148,63 +215,8 @@ def present_valuation_scenarios(
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
     result = ValuationResult.model_validate(outcome.result)
-    base = next(row for row in result.scenarios if row.label == "base")
-    answer = (
-        ToolFact(
-            name="value_at_horizon_base",
-            label=text("tools.calc.valuation_scenarios.value_at_horizon_base"),
-            value=round(base.value_at_horizon, 2),
-            unit=text("tools.calc.units.currency", code=currency),
-        )
-        if base.value_at_horizon is not None
-        else ToolFact(
-            name="base_annual_return_pct",
-            label=text("tools.calc.valuation_scenarios.annual_return_base"),
-            value=round(base.annual_return_pct, 2),
-            unit=text("chat.tools.units.percent"),
-        )
-    )
-    rows: list[ToolFact] = [
-        ToolFact(
-            name="current_multiple",
-            label=text("tools.calc.fields.multiple"),
-            value=round(result.current_multiple, 2),
-            unit=text(UNIT_MULTIPLE_KEY),
-        )
-    ]
-    for row in result.scenarios:
-        if row.value_at_horizon is not None:
-            rows.append(
-                ToolFact(
-                    name=f"value_at_horizon_{row.label}",
-                    label=text(
-                        f"tools.calc.valuation_scenarios.value_at_horizon_{row.label}"
-                    ),
-                    value=round(row.value_at_horizon, 2),
-                    unit=text("tools.calc.units.currency", code=currency),
-                )
-            )
-        rows.append(
-            ToolFact(
-                name=f"price_at_horizon_{row.label}",
-                label=text(
-                    f"tools.calc.valuation_scenarios.price_at_horizon_{row.label}"
-                ),
-                value=round(row.price_at_horizon, 2),
-                unit=text("tools.calc.units.currency", code=currency),
-            )
-        )
-        rows.append(
-            percent_fact_named(
-                f"annual_return_pct_{row.label}",
-                text(f"tools.calc.valuation_scenarios.annual_return_{row.label}"),
-                row.annual_return_pct,
-            )
-        )
     return ToolCardPresentation(
         title=title,
-        answer=answer,
-        rows=rows,
         inputs=inputs,
         notes=[
             text("tools.calc.notes.scenarios_not_forecasts"),
@@ -263,6 +275,7 @@ def get_valuation_scenarios_declaration() -> ToolDeclaration:
             locale_key="tools.calc.valuation_scenarios.progress"
         ),
         card=ToolCardBinding(
+            result_projection=RESULT_PROJECTION,
             card_type="valuation_scenarios",
             version=1,
             presenter=present_valuation_scenarios,

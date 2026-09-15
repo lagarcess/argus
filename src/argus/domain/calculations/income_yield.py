@@ -20,13 +20,14 @@ from argus.domain.calculations._shared import (
 )
 from argus.domain.finance import ratios
 from argus.domain.finance.outcomes import NoSolution
-from argus.domain.tool_contracts import ToolCardPresentation, ToolFact, ToolOutcome
+from argus.domain.tool_contracts import ToolCardPresentation, ToolOutcome
 from argus.domain.tool_declaration import (
     ExactlyOneUnknown,
     ToolCardBinding,
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection, solved_facts
 
 UNKNOWN_FIELDS = ("annual_income", "price", "yield_pct")
 
@@ -85,6 +86,22 @@ def compute_income_yield(arguments: IncomeYieldArguments) -> IncomeYieldResult:
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        *solved_facts(
+            UNKNOWN_FIELDS,
+            lambda name, a, r: percent_fact(name, pct(r.yield_pct))
+            if name == "yield_pct"
+            else money_fact(name, r.solved_value, a.currency),
+        ),
+        ResultFact(
+            "monthly_income",
+            lambda name, a, r: money_fact(name, r.monthly_income, a.currency),
+        ),
+    )
+)
+
+
 def present_income_yield(
     arguments: IncomeYieldArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -98,14 +115,7 @@ def present_income_yield(
     title = text("tools.calc.income_yield.title")
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
-    result = IncomeYieldResult.model_validate(outcome.result)
-    answer: ToolFact = (
-        percent_fact("yield_pct", pct(result.yield_pct))
-        if result.solved_field == "yield_pct"
-        else money_fact(result.solved_field, result.solved_value, currency)
-    )
-    rows = [money_fact("monthly_income", result.monthly_income, currency)]
-    return ToolCardPresentation(title=title, answer=answer, rows=rows, inputs=inputs)
+    return ToolCardPresentation(title=title, inputs=inputs)
 
 
 def get_income_yield_declaration() -> ToolDeclaration:
@@ -119,7 +129,10 @@ def get_income_yield_declaration() -> ToolDeclaration:
         policy=free_policy(*UNKNOWN_FIELDS, driving=UNKNOWN_FIELDS),
         progress=ToolProgressTemplate(locale_key="tools.calc.income_yield.progress"),
         card=ToolCardBinding(
-            card_type="income_yield", version=1, presenter=present_income_yield
+            result_projection=RESULT_PROJECTION,
+            card_type="income_yield",
+            version=1,
+            presenter=present_income_yield,
         ),
         rules=(ExactlyOneUnknown(fields=UNKNOWN_FIELDS),),
         domain=("Income is the stated yearly amount; nothing here projects it forward.",),

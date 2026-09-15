@@ -10,7 +10,6 @@ name never fails the whole answer, and the runtime drops it on record.
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Annotated, Any, Literal, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema, field_validator
@@ -219,13 +218,12 @@ def _argument_lines(declaration: ToolDeclaration) -> list[str]:
 
 
 def _result_line(declaration: ToolDeclaration) -> str:
+    projection = declaration.card.result_projection if declaration.card else None
+    if projection is None:
+        raise ValueError(f"Calculation {declaration.name} needs a result presentation")
     names = [
-        name
-        for name, model_field in declaration.result_type.model_fields.items()
-        if not name.startswith("solved_")
-        and get_origin(model_field.annotation) is not list
-        and model_field.annotation
-        in (float, int, date, float | None, int | None, date | None)
+        reference.name + (" (when present)" if reference.conditional else "")
+        for reference in projection.references
     ]
     return f" Results: {', '.join(names)}." if names else ""
 

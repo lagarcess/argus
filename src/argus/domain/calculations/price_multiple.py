@@ -21,13 +21,14 @@ from argus.domain.calculations._shared import (
 )
 from argus.domain.finance import ratios
 from argus.domain.finance.outcomes import NoSolution
-from argus.domain.tool_contracts import ToolCardPresentation, ToolFact, ToolOutcome
+from argus.domain.tool_contracts import ToolCardPresentation, ToolOutcome
 from argus.domain.tool_declaration import (
     ExactlyOneUnknown,
     ToolCardBinding,
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection, solved_facts
 
 UNKNOWN_FIELDS = ("price", "per_share", "multiple")
 
@@ -87,6 +88,24 @@ def compute_price_multiple(arguments: PriceMultipleArguments) -> PriceMultipleRe
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        *solved_facts(
+            UNKNOWN_FIELDS,
+            lambda name, a, r: number_fact(
+                name, rounded(r.multiple), text(UNIT_MULTIPLE_KEY)
+            )
+            if name == "multiple"
+            else money_fact(name, r.solved_value, a.currency),
+        ),
+        ResultFact(
+            "earnings_yield_pct",
+            lambda name, a, r: percent_fact(name, r.earnings_yield_pct / 100.0),
+        ),
+    )
+)
+
+
 def present_price_multiple(
     arguments: PriceMultipleArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -100,15 +119,7 @@ def present_price_multiple(
     title = text("tools.calc.price_multiple.title")
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
-    result = PriceMultipleResult.model_validate(outcome.result)
-    if result.solved_field == "multiple":
-        answer: ToolFact = number_fact(
-            "multiple", rounded(result.multiple), text(UNIT_MULTIPLE_KEY)
-        )
-    else:
-        answer = money_fact(result.solved_field, result.solved_value, currency)
-    rows = [percent_fact("earnings_yield_pct", result.earnings_yield_pct / 100.0)]
-    return ToolCardPresentation(title=title, answer=answer, rows=rows, inputs=inputs)
+    return ToolCardPresentation(title=title, inputs=inputs)
 
 
 def get_price_multiple_declaration() -> ToolDeclaration:
@@ -123,7 +134,10 @@ def get_price_multiple_declaration() -> ToolDeclaration:
         policy=free_policy(*UNKNOWN_FIELDS, driving=UNKNOWN_FIELDS),
         progress=ToolProgressTemplate(locale_key="tools.calc.price_multiple.progress"),
         card=ToolCardBinding(
-            card_type="price_multiple", version=1, presenter=present_price_multiple
+            result_projection=RESULT_PROJECTION,
+            card_type="price_multiple",
+            version=1,
+            presenter=present_price_multiple,
         ),
         rules=(ExactlyOneUnknown(fields=UNKNOWN_FIELDS),),
         domain=("A multiple is a ratio of cited figures, never a verdict on value.",),

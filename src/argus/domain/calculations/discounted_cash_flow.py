@@ -28,6 +28,7 @@ from argus.domain.tool_declaration import (
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection, solved_facts
 
 UNKNOWN_FIELDS = ("value", "growth_rate_pct")
 
@@ -87,6 +88,22 @@ def _named(outcome: NoSolution) -> NoSolution:
     return NoSolution(field=fields.get(outcome.field, outcome.field), code=outcome.code)
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        *solved_facts(
+            UNKNOWN_FIELDS,
+            lambda name, a, r: money_fact(name, r.value, a.currency)
+            if name == "value"
+            else percent_fact(name, pct(r.growth_rate_pct)),
+        ),
+        ResultFact(
+            "cash_flow_at_horizon",
+            lambda name, a, r: money_fact(name, r.cash_flow_at_horizon, a.currency),
+        ),
+    )
+)
+
+
 def present_discounted_cash_flow(
     arguments: CashFlowArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -103,14 +120,7 @@ def present_discounted_cash_flow(
     title = text("tools.calc.discounted_cash_flow.title")
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
-    result = CashFlowResult.model_validate(outcome.result)
-    answer = (
-        money_fact("value", result.value, currency)
-        if result.solved_field == "value"
-        else percent_fact("growth_rate_pct", pct(result.growth_rate_pct))
-    )
-    rows = [money_fact("cash_flow_at_horizon", result.cash_flow_at_horizon, currency)]
-    return ToolCardPresentation(title=title, answer=answer, rows=rows, inputs=inputs)
+    return ToolCardPresentation(title=title, inputs=inputs)
 
 
 def get_discounted_cash_flow_declaration() -> ToolDeclaration:
@@ -140,6 +150,7 @@ def get_discounted_cash_flow_declaration() -> ToolDeclaration:
             locale_key="tools.calc.discounted_cash_flow.progress"
         ),
         card=ToolCardBinding(
+            result_projection=RESULT_PROJECTION,
             card_type="discounted_cash_flow",
             version=1,
             presenter=present_discounted_cash_flow,

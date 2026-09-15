@@ -20,12 +20,13 @@ from argus.domain.calculations._shared import (
 )
 from argus.domain.finance import ratios, tvm
 from argus.domain.finance.outcomes import NoSolution
-from argus.domain.tool_contracts import ToolCardPresentation, ToolFact, ToolOutcome
+from argus.domain.tool_contracts import ToolCardPresentation, ToolOutcome
 from argus.domain.tool_declaration import (
     ToolCardBinding,
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection
 
 
 class EffectiveRateArguments(CalculationArguments):
@@ -97,6 +98,25 @@ def compute_effective_rate(arguments: EffectiveRateArguments) -> EffectiveRateRe
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        ResultFact(
+            "effective_rate_pct",
+            lambda name, a, r: percent_fact(name, pct(r.effective_rate_pct)),
+            placement="answer",
+        ),
+        *(
+            ResultFact(
+                field,
+                lambda name, a, r: money_fact(name, getattr(r, name), a.currency),
+                when=lambda a, r: r.payment > 0,
+            )
+            for field in ("payment", "total_paid", "total_cost")
+        ),
+    )
+)
+
+
 def present_effective_rate(
     arguments: EffectiveRateArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -114,18 +134,8 @@ def present_effective_rate(
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
     result = EffectiveRateResult.model_validate(outcome.result)
-    answer = percent_fact("effective_rate_pct", pct(result.effective_rate_pct))
-    rows: list[ToolFact] = []
-    if result.payment > 0:
-        rows = [
-            money_fact("payment", result.payment, currency),
-            money_fact("total_paid", result.total_paid, currency),
-            money_fact("total_cost", result.total_cost, currency),
-        ]
     notes = [text("tools.calc.notes.includes_fees")] if result.includes_fees else []
-    return ToolCardPresentation(
-        title=title, answer=answer, rows=rows, inputs=inputs, notes=notes
-    )
+    return ToolCardPresentation(title=title, inputs=inputs, notes=notes)
 
 
 def get_effective_rate_declaration() -> ToolDeclaration:
@@ -147,7 +157,10 @@ def get_effective_rate_declaration() -> ToolDeclaration:
         ),
         progress=ToolProgressTemplate(locale_key="tools.calc.effective_rate.progress"),
         card=ToolCardBinding(
-            card_type="effective_rate", version=1, presenter=present_effective_rate
+            result_projection=RESULT_PROJECTION,
+            card_type="effective_rate",
+            version=1,
+            presenter=present_effective_rate,
         ),
         domain=("Fees are counted as money kept by the lender on day one.",),
     )

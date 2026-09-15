@@ -18,13 +18,14 @@ from argus.domain.calculations._shared import (
 )
 from argus.domain.finance import ratios
 from argus.domain.finance.outcomes import NoSolution
-from argus.domain.tool_contracts import ToolCardPresentation, ToolFact, ToolOutcome
+from argus.domain.tool_contracts import ToolCardPresentation, ToolOutcome
 from argus.domain.tool_declaration import (
     ExactlyOneUnknown,
     ToolCardBinding,
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection, solved_facts
 
 UNKNOWN_FIELDS = ("monthly_debt_payments", "monthly_income", "ratio_pct")
 
@@ -94,6 +95,22 @@ def compute_debt_to_income(arguments: DebtToIncomeArguments) -> DebtToIncomeResu
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        *solved_facts(
+            UNKNOWN_FIELDS,
+            lambda name, a, r: percent_fact(name, pct(r.ratio_pct))
+            if name == "ratio_pct"
+            else money_fact(name, r.solved_value, a.currency),
+        ),
+        ResultFact(
+            "income_after_debt",
+            lambda name, a, r: money_fact(name, r.income_after_debt, a.currency),
+        ),
+    )
+)
+
+
 def present_debt_to_income(
     arguments: DebtToIncomeArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -106,14 +123,7 @@ def present_debt_to_income(
     title = text("tools.calc.debt_to_income.title")
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
-    result = DebtToIncomeResult.model_validate(outcome.result)
-    answer: ToolFact = (
-        percent_fact("ratio_pct", pct(result.ratio_pct))
-        if result.solved_field == "ratio_pct"
-        else money_fact(result.solved_field, result.solved_value, currency)
-    )
-    rows = [money_fact("income_after_debt", result.income_after_debt, currency)]
-    return ToolCardPresentation(title=title, answer=answer, rows=rows, inputs=inputs)
+    return ToolCardPresentation(title=title, inputs=inputs)
 
 
 def get_debt_to_income_declaration() -> ToolDeclaration:
@@ -127,7 +137,10 @@ def get_debt_to_income_declaration() -> ToolDeclaration:
         policy=free_policy(*UNKNOWN_FIELDS, driving=UNKNOWN_FIELDS),
         progress=ToolProgressTemplate(locale_key="tools.calc.debt_to_income.progress"),
         card=ToolCardBinding(
-            card_type="debt_to_income", version=1, presenter=present_debt_to_income
+            result_projection=RESULT_PROJECTION,
+            card_type="debt_to_income",
+            version=1,
+            presenter=present_debt_to_income,
         ),
         rules=(ExactlyOneUnknown(fields=UNKNOWN_FIELDS),),
         domain=(

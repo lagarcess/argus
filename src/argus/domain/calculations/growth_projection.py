@@ -25,13 +25,14 @@ from argus.domain.calculations._shared import (
 )
 from argus.domain.finance import growth, tvm
 from argus.domain.finance.outcomes import NoSolution
-from argus.domain.tool_contracts import ToolCardPresentation, ToolFact, ToolOutcome
+from argus.domain.tool_contracts import ToolCardPresentation, ToolOutcome
 from argus.domain.tool_declaration import (
     ExactlyOneUnknown,
     ToolCardBinding,
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection, solved_facts
 
 UNKNOWN_FIELDS = ("start_value", "end_value", "annual_rate_pct", "periods")
 
@@ -152,6 +153,32 @@ def compute_growth(arguments: GrowthArguments) -> GrowthResult:
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        *solved_facts(
+            UNKNOWN_FIELDS,
+            lambda name, a, r: percent_fact(name, pct(r.solved_value))
+            if name == "annual_rate_pct"
+            else number_fact(
+                name, rounded(r.solved_value, 1), period_unit(a.periods_per_year)
+            )
+            if name == "periods"
+            else money_fact(name, r.solved_value, a.currency),
+        ),
+        *(
+            ResultFact(
+                field, lambda name, a, r: money_fact(name, getattr(r, name), a.currency)
+            )
+            for field in ("total_contributed", "growth", "real_end_value")
+        ),
+        ResultFact(
+            "real_annual_rate_pct",
+            lambda name, a, r: percent_fact(name, pct(r.real_annual_rate_pct)),
+        ),
+    )
+)
+
+
 def present_growth(
     arguments: GrowthArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -169,26 +196,8 @@ def present_growth(
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
     result = GrowthResult.model_validate(outcome.result)
-    if result.solved_field == "annual_rate_pct":
-        answer: ToolFact = percent_fact("annual_rate_pct", pct(result.solved_value))
-    elif result.solved_field == "periods":
-        answer = number_fact(
-            "periods",
-            rounded(result.solved_value, 1),
-            period_unit(arguments.periods_per_year),
-        )
-    else:
-        answer = money_fact(result.solved_field, result.solved_value, currency)
-    rows = [
-        money_fact("total_contributed", result.total_contributed, currency),
-        money_fact("growth", result.growth, currency),
-        money_fact("real_end_value", result.real_end_value, currency),
-        percent_fact("real_annual_rate_pct", pct(result.real_annual_rate_pct)),
-    ]
     return ToolCardPresentation(
         title=title,
-        answer=answer,
-        rows=rows,
         inputs=inputs,
         notes=[note(code) for code in result.notes],
     )
@@ -213,7 +222,10 @@ def get_growth_projection_declaration() -> ToolDeclaration:
         ),
         progress=ToolProgressTemplate(locale_key="tools.calc.growth_projection.progress"),
         card=ToolCardBinding(
-            card_type="growth_projection", version=1, presenter=present_growth
+            result_projection=RESULT_PROJECTION,
+            card_type="growth_projection",
+            version=1,
+            presenter=present_growth,
         ),
         rules=(ExactlyOneUnknown(fields=UNKNOWN_FIELDS),),
         domain=(

@@ -28,6 +28,7 @@ from argus.domain.tool_contracts import (
     ToolRepair,
     ToolResultCard,
 )
+from argus.domain.tool_fact_projection import ResultProjection
 
 
 class ToolInvocationError(ValueError):
@@ -136,6 +137,7 @@ class ToolCardBinding:
     card_type: str
     version: int
     presenter: Callable[[Any, ToolOutcome], ToolCardPresentation]
+    result_projection: ResultProjection | None = None
 
     def __post_init__(self) -> None:
         if not self.card_type or self.version < 1 or not callable(self.presenter):
@@ -520,6 +522,11 @@ class ToolDeclaration:
             presentation = ToolCardPresentation.model_validate(
                 self.card.presenter(arguments, outcome)
             )
+            if outcome.status == "succeeded" and self.card.result_projection is not None:
+                answer, rows = self.card.result_projection.render(arguments, returned)
+                presentation = presentation.model_copy(
+                    update={"answer": answer, "rows": rows}
+                )
             # Editability, unknown identity, units and provenance derive from the
             # declaration, never from a second policy hand-maintained per presenter.
             input_units = {

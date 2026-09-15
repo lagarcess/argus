@@ -30,6 +30,7 @@ from argus.domain.tool_declaration import (
     ToolDeclaration,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection
 
 
 class ScaledAmountArguments(CalculationArguments):
@@ -82,6 +83,17 @@ def _rate_unit(arguments: ScaledAmountArguments) -> LocalizedText:
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        ResultFact(
+            "scaled_amount",
+            lambda name, a, r: money_fact(name, r.scaled_amount, r.output_currency),
+            placement="answer",
+        ),
+    )
+)
+
+
 def present_scaled_amount(
     arguments: ScaledAmountArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -93,10 +105,8 @@ def present_scaled_amount(
     title = text("tools.calc.scaled_amount.title")
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
-    result = ScaledAmountResult.model_validate(outcome.result)
     return ToolCardPresentation(
         title=title,
-        answer=money_fact("scaled_amount", result.scaled_amount, result.output_currency),
         inputs=inputs,
         notes=[note(f"scaled_{arguments.operation}")],
     )
@@ -124,7 +134,10 @@ def get_scaled_amount_declaration() -> ToolDeclaration:
         ),
         progress=ToolProgressTemplate(locale_key="tools.calc.scaled_amount.progress"),
         card=ToolCardBinding(
-            card_type="scaled_amount", version=1, presenter=present_scaled_amount
+            result_projection=RESULT_PROJECTION,
+            card_type="scaled_amount",
+            version=1,
+            presenter=present_scaled_amount,
         ),
         domain=(
             "The rate must be stated or sourced; this calculation does not fetch it.",

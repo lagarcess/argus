@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 from argus.domain.finance.outcomes import NoSolution
 
+SCENARIO_LABELS = ("low", "base", "high")
+
 
 @dataclass(frozen=True)
 class Scenario:
@@ -50,7 +52,7 @@ def valuation_scenarios(
         return NoSolution(field="per_share", code="growth_needs_positive_values")
     scenarios: list[Scenario] = []
     for label, growth_rate, multiple in zip(
-        ("low", "base", "high"), growth, multiples, strict=False
+        SCENARIO_LABELS, growth, multiples, strict=False
     ):
         if multiple <= 0 or growth_rate <= -1:
             return NoSolution(

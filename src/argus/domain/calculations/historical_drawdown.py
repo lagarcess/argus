@@ -24,6 +24,7 @@ from argus.domain.tool_declaration import (
     ToolPolicy,
     ToolProgressTemplate,
 )
+from argus.domain.tool_fact_projection import ResultFact, ResultProjection
 
 
 class HistoricalDrawdownArguments(BaseModel):
@@ -43,6 +44,38 @@ def compute_historical_drawdown(
     )
 
 
+RESULT_PROJECTION = ResultProjection(
+    (
+        ResultFact(
+            "max_drawdown_pct",
+            lambda name, a, r: percent_fact(name, r.max_drawdown_pct / 100).model_copy(
+                update={
+                    "source": ToolFactSource(
+                        kind="market_data", date=r.observed_end_date.isoformat()
+                    )
+                }
+            ),
+            placement="answer",
+        ),
+        *(
+            ResultFact(
+                field, lambda name, a, r: number_fact(name, getattr(r, name).isoformat())
+            )
+            for field in ("observed_start_date", "observed_end_date")
+        ),
+        ResultFact("observations", lambda name, a, r: number_fact(name, r.observations)),
+        *(
+            ResultFact(
+                field,
+                lambda name, a, r: number_fact(name, getattr(r, name)),
+                when=lambda a, r, key=field: getattr(r, key) is not None,
+            )
+            for field in ("peak_date", "trough_date")
+        ),
+    )
+)
+
+
 def present_historical_drawdown(
     arguments: HistoricalDrawdownArguments, outcome: ToolOutcome
 ) -> ToolCardPresentation:
@@ -55,19 +88,6 @@ def present_historical_drawdown(
     if outcome.status != "succeeded":
         return ToolCardPresentation(title=title, inputs=inputs)
     result = HistoricalDrawdownObservation.model_validate(outcome.result)
-    source = ToolFactSource(kind="market_data", date=result.observed_end_date.isoformat())
-    answer = percent_fact("max_drawdown_pct", result.max_drawdown_pct / 100).model_copy(
-        update={"source": source}
-    )
-    rows = [
-        number_fact("observed_start_date", result.observed_start_date.isoformat()),
-        number_fact("observed_end_date", result.observed_end_date.isoformat()),
-        number_fact("observations", result.observations),
-    ]
-    for name in ("peak_date", "trough_date"):
-        value = getattr(result, name)
-        if value is not None:
-            rows.append(number_fact(name, value))
     notes = [note("historical_daily_closes")]
     if result.default_window:
         notes.append(
@@ -77,9 +97,7 @@ def present_historical_drawdown(
                 end=result.requested_end_date.isoformat(),
             )
         )
-    return ToolCardPresentation(
-        title=title, answer=answer, inputs=inputs, rows=rows, notes=notes
-    )
+    return ToolCardPresentation(title=title, inputs=inputs, notes=notes)
 
 
 def get_historical_drawdown_declaration() -> ToolDeclaration:
@@ -104,6 +122,7 @@ def get_historical_drawdown_declaration() -> ToolDeclaration:
             locale_key="tools.calc.historical_drawdown.progress"
         ),
         card=ToolCardBinding(
+            result_projection=RESULT_PROJECTION,
             card_type="historical_drawdown",
             version=1,
             presenter=present_historical_drawdown,
