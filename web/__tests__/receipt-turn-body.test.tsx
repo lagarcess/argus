@@ -9,12 +9,14 @@ import type { ResearchReceiptTurn } from "../lib/public-receipt-turns";
 import { legacyReceipt, researchTurn, backtestTurn, turnDocument } from "./fixtures/receipt-turns";
 
 describe.each(["en", "es-419"] as const)("receipt body in %s", (language) => {
-  test("preserves the complete v1 main markup", () => {
+  test("renders legacy frozen facts in the shared chat presentation", () => {
     const markup = renderToStaticMarkup(<ReceiptBody payload={legacyReceipt} createdAt="2026-09-09T14:32:00Z" language={language} copy={receiptCopy(language)} />);
-    expect(markup.match(/<main[\s\S]*<\/main>/)?.[0]).toMatchSnapshot();
+    expect(markup).toContain(legacyReceipt.idea_title);
+    expect(markup).toContain(legacyReceipt.metrics[0].value);
+    expect(markup).toContain('data-receipt-question=""');
   });
 
-  test("renders the exact selected research and backtest content with one public action", () => {
+  test("renders the exact selected research and backtest content with one follow-up box", () => {
     const markup = renderToStaticMarkup(<ReceiptBody payload={turnDocument(researchTurn, backtestTurn)} createdAt="2026-09-09T14:32:00Z" language={language} copy={receiptCopy(language)} />);
     expect(markup).toContain(researchTurn.question);
     expect(markup).toContain("<strong>Revenue increased.</strong>");
@@ -23,7 +25,7 @@ describe.each(["en", "es-419"] as const)("receipt body in %s", (language) => {
     expect(markup).toContain(backtestTurn.idea_title);
     expect(markup).toContain("250");
     expect(markup).toContain("10");
-    expect(markup.match(/href="\/"/g)).toHaveLength(1);
+    expect(markup.match(/<textarea/g)).toHaveLength(1);
     expect(markup.match(/<main/g)).toHaveLength(1);
   });
 

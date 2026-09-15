@@ -1645,6 +1645,23 @@
     }
   },
   "receipt": {
+    "thread": {
+      "notice": "Shared from Argus, snapshot from {{date}}. Your follow-ups start your own chat.",
+      "preview_notice": "Shared from Argus. Snapshot preview. Your follow-ups start your own chat.",
+      "read_only": "Read-only snapshot",
+      "carried": "From a shared conversation, {{date}}"
+    },
+    "followup": {
+      "error": "Your chat could not start. Try again.",
+      "retry": "Try again",
+      "unavailable": "This shared conversation is no longer available.",
+      "loading": "Starting your chat",
+      "label": "Follow up in your own chat",
+      "placeholder": "Ask a follow-up...",
+      "send": "Send follow-up",
+      "starting": "Starting your chat",
+      "hint": "Your follow-up starts your own Argus chat."
+    },
     "calculation": {
       "stamp": "Argus computed this on {{date}}",
       "used": "What Argus used",

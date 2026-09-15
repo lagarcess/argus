@@ -76,7 +76,7 @@ export function ShareReceiptPanel({ conversationId, onClose }: ReceiptShareTarge
         <p className="mt-3 text-[13px] leading-relaxed text-black/55 dark:text-white/55">{copy.owner.created_note}</p>
       </> : state.preview ? <>
         {state.preview.existing_receipt && <p className="mb-3 text-[13px] leading-relaxed text-black/55 dark:text-white/55">{copy.selection.existing}</p>}
-        <div lang={language} className="-mx-5 bg-[#191c1f]"><ReceiptBody payload={state.preview.payload} createdAt={state.preview.existing_receipt?.created_at ?? null} language={language} copy={copy} preview /></div>
+        <div lang={language} className="-mx-5 bg-white dark:bg-[#191c1f]"><ReceiptBody payload={state.preview.payload} createdAt={state.preview.existing_receipt?.created_at ?? null} language={language} copy={copy} preview /></div>
       </> : <>
         <fieldset disabled={busy}>
           <legend className="sr-only">{copy.selection.title}</legend>

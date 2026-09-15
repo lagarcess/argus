@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from loguru import logger
 
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.state.models import ConversationMessage
 from argus.api import state as api_state
 from argus.api.chat.previews import (
@@ -820,17 +821,21 @@ def load_runtime_thread_history(
     conversation_id: str,
     limit: int = 20,
     drop_failed_lookups: bool = False,
+    drop_shared_turns: bool = False,
     failed_assistant_id: str | None = None,
 ) -> list[ConversationMessage]:
     messages = _load_runtime_thread_messages(
         user_id=user_id,
         conversation_id=conversation_id,
         limit=limit,
+        drop_shared_turns=drop_shared_turns,
     )
     history, _ = _runtime_thread_history(
         messages,
         conversation_id=conversation_id,
+        limit=limit,
         drop_failed_lookups=drop_failed_lookups,
+        drop_shared_turns=drop_shared_turns,
         failed_assistant_id=failed_assistant_id,
     )
     return history
@@ -841,8 +846,10 @@ def _load_runtime_thread_messages(
     user_id: str,
     conversation_id: str,
     limit: int,
+    drop_shared_turns: bool = False,
 ) -> list[Message]:
     messages: list[Message] = []
+    imported: list[Message] = []
     if api_state.supabase_gateway is not None:
         try:
             messages = api_state.supabase_gateway.list_messages(
@@ -851,24 +858,44 @@ def _load_runtime_thread_messages(
                 limit=limit,
                 newest_first_window=True,
             )
+            if not drop_shared_turns:
+                imported = api_state.supabase_gateway.list_shared_messages(
+                    user_id=user_id, conversation_id=conversation_id
+                )
         except Exception as exc:
             if not dev_memory_fallback_enabled():
                 raise
+            messages = []
             logger.warning(
                 "Supabase message history read failed; using dev memory fallback",
                 error=str(exc),
                 conversation_id=conversation_id,
             )
-    if not messages:
-        messages = list(api_state.store.messages.get(conversation_id, []))[-limit:]
-    return sorted(messages, key=lambda item: (item.created_at, item.id))
+    if (
+        not messages
+        and api_state.store.conversation_owners.get(conversation_id) == user_id
+    ):
+        stored = list(api_state.store.messages.get(conversation_id, []))
+        messages = stored[-limit:]
+        if not drop_shared_turns:
+            imported = [
+                message
+                for message in stored
+                if isinstance((message.metadata or {}).get("shared_conversation"), dict)
+            ]
+    return sorted(
+        {message.id: message for message in [*imported, *messages]}.values(),
+        key=lambda item: (item.created_at, item.id),
+    )
 
 
 def _runtime_thread_history(
     messages: list[Message],
     *,
     conversation_id: str,
+    limit: int = 20,
     drop_failed_lookups: bool = False,
+    drop_shared_turns: bool = False,
     failed_assistant_id: str | None = None,
 ) -> tuple[list[ConversationMessage], str | None]:
     # Runtime history uses explicit retry identity, never repeated-question text.
@@ -882,6 +909,8 @@ def _runtime_thread_history(
         excluded_reply_ids.add(failed_assistant_id)
     history: list[ConversationMessage] = []
     for message in messages:
+        if drop_shared_turns and (message.metadata or {}).get("shared_conversation"):
+            continue
         if message.role not in {"user", "assistant", "system", "tool"}:
             continue
         if message.role == "assistant" and message.id in excluded_reply_ids:
@@ -904,8 +933,16 @@ def _runtime_thread_history(
             if card_facts is not None
             else message.content
         )
-        history.append(ConversationMessage(role=message.role, content=content))
-    return history, failed_assistant_id
+        history.append(
+            ConversationMessage(
+                role=message.role,
+                content=content,
+                shared_context=isinstance(
+                    (message.metadata or {}).get("shared_conversation"), dict
+                ),
+            )
+        )
+    return select_thread_history(history, recent_limit=limit), failed_assistant_id
 
 
 def _should_suppress_late_success_artifact(

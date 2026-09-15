@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.interpreter.audits import DcaContractAudit
 from argus.agent_runtime.interpreter.shared import (
     _TOTAL_CAPITAL_SOURCES,
@@ -410,8 +411,8 @@ def _strategy_family_continuity_audit_messages(
     request: InterpretationRequest,
 ) -> list[dict[str, str]]:
     recent_history = [
-        item.model_dump(mode="json")
-        for item in request.recent_thread_history[-6:]
+        {"role": item.role, "content": item.content}
+        for item in select_thread_history(request.recent_thread_history)
         if hasattr(item, "role") and hasattr(item, "content")
     ]
     return [

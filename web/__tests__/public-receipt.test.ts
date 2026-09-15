@@ -346,8 +346,8 @@ describe("the preview image inherits the never-expose list", () => {
 describe("the rendered page", () => {
   test("carries the provenance mark and prominent not-advice framing", () => {
     const body = source(RECEIPT_BODY);
-    expect(body).toContain("ProvenanceMark");
-    expect(body).toContain("copy.framing.headline");
+    expect(body).toContain("copy.thread.notice");
+    expect(body).toContain("ReceiptTurnContent");
     const markup = renderToStaticMarkup(createElement(ReceiptBody, { payload: PAYLOAD, createdAt: null, language: "en", copy: receiptCopy("en") }));
     expect(markup).toContain(receiptCopy("en").framing.detail);
   });
@@ -435,7 +435,7 @@ describe("the strategy a receipt shows", () => {
   test("the rules shown are composed from the frozen facts", () => {
     const plan = source(join(WEB_ROOT, "lib/receipt-plan.ts"));
     expect(plan).toContain("payload.strategy_facts");
-    expect(source(RECEIPT_BODY)).toContain("plan.rows.map");
+    expect(source(join(WEB_ROOT, "components/receipt/ReceiptTurnContent.tsx"))).toContain("plan.rows.map");
   });
 
   test("labels are the viewer's language and values stay frozen", () => {
@@ -703,7 +703,7 @@ describe("the action bar", () => {
     // Not optional and not defaulted: the prop is required by the type.
     expect(bar).toContain("framing: string;");
     expect(bar).not.toContain("framing?");
-    for (const surface of [RECEIPT_BODY, join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
+    for (const surface of [join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
       expect(source(surface)).toContain("copy.framing.headline");
     }
   });
@@ -727,10 +727,10 @@ describe("the action bar", () => {
     expect(layout).toContain("calc(112px_+_env(safe-area-inset-bottom))");
   });
 
-  test("both surfaces leave room for it, from one shared value", () => {
+  test("the tombstone leaves room for its fixed bar while the thread has an in-flow composer", () => {
     // A page that renders the bar without the clearance hides its own last line,
     // and two hand-copied paddings would drift.
-    for (const surface of [RECEIPT_BODY, join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
+    for (const surface of [join(WEB_ROOT, "components/receipt/ReceiptNotice.tsx")]) {
       const body = source(surface);
       expect(body).toContain("RECEIPT_ACTION_BAR_CLEARANCE");
       expect(body).not.toContain("pb-14");

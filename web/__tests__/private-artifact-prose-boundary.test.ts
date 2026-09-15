@@ -99,7 +99,9 @@ describe("private artifact prose AST boundary", () => {
       "components/chat/ChatMessage.tsx:getDisplayContent:message.content": 1,
       // General transcript hydration/stream state consumes the scrubbed DTO.
       "components/chat/chat-message-projection.ts:applyEmptyFinalFallback:options.content": 1,
-      "components/chat/chat-message-projection.ts:hydrateMessagesFromApi:message.content": 1,
+      // The second read carries ordinary imported history. Shared provenance
+      // returns before all live artifact branches and renders frozen public cards.
+      "components/chat/chat-message-projection.ts:hydrateMessagesFromApi:message.content": 2,
       "components/chat/chat-message-projection.ts:messageStreamPresentation:message.content": 1,
       // Presence-only status check moved out of ChatInterface; it never renders prose.
       "components/chat/chat-message-projection.ts:standaloneStreamStatusVisible:latestAssistant?.content": 1,

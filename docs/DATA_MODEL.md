@@ -1427,6 +1427,37 @@ The snapshot is frozen at creation and the public read never queries the source
 conversation, message, run or provider. Asking again or rerunning produces new
 source material and leaves the earlier receipt unchanged.
 
+### Receiver copies (founder-locked 2026-09-14)
+
+A first follow-up creates a receiver-owned conversation and ordinary message rows
+from the frozen public payload, inside one transaction. No new table, column or
+migration is needed. Receipt rows and their source deletion/revocation lifecycle
+are unchanged. The transaction serializes fork admission with revocation and uses
+receiver/request retry identity to create exactly one copy. A receiver copy has
+no source-conversation foreign key, so later revoke/delete keeps its copied text.
+Replay matches the imported request id within current message and conversation
+ownership. It does not derive replay identity from the current owner's user id:
+the existing guest handoff transfers ownership without changing message IDs or
+the imported request metadata, so the permanent account reuses the same copy.
+
+Imported message metadata uses `shared_conversation` with `snapshot_at`, public
+receipt id, request id, turn index, and the assistant's frozen public `card` where
+present. These fields are provenance and retry identity, never analytics viewer
+identity or live run/confirmation/calculation handles. All owner notes are removed,
+including notes on individual turns. Normal history readers include the carried
+user/assistant content; naming excludes imported messages. No runs, interests,
+memory records, usage records, or owner activity are imported. Cards render only
+frozen public fields and cannot be edited or recomputed in place.
+Runtime history derives internal carried-context provenance from this metadata.
+One selection rule retains that bounded context alongside the normal recent
+receiver turns; provider messages still contain ordinary roles and content only.
+
+Total ordinary history text is bounded at 64 KiB UTF-8, and total carried text and
+card metadata at 512 KiB. Oversized public facts fail before any write or guest
+replacement. Guest copies use the existing workspace, explicit nonempty-chat
+replacement choice, unchanged counters/expiry and existing signup transfer.
+Count-only followed-up and signed-up stages add no viewer identifier.
+
 Fields:
 - `id`: `uuid` (Primary Key)
 - `public_id`: `text` (Unique, `^[A-Za-z0-9_-]{22,64}$`, 24 bytes of urlsafe

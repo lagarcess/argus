@@ -2404,6 +2404,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/public/receipts/{public_id}/fork:
+    post:
+      tags:
+      - public-receipts
+      parameters:
+      - name: public_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicExcerptForkRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptForkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/search:
     get:
       tags:
@@ -5432,6 +5469,37 @@ components:
       - config_snapshot
       - figures
       - result_card
+    PublicExcerptForkRequest:
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+        replace_guest_conversation_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - request_id
+    PublicExcerptForkResponse:
+      properties:
+        conversation:
+          $ref: '#/components/schemas/Conversation'
+        created:
+          type: boolean
+      type: object
+      required:
+      - conversation
+      - created
     PublicExcerptFunnelStage:
       properties:
         stage:
@@ -5439,6 +5507,8 @@ components:
           enum:
           - viewed
           - try_argus
+          - followed_up
+          - signed_up
         kind:
           type: string
           enum:

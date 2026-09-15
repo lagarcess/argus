@@ -2804,6 +2804,7 @@ class PostgresCanonicalMemoryStore:
                  where message.id = %s
                    and message.user_id = %s
                    and conversation.user_id = %s
+                   and not (coalesce(message.metadata, '{}'::jsonb) ? 'shared_conversation')
             """,
         }
         statement = statements[source_kind]

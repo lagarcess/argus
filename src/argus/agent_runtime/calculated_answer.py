@@ -29,6 +29,7 @@ from argus.agent_runtime.answer_calculation import (
     publish_calculations,
 )
 from argus.agent_runtime.calculation_rows import market_counterfactual_rows
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.knowledge_answer import VoicedAnswer
 from argus.agent_runtime.result_next_steps import next_steps_patch, offered_test_steps
 from argus.agent_runtime.stages.interpret_types import (
@@ -585,7 +586,7 @@ def _messages(
         calculation_kinds_clause(),
     ]
     lines: list[str] = []
-    for turn in list(history or [])[-_HISTORY_TURNS:]:
+    for turn in select_thread_history(history or [], recent_limit=_HISTORY_TURNS):
         role = str(
             getattr(turn, "role", "")
             or (turn.get("role") if isinstance(turn, dict) else "")

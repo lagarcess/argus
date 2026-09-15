@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from argus.agent_runtime.clarification_contract import (
     validated_starting_capital_bounds,
 )
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.response_style import ARGUS_RESPONSE_STYLE_CONTRACT
 from argus.agent_runtime.state.models import (
     ConversationMessage,
@@ -177,7 +178,7 @@ class OpenRouterClarificationGenerator:
 
     def _messages(self, request: ClarificationRequest) -> list[BaseMessage]:
         history: list[BaseMessage] = []
-        for item in request.recent_thread_history[-6:]:
+        for item in select_thread_history(request.recent_thread_history):
             if not hasattr(item, "role") or not hasattr(item, "content"):
                 continue
             content = str(item.content)

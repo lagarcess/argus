@@ -1,3 +1,4 @@
+import { rememberReceiptFollowupClaim } from './receipt-followup-storage';
 import { parseToolProgress, type ToolProgress, type ToolResultCard, type ToolScalar } from "./tool-result-card";
 import { getSupabaseClient } from "./supabase-client";
 import i18next from "i18next";
@@ -574,12 +575,15 @@ export async function persistBrowserSession(payload: AuthResponsePayload) {
   if (!supabase) {
     return;
   }
-  const { error } = await supabase.auth.setSession({
+  const { data, error } = await supabase.auth.setSession({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
   });
   if (error) {
     throw error;
+  }
+  if (payload.guest_claim && data?.session?.user.id) {
+    rememberReceiptFollowupClaim(data.session.user.id, payload.guest_claim.conversation_id);
   }
 }
 
@@ -1032,13 +1036,10 @@ export async function streamChatMessage(
         ? { failed_assistant_id: options.failedAssistantId }
         : {}),
       ...(typeof input === "string" ? { message: input } : { action: input }),
-      // Callers decide which turns carry mentions; this layer only forwards
-      // them. Gating on a string input silently dropped the resolver identity
-      // that a discovery selection attaches to its action turn.
+      // Forward caller-owned mentions, including discovery action identity.
       ...(mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
-      // Temporary chat: only ever narrows behavior, so the transport layer
-      // owns it and ordinary conversations send an unchanged body.
+      // Temporary chat narrows behavior; ordinary requests stay unchanged.
       ...(isConversationMemoryOptOut(conversationId)
         ? { memory_opt_out: true }
         : {}),
