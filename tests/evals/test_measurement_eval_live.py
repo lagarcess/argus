@@ -41,6 +41,11 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
     if os.getenv("ARGUS_RUN_LIVE_EVALS") != "1":
         pytest.skip("set ARGUS_RUN_LIVE_EVALS=1 to spend live LLM eval calls")
     _assert_requested_live_eval_credentials()
+    budget_report = (os.getenv("ARGUS_EVAL_BUDGET_REPORT") or "").strip()
+    if not budget_report:
+        raise RuntimeError(
+            "ARGUS_EVAL_BUDGET_REPORT is required for the approved live measurement"
+        )
 
     if not (os.getenv("ARGUS_ASSET_PROVIDER_MODE") or "").strip():
         asset_provider_mode = (
@@ -61,23 +66,19 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
 
     provenance = build_scorecard_provenance(evaluation_mode="live")
     cases = load_eval_cases()
-    budget_report = os.getenv("ARGUS_EVAL_BUDGET_REPORT")
-    if budget_report:
-        from tests.evals.measurement_budget import MeasurementBudget
-        from tests.evals.measurement_budget_runner import run_budgeted_cases
+    from tests.evals.measurement_budget import MeasurementBudget
+    from tests.evals.measurement_budget_runner import run_budgeted_cases
 
-        report_path = Path(budget_report)
-        budget = MeasurementBudget(report_path, [case.id for case in cases])
-        budget.install(monkeypatch)
-        results = run_budgeted_cases(
-            cases,
-            run_case=run_eval_case,
-            budget=budget,
-            provenance=provenance,
-            progress_path=report_path.with_suffix(".progress.json"),
-        )
-    else:
-        results = [run_eval_case(case) for case in cases]
+    report_path = Path(budget_report)
+    budget = MeasurementBudget(report_path, [case.id for case in cases])
+    budget.install(monkeypatch)
+    results = run_budgeted_cases(
+        cases,
+        run_case=run_eval_case,
+        budget=budget,
+        provenance=provenance,
+        progress_path=report_path.with_suffix(".progress.json"),
+    )
     scorecard_path = write_scorecard(results, provenance=provenance)
     failures = [
         {

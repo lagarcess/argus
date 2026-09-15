@@ -80,10 +80,19 @@ Run the live harness with:
 ```bash
 ARGUS_RUN_LIVE_EVALS=1 \
 ARGUS_EVAL_ENV_FILE=<path> \
+ARGUS_EVAL_BUDGET_REPORT=temp/calculation-measurement-costs.jsonl \
 ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
 ARGUS_ASSET_PROVIDER_MODE=live_provider \
 poetry run pytest tests/evals/test_measurement_eval_live.py -q
 ```
+
+`ARGUS_EVAL_BUDGET_REPORT` is mandatory and must name a new, ignored JSONL
+file. The sanctioned suite refuses missing or blank budget configuration before
+provider work. The current approved scope is $15 total, including $8 for Agent
+and at most 16 Agent sends, one per eligible case; see the
+[approved budget and case allowlists](../../docs/reports/evidence/calculation-followups/measurement-budget-proposal.md).
+Interrupted runs retain a sibling `.progress.json` file and never write a
+passing scorecard. Do not delete an existing ledger to reuse its path.
 
 `ARGUS_EVAL_ENV_FILE` must name a file no tracked file feeds, such as the
 gitignored `.env`. The harness refuses the file when it, or any step on the way

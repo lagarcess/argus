@@ -373,6 +373,7 @@ def test_live_suite_runs_environment_probe_before_any_eval_case(
         "ARGUS_ASSET_PROVIDER_MODE",
         "recorded_provider_fixture",
     )
+    monkeypatch.setenv("ARGUS_EVAL_BUDGET_REPORT", "unused-probe-only.jsonl")
     monkeypatch.setattr(live_suite, "clear_asset_cache", lambda: None)
     case_iteration_started = False
 
@@ -479,3 +480,26 @@ def test_budgeted_live_suite_cannot_write_scorecard_after_denied_send(
     assert partial["status"] == "incomplete"
     assert partial["interrupted_case_id"] == denied.id
     assert partial["results"] == []
+
+
+@pytest.mark.parametrize("report", [None, "", "  "])
+def test_live_suite_requires_budget_configuration_before_provider_work(
+    monkeypatch, report
+) -> None:
+    from tests.evals import test_measurement_eval_live as live_suite
+
+    monkeypatch.setenv("ARGUS_RUN_LIVE_EVALS", "1")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "fixture-only-key")
+    monkeypatch.setenv("ARGUS_ASSET_PROVIDER_MODE", "recorded_provider_fixture")
+    if report is None:
+        monkeypatch.delenv("ARGUS_EVAL_BUDGET_REPORT", raising=False)
+    else:
+        monkeypatch.setenv("ARGUS_EVAL_BUDGET_REPORT", report)
+    monkeypatch.setattr(live_suite, "clear_asset_cache", lambda: None)
+
+    def probe(**kwargs):
+        pytest.fail("provider probe ran without an approved budget guard")
+
+    monkeypatch.setattr(live_suite, "build_scorecard_provenance", probe)
+    with pytest.raises(RuntimeError, match="ARGUS_EVAL_BUDGET_REPORT is required"):
+        live_suite.test_measurement_live_eval_suite_writes_scorecard(monkeypatch)

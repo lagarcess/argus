@@ -1,7 +1,8 @@
 # Proposed 93-case measurement budget
 
 Status: founder-approved budget. The measurement-only guard now enforces the
-limits below at the HTTP-send boundary when `ARGUS_EVAL_BUDGET_REPORT` is set.
+limits below at the HTTP-send boundary. `ARGUS_EVAL_BUDGET_REPORT` is required;
+a missing or blank value refuses the live run before provider work.
 It leaves production retries unchanged. Live execution still requires its
 explicit go and a clean reconciled head; enabling the guard alone starts no call.
 
