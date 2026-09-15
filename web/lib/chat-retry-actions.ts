@@ -237,6 +237,7 @@ export function durableRetryLastTurnFromStreamError(
       },
     },
     {
+      assistantMessageId: stringOrNull(metadata.message_id)?.trim(),
       owningMessageId: requestMessageId,
       persistedMessage,
       messageRole: "user",

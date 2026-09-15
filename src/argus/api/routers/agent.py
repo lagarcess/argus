@@ -125,7 +125,7 @@ from argus.api.dependencies import current_user, dev_memory_fallback_enabled, pr
 from argus.api.guest_access import account_context, client_identity
 from argus.api.message_store import (
     latest_unresolved_terminal_runtime_failure_metadata,
-    load_runtime_thread_history,
+    load_chat_request_history,
     reconcile_stale_chat_turns,
 )
 from argus.api.naming import get_starter_prompts
@@ -352,9 +352,10 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
     )
-    recent_thread_history = load_runtime_thread_history(
+    payload, recent_thread_history = load_chat_request_history(
         user_id=user.id,
         conversation_id=conversation.id,
+        payload=payload,
     )
     confirmation_action_messages = recent_confirmation_messages(
         payload=payload,
@@ -1220,8 +1221,7 @@ async def chat_stream(
                 ):
                     retryable_recovery_code = chat_retry.durable_retry_code(recovery)
                     if retryable_recovery_code is not None:
-                        # A retryable lookup recovery: the lifecycle owns the
-                        # durable retry; completed turns strip it by design.
+                        # The lifecycle owns durable retries on failed lookups.
                         assistant_message = lifecycle_hooks.recoverable_failure(
                             content=persisted_text or "",
                             metadata=metadata,
