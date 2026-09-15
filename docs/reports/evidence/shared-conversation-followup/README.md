@@ -2,10 +2,10 @@
 
 ## Candidate and integration
 
-- Product head captured: `cd49e68e`.
+- Product head captured: `32268093`.
 - Original integration base: `350e3dca8f573f5dfd61f1f753d8ed16a2724c9e`.
-- Reconciled integration: `bed233b0cdc96366acc5fc9d5a8d9193723612af`.
-- One-way merge: `1c7080379667556345f8dab7578eb45b211ee8d0`.
+- Reconciled integration: `538aec3a9947caf8eb290a1f87551a2212496d44`.
+- Latest one-way merge: `cf4edc6e56342c99b564ab9048c84af43cdb7d3b`.
 - No textual conflicts. Semantic overlap is PR #639's viewport portals in
   AdaptivePanel and the guest dialogs. Both sides retained. All five public and
   preview cases and fourteen receiver bridge cases passed after reconciliation.
@@ -16,6 +16,19 @@
   clock-unavailable failure caused by that import. Linux CI owns the final
   unaffected-environment check. OpenAPI compatibility: 23 pass. Merged-tree
   modularity passes. No textual conflicts; both lanes retained.
+
+### Latest integration overlap
+
+PR #635 landed after the review fixes. Its saved-message freshness logic shares
+ChatInterface transcript loading, conversation activity, and the PostgreSQL
+latest-message reader with this lane. The merge retained both owners without
+textual conflicts. No migration, deployment setting or release contract changed.
+The merged tree passes 113 focused backend/OpenAPI checks, 2,047 frontend tests,
+production build, and the modularity budget. All 27 browser cases pass: the 19
+sharing cases plus eight English/Spanish transcript-freshness cases. Public and
+preview screenshots were refreshed at the recorded product head. Earlier
+unaffected backend and PostgreSQL evidence is retained; the new CI run verifies
+the complete merged tree in Linux.
 
 ## Attribution
 
@@ -73,7 +86,7 @@ existing guest consent/cancel, retry identity, reload, revoke and conversion.
 
 ## Deterministic verification
 
-- Frontend: 2,027 tests pass; production build passes; lint has zero errors
+- Frontend: 2,047 tests pass; production build passes; lint has zero errors
   (eight existing unused-variable warnings).
 - Backend fork/fixture/runtime final selection: 18 pass, including six real
   PostgreSQL tests using an isolated empty schema clone, with no new migration.
