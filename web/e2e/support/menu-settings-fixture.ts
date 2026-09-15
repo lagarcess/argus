@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import path from "node:path";
 import { FREEZE_CSS, installBreakpointFixture, type Account, type Language } from "./breakpoint-fixture";
 
-export type Cell = { width: number; account: Account; language: Language; theme?: "dark" | "light" };
+export type Cell = { width: number; account: Account; language: Language; theme?: "dark" | "light"; motion?: "on" };
 export const AUDIT_DIR = process.env.ARGUS_MENU_AUDIT_DIR
   ? path.resolve(process.env.ARGUS_MENU_AUDIT_DIR)
   : path.resolve(__dirname, "../../../docs/reports/evidence/menu-settings-width-contract/audit");
@@ -14,7 +14,7 @@ export function auditTag(cell: Cell) { return `${cell.account}-${cell.language}-
 
 export async function openFixture(page: Page, cell: Cell, url = "/chat?conversation=conversation-alpha") {
   await page.setViewportSize({ width: cell.width, height: 900 });
-  await page.emulateMedia({ colorScheme: cell.theme ?? "dark", reducedMotion: "reduce" });
+  await page.emulateMedia({ colorScheme: cell.theme ?? "dark", reducedMotion: cell.motion === "on" ? "no-preference" : "reduce" });
   // Deny all external requests; the fixture installed afterwards owns API reads.
   await page.route("**/*", (route) => {
     const url = new URL(route.request().url());
@@ -41,7 +41,7 @@ export async function openFixture(page: Page, cell: Cell, url = "/chat?conversat
     return route.fallback();
   });
   await page.goto(url, { waitUntil: "networkidle" });
-  await page.addStyleTag({ content: FREEZE_CSS });
+  if (cell.motion !== "on") await page.addStyleTag({ content: FREEZE_CSS });
   if (url.startsWith("/chat")) await expect(page.getByTestId("chat-input")).toBeVisible();
 }
 

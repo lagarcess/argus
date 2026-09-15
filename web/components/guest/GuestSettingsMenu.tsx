@@ -41,7 +41,9 @@ export default function GuestSettingsMenu({
   const gearButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    // The sheet owns outside presses and Escape. Its portaled controls are
+    // outside menuRef, so the desktop listener would dismiss them on mousedown.
+    if (!isOpen || asSheet) return;
     const handlePointerDown = (event: MouseEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) {
         setIsOpen(false);
@@ -59,7 +61,7 @@ export default function GuestSettingsMenu({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, asSheet]);
 
   const themeOptions = [
     {

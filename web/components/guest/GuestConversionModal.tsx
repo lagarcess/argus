@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -30,7 +32,7 @@ type GuestConversionModalProps = {
   ) => Promise<AuthFormSubmissionResult | void>;
 };
 
-export default function GuestConversionModal({
+export function GuestConversionModalSurface({
   isOpen,
   reason,
   initialMode,
@@ -178,3 +180,5 @@ export default function GuestConversionModal({
     </div>
   );
 }
+
+export default withViewportPortal(GuestConversionModalSurface);

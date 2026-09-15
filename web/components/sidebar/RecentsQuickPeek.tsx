@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { History, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -25,7 +27,7 @@ function historyConversationId(item: HistoryItem): string {
   return item.conversation_id ?? item.id;
 }
 
-export default function RecentsQuickPeek({
+export function RecentsQuickPeekSurface({
   historyItems,
   activeConversationId,
   onOpenItem,
@@ -189,3 +191,5 @@ export default function RecentsQuickPeek({
     </div>
   );
 }
+
+export default withViewportPortal(RecentsQuickPeekSurface);
