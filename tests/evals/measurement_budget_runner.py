@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import traceback
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable
+
+import httpx
+
+from tests.evals.measurement_budget import MeasurementCaseFailure
 
 
 def run_budgeted_cases(
@@ -38,8 +44,43 @@ def run_budgeted_cases(
     try:
         for case in cases:
             current = case.id
-            with budget.case(case.id):
-                result = run_case(case)
+            try:
+                with budget.case(case.id):
+                    result = run_case(case)
+            except (
+                MeasurementCaseFailure,
+                TimeoutError,
+                asyncio.TimeoutError,
+                asyncio.CancelledError,
+                httpx.TransportError,
+            ) as exc:
+                infrastructure = isinstance(exc, httpx.TransportError)
+                code = "transport_failure" if infrastructure else "runtime_timeout"
+                if isinstance(exc, MeasurementCaseFailure):
+                    code = "measurement_policy:" + str(exc)
+                result = {
+                    "id": case.id,
+                    "category": case.category,
+                    "status": "infrastructure_error" if infrastructure else "failed",
+                    "failed_checks": [] if infrastructure else [code],
+                    "infrastructure_errors": [
+                        {"component": "provider_transport", "code": type(exc).__name__}
+                    ]
+                    if infrastructure
+                    else [],
+                    "typed_outcome": {},
+                    "prose_judge": None,
+                    "route_receipts": [],
+                    "expected_fail": None,
+                    "failure_trace": [
+                        {
+                            "file": Path(frame.filename).name,
+                            "line": frame.lineno,
+                            "function": frame.name,
+                        }
+                        for frame in traceback.extract_tb(exc.__traceback__)
+                    ],
+                }
             results.append(result)
             persist("running")
             print(

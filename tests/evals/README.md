@@ -93,6 +93,13 @@ and at most 16 Agent sends, one per eligible case; see the
 [approved budget and case allowlists](../../docs/reports/evidence/calculation-followups/measurement-budget-proposal.md).
 Interrupted runs retain a sibling `.progress.json` file and never write a
 passing scorecard. Do not delete an existing ledger to reuse its path.
+A cancelled or unbilled call retains its reservation and does not stop later
+cases. The runner preserves ordinary runtime scoring; an escaped deadline is a
+product failure and an escaped transport failure is `infrastructure_error`.
+Admission includes all settled and reserved spend, including the approved
+stopped-run ledger ($0.093172736 settled plus $0.10 reserved). The only spend
+caps are $15 total, $8 Agent, and 16 Agent sends. The next paid run waits for the
+founder to free the slot.
 
 `ARGUS_EVAL_ENV_FILE` must name a file no tracked file feeds, such as the
 gitignored `.env`. The harness refuses the file when it, or any step on the way

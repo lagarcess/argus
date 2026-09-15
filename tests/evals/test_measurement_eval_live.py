@@ -66,11 +66,13 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
 
     provenance = build_scorecard_provenance(evaluation_mode="live")
     cases = load_eval_cases()
-    from tests.evals.measurement_budget import MeasurementBudget
+    from tests.evals.measurement_budget import PRIOR_LEDGER, MeasurementBudget
     from tests.evals.measurement_budget_runner import run_budgeted_cases
 
     report_path = Path(budget_report)
-    budget = MeasurementBudget(report_path, [case.id for case in cases])
+    budget = MeasurementBudget(
+        report_path, [case.id for case in cases], prior_ledger=PRIOR_LEDGER
+    )
     budget.install(monkeypatch)
     results = run_budgeted_cases(
         cases,

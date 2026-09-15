@@ -86,7 +86,15 @@ def composer_unavailability(receipts: list[dict[str, Any]]) -> list[dict[str, An
     return [
         {
             "component": "runtime_composer",
-            "code": "provider_unavailable",
+            "code": (
+                "runtime_timeout"
+                if any(
+                    receipts[index].get("failure_mode")
+                    in {"TimeoutError", "CancelledError"}
+                    for index in attempts
+                )
+                else "provider_unavailable"
+            ),
             "route_receipt_indices": attempts,
         }
     ]

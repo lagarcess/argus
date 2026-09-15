@@ -296,7 +296,12 @@ def run_eval_case(
     typed_outcome["requires_new_facts"] = interpreter.research_need()
     typed_outcome["research_provider_attempts"] = len(research_attempts)
     failed_checks = typed_expectation_failures(case=case, outcome=typed_outcome)
-    infrastructure_errors = composer_unavailability(route_receipts)
+    unavailability = composer_unavailability(route_receipts)
+    infrastructure_errors = [
+        item for item in unavailability if item["code"] != "runtime_timeout"
+    ]
+    if any(item["code"] == "runtime_timeout" for item in unavailability):
+        failed_checks.append("runtime_timeout")
     judge_result = None
     if run_prose_judge and case.prose_judge_criteria:
         judged_final_patch = _final_patch(
@@ -309,7 +314,7 @@ def run_eval_case(
             final_patch=judged_final_patch,
             interpret_patch=interpret_result.patch,
         )
-        if infrastructure_errors:
+        if unavailability:
             judge_result = unavailable_prose_result(
                 "runtime composer did not return prose"
             )

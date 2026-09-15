@@ -426,7 +426,7 @@ def test_live_measurement_keeps_its_declared_runtime_flags(monkeypatch) -> None:
     assert {key: os.environ[key] for key in flags} == flags
 
 
-def test_budgeted_live_suite_cannot_write_scorecard_after_denied_send(
+def test_budgeted_live_suite_scores_denied_send_and_carries_prior_spend(
     monkeypatch, tmp_path
 ) -> None:
     from dataclasses import dataclass
@@ -434,7 +434,6 @@ def test_budgeted_live_suite_cannot_write_scorecard_after_denied_send(
     import httpx
 
     from tests.evals import test_measurement_eval_live as live_suite
-    from tests.evals.measurement_budget import MeasurementBudgetStop
 
     @dataclass
     class Provenance:
@@ -472,14 +471,17 @@ def test_budgeted_live_suite_cannot_write_scorecard_after_denied_send(
     monkeypatch.setattr(
         live_suite, "write_scorecard", lambda *a, **k: scorecards_written.append(a)
     )
-    with pytest.raises(MeasurementBudgetStop, match="no_new_facts_research_attempt"):
+    with pytest.raises(AssertionError, match="Argus eval failures"):
         live_suite.test_measurement_live_eval_suite_writes_scorecard(monkeypatch)
     assert sent == []
-    assert scorecards_written == []
+    assert len(scorecards_written) == 1
     partial = json.loads(report.with_suffix(".progress.json").read_text())
-    assert partial["status"] == "incomplete"
-    assert partial["interrupted_case_id"] == denied.id
-    assert partial["results"] == []
+    assert partial["status"] == "completed"
+    assert partial["budget"]["committed_usd"] == "0.193172736"
+    assert partial["interrupted_case_id"] is None
+    assert partial["results"][0]["failed_checks"] == [
+        "measurement_policy:no_new_facts_research_attempt"
+    ]
 
 
 @pytest.mark.parametrize("report", [None, "", "  "])
