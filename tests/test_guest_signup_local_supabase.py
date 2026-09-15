@@ -19,11 +19,11 @@ from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.routers import agent as agent_router
 from argus.api.routers import auth as auth_router
-from argus.domain.supabase_gateway import SupabaseGateway
 from argus.domain.visitor_usage import visitor_key_for
 from fastapi.testclient import TestClient
 
 from supabase import create_client
+from tests.local_supabase_support import local_supabase_gateway as _gateway
 
 LOCAL_URL = os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip()
 LOCAL_ANON_KEY = os.getenv("ARGUS_LOCAL_SUPABASE_ANON_KEY", "").strip()
@@ -39,13 +39,6 @@ pytestmark = pytest.mark.skipif(
     not all((LOCAL_URL, LOCAL_ANON_KEY, LOCAL_SERVICE_KEY, LOCAL_DATABASE_URL)),
     reason="local Supabase Auth proof is not configured",
 )
-
-
-def _gateway() -> SupabaseGateway:
-    return SupabaseGateway(
-        client=create_client(LOCAL_URL, LOCAL_SERVICE_KEY),
-        auth_client=create_client(LOCAL_URL, LOCAL_ANON_KEY),
-    )
 
 
 def _deterministic_launch_payload(language: str) -> dict[str, Any]:
