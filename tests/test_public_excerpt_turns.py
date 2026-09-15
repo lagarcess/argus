@@ -102,7 +102,7 @@ def test_preview_is_exact_closed_frozen_document_without_side_effects(owner):
     assert result.payload.schema_version == 2
     assert result.payload.kind == "turns"
     leaf = result.payload.turns[0]
-    assert leaf.question == "Why did AAPL rise?"
+    assert leaf.question == "  Why\n did AAPL rise? "
     assert leaf.answer == answer.content
     assert set(leaf.model_dump()) == {
         "kind",
@@ -146,13 +146,9 @@ def test_selection_bounds_and_canonical_order(owner, count):
 @pytest.mark.parametrize(
     "mutation,reason",
     [
-        (lambda m: m.update(memory_recalls=[{}]), "memory_used"),
-        (lambda m: m["research"].update(degraded=True), "degraded"),
-        (lambda m: m["research"].update(sources=[]), "missing_sources"),
         (lambda m: m["research"].update(shape="find"), "unsupported_shape"),
         (lambda m: m["research"].update(shape="personal_money"), "unsupported_shape"),
         (lambda m: m["agent_runtime_turn"].update(terminal=False), "not_completed"),
-        (lambda m: m.update(confirmation={}), "unsupported_turn"),
     ],
 )
 def test_refusal_refuses_whole_selection_and_candidates_name_reason(
@@ -173,10 +169,7 @@ def test_refusal_refuses_whole_selection_and_candidates_name_reason(
 
 @pytest.mark.parametrize("shape", ["fast", "balanced", "thorough"])
 def test_every_rail_shape_with_a_publisher_is_a_receipt(owner, shape):
-    """A quote is an answer like any other. The fast shape was excluded on the
-    reasoning that a quote has no publisher; a fast turn with a typed source
-    freezes like a balanced one, and one without any is refused for the
-    missing source, never for its shape."""
+    """All answer rail shapes share; sources are preserved when present."""
     _, answer = add_pair(
         owner, question="What is Apple at?", answer="Apple is at **$316.22**."
     )
@@ -187,23 +180,12 @@ def test_every_rail_shape_with_a_publisher_is_a_receipt(owner, shape):
     candidates = service.receipt_candidates(user=owner[0], conversation_id=owner[1].id)
     assert candidates.items[0].eligible
     answer.metadata["research"]["sources"] = []
-    with pytest.raises(PublicExcerptSourceError) as error:
-        preview(owner, [answer])
-    assert error.value.reason == "missing_sources"
+    assert preview(owner, [answer]).payload.turns[0].sources == []
 
 
 @pytest.mark.parametrize("field", ["question", "answer", "owner_note"])
-@pytest.mark.parametrize(
-    "unsafe",
-    [
-        "record 12345678-1234-4123-8123-123456789abc",
-        "Bearer secret",
-        "supabase record",
-        "abcdefghijklmnopqrstuvwxyzABCDEF",
-        "sk-abcdefghi",
-    ],
-)
-def test_every_prose_field_shares_identifier_and_secret_audit(owner, field, unsafe):
+def test_every_prose_field_rejects_exact_private_argus_identifiers(owner, field):
+    unsafe = owner[1].id
     kwargs = {field: unsafe} if field != "owner_note" else {}
     _, answer = add_pair(owner, **kwargs)
     with pytest.raises(PublicExcerptSourceError) as error:
@@ -211,9 +193,7 @@ def test_every_prose_field_shares_identifier_and_secret_audit(owner, field, unsa
     assert error.value.field == field
 
 
-@pytest.mark.parametrize(
-    "field,length", [("question", 501), ("answer", 4001), ("owner_note", 281)]
-)
+@pytest.mark.parametrize("field,length", [("owner_note", 281)])
 def test_field_bounds_refuse_without_truncation(owner, field, length):
     value = ("short " * length)[:length]
     _, answer = add_pair(owner, **({field: value} if field != "owner_note" else {}))
@@ -234,12 +214,9 @@ def test_field_bounds_refuse_without_truncation(owner, field, length):
         "Read https://evil.test/x",
     ],
 )
-def test_all_url_destinations_must_be_verbatim_typed_sources(owner, answer):
+def test_owner_preview_accepts_links_without_a_source_list_entry(owner, answer):
     _, message = add_pair(owner, answer=answer)
-    with pytest.raises(PublicExcerptSourceError) as error:
-        preview(owner, [message])
-    assert error.value.field == "answer"
-    assert error.value.reason == "unlisted_url"
+    assert preview(owner, [message]).payload.turns[0].answer == answer
 
 
 def test_listed_markdown_link_preserved_and_next_step_reads_typed_symbols(owner):

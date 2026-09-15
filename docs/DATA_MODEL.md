@@ -1438,10 +1438,11 @@ Fields:
   ON DELETE SET NULL)
 - `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
   ON DELETE SET NULL)
-- `kind`: `text` (`backtest`, `research_answer`, `calculation`, or `mixed`;
+- `kind`: `text` (`backtest`, `research_answer`, `calculation`, `answer`, or `mixed`;
   existing rows default to `backtest`; migration
   `20260912190000_share_calculation_receipts.sql` added `calculation` to the
-  check additively)
+  check additively; `20260914120000_share_plain_answer_receipts.sql` adds
+  `answer` using the same check and must be applied at promotion)
 - `source_message_ids`: `uuid[]` (Private selected assistant messages; one or more
   for new receipts, empty for legacy rows)
 - `source_run_ids`, `source_artifact_ids`: `uuid[]` (Private selected backtest
@@ -1471,9 +1472,12 @@ on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
 
 Version 2 is a closed outer `{schema_version: 2, kind: "turns", turns: [...]}`
 wrapper. It contains one or more per-turn payloads in conversation order. Each
-turn has a closed `kind` discriminator. The exact research leaf is specified by
-`docs/specs/conversation-sharing.md` section 4.2; no field is added to that leaf.
-The backtest leaf freezes the card's closed typed fact bank, title, visual, note,
+turn has a closed `kind` discriminator. The active frozen-field policy is in
+`docs/specs/conversation-sharing.md` section 4.2. Plain final answers use `answer`;
+research keeps any available typed sources and dates without requiring them. New
+backtest leaves also freeze question and final answer text; optional fields keep
+older version 2 rows readable. The backtest leaf freezes the card's closed typed
+fact bank, title, visual, note,
 content language, framing and provenance. `public_excerpt_fact_schemas.py` closes
 every nested config, rule, figure and cost field. The public renderer reads the
 same result fact and display owners as the result card.
@@ -1483,17 +1487,20 @@ inputs, notes, computed_at, owner_note, content_language, framing:
 "calculation_not_advice", provenance_mark}` for one calculation. For an answer
 that weighs options it carries `calculations: [{title, answer, rows, inputs,
 notes}, ...]` in place of those five fields, one per card in order; every card
-must pass its receipt policy or the answer is refused, and a leaf frozen in the
-first shape still renders. The title and every label, unit,
+uses the closed public presentation, and a leaf frozen in the first shape
+still renders. New leaves additionally retain the selected final answer text. The title and every label, unit,
 `value_text` and note is `{locale_key, interpolation_args}`. A fact is `{label,
 value, value_text, unit, source}`, where `source` is `{title, url, date}` and
-exists only for a page. `inputs` holds only the inputs a public page stated or a
-declaration marked `public`; an input the user typed, the card's `arguments` and
-its visual never enter the payload. The receipt freezes those facts at creation
+exists only for a page. `inputs` holds explicitly public/page-sourced inputs and user-written inputs
+selected through the owner preview. Hidden account or memory inputs are not
+added. Raw card `arguments` and its visual never enter the payload. The receipt freezes those facts at creation
 and never recomputes.
 
-Every selected turn independently passes the shared eligibility and privacy audit
-at preview and creation. A refusal refuses the entire selection. The owner sees
+Every selected final answer independently passes the shared completion,
+ownership and exact private Argus identifier audit at preview and creation.
+Credential shape, missing sources, unlisted links, question/answer length,
+degraded output and memory use are not refusal reasons. Confirmations and
+clarifications are not sharing units. A refusal refuses the entire selection. The owner sees
 the exact public rendering before creation; its digest must still match when
 creation rechecks the sources. The preview bounds the accepted cross-turn
 inference risk; it does not eliminate it.

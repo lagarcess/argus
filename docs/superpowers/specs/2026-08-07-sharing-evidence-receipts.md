@@ -248,31 +248,20 @@ Creation is gated by the allowlist today, which is the real control while the
 alpha is closed. A report path and takedown flow are required before public
 exposure and are not needed at current scale.
 
-### 7.5 What is shareable — DECIDED 2026-08-07
+### 7.5 What is shareable — SUPERSEDED 2026-09-14
 
-**Superseded in scope, founder 2026-09-09:**
-[conversation-sharing.md sections 4 and 4.5](../../specs/conversation-sharing.md#4-the-research-receipt)
-now permit grounded research answers and up to four independently eligible turns
-from one conversation, through this same receipt pipeline. The research exclusion
-and sequencing below record the original decision, not the active boundary.
-Freeze, privacy, revocation and owner requirements remain in force.
+The founder's 2026-09-14 decision in
+[conversation-sharing.md](../../specs/conversation-sharing.md) replaces this
+section. Shareable by default: the owner selects a question and its final answer
+inside the conversation, including backtests, research, calculations and plain
+answers. Confirmation cards and clarifications are not sharing units.
 
-**Completed backtest results only. Comparisons second, once the funnel is
-measured. Research answers not at all.**
-
-A result is the clean case: frozen numbers, closed payload, and it is what people
-actually want to show someone.
-
-A comparison is a reasonable second because its members are also frozen
-artifacts, but it references several runs and widens the surface. Wait until
-there is evidence anyone wants it.
-
-**Research answers are excluded on a different basis, not merely deferred.** They
-carry third-party claims into a page Argus publishes under its own domain,
-permanently, with no correction path once frozen. If a provider was wrong, Argus
-is the publisher of that error. That is a different risk class from publishing
-your own simulation results, and the sharing value is lower anyway: the
-interesting artifact is what would have happened, not what an article said.
+Owner selection and the exact preview are the privacy boundary. Credential-shaped
+text, missing sources, unlisted links, length, degraded answers and memory use
+are not refusal reasons. The closed projection still adds no account data or
+unselected turns, and exact Argus private identifiers remain prohibited.
+Frozen snapshots, registered ownership, noindex, revoke and deletion behavior
+remain unchanged. Sharing stays dark until the founder promotes it.
 
 ### 7.6 Revocation semantics — partially decided
 

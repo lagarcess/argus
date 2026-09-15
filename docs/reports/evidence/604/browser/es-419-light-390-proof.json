@@ -1,0 +1,16 @@
+{
+  "fixture": "production receipt API, synthetic memory store; unrelated shell endpoints stubbed",
+  "language": "es-419",
+  "theme": "light",
+  "width": 390,
+  "turns": 5,
+  "exact_preview_matches_public_payload": true,
+  "private_ids_absent": true,
+  "noindex": true,
+  "public_widths": [
+    390,
+    1024
+  ],
+  "revoked": true,
+  "provider_calls": 0
+}

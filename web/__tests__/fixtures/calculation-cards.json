@@ -6193,10 +6193,21 @@
       "value": 24.0,
       "value_text": null
     },
+    "answer_text": "Here is that multiple.",
     "computed_at": "2026-09-11T12:00:00Z",
     "content_language": "en",
     "framing": "calculation_not_advice",
     "inputs": [
+      {
+        "label": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.fields.symbol"
+        },
+        "source": null,
+        "unit": null,
+        "value": "AAPL",
+        "value_text": null
+      },
       {
         "label": {
           "interpolation_args": {},
@@ -6214,6 +6225,21 @@
           "locale_key": "tools.calc.units.currency"
         },
         "value": 150.0,
+        "value_text": null
+      },
+      {
+        "label": {
+          "interpolation_args": {},
+          "locale_key": "tools.calc.fields.per_share"
+        },
+        "source": null,
+        "unit": {
+          "interpolation_args": {
+            "code": "USD"
+          },
+          "locale_key": "tools.calc.units.currency"
+        },
+        "value": 6.25,
         "value_text": null
       }
     ],

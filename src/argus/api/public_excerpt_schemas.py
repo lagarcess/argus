@@ -208,7 +208,9 @@ class PublicExcerptPayload(BaseModel):
 # owner about it, and it exists so a request of nonexistent ids cannot buy
 # unbounded work before it is refused.
 PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT = 500
-PublicExcerptKind = Literal["backtest", "research_answer", "calculation", "mixed"]
+PublicExcerptKind = Literal[
+    "backtest", "research_answer", "calculation", "answer", "mixed"
+]
 PublicExcerptRefusalReason = Literal[
     "not_completed",
     "unsupported_turn",
@@ -246,10 +248,10 @@ class PublicExcerptOfferedNextStep(BaseModel):
 class PublicExcerptResearchTurn(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     kind: Literal["research_answer"] = "research_answer"
-    question: str = Field(min_length=1, max_length=500)
-    answer: str = Field(min_length=1, max_length=4000)
-    sources: list[PublicExcerptResearchSource] = Field(min_length=1, max_length=5)
-    retrieved_at: datetime
+    question: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    sources: list[PublicExcerptResearchSource] = Field(default_factory=list)
+    retrieved_at: datetime | None = None
     anchor_symbols: list[str] = Field(default_factory=list, max_length=5)
     asset_class: AssetClass | None = None
     offered_next_step: PublicExcerptOfferedNextStep | None = None
@@ -263,6 +265,8 @@ class PublicExcerptBacktestTurn(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     kind: Literal["backtest"] = "backtest"
     idea_title: str
+    question: str | None = None
+    answer: str | None = None
     fact_bank: PublicExcerptFactBank
     visual: PublicExcerptVisual | None = None
     owner_note: str | None = Field(default=None, max_length=280)
@@ -271,6 +275,14 @@ class PublicExcerptBacktestTurn(BaseModel):
         "historical_simulation_not_advice"
     )
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
+
+    @model_serializer(mode="wrap")
+    def _preserve_legacy_shape(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        for field in ("question", "answer"):
+            if data[field] is None:
+                data.pop(field)
+        return data
 
 
 class PublicExcerptCalculationText(BaseModel):
@@ -323,12 +335,13 @@ class PublicExcerptCalculationTurn(BaseModel):
 
     One calculation serializes flat, exactly as every receipt frozen before
     answers carried several, and more as ``calculations``; both shapes read
-    back alike. Inputs publish only when a public page stated them; an input
-    the user typed and the cards' arguments stay in the account."""
+    back alike. Public or user-written inputs are visible in the exact preview;
+    hidden account inputs and raw tool arguments stay in the account."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     kind: Literal["calculation"] = "calculation"
-    question: str = Field(min_length=1, max_length=500)
+    question: str = Field(min_length=1)
+    answer_text: str | None = None
     calculations: list[PublicExcerptCalculation] = Field(min_length=1, max_length=4)
     computed_at: datetime
     owner_note: str | None = Field(default=None, max_length=280)
@@ -352,6 +365,8 @@ class PublicExcerptCalculationTurn(BaseModel):
     @model_serializer(mode="wrap")
     def _frozen_shape(self, handler: SerializerFunctionWrapHandler):
         data = handler(self)
+        if data.get("answer_text") is None:
+            data.pop("answer_text", None)
         calculations = data.pop("calculations")
         head = {"kind": data.pop("kind"), "question": data.pop("question")}
         body = (
@@ -360,8 +375,24 @@ class PublicExcerptCalculationTurn(BaseModel):
         return {**head, **body, **data}
 
 
+class PublicExcerptAnswerTurn(BaseModel):
+    """Only the selected question and final answer, with no runtime metadata."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    kind: Literal["answer"] = "answer"
+    question: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    owner_note: str | None = Field(default=None, max_length=280)
+    content_language: Language = "en"
+    framing: Literal["answer_not_advice"] = "answer_not_advice"
+    provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
+
+
 PublicExcerptTurn = Annotated[
-    PublicExcerptResearchTurn | PublicExcerptBacktestTurn | PublicExcerptCalculationTurn,
+    PublicExcerptResearchTurn
+    | PublicExcerptBacktestTurn
+    | PublicExcerptCalculationTurn
+    | PublicExcerptAnswerTurn,
     Field(discriminator="kind"),
 ]
 
@@ -497,7 +528,7 @@ class PublicExcerptCandidate(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     message_id: str
     question: str | None = None
-    kind: Literal["backtest", "research_answer", "calculation"] | None = None
+    kind: Literal["backtest", "research_answer", "calculation", "answer"] | None = None
     eligible: bool
     reason: PublicExcerptRefusalReason | None = None
     field: PublicExcerptRefusalField | None = None

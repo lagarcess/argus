@@ -19,7 +19,7 @@ export type ReceiptFigures = {
 export type ReceiptCalculation = ReceiptFigures & { title: string };
 
 export type ReceiptPresentation = ReceiptFigures & {
-  title: string; language: ArgusLanguage; stamp: string | null;
+  title: string; answer?: string | null; textOnly?: boolean; language: ArgusLanguage; stamp: string | null;
   visual?: PublicReceiptVisual | null;
   research?: { answer: string; sources: ResearchReceiptTurn["sources"]; nextStep: string | null };
   /** Several calculations in order, each under its title; one calculation's figures sit on the entry itself. */
@@ -51,12 +51,13 @@ function legacyPresentation(payload: PublicReceiptPayload, createdAt: string | n
 function turnPresentation(turn: PublicReceiptTurn, createdAt: string | null, language: ArgusLanguage): ReceiptPresentation {
   const copy = receiptCopy(language);
   const base = { language: turn.content_language, ownerNote: turn.owner_note };
+  if (turn.kind === "answer") return { ...base, title: turn.question, answer: turn.answer, textOnly: true, stamp: null, rows: [], framing: copy.answer.framing };
   if (turn.kind === "calculation") return calculationPresentation(turn, language);
   if (turn.kind === "research_answer") {
     const date = formatReceiptDate(turn.retrieved_at, language) ?? "";
     const nextStepTemplate = turn.offered_next_step ? copy.research[turn.offered_next_step.kind] : null;
     return {
-      ...base, title: turn.question, stamp: interpolate(copy.research.stamp, { date }), rows: [], framing: copy.research.framing,
+      ...base, title: turn.question, stamp: date ? interpolate(copy.research.stamp, { date }) : null, rows: [], framing: copy.research.framing,
       research: { answer: turn.answer, sources: turn.sources, nextStep: typeof nextStepTemplate === "string" && turn.offered_next_step ? interpolate(nextStepTemplate, { symbols: turn.offered_next_step.symbols.join(", ") }) : null },
     };
   }
@@ -67,7 +68,7 @@ function turnPresentation(turn: PublicReceiptTurn, createdAt: string | null, lan
     dateRange: facts?.dateRange, readoutFacts: facts, executionCosts: facts?.costs,
   }, { t: receiptTranslator(language), locale: language });
   return {
-    ...base, title: turn.idea_title, stamp: formatReceiptDate(createdAt, language),
+    ...base, title: turn.question ?? turn.idea_title, answer: turn.answer, stamp: formatReceiptDate(createdAt, language),
     headline: facts?.totalReturnPct === undefined ? undefined : signedPercentText(facts.totalReturnPct, language),
     verdict: view.evidence.benchmark.unavailable ? null : view.evidence.benchmark.value,
     benchmarkSymbol: facts?.benchmarkSymbol,
@@ -114,7 +115,7 @@ function calculationPresentation(turn: CalculationReceiptTurn, language: ArgusLa
   });
   const date = formatReceiptDate(turn.computed_at, language) ?? "";
   const base = {
-    language: turn.content_language, ownerNote: turn.owner_note, title: turn.question,
+    language: turn.content_language, ownerNote: turn.owner_note, title: turn.question, answer: turn.answer_text,
     stamp: interpolate(copy.calculation.stamp, { date }), framing: copy.calculation.framing,
   };
   if ("calculations" in turn) {

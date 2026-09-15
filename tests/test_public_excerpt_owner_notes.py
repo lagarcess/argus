@@ -1,9 +1,7 @@
-"""Adversarial proofs for the one free-text channel a receipt carries.
+"""Owner-chosen prose is no longer refused by credential-shape heuristics.
 
-Split out of ``test_public_excerpt_receipts.py``: those cases are about the closed
-payload and the strategies it describes, while these are about credential detection,
-which is a separate module with its own failure mode. The split keeps each file inside
-the modularity budget without raising a baseline.
+The shared credential grammar still has independent eval consumers, tested here
+without applying it to sharing decisions.
 """
 
 from __future__ import annotations
@@ -13,13 +11,12 @@ import re
 import pytest
 from argus.domain import credential_shapes
 from argus.domain.public_excerpts import (
-    PublicExcerptOwnerNoteError,
-    PublicExcerptSanitizationError,
     audit_public_excerpt_document,
     normalize_owner_note,
 )
 
-# ── The owner note, the one channel a secret can reach a public page through ───
+# Owner notes use the same exact-preview boundary as question and answer prose.
+
 
 # Real credential shapes. Each is a distinct grammar: an issuer prefix, a segment
 # count, a scheme keyword, a PEM banner, userinfo in a URL. None is caught by length
@@ -94,17 +91,8 @@ ORDINARY_NOTES: tuple[str, ...] = (
 
 
 @pytest.mark.parametrize(("name", "note"), CREDENTIAL_NOTES, ids=lambda value: value)
-def test_a_credential_shaped_note_is_refused_whatever_its_length(
-    name: str,
-    note: str,
-) -> None:
-    """Grammar, not size. The AWS key id that motivated this is twenty characters.
-
-    Refused rather than redacted: a receipt is frozen at creation, so a marker
-    would be permanent, and the owner is here now and can take the key out.
-    """
-    with pytest.raises(PublicExcerptOwnerNoteError):
-        normalize_owner_note(note)
+def test_owner_preview_accepts_credential_shaped_prose(name: str, note: str) -> None:
+    assert normalize_owner_note(note) == note
 
 
 @pytest.mark.parametrize("note", ORDINARY_NOTES, ids=lambda value: value[:36])
@@ -113,22 +101,16 @@ def test_an_ordinary_note_is_not_over_redacted(note: str) -> None:
     assert normalize_owner_note(note) == note
 
 
-def test_a_credential_shaped_value_anywhere_in_the_payload_fails_closed() -> None:
-    """The note is checked as it is written; this guards every other field."""
-    with pytest.raises(PublicExcerptSanitizationError):
-        audit_public_excerpt_document({"idea_title": "AKIAIOSFODNN7EXAMPLE run"})
+def test_credential_shapes_do_not_override_the_owner_preview() -> None:
+    audit_public_excerpt_document({"idea_title": "AKIAIOSFODNN7EXAMPLE run"})
 
 
 def test_the_credential_grammar_has_one_home() -> None:
-    """The eval lane and the receipt path share the grammar rather than copying it."""
+    """The eval lane continues to use its existing credential grammar."""
     from tests.evals import prose_evidence
 
     assert prose_evidence.JWT_PATTERN is credential_shapes.JWT_PATTERN
-    assert (
-        prose_evidence.UPPERCASE_KEY_PATTERN is credential_shapes.UPPERCASE_KEY_PATTERN
-    )
-
-
+    assert prose_evidence.UPPERCASE_KEY_PATTERN is credential_shapes.UPPERCASE_KEY_PATTERN
 
 
 def test_every_recognized_credential_key_is_caught_when_assigned() -> None:
