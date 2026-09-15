@@ -45,7 +45,7 @@ The deterministic date resolver accepts a model-supplied ISO year or typed year.
 
 The trace therefore places the stale year on the interpreted-date side of the boundary, not in current-year arithmetic. It does **not** retain enough raw structured output to identify whether the first 2024 appeared in the main interpreter, focused strategy extraction, or focused date extraction. Repair fingerprints show that dates changed but do not expose their values. This is an evidence limitation, not proof of a particular new prompt hunk causing the year error. The focused date extraction owner predates this PR and had no runtime clock in its inputs.
 
-The fix introduces a language-neutral `year_reference=current_year` on the shared date intent. For a month/day range with an omitted year or a current-year qualifier, the model supplies `--MM-DD` endpoints and the runtime binds them using `new_york_today`. Even an ISO endpoint carrying a stale year is rebound when that typed reference is present. A user-stated historical year remains unchanged. An invalid leap day fails instead of being clamped. No code re-parses the user's words, and the removed date-precision re-ask path stays removed.
+The fix introduces a language-neutral `year_reference=current_year` on the shared date intent, used by explicit ranges, endpoint edits, calendar years, and year-to-date windows. For a month/day range with an omitted year or a current-year qualifier, the model supplies `--MM-DD` endpoints and the runtime binds them using `new_york_today`. Even an ISO endpoint carrying a stale year is rebound when that typed reference is present. A user-stated historical year remains unchanged. An invalid leap day fails instead of being clamped. No code re-parses the user's words, and the removed date-precision re-ask path stays removed.
 
 The model still owns identifying an omitted/current year. The targeted measurement must verify that it emits this contract in both languages; a schema test alone cannot prove that behavior.
 
@@ -54,7 +54,7 @@ The model still owns identifying an omitted/current year. The targeted measureme
 `LLMDateRangeIntent.year_reference` description:
 
 ```text
-Use current_year for month/day endpoints when the user omits the year or qualifies them as this year. Return explicit_range or endpoint_patch with month/day endpoints as --MM-DD; Argus supplies the year from its New York clock. Leave null for a user-stated historical year.
+Use current_year when the user says this year, or supplies month/day endpoints without a year. For explicit_range or endpoint_patch, return month/day endpoints as --MM-DD; Argus supplies the year from its New York clock. Leave null for a user-stated year.
 ```
 
 Both `LLMDateRangeIntent.start` and `.end` descriptions replace `ISO date, YYYY-MM-DD, or canonical sentinel 'today'.` with:
@@ -79,9 +79,9 @@ The date fixtures are unchanged in this investigation. August 16, 2026 is Sunday
 
 ## Free verification
 
-- [Red replay](free-verification/regressions-red.txt): the new tests against original 4c4e7a00 source produced 13 failures and one passing historical-year control. The edited files were restored in `finally`; no stash was used.
-- [Final focused run](free-verification/focused-green.txt): all 26 tests passed, including the 14 new boundary cases, nine existing guards against routing unread money questions into tests, two date-intent serialization checks, and the transiently failed Git fixture below.
-- [Full free suite](free-verification/full-suite.txt): 8,699 passed, 605 skipped, two failures. One is the expected prompt freeze. The other was a temporary `git add` error (`unable to create temporary file: Invalid argument`) while building an isolated test repository; its focused rerun passed. Hosted CI at the pushed head is the final check for that environment-dependent result.
+- [Red replay](free-verification/regressions-red.txt): the new tests against original 4c4e7a00 source produced 17 failures and three passes. The edited files were restored in `finally`; no stash was used.
+- [Final focused run](free-verification/focused-green.txt): all 34 tests passed, including the 20 new boundary cases, nine existing guards against routing unread money questions into tests, two date-intent serialization checks, and three Git-fixture checks.
+- [Full free suite](free-verification/full-suite.txt): 8,704 passed, 605 skipped, three failures. One is the expected prompt freeze. The other two were temporary `git add` errors (`unable to create temporary file: Invalid argument`) while building isolated test repositories; both focused reruns passed. Hosted CI at the pushed head is the final check for those environment-dependent results.
 - Repository Ruff and [modularity](free-verification/modularity.txt) pass. Existing date-intent serialization assertions now derive defaults from the canonical schema rather than duplicating its optional fields.
 - The local SciPy 1.15.3 macOS 14 wheel could not load after the host change. The same locked version's compatible macOS 12 wheel was already cached and restored locally; no repository dependency changed or download completed. Free suites temporarily removed the `.env` symlink and provider environment keys, then restored the symlink. The sandbox-restricted attempt could not open local test servers; the complete run above had the required local permissions.
 

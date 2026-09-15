@@ -160,10 +160,10 @@ class LLMDateRangeIntent(BaseModel):
     year_reference: Literal["current_year"] | None = Field(
         default=None,
         description=(
-            "Use current_year for month/day endpoints when the user omits the "
-            "year or qualifies them as this year. Return explicit_range or endpoint_patch with "
+            "Use current_year when the user says this year, or supplies month/day "
+            "endpoints without a year. For explicit_range or endpoint_patch, return "
             "month/day endpoints as --MM-DD; Argus supplies the year from its "
-            "New York clock. Leave null for a user-stated historical year."
+            "New York clock. Leave null for a user-stated year."
         ),
     )
     endpoint: Literal["start", "end"] | None = None

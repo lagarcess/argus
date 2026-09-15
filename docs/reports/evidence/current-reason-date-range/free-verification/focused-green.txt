@@ -5,13 +5,13 @@ rootdir: /Users/garces/.codex/worktrees/f945/private-alpha-next
 configfile: pyproject.toml
 plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
 asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collected 26 items
+collected 34 items
 
-tests/agent_runtime/test_current_reason_measured_failures.py ........... [ 42%]
-...                                                                      [ 53%]
-tests/agent_runtime/test_money_question_recovery.py .........            [ 88%]
-tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py . [ 92%]
-.                                                                        [ 96%]
-tests/test_promotion_evidence_configuration.py .                         [100%]
+tests/agent_runtime/test_current_reason_measured_failures.py ........... [ 32%]
+.........                                                                [ 58%]
+tests/agent_runtime/test_money_question_recovery.py .........            [ 85%]
+tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py . [ 88%]
+.                                                                        [ 91%]
+tests/test_promotion_evidence_configuration.py ...                       [100%]
 
-============================== 26 passed in 1.36s ==============================
+============================== 34 passed in 1.41s ==============================

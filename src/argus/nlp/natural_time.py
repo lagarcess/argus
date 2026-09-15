@@ -248,6 +248,7 @@ def resolve_date_range_intent(
     if not payload:
         return None
     current_date = today or new_york_today()
+    current_year = payload.get("year_reference") == "current_year"
     if not _intent_confidence_is_usable(payload):
         return None
 
@@ -275,10 +276,18 @@ def resolve_date_range_intent(
         )
 
     if kind == "year_to_date":
-        year = _positive_int(payload.get("year")) or current_date.year
+        year = (
+            current_date.year
+            if current_year
+            else _positive_int(payload.get("year")) or current_date.year
+        )
         if year > current_date.year:
             return None
-        end = _intent_date(payload.get("end"), today=current_date)
+        end = _intent_date(
+            payload.get("end"), today=current_date, current_year=current_year
+        )
+        if current_year and payload.get("end") and end is None:
+            return None
         if end is None:
             end = current_date if year == current_date.year else date(year, 12, 31)
         if end < date(year, 1, 1):
@@ -290,7 +299,7 @@ def resolve_date_range_intent(
         )
 
     if kind == "calendar_year":
-        year = _positive_int(payload.get("year"))
+        year = current_date.year if current_year else _positive_int(payload.get("year"))
         if year is None or year > current_date.year:
             return None
         end = current_date if year == current_date.year else date(year, 12, 31)
@@ -318,7 +327,6 @@ def resolve_date_range_intent(
 
     if kind in {"explicit_range", "endpoint_patch"}:
         patch: dict[str, str] = {}
-        current_year = payload.get("year_reference") == "current_year"
         start = _intent_date(
             payload.get("start"), today=current_date, current_year=current_year
         )

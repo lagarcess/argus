@@ -163,12 +163,13 @@ def test_explicit_historical_year_is_preserved():
     assert result.payload == {"start": "2024-08-16", "end": "2024-08-19"}
 
 
-def test_current_year_does_not_clamp_an_invalid_leap_day():
+@pytest.mark.parametrize("kind", ["explicit_range", "year_to_date"])
+def test_current_year_does_not_clamp_an_invalid_leap_day(kind):
     result = natural_time.resolve_date_range_intent(
         LLMDateRangeIntent(
-            kind="explicit_range",
-            start="2024-02-29",
-            end="2024-03-01",
+            kind=kind,
+            start="2024-02-28",
+            end="2024-02-29",
             year_reference="current_year",
         ),
         today=date(2026, 9, 15),
@@ -189,3 +190,30 @@ def test_focused_date_writer_requires_the_clock_owned_year_contract():
         response=response, request=request
     )
     assert "year_reference=current_year" in messages[0]["content"]
+
+
+@pytest.mark.parametrize("kind", ["calendar_year", "year_to_date"])
+@pytest.mark.parametrize("encoded_year", [2024, None])
+def test_whole_current_year_intents_use_the_same_clock_owner(
+    monkeypatch, kind, encoded_year
+):
+    today = date(2026, 9, 15)
+    monkeypatch.setattr(natural_time, "new_york_today", lambda: today)
+    result = natural_time.resolve_date_range_intent(
+        LLMDateRangeIntent(kind=kind, year=encoded_year, year_reference="current_year")
+    )
+    assert result is not None
+    assert result.payload == {"start": "2026-01-01", "end": today.isoformat()}
+
+
+def test_current_year_to_date_binds_an_explicit_endpoint_to_the_same_year():
+    result = natural_time.resolve_date_range_intent(
+        LLMDateRangeIntent(
+            kind="year_to_date",
+            year=2024,
+            end="2024-08-19",
+            year_reference="current_year",
+        ),
+        today=date(2026, 9, 15),
+    )
+    assert result.payload == {"start": "2026-01-01", "end": "2026-08-19"}

@@ -5,7 +5,7 @@ rootdir: /Users/garces/.codex/worktrees/f945/private-alpha-next
 configfile: pyproject.toml
 plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
 asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collected 9306 items
+collected 9312 items
 
 tests/agent_runtime/discovery/test_discovery_composer.py ............... [  0%]
 ..............................                                           [  0%]
@@ -46,7 +46,7 @@ tests/agent_runtime/test_conversion_failure_transport.py .....           [  6%]
 tests/agent_runtime/test_cost_fidelity_stage_clarification.py .......... [  7%]
 ............                                                             [  7%]
 tests/agent_runtime/test_current_reason_measured_failures.py ........... [  7%]
-...                                                                      [  7%]
+.........                                                                [  7%]
 tests/agent_runtime/test_current_reason_resolution.py ......             [  7%]
 tests/agent_runtime/test_current_reply_inputs.py ....................... [  7%]
 ..............                                                           [  7%]
@@ -81,7 +81,7 @@ tests/agent_runtime/test_issue_154_s3_recovery_i18n_contract.py ....     [ 12%]
 tests/agent_runtime/test_issue_270_strategy_transitions.py ......        [ 12%]
 tests/agent_runtime/test_issue_271_cost_fidelity_audit.py .............. [ 12%]
 ...........                                                              [ 12%]
-tests/agent_runtime/test_issue_271_modeled_cost_preservation.py ........ [ 12%]
+tests/agent_runtime/test_issue_271_modeled_cost_preservation.py ........ [ 13%]
 ............................                                             [ 13%]
 tests/agent_runtime/test_issue_345_recommendation_continuity.py ........ [ 13%]
 .....                                                                    [ 13%]
@@ -102,7 +102,7 @@ tests/agent_runtime/test_llm_interpreter_date_window_repairs.py ........ [ 15%]
 ........................................                                 [ 16%]
 tests/agent_runtime/test_llm_interpreter_grounding_and_signal_rules.py . [ 16%]
 ........................................................................ [ 16%]
-......                                                                   [ 16%]
+......                                                                   [ 17%]
 tests/agent_runtime/test_llm_interpreter_semantic_contracts.py ......... [ 17%]
 ................................................................         [ 17%]
 tests/agent_runtime/test_market_counterfactual_dollars.py .....          [ 17%]
@@ -125,7 +125,7 @@ tests/agent_runtime/test_post_result_edit_routing.py ...............     [ 20%]
 tests/agent_runtime/test_private_artifact_prose_boundary.py ............ [ 20%]
                                                                          [ 20%]
 tests/agent_runtime/test_provider_asset_ownership.py ................... [ 20%]
-.........                                                                [ 20%]
+.........                                                                [ 21%]
 tests/agent_runtime/test_provider_context_asset_catalog.py .......       [ 21%]
 tests/agent_runtime/test_real_backtest_tool.py .....                     [ 21%]
 tests/agent_runtime/test_recognition_contract_guards.py ................ [ 21%]
@@ -133,14 +133,14 @@ tests/agent_runtime/test_recognition_contract_guards.py ................ [ 21%]
 tests/agent_runtime/test_recovery_composer.py .                          [ 21%]
 tests/agent_runtime/test_recovery_edit_outcomes.py ..................... [ 21%]
 ..                                                                       [ 21%]
-tests/agent_runtime/test_refine_action_edit_routing.py ..............    [ 21%]
+tests/agent_runtime/test_refine_action_edit_routing.py ..............    [ 22%]
 tests/agent_runtime/test_registered_backtest_legacy_workflow.py ...      [ 22%]
 tests/agent_runtime/test_registered_backtest_presentation.py ........... [ 22%]
 ......                                                                   [ 22%]
 tests/agent_runtime/test_registered_tool_execution.py .................. [ 22%]
 ..............                                                           [ 22%]
 tests/agent_runtime/test_research_routing_contract.py .................. [ 22%]
-.......................                                                  [ 22%]
+.......................                                                  [ 23%]
 tests/agent_runtime/test_resolution_context.py ...............           [ 23%]
 tests/agent_runtime/test_response_style_contract.py .......              [ 23%]
 tests/agent_runtime/test_result_conversation.py .............            [ 23%]
@@ -206,7 +206,7 @@ tests/domain/test_computation_compare.py .....................           [ 30%]
 tests/domain/test_dca_benchmark_observed_fills.py .......                [ 30%]
 tests/domain/test_dca_capital_semantics.py ............................. [ 31%]
 ................................................................         [ 31%]
-tests/domain/test_dca_flow_adjusted_metrics.py ....................      [ 31%]
+tests/domain/test_dca_flow_adjusted_metrics.py ....................      [ 32%]
 tests/domain/test_dca_trading_day_rule.py ............                   [ 32%]
 tests/domain/test_discovery_search_adapters.py ......................... [ 32%]
 .............                                                            [ 32%]
@@ -256,7 +256,7 @@ tests/evals/test_result_readout_probe.py ...........................     [ 39%]
 tests/evals/test_search_provider_eval.py ....................            [ 39%]
 tests/memory/test_api_guest_isolation.py ....                            [ 39%]
 tests/memory/test_api_registered_endpoints.py .....                      [ 39%]
-tests/memory/test_api_role_gate.py ........                              [ 39%]
+tests/memory/test_api_role_gate.py ........                              [ 40%]
 tests/memory/test_api_sensitivity_assessment.py .........                [ 40%]
 tests/memory/test_chat_memory_recall.py .....                            [ 40%]
 tests/memory/test_confirm_stored_sensitivity.py ...                      [ 40%]
@@ -328,7 +328,7 @@ tests/research/test_research_answer.py ................................. [ 51%]
 tests/research/test_research_cache.py ..........                         [ 51%]
 tests/research/test_research_citations.py .........                      [ 51%]
 tests/research/test_research_claim_release.py .......................... [ 51%]
-....                                                                     [ 51%]
+....                                                                     [ 52%]
 tests/research/test_research_client.py ...............................   [ 52%]
 tests/research/test_research_config.py ....                              [ 52%]
 tests/research/test_research_contract_example.py ...                     [ 52%]
@@ -362,7 +362,7 @@ tests/test_access_approval_email.py .................................... [ 57%]
 ...                                                                      [ 57%]
 tests/test_access_request_migration.py ..                                [ 57%]
 tests/test_access_request_postgres.py ssssssssssssssssssssss             [ 57%]
-tests/test_access_requests.py ..........................                 [ 57%]
+tests/test_access_requests.py ..........................                 [ 58%]
 tests/test_access_welcome_claim_migration.py ......                      [ 58%]
 tests/test_access_welcome_delivery_migration.py ...                      [ 58%]
 tests/test_access_welcome_recovery_postgres.py sssss                     [ 58%]
@@ -388,8 +388,8 @@ tests/test_artifact_naming.py .....                                      [ 61%]
 tests/test_artifact_presentation.py ......................               [ 61%]
 tests/test_artifact_result_supabase.py .                                 [ 61%]
 tests/test_asset_history_start.py ..........                             [ 61%]
-tests/test_auth_sessions.py .....                                        [ 61%]
-tests/test_avatar_theme_migration.py .                                   [ 61%]
+tests/test_auth_sessions.py .....                                        [ 62%]
+tests/test_avatar_theme_migration.py .                                   [ 62%]
 tests/test_avatar_theme_rls_postgres.py s                                [ 62%]
 tests/test_backtest_admission_logs.py ......                             [ 62%]
 tests/test_backtest_evidence_backfill_postgres.py ss                     [ 62%]
@@ -468,7 +468,7 @@ tests/test_effective_window_confirmation.py ..............               [ 71%]
 tests/test_engine_signals.py .......                                     [ 71%]
 tests/test_environment_scripts.py ...................................... [ 71%]
 ..........                                                               [ 71%]
-tests/test_facade_reexport_integrity.py .........                        [ 71%]
+tests/test_facade_reexport_integrity.py .........                        [ 72%]
 tests/test_feedback_notification.py ............                         [ 72%]
 tests/test_frontend_search_casefold.py ...                               [ 72%]
 tests/test_guest_access_policy.py .......                                [ 72%]
@@ -500,7 +500,7 @@ tests/test_issue_542_durable_backtest_failures.py ....                   [ 75%]
 tests/test_legacy_orchestrator_retirement.py ......                      [ 75%]
 tests/test_legacy_surface_removal.py .....                               [ 75%]
 tests/test_local_qa_env_writer.py .                                      [ 75%]
-tests/test_local_smoke_contract.py .....                                 [ 75%]
+tests/test_local_smoke_contract.py .....                                 [ 76%]
 tests/test_localization.py .                                             [ 76%]
 tests/test_market_session_api.py ......                                  [ 76%]
 tests/test_memory_ledger_index.py .............                          [ 76%]
@@ -536,8 +536,8 @@ tests/test_private_alpha_release_docs.py ......................          [ 80%]
 tests/test_private_alpha_release_profile.py ..............               [ 81%]
 tests/test_private_launch_hardening.py ....                              [ 81%]
 tests/test_profile_theme_retired.py .......                              [ 81%]
-tests/test_promotion_evidence_configuration.py ......................F.. [ 81%]
-....................................................................     [ 82%]
+tests/test_promotion_evidence_configuration.py ......................... [ 81%]
+...............................................................F.F..     [ 82%]
 tests/test_promotion_evidence_identity.py .............................. [ 82%]
 .......                                                                  [ 82%]
 tests/test_public_alpha_render_load.py ........                          [ 82%]
@@ -684,7 +684,7 @@ observed = {'src/argus/agent_runtime/calculated_answer.py': {'chars': 1303, 'ent
         )
 E       Failed: Text the interpretation model reads changed since it was last measured.
 E         changed  src/argus/agent_runtime/llm_clarifier.py  (5676 -> 5786 chars, 6 -> 6 entries)
-E         changed  src/argus/agent_runtime/llm_interpreter_types.py  (10304 -> 10777 chars, 40 -> 41 entries)
+E         changed  src/argus/agent_runtime/llm_interpreter_types.py  (10304 -> 10759 chars, 40 -> 41 entries)
 E
 E       Last measured at dc8608c8a09252ff8c51ef077f32d449bb0b6e8b: 69 passed, 2 failed.
 E
@@ -701,19 +701,20 @@ E
 E       If you did not intend to touch model-facing text, revert instead.
 
 tests/test_interpreter_prompt_freeze.py:77: Failed
-_ test_model_or_flag_mismatch_fails_promotion[contract-ARGUS_STRUCTURED_MODEL] _
+__________ test_targeted_ab_uses_shared_configuration_check[baseline] __________
 
-tmp_path = PosixPath('/private/var/folders/04/_3s7_2qd2z3_pxhb1jgjj5m00000gn/T/pytest-of-garces/pytest-5/test_model_or_flag_mismatch_fa22')
-key = 'ARGUS_STRUCTURED_MODEL', changed_in = 'contract'
+tmp_path = PosixPath('/private/var/folders/04/_3s7_2qd2z3_pxhb1jgjj5m00000gn/T/pytest-of-garces/pytest-9/test_targeted_ab_uses_shared_c0')
+side = 'baseline'
 
-    @pytest.mark.parametrize("key", sorted(_configuration(_profile())))
-    @pytest.mark.parametrize("changed_in", ["contract", "eval-environment"])
-    def test_model_or_flag_mismatch_fails_promotion(
-        tmp_path: Path, key: str, changed_in: str
-    ) -> None:
->       measured, profile, scorecard = _measured(tmp_path)
+    @pytest.mark.parametrize("side", ["baseline", "candidate"])
+    def test_targeted_ab_uses_shared_configuration_check(tmp_path: Path, side: str) -> None:
+        from tests.release_promotion_evidence_support import (
+            assert_prose_failure_measured_on_both_sides,
+        )
 
-tests/test_promotion_evidence_configuration.py:62:
+>       sha, _, scorecard = _measured(tmp_path)
+
+tests/test_promotion_evidence_configuration.py:174:
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 tests/test_promotion_evidence_configuration.py:39: in _measured
     sha = commit_files(tmp_path, {PROFILE: json.dumps(profile)})
@@ -727,7 +728,107 @@ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 input = None, capture_output = True, timeout = None, check = True
 popenargs = (['git', 'add', '--all'],)
-kwargs = {'cwd': PosixPath('/private/var/folders/04/_3s7_2qd2z3_pxhb1jgjj5m00000gn/T/pytest-of-garces/pytest-5/test_model_or_flag_mismatch_fa22'), 'stderr': -1, 'stdout': -1, 'text': True}
+kwargs = {'cwd': PosixPath('/private/var/folders/04/_3s7_2qd2z3_pxhb1jgjj5m00000gn/T/pytest-of-garces/pytest-9/test_targeted_ab_uses_shared_c0'), 'stderr': -1, 'stdout': -1, 'text': True}
+process = <Popen: returncode: 128 args: ['git', 'add', '--all']>, stdout = ''
+stderr = "error: unable to create temporary file: Invalid argument\nerror: .github/private-alpha-release-profile.json: failed t...nto database\nerror: unable to index file '.github/private-alpha-release-profile.json'\nfatal: updating files failed\n"
+retcode = 128
+
+    def run(*popenargs,
+            input=None, capture_output=False, timeout=None, check=False, **kwargs):
+        """Run command with arguments and return a CompletedProcess instance.
+
+        The returned instance will have attributes args, returncode, stdout and
+        stderr. By default, stdout and stderr are not captured, and those attributes
+        will be None. Pass stdout=PIPE and/or stderr=PIPE in order to capture them,
+        or pass capture_output=True to capture both.
+
+        If check is True and the exit code was non-zero, it raises a
+        CalledProcessError. The CalledProcessError object will have the return code
+        in the returncode attribute, and output & stderr attributes if those streams
+        were captured.
+
+        If timeout is given, and the process takes too long, a TimeoutExpired
+        exception will be raised.
+
+        There is an optional argument "input", allowing you to
+        pass bytes or a string to the subprocess's stdin.  If you use this argument
+        you may not also use the Popen constructor's "stdin" argument, as
+        it will be used internally.
+
+        By default, all communication is in bytes, and therefore any "input" should
+        be bytes, and the stdout and stderr will be bytes. If in text mode, any
+        "input" should be a string, and stdout and stderr will be strings decoded
+        according to locale encoding, or by "encoding" if set. Text mode is
+        triggered by setting any of text, encoding, errors or universal_newlines.
+
+        The other arguments are the same as for the Popen constructor.
+        """
+        if input is not None:
+            if kwargs.get('stdin') is not None:
+                raise ValueError('stdin and input arguments may not both be used.')
+            kwargs['stdin'] = PIPE
+
+        if capture_output:
+            if kwargs.get('stdout') is not None or kwargs.get('stderr') is not None:
+                raise ValueError('stdout and stderr arguments may not be used '
+                                 'with capture_output.')
+            kwargs['stdout'] = PIPE
+            kwargs['stderr'] = PIPE
+
+        with Popen(*popenargs, **kwargs) as process:
+            try:
+                stdout, stderr = process.communicate(input, timeout=timeout)
+            except TimeoutExpired as exc:
+                process.kill()
+                if _mswindows:
+                    # Windows accumulates the output in a single blocking
+                    # read() call run on child threads, with the timeout
+                    # being done in a join() on those threads.  communicate()
+                    # _after_ kill() is required to collect that and add it
+                    # to the exception.
+                    exc.stdout, exc.stderr = process.communicate()
+                else:
+                    # POSIX _communicate already populated the output so
+                    # far into the TimeoutExpired exception.
+                    process.wait()
+                raise
+            except:  # Including KeyboardInterrupt, communicate handled that.
+                process.kill()
+                # We don't call process.wait() as .__exit__ does that for us.
+                raise
+            retcode = process.poll()
+            if check and retcode:
+>               raise CalledProcessError(retcode, process.args,
+                                         output=stdout, stderr=stderr)
+E               subprocess.CalledProcessError: Command '['git', 'add', '--all']' returned non-zero exit status 128.
+
+../../../../.local/share/uv/python/cpython-3.10.20-macos-aarch64-none/lib/python3.10/subprocess.py:526: CalledProcessError
+________ test_baseline_configuration_change_does_not_hide_new_failures _________
+
+tmp_path = PosixPath('/private/var/folders/04/_3s7_2qd2z3_pxhb1jgjj5m00000gn/T/pytest-of-garces/pytest-9/test_baseline_configuration_ch0')
+
+    def test_baseline_configuration_change_does_not_hide_new_failures(tmp_path: Path) -> None:
+        from tests.release_promotion_evidence_support import (
+            assert_main_promotion_baseline_comparison,
+        )
+
+>       measured, profile, baseline = _measured(tmp_path)
+
+tests/test_promotion_evidence_configuration.py:209:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests/test_promotion_evidence_configuration.py:39: in _measured
+    sha = commit_files(tmp_path, {PROFILE: json.dumps(profile)})
+tests/promotion_evidence_repository.py:157: in commit_files
+    return _commit(repository_root, message)
+tests/promotion_evidence_repository.py:278: in _commit
+    _git(repository_root, "add", "--all")
+tests/promotion_evidence_repository.py:297: in _git
+    completed = subprocess.run(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+input = None, capture_output = True, timeout = None, check = True
+popenargs = (['git', 'add', '--all'],)
+kwargs = {'cwd': PosixPath('/private/var/folders/04/_3s7_2qd2z3_pxhb1jgjj5m00000gn/T/pytest-of-garces/pytest-9/test_baseline_configuration_ch0'), 'stderr': -1, 'stdout': -1, 'text': True}
 process = <Popen: returncode: 128 args: ['git', 'add', '--all']>, stdout = ''
 stderr = "error: unable to create temporary file: Invalid argument\nerror: .github/private-alpha-release-profile.json: failed t...nto database\nerror: unable to index file '.github/private-alpha-release-profile.json'\nfatal: updating files failed\n"
 retcode = 128
@@ -817,5 +918,6 @@ tests/test_auth_sessions.py::test_auth_session_timeout_maps_to_verification_unav
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
 FAILED tests/test_interpreter_prompt_freeze.py::test_model_facing_text_matches_its_measured_fingerprint
-FAILED tests/test_promotion_evidence_configuration.py::test_model_or_flag_mismatch_fails_promotion[contract-ARGUS_STRUCTURED_MODEL]
-===== 2 failed, 8699 passed, 605 skipped, 5 warnings in 181.12s (0:03:01) ======
+FAILED tests/test_promotion_evidence_configuration.py::test_targeted_ab_uses_shared_configuration_check[baseline]
+FAILED tests/test_promotion_evidence_configuration.py::test_baseline_configuration_change_does_not_hide_new_failures
+===== 3 failed, 8704 passed, 605 skipped, 5 warnings in 187.65s (0:03:07) ======
