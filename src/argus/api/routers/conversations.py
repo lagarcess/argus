@@ -918,7 +918,10 @@ def add_confirmation_peer_assets(
     source_payload = read.source_payload
     expected_source_metadata = read.expected_source_metadata
     expected_latest_message_id = read.expected_latest_message_id
-    offered_symbols: list[str] = []
+    basket_class = str(
+        (source_payload.get("strategy") or {}).get("asset_class") or "equity"
+    )
+    offered_peers: list[dict[str, str]] = []
     rows_sidecar = source_message.metadata.get("next_experiments")
     rows = rows_sidecar.get("rows") if isinstance(rows_sidecar, dict) else None
     for row in rows or []:
@@ -928,10 +931,27 @@ def add_confirmation_peer_assets(
             continue
         why = row.get("why")
         params = why.get("params") if isinstance(why, dict) else None
-        for symbol in (params or {}).get("symbols") or []:
-            normalized = str(symbol).strip().upper()
-            if normalized and normalized not in offered_symbols:
-                offered_symbols.append(normalized)
+        # Old stored rows contain only symbols. Their owning confirmation
+        # supplies the class; neither old nor new rows need a ticker lookup.
+        identities = (params or {}).get("peers")
+        if identities is None:
+            identities = [
+                {"symbol": str(s), "name": str(s), "asset_class": basket_class}
+                for s in (params or {}).get("symbols") or []
+            ]
+        for peer in identities:
+            if not isinstance(peer, dict) or peer.get("asset_class") != basket_class:
+                continue
+            symbol = str(peer.get("symbol") or "").strip().upper()
+            if symbol:
+                offered_peers.append(
+                    {
+                        "symbol": symbol,
+                        "name": str(peer.get("name") or symbol),
+                        "asset_class": basket_class,
+                    }
+                )
+    offered_symbols = list(dict.fromkeys(p["symbol"] for p in offered_peers))
     language = str(getattr(user, "language", None) or "en")
 
     if payload.restore_previous:
@@ -949,15 +969,36 @@ def add_confirmation_peer_assets(
                 or []
             }
             restored |= current - previous
+            added_names = {
+                p["symbol"]: p.get("name", p["symbol"])
+                for p in adjustment.get("added") or []
+            }
+            offered_peers.extend(
+                {"symbol": s, "name": added_names.get(s, s), "asset_class": basket_class}
+                for s in current - previous
+            )
         remaining_symbols = sorted(restored)
     else:
-        requested = [str(symbol).strip().upper() for symbol in payload.symbols or []]
+        requested = [
+            str(symbol).strip().upper()
+            for symbol in (
+                [p.symbol for p in payload.peers]
+                if payload.peers is not None
+                else payload.symbols or []
+            )
+        ]
         # Every candidate passed the resolver before it became a row;
         # anything else is not addable, whoever asks.
         if not requested or any(symbol not in offered_symbols for symbol in requested):
             raise invalid_state
-        added = _resolved_peer_identities(dict.fromkeys(requested))
+        added = _resolved_peer_identities(
+            dict.fromkeys(requested), offered_peers=offered_peers
+        )
         if added is None:
+            raise invalid_state
+        if payload.peers is not None and any(
+            p.asset_class != basket_class for p in payload.peers
+        ):
             raise invalid_state
         preparation = peer_added_confirmation_preparation(
             source_payload,
@@ -994,7 +1035,9 @@ def add_confirmation_peer_assets(
             detail="The requested basket cannot run as one test.",
         )
     new_payload = preparation.confirmation_payload
-    remaining_peers = _resolved_peer_identities(remaining_symbols) or []
+    remaining_peers = (
+        _resolved_peer_identities(remaining_symbols, offered_peers=offered_peers) or []
+    )
     basket = [
         str(symbol).strip().upper()
         for symbol in (new_payload.get("strategy") or {}).get("asset_universe") or []
@@ -1181,21 +1224,14 @@ def _confirmation_changed_conflict(request: Request):
     )
 
 
-def _resolved_peer_identities(symbols) -> list[dict[str, str]] | None:
-    """Resolver-owned identity for peer symbols; None when any fails."""
-    from argus.domain.market_data.assets import resolve_asset
-
-    resolved: list[dict[str, str]] = []
-    for symbol in symbols:
-        try:
-            asset = resolve_asset(str(symbol))
-        except Exception:  # noqa: BLE001
-            return None
-        resolved.append(
-            {
-                "symbol": asset.canonical_symbol.upper(),
-                "name": asset.name or asset.canonical_symbol.upper(),
-                "asset_class": asset.asset_class,
-            }
-        )
-    return resolved
+def _resolved_peer_identities(
+    symbols,
+    *,
+    offered_peers: list[dict[str, str]],
+) -> list[dict[str, str]] | None:
+    """Select the stored resolver-owned identities, never resolve a ticker again."""
+    by_symbol = {p["symbol"]: p for p in offered_peers}
+    selected = list(symbols)
+    if any(symbol not in by_symbol for symbol in selected):
+        return None
+    return [dict(by_symbol[symbol]) for symbol in selected]
