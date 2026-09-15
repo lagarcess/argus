@@ -3382,6 +3382,21 @@ stores nothing and makes no LLM, provider, or market-data call.
 
 # 12. Chat Streaming Endpoint
 
+`POST /chat/stream` accepts optional `failed_assistant_id: string | null`
+(1 to 128 characters when supplied). Retry sends the failed assistant reply's
+message ID alongside the original question or structured action, both live and
+after reload. The API stores it as `metadata.failed_assistant_id` on the new
+user message, preserving any original `chat_action` metadata.
+
+For that retry turn, runtime history omits only the assistant message with that
+ID from the owned conversation. The question and every other reply, including
+degraded answers, remain eligible for history. An absent or unmatched ID drops
+nothing. Once an assistant reply follows the persisted retry request, later
+turns omit that same failed reply through the durable retry link. The legacy
+`chat_action.type: retry_last_turn` / `payload.failed_assistant_id` link remains
+read-compatible. Matching repeated question text alone does not remove replies
+from model history; that compatibility behavior belongs to transcript display.
+
 ### Declared tool calls and results
 
 The neutral transport `ToolCall` is `{tool_name, call_id, arguments}`. Each
