@@ -7,6 +7,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Literal, cast
 
 from dateparser.date import DateDataParser
+from dateparser.languages.loader import default_loader
 from dateparser.search import search_dates
 
 from argus.domain.market_data.new_york_clock import new_york_today
@@ -875,6 +876,13 @@ def _parse_date_span(
     if data.date_obj is None:
         return None
     period = str(data.period or "day")
+    if require_parts and period == "month":
+        # Numeric amounts plus a year can parse as a month. Coarse calendar
+        # evidence needs a month name recognized by the library's locale data.
+        locale = default_loader.get_locale(data.locale)
+        translated = locale.translate(span, settings=parser._settings)
+        if calendar.month_name[data.date_obj.month].casefold() not in translated.split():
+            return None
     if period not in {"day", "week", "month", "year"}:
         period = "day"
     return _ParsedDate(

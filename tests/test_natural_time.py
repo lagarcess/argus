@@ -15,7 +15,10 @@ from argus.nlp.natural_time import (
 
 @pytest.mark.parametrize(
     ("evidence", "language"),
-    [("April 1, 2026", "en"), ("1 de abril de 2026", "es-419")],
+    [
+        ("April 1, 2026", "en"), ("1 de abril de 2026", "es-419"),
+        ("2026-04-01", "en"), ("04/01/2026", "en"),
+    ],
 )
 @pytest.mark.parametrize("endpoint", ["start", "end"])
 def test_date_quote_must_support_the_proposed_endpoint(evidence, language, endpoint):
@@ -52,15 +55,16 @@ def test_date_quote_must_support_both_range_endpoints(evidence, start, end, lang
 
 
 @pytest.mark.parametrize("endpoint", ["start", "end"])
-def test_bare_fee_number_cannot_ground_a_planner_date(endpoint):
+@pytest.mark.parametrize("evidence", ["1", "$1 in 2025", "1 in 2025"])
+def test_non_calendar_number_cannot_ground_a_planner_date(endpoint, evidence):
     # The permissive date parser fills in a year/month for the bare fee value.
     # That inferred date must not become current-turn evidence for an edit.
-    inferred = parse_date_text("1", endpoint=endpoint)
+    inferred = parse_date_text(evidence, endpoint=endpoint)
     assert inferred is not None
     assert not date_range_intent_matches_evidence(
         {"kind": "endpoint_patch", "endpoint": endpoint,
-         endpoint: inferred.isoformat(), "evidence": "1"},
-        current_message="change the benchmark to QQQ and set the fee to 1",
+         endpoint: inferred.isoformat(), "evidence": evidence},
+        current_message=f"I made {evidence}; change the benchmark to QQQ",
     )
 
 
