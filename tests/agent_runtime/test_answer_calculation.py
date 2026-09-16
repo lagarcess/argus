@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from argus.agent_runtime import answer_calculation as ac
 from argus.domain.calculations.answer_request import AnswerCalculation
 from argus.domain.capability_registry import get_tool_catalog
@@ -205,12 +206,12 @@ def test_the_prose_states_the_computed_payment_through_its_reference() -> None:
     }
 
 
-def test_an_unknown_reference_hands_over_to_argus_lead_and_cited_digits_stand() -> None:
+def test_an_unknown_reference_attaches_a_computed_result_and_cited_digits_stand() -> None:
     notes: list[str] = []
     published = _published("It costs {{monthly_cost}}.", notes=notes)
     for card in ac.cards_in(published.patch):
         assert ac.figure_text(card.presentation.answer) in published.answer_text
-    assert published.template is None
+    assert published.template is not None
     assert ac.FIGURE_CHECK_REASON_CODE in notes
     cited = _published(
         "At the bank's published 14% rate, paying {{present_value}} at "
@@ -490,23 +491,58 @@ def test_a_reference_two_options_both_hold_is_never_guessed() -> None:
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 
-def test_missing_option_result_does_not_preserve_an_unsupported_comparison() -> None:
+@pytest.mark.parametrize("extra", ["", " Also {{unknown_result}}."])
+def test_missing_option_result_discards_the_ungrounded_comparison(extra) -> None:
     notes: list[str] = []
     published = _published_many(
-        "Bank A is cheaper at {{bank_a.payment}}.",
+        "Bank A is cheaper at {{bank_a.payment}}." + extra,
         [_named("Bank A", LOAN), _named("Bank B", LOAN_AT_12)],
         notes=notes,
     )
     first, second = ac.cards_in(published.patch)
     assert first.presentation.answer.value > second.presentation.answer.value
     assert "cheaper" not in published.answer_text
-    assert published.template is None
-    for label, card in zip(("Bank A", "Bank B"), (first, second), strict=True):
+    assert published.template is None or "cheaper" not in published.template["text"]
+    assert f"Bank A: {ac.figure_text(first.presentation.answer)}" in published.answer_text
+    assert (
+        f"Bank B: {ac.figure_text(second.presentation.answer)}" in published.answer_text
+    )
+    assert ac.FIGURE_CHECK_REASON_CODE in notes
+
+
+def test_complete_option_comparison_keeps_its_prose_and_template() -> None:
+    template = (
+        "Bank B is cheaper at {{bank_b.payment}} than Bank A at {{bank_a.payment}}."
+    )
+    published = _published_many(
+        template, [_named("Bank A", LOAN), _named("Bank B", LOAN_AT_12)]
+    )
+    first, second = ac.cards_in(published.patch)
+    assert second.presentation.answer.value < first.presentation.answer.value
+    assert published.answer_text == (
+        f"Bank B is cheaper at {ac.figure_text(second.presentation.answer)} "
+        f"than Bank A at {ac.figure_text(first.presentation.answer)}."
+    )
+    assert published.template["text"] == template
+
+
+@pytest.mark.parametrize("names", [("", ""), ("Bank", "Bank"), (" ", " ")])
+def test_comparison_fallback_distinguishes_unnamed_or_duplicate_options(names):
+    requests = [_named(names[0], LOAN), _named(names[1], LOAN_AT_12)]
+    owner = ac.calculation_names(requests)[0]
+    published = _published_many(
+        "This option is cheaper at {{" + owner + ".payment}}.", requests
+    )
+    assert "cheaper" not in published.answer_text
+    for index, (name, card) in enumerate(
+        zip(names, ac.cards_in(published.patch), strict=True), start=1
+    ):
+        label = f"{name.strip()}: " if name.strip() else ""
         assert (
-            f"{label}: {ac.figure_text(card.presentation.answer)}"
+            f"{index}. {label}{ac.figure_text(card.presentation.answer)}"
             in published.answer_text
         )
-    assert ac.FIGURE_CHECK_REASON_CODE in notes
+    assert "cheaper" not in published.template["text"]
 
 
 def test_an_option_that_cannot_compute_holds_back_every_card() -> None:
