@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
 from argus.agent_runtime.artifact_edit_planner import (
     ArtifactAssumptionEditPlan,
     EditOperation,
@@ -21,7 +22,7 @@ from argus.agent_runtime.interpreter.artifact_assumption_edit import (
     ARTIFACT_EDIT_PENDING_FIELDS,
     _response_from_artifact_assumption_edit_plan,
 )
-from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent, LLMStrategyDraft
 from argus.agent_runtime.stages.confirm import confirm_stage
 from argus.agent_runtime.stages.interpret_types import (
     InterpretationRequest,
@@ -503,6 +504,34 @@ class TestAcceptedOperationsLandOrFailLoudly:
     plan completes a half-built operation list before it can ship."""
 
     MESSAGE = "change the benchmark to QQQ and change the start to April 1, 2026"
+
+    @pytest.mark.parametrize("evidence", [None, "", "April 1, 2026", "QQQ"])
+    def test_benchmark_only_turn_refuses_ungrounded_planner_date(self, evidence):
+        from argus.agent_runtime.interpreter.artifact_assumption_edit import (
+            materialized_artifact_edit_targets,
+        )
+
+        request = _request("change the benchmark to QQQ")
+        plan = ArtifactAssumptionEditPlan(
+            outcome="ready_to_confirm",
+            operations=[
+                EditOperation(op="set", target="benchmark", value="QQQ"),
+                EditOperation(
+                    op="set", target="date_window",
+                    date_window=LLMDateRangeIntent(
+                        kind="endpoint_patch", endpoint="start",
+                        start="2026-04-01", evidence=evidence,
+                    ),
+                ),
+            ],
+        )
+        primary = LLMStrategyDraft(
+            comparison_baseline="QQQ",
+            field_provenance={"comparison_baseline": "explicit_user"},
+        )
+        assert materialized_artifact_edit_targets(
+            plan, request=request, primary_draft=primary,
+        ) is None
 
     @staticmethod
     def _unresolvable_date_op() -> EditOperation:

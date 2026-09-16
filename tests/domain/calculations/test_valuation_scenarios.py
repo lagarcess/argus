@@ -42,6 +42,29 @@ def test_the_symbol_rides_along_as_a_stated_input() -> None:
     assert card.arguments["symbol"] == "AAPL"
 
 
+@pytest.mark.parametrize(
+    "field", ["growth_low_pct", "growth_base_pct", "growth_high_pct"]
+)
+@pytest.mark.parametrize("growth", [-100, -100.01])
+def test_total_loss_boundary_on_every_scenario(field: str, growth: float) -> None:
+    arguments = {
+        **_APPLE,
+        "growth_low_pct": -100,
+        "growth_base_pct": -100,
+        "growth_high_pct": -100,
+        field: growth,
+        "amount": 10000,
+    }
+    card = run_calculation("valuation_scenarios", arguments)
+    if growth < -100:
+        assert card.outcome.status == "invalid"
+    else:
+        assert card.outcome.status == "succeeded"
+        for label in ("low", "base", "high"):
+            assert row_value(card, f"value_at_horizon_{label}") == 0
+            assert row_value(card, f"annual_return_pct_{label}") == -100
+
+
 def test_an_invested_amount_is_carried_to_the_horizon_and_leads_the_card() -> None:
     card = run_calculation("valuation_scenarios", {**_APPLE, "amount": 10_000})
     base_price = row_value(card, "price_at_horizon_base")
@@ -85,7 +108,9 @@ def test_missing_bounds_fall_back_to_the_base_and_are_named_as_assumptions() -> 
         "tools.calc.notes.current_multiple_held",
         "tools.calc.notes.single_multiple",
     ]
-    blank = next(fact for fact in card.presentation.inputs if fact.name == "growth_low_pct")
+    blank = next(
+        fact for fact in card.presentation.inputs if fact.name == "growth_low_pct"
+    )
     assert blank.value is None and not blank.unknown
 
 

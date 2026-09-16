@@ -363,7 +363,7 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-15 at integration `0044d79a`, after production promotion
+**Updated 2026-09-16 at integration `31bdf027`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
@@ -1454,7 +1454,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `0044d79a`.
+shipped means live in production. Integration is `31bdf027`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1556,6 +1556,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | A second tab reads only what changed | outside the releases | **LANDED** `d018075b`, PR #645, closing #641. While a second tab waits for a reply, unchanged checks read only the newest messages instead of the whole conversation. |
 | Retry leaves the failed reply out of history | outside the releases | **LANDED** `46ec72a8`, PR #637, closing #625 and #642. Retry sends the failed reply's id, the API checks it is the conversation's latest retryable failure, and only that reply leaves the retry turn's history, in long conversations too. Every other reply stays. |
 | Shared links open as an Argus conversation | Sharing | **LANDED, switched off** `0044d79a`, PR #643. The shared page is a read-only Argus thread with the owner's note, dated snapshot and TradingView attribution, and a follow-up box. The first follow-up forks into the receiver's own chat (guest if signed out) with trimmed, labeled context; carried backtests and calculations stay read-only; guest caps unchanged. The $1 live check did not run (the lane's approval review blocked the provider call), so the enabled-surface walk at promotion carries it. |
+| Integration regressions repaired before promotion | outside the releases | **LANDED** `31bdf027`, PR #648, closing #647. Three flows that answered worse than production: a research question about future value kept its scenarios instead of being replaced by a request for calculation inputs, a growth rate of exactly -100% computes as the value going to zero, and a compound edit keeps the requested start date beside the benchmark change. Found by measuring integration against production, which nothing had done before. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
