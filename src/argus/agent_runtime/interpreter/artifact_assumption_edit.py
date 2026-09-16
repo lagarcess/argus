@@ -993,9 +993,16 @@ def materialized_artifact_edit_targets(
     ):
         requested_targets.add("asset")
     # An omitted date is not a conflicting date. The independent planner can
-    # supply it even when the primary read already supplied another edit.
+    # supply it from a current-turn quote even when the primary read already
+    # supplied another edit. Missing or stale evidence cannot license a date.
+    date_evidence = (
+        str(draft.date_range_intent.evidence or "").strip()
+        if draft.date_range_intent is not None else ""
+    )
     planner_supplies_date = (
         "date_window" in materialized_targets
+        and bool(date_evidence)
+        and date_evidence in request.current_user_message
         and primary_draft.date_range is None
         and primary_draft.date_range_intent is None
         and not primary_draft.date_range_raw_text
