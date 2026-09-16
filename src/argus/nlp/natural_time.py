@@ -57,7 +57,7 @@ def resolve_date_range_text(
     *,
     today: date | None = None,
     languages: tuple[str, ...] | None = None,
-    strict: bool = False,
+    require_parts: tuple[str, ...] = (),
 ) -> NaturalDateRange | None:
     """Resolve bounded natural-language date/window text into canonical dates.
 
@@ -83,7 +83,7 @@ def resolve_date_range_text(
     parsed = [
         parsed
         for span, _ in matches
-        if (parsed := _parse_date_span(span, today=current_date, languages=languages, strict=strict))
+        if (parsed := _parse_date_span(span, today=current_date, languages=languages, require_parts=require_parts))
         is not None
     ]
     if len(parsed) < 2:
@@ -695,7 +695,7 @@ def parse_date_text(
     endpoint: Literal["start", "end"] = "start",
     languages: tuple[str, ...] | None = None,
     prefer_dates_from: Literal["past", "future"] | None = None,
-    strict: bool = False,
+    require_parts: tuple[str, ...] = (),
 ) -> date | None:
     current_date = today or new_york_today()
     if text_has_fractional_duration(str(text or "")):
@@ -705,7 +705,7 @@ def parse_date_text(
         today=current_date,
         languages=languages,
         prefer_dates_from=prefer_dates_from,
-        strict=strict,
+        require_parts=require_parts,
     )
     if parsed is None:
         parsed = _single_searched_date_span(
@@ -713,7 +713,7 @@ def parse_date_text(
             today=current_date,
             languages=languages,
             prefer_dates_from=prefer_dates_from,
-            strict=strict,
+            require_parts=require_parts,
         )
     if parsed is None:
         return None
@@ -737,14 +737,14 @@ def date_range_intent_matches_evidence(
     if proposed is None:
         return False
     languages = dateparser_languages_for_user_language(language)
-    quoted = resolve_date_range_text(evidence, today=today, languages=languages, strict=True)
+    quoted = resolve_date_range_text(evidence, today=today, languages=languages, require_parts=("month", "year"))
     if quoted is not None:
         supported = quoted.payload
     else:
         supported = {}
         for endpoint in ("start", "end"):
             value = parse_date_text(
-                evidence, today=today, endpoint=endpoint, languages=languages, strict=True,
+                evidence, today=today, endpoint=endpoint, languages=languages, require_parts=("month", "year"),
             )
             if value is not None:
                 supported[endpoint] = value.isoformat()
@@ -856,14 +856,14 @@ def _parse_date_span(
     today: date,
     languages: tuple[str, ...] | None,
     prefer_dates_from: Literal["past", "future"] | None = None,
-    strict: bool = False,
+    require_parts: tuple[str, ...] = (),
 ) -> _ParsedDate | None:
     settings = {
         "RELATIVE_BASE": _relative_base(today),
         "RETURN_AS_TIMEZONE_AWARE": False,
         "PREFER_DAY_OF_MONTH": "first",
         "PREFER_MONTH_OF_YEAR": "first",
-        "STRICT_PARSING": strict,
+        "REQUIRE_PARTS": list(require_parts),
     }
     if prefer_dates_from is not None:
         settings["PREFER_DATES_FROM"] = prefer_dates_from
@@ -890,7 +890,7 @@ def _single_searched_date_span(
     today: date,
     languages: tuple[str, ...] | None,
     prefer_dates_from: Literal["past", "future"] | None = None,
-    strict: bool = False,
+    require_parts: tuple[str, ...] = (),
 ) -> _ParsedDate | None:
     if text_has_fractional_duration(text):
         return None
@@ -909,11 +909,11 @@ def _single_searched_date_span(
         today=today,
         languages=languages,
         prefer_dates_from=prefer_dates_from,
-        strict=strict,
+        require_parts=require_parts,
     )
     if parsed is not None:
         return parsed
-    if strict:
+    if require_parts:
         return None
     return _ParsedDate(
         value=value.date(),

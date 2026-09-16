@@ -32,15 +32,22 @@ def test_date_quote_must_support_the_proposed_endpoint(evidence, language, endpo
     )
 
 
-def test_date_quote_must_support_both_range_endpoints():
-    evidence = "April 1, 2026 to July 30, 2026"
+@pytest.mark.parametrize(
+    ("evidence", "start", "end", "language"),
+    [
+        ("April 1, 2026 to July 30, 2026", "2026-04-01", "2026-07-30", "en"),
+        ("April 2026 to July 2026", "2026-04-01", "2026-07-31", "en"),
+        ("enero de 2021 hasta diciembre de 2024", "2021-01-01", "2024-12-31", "es-419"),
+    ],
+)
+def test_date_quote_must_support_both_range_endpoints(evidence, start, end, language):
     intent = {
-        "kind": "explicit_range", "start": "2026-04-01",
-        "end": "2026-07-30", "evidence": evidence,
+        "kind": "explicit_range", "start": start,
+        "end": end, "evidence": evidence,
     }
-    assert date_range_intent_matches_evidence(intent, current_message=evidence)
+    assert date_range_intent_matches_evidence(intent, current_message=evidence, language=language)
     assert not date_range_intent_matches_evidence(
-        {**intent, "end": "2026-08-01"}, current_message=evidence,
+        {**intent, "end": "2026-08-01"}, current_message=evidence, language=language,
     )
 
 
