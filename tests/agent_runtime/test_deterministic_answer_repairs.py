@@ -208,13 +208,15 @@ def test_discarded_inputs_cannot_change_the_calculation_currency(extra):
         "Total interest: {{total_interest}}.",
     ],
 )
-def test_completed_card_cannot_publish_prose_without_its_primary_result(template):
+def test_completed_card_attaches_its_primary_result_without_discarding_prose(template):
     notes = []
     published = _published(template, notes=notes)
     card = ac.card_in(published.patch)
-    assert published.template is None
+    assert published.template is not None
     assert ac.figure_text(card.presentation.answer) in published.answer_text
-    assert template not in published.answer_text
+    rendered, failure = ac.render_answer_text(template, {"calculation_1": card})
+    assert failure == "missing_computed_reference"
+    assert rendered in published.answer_text
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 

@@ -205,12 +205,12 @@ def test_the_prose_states_the_computed_payment_through_its_reference() -> None:
     }
 
 
-def test_an_unknown_reference_hands_over_to_argus_lead_and_cited_digits_stand() -> None:
+def test_an_unknown_reference_attaches_a_computed_result_and_cited_digits_stand() -> None:
     notes: list[str] = []
     published = _published("It costs {{monthly_cost}}.", notes=notes)
     for card in ac.cards_in(published.patch):
         assert ac.figure_text(card.presentation.answer) in published.answer_text
-    assert published.template is None
+    assert published.template is not None
     assert ac.FIGURE_CHECK_REASON_CODE in notes
     cited = _published(
         "At the bank's published 14% rate, paying {{present_value}} at "
@@ -490,22 +490,24 @@ def test_a_reference_two_options_both_hold_is_never_guessed() -> None:
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 
-def test_missing_option_result_does_not_preserve_an_unsupported_comparison() -> None:
+def test_missing_option_result_keeps_explanation_and_attaches_the_other_result() -> None:
     notes: list[str] = []
     published = _published_many(
-        "Bank A is cheaper at {{bank_a.payment}}.",
+        "Bank A's payment is {{bank_a.payment}}. Compare both options carefully.",
         [_named("Bank A", LOAN), _named("Bank B", LOAN_AT_12)],
         notes=notes,
     )
     first, second = ac.cards_in(published.patch)
     assert first.presentation.answer.value > second.presentation.answer.value
-    assert "cheaper" not in published.answer_text
-    assert published.template is None
-    for label, card in zip(("Bank A", "Bank B"), (first, second), strict=True):
-        assert (
-            f"{label}: {ac.figure_text(card.presentation.answer)}"
-            in published.answer_text
-        )
+    assert "Compare both options carefully." in published.answer_text
+    assert published.template is not None
+    assert (
+        f"Bank A's payment is {ac.figure_text(first.presentation.answer)}"
+        in published.answer_text
+    )
+    assert (
+        f"Bank B: {ac.figure_text(second.presentation.answer)}" in published.answer_text
+    )
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 
