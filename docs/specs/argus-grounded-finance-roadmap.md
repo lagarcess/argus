@@ -363,7 +363,7 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-16 at integration `44cd936c`, after production promotion
+**Updated 2026-09-16 at integration `d825d3a8`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
@@ -1454,7 +1454,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `44cd936c`.
+shipped means live in production. Integration is `d825d3a8`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1558,6 +1558,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Shared links open as an Argus conversation | Sharing | **LANDED, switched off** `0044d79a`, PR #643. The shared page is a read-only Argus thread with the owner's note, dated snapshot and TradingView attribution, and a follow-up box. The first follow-up forks into the receiver's own chat (guest if signed out) with trimmed, labeled context; carried backtests and calculations stay read-only; guest caps unchanged. The $1 live check did not run (the lane's approval review blocked the provider call), so the enabled-surface walk at promotion carries it. |
 | Integration regressions repaired before promotion | outside the releases | **LANDED** `31bdf027`, PR #648, closing #647. Three flows that answered worse than production: a research question about future value kept its scenarios instead of being replaced by a request for calculation inputs, a growth rate of exactly -100% computes as the value going to zero, and a compound edit keeps the requested start date beside the benchmark change. Found by measuring integration against production, which nothing had done before. |
 | Calculation boundaries repaired, code only | outside the releases | **LANDED** `44cd936c`, PR #649, split out of PR #634 so no measurement was needed. An uncited currency can no longer own a calculation, which is the peso shown as dollars defect this board exists to prevent; empty optional interpreter objects keep their typed facts; only a declaration's own rule may erase an input; a completed card must reference its result; and a missing educational query no longer permits research. PR #634 stays parked with the model-facing work. |
+| Scenario answers keep their labels | outside the releases | **LANDED** `d825d3a8`, PR #650. When three scenario cards all computed but the shared formula named its figures without saying which card, the answer fell back to an unlabeled list of numbers and lost the scenarios. The fix keeps the labeled scenario prose whenever every card succeeded. Found by the measurement, not by review. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
