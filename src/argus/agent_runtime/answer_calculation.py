@@ -178,6 +178,24 @@ def publish_calculations(
     succeeded = all(card.outcome.status == "succeeded" for card in cards.values())
     text, failure = render_answer_text(template, cards)
     patch = combined_patch(patches)
+    if succeeded and failure == "invalid_figure_reference" and len(cards) > 1:
+        _note(
+            notes,
+            FIGURE_CHECK_REASON_CODE,
+            failure=failure,
+            unresolved=unresolved_references(template, cards),
+            recovery="labeled_scenarios",
+        )
+        template, _ = _trim_unresolved_clauses(template, cards)
+        referenced = _referenced_inputs(template, cards)
+        for request, (owner, card) in zip(requests, cards.items(), strict=True):
+            answer = card.presentation.answer
+            if answer is not None and (owner, answer.name) not in referenced:
+                # Preserve the model's display name, not the folded reference key.
+                label = request.name or owner
+                template += f"\n\n{label}: {{{{{owner}.{answer.name}}}}}"
+        template = template.strip()
+        text, failure = render_answer_text(template, cards)
     if succeeded and failure is None:
         assumptions = unstated_assumptions(template, cards)
         driving = _driving(cards, assumptions)
@@ -213,7 +231,13 @@ def publish_calculations(
     )
     return PublishedCalculation(
         patch,
-        completed_card_readout(cards)
+        completed_card_readout(
+            cards,
+            labels={
+                owner: request.name or owner
+                for request, owner in zip(requests, cards, strict=True)
+            },
+        )
         if succeeded
         else fallback_answer_lead(language, succeeded=False),
         None,
@@ -526,19 +550,20 @@ def figure_text(fact: ToolFact) -> str:
     return _number(value)
 
 
-def completed_card_readout(cards: AnswerCards) -> str:
+def completed_card_readout(cards: AnswerCards, *, labels: Mapping[str, str]) -> str:
     """A language-neutral last resort when model prose contradicts completed math.
 
     The ordinary answer is model-voiced. This recovery publishes only the
     presenter's primary result and supporting values, without fresh claims.
     """
     return "\n\n".join(
-        " · ".join(
+        (f"{labels[owner]}: " if len(cards) > 1 else "")
+        + " · ".join(
             figure_text(fact)
             for fact in [card.presentation.answer, *card.presentation.rows]
             if fact is not None and fact.value is not None and not fact.comparison_only
         )
-        for card in cards.values()
+        for owner, card in cards.items()
         if card.outcome.status == "succeeded"
     )
 
@@ -686,18 +711,29 @@ def render_offer_prose(template: str, cards: AnswerCards) -> tuple[str, int]:
             return match.group(0)
         return value if isinstance(value, str) else figure_text(value)
 
-    filled = _REFERENCE.sub(fill, _without_written_currency(template, cards))
+    kept, dropped = _trim_unresolved_clauses(template, cards)
+    return _REFERENCE.sub(fill, _without_written_currency(kept, cards)), dropped
+
+
+def _trim_unresolved_clauses(template: str, cards: AnswerCards) -> tuple[str, int]:
+    """Keep valid prose and its references, so recovered answers can recompute."""
+
+    def unresolved(text: str) -> bool:
+        return bool(unresolved_references(text, cards)) or "{{" in _REFERENCE.sub(
+            "", text
+        )
+
     kept: list[str] = []
     dropped = 0
-    for line in filled.split("\n"):
-        if "{{" not in line:
+    for line in template.split("\n"):
+        if not unresolved(line):
             kept.append(line)
             continue
         if line.lstrip().startswith("|"):
             dropped += 1
             continue
         sentences = _SENTENCE_BREAK.split(line)
-        remaining = [sentence for sentence in sentences if "{{" not in sentence]
+        remaining = [sentence for sentence in sentences if not unresolved(sentence)]
         dropped += len(sentences) - len(remaining)
         if remaining:
             kept.append(" ".join(remaining))
