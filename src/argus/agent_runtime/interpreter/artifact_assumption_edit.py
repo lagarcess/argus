@@ -67,7 +67,10 @@ from argus.agent_runtime.stages.artifact_context import (
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
-from argus.nlp.natural_time import resolve_date_range_intent
+from argus.nlp.natural_time import (
+    date_range_intent_matches_evidence,
+    resolve_date_range_intent,
+)
 
 ResolveAssetCandidate = Callable[..., AssetResolution | None]
 
@@ -995,18 +998,17 @@ def materialized_artifact_edit_targets(
     # An omitted date is not a conflicting date. The independent planner can
     # supply it from a current-turn quote even when the primary read already
     # supplied another edit. Missing or stale evidence cannot license a date.
-    date_evidence = (
-        str(draft.date_range_intent.evidence or "").strip()
-        if draft.date_range_intent is not None else ""
-    )
     planner_supplies_date = (
         "date_window" in materialized_targets
-        and bool(date_evidence)
-        and date_evidence in request.current_user_message
         and primary_draft.date_range is None
         and primary_draft.date_range_intent is None
         and not primary_draft.date_range_raw_text
         and primary_provenance.get("date_range") != "explicit_user"
+        and date_range_intent_matches_evidence(
+            draft.date_range_intent,
+            current_message=request.current_user_message,
+            language=request.user.language_preference,
+        )
     )
     matching_targets = {
         target

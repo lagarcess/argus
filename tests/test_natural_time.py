@@ -1,7 +1,9 @@
 from datetime import date
 
+import pytest
 from argus.nlp.natural_time import (
     contains_named_date_evidence,
+    date_range_intent_matches_evidence,
     dateparser_languages_for_user_language,
     parse_date_text,
     resolve_date_range_endpoint_patch,
@@ -9,6 +11,37 @@ from argus.nlp.natural_time import (
     resolve_date_range_text,
     resolve_rolling_window_intent_text,
 )
+
+
+@pytest.mark.parametrize(
+    ("evidence", "language"),
+    [("April 1, 2026", "en"), ("1 de abril de 2026", "es-419")],
+)
+@pytest.mark.parametrize("endpoint", ["start", "end"])
+def test_date_quote_must_support_the_proposed_endpoint(evidence, language, endpoint):
+    intent = {
+        "kind": "endpoint_patch", "endpoint": endpoint,
+        endpoint: "2026-04-01", "evidence": evidence,
+    }
+    assert date_range_intent_matches_evidence(
+        intent, current_message=evidence, language=language,
+    )
+    assert not date_range_intent_matches_evidence(
+        {**intent, endpoint: "2026-05-01"},
+        current_message=evidence, language=language,
+    )
+
+
+def test_date_quote_must_support_both_range_endpoints():
+    evidence = "April 1, 2026 to July 30, 2026"
+    intent = {
+        "kind": "explicit_range", "start": "2026-04-01",
+        "end": "2026-07-30", "evidence": evidence,
+    }
+    assert date_range_intent_matches_evidence(intent, current_message=evidence)
+    assert not date_range_intent_matches_evidence(
+        {**intent, "end": "2026-08-01"}, current_message=evidence,
+    )
 
 
 def test_resolves_spanish_month_year_range() -> None:

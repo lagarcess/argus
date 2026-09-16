@@ -716,6 +716,37 @@ def parse_date_text(
     return _endpoint_date(parsed, endpoint=endpoint, today=current_date)
 
 
+def date_range_intent_matches_evidence(
+    intent: Mapping[str, Any] | object | None,
+    *,
+    current_message: str,
+    language: str | None = None,
+) -> bool:
+    """Validate a typed date against its current-turn quote, without reading intent
+    from unrelated message text. The date resolver owns both canonical values.
+    """
+    evidence = str(_intent_payload(intent).get("evidence") or "").strip()
+    if not evidence or evidence not in current_message:
+        return False
+    today = new_york_today()
+    proposed = resolve_date_range_intent(intent, today=today)
+    if proposed is None:
+        return False
+    languages = dateparser_languages_for_user_language(language)
+    quoted = resolve_date_range_text(evidence, today=today, languages=languages)
+    if quoted is not None:
+        supported = quoted.payload
+    else:
+        supported = {}
+        for endpoint in ("start", "end"):
+            value = parse_date_text(
+                evidence, today=today, endpoint=endpoint, languages=languages,
+            )
+            if value is not None:
+                supported[endpoint] = value.isoformat()
+    return all(supported.get(key) == value for key, value in proposed.payload.items())
+
+
 def dateparser_languages_for_user_language(language: str | None) -> tuple[str, ...]:
     primary = str(language or "en").strip().replace("_", "-").split("-", 1)[0]
     primary = primary.casefold()

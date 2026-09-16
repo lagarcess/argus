@@ -505,7 +505,7 @@ class TestAcceptedOperationsLandOrFailLoudly:
 
     MESSAGE = "change the benchmark to QQQ and change the start to April 1, 2026"
 
-    @pytest.mark.parametrize("evidence", [None, "", "April 1, 2026"])
+    @pytest.mark.parametrize("evidence", [None, "", "April 1, 2026", "QQQ"])
     def test_benchmark_only_turn_refuses_ungrounded_planner_date(self, evidence):
         from argus.agent_runtime.interpreter.artifact_assumption_edit import (
             materialized_artifact_edit_targets,
