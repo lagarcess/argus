@@ -20,10 +20,10 @@ from __future__ import annotations
 from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.interpreter.research_routing import (
     concept_research_query,
+    educational_question_has_no_query,
     primary_research_query,
     research_turn_has_conflicting_owner,
     scenario_is_typed,
-    unkinded_question_research_query,
     unsupported_verdict_research_query,
 )
 
@@ -64,13 +64,12 @@ async def research_answer_stage_result(
 
     Returns None without a supported primary-interpreter question payload.
     """
-    if not research_rail_enabled():
+    if not research_rail_enabled() or educational_question_has_no_query(interpretation):
         return None
     query = (
         primary_research_query(interpretation)
         or concept_research_query(interpretation)
         or unsupported_verdict_research_query(interpretation)
-        or unkinded_question_research_query(interpretation)
     )
     if query is None:
         return None
@@ -287,9 +286,18 @@ def _resolved_subjects(query: ResearchQueryExtraction) -> list[dict[str, str]]:
         if not candidate or candidate in seen:
             continue
         try:
-            from argus.domain.market_data.assets import resolve_asset
+            from argus.agent_runtime.resolution import resolve_asset_candidate
 
-            resolved = resolve_asset(candidate)
+            resolution = resolve_asset_candidate(
+                candidate,
+                field="research_query.symbols",
+                source="llm_extraction",
+                asset_class_hint=query.asset_class_hint,
+                require_unambiguous_class=True,
+            )
+            resolved = resolution.asset
+            if resolution.status != "resolved" or resolved is None:
+                continue
         except Exception:  # noqa: BLE001
             continue
         symbol = resolved.canonical_symbol.upper()

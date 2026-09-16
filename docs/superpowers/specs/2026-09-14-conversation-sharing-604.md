@@ -1,75 +1,112 @@
-# Sharing selected answers in the conversation
+# Shared conversations and receiver follow-ups
 
-Founder-locked 2026-09-14, adapting the existing receipt feature after #604.
+Founder-locked 2026-09-14. Supersedes this spec's earlier prohibition on public
+fork and continuation state. The selected frozen receipt remains the privacy
+boundary; continuation belongs solely to the receiver.
 
-## 1. Why
+## 1. Outcome
 
-Argus PRODUCT.md makes conversation the primary workspace. The grounded-finance
-roadmap's Sharing lane makes a useful answer something its owner can send.
-The promotion walk found that ordinary completed answers could not be selected.
+A receiver sees Argus answering a real question in a read-only chat thread, then
+asks a follow-up that starts their own chat. Viewing never creates a workspace,
+conversation, run or charge. PRODUCT.md's conversation-first direction and the
+Sharing lane of the grounded-finance roadmap govern this work.
 
 ## 2. Locked decisions
 
-1. Select question plus final answer inside the conversation. Backtests,
-   research, calculations and plain answers qualify; confirmations and
-   clarifications do not. Keep Select all, owner note and exact preview.
-2. Owner selection and the exact preview are the privacy boundary. Remove
-   credential-shape scanning, question/answer caps, source requirements and
-   link/source matching, and memory/degraded-answer refusals. Retain exact
-   matching against private Argus user, conversation, message, job and artifact
-   identifiers and closed projections that add no account data or other turns.
-3. Diagnose and fix the completed backtest judgment using canonical completion
-   truth. Do not merely bypass it.
-4. Keep frozen snapshots, registered owners, /r/<id>, Settings Shared links,
-   revoke, tombstones, delete cascade, noindex and rate limits. Preserve sources
-   and dates where present. Reuse existing receipt records and table.
-5. Follow docs/BREAKPOINTS.md and DESIGN.md section 8. Selection is in the
-   conversation thread. Note, preview, link and Shared links use AdaptivePanel:
-   a sheet below 1024px and a dialog from 1024px, with 44px sheet tap targets.
-   Use shared responsive primitives and no hard-coded breakpoint widths.
-6. Sharing flags remain false in render.yaml and the release profile. Enable
-   only in local fixtures. Prefer no migration; report any widened kind check.
+1. Anyone with the link can read it, with no access list or sign-in wall.
+2. Render each selected question as a user bubble and final answer as an Argus
+   reply. Backtest, calculation, sourced research and plain answers use chat's
+   visuals with frozen public fields only. The owner note is at the top. Show
+   the snapshot date and explain that follow-ups start the receiver's own chat.
+   Owner preview uses the identical layout; unfurl images may retain figures.
+3. A bottom follow-up composer initiates a receiver-owned fork only on submit.
+   Signed-in receivers get an account chat; signed-out receivers enter the
+   ordinary guest flow. Later follow-ups use the resulting conversation.
+4. Carry each selected question, shortened final answer and bounded public
+   facts as ordinary history. Never carry the owner note. Trim deterministically,
+   without a model call. History text has a total 64 KiB UTF-8 bound, divided fairly across
+   selected questions and answers. Carried text plus card metadata is bounded
+   at 512 KiB; oversized public facts are refused before any write. No model
+   summary is generated.
+5. Carried backtests and calculations are frozen read-only cards, with no live
+   run, artifact or execution state. Changes go through the receiver's normal
+   interpretation, confirmation and allowances.
+6. Reuse guest entry, its existing new-conversation choice, fixed workspace
+   lifetime, caps, budgets and signup handoff. Never silently overwrite a guest
+   conversation; Start over requires that existing choice.
+7. Label carried history as from a shared conversation with its date. Imported
+   turns cost nothing and are excluded from interest greetings, memory and
+   conversation naming. The receiver's own follow-ups behave normally.
+8. A guest signup retains the fork through the existing guest handoff.
+9. Date snapshot figures. Current-figure questions take the normal fresh-answer
+   path rather than treating frozen figures as current data.
+10. Extend count-only funnel stages with followed_up and signed_up alongside
+    try_argus. Add no viewer identifier.
 
-## 3. Reserved scope
+## 3. Retained boundaries and no-touch areas
 
-No provider/model/runtime redesign, memory subsystem changes, new sharing
-service, public fork or continuation state, hosted migration, merge or deploy.
-No shared AdaptivePanel change. No live answer without an approved spend cap.
+Keep frozen snapshots, owner selection, exact preview, receipt records, revoke,
+tombstones, source deletion cascade, noindex and rate limits. A revoked, deleted
+or tombstoned link cannot create a fork; existing receiver copies survive.
+No new model-facing instruction text and no prompt fingerprint change. No private
+id-dependent chat components on the public page. Public fields may derive only
+from selected turns. No owner activity becomes receiver activity.
 
-## 4. Contract gates
+Do not touch render.yaml or release contracts. Sharing flags remain false there
+and may be enabled only in isolated local fixtures. No paid calls during build.
+No git stash, hosted migration, PR merge or deployment.
 
-Update docs/specs/conversation-sharing.md, supersede section 7.5 of the original
-receipt spec, update API_CONTRACT.md and DATA_MODEL.md, and regenerate OpenAPI
-if schemas change. Backend and web share a closed versioned payload contract.
+## 4. Contract and implementation gates
+
+Update API_CONTRACT.md and DATA_MODEL.md and regenerate OpenAPI for all route or
+field additions. Prefer existing message metadata and receipt records. If atomic
+fork creation requires a migration, it must be additive and its classification
+reported. Follow BREAKPOINTS.md and DESIGN.md section 8 using shared responsive
+primitives. No em dashes in user-facing English or Spanish copy.
+
+Use one public presentation owner for page, exact preview and read-only carried
+cards. Use receiver authentication for writes and revalidate snapshot liveness at
+fork admission. Protect retries/concurrency with durable idempotency. Do not seed
+runtime execution state or copy sender identifiers into the receiver's history.
 
 ## 5. Execution contract
 
-One PR targeting codex/private-alpha-next, closing #604. Original fetched base:
-`d788449385ec93e92609b4692aa0fe8c1981ab58`.
+One worker PR targeting codex/private-alpha-next. Original fetched integration
+base: `350e3dca8f573f5dfd61f1f753d8ed16a2724c9e`.
 
-Scripted regression tests must fail on that base and pass on the final code for
-all #604 cases. Verify retained private-ID, exact-preview, ownership, revocation
-and deletion behavior. Use seeded or recorded conversations for EN/es-419
-browser evidence matching the breakpoint baseline spine: English dark at
-390, 720, 1024 and 1280px, Spanish light at 390px, and signed-out pages at
-390/1024px. Commit durable evidence. The founder revised the earlier breakpoint
-request to match AdaptivePanel; there is no shared-panel blocker.
+Test first: view creates nothing; first submit creates exactly one fork; retries
+and later follow-ups reuse it; trimmed context excludes note and stays bounded;
+revoked/deleted/tombstoned cannot fork; guest/account ownership and existing guest
+choice; no imported usage or personalization/naming/memory; read-only cards and
+receiver-owned changed confirmation; guest signup retention; frozen fingerprint.
+Use scripts/qa/sharing_604_fixture.py without providers, fixing its seeded job's
+missing updated_at and finished_at. Capture public page and preview with motion
+on in English dark at 390/720/1024/1280 and Spanish light at 390. Include every
+answer kind and an explicit recurring-contribution backtest. Commit evidence.
 
-Reconcile current integration one-way, audit semantic overlap, run the merged
-modularity budget and deterministic gates. Get CI green and a clean Codex
-review on the final head, with zero unresolved review threads. Stop and report;
-the founder merges and enables flags at promotion.
+Merge latest integration into the worker, preserving both sides' intent in any
+conflict. Report semantic overlap, retained/invalidated evidence and merged-tree
+modularity check. Founder update 2026-09-15: PR #643 stays ready throughout
+review. Validate every finding against these locked decisions; fix confirmed
+findings at their owner with pattern-wide coverage and tests, or decline with
+the reason. Reply on and resolve every thread, push, wait for green CI, then
+request the next Codex review. Repeat until the current head is clean with zero
+unresolved threads. Never return this PR to draft.
+When other gates are green, propose a live check capped at $1.00: signed-out
+receiver opens link, asks one plain follow-up and one fresh-figure question;
+report actual per-follow-up cost. Wait for founder go before spending. Keep
+the already-ready PR ready throughout; after approved acceptance, stop. Founder merges.
 
 ## 6. Stop conditions
 
-- Founder authorized one resume after the research-kind correction slip. Fix
-  it test-first and make browser fixture reuse repeatable. If the requested
-  final-head Codex review raises renderer provenance again, stop and report.
-- Any live provider answer needs a proposed spend cap and founder approval.
-- Scope requires account data, hidden turns or live public source reads: stop.
+- New model instructions or changed prompt fingerprint are needed.
+- Rendering requires anything beyond selected frozen public turn fields.
+- A finding requires changing a locked decision, a migration, render.yaml or a
+  release contract. Repeated findings alone no longer stop this review loop.
+- Live calls lack explicit approval under the proposed maximum $1.00 cap.
 
 ## Sources
 
-Founder instructions 2026-09-14; issue #604 and its recorded promotion evidence;
-docs/PRODUCT.md; docs/specs/argus-grounded-finance-roadmap.md Sharing lane;
-docs/specs/private-alpha-next-decision-memo.md sections 5.8 and 10.7.
+Founder instructions 2026-09-14; issue #604 and PR #632 history; PRODUCT.md;
+argus-grounded-finance-roadmap.md Sharing lane; private-alpha-next-decision-memo.md
+sections 5.8 and 10.7. The new founder decisions override older no-fork clauses.

@@ -5,6 +5,7 @@ import { ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning, Rotat
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
+import SharedConversationMessage from "./SharedConversationMessage";
 import StrategyResultCard from "./StrategyResultCard";
 import ToolResultCard from "./ToolResultCard";
 import { answerAssumptionsText, type ToolRecompute } from "@/lib/tool-result-card";
@@ -328,6 +329,8 @@ export default function ChatMessage({
       </div>
     );
   }
+
+  if (message.sharedConversation) return <SharedConversationMessage message={message} />;
 
   if (isUser) {
     return (

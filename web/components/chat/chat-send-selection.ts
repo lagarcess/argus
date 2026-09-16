@@ -2,6 +2,12 @@ import type { StarterSelectionMetadata } from "@/components/chat/StarterActions"
 import type { ChatActionOption, ChatMention } from "./types";
 
 export type SendOptions = {
+  /** Durable identity for a receiver follow-up resumed after navigation. */
+  requestId?: string;
+  /** Wait for transport and normal reconciliation, without claiming durability. */
+  awaitCompletion?: boolean;
+  /** An authorized canonical final frame settled this request. */
+  onTerminal?: () => void;
   renderUserMessage?: boolean;
   replacementAssistantId?: string;
   bypassGuestGate?: boolean;

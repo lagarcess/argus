@@ -38,6 +38,7 @@ export const STORAGE_REGISTRY = {
   "argus:guest-hint:result:v1": "tips",
   "argus:feedback-ask:v1": "tips",
   "argus.memoryOptOutConversations.v1": "temporary",
+  "argus:receipt-followup:v1": "temporary",
 } as const satisfies Record<string, StorageConcept>;
 
 export type StorageKey = keyof typeof STORAGE_REGISTRY;
@@ -71,4 +72,21 @@ export function removeStored(key: StorageKey): void {
   } catch {
     // Same as writeStored: absence is an acceptable outcome.
   }
+}
+
+/** A pending receiver follow-up lasts only in this tab, never across visits. */
+export function readSessionStored(key: StorageKey): string | null {
+  try { return typeof window === "undefined" ? null : window.sessionStorage.getItem(key); }
+  catch { return null; }
+}
+export function writeSessionStored(key: StorageKey, value: string): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    window.sessionStorage.setItem(key, value);
+    return true;
+  } catch { return false; }
+}
+export function removeSessionStored(key: StorageKey): void {
+  try { if (typeof window !== "undefined") window.sessionStorage.removeItem(key); }
+  catch { /* Already absent or storage unavailable. */ }
 }

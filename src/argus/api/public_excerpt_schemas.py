@@ -488,7 +488,7 @@ class PublicExcerptFunnelStage(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    stage: Literal["viewed", "try_argus"]
+    stage: Literal["viewed", "try_argus", "followed_up", "signed_up"]
     kind: PublicExcerptKind = "backtest"
 
 

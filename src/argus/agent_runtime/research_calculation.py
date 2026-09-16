@@ -2,7 +2,8 @@
 
 The research provider returns prose and its calculations; they compute here
 through the answer step, with the pages this answer retrieved as the only
-pages an input may cite. When the lookup fails or a page input was not found,
+pages an input may cite. An unusable calculation leaves the research prose
+standing. When the lookup fails,
 the no-search step answers from Argus market data and stated assumptions and
 says what it could not look up: a failed lookup never becomes the answer.
 """
@@ -19,6 +20,7 @@ from pydantic import ValidationError
 from argus.agent_runtime.answer_calculation import (
     calculation_names,
     card_in,
+    cards_in,
     computed_answer_patch,
     latest_market_close,
     publish_calculations,
@@ -44,9 +46,7 @@ OFFER_PROSE_TRIMMED_REASON_CODE = "offer_prose_results_dropped"
 MALFORMED_CALCULATION_REASON_CODE = "answer_calculation_malformed"
 # Degraded research an answer without a lookup may replace; a survey or a claim
 # withheld for want of a publisher keeps its own honest note.
-LOOKUP_FAILURE_CODES = frozenset(
-    {"research_not_grounded", "scenario_inputs_uncited", CALCULATION_NOT_COMPUTED_CODE}
-)
+LOOKUP_FAILURE_CODES = frozenset({"research_not_grounded"})
 _MAX_MARKET_SUBJECTS = 3
 
 
@@ -55,7 +55,20 @@ class NotComputed:
     """A calculation the answer returned but Argus could not compute from its sources."""
 
     code: str
-    not_looked_up: tuple[str, ...]
+    answer_text: str
+
+
+def skipped_calculation(
+    packet: ResearchPacket,
+    notes: list[str],
+    code: str,
+) -> NotComputed:
+    """Keep research independent of optional math, without unresolved references."""
+    _note(notes, code)
+    prose, dropped = render_offer_prose(packet.answer_markdown, {})
+    if dropped:
+        _note(notes, OFFER_PROSE_TRIMMED_REASON_CODE)
+    return NotComputed(code, prose)
 
 
 def packet_answer(
@@ -65,13 +78,16 @@ def packet_answer(
     user: UserState,
     language: str,
     notes: list[str],
+    scenario: bool = False,
 ) -> CalculatedAnswer | NotComputed | None:
     """The answer's computed calculations, what they could not compute, or None
     when it returned none and its prose stands on its own."""
     if not packet.calculations:
         if "{{" in packet.answer_markdown:
             _note(notes, MALFORMED_CALCULATION_REASON_CODE)
-            return NotComputed(CALCULATION_NOT_COMPUTED_CODE, ())
+            return skipped_calculation(packet, notes, CALCULATION_NOT_COMPUTED_CODE)
+        if scenario:
+            return skipped_calculation(packet, notes, "scenario_inputs_uncited")
         return None
     try:
         requests = [
@@ -79,7 +95,7 @@ def packet_answer(
         ]
     except ValidationError:
         _note(notes, MALFORMED_CALCULATION_REASON_CODE)
-        return NotComputed(CALCULATION_NOT_COMPUTED_CODE, ())
+        return skipped_calculation(packet, notes, CALCULATION_NOT_COMPUTED_CODE)
     from argus.domain.capability_registry import get_tool_catalog
 
     retrieved = retrieved_pages(packet)
@@ -97,9 +113,11 @@ def packet_answer(
         evidence=evidence,
     )
     if published is None:
-        return NotComputed(CALCULATION_NOT_COMPUTED_CODE, ())
+        return skipped_calculation(packet, notes, CALCULATION_NOT_COMPUTED_CODE)
     if published.not_looked_up:
-        return NotComputed(CALCULATION_NOT_COMPUTED_CODE, published.not_looked_up)
+        return skipped_calculation(packet, notes, CALCULATION_NOT_COMPUTED_CODE)
+    if any(card.outcome.status != "succeeded" for card in cards_in(published.patch)):
+        return skipped_calculation(packet, notes, "research_calculation_invalid")
     return answer_from_published(
         requests,
         published,
@@ -164,6 +182,7 @@ def offered_calculation(
         notes.append(CALCULATION_OFFERED_REASON_CODE)
     logger.info(
         "Calculation offered on the reader's own figures",
+        failure_classification=CALCULATION_OFFERED_REASON_CODE,
         kinds=[item.get("kind") for item in pending_requests(offer)],
         requested_field=offer.get("requested_field"),
     )

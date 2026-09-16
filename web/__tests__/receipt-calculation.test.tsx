@@ -40,21 +40,21 @@ describe.each(["en", "es-419"] as const)("a calculation receipt in %s", (languag
     expect(entry.framing).toBe(copy.calculation.framing);
   });
 
-  test("renders read-only with one public action and no recompute control", () => {
+  test("renders read-only with a follow-up box and no recompute control", () => {
     const markup = renderToStaticMarkup(
       <ReceiptBody payload={documentOf(turn)} createdAt="2026-09-11T12:00:00Z" language={language} copy={copy} />,
     );
     expect(markup).toContain(turn.question);
     expect(markup).toContain(copy.calculation.used);
     expect(markup).toContain("Apple quote");
-    expect(markup).toContain(copy.calculation.headline);
+    expect(markup).toContain(copy.thread.read_only);
     expect(markup).not.toContain("<input");
     // Owner-written inputs are part of the selected preview, even without a publisher source.
     for (const input of turn.inputs.filter((item) => !item.source && item.value != null)) {
       expect(markup).toContain(String(input.value));
     }
     expect(markup).toContain(turn.answer_text!);
-    expect(markup.match(/href="\/"/g)).toHaveLength(1);
+    expect(markup.match(/<textarea/g)).toHaveLength(1);
     expect(markup).not.toContain("—");
   });
 

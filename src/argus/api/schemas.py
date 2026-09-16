@@ -280,6 +280,7 @@ class ConversationActivity(BaseModel):
 
     operation: ConversationOperation
     attention: ConversationAttention
+    latest_message_id: str | None = None
 
 
 class ConversationActivityMarkUnread(BaseModel):
@@ -828,6 +829,9 @@ class ChatStreamRequest(BaseModel):
     conversation_id: str = Field(max_length=CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH)
     message: str | None = Field(default=None, max_length=CHAT_STREAM_MAX_MESSAGE_LENGTH)
     action: ChatActionPayload | None = None
+    failed_assistant_id: str | None = Field(
+        default=None, min_length=1, max_length=CHAT_STREAM_MAX_CONVERSATION_ID_LENGTH
+    )
     mentions: list[ChatMentionPayload] = Field(
         default_factory=list,
         max_length=CHAT_STREAM_MAX_MENTIONS,

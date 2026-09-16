@@ -15,10 +15,12 @@ import pytest
 from argus.agent_runtime import research_answer as ra
 from argus.agent_runtime import research_calculation
 from argus.agent_runtime import research_grounded as grounded
+from argus.agent_runtime.answer_calculation import figure_text
 from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.tool_contracts import ToolFact
 
 from tests.research.conftest import (
     RecordingTransport,
@@ -152,8 +154,9 @@ def test_a_scenario_publishes_its_calculation_and_argus_computes_it(
     sidecar = result.stage_patch["research"]
     assert "degraded" not in sidecar
     answer = result.stage_patch["assistant_response"]
-    assert "USD 218.36" in answer and "25%" in answer and "{{" not in answer
+    assert "{{" not in answer
     card = _scenario_card(result)
+    assert figure_text(ToolFact.model_validate(card["presentation"]["answer"])) in answer
     assert card["tool_name"] == "valuation_scenarios"
     assert card["outcome"]["status"] == "succeeded"
     assert card["arguments"]["price"] == 218.36
@@ -187,14 +190,14 @@ def test_a_scenario_citing_pages_it_never_read_renders_no_blank_card(
     result = _run_scenario(monkeypatch, cited=False, source_urls=[OUTLOOK_PAGE])
     assert result is not None
     sidecar = result.stage_patch["research"]
-    assert sidecar["degraded"] == {"code": "calculation_inputs_not_found"}
+    assert "degraded" not in sidecar
     assert "couldn't look up every figure" in result.stage_patch["assistant_response"]
     # The subject the user named stays testable.
     assert result.stage_patch["next_experiments"]["rows"]
     assert "final_response_payload" not in result.stage_patch
 
 
-def test_the_background_scenario_applies_the_same_input_gate() -> None:
+def test_the_background_scenario_preserves_research_without_a_calculation() -> None:
     from argus.domain.research.contracts import (
         ResearchPacket,
         ResearchSource,
@@ -215,17 +218,17 @@ def test_the_background_scenario_applies_the_same_input_gate() -> None:
         "subjects": [{"symbol": "NVDA", "name": "NVIDIA", "asset_class": "equity"}],
     }
     composed = grounded.compose_completed_research(job_request=job_request, packet=packet)
-    assert composed["research"]["degraded"] == {"code": "scenario_inputs_uncited"}
-    assert "won't compute a range" in composed["answer"]
+    assert "degraded" not in composed["research"]
+    assert packet.answer_markdown in composed["answer"]
 
 
-def test_a_comparison_scenario_runs_balanced_and_a_withheld_cache_hit_stays_withheld(
+def test_a_comparison_scenario_preserves_research_on_a_cache_hit(
     monkeypatch,
 ) -> None:
     """A scenario computes from retrieved inputs on the balanced path, so a
     named comparison asked as a scenario never takes the thorough job. A
-    withheld scenario is cached so the same question is not billed twice; the
-    repeat composes from that cache and is withheld the same way."""
+    scenario with an unusable calculation is cached so the same question is not
+    billed twice; the repeat preserves its research prose in the same way."""
     set_research_query(
         monkeypatch,
         globals(),
@@ -253,9 +256,8 @@ def test_a_comparison_scenario_runs_balanced_and_a_withheld_cache_hit_stays_with
     first = _run("Which of NVDA or AMD will be worth more in ten years?")
     assert first is not None
     assert "research_job_request" not in first.stage_patch
-    assert first.stage_patch["research"]["degraded"] == {
-        "code": "calculation_inputs_not_found"
-    }
+    assert "degraded" not in first.stage_patch["research"]
+    assert "calculation_inputs_not_found" in first.decision.reason_codes
     assert len(transport.requests) == 1
 
     repeat = _run("Which of NVDA or AMD will be worth more in ten years?")
@@ -263,8 +265,9 @@ def test_a_comparison_scenario_runs_balanced_and_a_withheld_cache_hit_stays_with
     assert len(transport.requests) == 1, "a cache hit must not touch the provider"
     sidecar = repeat.stage_patch["research"]
     assert sidecar["usage"]["cache_status"] == "hit"
-    assert sidecar["degraded"] == {"code": "calculation_inputs_not_found"}
-    assert "written from memory" not in repeat.stage_patch["assistant_response"]
+    assert "degraded" not in sidecar
+    assert "written from memory" in repeat.stage_patch["assistant_response"]
+    assert "calculation_inputs_not_found" in repeat.decision.reason_codes
     assert "final_response_payload" not in repeat.stage_patch
 
 
@@ -326,9 +329,8 @@ def test_a_typed_horizon_alone_selects_the_scenario_contract(monkeypatch) -> Non
     assert result is not None
     body = __import__("json").loads(transport.requests[0].content.decode())
     assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
-    assert result.stage_patch["research"]["degraded"] == {
-        "code": "calculation_inputs_not_found"
-    }
+    assert "degraded" not in result.stage_patch["research"]
+    assert "calculation_inputs_not_found" in result.decision.reason_codes
     # The compensation reaches the persisted turn through the decision.
     from argus.agent_runtime.research_grounded import SCENARIO_FROM_HORIZON_REASON_CODE
 
@@ -459,7 +461,12 @@ def test_a_scenario_typed_as_market_stats_is_grounded_not_voiced_from_history(
     body = __import__("json").loads(transport.requests[0].content.decode())
     assert body["instructions"] == SCENARIO_RETRIEVAL_INSTRUCTIONS
     assert result.stage_patch["research"]["shape"] == "balanced"
-    assert "Bear" in result.stage_patch["assistant_response"]
+    assert (
+        figure_text(
+            ToolFact.model_validate(_scenario_card(result)["presentation"]["answer"])
+        )
+        in result.stage_patch["assistant_response"]
+    )
 
 
 def test_a_scenario_about_named_subjects_is_a_fact_question_whatever_its_kind(
@@ -624,7 +631,12 @@ def test_a_scenario_typed_as_a_survey_is_not_handled_as_one(monkeypatch) -> None
     sidecar = result.stage_patch["research"]
     assert sidecar["capability_class"] == "balanced_lookup"
     assert "degraded" not in sidecar
-    assert "Bear" in result.stage_patch["assistant_response"]
+    assert (
+        figure_text(
+            ToolFact.model_validate(_scenario_card(result)["presentation"]["answer"])
+        )
+        in result.stage_patch["assistant_response"]
+    )
 
 
 def test_a_subjectless_scenario_reaches_research_only_when_a_page_supplies_a_figure(

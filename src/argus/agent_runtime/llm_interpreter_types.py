@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr
+from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr, field_validator
 
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
@@ -319,6 +319,15 @@ class LLMAmbiguousField(BaseModel):
 
 
 class LLMInterpretationResponse(BaseModel):
+    @field_validator(
+        "candidate_strategy_draft", "response_profile_overrides", mode="before"
+    )
+    @classmethod
+    def _empty_optional_objects(cls, value: Any) -> Any:
+        # Null and omitted optional objects both mean no supplied fields, not
+        # failure of an otherwise usable typed question or refusal.
+        return {} if value is None else value
+
     intent: Literal[
         "beginner_guidance",
         "strategy_drafting",
@@ -360,10 +369,7 @@ class LLMInterpretationResponse(BaseModel):
     reason_codes: list[str] = Field(default_factory=list)
     ambiguous_fields: list[LLMAmbiguousField] = Field(default_factory=list)
     unsupported_constraints: list[LLMUnsupportedConstraint] = Field(default_factory=list)
-    response_profile_overrides: Annotated[
-        ResponseProfileOverrides,
-        BeforeValidator(lambda value: {} if value is None else value),
-    ] = Field(
+    response_profile_overrides: ResponseProfileOverrides = Field(
         default_factory=ResponseProfileOverrides
     )
     semantic_turn_act: (

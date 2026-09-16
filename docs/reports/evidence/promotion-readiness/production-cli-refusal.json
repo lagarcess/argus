@@ -1,0 +1,13 @@
+{
+  "candidate_sha": "75dafb2ddb1d12c4d49f4d218b4409805c089d3f",
+  "checked_at": "2026-09-15T00:21:58.050782Z",
+  "database_access": "read_only",
+  "database_transport": "tls_verify_full",
+  "error": "ARGUS_PRODUCTION_DATABASE_URL must be set explicitly; dotenv discovery is disabled",
+  "migration_apply": "never",
+  "schema_version": "argus.production_migration_gate.v1",
+  "status": "blocked",
+  "stop_reasons": [
+    "gate_execution_failed"
+  ]
+}

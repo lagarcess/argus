@@ -21,6 +21,7 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.next_experiments_contract import NEXT_EXPERIMENT_ACTION_LABELS
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.result_fact_figures import (
@@ -615,19 +616,15 @@ def _run_start(metadata: dict[str, Any]) -> str:
 
 def _recent_conversation_lines(messages: Sequence[Any]) -> list[str]:
     lines: list[str] = []
-    for message in list(messages)[-_RECENT_MESSAGES:]:
-        if isinstance(message, dict):
-            role, content = message.get("role"), message.get("content")
-        else:
-            role, content = (
-                getattr(message, "role", None),
-                getattr(message, "content", None),
-            )
-        text = " ".join(str(content or "").split())
+    for message in select_thread_history(messages, recent_limit=_RECENT_MESSAGES):
+        role = message.role
+        text = " ".join(message.content.split())
         if role not in {"user", "assistant"} or not text:
             continue
         speaker = "Reader" if role == "user" else "Argus"
-        lines.append(f"{speaker}: {text[:_MAX_MESSAGE_CHARS]}")
+        if not message.shared_context:
+            text = text[:_MAX_MESSAGE_CHARS]
+        lines.append(f"{speaker}: {text}")
     return lines
 
 

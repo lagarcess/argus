@@ -174,8 +174,9 @@ class OpenRouterClarificationGenerator:
         return
 
     def _messages(self, request: ClarificationRequest) -> list[BaseMessage]:
-        # Interpretation owns conversation history. The writer voices the current
-        # decision, so earlier questions cannot compete with its stored reason.
+        # Interpretation owns conversation history, including imported turns.
+        # The writer voices the current decision, so earlier questions cannot
+        # compete with its stored reason.
         context = {
             "language": request.language,
             "current_user_message": request.current_user_message,

@@ -28,7 +28,7 @@ def implied_annual_return(
 ) -> float | NoSolution:
     if horizon <= 0:
         return NoSolution(field="horizon_years", code="no_periods")
-    if price <= 0 or future_price <= 0:
+    if price <= 0 or future_price < 0:
         return NoSolution(field="price", code="growth_needs_positive_values")
     return (future_price / price) ** (1.0 / horizon) - 1.0
 
@@ -52,7 +52,7 @@ def valuation_scenarios(
     for label, growth_rate, multiple in zip(
         ("low", "base", "high"), growth, multiples, strict=False
     ):
-        if multiple <= 0 or growth_rate <= -1:
+        if multiple <= 0 or growth_rate < -1:
             return NoSolution(
                 field=f"multiple_{label}", code="growth_needs_positive_values"
             )

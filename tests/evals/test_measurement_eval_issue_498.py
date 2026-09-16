@@ -234,3 +234,71 @@ def test_issue_498_compound_edits_apply_every_operation(
     assert result["status"] == "passed"
 
 
+@pytest.mark.parametrize("fallback", [False, True], ids=["primary-plan", "fallback-plan"])
+def test_compound_date_from_planner_survives_primary_omission(monkeypatch, fallback):
+    """Replay the missing-primary-date and repeated-planner shape on efaf4b53.
+
+    The saved trace records no primary date fields and a later benchmark-only
+    confirmation. Canned plans reproduce that shape, not unsaved model bytes.
+    """
+    from argus.agent_runtime import artifact_edit_planner
+    from argus.agent_runtime.artifact_edit_planner import EditOperation
+    from argus.agent_runtime.llm_interpreter_types import LLMDateRangeIntent
+    from loguru import logger
+
+    case_id = "compound_benchmark_start_date_preserves_confirmation_issue_339"
+    primary = _issue_498_primary(
+        comparison_baseline="QQQ",
+        field_provenance={"comparison_baseline": "explicit_user"},
+    )
+    complete_plan = _issue_498_plan(
+        operations=[
+            EditOperation(op="set", target="benchmark", value="QQQ"),
+            EditOperation(
+                op="set",
+                target="date_window",
+                date_window=LLMDateRangeIntent(
+                    kind="endpoint_patch",
+                    endpoint="start",
+                    start="2026-04-01",
+                    evidence="April 1, 2026",
+                ),
+            ),
+        ]
+    )
+    benchmark_only = _issue_498_plan(
+        operations=[EditOperation(op="set", target="benchmark", value="QQQ")]
+    )
+    plans = iter(([lambda: None] if fallback else []) + [complete_plan, benchmark_only])
+    calls = []
+
+    def next_plan():
+        calls.append(True)
+        return next(plans, benchmark_only)()
+
+    _issue_498_wiring(
+        monkeypatch,
+        primary=primary,
+        plan=next_plan,
+        effective_range=None,
+        adjustment_reason=None,
+    )
+    monkeypatch.setattr(
+        artifact_edit_planner,
+        "openrouter_structured_model_candidates",
+        lambda: ["m1", "m2"] if fallback else ["m1"],
+    )
+    case = {case.id: case for case in load_eval_cases()}[case_id]
+    reasons = []
+    sink = logger.add(
+        lambda message: reasons.append(message.record["extra"].get("reason_code"))
+    )
+    try:
+        result = harness.run_eval_case(case, run_prose_judge=False)
+    finally:
+        logger.remove(sink)
+
+    assert result["failed_checks"] == []
+    assert result["status"] == "passed"
+    assert len(calls) == (2 if fallback else 1)
+    assert "artifact_edit_date_completed_from_plan" in reasons

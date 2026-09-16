@@ -359,7 +359,10 @@ describe.each(["en", "es-419"] as const)("a calculation receipt in either shape 
     expect(markup).toContain("Apple quote");
     expect(markup).toContain(copy.calculation.used);
     expect(markup).not.toContain("<input");
-    expect(markup.match(/href="\/"/g)).toHaveLength(1);
+    expect(markup).toContain(copy.thread.read_only);
+    expect(markup.match(/<textarea/g)).toHaveLength(1);
+    expect(markup).toContain(`aria-label="${copy.followup.label}"`);
+    expect(markup).not.toContain('href="/"');
     expect(markup).not.toMatch(/tools\.(calc|card)\.[a-z_.]+/);
     expect(markup).not.toContain("—");
     const flatMarkup = renderToStaticMarkup(

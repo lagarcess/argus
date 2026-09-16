@@ -7,6 +7,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Literal, cast
 
 from dateparser.date import DateDataParser
+from dateparser.languages.loader import default_loader
 from dateparser.search import search_dates
 
 from argus.domain.market_data.new_york_clock import new_york_today
@@ -57,6 +58,7 @@ def resolve_date_range_text(
     *,
     today: date | None = None,
     languages: tuple[str, ...] | None = None,
+    require_parts: tuple[str, ...] = (),
 ) -> NaturalDateRange | None:
     """Resolve bounded natural-language date/window text into canonical dates.
 
@@ -82,7 +84,7 @@ def resolve_date_range_text(
     parsed = [
         parsed
         for span, _ in matches
-        if (parsed := _parse_date_span(span, today=current_date, languages=languages))
+        if (parsed := _parse_date_span(span, today=current_date, languages=languages, require_parts=require_parts))
         is not None
     ]
     if len(parsed) < 2:
@@ -729,6 +731,7 @@ def parse_date_text(
     endpoint: Literal["start", "end"] = "start",
     languages: tuple[str, ...] | None = None,
     prefer_dates_from: Literal["past", "future"] | None = None,
+    require_parts: tuple[str, ...] = (),
 ) -> date | None:
     current_date = today or new_york_today()
     if text_has_fractional_duration(str(text or "")):
@@ -738,6 +741,7 @@ def parse_date_text(
         today=current_date,
         languages=languages,
         prefer_dates_from=prefer_dates_from,
+        require_parts=require_parts,
     )
     if parsed is None:
         parsed = _single_searched_date_span(
@@ -745,10 +749,42 @@ def parse_date_text(
             today=current_date,
             languages=languages,
             prefer_dates_from=prefer_dates_from,
+            require_parts=require_parts,
         )
     if parsed is None:
         return None
     return _endpoint_date(parsed, endpoint=endpoint, today=current_date)
+
+
+def date_range_intent_matches_evidence(
+    intent: Mapping[str, Any] | object | None,
+    *,
+    current_message: str,
+    language: str | None = None,
+) -> bool:
+    """Validate a typed date against its current-turn quote, without reading intent
+    from unrelated message text. The date resolver owns both canonical values.
+    """
+    evidence = str(_intent_payload(intent).get("evidence") or "").strip()
+    if not evidence or evidence not in current_message:
+        return False
+    today = new_york_today()
+    proposed = resolve_date_range_intent(intent, today=today)
+    if proposed is None:
+        return False
+    languages = dateparser_languages_for_user_language(language)
+    quoted = resolve_date_range_text(evidence, today=today, languages=languages, require_parts=("month", "year"))
+    if quoted is not None:
+        supported = quoted.payload
+    else:
+        supported = {}
+        for endpoint in ("start", "end"):
+            value = parse_date_text(
+                evidence, today=today, endpoint=endpoint, languages=languages, require_parts=("month", "year"),
+            )
+            if value is not None:
+                supported[endpoint] = value.isoformat()
+    return all(supported.get(key) == value for key, value in proposed.payload.items())
 
 
 def dateparser_languages_for_user_language(language: str | None) -> tuple[str, ...]:
@@ -856,12 +892,14 @@ def _parse_date_span(
     today: date,
     languages: tuple[str, ...] | None,
     prefer_dates_from: Literal["past", "future"] | None = None,
+    require_parts: tuple[str, ...] = (),
 ) -> _ParsedDate | None:
     settings = {
         "RELATIVE_BASE": _relative_base(today),
         "RETURN_AS_TIMEZONE_AWARE": False,
         "PREFER_DAY_OF_MONTH": "first",
         "PREFER_MONTH_OF_YEAR": "first",
+        "REQUIRE_PARTS": list(require_parts),
     }
     if prefer_dates_from is not None:
         settings["PREFER_DATES_FROM"] = prefer_dates_from
@@ -873,6 +911,14 @@ def _parse_date_span(
     if data.date_obj is None:
         return None
     period = str(data.period or "day")
+    if require_parts and period == "month":
+        # Numeric amounts plus a year can parse as a month. Coarse calendar
+        # evidence needs a month name recognized by the library's locale data.
+        locale = default_loader.get_locale(data.locale)
+        translated = locale.translate(span, settings=parser._settings)
+        month_tokens = "".join(char if char.isalpha() else " " for char in translated).split()
+        if calendar.month_name[data.date_obj.month].casefold() not in month_tokens:
+            return None
     if period not in {"day", "week", "month", "year"}:
         period = "day"
     return _ParsedDate(
@@ -888,6 +934,7 @@ def _single_searched_date_span(
     today: date,
     languages: tuple[str, ...] | None,
     prefer_dates_from: Literal["past", "future"] | None = None,
+    require_parts: tuple[str, ...] = (),
 ) -> _ParsedDate | None:
     if text_has_fractional_duration(text):
         return None
@@ -906,9 +953,12 @@ def _single_searched_date_span(
         today=today,
         languages=languages,
         prefer_dates_from=prefer_dates_from,
+        require_parts=require_parts,
     )
     if parsed is not None:
         return parsed
+    if require_parts:
+        return None
     return _ParsedDate(
         value=value.date(),
         period="day",

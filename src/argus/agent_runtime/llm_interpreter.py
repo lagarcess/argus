@@ -15,6 +15,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from loguru import logger
 
 from argus.domain.market_data.new_york_clock import new_york_today
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401
     _apply_legacy_flat_edit_fields,
     _edit_plan_reshapes_non_recurring_strategy,
@@ -755,15 +756,14 @@ class OpenRouterStructuredInterpreter:
             )
         )
         history: list[BaseMessage] = []
-        if not has_artifact_context:
-            for item in request.recent_thread_history[-6:]:
-                if not hasattr(item, "role") or not hasattr(item, "content"):
-                    continue
-                content = str(item.content)
-                if item.role == "assistant":
-                    history.append(AIMessage(content=content))
-                elif item.role == "user":
-                    history.append(HumanMessage(content=content))
+        for item in select_thread_history(
+            request.recent_thread_history, recent_limit=0 if has_artifact_context else 6
+        ):
+            content = str(item.content)
+            if item.role == "assistant":
+                history.append(AIMessage(content=content))
+            elif item.role == "user":
+                history.append(HumanMessage(content=content))
         asset_context_messages = (
             [
                 SystemMessage(

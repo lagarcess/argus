@@ -27,7 +27,7 @@ export type ReceiptPresentation = ReceiptFigures & {
   ownerNote?: string | null; framing: string;
 };
 
-/** Isolated v1 compatibility. Its display strings and markup stay frozen. */
+/** Isolated v1 compatibility: preserve its frozen facts in the shared presentation. */
 function legacyPresentation(payload: PublicReceiptPayload, createdAt: string | null, language: ArgusLanguage): ReceiptPresentation {
   const copy = receiptCopy(language);
   const metric = (...keys: string[]) => payload.metrics.find((entry) => keys.includes(entry.key));

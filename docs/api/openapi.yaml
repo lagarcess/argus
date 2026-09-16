@@ -2404,6 +2404,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/public/receipts/{public_id}/fork:
+    post:
+      tags:
+      - public-receipts
+      parameters:
+      - name: public_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicExcerptForkRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicExcerptForkResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/search:
     get:
       tags:
@@ -3044,6 +3081,12 @@ components:
           anyOf:
           - $ref: '#/components/schemas/ChatActionPayload'
           - type: 'null'
+        failed_assistant_id:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
         mentions:
           items:
             $ref: '#/components/schemas/ChatMentionPayload'
@@ -3331,6 +3374,14 @@ components:
             maxItems: 4
             minItems: 1
           - type: 'null'
+        peers:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ConfirmationPeerIdentity'
+            type: array
+            maxItems: 4
+            minItems: 1
+          - type: 'null'
         restore_previous:
           type: boolean
           default: false
@@ -3340,7 +3391,7 @@ components:
 
         Add mode: only symbols the active turn offered as research peer rows are
 
-        addable; the backend re-verifies each against the resolver and coverage
+        addable; the backend checks the stored identity and coverage
 
         gates. Restore mode undoes the latest add by re-materializing the exact
 
@@ -3352,6 +3403,21 @@ components:
       type: object
       required:
       - message
+    ConfirmationPeerIdentity:
+      properties:
+        symbol:
+          type: string
+          minLength: 1
+        asset_class:
+          type: string
+          enum:
+          - equity
+          - crypto
+          - currency_pair
+      type: object
+      required:
+      - symbol
+      - asset_class
     ContinuedResultResponse:
       properties:
         conversation:
@@ -3424,6 +3490,10 @@ components:
           $ref: '#/components/schemas/ConversationOperation'
         attention:
           $ref: '#/components/schemas/ConversationAttention'
+        latest_message_id:
+          anyOf:
+          - type: string
+          - type: 'null'
       type: object
       required:
       - operation
@@ -5399,6 +5469,37 @@ components:
       - config_snapshot
       - figures
       - result_card
+    PublicExcerptForkRequest:
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+        replace_guest_conversation_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - request_id
+    PublicExcerptForkResponse:
+      properties:
+        conversation:
+          $ref: '#/components/schemas/Conversation'
+        created:
+          type: boolean
+      type: object
+      required:
+      - conversation
+      - created
     PublicExcerptFunnelStage:
       properties:
         stage:
@@ -5406,6 +5507,8 @@ components:
           enum:
           - viewed
           - try_argus
+          - followed_up
+          - signed_up
         kind:
           type: string
           enum:

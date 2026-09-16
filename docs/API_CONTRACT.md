@@ -664,11 +664,14 @@ turn refuses the entire selection. All owner endpoints require
 turn eligibility and receipt identity. The existing public route, owner list,
 revoke, tombstone, rate limits, and flag-off byte identity continue to apply.
 
-The reader receives only a frozen snapshot. No live source reads, fork, prompt
-seed, history copy, refresh, or rerun are part of this extension. The public action
-is Continue with Argus and lands at guest entry without carried state. The
-selection preview bounds but does not eliminate the cross-turn inference risk
-explicitly accepted in section 4.5: the owner sees exactly what they publish.
+The reader receives only a frozen snapshot. Founder-locked 2026-09-14, a first
+follow-up may import trimmed public history into a receiver-owned chat. This
+supersedes the earlier no-fork clause. Reading never creates a chat or performs
+provider work. The selected question and final answer render as an Argus thread,
+with the owner's note at the top, snapshot date, and a follow-up composer. Exact
+owner preview uses the same layout. Anyone with the link can read it without an
+access list or sign-in wall; only the receiver-owned write needs authentication.
+The existing guest bootstrap supplies that authentication for signed-out users.
 
 Behind the default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag. While it is
 off, every path below answers exactly as a route that does not exist: status 404
@@ -771,17 +774,59 @@ timestamps cannot drop or repeat a row across pages.
   from a message.
 
 `POST /public/receipt-funnel` takes
-`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "calculation" | "answer" | "mixed"}`
+`{"stage": "viewed" | "try_argus" | "followed_up" | "signed_up", "kind": "backtest" | "research_answer" | "calculation" | "answer" | "mixed"}`
 (kind defaults to `backtest` for compatible callers) and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
 rendered page rather than counted when the receipt is read, because that read also
 answers the metadata pass and the preview image; a link pasted into a chat would
 otherwise log views nobody caused. It exists because the Try Argus tap
-happens on a page nobody is signed in to, and the alternative, a marker on the
-guest entry url, is ruled out: sharing adds no new parameter to that surface.
+happens on a public page. Follow-up intent stays in the receiver tab for the
+bridge to normal chat; it adds no viewer identifier or tracking URL parameter.
 An owner preview reports no view, and a multi-turn public page reports one view.
 Tombstones and unavailable pages with no known kind do not emit kind-attributed
 events; they never guess that the missing document was a backtest.
+
+#### Receiver-owned fork
+
+`POST /public/receipts/{public_id}/fork` requires a current Argus user (registered
+or guest). It takes `{request_id: UUID, language?: "en" | "es-419",
+replace_guest_conversation_id?: UUID}` and returns
+`{conversation: Conversation, created: boolean}`. The request id is retry identity,
+not a viewer identifier. The client retains the text, destination and request id
+until the normal chat stream reaches a terminal frame or canonical reconciliation
+proves completion. Reload reconciles the same request before resending.
+The server reuses that receiver-owned fork on replay, including after the existing
+guest signup handoff transfers ownership. Creating the fork performs
+no model, provider, calculation, simulation or allowance operation; the submitted
+follow-up uses the existing normal chat endpoint after canonical hydration.
+
+A nonempty existing guest chat returns `409 receipt_guest_choice_required`; the
+client presents the existing Start over / create-account-or-sign-in / cancel
+choice. Only explicit Start over sends that current conversation id. A stale
+choice returns `409 receipt_guest_choice_stale`. Guest replacement and import are
+atomic and preserve existing workspace expiry and allowance counters. A revoked,
+deleted, unknown or tombstoned source cannot create a fork (`410
+receipt_unavailable`). Already-created copies survive later source revocation.
+
+Each selected turn contributes ordinary user/assistant history plus frozen public
+card metadata labeled with the snapshot date. No owner note, private source ids,
+run/job/confirmation state or calculation execution handle is copied. History
+text is trimmed deterministically to at most 64 KiB UTF-8 total, fairly divided
+across questions and final answers; text plus carried card metadata is at most
+512 KiB. Oversized facts are refused before conversation creation/replacement.
+Imported messages are excluded from naming, interest and memory, and charge no
+usage. New backtests and calculations follow the receiver's normal flow and
+allowances. Existing guest signup handoff retains the conversation and its copy.
+The bounded carried context is preserved through runtime history selection;
+normal recent-message limits apply to the receiver's own turns, not to the
+selected snapshot turns. Internal provenance is not sent as model instructions.
+No model-facing instruction or prompt fingerprint changes are part of this route.
+
+Fork admission is limited to 60 requests per client identity per hour, with the
+existing 429/Retry-After treatment. Context exceeding the documented bound returns
+`413 receipt_context_too_large`; a retry id reused for another receipt returns
+`409 receipt_request_conflict`. A deleted destination returns
+`410 receipt_fork_deleted` instead of creating another copy.
 
 Rate limits: receipt creation is 10 per hour and 30 per day, keyed by both user id
 and client identity, answering `429` with `Retry-After`. The funnel endpoint is 60
@@ -3203,6 +3248,7 @@ Both endpoints return:
 
 ```json
 {
+  "latest_message_id": "saved-message-uuid-or-null",
   "operation": {
     "status": "idle | queued | running | checking",
     "kind": "chat_turn | backtest_job | null",
@@ -3214,6 +3260,16 @@ Both endpoints return:
   }
 }
 ```
+
+`latest_message_id` identifies the latest owner-scoped saved message in the
+canonical message ordering (`created_at`, then `id`), excluding legacy onboarding
+markers. It is null for an empty transcript. The same field appears in history
+and conversation-list activity projections. It changes for an ordinary saved
+reply even without a job or lifecycle row, and marking read does not clear it.
+Clients compare this opaque identity with the last raw API message they loaded
+and reload saved messages when it differs, including on focus/visibility
+refreshes. Neither operation timestamps nor attention cursors represent
+transcript freshness. A refresh preserves the current message anchor and scroll.
 
 Operation precedence is `running > queued > checking > idle`; equal states use
 the newest source timestamp, then prefer a backtest job. Accepted turns and
@@ -3381,6 +3437,33 @@ stores nothing and makes no LLM, provider, or market-data call.
 ---
 
 # 12. Chat Streaming Endpoint
+
+`POST /chat/stream` accepts optional `failed_assistant_id: string | null`
+(1 to 128 characters when supplied). Retry sends the failed assistant reply's
+message ID alongside the original question or structured action, both live and
+after reload. The API accepts the ID only when it identifies this conversation's
+latest assistant reply and that reply has `recovery.retryable: true`. Validation
+and history selection use the same owned newest 20-message snapshot, augmented
+by the bounded imported shared context, in chronological order. This includes
+Supabase-backed conversations and needs no separate retry-validation read.
+Other IDs are ignored and
+are not persisted. The API stores an accepted ID as
+`metadata.failed_assistant_id` on the new user message, preserving any original
+`chat_action` metadata. This also applies to canonical `run_backtest` retries:
+their user-message ID is stable per confirmation and failed reply, so the retry
+is saved after the failure without changing the backtest execution identity.
+
+For that retry turn, runtime history omits only the assistant message with that
+ID from the owned conversation. The question and every other reply, including
+degraded answers, remain eligible for history. An absent, unmatched, stale, or
+nonretryable ID drops nothing. Once an assistant reply follows the persisted
+retry request, later turns omit that same failed reply through the durable retry
+link, subject to the same validation against the preceding latest assistant.
+If the retry stream is interrupted, the next ordinary user turn clears its
+pending retirement; a later assistant cannot complete that abandoned link. The legacy
+`chat_action.type: retry_last_turn` / `payload.failed_assistant_id` link remains
+read-compatible. Matching repeated question text alone does not remove replies
+from model history; that compatibility behavior belongs to transcript display.
 
 ### Declared tool calls and results
 
@@ -4509,6 +4592,12 @@ Contract rules:
 - Runnable next steps ride the existing typed `next_experiments` surface.
   Provider identity is absent from prose and sidecars; route receipts and the
   cost ledger own provenance.
+  Research resolution preserves `asset_class_hint` through the shared class-aware
+  resolver. An unhinted ticker found in multiple asset classes earns no test row
+  and uses the existing honest no-next line. A comparison contains only the
+  anchor subject's asset class, including its verified peers; an unresolved
+  named subject is never replaced by a peer. Background research requests retain
+  the requested symbols and class hint for the same publication behavior.
 - Thorough-shape questions run in provider background mode through the
   existing job lifecycle: the turn ends with a `backtest_job` sidecar whose
   `operation_scope` is `"chat.research"`, and the finalized answer arrives as
@@ -4539,8 +4628,11 @@ Contract rules:
 - Researched peers still outside the active basket ride the ordinary
   `next_experiments` surface of the card-bearing message as
   `research_add_peer` / `research_add_peer_set` rows, bounded by free asset
-  slots; each row's `why.params.symbols` carries the resolver-verified
-  identity the tap adds. The card itself never grows a peer section.
+  slots; each row's `why.params.peers` carries the stored resolver-verified
+  `{symbol, name, asset_class}` identities. `why.params.symbols` remains a
+  legacy projection. The tap forwards symbol and class; the server selects
+  the stored identity, including its name, without resolving the ticker
+  again. The card itself never grows a peer section.
 - The superseding card carries typed `assets_adjustment` data
   (`{code: "assets_added" | "assets_restored", added, previous_symbols,
   symbols, period_change?}`). Clients render it as motion on the freshly
@@ -4558,9 +4650,14 @@ are both on (404 otherwise; the in-place surface ships default off until
 the run-consumption guard lane closes).
 
 **Request:** exactly one mode.
-- Add: `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must appear in the
-  active turn's `research_add_peer` rows, so nothing outside the
-  resolver-verified offer set is addable, whoever asks).
+- Add: `{"peers": [{"symbol": "BTC", "asset_class": "crypto"}]}` (1-4
+  identities; each must match a stored `research_add_peer` offer in the
+  active confirmation's class). The client cannot replace the stored name
+  or change the offered asset class.
+- Legacy add: `{"symbols": ["DIS"]}` remains accepted against stored offers.
+  For older rows containing only symbols, the owning confirmation supplies
+  the asset class. No add, remaining-offer, or undo path resolves a ticker
+  again.
 - Undo: `{"restore_previous": true}` re-materializes the exact previous
   asset set from the active card's own `assets_adjustment` data.
 
@@ -4572,7 +4669,7 @@ offer set is consumed). No turn was spent, so nothing new appears in the
 transcript; see the record-creation rule under the direct-edit endpoint.
 
 **Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
-non-active confirmation, non-offered symbols, and restore with nothing to
+non-active confirmation, non-offered identities, and restore with nothing to
 restore; `409 confirmation_changed` when a concurrent writer changed the
 card between this request's read and its write (nothing was applied; a
 retry re-reads the current card); `422 asset_maximum_reached |
