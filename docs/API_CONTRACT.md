@@ -4494,9 +4494,9 @@ Contract rules:
   `survey_synthesis_incomplete` when the survey retrieved but its prose names
   no asset the resolver verifies, `survey_not_grounded` when a survey never
   retrieved, `research_not_grounded` when any other answer never
-  retrieved. A retrieved scenario without a calculation records
-  `scenario_inputs_uncited` as a calculation skip and keeps its research
-  answer, on the inline and background paths alike. The
+  retrieved, and `scenario_inputs_uncited` when a computed scenario
+  (decision 10, `research_query.scenario_question`) retrieved but no input
+  row cites a public page, on the inline and the background path alike; the
   scenario contract is also part of the research cache identity, so a packet
   answered under the ordinary retrieval contract never serves a scenario
   question. Whatever withholds the
@@ -5596,20 +5596,10 @@ reply completes the calculation with the cited inputs kept. A tap whose latest
 answer carries no offer answers with a short note and runs nothing. A background
 answer stores the same offer on its message.
 
-A retrieved research answer also survives a missing or unusable calculation.
-The turn records `scenario_inputs_uncited` when a scenario returns no calculation,
-`calculation_inputs_not_found` when required inputs cannot be grounded, or
-`research_calculation_invalid` when execution rejects the calculation. Its
-research prose, sources and rows remain available; unresolved calculation
-references are trimmed with `offer_prose_results_dropped`. These calculation
-skips do not mark the research lookup degraded or invoke input-request recovery.
-If no usable prose remains, the existing calculation notice stands alone, with
-no blank card or automatic question. Inline, cache-hit and background answers
-use the same rule. Valuation growth accepts exactly -100% as a zero terminal
-value and -100% annual return for a positive horizon; lower growth is invalid.
-
 A failed lookup never becomes the answer and never names the conversation.
-When research is unavailable or retrieves nothing (`research_not_grounded`), the
+When research is unavailable, retrieves nothing (`research_not_grounded`),
+returns a scenario without a calculation (`scenario_inputs_uncited`) or a
+calculation whose inputs were not found (`calculation_inputs_not_found`), the
 no-search answer replies from Argus market data for the named subjects and
 stated assumptions and says what could not be looked up; the degraded code stays
 on the `research` sidecar. When research is unavailable, the lookup's recovery
