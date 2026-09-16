@@ -179,16 +179,20 @@ def publish_calculations(
     text, failure = render_answer_text(template, cards)
     patch = combined_patch(patches)
     if succeeded and failure is not None:
-        # Missing a result reference is not evidence that the explanation is
-        # wrong. Keep valid prose and attach the successful card's result.
+        recovered, _ = _trim_unresolved_clauses(template, cards)
+        missing = _missing_computed_references(recovered, cards)
+        # A comparison must account for every option before its prose can stand.
+        # Single-card explanations can still introduce their result through recovery.
+        unsafe_comparison = len(cards) > 1 and bool(missing)
         _note(
             notes,
             FIGURE_CHECK_REASON_CODE,
             failure=failure,
             unresolved=unresolved_references(template, cards),
-            recovery="labeled_scenarios",
+            recovery="labeled_card_results" if unsafe_comparison else "labeled_scenarios",
+            missing_results=missing,
         )
-        template, _ = _trim_unresolved_clauses(template, cards)
+        template = "" if unsafe_comparison else recovered
         referenced = _referenced_inputs(template, cards)
         for request, (owner, card) in zip(requests, cards.items(), strict=True):
             answer = card.presentation.answer
@@ -384,20 +388,21 @@ def render_answer_text(template: str, cards: AnswerCards) -> tuple[str, str | No
     text = _REFERENCE.sub(fill, _without_written_currency(template, cards))
     if unresolved or "{{" in text:
         return text, "invalid_figure_reference"
-    located = [_located(ref, cards) for ref in _REFERENCE.findall(template)]
-    for owner, card in cards.items():
-        if card.outcome.status != "succeeded":
-            continue
-        answer = card.presentation.answer
-        if answer is not None and not any(
-            entry is not None
-            and entry[0] == owner
-            and isinstance(entry[1], ToolFact)
-            and entry[1].name == answer.name
-            for entry in located
-        ):
-            return text, "missing_computed_reference"
+    if _missing_computed_references(template, cards):
+        return text, "missing_computed_reference"
     return text, None
+
+
+def _missing_computed_references(template: str, cards: AnswerCards) -> list[str]:
+    """One completeness check for rendering and deciding whether to preserve prose."""
+    referenced = _referenced_inputs(template, cards)
+    return [
+        f"{owner}.{card.presentation.answer.name}"
+        for owner, card in cards.items()
+        if card.outcome.status == "succeeded"
+        and card.presentation.answer is not None
+        and (owner, card.presentation.answer.name) not in referenced
+    ]
 
 
 def unstated_assumptions(template: str, cards: AnswerCards) -> list[dict[str, str]]:

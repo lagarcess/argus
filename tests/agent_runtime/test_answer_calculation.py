@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from argus.agent_runtime import answer_calculation as ac
 from argus.domain.calculations.answer_request import AnswerCalculation
 from argus.domain.capability_registry import get_tool_catalog
@@ -490,25 +491,39 @@ def test_a_reference_two_options_both_hold_is_never_guessed() -> None:
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 
-def test_missing_option_result_keeps_explanation_and_attaches_the_other_result() -> None:
+@pytest.mark.parametrize("extra", ["", " Also {{unknown_result}}."])
+def test_missing_option_result_discards_the_ungrounded_comparison(extra) -> None:
     notes: list[str] = []
     published = _published_many(
-        "Bank A's payment is {{bank_a.payment}}. Compare both options carefully.",
+        "Bank A is cheaper at {{bank_a.payment}}." + extra,
         [_named("Bank A", LOAN), _named("Bank B", LOAN_AT_12)],
         notes=notes,
     )
     first, second = ac.cards_in(published.patch)
     assert first.presentation.answer.value > second.presentation.answer.value
-    assert "Compare both options carefully." in published.answer_text
-    assert published.template is not None
-    assert (
-        f"Bank A's payment is {ac.figure_text(first.presentation.answer)}"
-        in published.answer_text
-    )
+    assert "cheaper" not in published.answer_text
+    assert published.template is None or "cheaper" not in published.template["text"]
+    assert f"Bank A: {ac.figure_text(first.presentation.answer)}" in published.answer_text
     assert (
         f"Bank B: {ac.figure_text(second.presentation.answer)}" in published.answer_text
     )
     assert ac.FIGURE_CHECK_REASON_CODE in notes
+
+
+def test_complete_option_comparison_keeps_its_prose_and_template() -> None:
+    template = (
+        "Bank B is cheaper at {{bank_b.payment}} than Bank A at {{bank_a.payment}}."
+    )
+    published = _published_many(
+        template, [_named("Bank A", LOAN), _named("Bank B", LOAN_AT_12)]
+    )
+    first, second = ac.cards_in(published.patch)
+    assert second.presentation.answer.value < first.presentation.answer.value
+    assert published.answer_text == (
+        f"Bank B is cheaper at {ac.figure_text(second.presentation.answer)} "
+        f"than Bank A at {ac.figure_text(first.presentation.answer)}."
+    )
+    assert published.template["text"] == template
 
 
 def test_an_option_that_cannot_compute_holds_back_every_card() -> None:
