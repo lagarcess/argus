@@ -124,9 +124,8 @@ def test_a_price_in_another_currency_is_not_computed_and_no_blank_card_renders(
     result, _, interpretation = _turn(monkeypatch, _goal("USD"))
     assert result is not None
     assert "final_response_payload" not in result.stage_patch
-    assert result.stage_patch["research"]["degraded"] == {
-        "code": "calculation_inputs_not_found"
-    }
+    assert "degraded" not in result.stage_patch["research"]
+    assert "calculation_inputs_not_found" in result.decision.reason_codes
     assert ac.CURRENCY_MISMATCH_REASON_CODE in interpretation.reason_codes
     answer = result.stage_patch["assistant_response"]
     assert "{{" not in answer and "DOP" not in answer
@@ -167,9 +166,8 @@ def test_an_offer_whose_prose_leans_on_a_result_it_cannot_show_is_not_published(
     goal["inputs"][1] = {"name": "present_value", "value": None, "source": "user"}
     result, _, _ = _turn(monkeypatch, goal)
     assert result is not None
-    assert result.stage_patch["research"]["degraded"] == {
-        "code": "calculation_inputs_not_found"
-    }
+    assert "degraded" not in result.stage_patch["research"]
+    assert "calculation_inputs_not_found" in result.decision.reason_codes
     assert "{{" not in str(result.stage_patch.get("assistant_response"))
 
 

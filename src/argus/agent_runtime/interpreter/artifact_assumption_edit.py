@@ -7,6 +7,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from loguru import logger
+
 from argus.agent_runtime.artifact_edit_outcomes import (
     artifact_edit_has_changes,
     canonical_artifact_edit_plan,
@@ -65,7 +67,10 @@ from argus.agent_runtime.stages.artifact_context import (
 from argus.agent_runtime.stages.interpret_types import InterpretationRequest
 from argus.agent_runtime.state.models import StrategySummary
 from argus.agent_runtime.strategy_contract import canonical_strategy_type
-from argus.nlp.natural_time import resolve_date_range_intent
+from argus.nlp.natural_time import (
+    date_range_intent_matches_evidence,
+    resolve_date_range_intent,
+)
 
 ResolveAssetCandidate = Callable[..., AssetResolution | None]
 
@@ -990,10 +995,26 @@ def materialized_artifact_edit_targets(
         )
     ):
         requested_targets.add("asset")
+    # An omitted date is not a conflicting date. The independent planner can
+    # supply it from a current-turn quote even when the primary read already
+    # supplied another edit. Missing or stale evidence cannot license a date.
+    planner_supplies_date = (
+        "date_window" in materialized_targets
+        and primary_draft.date_range is None
+        and primary_draft.date_range_intent is None
+        and not primary_draft.date_range_raw_text
+        and primary_provenance.get("date_range") != "explicit_user"
+        and date_range_intent_matches_evidence(
+            draft.date_range_intent,
+            current_message=request.current_user_message,
+            language=request.user.language_preference,
+        )
+    )
     matching_targets = {
         target
         for target in materialized_targets
         if (not primary_has_material_delta and target != "asset")
+        or (target == "date_window" and planner_supplies_date)
         or (
             (target != "asset" or target in requested_targets)
             and _materialized_target_matches_primary_delta(
@@ -1029,6 +1050,11 @@ def materialized_artifact_edit_targets(
             unapplied_target = entry.get("target") if isinstance(entry, dict) else None
             if isinstance(unapplied_target, str):
                 matching_targets.add(unapplied_target)
+    if planner_supplies_date:
+        logger.info(
+            "Artifact edit planner supplied omitted primary date",
+            reason_code="artifact_edit_date_completed_from_plan",
+        )
     return matching_targets
 
 
