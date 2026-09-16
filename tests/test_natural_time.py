@@ -44,6 +44,19 @@ def test_date_quote_must_support_both_range_endpoints():
     )
 
 
+@pytest.mark.parametrize("endpoint", ["start", "end"])
+def test_bare_fee_number_cannot_ground_a_planner_date(endpoint):
+    # The permissive date parser fills in a year/month for the bare fee value.
+    # That inferred date must not become current-turn evidence for an edit.
+    inferred = parse_date_text("1", endpoint=endpoint)
+    assert inferred is not None
+    assert not date_range_intent_matches_evidence(
+        {"kind": "endpoint_patch", "endpoint": endpoint,
+         endpoint: inferred.isoformat(), "evidence": "1"},
+        current_message="change the benchmark to QQQ and set the fee to 1",
+    )
+
+
 def test_resolves_spanish_month_year_range() -> None:
     resolved = resolve_date_range_text(
         "desde enero de 2021 hasta diciembre de 2024",
