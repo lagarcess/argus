@@ -208,7 +208,14 @@ def publish_calculations(
         ),
     )
     return PublishedCalculation(
-        patch, fallback_answer_lead(language, succeeded=succeeded), None, None, ()
+        patch,
+        completed_card_readout(cards)
+        if succeeded
+        else fallback_answer_lead(language, succeeded=False),
+        None,
+        None,
+        (),
+        assumptions=tuple(unstated_assumptions("", cards)),
     )
 
 
@@ -228,6 +235,15 @@ def resolve_calculation(
         _note(notes, KIND_UNKNOWN_REASON_CODE, kind=request.kind)
         return None
     declared = set(declaration.arguments_type.model_fields) - RUNTIME_ARGUMENTS
+    solve_fields = {name for rule in declaration.rules for name in rule.fields}
+    if request.solve_for is not None and request.solve_for not in solve_fields:
+        _note(
+            notes,
+            "calculation_solve_for_ignored",
+            kind=request.kind,
+            field=request.solve_for,
+        )
+        request = request.model_copy(update={"solve_for": None})
     pages = {source.url: source for source in retrieved}
     counted_in = _calculation_currency(request, currency, notes)
     arguments: dict[str, Any] = {CURRENCY_FIELD: counted_in}
@@ -285,6 +301,21 @@ def resolve_calculation(
                     else evidence_source(cited)
                 ),
             )
+    # The verified amount also owns the provenance of its denomination.
+    # Finance evidence need not contain a separate numeric row for a code.
+    currency_owner = next(
+        (
+            item
+            for item in request.inputs
+            if item.currency
+            and item.currency.strip().upper() == counted_in
+            and item.name in sources
+            and sources[item.name].kind in {"user", "page"}
+        ),
+        None,
+    )
+    if currency_owner is not None:
+        sources[CURRENCY_FIELD] = sources[currency_owner.name]
     if request.solve_for in declared:
         arguments[request.solve_for] = None
     if sources:
@@ -332,6 +363,19 @@ def render_answer_text(template: str, cards: AnswerCards) -> tuple[str, str | No
     text = _REFERENCE.sub(fill, _without_written_currency(template, cards))
     if unresolved or "{{" in text:
         return text, "invalid_figure_reference"
+    located = [_located(ref, cards) for ref in _REFERENCE.findall(template)]
+    for owner, card in cards.items():
+        if card.outcome.status != "succeeded":
+            continue
+        answer = card.presentation.answer
+        if answer is not None and not any(
+            entry is not None
+            and entry[0] == owner
+            and isinstance(entry[1], ToolFact)
+            and entry[1].name == answer.name
+            for entry in located
+        ):
+            return text, "missing_computed_reference"
     return text, None
 
 
@@ -480,6 +524,23 @@ def figure_text(fact: ToolFact) -> str:
     if key == UNIT_MULTIPLE_KEY:
         return f"{_number(value)}x"
     return _number(value)
+
+
+def completed_card_readout(cards: AnswerCards) -> str:
+    """A language-neutral last resort when model prose contradicts completed math.
+
+    The ordinary answer is model-voiced. This recovery publishes only the
+    presenter's primary result and supporting values, without fresh claims.
+    """
+    return "\n\n".join(
+        " · ".join(
+            figure_text(fact)
+            for fact in [card.presentation.answer, *card.presentation.rows]
+            if fact is not None and fact.value is not None and not fact.comparison_only
+        )
+        for card in cards.values()
+        if card.outcome.status == "succeeded"
+    )
 
 
 def fallback_answer_lead(language: str, *, succeeded: bool) -> str:
@@ -672,6 +733,18 @@ def _number(value: float, *, money: bool = False) -> str:
 def _calculation_currency(
     request: AnswerCalculation, currency: str | None, notes: list[str]
 ) -> str:
+    # A stated amount owns its denomination, even when the profile or a
+    # separate currency input names another currency.
+    denominations = {
+        item.currency.strip().upper()
+        for item in request.inputs
+        if item.source in {"user", "page"}
+        and item.value is not None
+        and item.currency
+        and item.currency.strip().upper() in CURRENCY_CODES
+    }
+    if len(denominations) == 1:
+        return next(iter(denominations))
     stated = next(
         (
             str(item.value).strip().upper()

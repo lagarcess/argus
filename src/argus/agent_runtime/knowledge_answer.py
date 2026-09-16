@@ -20,6 +20,7 @@ from argus.agent_runtime.interpreter.draft_shape import (
     strategy_has_execution_evidence,
 )
 from argus.agent_runtime.interpreter.research_routing import (
+    educational_question_has_no_query,
     primary_read_is_arithmetic,
     primary_research_query,
 )
@@ -222,6 +223,8 @@ async def knowledge_answer_stage_result(
             [item.category for item in interpretation.unsupported_constraints],
             categories=[item.category for item in interpretation.unsupported_constraints],
         )
+        return None
+    if educational_question_has_no_query(interpretation):
         return None
     if primary_read_is_arithmetic(interpretation):
         # The user's own numbers are enough: the no-search answer computes it.
