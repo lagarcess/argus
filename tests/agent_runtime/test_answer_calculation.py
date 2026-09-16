@@ -482,9 +482,11 @@ def test_a_reference_two_options_both_hold_is_never_guessed() -> None:
         [_named("a", LOAN), _named("b", LOAN_AT_12)],
         notes=notes,
     )
-    assert published.template is None
-    for card in ac.cards_in(published.patch):
-        assert ac.figure_text(card.presentation.answer) in published.answer_text
+    assert published.template is not None
+    for name, card in zip(("a", "b"), ac.cards_in(published.patch), strict=True):
+        assert (
+            f"{name}: {ac.figure_text(card.presentation.answer)}" in published.answer_text
+        )
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 
