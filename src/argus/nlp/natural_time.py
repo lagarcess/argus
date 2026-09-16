@@ -881,7 +881,8 @@ def _parse_date_span(
         # evidence needs a month name recognized by the library's locale data.
         locale = default_loader.get_locale(data.locale)
         translated = locale.translate(span, settings=parser._settings)
-        if calendar.month_name[data.date_obj.month].casefold() not in translated.split():
+        month_tokens = "".join(char if char.isalpha() else " " for char in translated).split()
+        if calendar.month_name[data.date_obj.month].casefold() not in month_tokens:
             return None
     if period not in {"day", "week", "month", "year"}:
         period = "day"
