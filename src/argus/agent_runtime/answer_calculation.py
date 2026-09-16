@@ -194,12 +194,17 @@ def publish_calculations(
         )
         template = "" if unsafe_comparison else recovered
         referenced = _referenced_inputs(template, cards)
-        for request, (owner, card) in zip(requests, cards.items(), strict=True):
+        for index, (request, (owner, card)) in enumerate(
+            zip(requests, cards.items(), strict=True), start=1
+        ):
             answer = card.presentation.answer
             if answer is not None and (owner, answer.name) not in referenced:
                 # Only the model's display name is prose. Internal reference
                 # keys are not localized labels; the attached card owns those.
-                label = f"{request.name}: " if request.name else ""
+                name = request.name.strip() if unsafe_comparison else request.name
+                label = f"{name}: " if name else ""
+                if unsafe_comparison:
+                    label = f"{index}. {label}"
                 template += f"\n\n{label}{{{{{owner}.{answer.name}}}}}"
         template = template.strip()
         text, failure = render_answer_text(template, cards)

@@ -526,6 +526,25 @@ def test_complete_option_comparison_keeps_its_prose_and_template() -> None:
     assert published.template["text"] == template
 
 
+@pytest.mark.parametrize("names", [("", ""), ("Bank", "Bank"), (" ", " ")])
+def test_comparison_fallback_distinguishes_unnamed_or_duplicate_options(names):
+    requests = [_named(names[0], LOAN), _named(names[1], LOAN_AT_12)]
+    owner = ac.calculation_names(requests)[0]
+    published = _published_many(
+        "This option is cheaper at {{" + owner + ".payment}}.", requests
+    )
+    assert "cheaper" not in published.answer_text
+    for index, (name, card) in enumerate(
+        zip(names, ac.cards_in(published.patch), strict=True), start=1
+    ):
+        label = f"{name.strip()}: " if name.strip() else ""
+        assert (
+            f"{index}. {label}{ac.figure_text(card.presentation.answer)}"
+            in published.answer_text
+        )
+    assert "cheaper" not in published.template["text"]
+
+
 def test_an_option_that_cannot_compute_holds_back_every_card() -> None:
     uncited = [
         {**item, "source_url": "https://elsewhere.example"}
