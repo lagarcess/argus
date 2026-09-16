@@ -178,22 +178,34 @@ def publish_calculations(
     succeeded = all(card.outcome.status == "succeeded" for card in cards.values())
     text, failure = render_answer_text(template, cards)
     patch = combined_patch(patches)
-    if succeeded and failure == "invalid_figure_reference" and len(cards) > 1:
+    if succeeded and failure is not None:
+        recovered, _ = _trim_unresolved_clauses(template, cards)
+        missing = _missing_computed_references(recovered, cards)
+        # A comparison must account for every option before its prose can stand.
+        # Single-card explanations can still introduce their result through recovery.
+        unsafe_comparison = len(cards) > 1 and bool(missing)
         _note(
             notes,
             FIGURE_CHECK_REASON_CODE,
             failure=failure,
             unresolved=unresolved_references(template, cards),
-            recovery="labeled_scenarios",
+            recovery="labeled_card_results" if unsafe_comparison else "labeled_scenarios",
+            missing_results=missing,
         )
-        template, _ = _trim_unresolved_clauses(template, cards)
+        template = "" if unsafe_comparison else recovered
         referenced = _referenced_inputs(template, cards)
-        for request, (owner, card) in zip(requests, cards.items(), strict=True):
+        for index, (request, (owner, card)) in enumerate(
+            zip(requests, cards.items(), strict=True), start=1
+        ):
             answer = card.presentation.answer
             if answer is not None and (owner, answer.name) not in referenced:
-                # Preserve the model's display name, not the folded reference key.
-                label = request.name or owner
-                template += f"\n\n{label}: {{{{{owner}.{answer.name}}}}}"
+                # Only the model's display name is prose. Internal reference
+                # keys are not localized labels; the attached card owns those.
+                name = request.name.strip() if unsafe_comparison else request.name
+                label = f"{name}: " if name else ""
+                if unsafe_comparison:
+                    label = f"{index}. {label}"
+                template += f"\n\n{label}{{{{{owner}.{answer.name}}}}}"
         template = template.strip()
         text, failure = render_answer_text(template, cards)
     if succeeded and failure is None:
@@ -231,13 +243,7 @@ def publish_calculations(
     )
     return PublishedCalculation(
         patch,
-        completed_card_readout(
-            cards,
-            labels={
-                owner: request.name or owner
-                for request, owner in zip(requests, cards, strict=True)
-            },
-        )
+        render_offer_prose(template, cards)[0]
         if succeeded
         else fallback_answer_lead(language, succeeded=False),
         None,
@@ -387,20 +393,21 @@ def render_answer_text(template: str, cards: AnswerCards) -> tuple[str, str | No
     text = _REFERENCE.sub(fill, _without_written_currency(template, cards))
     if unresolved or "{{" in text:
         return text, "invalid_figure_reference"
-    located = [_located(ref, cards) for ref in _REFERENCE.findall(template)]
-    for owner, card in cards.items():
-        if card.outcome.status != "succeeded":
-            continue
-        answer = card.presentation.answer
-        if answer is not None and not any(
-            entry is not None
-            and entry[0] == owner
-            and isinstance(entry[1], ToolFact)
-            and entry[1].name == answer.name
-            for entry in located
-        ):
-            return text, "missing_computed_reference"
+    if _missing_computed_references(template, cards):
+        return text, "missing_computed_reference"
     return text, None
+
+
+def _missing_computed_references(template: str, cards: AnswerCards) -> list[str]:
+    """One completeness check for rendering and deciding whether to preserve prose."""
+    referenced = _referenced_inputs(template, cards)
+    return [
+        f"{owner}.{card.presentation.answer.name}"
+        for owner, card in cards.items()
+        if card.outcome.status == "succeeded"
+        and card.presentation.answer is not None
+        and (owner, card.presentation.answer.name) not in referenced
+    ]
 
 
 def unstated_assumptions(template: str, cards: AnswerCards) -> list[dict[str, str]]:
@@ -548,24 +555,6 @@ def figure_text(fact: ToolFact) -> str:
     if key == UNIT_MULTIPLE_KEY:
         return f"{_number(value)}x"
     return _number(value)
-
-
-def completed_card_readout(cards: AnswerCards, *, labels: Mapping[str, str]) -> str:
-    """A language-neutral last resort when model prose contradicts completed math.
-
-    The ordinary answer is model-voiced. This recovery publishes only the
-    presenter's primary result and supporting values, without fresh claims.
-    """
-    return "\n\n".join(
-        (f"{labels[owner]}: " if len(cards) > 1 else "")
-        + " · ".join(
-            figure_text(fact)
-            for fact in [card.presentation.answer, *card.presentation.rows]
-            if fact is not None and fact.value is not None and not fact.comparison_only
-        )
-        for owner, card in cards.items()
-        if card.outcome.status == "succeeded"
-    )
 
 
 def fallback_answer_lead(language: str, *, succeeded: bool) -> str:

@@ -264,9 +264,11 @@ def test_the_provider_returns_its_calculation_and_argus_computes_the_scenarios()
     )
     assert published is not None and not published.not_looked_up, notes
     # The recorded prose references inputs, but never its completed primary result.
-    assert published.template is None
+    assert published.template is not None
     assert "answer_figures_replaced" in notes
     from argus.agent_runtime.answer_calculation import cards_in, figure_text
+
+    assert packet.answer_markdown.split("{{", 1)[0] in published.answer_text
 
     assert (
         figure_text(cards_in(published.patch)[0].presentation.answer)
