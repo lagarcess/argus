@@ -482,9 +482,30 @@ def test_a_reference_two_options_both_hold_is_never_guessed() -> None:
         [_named("a", LOAN), _named("b", LOAN_AT_12)],
         notes=notes,
     )
+    assert published.template is not None
+    for name, card in zip(("a", "b"), ac.cards_in(published.patch), strict=True):
+        assert (
+            f"{name}: {ac.figure_text(card.presentation.answer)}" in published.answer_text
+        )
+    assert ac.FIGURE_CHECK_REASON_CODE in notes
+
+
+def test_missing_option_result_does_not_preserve_an_unsupported_comparison() -> None:
+    notes: list[str] = []
+    published = _published_many(
+        "Bank A is cheaper at {{bank_a.payment}}.",
+        [_named("Bank A", LOAN), _named("Bank B", LOAN_AT_12)],
+        notes=notes,
+    )
+    first, second = ac.cards_in(published.patch)
+    assert first.presentation.answer.value > second.presentation.answer.value
+    assert "cheaper" not in published.answer_text
     assert published.template is None
-    for card in ac.cards_in(published.patch):
-        assert ac.figure_text(card.presentation.answer) in published.answer_text
+    for label, card in zip(("Bank A", "Bank B"), (first, second), strict=True):
+        assert (
+            f"{label}: {ac.figure_text(card.presentation.answer)}"
+            in published.answer_text
+        )
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 
