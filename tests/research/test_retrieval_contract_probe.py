@@ -263,7 +263,15 @@ def test_the_provider_returns_its_calculation_and_argus_computes_the_scenarios()
         evidence=[row for row in packet.rows if row.source_url is None],
     )
     assert published is not None and not published.not_looked_up, notes
-    assert published.template is not None, notes
+    # The recorded prose references inputs, but never its completed primary result.
+    assert published.template is None
+    assert "answer_figures_replaced" in notes
+    from argus.agent_runtime.answer_calculation import cards_in, figure_text
+
+    assert (
+        figure_text(cards_in(published.patch)[0].presentation.answer)
+        in published.answer_text
+    )
     card = published.patch["final_response_payload"]["tool_result_cards"][0]
     assert card["outcome"]["status"] == "succeeded"
     assert card["arguments"]["amount"] == 10000

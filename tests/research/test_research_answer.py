@@ -562,6 +562,14 @@ def test_an_out_of_scope_verdict_with_nothing_to_run_is_researched(monkeypatch) 
         UNSUPPORTED_VERDICT_REASON_CODE,
     )
 
+    original = globals()["_interpretation"]
+    monkeypatch.setitem(
+        globals(),
+        "_interpretation",
+        lambda: original().model_copy(
+            update={"semantic_turn_act": "unsupported_request"}
+        ),
+    )
     transport = _wire_client(
         monkeypatch,
         [
@@ -701,6 +709,9 @@ def test_a_research_answer_ends_with_the_questions_its_research_offered(
 def test_a_declined_request_keeps_its_plain_reply_and_offers_nothing(monkeypatch) -> None:
     from argus.agent_runtime.research_grounded import DECLINED_REASON_CODE
 
+    set_research_query(
+        monkeypatch, globals(), question_kind="current_external", symbols=[]
+    )
     reply = "Argus does not place trades. It can test a trading idea on past data."
     _wire_client(
         monkeypatch,
@@ -755,14 +766,12 @@ def test_an_answer_stating_a_figure_with_no_source_is_recorded_not_replaced(
 
 
 @pytest.mark.parametrize("intent", ["conversation_followup", "beginner_guidance"])
-def test_an_educational_question_left_with_no_kind_is_researched_for_the_readers_country(
+def test_an_explicit_concept_question_is_researched_for_the_readers_country(
     monkeypatch, intent
 ) -> None:
-    """A question the primary read typed no kind for is research's, not the
-    interpreter's own prose: the reader's country and currency reach the
-    prompt, so the answer never assumes another country or asks for it."""
+    """An explicit query carries the reader's country and currency to research."""
     from argus.agent_runtime.interpreter.research_routing import (
-        UNKINDED_QUESTION_REASON_CODE,
+        CONCEPT_QUESTION_REASON_CODE,
     )
 
     original = globals()["_interpretation"]
@@ -771,6 +780,7 @@ def test_an_educational_question_left_with_no_kind_is_researched_for_the_readers
         "_interpretation",
         lambda: original().model_copy(update={"intent": intent}),
     )
+    set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
     transport = _wire_client(
         monkeypatch,
         [
@@ -794,7 +804,7 @@ def test_an_educational_question_left_with_no_kind_is_researched_for_the_readers
         "Answer for that country unless the question names another, and never ask "
         "where the reader lives."
     ) in body["input"]
-    assert UNKINDED_QUESTION_REASON_CODE in result.decision.reason_codes
+    assert CONCEPT_QUESTION_REASON_CODE in result.decision.reason_codes
 
 
 def test_a_reader_with_no_country_is_never_placed_in_one(monkeypatch) -> None:
@@ -804,6 +814,7 @@ def test_a_reader_with_no_country_is_never_placed_in_one(monkeypatch) -> None:
         "_interpretation",
         lambda: original().model_copy(update={"intent": "conversation_followup"}),
     )
+    set_research_query(monkeypatch, globals(), question_kind="concept", symbols=[])
     transport = _wire_client(
         monkeypatch,
         [

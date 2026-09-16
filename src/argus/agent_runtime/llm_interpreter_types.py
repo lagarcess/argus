@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
@@ -298,6 +298,15 @@ class LLMAmbiguousField(BaseModel):
 
 
 class LLMInterpretationResponse(BaseModel):
+    @field_validator(
+        "candidate_strategy_draft", "response_profile_overrides", mode="before"
+    )
+    @classmethod
+    def _empty_optional_objects(cls, value: Any) -> Any:
+        # Null and omitted optional objects both mean no supplied fields, not
+        # failure of an otherwise usable typed question or refusal.
+        return {} if value is None else value
+
     intent: Literal[
         "beginner_guidance",
         "strategy_drafting",

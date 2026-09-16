@@ -271,11 +271,11 @@ def test_unsupported_turn_with_unavailable_classifier_declines(
     assert _run(_interpretation()) is None
 
 
-def test_educational_turn_with_enriched_asset_uses_the_classifier(
+def test_educational_turn_with_enriched_asset_and_no_query_skips_the_classifier(
     monkeypatch,
 ) -> None:
     # "What is SPY?" can arrive with SPY attached by provider enrichment; the
-    # asset alone must not shortcut to statistics.
+    # asset alone cannot authorize research when the typed query is missing.
     calls: list[str] = []
 
     async def classify(**_kwargs: Any) -> ka.KnowledgeQueryExtraction:
@@ -289,7 +289,7 @@ def test_educational_turn_with_enriched_asset_uses_the_classifier(
         semantic_turn_act="educational_question",
     )
     assert _run(educational, "¿Qué es SPY?") is None
-    assert calls == ["classified"]
+    assert calls == []
 
 
 def test_unsupported_request_describing_a_test_keeps_its_recovery_route(

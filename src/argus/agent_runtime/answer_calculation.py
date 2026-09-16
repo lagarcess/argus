@@ -36,7 +36,11 @@ from argus.domain.calculations._shared import (
     UNIT_MULTIPLE_KEY,
     UNIT_PERCENT_KEY,
 )
-from argus.domain.calculations.answer_request import RUNTIME_ARGUMENTS, AnswerCalculation
+from argus.domain.calculations.answer_request import (
+    RUNTIME_ARGUMENTS,
+    AnswerCalculation,
+    AnswerCalculationInput,
+)
 from argus.domain.research.contracts import (
     CURRENCY_CODES,
     ResearchSource,
@@ -208,7 +212,14 @@ def publish_calculations(
         ),
     )
     return PublishedCalculation(
-        patch, fallback_answer_lead(language, succeeded=succeeded), None, None, ()
+        patch,
+        completed_card_readout(cards)
+        if succeeded
+        else fallback_answer_lead(language, succeeded=False),
+        None,
+        None,
+        (),
+        assumptions=tuple(unstated_assumptions("", cards)),
     )
 
 
@@ -228,10 +239,27 @@ def resolve_calculation(
         _note(notes, KIND_UNKNOWN_REASON_CODE, kind=request.kind)
         return None
     declared = set(declaration.arguments_type.model_fields) - RUNTIME_ARGUMENTS
+    solve_fields = {name for rule in declaration.rules for name in rule.fields}
+    if request.solve_for is not None and request.solve_for not in solve_fields:
+        _note(
+            notes,
+            "calculation_solve_for_ignored",
+            kind=request.kind,
+            field=request.solve_for,
+        )
+        request = request.model_copy(update={"solve_for": None})
     pages = {source.url: source for source in retrieved}
-    counted_in = _calculation_currency(request, currency, notes)
-    arguments: dict[str, Any] = {CURRENCY_FIELD: counted_in}
     symbol = _stated_symbol(request) or subject_symbol
+    counted_in = _calculation_currency(
+        request,
+        currency,
+        notes,
+        declared=declared,
+        pages=pages,
+        evidence=evidence,
+        symbol=symbol,
+    )
+    arguments: dict[str, Any] = {CURRENCY_FIELD: counted_in}
     if SYMBOL_FIELD in declared and symbol:
         arguments[SYMBOL_FIELD] = symbol
     sources: dict[str, ToolFactSource] = {}
@@ -265,26 +293,29 @@ def resolve_calculation(
                 continue
             arguments[name], sources[name] = price
         else:
-            page = pages.get(item.source_url or "")
-            cited = (
-                None
-                if page is not None
-                else _evidenced(
-                    item.value, evidence, name=name, currency=counted_in, symbol=symbol
-                )
+            source = _page_input_source(
+                item, pages=pages, evidence=evidence, currency=counted_in, symbol=symbol
             )
-            if item.value is None or (page is None and cited is None):
+            if source is None:
                 resolved.not_looked_up.append(name)
                 _note(notes, PAGE_UNCITED_REASON_CODE, name=name)
                 continue
-            arguments[name], sources[name] = (
-                item.value,
-                (
-                    page_source(page, item.as_of)
-                    if page is not None
-                    else evidence_source(cited)
-                ),
-            )
+            arguments[name], sources[name] = item.value, source
+    # The verified amount also owns the provenance of its denomination.
+    # Finance evidence need not contain a separate numeric row for a code.
+    currency_owner = next(
+        (
+            item
+            for item in request.inputs
+            if item.currency
+            and item.currency.strip().upper() == counted_in
+            and item.name in sources
+            and sources[item.name].kind in {"user", "page"}
+        ),
+        None,
+    )
+    if currency_owner is not None:
+        sources[CURRENCY_FIELD] = sources[currency_owner.name]
     if request.solve_for in declared:
         arguments[request.solve_for] = None
     if sources:
@@ -332,6 +363,19 @@ def render_answer_text(template: str, cards: AnswerCards) -> tuple[str, str | No
     text = _REFERENCE.sub(fill, _without_written_currency(template, cards))
     if unresolved or "{{" in text:
         return text, "invalid_figure_reference"
+    located = [_located(ref, cards) for ref in _REFERENCE.findall(template)]
+    for owner, card in cards.items():
+        if card.outcome.status != "succeeded":
+            continue
+        answer = card.presentation.answer
+        if answer is not None and not any(
+            entry is not None
+            and entry[0] == owner
+            and isinstance(entry[1], ToolFact)
+            and entry[1].name == answer.name
+            for entry in located
+        ):
+            return text, "missing_computed_reference"
     return text, None
 
 
@@ -480,6 +524,23 @@ def figure_text(fact: ToolFact) -> str:
     if key == UNIT_MULTIPLE_KEY:
         return f"{_number(value)}x"
     return _number(value)
+
+
+def completed_card_readout(cards: AnswerCards) -> str:
+    """A language-neutral last resort when model prose contradicts completed math.
+
+    The ordinary answer is model-voiced. This recovery publishes only the
+    presenter's primary result and supporting values, without fresh claims.
+    """
+    return "\n\n".join(
+        " · ".join(
+            figure_text(fact)
+            for fact in [card.presentation.answer, *card.presentation.rows]
+            if fact is not None and fact.value is not None and not fact.comparison_only
+        )
+        for card in cards.values()
+        if card.outcome.status == "succeeded"
+    )
 
 
 def fallback_answer_lead(language: str, *, succeeded: bool) -> str:
@@ -670,22 +731,87 @@ def _number(value: float, *, money: bool = False) -> str:
 
 
 def _calculation_currency(
-    request: AnswerCalculation, currency: str | None, notes: list[str]
+    request: AnswerCalculation,
+    currency: str | None,
+    notes: list[str],
+    *,
+    declared: set[str],
+    pages: Mapping[str, ResearchSource],
+    evidence: Sequence[RetrievedRow],
+    symbol: str | None,
 ) -> str:
-    stated = next(
-        (
-            str(item.value).strip().upper()
-            for item in request.inputs
-            if item.name == CURRENCY_FIELD and isinstance(item.value, str)
-        ),
-        "",
-    )
-    if stated in CURRENCY_CODES:
+    # A stated amount owns its denomination, even when the profile or a
+    # separate currency input names another currency.
+    denominations = {
+        item.currency.strip().upper()
+        for item in request.inputs
+        if item.name in declared
+        and item.name not in {CURRENCY_FIELD, SYMBOL_FIELD, request.solve_for}
+        and item.source in {"user", "page"}
+        and item.value is not None
+        and item.currency
+        and item.currency.strip().upper() in CURRENCY_CODES
+        and (
+            item.source == "user"
+            or _page_input_source(
+                item,
+                pages=pages,
+                evidence=evidence,
+                currency=item.currency.strip().upper(),
+                symbol=symbol,
+            )
+            is not None
+        )
+    }
+    stated = ""
+    for item in request.inputs:
+        if item.name != CURRENCY_FIELD or not isinstance(item.value, str):
+            continue
+        code = item.value.strip().upper()
+        if code not in CURRENCY_CODES:
+            continue
+        if (
+            item.source == "page"
+            and _page_input_source(
+                item, pages=pages, evidence=evidence, currency=code, symbol=symbol
+            )
+            is None
+        ):
+            _note(notes, PAGE_UNCITED_REASON_CODE, name=item.name)
+            continue
+        if item.source == "market_data":
+            _note(notes, MARKET_DATA_NOT_A_PRICE_REASON_CODE, name=item.name)
+            continue
+        stated = code
+        break
+    if len(denominations) == 1:
+        return next(iter(denominations))
+    if stated:
         return stated
     if currency:
         return currency.strip().upper()
     _note(notes, CURRENCY_DEFAULTED_REASON_CODE, currency=DEFAULT_CURRENCY)
     return DEFAULT_CURRENCY
+
+
+def _page_input_source(
+    item: AnswerCalculationInput,
+    *,
+    pages: Mapping[str, ResearchSource],
+    evidence: Sequence[RetrievedRow],
+    currency: str,
+    symbol: str | None,
+) -> ToolFactSource | None:
+    """One source check for both an amount and its denomination."""
+    if item.value is None:
+        return None
+    page = pages.get(item.source_url or "")
+    if page is not None:
+        return page_source(page, item.as_of)
+    cited = _evidenced(
+        item.value, evidence, name=item.name, currency=currency, symbol=symbol
+    )
+    return evidence_source(cited) if cited is not None else None
 
 
 def _stated_symbol(request: AnswerCalculation) -> str | None:
