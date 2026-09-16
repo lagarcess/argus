@@ -45,9 +45,9 @@ class ValuationArguments(CalculationArguments):
     symbol: Symbol
     price: float | None = Field(default=None, gt=0)
     per_share: float | None = Field(default=None, gt=0)
-    growth_low_pct: float | None = Field(default=None, gt=-100)
-    growth_base_pct: float | None = Field(default=None, gt=-100)
-    growth_high_pct: float | None = Field(default=None, gt=-100)
+    growth_low_pct: float | None = Field(default=None, ge=-100)
+    growth_base_pct: float | None = Field(default=None, ge=-100)
+    growth_high_pct: float | None = Field(default=None, ge=-100)
     multiple_low: float | None = Field(default=None, gt=0)
     multiple_base: float | None = Field(default=None, gt=0)
     multiple_high: float | None = Field(default=None, gt=0)

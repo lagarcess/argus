@@ -559,11 +559,7 @@ def _packet_stage_result(
             question_as_of_date=question_as_of_date,
         )
     answer = published_answer(packet, language)
-    degraded_code = (
-        _not_grounded_code(packet, survey=survey)
-        or withheld_code
-        or _scenario_inputs_code(packet, scenario=scenario)
-    )
+    degraded_code = _not_grounded_code(packet, survey=survey) or withheld_code
     peers: list[dict[str, str]] = []
     if degraded_code is None:
         # A withheld answer shows no peer, so a reason already established
@@ -627,11 +623,11 @@ def _packet_stage_result(
         answer_without_lookup,
         offered_calculation,
         packet_answer,
+        skipped_calculation,
     )
 
     answered = None
     offer: dict[str, Any] | None = None
-    not_found: tuple[str, ...] = ()
     if degraded_code is None and not survey:
         read = packet_answer(
             packet,
@@ -639,9 +635,17 @@ def _packet_stage_result(
             user=user,
             language=language,
             notes=interpretation.reason_codes,
+            scenario=scenario,
         )
         if isinstance(read, NotComputed):
-            degraded_code, not_found = read.code, read.not_looked_up
+            answer = (
+                published_answer(
+                    packet.model_copy(update={"answer_markdown": read.answer_text}),
+                    language,
+                )
+                if read.answer_text
+                else _withheld_note(language, code=read.code, question_kind=question_kind)
+            )
         elif read is not None and read.question_field is not None:
             offered = offered_calculation(
                 published_answer(packet, language),
@@ -651,7 +655,14 @@ def _packet_stage_result(
                 notes=interpretation.reason_codes,
             )
             if offered is None:
-                degraded_code = CALCULATION_NOT_COMPUTED_CODE
+                skipped_calculation(
+                    packet, interpretation.reason_codes, CALCULATION_NOT_COMPUTED_CODE
+                )
+                answer = _withheld_note(
+                    language,
+                    code=CALCULATION_NOT_COMPUTED_CODE,
+                    question_kind=question_kind,
+                )
             else:
                 answer, offer = offered
         elif read is not None:
@@ -665,7 +676,7 @@ def _packet_stage_result(
                 language=language,
                 user=user,
                 subjects=subjects,
-                not_looked_up=not_found,
+                not_looked_up=(),
                 notes=interpretation.reason_codes,
             )
             if degraded_code in LOOKUP_FAILURE_CODES and not survey
@@ -1500,19 +1511,6 @@ def _not_grounded_code(packet: ResearchPacket, *, survey: bool) -> str | None:
     return "survey_not_grounded" if survey else "research_not_grounded"
 
 
-def _scenario_inputs_code(packet: ResearchPacket, *, scenario: bool) -> str | None:
-    """A computed scenario publishes only through the calculation its answer
-    returns (decision 10): without one, any figure it states is the provider's
-    own arithmetic."""
-    if not scenario or packet.calculations:
-        return None
-    logger.info(
-        "Scenario withheld: the answer returned no calculation"
-        f" rows={len(packet.rows)} sources={len(packet.sources)}"
-    )
-    return "scenario_inputs_uncited"
-
-
 def _withheld_note(language: str, *, code: str, question_kind: str | None) -> str:
     """The honest line for a withheld answer, keyed by its degraded code."""
     if code == "research_unavailable_missing_public_sources":
@@ -1521,7 +1519,7 @@ def _withheld_note(language: str, *, code: str, question_kind: str | None) -> st
         return _not_grounded_note(language)
     if code == "scenario_inputs_uncited":
         return _scenario_inputs_uncited_note(language)
-    if code == "calculation_inputs_not_found":
+    if code in {"calculation_inputs_not_found", "research_calculation_invalid"}:
         return _calculation_inputs_not_found_note(language)
     return _survey_recovery_note(
         language,
@@ -1977,16 +1975,12 @@ def compose_completed_research(
             ),
             "computed": None,
         }
-    degraded_code = (
-        _not_grounded_code(
-            packet, survey=is_market_survey(question_kind) and not scenario
-        )
-        or (
-            "research_unavailable_missing_public_sources"
-            if job_request.get("requires_publisher_sources") and not sources
-            else None
-        )
-        or _scenario_inputs_code(packet, scenario=scenario)
+    degraded_code = _not_grounded_code(
+        packet, survey=is_market_survey(question_kind) and not scenario
+    ) or (
+        "research_unavailable_missing_public_sources"
+        if job_request.get("requires_publisher_sources") and not sources
+        else None
     )
     from argus.agent_runtime.answer_calculation import (
         ANSWER_ASSUMPTIONS_KEY,
@@ -2004,6 +1998,7 @@ def compose_completed_research(
         answer_without_lookup,
         offered_calculation,
         packet_answer,
+        skipped_calculation,
     )
     from argus.agent_runtime.state.models import UserState
 
@@ -2017,13 +2012,24 @@ def compose_completed_research(
     answered = None
     offer: dict[str, Any] | None = None
     offer_text: str | None = None
-    not_found: tuple[str, ...] = ()
     if degraded_code is None and not survey:
         read = packet_answer(
-            packet, subjects=subjects, user=user, language=language, notes=notes
+            packet,
+            subjects=subjects,
+            user=user,
+            language=language,
+            notes=notes,
+            scenario=scenario,
         )
         if isinstance(read, NotComputed):
-            degraded_code, not_found = read.code, read.not_looked_up
+            offer_text = (
+                published_answer(
+                    packet.model_copy(update={"answer_markdown": read.answer_text}),
+                    language,
+                )
+                if read.answer_text
+                else _withheld_note(language, code=read.code, question_kind=question_kind)
+            )
         elif read is not None and read.question_field is not None:
             offered = offered_calculation(
                 published_answer(packet, language),
@@ -2033,7 +2039,12 @@ def compose_completed_research(
                 notes=notes,
             )
             if offered is None:
-                degraded_code = CALCULATION_NOT_COMPUTED_CODE
+                skipped_calculation(packet, notes, CALCULATION_NOT_COMPUTED_CODE)
+                offer_text = _withheld_note(
+                    language,
+                    code=CALCULATION_NOT_COMPUTED_CODE,
+                    question_kind=question_kind,
+                )
             else:
                 offer_text, offer = offered
         elif read is not None:
@@ -2044,7 +2055,7 @@ def compose_completed_research(
             language=language,
             user=user,
             subjects=subjects,
-            not_looked_up=not_found,
+            not_looked_up=(),
             notes=notes,
         )
     if answered is not None and answered.question_field is not None:
