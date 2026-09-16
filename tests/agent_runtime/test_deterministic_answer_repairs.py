@@ -84,6 +84,90 @@ def test_stated_amount_owns_currency_and_its_source(source):
     )
 
 
+@pytest.mark.parametrize("cited", [False, True])
+def test_standalone_page_currency_requires_the_same_source_admission(cited):
+    from tests.agent_runtime.test_answer_calculation import RATE_PAGE
+
+    inputs = [
+        {key: value for key, value in item.items() if key != "currency"} for item in LOAN
+    ]
+    inputs.append(
+        {
+            "name": "currency",
+            "value": "USD",
+            "source": "page",
+            "source_url": RATE_PAGE.url
+            if cited
+            else "https://unretrieved.example/currency",
+        }
+    )
+    notes = []
+    resolved = _resolve(
+        _request("time_value", inputs, "payment"), currency="DOP", notes=notes
+    )
+    expected = "USD" if cited else "DOP"
+    assert resolved.computable
+    assert resolved.arguments["currency"] == expected
+    card = ac.card_in(ac.computed_answer_patch(resolved))
+    assert card.outcome.status == "succeeded"
+    assert card.presentation.answer.unit.interpolation_args["code"] == expected
+    assert (ac.PAGE_UNCITED_REASON_CODE in notes) is (not cited)
+
+
+@pytest.mark.parametrize("source", ["user", "assumption", "market_data"])
+def test_standalone_currency_cannot_claim_an_unsupported_market_data_source(source):
+    inputs = [
+        {key: value for key, value in item.items() if key != "currency"} for item in LOAN
+    ]
+    inputs.append({"name": "currency", "value": "USD", "source": source})
+    notes = []
+    resolved = _resolve(
+        _request("time_value", inputs, "payment"), currency="DOP", notes=notes
+    )
+    assert resolved.computable
+    assert resolved.arguments["currency"] == ("DOP" if source == "market_data" else "USD")
+    assert (ac.MARKET_DATA_NOT_A_PRICE_REASON_CODE in notes) is (source == "market_data")
+
+
+@pytest.mark.parametrize("source", ["user", "page"])
+def test_accepted_amount_keeps_its_currency_despite_an_uncited_standalone_code(source):
+    from tests.agent_runtime.test_answer_calculation import RATE_PAGE
+
+    inputs = [
+        {
+            **item,
+            "currency": "USD",
+            "source": source,
+            "source_url": RATE_PAGE.url if source == "page" else None,
+        }
+        if item["name"] == "present_value"
+        else item
+        for item in LOAN
+    ]
+    inputs.append(
+        {
+            "name": "currency",
+            "value": "EUR",
+            "source": "page",
+            "source_url": "https://unretrieved.example/currency",
+        }
+    )
+    notes = []
+    resolved = _resolve(
+        _request("time_value", inputs, "payment"), currency="DOP", notes=notes
+    )
+    assert resolved.computable
+    assert resolved.arguments["currency"] == "USD"
+    assert (
+        resolved.arguments["sources"]["currency"]
+        == resolved.arguments["sources"]["present_value"]
+    )
+    card = ac.card_in(ac.computed_answer_patch(resolved))
+    assert card.outcome.status == "succeeded"
+    assert card.presentation.answer.unit.interpolation_args["code"] == "USD"
+    assert ac.PAGE_UNCITED_REASON_CODE in notes
+
+
 @pytest.mark.parametrize(
     "extra",
     [

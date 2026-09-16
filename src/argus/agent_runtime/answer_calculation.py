@@ -763,17 +763,30 @@ def _calculation_currency(
             is not None
         )
     }
+    stated = ""
+    for item in request.inputs:
+        if item.name != CURRENCY_FIELD or not isinstance(item.value, str):
+            continue
+        code = item.value.strip().upper()
+        if code not in CURRENCY_CODES:
+            continue
+        if (
+            item.source == "page"
+            and _page_input_source(
+                item, pages=pages, evidence=evidence, currency=code, symbol=symbol
+            )
+            is None
+        ):
+            _note(notes, PAGE_UNCITED_REASON_CODE, name=item.name)
+            continue
+        if item.source == "market_data":
+            _note(notes, MARKET_DATA_NOT_A_PRICE_REASON_CODE, name=item.name)
+            continue
+        stated = code
+        break
     if len(denominations) == 1:
         return next(iter(denominations))
-    stated = next(
-        (
-            str(item.value).strip().upper()
-            for item in request.inputs
-            if item.name == CURRENCY_FIELD and isinstance(item.value, str)
-        ),
-        "",
-    )
-    if stated in CURRENCY_CODES:
+    if stated:
         return stated
     if currency:
         return currency.strip().upper()
