@@ -85,6 +85,38 @@ def test_stated_amount_owns_currency_and_its_source(source):
 
 
 @pytest.mark.parametrize(
+    "extra",
+    [
+        {"name": "price", "value": 99, "source": "user", "currency": "USD"},
+        {"name": "payment", "value": 99, "source": "user", "currency": "USD"},
+        {"name": "present_value", "value": None, "source": "user", "currency": "USD"},
+        {
+            "name": "present_value",
+            "value": 99,
+            "source": "page",
+            "currency": "USD",
+            "source_url": "https://unretrieved.example/amount",
+        },
+    ],
+)
+def test_discarded_inputs_cannot_change_the_calculation_currency(extra):
+    inputs = [
+        {key: value for key, value in item.items() if key != "currency"} for item in LOAN
+    ]
+    resolved = _resolve(
+        _request("time_value", [*inputs, extra], "payment"), currency="DOP"
+    )
+    assert resolved.arguments["currency"] == "DOP"
+    if extra["name"] in {"price", "payment"}:
+        assert (
+            ac.card_in(
+                ac.computed_answer_patch(resolved)
+            ).presentation.answer.unit.interpolation_args["code"]
+            == "DOP"
+        )
+
+
+@pytest.mark.parametrize(
     "template",
     [
         "How many payments?",
