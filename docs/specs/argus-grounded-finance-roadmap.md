@@ -333,10 +333,30 @@ reviewer should reject it on operating rule 8.
 | 7 | Currency | *"¿Ahorro en pesos o en dólares?"* | growth + comparison + retrieval |
 | 8 | Inflation | *"Is my savings account actually losing money?"* | growth + retrieval |
 | 9 | Backtest | *"Buy and hold Apple for the last year with $10,000."* | historical |
-| 10 | The boundary | *"Should I put my emergency fund in crypto?"* | historical; compute the drawdown, show it, stop |
+| 10 | The boundary | *"Should I put my emergency fund in crypto?"* | answer it straight, name the boundary, cite the sources, offer the next step |
 
 Plus the influencer's post from the section above, which is 4 and 5 combined
 and is the one a real Dominican audience is already asking a human.
+
+**Question 10's bar was rewritten 2026-09-17, and the old one is not coming
+back.** It used to read "historical; compute the drawdown, show it, stop." The
+final acceptance run failed on exactly that clause, in Spanish and then in
+English, and the failure was our test rather than the product: the calculator it
+demanded sits in a parked lane, and no reader of that answer needs it. Competitor
+answers to the same question are excellent without any drawdown. They answer
+directly, use the reader's own numbers, separate what the money is for from what
+it could earn, cite the local authority, and end with steps. That is the bar now:
+
+- answer the question asked, rather than describing a capability;
+- use the figures the reader gave, computed by Argus, not narrated by a model;
+- name the boundary plainly, since emergency money has to be there in full, on
+  short notice;
+- cite what the claim rests on, with its date;
+- end with next steps the reader can take.
+
+A calculation is welcome where it sharpens the answer, and is not required. What
+is still forbidden is the thing the acceptance sentence already forbids: a
+refusal that names a capability the reader did not ask about.
 
 **Also replay the real 2026-08-12 transcripts.** They are in the database, they
 are what actual users typed, and none of them was written by us.
