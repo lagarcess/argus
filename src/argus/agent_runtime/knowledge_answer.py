@@ -419,7 +419,7 @@ async def _market_stats_answer(
         asset = classify_symbol(symbol)
         series = await asyncio.to_thread(
             fetch_price_series,
-            symbol,
+            asset.symbol,
             asset.asset_class,
             window.start,
             window.end,

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import pandas as pd
 import pytest
+from argus.agent_runtime import knowledge_answer
 from argus.agent_runtime.answer_calculation import latest_market_close
 from argus.agent_runtime.calculation_rows import dollar_rate
+from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
 from argus.domain.market_data import assets, provider
 from faker import Faker
 
@@ -85,3 +87,38 @@ def test_dollar_rate_resolves_direct_and_inverse_pairs(
 def test_unknown_symbol_returns_none_without_fetching(market_closes: Mock) -> None:
     assert latest_market_close("UNKNOWN_SYMBOL") is None
     market_closes.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("symbol", "canonical", "asset_class"),
+    [("XBT/USD", "BTC", "crypto"), ("EUR/USD", "EURUSD", "currency_pair")],
+)
+async def test_market_stats_fetches_the_resolved_identity(
+    market_closes: Mock,
+    monkeypatch: pytest.MonkeyPatch,
+    faker: Faker,
+    symbol: str,
+    canonical: str,
+    asset_class: str,
+) -> None:
+    answer = faker.sentence()
+    voice = AsyncMock(return_value=answer)
+    monkeypatch.setattr(knowledge_answer, "_voiced_answer", voice)
+
+    result = await knowledge_answer._market_stats_answer(
+        query=knowledge_answer.KnowledgeQueryExtraction(
+            question_kind="market_stats", symbols=[symbol]
+        ),
+        interpretation=StructuredInterpretation(
+            intent="unsupported_or_out_of_scope",
+            task_relation="new_task",
+            user_goal_summary=faker.sentence(),
+        ),
+        message=faker.sentence(),
+        language="en",
+    )
+
+    assert result == answer
+    assert market_closes.call_args.args[:2] == (canonical, asset_class)
+    voice.assert_awaited_once()
