@@ -103,8 +103,9 @@ def test_every_date_extraction_boundary_treats_null_as_an_absent_endpoint(schema
 
 @pytest.mark.parametrize("language", ["en", "es-419"])
 @pytest.mark.parametrize("encoded_year", ["2024", "--"])
+@pytest.mark.parametrize("kind", ["explicit_range", "since"])
 def test_focused_yearless_endpoints_take_the_new_york_year(
-    monkeypatch, language, encoded_year
+    monkeypatch, language, encoded_year, kind
 ):
     monkeypatch.setattr(natural_time, "new_york_today", lambda: date(2026, 9, 15))
     start = "2024-08-16" if encoded_year == "2024" else "--08-16"
@@ -112,7 +113,7 @@ def test_focused_yearless_endpoints_take_the_new_york_year(
     extraction = FocusedDateWindowExtraction(
         has_date_window=True,
         date_range_intent=LLMDateRangeIntent(
-            kind="explicit_range",
+            kind=kind,
             start=start,
             end=end,
             year_reference="current_year",
@@ -163,7 +164,7 @@ def test_explicit_historical_year_is_preserved():
     assert result.payload == {"start": "2024-08-16", "end": "2024-08-19"}
 
 
-@pytest.mark.parametrize("kind", ["explicit_range", "year_to_date"])
+@pytest.mark.parametrize("kind", ["explicit_range", "year_to_date", "since"])
 def test_current_year_does_not_clamp_an_invalid_leap_day(kind):
     result = natural_time.resolve_date_range_intent(
         LLMDateRangeIntent(
@@ -192,7 +193,7 @@ def test_focused_date_writer_requires_the_clock_owned_year_contract():
     assert "year_reference=current_year" in messages[0]["content"]
 
 
-@pytest.mark.parametrize("kind", ["calendar_year", "year_to_date"])
+@pytest.mark.parametrize("kind", ["calendar_year", "year_to_date", "since"])
 @pytest.mark.parametrize("encoded_year", [2024, None])
 def test_whole_current_year_intents_use_the_same_clock_owner(
     monkeypatch, kind, encoded_year
@@ -217,3 +218,54 @@ def test_current_year_to_date_binds_an_explicit_endpoint_to_the_same_year():
         today=date(2026, 9, 15),
     )
     assert result.payload == {"start": "2026-01-01", "end": "2026-08-19"}
+
+
+@pytest.mark.parametrize("encoded_start", ["--08-16", "2024-08-16"])
+@pytest.mark.parametrize("current_year", [True, False])
+def test_since_window_uses_the_typed_year_and_defaults_end_to_today(
+    monkeypatch, encoded_start, current_year
+):
+    today = date(2026, 9, 15)
+    monkeypatch.setattr(natural_time, "new_york_today", lambda: today)
+    result = natural_time.resolve_date_range_intent(
+        LLMDateRangeIntent(
+            kind="since",
+            start=encoded_start,
+            year_reference="current_year" if current_year else None,
+        )
+    )
+    if not current_year and encoded_start.startswith("--"):
+        assert result is None
+    else:
+        assert result is not None
+        expected_year = (
+            today.year if current_year else date.fromisoformat(encoded_start).year
+        )
+        assert result.payload == {
+            "start": date(expected_year, 8, 16).isoformat(),
+            "end": today.isoformat(),
+        }
+
+
+@pytest.mark.parametrize("encoded_end", ["--08-19", "2024-08-19"])
+def test_rolling_window_binds_its_typed_endpoint_before_date_math(encoded_end):
+    from datetime import timedelta
+
+    today = date(2026, 9, 15)
+    end = date(today.year, 8, 19)
+    days = 10
+    result = natural_time.resolve_date_range_intent(
+        LLMDateRangeIntent(
+            kind="rolling_window",
+            count=days,
+            unit="day",
+            end=encoded_end,
+            year_reference="current_year",
+        ),
+        today=today,
+    )
+    assert result is not None
+    assert result.payload == {
+        "start": (end - timedelta(days=days)).isoformat(),
+        "end": end.isoformat(),
+    }

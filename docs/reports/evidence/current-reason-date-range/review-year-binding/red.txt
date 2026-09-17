@@ -1,0 +1,389 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.10.20, pytest-8.4.2, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /Users/garces/.codex/worktrees/f945/private-alpha-next
+configfile: pyproject.toml
+plugins: benchmark-5.2.3, mock-3.15.1, Faker-30.10.0, asyncio-1.4.0, hypothesis-6.151.12, langsmith-0.7.31, respx-0.23.1, cov-7.0.0, anyio-4.13.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 33 items
+
+tests/agent_runtime/test_current_reason_measured_failures.py .........FF [ 33%]
+FF.....F...F..F.FF..FF                                                   [100%]
+
+=================================== FAILURES ===================================
+____ test_focused_yearless_endpoints_take_the_new_york_year[since-2024-en] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c710160>
+language = 'en', encoded_year = '2024', kind = 'since'
+
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("encoded_year", ["2024", "--"])
+    @pytest.mark.parametrize("kind", ["explicit_range", "since"])
+    def test_focused_yearless_endpoints_take_the_new_york_year(
+        monkeypatch, language, encoded_year, kind
+    ):
+        monkeypatch.setattr(natural_time, "new_york_today", lambda: date(2026, 9, 15))
+        start = "2024-08-16" if encoded_year == "2024" else "--08-16"
+        end = "2024-08-19" if encoded_year == "2024" else "--08-19"
+        extraction = FocusedDateWindowExtraction(
+            has_date_window=True,
+            date_range_intent=LLMDateRangeIntent(
+                kind=kind,
+                start=start,
+                end=end,
+                year_reference="current_year",
+            ),
+            confidence=1,
+        )
+        request = InterpretationRequest(
+            current_user_message=fake.sentence(),
+            user=UserState(user_id=fake.uuid4(), language_preference=language),
+        )
+        response = LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            user_goal_summary="Test the stated range",
+        )
+        repaired = _response_from_focused_date_window_extraction(
+            response=response, extraction=extraction, request=request
+        )
+        assert repaired is not None
+>       assert repaired.candidate_strategy_draft.date_range == {
+            "start": "2026-08-16",
+            "end": "2026-08-19",
+        }
+E       AssertionError: assert {'end': '2024... '2024-08-16'} == {'end': '2026... '2026-08-16'}
+E         
+E         Differing items:
+E         {'end': '2024-08-19'} != {'end': '2026-08-19'}
+E         {'start': '2024-08-16'} != {'start': '2026-08-16'}
+E         Use -v to get more diff
+
+tests/agent_runtime/test_current_reason_measured_failures.py:136: AssertionError
+__ test_focused_yearless_endpoints_take_the_new_york_year[since-2024-es-419] ___
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e92f2b0>
+language = 'es-419', encoded_year = '2024', kind = 'since'
+
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("encoded_year", ["2024", "--"])
+    @pytest.mark.parametrize("kind", ["explicit_range", "since"])
+    def test_focused_yearless_endpoints_take_the_new_york_year(
+        monkeypatch, language, encoded_year, kind
+    ):
+        monkeypatch.setattr(natural_time, "new_york_today", lambda: date(2026, 9, 15))
+        start = "2024-08-16" if encoded_year == "2024" else "--08-16"
+        end = "2024-08-19" if encoded_year == "2024" else "--08-19"
+        extraction = FocusedDateWindowExtraction(
+            has_date_window=True,
+            date_range_intent=LLMDateRangeIntent(
+                kind=kind,
+                start=start,
+                end=end,
+                year_reference="current_year",
+            ),
+            confidence=1,
+        )
+        request = InterpretationRequest(
+            current_user_message=fake.sentence(),
+            user=UserState(user_id=fake.uuid4(), language_preference=language),
+        )
+        response = LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            user_goal_summary="Test the stated range",
+        )
+        repaired = _response_from_focused_date_window_extraction(
+            response=response, extraction=extraction, request=request
+        )
+        assert repaired is not None
+>       assert repaired.candidate_strategy_draft.date_range == {
+            "start": "2026-08-16",
+            "end": "2026-08-19",
+        }
+E       AssertionError: assert {'end': '2024... '2024-08-16'} == {'end': '2026... '2026-08-16'}
+E         
+E         Differing items:
+E         {'end': '2024-08-19'} != {'end': '2026-08-19'}
+E         {'start': '2024-08-16'} != {'start': '2026-08-16'}
+E         Use -v to get more diff
+
+tests/agent_runtime/test_current_reason_measured_failures.py:136: AssertionError
+_____ test_focused_yearless_endpoints_take_the_new_york_year[since----en] ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e91fb50>
+language = 'en', encoded_year = '--', kind = 'since'
+
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("encoded_year", ["2024", "--"])
+    @pytest.mark.parametrize("kind", ["explicit_range", "since"])
+    def test_focused_yearless_endpoints_take_the_new_york_year(
+        monkeypatch, language, encoded_year, kind
+    ):
+        monkeypatch.setattr(natural_time, "new_york_today", lambda: date(2026, 9, 15))
+        start = "2024-08-16" if encoded_year == "2024" else "--08-16"
+        end = "2024-08-19" if encoded_year == "2024" else "--08-19"
+        extraction = FocusedDateWindowExtraction(
+            has_date_window=True,
+            date_range_intent=LLMDateRangeIntent(
+                kind=kind,
+                start=start,
+                end=end,
+                year_reference="current_year",
+            ),
+            confidence=1,
+        )
+        request = InterpretationRequest(
+            current_user_message=fake.sentence(),
+            user=UserState(user_id=fake.uuid4(), language_preference=language),
+        )
+        response = LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            user_goal_summary="Test the stated range",
+        )
+        repaired = _response_from_focused_date_window_extraction(
+            response=response, extraction=extraction, request=request
+        )
+>       assert repaired is not None
+E       assert None is not None
+
+tests/agent_runtime/test_current_reason_measured_failures.py:135: AssertionError
+___ test_focused_yearless_endpoints_take_the_new_york_year[since----es-419] ____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e92f370>
+language = 'es-419', encoded_year = '--', kind = 'since'
+
+    @pytest.mark.parametrize("language", ["en", "es-419"])
+    @pytest.mark.parametrize("encoded_year", ["2024", "--"])
+    @pytest.mark.parametrize("kind", ["explicit_range", "since"])
+    def test_focused_yearless_endpoints_take_the_new_york_year(
+        monkeypatch, language, encoded_year, kind
+    ):
+        monkeypatch.setattr(natural_time, "new_york_today", lambda: date(2026, 9, 15))
+        start = "2024-08-16" if encoded_year == "2024" else "--08-16"
+        end = "2024-08-19" if encoded_year == "2024" else "--08-19"
+        extraction = FocusedDateWindowExtraction(
+            has_date_window=True,
+            date_range_intent=LLMDateRangeIntent(
+                kind=kind,
+                start=start,
+                end=end,
+                year_reference="current_year",
+            ),
+            confidence=1,
+        )
+        request = InterpretationRequest(
+            current_user_message=fake.sentence(),
+            user=UserState(user_id=fake.uuid4(), language_preference=language),
+        )
+        response = LLMInterpretationResponse(
+            intent="strategy_drafting",
+            task_relation="new_task",
+            user_goal_summary="Test the stated range",
+        )
+        repaired = _response_from_focused_date_window_extraction(
+            response=response, extraction=extraction, request=request
+        )
+>       assert repaired is not None
+E       assert None is not None
+
+tests/agent_runtime/test_current_reason_measured_failures.py:135: AssertionError
+_________ test_current_year_does_not_clamp_an_invalid_leap_day[since] __________
+
+kind = 'since'
+
+    @pytest.mark.parametrize("kind", ["explicit_range", "year_to_date", "since"])
+    def test_current_year_does_not_clamp_an_invalid_leap_day(kind):
+        result = natural_time.resolve_date_range_intent(
+            LLMDateRangeIntent(
+                kind=kind,
+                start="2024-02-28",
+                end="2024-02-29",
+                year_reference="current_year",
+            ),
+            today=date(2026, 9, 15),
+        )
+>       assert result is None
+E       AssertionError: assert DateRangeIntentResolution(label='since 2024-02-28', payload={'start': '2024-02-28', 'end': '2024-02-29'}, evidence_spans=()) is None
+
+tests/agent_runtime/test_current_reason_measured_failures.py:178: AssertionError
+_____ test_whole_current_year_intents_use_the_same_clock_owner[2024-since] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e92d240>
+kind = 'since', encoded_year = 2024
+
+    @pytest.mark.parametrize("kind", ["calendar_year", "year_to_date", "since"])
+    @pytest.mark.parametrize("encoded_year", [2024, None])
+    def test_whole_current_year_intents_use_the_same_clock_owner(
+        monkeypatch, kind, encoded_year
+    ):
+        today = date(2026, 9, 15)
+        monkeypatch.setattr(natural_time, "new_york_today", lambda: today)
+        result = natural_time.resolve_date_range_intent(
+            LLMDateRangeIntent(kind=kind, year=encoded_year, year_reference="current_year")
+        )
+        assert result is not None
+>       assert result.payload == {"start": "2026-01-01", "end": today.isoformat()}
+E       AssertionError: assert {'end': '2026... '2024-01-01'} == {'end': '2026... '2026-01-01'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'start': '2024-01-01'} != {'start': '2026-01-01'}
+E         Use -v to get more diff
+
+tests/agent_runtime/test_current_reason_measured_failures.py:207: AssertionError
+_____ test_whole_current_year_intents_use_the_same_clock_owner[None-since] _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e918d30>
+kind = 'since', encoded_year = None
+
+    @pytest.mark.parametrize("kind", ["calendar_year", "year_to_date", "since"])
+    @pytest.mark.parametrize("encoded_year", [2024, None])
+    def test_whole_current_year_intents_use_the_same_clock_owner(
+        monkeypatch, kind, encoded_year
+    ):
+        today = date(2026, 9, 15)
+        monkeypatch.setattr(natural_time, "new_york_today", lambda: today)
+        result = natural_time.resolve_date_range_intent(
+            LLMDateRangeIntent(kind=kind, year=encoded_year, year_reference="current_year")
+        )
+>       assert result is not None
+E       assert None is not None
+
+tests/agent_runtime/test_current_reason_measured_failures.py:206: AssertionError
+_ test_since_window_uses_the_typed_year_and_defaults_end_to_today[True---08-16] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c6ea020>
+encoded_start = '--08-16', current_year = True
+
+    @pytest.mark.parametrize("encoded_start", ["--08-16", "2024-08-16"])
+    @pytest.mark.parametrize("current_year", [True, False])
+    def test_since_window_uses_the_typed_year_and_defaults_end_to_today(
+        monkeypatch, encoded_start, current_year
+    ):
+        today = date(2026, 9, 15)
+        monkeypatch.setattr(natural_time, "new_york_today", lambda: today)
+        result = natural_time.resolve_date_range_intent(
+            LLMDateRangeIntent(
+                kind="since",
+                start=encoded_start,
+                year_reference="current_year" if current_year else None,
+            )
+        )
+        if not current_year and encoded_start.startswith("--"):
+            assert result is None
+        else:
+>           assert result is not None
+E           assert None is not None
+
+tests/agent_runtime/test_current_reason_measured_failures.py:240: AssertionError
+_ test_since_window_uses_the_typed_year_and_defaults_end_to_today[True-2024-08-16] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e92a4d0>
+encoded_start = '2024-08-16', current_year = True
+
+    @pytest.mark.parametrize("encoded_start", ["--08-16", "2024-08-16"])
+    @pytest.mark.parametrize("current_year", [True, False])
+    def test_since_window_uses_the_typed_year_and_defaults_end_to_today(
+        monkeypatch, encoded_start, current_year
+    ):
+        today = date(2026, 9, 15)
+        monkeypatch.setattr(natural_time, "new_york_today", lambda: today)
+        result = natural_time.resolve_date_range_intent(
+            LLMDateRangeIntent(
+                kind="since",
+                start=encoded_start,
+                year_reference="current_year" if current_year else None,
+            )
+        )
+        if not current_year and encoded_start.startswith("--"):
+            assert result is None
+        else:
+            assert result is not None
+            expected_year = today.year if current_year else date.fromisoformat(encoded_start).year
+>           assert result.payload == {
+                "start": date(expected_year, 8, 16).isoformat(),
+                "end": today.isoformat(),
+            }
+E           AssertionError: assert {'end': '2026... '2024-08-16'} == {'end': '2026... '2026-08-16'}
+E             
+E             Omitting 1 identical items, use -vv to show
+E             Differing items:
+E             {'start': '2024-08-16'} != {'start': '2026-08-16'}
+E             Use -v to get more diff
+
+tests/agent_runtime/test_current_reason_measured_failures.py:242: AssertionError
+____ test_rolling_window_binds_its_typed_endpoint_before_date_math[--08-19] ____
+
+encoded_end = '--08-19'
+
+    @pytest.mark.parametrize("encoded_end", ["--08-19", "2024-08-19"])
+    def test_rolling_window_binds_its_typed_endpoint_before_date_math(encoded_end):
+        from datetime import timedelta
+    
+        today = date(2026, 9, 15)
+        end = date(today.year, 8, 19)
+        days = 10
+        result = natural_time.resolve_date_range_intent(
+            LLMDateRangeIntent(
+                kind="rolling_window", count=days, unit="day",
+                end=encoded_end, year_reference="current_year",
+            ),
+            today=today,
+        )
+        assert result is not None
+>       assert result.payload == {
+            "start": (end - timedelta(days=days)).isoformat(), "end": end.isoformat()
+        }
+E       AssertionError: assert {'end': '2026... '2026-09-05'} == {'end': '2026... '2026-08-09'}
+E         
+E         Differing items:
+E         {'end': '2026-09-15'} != {'end': '2026-08-19'}
+E         {'start': '2026-09-05'} != {'start': '2026-08-09'}
+E         Use -v to get more diff
+
+tests/agent_runtime/test_current_reason_measured_failures.py:263: AssertionError
+__ test_rolling_window_binds_its_typed_endpoint_before_date_math[2024-08-19] ___
+
+encoded_end = '2024-08-19'
+
+    @pytest.mark.parametrize("encoded_end", ["--08-19", "2024-08-19"])
+    def test_rolling_window_binds_its_typed_endpoint_before_date_math(encoded_end):
+        from datetime import timedelta
+    
+        today = date(2026, 9, 15)
+        end = date(today.year, 8, 19)
+        days = 10
+        result = natural_time.resolve_date_range_intent(
+            LLMDateRangeIntent(
+                kind="rolling_window", count=days, unit="day",
+                end=encoded_end, year_reference="current_year",
+            ),
+            today=today,
+        )
+        assert result is not None
+>       assert result.payload == {
+            "start": (end - timedelta(days=days)).isoformat(), "end": end.isoformat()
+        }
+E       AssertionError: assert {'end': '2024... '2024-08-09'} == {'end': '2026... '2026-08-09'}
+E         
+E         Differing items:
+E         {'end': '2024-08-19'} != {'end': '2026-08-19'}
+E         {'start': '2024-08-09'} != {'start': '2026-08-09'}
+E         Use -v to get more diff
+
+tests/agent_runtime/test_current_reason_measured_failures.py:263: AssertionError
+=========================== short test summary info ============================
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_focused_yearless_endpoints_take_the_new_york_year[since-2024-en]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_focused_yearless_endpoints_take_the_new_york_year[since-2024-es-419]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_focused_yearless_endpoints_take_the_new_york_year[since----en]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_focused_yearless_endpoints_take_the_new_york_year[since----es-419]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_current_year_does_not_clamp_an_invalid_leap_day[since]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_whole_current_year_intents_use_the_same_clock_owner[2024-since]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_whole_current_year_intents_use_the_same_clock_owner[None-since]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_since_window_uses_the_typed_year_and_defaults_end_to_today[True---08-16]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_since_window_uses_the_typed_year_and_defaults_end_to_today[True-2024-08-16]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_rolling_window_binds_its_typed_endpoint_before_date_math[--08-19]
+FAILED tests/agent_runtime/test_current_reason_measured_failures.py::test_rolling_window_binds_its_typed_endpoint_before_date_math[2024-08-19]
+======================== 11 failed, 22 passed in 0.97s =========================

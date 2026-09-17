@@ -1,0 +1,31 @@
+import ast, json, subprocess, sys
+from datetime import date
+from pathlib import Path
+sys.path[:0]=[str(Path.cwd()),str(Path.cwd()/'src')]
+from argus.nlp import natural_time
+old=subprocess.check_output(['/Library/Developer/CommandLineTools/usr/bin/git','show','HEAD:src/argus/nlp/natural_time.py'],text=True)
+f=next(n for n in ast.parse(old).body if isinstance(n,ast.FunctionDef) and n.name=='resolve_date_range_intent')
+scope=natural_time.__dict__.copy();exec(compile(ast.Module(body=[f],type_ignores=[]),'measured_date_resolver','exec'),scope)
+resolve_before=scope['resolve_date_range_intent'];intents=[]
+def walk(value,case,attempt):
+ if isinstance(value,dict):
+  for k,v in value.items():
+   if k=='date_range_intent' and isinstance(v,dict):intents.append((case,attempt,v))
+   walk(v,case,attempt)
+ elif isinstance(value,list):
+  for v in value:walk(v,case,attempt)
+p=Path('docs/reports/evidence/current-reason-date-range/accepted-measurement/provider-responses.jsonl')
+for line in p.read_text().splitlines():
+ row=json.loads(line)
+ for choice in row.get('response',{}).get('choices',[]):
+  try:v=json.loads(choice['message']['content'])
+  except (KeyError,TypeError,ValueError):continue
+  walk(v,row['case_id'],row['attempt'])
+assert intents
+changed=[]
+for case,attempt,intent in intents:
+ for today in (date(2026,9,16),date(2026,9,17)):
+  before=resolve_before(intent,today=today);after=natural_time.resolve_date_range_intent(intent,today=today)
+  if before!=after:changed.append({'case':case,'attempt':attempt,'intent':intent,'today':today.isoformat(),'before':str(before),'after':str(after)})
+result={'source':str(p),'date_intents':len(intents),'cases_with_date_intents':len({x[0] for x in intents}),'clock_dates':['2026-09-16','2026-09-17'],'comparisons':len(intents)*2,'changed':changed,'scope':'Free replay of every saved structured date_range_intent against measured and review-fixed resolvers. No provider calls; not a new complete full-turn measurement.'}
+print(json.dumps(result,indent=2));assert not changed

@@ -262,12 +262,23 @@ def resolve_date_range_intent(
         # historical test window (issue #241 executable boundary).
         return None
 
+    year = current_date.year if current_year else _positive_int(payload.get("year"))
+    start = _intent_date(
+        payload.get("start"), today=current_date, current_year=current_year
+    )
+    end = _intent_date(payload.get("end"), today=current_date, current_year=current_year)
+    if current_year and any(
+        payload.get(key) and value is None
+        for key, value in (("start", start), ("end", end))
+    ):
+        return None
+
     if kind == "rolling_window":
         count = _positive_number(payload.get("count"))
         unit = _intent_unit(payload.get("unit"))
         if count is None or unit is None:
             return None
-        end = _intent_date(payload.get("end"), today=current_date) or current_date
+        end = end or current_date
         start = _subtract_period(end, count=count, unit=unit)
         if end < start:
             return None
@@ -278,17 +289,8 @@ def resolve_date_range_intent(
         )
 
     if kind == "year_to_date":
-        year = (
-            current_date.year
-            if current_year
-            else _positive_int(payload.get("year")) or current_date.year
-        )
+        year = year or current_date.year
         if year > current_date.year:
-            return None
-        end = _intent_date(
-            payload.get("end"), today=current_date, current_year=current_year
-        )
-        if current_year and payload.get("end") and end is None:
             return None
         if end is None:
             end = current_date if year == current_date.year else date(year, 12, 31)
@@ -301,7 +303,6 @@ def resolve_date_range_intent(
         )
 
     if kind == "calendar_year":
-        year = current_date.year if current_year else _positive_int(payload.get("year"))
         if year is None or year > current_date.year:
             return None
         end = current_date if year == current_date.year else date(year, 12, 31)
@@ -312,13 +313,11 @@ def resolve_date_range_intent(
         )
 
     if kind == "since":
-        start = _intent_date(payload.get("start"), today=current_date)
-        year = _positive_int(payload.get("year"))
         if start is None and year is not None:
             start = date(year, 1, 1)
         if start is None or start > current_date:
             return None
-        end = _intent_date(payload.get("end"), today=current_date) or current_date
+        end = end or current_date
         if end < start:
             return None
         return DateRangeIntentResolution(
@@ -329,17 +328,6 @@ def resolve_date_range_intent(
 
     if kind in {"explicit_range", "endpoint_patch"}:
         patch: dict[str, str] = {}
-        start = _intent_date(
-            payload.get("start"), today=current_date, current_year=current_year
-        )
-        end = _intent_date(
-            payload.get("end"), today=current_date, current_year=current_year
-        )
-        if current_year and any(
-            payload.get(key) and value is None
-            for key, value in (("start", start), ("end", end))
-        ):
-            return None
         offset_date = _intent_day_offset_date(payload, today=current_date)
         endpoint = str(payload.get("endpoint") or "").strip()
         if start is not None:
