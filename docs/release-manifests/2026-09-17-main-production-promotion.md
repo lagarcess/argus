@@ -2,12 +2,12 @@
 
 ## Candidate
 
-- Candidate SHA: `e5b6f95f8db1e8629c2219c7dadd749fee637684`
+- Candidate SHA: `2523e3a3dcb64fc713d978cc0e503904373de307`
 - Candidate branch: `codex/production-promotion-20260917`
 - Approved integration cut / original fetched integration: `cfc1988dd80ca1a8007b8f336c107700dd57e009`.
 - Last fetched integration: `cfc1988dd80ca1a8007b8f336c107700dd57e009`.
 - Last fetched main: `3d189204c6a685b7f3bb1818b38e34a33d1f10de`.
-- Reconciliation: none needed at preparation. The would-be merged tree is exactly the candidate tree, `f67f41155f662c016277d236d92913c2fda9cdad`; modularity passes on that tree.
+- Reconciliation: none needed at preparation. The would-be merged tree is exactly the candidate tree, `ff4b5e46d3c39b8925c0c54c810227a77ca2ba8f`; modularity passes on that tree.
 - Checkpoint semantics: this SHA pins the reviewed code-plus-evidence checkpoint, not the commit that subsequently publishes this manifest update. The native eval measured `3cecda6933399e53f6ea00edc8004a88d7eefad4`; only documentation/evidence changed between it and this checkpoint. No descendant is implicitly deploy-cleared. Before deployment, record and gate the exact landed `origin/main` SHA, then bind each service readback to that SHA.
 - Scope: the whole approved roadmap cut, plus sharing configuration and promotion evidence. No product code or migration SQL changed in this task.
 - Validation status: Live comparison complete; founder explicitly accepted both candidate-only typed failures after reviewing their concrete effects. Awaiting staging disposition before production steps. No production migration, main promotion, or deployment performed.
@@ -122,7 +122,7 @@ Evidence summary: `docs/reports/evidence/2026-09-17-main-promotion/verification.
 | Real PostgreSQL matrix | 395 passed, zero skips. |
 | Real anonymous Auth matrix | 12 passed, zero skips. |
 | Hosted staging / production acceptance | Not performed. |
-| Required hosted CI / final review | PR #655: all real push CI jobs passed at `e5b6f95f`; draft-event jobs skipped. First Codex review identified the stale candidate pin; this documentation update addresses it. Delta review and final-head CI remain pending. |
+| Required hosted CI / final review | PR #655: all real CI jobs passed at `2523e3a3`; draft-event jobs skipped. Final scoped Codex review is clean at that SHA, with zero unresolved threads. Links and exact proof are in the preproduction checkpoint. |
 
 Resolved setup failures: the initial SciPy 1.15.3 macOS wheel could not import `scipy.linalg`; the official macosx_12_0_arm64 wheel at the same locked version fixed both imports. Supabase CLI 2.117.0 created broader local grants and caused four permission-test failures (391 other cases passed). Rebuilding only the disposable stack with CI-pinned 2.109.0 restored expected grants and the full matrix passed. The first browser-storage attempt collided with local port 3100; a separate port passed. No product code was changed for these setup failures.
 
@@ -130,12 +130,14 @@ Canary: workflow 298408697 was read back `disabled_manually`; issue #614 was clo
 
 ## Release Decision
 
-- Decision: **IN PROGRESS; NOT YET PROMOTED**. Founder explicitly accepted both candidate-only typed failures for the pinned cut after the full comparison. Staging disposition remains pending.
-- Pending: staging choice, production backup/migrations/gate, release PR/CI/review, landed-ref gate, three-service deploy and hosted verification.
+- Decision: **WAITING FOR FOUNDER STAGING DECISION; NOT PROMOTED**. Founder explicitly accepted both candidate-only typed failures for the pinned cut after the full comparison. Staging disposition remains pending.
+- Pending: staging choice, production backup/migrations/gate, main landing and landed-ref gate, three-service deploy and hosted verification. PR #655 is draft; no readiness or deploy clearance is inferred from this preparation checkpoint. The later documentation-publication head must retain current CI before landing.
 - Signed-out sharing walk: not performed because this candidate is not deployed. Planned check: one money question, publish its answer, open in a fresh signed-out session, start a follow-up; retain observed text and screenshots, then verify revocation if completing the full sharing acceptance gate.
 - Tester invitations/public exposure changes: none.
 - Rollback owner: founder/Codex within the explicit promotion authority; restore the prior code and sharing posture while retaining compatible widened schema.
-- Cleanup: owned local Supabase stack and baseline checkout remain available for the ongoing release; operator dotenv link is temporarily outside automatic discovery and will be restored.
+- Cleanup: original workspace dotenv link restored; both temporary native-eval worktrees removed; owned local Supabase stack stopped without retaining its disposable database. The PR-managed, data-free Supabase preview remains attached to open PR #655. No git stash was used.
+
+Preproduction checkpoint, written after final review returned: `docs/reports/evidence/2026-09-17-main-promotion/preproduction-checkpoint.json`. It binds the reviewed/CI-tested checkpoint, retained evidence, founder acceptance, and cleanup. The only new publication changes are this status record and its artifact.
 
 ## Privacy Notes
 
