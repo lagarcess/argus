@@ -1,0 +1,12 @@
+{
+  "source": "docs/reports/evidence/current-reason-date-range/accepted-measurement/provider-responses.jsonl",
+  "date_intents": 30,
+  "cases_with_date_intents": 23,
+  "clock_dates": [
+    "2026-09-16",
+    "2026-09-17"
+  ],
+  "comparisons": 60,
+  "changed": [],
+  "scope": "Free replay of every saved structured date_range_intent against measured and review-fixed resolvers. No provider calls; not a new complete full-turn measurement."
+}

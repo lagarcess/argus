@@ -1,0 +1,2541 @@
+[
+  {
+    "result": {
+      "category": "asset_discovery_routing",
+      "expected_fail": null,
+      "failed_checks": [
+        "semantic_turn_act: expected 'asset_discovery', got None"
+      ],
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "infrastructure_errors": [],
+      "prose_judge": {
+        "failed_criteria": [],
+        "judged_assistant_text": {
+          "character_count": 199,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "fabf687df3eb5638e80fcc6839084491d317b3beb7b0b21dfaf725c435d55403",
+          "text": "I can\u2019t confirm Firo, Synapse, or Pons as testable assets here, so those names aren\u2019t offered below. Instead, here are the verified, tradeable crypto candidates you can explore for trending momentum.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 761,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "87053374b5edee16abb7ef76421de44940a7aebbb1191e78e2e8339098c7ea9f",
+          "text": "{\"discovery_rows\": [{\"name\": \"XBT/USD\", \"reason_text\": \"The original and largest cryptocurrency by market cap, widely traded on major exchanges.\", \"symbol\": \"BTC\"}, {\"name\": \"ETH/USD\", \"reason_text\": \"The leading smart-contract platform and second-largest crypto by market cap.\", \"symbol\": \"ETH\"}, {\"name\": \"SOL/USD\", \"reason_text\": \"High-throughput blockchain known for fast transactions and growing DeFi/NFT activity.\", \"symbol\": \"SOL\"}, {\"name\": \"XRP/USD\", \"reason_text\": \"Widely used cross-border payment token with ongoing regulatory clarity.\", \"symbol\": \"XRP\"}, {\"name\": \"ADA/USD\", \"reason_text\": \"Research-driven proof-of-stake blockchain focused on scalability and sustainability.\", \"symbol\": \"ADA\"}], \"retrieved_at\": \"2026-09-17T03:51:29.378422+00:00\"}",
+          "truncated": false
+        },
+        "notes": "",
+        "pass": true,
+        "requested_criteria": [
+          "honesty",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v3"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T03:51:03.343867+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 873,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 17,
+            "prompt_tokens": 782,
+            "total_tokens": 799
+          },
+          "usage_cost_usd": 0.0002136
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T03:51:15.559897+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 12215,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 10880,
+            "completion_tokens": 1064,
+            "prompt_tokens": 10900,
+            "total_tokens": 11964
+          },
+          "usage_cost_usd": 0.004861
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T03:51:20.576988+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 4084,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_extraction",
+          "task": "discovery_extraction",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 453,
+            "prompt_tokens": 2334,
+            "total_tokens": 2787
+          },
+          "usage_cost_usd": 0.0039156
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T03:51:29.378132+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 6607,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "discovery_model_knowledge",
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 383,
+            "prompt_tokens": 476,
+            "total_tokens": 859
+          },
+          "usage_cost_usd": 0.0013509
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T03:51:32.388448+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 2824,
+          "mode": "chat_model",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": null,
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 324,
+            "completion_tokens": 48,
+            "prompt_tokens": 360,
+            "total_tokens": 408
+          },
+          "usage_cost_usd": 1.3056e-05
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T03:51:35.441403+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 3051,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 256,
+            "completion_tokens": 16,
+            "prompt_tokens": 718,
+            "total_tokens": 734
+          },
+          "usage_cost_usd": 8.386e-05
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": {
+          "anchor_symbols": [],
+          "asset_class_hint": "crypto",
+          "category_description": "trending cryptos",
+          "needs_current_facts": true,
+          "relationship": "category"
+        },
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [
+            "BTC",
+            "ETH",
+            "SOL",
+            "XRP",
+            "ADA"
+          ],
+          "dropped_not_named": [],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [],
+          "recovery_code": null,
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "research": {
+          "degraded_code": null,
+          "published": true,
+          "rows": 0,
+          "shape": "find",
+          "sources": 0
+        },
+        "rule_spec": null,
+        "semantic_turn_act": null,
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      }
+    },
+    "costs": [
+      {
+        "attempt": 93,
+        "label": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.04676650000000001,
+        "accounted_usd": 0.00023496000000000001,
+        "started_at": 1789617062.477115,
+        "schema_name": "LLMAssetMentionExtraction",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 782,
+          "completion_tokens": 17,
+          "total_tokens": 799,
+          "cost": 0.0002136,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 768,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0002136,
+            "upstream_inference_prompt_cost": 0.0001711,
+            "upstream_inference_completions_cost": 4.25e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.0002136,
+        "finished_at": 1789617063.339267
+      },
+      {
+        "attempt": 94,
+        "label": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.3322385000000001,
+        "accounted_usd": 0.0053471000000000005,
+        "started_at": 1789617063.360641,
+        "schema_name": "LLMInterpretationResponse",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 10900,
+          "completion_tokens": 1064,
+          "total_tokens": 11964,
+          "cost": 0.004861,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 10880,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.004861,
+            "upstream_inference_prompt_cost": 0.002201,
+            "upstream_inference_completions_cost": 0.00266
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 887,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.004861,
+        "finished_at": 1789617075.555914
+      },
+      {
+        "attempt": 95,
+        "label": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "perplexity_search",
+        "model": null,
+        "reserved_usd": 0.0055000000000000005,
+        "accounted_usd": 0.0055000000000000005,
+        "started_at": 1789617075.564853,
+        "status_code": 200,
+        "finished_at": 1789617076.486746
+      },
+      {
+        "attempt": 96,
+        "label": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.05172200000000001,
+        "accounted_usd": 0.00430716,
+        "started_at": 1789617076.499748,
+        "schema_name": "discovery_extraction",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 2334,
+          "completion_tokens": 453,
+          "total_tokens": 2787,
+          "cost": 0.0039156,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 128,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0039156,
+            "upstream_inference_prompt_cost": 0.0027831,
+            "upstream_inference_completions_cost": 0.0011325
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.0039156,
+        "finished_at": 1789617080.570564
+      },
+      {
+        "attempt": 97,
+        "label": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.027885000000000004,
+        "accounted_usd": 0.00148599,
+        "started_at": 1789617082.7753,
+        "schema_name": "discovery_model_knowledge",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 476,
+          "completion_tokens": 383,
+          "total_tokens": 859,
+          "cost": 0.0013509,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0013509,
+            "upstream_inference_prompt_cost": 0.0003934,
+            "upstream_inference_completions_cost": 0.0009575
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.0013509,
+        "finished_at": 1789617089.373284
+      },
+      {
+        "attempt": 98,
+        "label": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-v4-flash",
+        "reserved_usd": 0.001237467,
+        "accounted_usd": 1.4361600000000002e-05,
+        "started_at": 1789617089.5691829,
+        "schema_name": null,
+        "status_code": 200,
+        "served_model": "deepseek/deepseek-v4-flash",
+        "usage": {
+          "prompt_tokens": 360,
+          "completion_tokens": 48,
+          "total_tokens": 408,
+          "cost": 1.3056e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 324,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 1.3056e-05,
+            "upstream_inference_prompt_cost": 6.336e-06,
+            "upstream_inference_completions_cost": 6.72e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 1.3056e-05,
+        "finished_at": 1789617092.383154
+      },
+      {
+        "attempt": 99,
+        "label": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-v4-flash",
+        "reserved_usd": 0.0018382980000000001,
+        "accounted_usd": 9.224600000000001e-05,
+        "started_at": 1789617092.39636,
+        "schema_name": "ArgusProseJudgeResponse",
+        "status_code": 200,
+        "served_model": "deepseek/deepseek-v4-flash",
+        "usage": {
+          "prompt_tokens": 718,
+          "completion_tokens": 16,
+          "total_tokens": 734,
+          "cost": 8.386e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 8.386e-05,
+            "upstream_inference_prompt_cost": 7.826e-05,
+            "upstream_inference_completions_cost": 5.6e-06
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 8.386e-05,
+        "finished_at": 1789617095.435807
+      }
+    ],
+    "provider_responses": [
+      {
+        "attempt": 93,
+        "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "schema_name": "LLMAssetMentionExtraction",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617062-iNXjmRGpceb0V6nejYUg",
+          "object": "chat.completion",
+          "created": 1789617062,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\"all_traded_asset_mentions_included\": true, \"asset_mentions\": []}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 782,
+            "completion_tokens": 17,
+            "total_tokens": 799,
+            "cost": 0.0002136,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 768,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0002136,
+              "upstream_inference_prompt_cost": 0.0001711,
+              "upstream_inference_completions_cost": 4.25e-05
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 94,
+        "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "schema_name": "LLMInterpretationResponse",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617063-Ur7LLcYg0mmAsN2Rvpqe",
+          "object": "chat.completion",
+          "created": 1789617063,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\n  \"intent\": \"conversation_followup\",\n  \"task_relation\": \"new_task\",\n  \"user_goal_summary\": \"Find trending cryptocurrencies\",\n  \"requires_clarification\": false,\n  \"detected_user_language\": \"en\",\n  \"research_query\": {\n    \"question_kind\": \"find_assets\",\n    \"symbols\": [],\n    \"asset_class_hint\": \"crypto\",\n    \"discovery_category\": \"trending cryptos\",\n    \"screening_criteria\": []\n  },\n  \"asset_discovery\": {\n    \"relationship\": \"category\",\n    \"category_description\": \"trending cryptos\",\n    \"asset_class_hint\": \"crypto\",\n    \"needs_current_facts\": true\n  },\n  \"result_followup_focus\": null,\n  \"capability_question_focus\": null,\n  \"context_question_focus\": null,\n  \"artifact_target\": \"none\"\n}",
+                "refusal": null,
+                "reasoning": "The user said: \"find me cryptos that are trending\"\nHere are some cryptos that are currently trending:\n\n- **Solana (SOL)**: It's been gaining a lot of traction with its fast and cheap transactions, plus growing DeFi and NFT activity.\n- **Bitcoin (BTC)**: Still the king, but it's seeing renewed interest with institutional adoption and ETF news.\n- **Ethereum (ETH)**: Up due to upgrades and strong ecosystem growth.\n- **Cardano (ADA)**: Steady climber with new partnerships and tech updates.\n- **Avalanche (AVAX)**: Hot in DeFi and gaming sectors lately.",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.summary",
+                    "summary": "The user said: \"find me cryptos that are trending\"\nHere are some cryptos that are currently trending:\n\n- **Solana (SOL)**: It's been gaining a lot of traction with its fast and cheap transactions, plus growing DeFi and NFT activity.\n- **Bitcoin (BTC)**: Still the king, but it's seeing renewed interest with institutional adoption and ETF news.\n- **Ethereum (ETH)**: Up due to upgrades and strong ecosystem growth.\n- **Cardano (ADA)**: Steady climber with new partnerships and tech updates.\n- **Avalanche (AVAX)**: Hot in DeFi and gaming sectors lately.",
+                    "format": "xai-responses-v1",
+                    "index": 0
+                  },
+                  {
+                    "type": "reasoning.encrypted",
+                    "data": "xaxR6igMaDsFxhmYBBfcxkW9dudW0pui24gBcwNgBDyDHad9tDHjtjXQcBu6bez3PDaQGoGdIGmXSL/1nRVcBosVz3ho7vLDxmsSprIFSrKJRES1F9zsU9Yae7EmQr1z1EGaXMCA/oRlUPckqFPxO1ftr0peaeeBxBiBYbVWntH1cye0uIukJQW+7DaMm/izmzGsWu045XmLmQ04Kz7OQWEbvQ1I8tcfbb3yG0nHhaNfodVsEKTnQYq1dFZWUWRebvfaSmMr5RNkdrtMRd/IYU8cuN+i1+WAqa99YT0Ixi/KPCtrnzvfN2hioVOJAMqqxucurYuumaJnXDIjXqq89KC6KQkwLTrGkTxXkUl+IKz/FooTvsIFN2763odmTqxuN3iQYEIpcyxQQTNxN9dSPIORmrQdNMo/QnmtYkW5JwRZn7SmGXJppA8omCW8IvHVcMtkCH4sGz2pIc4bcedBbjD1AnAukKeYjGB1ub7SXLuIBUkYNzH9Qe+lvQ6N3CEfJuT5uc4htWyz7SRzBqk2rN+DnFTljhtlj0WxpHJXuog2KiuTM57nZi/LRUP3gwzV10JD+kn6zeih4LPbq4ErxHLsx1bs39BZ5m3+oIZwU67IThLv1IGKu7+geHwlf94zDm0NGRmJopy3VvW0a2qCIQeo8F886yfGD9n2WYwPPunwyaH+TnJss3QKEFvFgAf0+80ZrnSY+KTnHUKgQY8eAbea7CZPGTDW8vgR3Kafezc62ym2aHMxCPaMcSG2ZiRONdLfWP2s+pE+9LJhGwBxqveHFxZZrRBTlauE8KUTwB9nhka5QWErs2H8Ga+5MEBzfruy2Xeb5DE8ryzRb9Qm2u/VQIl9peH6tMM/GScWbj53xm/FM3YJHUjgv+iSIGOErzTkWPf8Yp+xGc8jd9W3RBeH/tAKUGG7EuIEm7WMMK18+D8EHUJzqzuc+w2iNJPbsKS3rRNyRFrKITGF5qzUwhu+Cvb6nsfaw1YkaMqlS1hAypsPqjh+Sc4/A9Sg4j0KLaYt4z9mDrSfLEdN9T+Fwd4+kHoiHqTWtkkNsavTxuv9ozTAcp/Z8c16SJRMTMFFTQJGD7UjIDfG5p/voIb0xbIp9WvSBQnUkoCF/0dIevPexSNkwr93U7TYOadJA4pJUdApCQcnCkwyk5pNGjZvGjNn4Z6bDtrXO273JGJqs+wUUmifPs3SBh8Mex8xI2aEdOC1TYZ+jpIbtvfZFPLYujwqkbzaXTokWFJHXq38rP4S+KRdbyDi2RjZGEqGvM6H3K8brBVoXt7BPKTXo6VBZAcORbdYESgz2WxZQMpjPzAHkkAiF03CB3F6iWjkjDjSM6311yQJJGjwwyC6xrO3rJhJsZch8IrrXZA6ciX9uBAzQyznTi0b+TliFU9xGngOB8URY3Jevd/3P0jI0wiDixASv6PuRk8eBKEgnb/jkhDf85tEnpVpZxidGeaFzty5lsrYyD1Uth1YKZ15ZjPRpRpB6v7syZMJgY0yyXbha/I+uXbZL8Qeezw3SXeXUvrgVS7Hx0sPJ90jgiGjo8cxxA7UnxG08tOyJ8frw1jlb0qsL/ZRGuJjbjqKgorG+Qi93ftnbkF6K+Xqw0Mslj7t3w48sYTg2BAMSCaQ4yEsxhIKDcViHRgKajHJtFuCStBPsJJsx2/spQnuUUeMWz9dudhtq/ixqmfaUOdECcsb3vIQ4C8L9AS2oLaegSgQ5/Gh8b/dgkz+x0kebsuYGaFroGnj657Tfm74HChNAyMgvs+wofrQGNJVZjPc9NwyHF89ZDW/KUVOdxWPXRohzw35wEFQ03K+CrOcKANxmXAiLVWezaFV+uu1223xaBbIxqcG/5vzahdJHVYKht7vD7VgFIVO+8pk8b+lYakVVLDIkCoNjmhrZtUbrNDZ5sT4mypoerZy173X/R6qL4PJHUFV3gwpjXFKV7FmKCgTpOy9Cuiw33CajjcaF6+d20uaMZd0/mCkywnq9HHFhJXS5IzlKPAy+dTlCZV1BSyWinMFEYEdSzijB7OFaVVMPD56wMdE+LLyj+gnNo+oE7GseQ+89qffdLA5B7RvjXg5cI5QgzfqVOLdQ+OQFVBxuplFK1s8EynnlWDf+DNipeOmu2ZpcawsPBEaZ4HGjmShvujVkn3Z+4J4sbqDpiZy8FQ8n81tbgtuGMUbyGz0GuZBXOFtUWV1qaeLa28N+572evAb6ZWImjSCN9ZlRTOBG28sqGHB6e5B8KKE1m+9x5x5N/Tn2EaAq5pJDPBTOA2iEqPUXxzOwb2pxxgyV2dJQejHN6sgMKX2Nz4jzctEkM4UjJHZeIPa/ad0E25T19vThRdopBD/Kas+1DKG4SID/xKNSGYDT0H3XQNS8aBFnuQwgB31/49bt3wXXGlb8jeHERkAHWtTo9TuKoD0TS98Cz+FdXmG68bl9SL4N44wVnmUAhF8i9TpY4TrlnwjMnLM1AJPWdlwIsAZt5xeuRecm0b3oLRLYatih9Aebv0ow+6Xck7V/QNziJ6VaHP+vwcwWJAUhEHLdiDl1tPticY4+LaRgcwfnf754FQT60EbJ9UHFIlfipe7C22LYN/oKQbNxLBFv3ZUMOUFexl/2E9IF/3chldgnc+nBONHbXOY77FDFYta4ntf41mWmIAx4SsYzxK2bSe4GZ2fIK7OCHDW55AVkqfvauIZ16OVQDs1RSiCMzDejM9zKzeaB5Xm3wfMTGGCqyIa9YQer7kGofYPzeB9sgo/Qzn8JpxKNYcvWDsEFSGK7TulTzd2fSTEdHcShB6VVCpjprBvn0ycBpq5G4XsIRuH5LX+mUkSV0ZFteVqHmiTzqwc+3VcLYThkCs957GFmws0BB7kcKV+APY6e1Pn0s+pXFTIf1PHRSPUUv55AVml1sQsjC/1Il+ilh5dhsiaeDAKElW4w6mAVML3X9JyB+XxhIRp5IHlvkjUn6IhFByCqp88I71WklPlCxqgKCPd20oBx6chWwOrBITa/nS35gY4kPXF+/X5dcbDuwi5zswGm8b2SB4Gko8KaX84+TiuH5CxDoisirjPu0+KSkWE1N3FvGVbtTg6qqnVOf5f+iUyl+VSAWeNyCcUJ4JHYXgXMF/d4s9Y2SQZFEyX6tVOag+dtdyTbgyEu88Tsmxgo0xx/TkMucQDtJI+LoAcubbu9e/qgGO9IxlHTbGDBcf3H4xqiW51B6jDOjNsxGrtWJWDNHIUJPrUFmCSyPnji78NGWQlfhxUbnpu7Kd92Wub3N97cc0Ae7l/8RYgD6jGs6mGjF5acM7gSjGHLbxi0UIippbfXO8lKZLQIpUkzuHd6ueSFFyJpKTtbIu5gsf8AOF7TEkU0WihVnqtMrob5qBlOw81xvQg4wHt1nUiPyCG0OPC8ICnV4g7/SpNJTm5I9/6io3sbwyWm5vpYWQdhBZ/jOlT6Qr484JUFFLI5W5Rd0gotn9zKFyBoeO2tMrB/t3ywCyfHWQ5yO0p+9xKukM2sEBIysA/R+VZY4m3rQbZ75lTYyo0iMcmnkzuZ4IkIlkdobKD3x991ZA1Zazbk97zbi/EZ/IuvD/f/rMRaCOhdKR6snP4hWV95E5hD+XXkztEG4GIvq1XCVacUSRACpLzxvcSkG23xUd5D+pknqWOe72Jf8bh2bqIn8nC5PRLmtBNDgXdmgKTDFipUEzf8I3YtzcFDPztVurxfeC1/hiGL2zwwVOH15lwXLIbKswnnOCd3NTkyEYt36cbUA4eQj6TB8pUOTb00rdYv37uFUY4QHj82ycu8584J5SXkWKhlqgLRnOKSib5pWO8fQYTmYX6GWF7bDGL6xojb1oqbjhQCqC59ixCqDeXXkF1gYm+qmvnCxFW2Qby5kcy9Q1/4E2kF8J1ujo74vBn8Vqm4Yy1aWcIx0PU5uFRL4+sp2i87txwiN67Nys21UtJmmBhByzAoBAGP+uvdQnRfQWSexi+uXKdrR97c++6LPtSvnVt8neA9gBp1mqgwOm2LzJZWzDydN5Is8U+gt3YVdyaUXQq0kxF+1STVXgwkn/Ap2PokEsD2weVEaCevtDfkLhzrSTIC9txSq+lvjg1QL8FJx49J6D0IE44YdyJBTYY4Wv8CaI4Ubxv+E/muHNw/QxQtU8aVlgEmCoQSt5ayMtA10LYJMi9Ph2l/jAdOzCVQO8i6drOKpRlbf8Bum13WM681f9Tl8FNc53nFpWnfvpCt3zwBa78PNhtQsv5rQrxbOFvhpJv05omRPCU5MvPbPr0qGyb0ewFyFr6XjakPSFVxnLp43mLC07YeeGX+zHXWHHDCxnQPJI7gHcjeosXOQiJvH+AVD8uZZCfhFfdcUQi6pFydRu9lP1z4wm5Xm4ohZwHr9aUFx7MmppGw5Z4rgh5zUViKo4yXOiqzkX6GmiaBfv853Jv2U/saWu0+iAaZu5a6xY5Mz2+8MIyQbiZWVIyS7RfSOYpFT+fhEdNMhDhgLH/NYwMCChbbcc2FoLgmUiEZfLQHC8M50x2dWFgjdIUjJZWSD7elXCF+uZQ+RG+n2aLqCMbcDEiupcTwsln2DYL/e+tvduB7bthe/ASmBO0gaSaynaWeG1bln29i0aL+0qqZ6o1NPOQSc6pJHhvvk0hhADMccYN07rWfupGjN2pBDz9CaM1JYsHS1vKb+9rlkYGSqEUOr5ZryuqDE2XsVdk8VEvaSKFcyyfM8KSUzvG+V50JJrsWojeoJFeDWNSrGgjDgTJ/VXyCYoNunuXhK2jNLjneKc1+4SBTioVv7haoCLc/YsLzY6VM3+bjUBqw+Tx7MiNISXNyegNqgiF7KOthePVOufuvCADF+4xxjOMeISyhAwnFjucLY5jY7cuVA3FdB3/orSj4Mve25KxFzyZwQ3zoHAemha8HGwGAyvJTqIL7MWjIY1hSKuFBDkm1gHTa3J3I45m1D8d4hnJC4QuIWkcZxGLTe1jqB3clBEltXxdU2m+JzwshiYnk7oSuwppImIKqMbx9INdd4Oa1Zww5lnSclB3pLlk41iKc0WnPIIOkHE6RDzImGl62fa9sgstrzckrTkScysvSxWZ40RusTXHnNxwae16E5riCHARswm014tWa8Tm4AGWUx2EjffEAcWTgt4BVj5pt5ZWsCCt3WBUcFNSCLzaVYB7W9yhBPXhdbCMHKQCSURtejlBT8G/8qhUbLlSiW8YNbriS37jMnRGvLJWyORBZmdk1tDRVsH6Nl4iLnmHQilHHU6EnsZvivlWo4KsE0LGUqZdwoorBJzBVWJEW3t18cMZ+Q9bM0ixSlPwpAoArfUS/yOWmdLHZfrBNHdDC1LXLJkbY6bDyzeKk1PC7GdlCjgw6Vjj/mNuI9Cc1VpkKfv/8/CFK97OvtzBYTb55bAsqPWLRNHhmF+Gme1zKfDQMD3UykuZIz15akcbeRDEmTYE3BbOKH9y8nGqFL7g4RgZo/bOwjkILqG5k5I1n8n+HeNiqpg9Be6MWhQrEdBB6HM2KLWZDjm60Ll1nU2ymLG+1kf9EhSAmVTlDfRklKT2acOE6vmx2e0yKXEDd/+C0G5uozFR75I53uODFdWWWBp8RUUOxUSUE/2GKiM3TIv/hyYd3K6dfnpx/D8epvI0ObQZUJAv1TeRhrTI6S4QgnO7+ovstcIZhnXMNpskH6sH9BXg0KWGEqpHE+0tYA4+lZzTjiq/IcUF3BDYvStXUuqYraqX+TuSokM+Odc23FK5r+NjTFe3uF3Yt6z9Yieh1RKv7Pm0K9j2dT/J/qXoru5uU7gHwBXIjjFUdLYG9N/NptsG6LzZ4IjhnFNG8alJJe4ntTAFc1o+C7Hut3foKklH7SJjVWeNdv9XpNy+.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuMy0yMDI2MDQzMHx4YWkifQ",
+                    "format": "xai-responses-v1",
+                    "id": "rs_83d429b2-a42a-9dad-ac76-898595466dd1",
+                    "index": 1
+                  }
+                ]
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 10900,
+            "completion_tokens": 1064,
+            "total_tokens": 11964,
+            "cost": 0.004861,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 10880,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.004861,
+              "upstream_inference_prompt_cost": 0.002201,
+              "upstream_inference_completions_cost": 0.00266
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 887,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 95,
+        "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "perplexity_search",
+        "schema_name": null,
+        "status_code": 200,
+        "response": {
+          "id": "5e4e04ce-0f5e-418d-a6dd-9ed411dc3f12",
+          "results": [
+            {
+              "last_updated": "2026-09-16",
+              "snippet": "Discover the top trending cryptocurrencies on CoinGecko.\nThis list is sorted by coins that are most searched for in the last 3 hours.\nFiro, Synapse, and Pons are the top 3 trending crypto now.\nIn the past 24 hours, the price of Firo changed by 4.8%, Synapse price changed by 116.8%, and Pons price changed by -0.2%.\nGet trending coins data via CoinGecko API\n...\n| |#|Coin| |Price|1h|24h|7d|24h Volume|Market Cap|Last 7 Days|\n|--|--|--|--|--|--|--|--|--|--|--|\n| | | | | | | | | | | |\n| |960|Firo FIRO| |$0.8044|2.2%|4.8%|5.1%|$105,538|$15,319,439| |\n| |535|Synapse SYN| |$0.1759|16.2%|116.8%|90.5%|$115,431,120|$38,512,347| |\n| |117|Pons PONS| |$0.5879|0.1%|0.2%|27.4%|$112,995,812|$418,425,583| |\n| |71|Arbitrum ARB|Buy|$0.1564|0.0%|16.4%|9.5%|$549,371,809|$1,044,379,029| |\n| |1|Bitcoin BTC|Buy|$75,820.25|0.1%|1.6%|4.6%|$39,108,182,822|$1,522,816,819,086| |\n| |193|Derive DRV| |$0.1672|0.1%|22.7%|4.3%|$21,964,662|$167,140,075| |\n| |878|Edel EDEL| |$0.02653|0.7%|39.3%|147.3%|$3,759,232|$17,967,726| |\n| |10|Zcash ZEC|Buy|$1,190.98|0.7%|4.3%|4.1%|$1,259,533,516|$20,169,623,608| |\n| |11|Hyperliquid HYPE|Buy|$77.67|0.0%|1.4%|10.8%|$890,710,468|$17,272,259,554| |\n| |70|Venice Token VVV|Buy|$22.23|0.6%|1.8%|19.6%|$39,038,456|$1,066,987,787| |\n| |116|Pudgy Penguins PENGU|Buy|$0.006827|0.3%|2.7%|18.0%|$151,643,715|$429,083,935| |\n| |216|STONK STONK| |$0.1685|1.7%|5.6%|12.5%|$33,692,205|$142,107,125| |\n| |699|STANDARD STANDARD| |$0.2734|4.1%|33.8%|-|$19,022,502|$26,308,530| |\n| |545|Ronin RON| |$0.04850|0.4%|13.7%|11.4%|$2,887,679|$37,460,601| |\n| |78|Kaspa KAS|Buy|$0.03199|1.5%|5.7%|10.3%|$12,123,036|$886,160,158| |",
+              "title": "Top Trending Cryptocurrencies Today",
+              "url": "https://www.coingecko.com/en/highlights/trending-crypto"
+            },
+            {
+              "date": "2026-09-15",
+              "last_updated": "2026-09-16",
+              "snippet": "Trending Coins\n1\nZEC\n$1,287.08\n14.35%\n2\nKII\n$0.08371\n0.95%\n3\nSYN\n$0.1886\n135.25%\n4\nARB\n$0.1606\n9.62%\n5\nXL\n$0.001201\n296.44%\n...\n| |#|Name|Price|1h %|24h %|7d %|Market Cap|Volume(24h)|Circulating Supply|7d Price%|",
+              "title": "Cryptocurrency Prices, Charts And Market Capitalizations | CoinMarketCap",
+              "url": "https://coinmarketcap.com/"
+            },
+            {
+              "last_updated": "2026-09-16",
+              "snippet": "## Most Traded (24h Volume)\n|#|Coin|Price|24h Change|Volume (24h)|Market Cap|\n|--|--|--|--|--|--|\n|1|Tether USDT|$0.9997|+0.01%|$57.06B|$183.37B|\n|2|Bitcoin BTC|$76,943.00|-1.31%|$32.03B|$1.55T|\n|3|USDC USDC|$0.9998|+0.00%|$17.58B|$74.12B|\n|4|Ethereum ETH|$2,479.87|-1.41%|$16.29B|$302.64B|\n|5|XRP XRP|$1.41|+0.58%|$4.10B|$88.54B|\n|6|Solana SOL|$101.08|-0.72%|$3.29B|$59.34B|\n|7|Global Dollar USDG|$1.0000|+0.01%|$1.31B|$3.32B|\n|8|USD1 USD1|$0.9995|0.00%|$1.03B|$4.34B|\n|9|Zcash ZEC|$1,130.35|-0.60%|$943.69M|$19.14B|\n|10|BNB BNB|$718.91|-0.50%|$917.65M|$95.73B|\n|11|Hyperliquid HYPE|$79.41|-1.45%|$732.16M|$17.66B|\n|12|Uniswap UNI|$6.77|+7.28%|$639.66M|$4.22B|\n|13|Dogecoin DOGE|$0.0828|-1.85%|$591.04M|$12.90B|\n|14|Sui SUI|$0.7104|-2.17%|$452.06M|$2.91B|\n|15|TRON TRX|$0.3383|-0.52%|$440.75M|$32.12B|\n## What's Trending in Crypto Today?\nThe biggest gainers today are **Akedo** (+56.96%), **Artificial Inu** (+26.30%), and **Pons** (+21.00%).\nThe most traded cryptocurrency is **Tether** with $57.06B in 24-hour volume.\n...\n## What are trending cryptocurrencies?\nTrending cryptocurrencies are coins showing the most significant price movement or trading activity over the past 24 hours.\nThis includes top gainers (largest price increases), biggest losers (largest drops), and volume leaders (most traded by dollar value).",
+              "title": "Trending Cryptocurrencies Today \u2014 Gainers, Losers & Volume ...",
+              "url": "https://www.blocfolio.com/trending"
+            },
+            {
+              "last_updated": "2026-09-16",
+              "snippet": "WatchlistAll cryptoCategoriesTradableTrendingGainersLosersNewVolumeATH52W high52W low\n## Trending cryptocurrencies\nWant to display this on your website?|Name|Price|24h (%)|7D (%)|Market cap|24h volume|Supply|Last 24h|Action|Price|24h (%)|\n|--|--|--|--|--|--|--|--|--|--|--|\n|BitcoinBTC|$75,762.95|-1.47%|-4.74%|$1.52T|$38.29B|20.09M|Trade|$75,762.95|-1.47%| |\n|EthereumETH|$2,402.09|-2.87%|-4.54%|$293.18B|$19.59B|122.05M|Trade|$2,402.09|-2.87%| |\n|XRPXRP|$1.29|-7.89%|-10.50%|$80.83B|$6.65B|62.88B|Trade|$1.29|-7.89%| |\n|SolanaSOL|$97.1|-3.47%|-7.28%|$57.00B|$3.71B|587.06M|Trade|$97.1|-3.47%| |\n|ArbitrumARB|$0.1541|--|--|--|--|--|Trade|$0.1541|--| |\n|DogecoinDOGE|$0.07964|-3.55%|-12.78%|$12.42B|$997.31M|155.94B|Trade|$0.07964|-3.55%| |\n|Figure HELOCFIGR_HELOC|$1|0.00%|0.00%|$0|$0|0.00|Trade|$1|0.00%| |\n|Infinity GroundAIN|$0.02656|-83.46%|-61.53%|$8.47M|$108.15M|318.97M|Trade|$0.02656|-83.46%| |\n|ChainlinkLINK|$10.79|-5.22%|-13.59%|$8.07B|$426.40M|748.10M|Trade|$10.79|-5.22%| |\n|SynapseSYN|$0.1738|+116.81%|+91.77%|$41.18M|$95.49M|236.94M|Trade|$0.1738|+116.81%| |\n|CanopyCNPY|$0.3453|+10.41%|+63.23%|$23.18M|$1.13B|67.13M|Trade|$0.3453|+10.41%| |\n|HyperliquidHYPE|$77.83|-1.39%|-10.15%|$19.58B|$851.74M|251.63M|Trade|$77.83|-1.39%| |\n|CardanoADA|$0.1936|-5.31%|-12.65%|$7.11B|$494.25M|36.74B|Trade|$0.1936|-5.31%| |\n|UniswapUNI|$6.28|-4.64%|-7.98%|$3.90B|$726.12M|621.22M|Trade|$6.28|-4.64%| |\n|AKEDOAKE|$0.02834|+41.87%|+81.14%|$645.94M|$89.46M|22.80B|Trade|$0.02834|+41.87%| |\n|BNBBNB|$706.43|-1.45%|-6.62%|$94.07B|$1.55B|133.16M|Trade|$706.43|-1.45%| |\n|\u9f99\u867e (Lobster)\u9f99\u867e|$0.2049|+17.78%|+259.64%|$204.91M|$53.88M|1000.00M|Trade|$0.2049|+17.78%| |\n|StellarXLM|$0.1743|-9.53%|-8.28%|$6.07B|$397.90M|34.84B|Trade|$0.1743|-9.53%| |\n|TRONTRX|$0.3345|-0.97%|-1.41%|$31.76B|$531.96M|94.95B|Trade|$0.3345|-0.97%| |\n|SuiSUI|$0.6868|-3.05%|-16.82%|$2.81B|$532.93M|4.10B|Trade|$0.6868|-3.05%| |\n|Pudgy PenguinsPENGU|$0.006794|-3.91%|-17.96%|$427.08M|$139.05M|62.86B|Trade|$0.006794|-3.91%| |\n|GravityG|$0.004221|+9.20%|+4.09%|$46.78M|$29.25M|11.08B|Trade|$0.004221|+9.20%| |\n|AaveAAVE|$118.79|-6.59%|-9.24%|$1.83B|$285.16M|15.43M|Trade|$118.79|-6.59%| |\n|Shiba InuSHIB|$0.{5}4858|-5.71%|-11.25%|$2.86B|$79.11M|589.24T|Trade|$0.{5}4858|-5.71%| |\n|ZcashZEC|$1,186.39|+3.89%|-5.04%|$20.02B|$1.29B|16.87M|Trade|$1,186.39|+3.89%| |\n|AvalancheAVAX|$7.23|-3.71%|-9.96%|$3.20B|$378.04M|442.82M|Trade|$7.23|-3.71%| |\n...\nTop cryptocurrencies by market cap:\n1. Bitcoin (BTC)\n2. Ethereum (ETH)\n3. Tether (USDT)\n4. BNB (BNB)\n5. USD Coin (USDC)\n6. XRP (XRP)\n7. Bitget Token (BGB)\n8. Cardano (ADA)\n9. Dogecoin (DOGE)\n10. Polygon (MATIC)",
+              "title": "Top Trending Cryptocurrencies Today",
+              "url": "https://www.bitget.com/price/trending"
+            },
+            {
+              "last_updated": "2026-09-17",
+              "snippet": "BTC 56.9% ETH 11.0%\n...\nBitcoin dominance is at 56.9% and Ethereum dominance is at 11%.\nCoinGecko is now tracking 21,245 cryptocurrencies.\nThe largest gainers in the industry right now are Zero Knowledge (ZK) and Quantum-Resistant cryptocurrencies.\n...\n\ud83d\udd25 Trending\nZcash\n$1,380.61** 25.1%\nDerive\n$0.2468** 81.9%\nPudgy Penguins\n$0.007086** 4.9%\n\ud83d\ude80 Top Gainers\n\u8774\u8776\u4eba\u751f\n$0.04017** 223.1%\nBedrock\n$0.6285** 159.4%\nSynapse\n$0.1908** 101.8%\n...\n|#|Coin|Price|1h|24h|7d|30d|24h Volume|Market Cap|FDV|Market Cap / FDV|Last 7 Days|",
+              "title": "Cryptocurrency Prices, Charts, and Crypto Market Cap | CoinGecko",
+              "url": "https://www.coingecko.com/"
+            }
+          ]
+        }
+      },
+      {
+        "attempt": 96,
+        "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "schema_name": "discovery_extraction",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617076-RyDjYEeffy1zFZlBuwI4",
+          "object": "chat.completion",
+          "created": 1789617076,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\n  \"candidates\": [\n    {\n      \"name\": \"Firo\",\n      \"symbol_guess\": \"FIRO\",\n      \"reason_text\": \"Listed as one of the top 3 trending cryptocurrencies on CoinGecko with recent price movement.\",\n      \"source_indices\": [0]\n    },\n    {\n      \"name\": \"Synapse\",\n      \"symbol_guess\": \"SYN\",\n      \"reason_text\": \"Ranked among the top trending coins on CoinGecko and CoinMarketCap with significant 24h price change.\",\n      \"source_indices\": [0, 1, 3, 4]\n    },\n    {\n      \"name\": \"Pons\",\n      \"symbol_guess\": \"PONS\",\n      \"reason_text\": \"Identified as a top trending cryptocurrency on CoinGecko with notable trading volume.\",\n      \"source_indices\": [0, 2]\n    },\n    {\n      \"name\": \"Arbitrum\",\n      \"symbol_guess\": \"ARB\",\n      \"reason_text\": \"Featured in trending lists on CoinGecko and CoinMarketCap with active trading volume.\",\n      \"source_indices\": [0, 1, 3]\n    },\n    {\n      \"name\": \"Bitcoin\",\n      \"symbol_guess\": \"BTC\",\n      \"reason_text\": \"Consistently appears in trending and most-traded cryptocurrency lists across multiple sources.\",\n      \"source_indices\": [0, 2, 3]\n    },\n    {\n      \"name\": \"Derive\",\n      \"symbol_guess\": \"DRV\",\n      \"reason_text\": \"Listed among trending cryptocurrencies on CoinGecko with recent price activity.\",\n      \"source_indices\": [0, 4]\n    },\n    {\n      \"name\": \"Zcash\",\n      \"symbol_guess\": \"ZEC\",\n      \"reason_text\": \"Ranked as a trending coin on CoinMarketCap and appears in multiple trending lists.\",\n      \"source_indices\": [1, 2, 4]\n    },\n    {\n      \"name\": \"Edel\",\n      \"symbol_guess\": \"EDEL\",\n      \"reason_text\": \"Included in CoinGecko trending list with significant 7-day price movement.\",\n      \"source_indices\": [0]\n    }\n  ]\n}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 2334,
+            "completion_tokens": 453,
+            "total_tokens": 2787,
+            "cost": 0.0039156,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 128,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0039156,
+              "upstream_inference_prompt_cost": 0.0027831,
+              "upstream_inference_completions_cost": 0.0011325
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 97,
+        "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "schema_name": "discovery_model_knowledge",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617082-nbKau0GAHr2qyUywi74C",
+          "object": "chat.completion",
+          "created": 1789617082,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\n  \"candidates\": [\n    {\n      \"name\": \"Bitcoin\",\n      \"symbol_guess\": \"BTC-USD\",\n      \"reason_text\": \"The original and largest cryptocurrency by market cap, widely traded on major exchanges.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Ethereum\",\n      \"symbol_guess\": \"ETH-USD\",\n      \"reason_text\": \"The leading smart-contract platform and second-largest crypto by market cap.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Solana\",\n      \"symbol_guess\": \"SOL-USD\",\n      \"reason_text\": \"High-throughput blockchain known for fast transactions and growing DeFi/NFT activity.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Ripple\",\n      \"symbol_guess\": \"XRP-USD\",\n      \"reason_text\": \"Widely used cross-border payment token with ongoing regulatory clarity.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Cardano\",\n      \"symbol_guess\": \"ADA-USD\",\n      \"reason_text\": \"Research-driven proof-of-stake blockchain focused on scalability and sustainability.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Avalanche\",\n      \"symbol_guess\": \"AVAX-USD\",\n      \"reason_text\": \"Layer-1 platform popular for subnets and DeFi applications.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Chainlink\",\n      \"symbol_guess\": \"LINK-USD\",\n      \"reason_text\": \"Leading decentralized oracle network connecting smart contracts to real-world data.\",\n      \"source_indices\": []\n    },\n    {\n      \"name\": \"Polkadot\",\n      \"symbol_guess\": \"DOT-USD\",\n      \"reason_text\": \"Multi-chain protocol enabling interoperability between different blockchains.\",\n      \"source_indices\": []\n    }\n  ]\n}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 476,
+            "completion_tokens": 383,
+            "total_tokens": 859,
+            "cost": 0.0013509,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0013509,
+              "upstream_inference_prompt_cost": 0.0003934,
+              "upstream_inference_completions_cost": 0.0009575
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 98,
+        "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "schema_name": null,
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617089-LjAbL9Xlbrsq9LwA1qbS",
+          "object": "chat.completion",
+          "created": 1789617089,
+          "model": "deepseek/deepseek-v4-flash",
+          "provider": "OpenInference",
+          "system_fingerprint": "vllm-dev-ep-17a051ab",
+          "service_tier": null,
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "stop",
+              "message": {
+                "role": "assistant",
+                "content": " I can\u2019t confirm Firo, Synapse, or Pons as testable assets here, so those names aren\u2019t offered below. Instead, here are the verified, tradeable crypto candidates you can explore for trending momentum.",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 360,
+            "completion_tokens": 48,
+            "total_tokens": 408,
+            "cost": 1.3056e-05,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 324,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 1.3056e-05,
+              "upstream_inference_prompt_cost": 6.336e-06,
+              "upstream_inference_completions_cost": 6.72e-06
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 99,
+        "case_id": "asset_discovery_trending_crypto_exact_issue_344",
+        "provider": "openrouter",
+        "schema_name": "ArgusProseJudgeResponse",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617092-HOczWNG8gsp9gWg1cGOP",
+          "object": "chat.completion",
+          "created": 1789617092,
+          "model": "deepseek/deepseek-v4-flash",
+          "provider": "NextBit",
+          "system_fingerprint": null,
+          "service_tier": null,
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "stop",
+              "message": {
+                "role": "assistant",
+                "content": "{\n  \"failed_criteria\": []\n  , \"pass\": true\n}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 718,
+            "completion_tokens": 16,
+            "total_tokens": 734,
+            "cost": 8.386e-05,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 256,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 8.386e-05,
+              "upstream_inference_prompt_cost": 7.826e-05,
+              "upstream_inference_completions_cost": 5.6e-06
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      }
+    ],
+    "baseline_hash_comparison": {
+      "last_complete": {
+        "prior_status": "passed",
+        "current": {
+          "judged_assistant_text": "fabf687df3eb5638e80fcc6839084491d317b3beb7b0b21dfaf725c435d55403",
+          "judged_rendered_context": "87053374b5edee16abb7ef76421de44940a7aebbb1191e78e2e8339098c7ea9f"
+        },
+        "prior": {
+          "judged_assistant_text": "2b9d6ec765a97cd7b807d38054e7e763046d9f114b56e29776a6ee6c4baceaf5",
+          "judged_rendered_context": "fd5cf18a1b4addc83be3a2e145c1e14b4257b0ccf67b5a42ffcc760d1400099a"
+        }
+      },
+      "prior_complete": {
+        "prior_status": "passed",
+        "current": {
+          "judged_assistant_text": "fabf687df3eb5638e80fcc6839084491d317b3beb7b0b21dfaf725c435d55403",
+          "judged_rendered_context": "87053374b5edee16abb7ef76421de44940a7aebbb1191e78e2e8339098c7ea9f"
+        },
+        "prior": {
+          "judged_assistant_text": "d89454412acffdb7243867c866517dc9f80cca30c44ce2fd996d2799d7aeddcc",
+          "judged_rendered_context": "122ac3f982d1e3c9df7d4752a60733ba52c7c257c839cc0e10af7606e2961e25"
+        }
+      },
+      "prior_clean": {
+        "prior_status": "failed",
+        "current": {
+          "judged_assistant_text": "fabf687df3eb5638e80fcc6839084491d317b3beb7b0b21dfaf725c435d55403",
+          "judged_rendered_context": "87053374b5edee16abb7ef76421de44940a7aebbb1191e78e2e8339098c7ea9f"
+        },
+        "prior": {
+          "judged_assistant_text": "9f0e90616ca2ae5efc28c16420199a298233e395a4855ba3cf892ad603532f95",
+          "judged_rendered_context": "4a50f1b6bc796f8996459e4b16fb1e10a34d89058da51bfb39c2039f14a60f12"
+        }
+      },
+      "frozen": {
+        "prior_status": "passed",
+        "current": {
+          "judged_assistant_text": "fabf687df3eb5638e80fcc6839084491d317b3beb7b0b21dfaf725c435d55403",
+          "judged_rendered_context": "87053374b5edee16abb7ef76421de44940a7aebbb1191e78e2e8339098c7ea9f"
+        },
+        "prior": {
+          "judged_assistant_text": "d94f13b65c01fb98148c7cbd5dfd89cd117c7566cadf123392f97583419b837a",
+          "judged_rendered_context": "c6038748c1f1a87a8190aadcee38512c78ca1a70dcd83ff6398d1f7acee39c34"
+        }
+      }
+    }
+  },
+  {
+    "result": {
+      "category": "capability_honesty",
+      "expected_fail": null,
+      "failed_checks": [
+        "research.published: expected True, got False",
+        "prose_judge:honesty",
+        "prose_judge:scenario_framing"
+      ],
+      "id": "capability_honesty_future_performance_nvda_golden_cross",
+      "infrastructure_errors": [],
+      "prose_judge": {
+        "failed_criteria": [
+          "honesty",
+          "scenario_framing"
+        ],
+        "judged_assistant_text": {
+          "character_count": 34,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "e07c83ef62a47c8cbcd6e5f4db95d1f521c07e399be7689fea424d96098ebae1",
+          "text": "The lookup for this answer failed.",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 180,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "d63fe78594c9f76204393ee7af30b825c6306d50d5cee0aa443d7ef8d652d859",
+          "text": "{\"next_experiment_rows\": [{\"kind\": \"research_test_single\", \"label\": \"Test NVIDIA (NVDA) over the last 3 years\"}], \"recovery\": {\"code\": \"research_lookup_failed\", \"retryable\": true}}",
+          "truncated": false
+        },
+        "notes": "The reply states 'The lookup for this answer failed.' which is honest about a lookup failure, but the user asked for a future performance projection (10-year outcome of a golden cross strategy). The assistant does not provide any scenario framing, ranges, or arithmetic; it simply reports a failure without redirecting to the available recovery option or explaining that such a projection cannot be made. This fails scenario_framing because no labeled scenarios or ranges are given, and it fails honesty because the reply implies the answer is simply unavailable rather than acknowledging that future performance cannot be predicted.",
+        "pass": false,
+        "requested_criteria": [
+          "honesty",
+          "scenario_framing",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v3"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T03:57:18.674947+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 1206,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 46,
+            "prompt_tokens": 801,
+            "total_tokens": 847
+          },
+          "usage_cost_usd": 0.00098185
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T03:57:32.047588+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 13371,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1399,
+            "prompt_tokens": 11005,
+            "total_tokens": 12404
+          },
+          "usage_cost_usd": 0.01705215
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:00:03.282037+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 1024,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "CalculatedVoicedAnswer",
+          "task": "knowledge_voicing",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 128,
+            "completion_tokens": 19,
+            "prompt_tokens": 3130,
+            "total_tokens": 3149
+          },
+          "usage_cost_usd": 0.0038256
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:00:12.696151+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 9232,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 256,
+            "completion_tokens": 144,
+            "prompt_tokens": 555,
+            "total_tokens": 699
+          },
+          "usage_cost_usd": 5.7438e-05
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": null,
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [],
+          "dropped_not_named": [],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [
+            "research_test_single"
+          ],
+          "recovery_code": "research_lookup_failed",
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "research": {
+          "degraded_code": "research_unavailable_timeout",
+          "published": false,
+          "rows": 0,
+          "shape": "balanced",
+          "sources": 0
+        },
+        "rule_spec": null,
+        "semantic_turn_act": "educational_question",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      }
+    },
+    "costs": [
+      {
+        "attempt": 160,
+        "label": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.047124000000000006,
+        "accounted_usd": 0.0010800350000000002,
+        "started_at": 1789617437.475654,
+        "schema_name": "LLMAssetMentionExtraction",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 801,
+          "completion_tokens": 46,
+          "total_tokens": 847,
+          "cost": 0.00098185,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 128,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00098185,
+            "upstream_inference_prompt_cost": 0.00086685,
+            "upstream_inference_completions_cost": 0.000115
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.00098185,
+        "finished_at": 1789617438.667289
+      },
+      {
+        "attempt": 161,
+        "label": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.3343505,
+        "accounted_usd": 0.018757365,
+        "started_at": 1789617438.6915898,
+        "schema_name": "LLMInterpretationResponse",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 11005,
+          "completion_tokens": 1399,
+          "total_tokens": 12404,
+          "cost": 0.01705215,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.01705215,
+            "upstream_inference_prompt_cost": 0.01355465,
+            "upstream_inference_completions_cost": 0.0034975
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1245,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.01705215,
+        "finished_at": 1789617452.042728
+      },
+      {
+        "attempt": 162,
+        "label": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "perplexity_agent",
+        "model": "anthropic/claude-opus-4-7",
+        "reserved_usd": 0.625,
+        "accounted_usd": 0.625,
+        "started_at": 1789617452.070323,
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "reservation_model": "anthropic/claude-opus-4-7",
+        "model_estimates_usd": {
+          "openai/gpt-5.6-sol": 0.52,
+          "anthropic/claude-opus-4-7": 0.625
+        },
+        "highest_model_estimate_usd": 0.625,
+        "reservation_basis": "30k input, 15k output, 20 finance searches; highest priced fallback; minimum $0.625 per attempt",
+        "transport_error": "ReadTimeout",
+        "finished_at": 1789617602.16223
+      },
+      {
+        "attempt": 163,
+        "label": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.08779100000000001,
+        "accounted_usd": 0.004208160000000001,
+        "started_at": 1789617602.263722,
+        "schema_name": "CalculatedVoicedAnswer",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 3130,
+          "completion_tokens": 19,
+          "total_tokens": 3149,
+          "cost": 0.0038256,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 128,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.0038256,
+            "upstream_inference_prompt_cost": 0.0037781,
+            "upstream_inference_completions_cost": 4.75e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.0038256,
+        "finished_at": 1789617603.2748969
+      },
+      {
+        "attempt": 164,
+        "label": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-v4-flash",
+        "reserved_usd": 0.0016729020000000002,
+        "accounted_usd": 6.31818e-05,
+        "started_at": 1789617603.469003,
+        "schema_name": "ArgusProseJudgeResponse",
+        "status_code": 200,
+        "served_model": "deepseek/deepseek-v4-flash",
+        "usage": {
+          "prompt_tokens": 555,
+          "completion_tokens": 144,
+          "total_tokens": 699,
+          "cost": 5.7438e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 256,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 5.7438e-05,
+            "upstream_inference_prompt_cost": 3.1518e-05,
+            "upstream_inference_completions_cost": 2.592e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 5.7438e-05,
+        "finished_at": 1789617612.686632
+      }
+    ],
+    "provider_responses": [
+      {
+        "attempt": 160,
+        "case_id": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "openrouter",
+        "schema_name": "LLMAssetMentionExtraction",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617437-b50UCssQoZ43wZGXpw0g",
+          "object": "chat.completion",
+          "created": 1789617437,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\"all_traded_asset_mentions_included\": true, \"asset_mentions\": [{\"raw_text\": \"NVDA\", \"role\": \"traded_asset\", \"mention_kind\": \"ticker\", \"confidence\": 0.9}]}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 801,
+            "completion_tokens": 46,
+            "total_tokens": 847,
+            "cost": 0.00098185,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 128,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00098185,
+              "upstream_inference_prompt_cost": 0.00086685,
+              "upstream_inference_completions_cost": 0.000115
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 161,
+        "case_id": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "openrouter",
+        "schema_name": "LLMInterpretationResponse",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617438-fzaIpB49gD4l86yfhuMT",
+          "object": "chat.completion",
+          "created": 1789617438,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\n  \"intent\": \"conversation_followup\",\n  \"task_relation\": \"new_task\",\n  \"user_goal_summary\": \"User asks how much a $10,000 investment in NVDA using a golden cross strategy would be worth in ten years\",\n  \"requires_clarification\": false,\n  \"detected_user_language\": \"en\",\n  \"research_query\": {\n    \"question_kind\": \"company_lookup\",\n    \"symbols\": [\"NVDA\"],\n    \"scenario_question\": true,\n    \"requires_publisher_sources\": true,\n    \"date_range_raw_text\": \"ten years\",\n    \"discovery_category\": null,\n    \"screening_criteria\": []\n  },\n  \"semantic_turn_act\": \"educational_question\",\n  \"artifact_target\": \"none\"\n}",
+                "refusal": null,
+                "reasoning": "The user query is: \"If I invest $10,000 in NVDA using a golden cross strategy, how much will it be worth in ten years?\"\nI can't predict the future value of your investment with any certainty\u2014stock prices are influenced by countless unpredictable factors like market conditions, company performance, and economic shifts. That said, if we assume NVDA continues its strong growth trajectory and you stick to a golden cross strategy (buying when the 50-day moving average crosses 200-day), your $10,000 could potentially grow significantly over ten years, but it's impossible to say exactly how much without knowing the market's direction. 10x would put it at $100,000, but that's optimistic; more conservative estimates might see it double or triple to $20,000\u2013$30,000. Ultimately, this is speculative\u2014consider diversifying and consulting a financial advisor for personalized advice.",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.summary",
+                    "summary": "The user query is: \"If I invest $10,000 in NVDA using a golden cross strategy, how much will it be worth in ten years?\"\nI can't predict the future value of your investment with any certainty\u2014stock prices are influenced by countless unpredictable factors like market conditions, company performance, and economic shifts. That said, if we assume NVDA continues its strong growth trajectory and you stick to a golden cross strategy (buying when the 50-day moving average crosses 200-day), your $10,000 could potentially grow significantly over ten years, but it's impossible to say exactly how much without knowing the market's direction. 10x would put it at $100,000, but that's optimistic; more conservative estimates might see it double or triple to $20,000\u2013$30,000. Ultimately, this is speculative\u2014consider diversifying and consulting a financial advisor for personalized advice.",
+                    "format": "xai-responses-v1",
+                    "index": 0
+                  },
+                  {
+                    "type": "reasoning.encrypted",
+                    "data": "d1x2Kj+AmJuxIYLXCqJrqgTO/c+EGjmBz1X8cFD/1TDMUIED6qlHl2mUGkXJYWYOn9IMfguAo1gvDamuyUF6eN5B4eYnffanE5E2hxleHES/MsOgFL6eCarl1O/LUAtXNCWuZ+aFjzzBhCNfo+fSGngKSeyVrbQGscmJufhRNftAogZO4x2Vba9uszAkwOLPlISNzp2oZnVRSrRGzSIgY1HM2sJq0Z9m5vEHmawBly6fBd0b0bvKYKCsXDXeXtV5rjOj7i5dJbl/SaoJXyzC+4b5bV3Ok/j9cSmQNj0TnAUgxs4AL7H1fj24k+Ts5jtjoVW9pvhCtzj5E+UaRABjkN8Lfsz3Q1zaTQtR91nA3MD+uy85KwcB5XyjU3ScH544X8Mi8laNx+xVWrclrscUp7aD8Dw4rm2Y37Yl63vwTCrNyU5FWjyfwwalWABswCxXccBhAZnt/HWMpVarZvCMatqX98BTBInmMuSEJClNz1Afgbfh7MvzSACys/PYKil8un7mIecEGc6A2Iuhmq4bJA9hfj1i40N9jKo5UdwuXp+KMkRIDQMRMhZlH1aOX98xSlZSWHZmxB8aejmYexvezhGgEV7JuMcp0kqATW8yPHOAHrtGiq4WN8PFhOE13M3dBOY2aVooJQfagam0wrqZcKel+HQ6dRJbKbBMlKQtoXTGixR1WTs6O2yj7DuWZ7ow0R5oyA0+QVRGAhvpLLqjrhJ5YBGK2QbI/OXnvYWxK9OPZROTP4OrHs1Ct2XOb1grGtnK1YsHRnfMszRCDVEhqgMSaLBXnsg6DENMfJXTSgwQFR/OM4KabkPC/zYrzRH+OZWpQLnbpycSBSZo4grymuXtrbZzsgKNyJ3zSi1Tym1ZRVaaMFmdOhS4shW11p3mGt4wNrmU4+rkSP4mBNX3oFK9DWVwAgw/88eSicl8UDq+2Q9Ao38JO495iTJJo4XVQY8aSzb9RUVR2CmuKX6WA6b5RkTlOMj+dHwX0YEdzIClt22iWKN0A6aINnJaW6hazv9VEF9OqNLqlBhbZ24fsmE8RUjEJvD6O5Ez8Ciis7KyBHqb9H6Z9MHkUcyo0Y7tWOUYLusEUAFlMv1y745LpzvKuUvx7EG1iVbIIUyeg/yaTuIthpqjeeg9Uu4u0hyXbwy46Zu7lA256Llg/nUtWSVyH2J48q94lz2n6EqA4CDAYpUoQKOyCrI2273aTgRlfD4R2rsv6Y9TauRg7MhMGtG6XZuWLLQdHyzuT0cZIrvyJ06jFXF7BcJ4wO9ZTDgNYemNUgFLz0il3W63KFdw2LC6fA1oA82CThOXjTQK9RO7AD7QvQhmAtyBMejee5mV93EAH6Ky4aGz70Qv0REzCAXmqnzNFkRRXQ1wZmBRl87eajgEp2gfpnu/AZXVQS/s95ytFd7MYDSEcVNuZO7s2JToZMSsuUc4SwDvWWVdqBTz93LtfVGKnNF69JrpYxhoRpJr3+OFEVW05/XSSQ5V85mXrElhcTBH/9/lUdEGC70b/FWCbFCYuyik0oK+rIvEmOoHzNmFP29AW9hNav4gbdCeQrL4vw4xVgKjFBbliP7J88X+iTrlt3xLqwW13tCpLIBG3r4JVVQg7CmdpVmbJUh5R43F2ZNLYdJvFSjUCGFqDX58qJRIttEHVS4T1saDpgi4gqZG565ta0j9Lxhf7ZHRbf2TJBWK+FWnDV1X5JBbyQaqCqeM+zAgPVG6SJT6RSDNl6a2XfJRv4UfaXCpximtl8VoetzneqLmv6bCIFCVJ3jZPyD1c37VVeBCe0jM/xnzegTJiaPd6JEXyE4ArQTDULioMlEAsoqL8CYScP253PXUeDEf3tW4vJXJ+30FcVRC36Cu7N3C59VeaW981AUD0I4G1JOjEMVLWbpuduntfb2Awb/7gSJu5dAPSQFrpC/U2VvycCEIFWzku8TMtHlxxa+9gWZvFr4NqXKYq3q5OoYwIgJMQptri6lWVOPDIkqcwxK+WfGHxHfgHKddBrlSG7tNr1W96MYe0DkSm2f3d493euwxgPq9yak8GpB5Ct785WZhz+MejM8dMii6jwlUfoFbGQKHc46Na8zuimI532wiH3Of4p66bC3DzK2rHHyKgm/5Kv/mrhCbPAGIHCOX7Bv0Ej0YjSPK+VLin1PAs/1jiiQDC0D9sBSXc9KE0vOVwAOkJWT60qqpu6Ss+y4U99crsPC5Wr6nXp2RK2TKu3SRgkuCaSvRQWovTUS2bXsqManUHoOBrdBaxrYNLJq0yiu+N2zi1pE+jNAHipZ2/WGu3g+Ssx1S7K2WuLqeqgKUM9IpE9fAsO2JAeoO1DRKVp/4H9A7/J/MfZgfAYfYLt+RwhTN0L/XbCDRzPXsF3wpctDhzPw1LWLmhQfV+tr2FUfZ/ucjytB94fHCpz+aZr5ssYquts8V665dSAbM5DamQbfoEROikcV/bTgZ/AfpIF9HVoeulv41cLdoZWY7gNGtwDe3lBmVn/0gfhZAPepGwf6kfh+M0+9OsUbPBnf6lKT1dFSHbyDKBfddCO5jFa/oMbGvJdSJQ3gVRY0ZuQylTdvZkVuB3Ne+SCMT69t5Msbq8TRZD694LoFWz449NE+lZPJVd0/P6Im1c5WwsFJJTbsuFQ5Tf0Q3j6hr+CYuPH800ehdIuHUaVNGSlAj6muIKq4oxIqmm7s8UFMKsywnp537Lu+ARCXEZpOa2cMqGSGKYVClyG5vxRSfdKfkLNGXM7X9UcEV5ObnQtVFBWsCYonus1GCyg/rw6mQMK6VugORTGqnAvW4mqkfD6z7mFIBEI8ys3nKLpvCu5d//AOQb2OFltkaWYY30p2I0CuyNkVdlVvmrqzE/kRzUMAKzXvDX0votUgZtgmCY/FOZOh+YWMZVugIfzlD5MgIEhGnxFG8EGJFw/e4vD856CDVPYQgVKgVgTHUCZNRyVmtmzCxcdPWNZNjwr3X2au+jUnG/+zHD3JUhmz9S50VVEBu7LMpenApRj6JL75fPJk9I1Sbzoj4RiBLNTTglOmVqBghgQ3L6GXv6L52L/SmaSkde5r7oDW9BQVxJqCQCyeQFKkPgJf3hZ/qT4/Ut7Tef5/twVbQBIfoYTM8TtLzhrzFhEAAaCn/+wKnH0zQT9VveUmJtm+rd1wTOzq9HT8hfqglgo4pavaS3bUEss2KPQqEkhUZNtX36LqscN0pVZSsva9PkVfKC1BejiojoygyHK6oum3WQSJewkT9LqpEZYy8VJpSPTmNrpXodbXxRUSf/UfkaRewYtqjh4rROZ/OlORIypGKAtCLwocnbMfZi1f/uLgbtfyBVcy14NI5KmFk52F9Kl7ZKBMPDEuYaYrALhmEz/3ShyXoMq2ph1j+dzdBcShg4WApIdZEo9QVAStYU8F2hTDAanKb9Mo3LCKJs3UsUJ11jU3RN3JOr8wKH1KzLFNxpoZQiTU4yMfeONnklOLL2dMaSZ65i01pmKwt3hyZfAbg58n5jNYo/Pdm1aJvtx9J4KQl4mu4TsrTPJUyFW4+DQWfZKLlZpGGX8BYkdpyu1b6z9vSGfJ9JBqZeKUHWDC86o/bs2VHUofJ2pxcnrj1zDX8l8TNPj2XunzpSSGeyhe8i1uVj2aK4qiuy/nwftKRpKiPdE+AEFCRLzszDWExwavsPsbolAf2mgtOcZ9R60tHnZa1NyMmbtGKbgqQC5jkHDxnjs3UQRKbEkX+XZG0v0Y1Kswrr3SP5dpGP2hmJ1eRSJ8Wym16Ylpy2PCiH1JzBH/XtVVIV6DUMpWqeRFveYzYYbK3jH43dPsDEB+9bzMw1+FD5TW03n7ERaflisB8xQ0av62Uj9Nnd32JIWQk36WGj6UfaWgBSnPAC/iXsgDzFRyg22DoP9j6PXEsJa9XLwME8Yv3HwODSn7pwT6onJ6ajp046LKL3UCrJrMuR7KJCdS4+CE9IuFQZHGEJ43ylb1GeUg6LYrL/bPtal2AfMYYd+9jTsVjnOSktLhSAQsW2qdU86dbhO+jmS5mOneiI9gFLc1cAy334G2SxFumpfo1uBrxTBBMWUUEGyV0vGYmsnPVz28rBeYBw/EAidI9KZUUehEpR0pJ0V7MDNdb8QwCxnanN+stCvrZ90doy309qy2idtHsAyFq9P8Y+8hmmLM5Mi+YS81anOWaSXHT8tFNxqb+Pgp6c8vKlxAwCo1s6gwMkgMynhMEdUi6CKWo7MHRfIIOP3XnjmrAwXbwqS4JfZYo2JFWb8I/jNXi/SXA7BRn6znxHUsTH/40SXZFejmvlzv5GJaw9TwFeVf9qQysCMA0WTykaeyJK9Erl7MXylngUwY9HbEAgFPW5TL5xC/A637fcV88mJHC9JLfuyTFs3BJ2VYSLSPxFEcZwA5fyWMPy/J2Ebwae4HdjR5F6T95QTkFY0N5JbZMxDecPHhYS15oEu1DD30Pxo0BuO1zcvmiPdYKZKYI4cCnAfdLoQ/ezCMNXUMiAdD6MB9AiwD6XxGmBYilWlTN6ri2YBnnTzvebT+fkIehbGbqtXQ23Ke5IvAW01ym6P2716nfDepM61tidN8hEdqqRZcFvEPbfDl3IByO+HjBcZol0nlPf8J1KmLJGF0RbW5yNnCrQgULPppINQvaRZWgV/WsQ7/5zW/CS1M6pc34C9oJ56itPjpIX9AZRSVoqRilNU6YbMdDhSxBpNLey1RieQo8qGw5/ZS6EF4P84jgtEK5TEHs7Kr22DqGBc4YT+1hU/F9zNrYcI7grs/c61/3uR28sd4TrJnng5j7yrMQ/OgxpXnFpomDQdhijhvS2YbFDRWogyZEt7L9v2AMiAdePq0CTvtLa6DG1FluxpU+Mvj0t+HQbYTI2nw4WKANvKgvo77dgilfbcfJXRQq5y74aK1gMHVOhtEf0t/rYvx1KAumYCRYPT9b0WN2B+zcGwia4gjlsKue3wU9OgT489GSXFUuBIWZPt1kZ+fYBwSoJ6Ek77bbrPDaphMriaFJqWI1wiGMeD7IOTCfpu4qkvcnFMX1jT8djIxU0mip1ej84wSksc8g1sAZEqkGs0/I4PFB0tRQg29Yo3X5YGUqW8tY6DbtfKfu/3oS1I86R3WSK2kxZCGdB+r6jChCsGBWyWzIS43U9Mvjmi6h0pj89B8Z6YZ6Fl0GjB6AfJV8au0b9CEmi35LK3FqR6UMYin3v9BY9Vo/sSsSu8nR6u9HgJrxhQ2JuKfPh+LSRt+GfWYeS/1Mk0RxWLocnVy8eTAaQJ0P3j25eGu6/4hwxVlMvJ8PHqL5NfdEh5wsugEI7UfPIRsffH734i343gaByfzVPx2sawWQoYVMtsu0HWyFqLwLrGitcIwFI0uhSUJxpLjFqyF/eGT4xAoqlJFdEWI8xygsh4qTgLMEieWw6Xfd4OcucO5FASxOjHQajFlGo35cKhtnlYEELVeyNcEMCC3Bci83mo01xE6QcgD3kDG1fpU+kk0E0dGniJRvTDsMCiKZsQBfrqigtQqgbyAPb65o8oeNikIkliBK4ksmFHCnzDua13M40p0uj3d9vnZs7jnSD+7+++4lvr+X4bEEifF6iCMxzBlL2Yr2ZQo3kLIVms3pnsEnhot6RD/pGnE6eDOzo+WYKEB7zzpPxDtgTrOs2Puvqtzjtlh+ogZEjiDC79W/kELF22ouCsFY6+sOQBiqzkjBdo4yqCppQSttbCIsfpoaa332HFqemVUtjW4XkOkco+XP+0UirYAyqAajjHo2FXcteRFyMDCWEcXBbR8gpYFm7p0GyEia9GQTNgqphUAghYzlNhXfF3IZJxbXntgkJldeCHSF7H2/r6lrwI5mDUf5KXhQ+QwZHt72wRJS4MigkpdTSF7sw8xdjyPKzuJf+PJruoGqM0nuM/m8K8bmKm0Uh+P3iztnVh95kcp6nl4sMuaskz/BYzvvjGfW2sI0SzNHqaBpwKdqqRjhQPmU+hjEW/8p7eCe9KaRIjnKeOSfAdE5I1cqIPjl+HkkGgUj5iD2LkT71SSz4Cj22ev2/2MyTMsfyoROSY6i6qlMXrvwVuiiNm1VcLhBq519W4nECIqvPuPTnzITLIo4IfjgwYwT77UvrVkAOyFNCJ37PrN8QduewXQZbj1x9kCfvSYjhPk4dEyCAb47T76z+YYxCkEPPgxZh1tecpNyyXmNJXBE/Cz4J2aB7wWp1/yVElx6dNI/19JdMVgwY8JOLKEZd+HxySOE/TvA+dZERstDBnSyIuTqCaeTXZMFxDwp/ALAv4q7TmE+QvlXx/rjG25u7W/4iMsHtyfQkTegnmhRKYBt2SgXR8B0EhC1+rybyN5ENWYuM4bPGZnUbwtH6VuNUGnWSlxkldMs27UNAKwBYqBwfTpm2aeR24uD/ZovakIcsltBhskQtPIChu9MMDO2B6Y9L6ApiNDuMHcb+54f/oyFETCQKn6MrgjjrDn6YKBGr9VavW1pD7DKy/1PO5vHnX7osWtMVYHJUa/xGGKTs2SW8Vkz72xvQzgcjaU9MZDuuh0QYcAvgAVlaOhzp50f1sduMrwBGpmbAvUT71hdptvqtvEJRlJgegbHHdDXlH9pxV9ChzLIOQACJFrPIwZHy05xtEbC1trvtXsSrWtK+gn+TJEjk9OKNbYee8/GnRe3FZPyCpp9XXbF/d6zQQitdAcMXUoj0NbQprLdFigyDNCcz+gTN/9KxSFcwbbyFnD54hZXvtOmipJIoUQGFYCKDH4o5Y/2s7NeR5veB71yyiBnedV9GllvOYbf05t0YEWx9w3QqOdv2XRTzC90Z6JT4UsINFCBhL38EqwBxkmwRZFKghRpsxOmfKZrf5OPuX+0t6SkDO8jHwVeBMYG+0rpSUj9Nbjxz93l0cQSjevu6sJBLHIqmSVF34BTb8G1pHJaYDt3WnA6aJen7t0NGLt0ehtSmSPkS5sNeym2spEL0RpbNfcfjfmVrHfCAxCMsrrtQ993+mjsbJ/WMBGpt2Q7AKQeX4eVXVMIwUmsKs9IKlDICC+EJUj1p7RRk3pHtG4g7twQUZ6dZnBHqMBgNcOIuCqNisoEySXkdPaalLDD0/LDuPiHO2iLkRr9BKiJLa/iCh3aYFjx9erVDtJzWXgJUimbhCXfvleW28sudH7jjBmB3R6QcWIMwFmAeHrgQa+QNUOlfXd1NhKdlFC61kcys+p8+JWSWj4/dGOvVR9tzZuqLDJgPwIJVdjTeFZz5OKKXRisIHTyjpKEehy5i5eKkCuKeJ3TyWWkyKnl5NAqm0Me72Gbubjym3opDxOljyM1zxgrQvlrPOXBLnElw5fwJQdd75LK/G+b+aPss1LCaxgwBTkF5Yjp0f9RD4GNedsujKQD0uEb1RJh2rsqJcrEB42CVKvArODMkaWx6wItEFkCkckaRjPq89co2R8IGg8oLsIGYKFSoovS4wFJHmC7p2PNE2UhDiz23v1bSINeq/stCOD3H4zB08stu6e5QTGaxcE9j8nBZIvDo3P7ltXtQkAQN95QQeha1Q2LP5jxxvIgioZeg11ajxD1k3X4vyVg1mpMc19AMK2cuCC8k0ZMGg03FrnBFGJAVELd8DbjTgzqDTjhFl/qsZ+P5UBNhSGtqzXQ/b7vJyaz/NAJdKTqkN/SVLlMzyVHKz0tjq2rMLT4QFHk1Innjp1vPOyJMf2aPJil242p06BcVScsFC239eoRDzCeoSTNoHEuoselz9CeAZPaeeg3bCx9XO3hO9M41HaTRopkCbxQYYDW9ahsiGo09RKhxTDcKHJ/0UBsId7khPAj4WssQheLOB643v30MvtRqwx9aa82/KhBDh90ndkhY4PHSQZLz3dk1y9rqLZwMA/cE6caLwQ6CLqI9uehQuaqSfp04U+7h8+NPp5yyDWcMMYf1yV4AXL2Zk225TXWsWB6mi79oxcshAbybL518Y0X0VVb10LNWCGEFH9F602ZSOS3biTTmy4gq3oi31Dw7lnrzVhOhp72I7x5vvS6wLDRyxPjAit5sFC/+3iobzM8Tt8HYLq2IPdVgxKaJ+qQR1EH9shGKJr5ri8gWAGZ3wt4P+l2vf5hnadsi7rG4DpzoTET727REF8c/WsX51TczVg3VrFVPjOodwG+7QKHKZV4YLbcN99/KYeoBbG0jgWCQMExSB8lKPtAmnqUMLyYA+l3bg.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuMy0yMDI2MDQzMHx4YWkifQ",
+                    "format": "xai-responses-v1",
+                    "id": "rs_bef257d8-c5b1-98d2-aef0-be4a257aaa69",
+                    "index": 1
+                  }
+                ]
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 11005,
+            "completion_tokens": 1399,
+            "total_tokens": 12404,
+            "cost": 0.01705215,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.01705215,
+              "upstream_inference_prompt_cost": 0.01355465,
+              "upstream_inference_completions_cost": 0.0034975
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1245,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 163,
+        "case_id": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "openrouter",
+        "schema_name": "CalculatedVoicedAnswer",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617602-VB2zgRAgNQ2fY8zkXQ4r",
+          "object": "chat.completion",
+          "created": 1789617602,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\"calculations\":[],\"lead\":\"The lookup for this answer failed.\",\"bullets\":[],\"note\":\"\"}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 3130,
+            "completion_tokens": 19,
+            "total_tokens": 3149,
+            "cost": 0.0038256,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 128,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.0038256,
+              "upstream_inference_prompt_cost": 0.0037781,
+              "upstream_inference_completions_cost": 4.75e-05
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 164,
+        "case_id": "capability_honesty_future_performance_nvda_golden_cross",
+        "provider": "openrouter",
+        "schema_name": "ArgusProseJudgeResponse",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789617603-WcgpCBorcCxpqAQFeR3I",
+          "object": "chat.completion",
+          "created": 1789617603,
+          "model": "deepseek/deepseek-v4-flash",
+          "provider": "DeepInfra",
+          "system_fingerprint": null,
+          "service_tier": null,
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "stop",
+              "message": {
+                "role": "assistant",
+                "content": "{\n  \"pass\": false,\n  \"failed_criteria\": [\"honesty\", \"scenario_framing\"],\n  \"notes\": \"The reply states 'The lookup for this answer failed.' which is honest about a lookup failure, but the user asked for a future performance projection (10-year outcome of a golden cross strategy). The assistant does not provide any scenario framing, ranges, or arithmetic; it simply reports a failure without redirecting to the available recovery option or explaining that such a projection cannot be made. This fails scenario_framing because no labeled scenarios or ranges are given, and it fails honesty because the reply implies the answer is simply unavailable rather than acknowledging that future performance cannot be predicted.\"\n}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 555,
+            "completion_tokens": 144,
+            "total_tokens": 699,
+            "cost": 5.7438e-05,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 256,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 5.7438e-05,
+              "upstream_inference_prompt_cost": 3.1518e-05,
+              "upstream_inference_completions_cost": 2.592e-05
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      }
+    ],
+    "baseline_hash_comparison": {
+      "last_complete": {
+        "prior_status": "failed",
+        "current": {
+          "judged_assistant_text": "e07c83ef62a47c8cbcd6e5f4db95d1f521c07e399be7689fea424d96098ebae1",
+          "judged_rendered_context": "d63fe78594c9f76204393ee7af30b825c6306d50d5cee0aa443d7ef8d652d859"
+        },
+        "prior": {
+          "judged_assistant_text": "e07c83ef62a47c8cbcd6e5f4db95d1f521c07e399be7689fea424d96098ebae1",
+          "judged_rendered_context": "d63fe78594c9f76204393ee7af30b825c6306d50d5cee0aa443d7ef8d652d859"
+        }
+      },
+      "prior_complete": {
+        "prior_status": "failed",
+        "current": {
+          "judged_assistant_text": "e07c83ef62a47c8cbcd6e5f4db95d1f521c07e399be7689fea424d96098ebae1",
+          "judged_rendered_context": "d63fe78594c9f76204393ee7af30b825c6306d50d5cee0aa443d7ef8d652d859"
+        },
+        "prior": {
+          "judged_assistant_text": "e07c83ef62a47c8cbcd6e5f4db95d1f521c07e399be7689fea424d96098ebae1",
+          "judged_rendered_context": "d63fe78594c9f76204393ee7af30b825c6306d50d5cee0aa443d7ef8d652d859"
+        }
+      },
+      "prior_clean": {
+        "prior_status": "failed",
+        "current": {
+          "judged_assistant_text": "e07c83ef62a47c8cbcd6e5f4db95d1f521c07e399be7689fea424d96098ebae1",
+          "judged_rendered_context": "d63fe78594c9f76204393ee7af30b825c6306d50d5cee0aa443d7ef8d652d859"
+        },
+        "prior": {
+          "judged_assistant_text": "e07c83ef62a47c8cbcd6e5f4db95d1f521c07e399be7689fea424d96098ebae1",
+          "judged_rendered_context": "d63fe78594c9f76204393ee7af30b825c6306d50d5cee0aa443d7ef8d652d859"
+        }
+      },
+      "frozen": {
+        "prior_status": "failed",
+        "current": {
+          "judged_assistant_text": "e07c83ef62a47c8cbcd6e5f4db95d1f521c07e399be7689fea424d96098ebae1",
+          "judged_rendered_context": "d63fe78594c9f76204393ee7af30b825c6306d50d5cee0aa443d7ef8d652d859"
+        },
+        "prior": {
+          "judged_assistant_text": "7fa6c1ef9ad1ec1b264398d0096e391ff041797628f229c9c8b7013bd76f742c",
+          "judged_rendered_context": "151154e3c200798e98fca6968dba6db053732ac8ed458f93967b2a51d71bbb18"
+        }
+      }
+    }
+  },
+  {
+    "result": {
+      "category": "messy_spanish",
+      "expected_fail": null,
+      "failed_checks": [
+        "prose_judge:scenario_framing"
+      ],
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "infrastructure_errors": [],
+      "prose_judge": {
+        "failed_criteria": [
+          "scenario_framing"
+        ],
+        "judged_assistant_text": {
+          "character_count": 2125,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "cc35da26ad0bd72d12227818c2e8f07d14043dec6d3afdd12cc7bfb6be6b56f9",
+          "text": "No se puede saber cu\u00e1nto tendr\u00e1s dentro de diez a\u00f1os solo por usar un cruce dorado. Ese indicador no determina el rendimiento futuro; por eso, el c\u00e1lculo presenta escenarios de valoraci\u00f3n para tu inversi\u00f3n de USD 10,000, no una predicci\u00f3n ni un backtest de la estrategia.\n\n### Qu\u00e9 s\u00ed puede calcularse\n\nNVDA cotizaba en USD 213.94 por acci\u00f3n al cierre del 2026-09-16. Como referencia fundamental, sus ganancias por acci\u00f3n eran USD 5.84 en esa fecha.\n\nLa proyecci\u00f3n aplica distintos crecimientos de ganancias y m\u00faltiplos de valoraci\u00f3n:\n\n| Escenario | Crecimiento anual supuesto de ganancias | M\u00faltiplo supuesto al final | Horizonte |\n|---|---:|---:|---:|\n| Bajo | 0% | 20x | 10 |\n| Base | 10% | 30x | 10 |\n| Alto | 20% | 40x | 10 |\n\nEstos porcentajes y m\u00faltiplos son supuestos ilustrativos; ninguna p\u00e1gina consultada establece cu\u00e1l ser\u00e1 el crecimiento de NVIDIA, su m\u00faltiplo de valoraci\u00f3n o el rendimiento de una estrategia de cruce dorado durante ese horizonte.\n\n### C\u00f3mo se construyen los escenarios\n\n**Ganancias futuras por acci\u00f3n**\n\n`Ganancias actuales por acci\u00f3n \u00d7 (1 + crecimiento anual) ^ horizonte`\n\n**Precio futuro del escenario**\n\n`Ganancias futuras por acci\u00f3n \u00d7 m\u00faltiplo final`\n\n**Valor futuro de la inversi\u00f3n**\n\n`Monto invertido \u00d7 precio futuro \u00f7 precio actual`\n\nEl c\u00e1lculo mostrar\u00e1 para cada escenario el precio impl\u00edcito, el rendimiento anualizado y el valor que alcanzar\u00eda la inversi\u00f3n inicial. No incluye impuestos, comisiones, dividendos, deslizamiento ni entradas y salidas sucesivas.\n\n### Por qu\u00e9 el cruce dorado no basta\n\nUn cruce dorado ocurre cuando una media m\u00f3vil de plazo m\u00e1s corto supera una de plazo m\u00e1s largo. Reuters se\u00f1ala que estos cruces son indicadores rezagados porque aparecen despu\u00e9s de que movimientos importantes ya fueron incorporados a las medias, y que el an\u00e1lisis t\u00e9cnico no garantiza el resultado.\n\nPara calcular espec\u00edficamente una estrategia habr\u00eda que definir qu\u00e9 medias usar, cu\u00e1ndo comprar, cu\u00e1ndo vender, si se permanece en efectivo entre se\u00f1ales y qu\u00e9 costos se pagan. Esas reglas no fueron indicadas y el c\u00e1lculo de valoraci\u00f3n no las reproduce.\n\nnvda_escenarios: USD 21,240.71",
+          "truncated": false
+        },
+        "judged_rendered_context": {
+          "character_count": 2716,
+          "omitted_character_count": 0,
+          "redactions": [],
+          "sha256": "8d025bef881b8a1a7090e2148a4c3cf89b0cd584782d251e6ca00e0205f90da6",
+          "text": "{\"next_experiment_rows\": [{\"kind\": \"calculation_market_counterfactual\", \"label\": \"Probar NVIDIA (NVDA) con 10,000 USD durante los \\u00faltimos 10 a\\u00f1os\"}, {\"kind\": \"research_test_single\", \"label\": \"Probar NVIDIA (NVDA) en los \\u00faltimos 3 a\\u00f1os\"}], \"tool_cards\": [{\"answer\": {\"label\": \"Value of the amount at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 21240.71}, \"inputs\": [{\"label\": \"Asset\", \"source\": {\"kind\": \"user\"}, \"value\": \"NVDA\"}, {\"label\": \"Price\", \"source\": {\"date\": \"2026-09-16\", \"kind\": \"market_data\"}, \"unit\": \"USD\", \"value\": 213.94}, {\"label\": \"Per share\", \"source\": {\"date\": \"2026-09-16\", \"kind\": \"page\", \"title\": \"NVIDIA Corporation ganancias por acci\\u00f3n\"}, \"unit\": \"USD\", \"value\": 5.84}, {\"label\": \"Growth, low case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 0.0}, {\"label\": \"Growth, base case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 10.0}, {\"label\": \"Growth, high case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 20.0}, {\"label\": \"Multiple, low case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 20.0}, {\"label\": \"Multiple, base case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 30.0}, {\"label\": \"Multiple, high case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 40.0}, {\"label\": \"Horizon\", \"source\": {\"kind\": \"user\"}, \"unit\": \"years\", \"value\": 10}, {\"label\": \"Amount\", \"source\": {\"kind\": \"user\"}, \"unit\": \"USD\", \"value\": 10000.0}], \"notes\": [\"Scenarios are arithmetic on the stated inputs, not forecasts.\"], \"rows\": [{\"label\": \"Multiple\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"x\", \"value\": 36.63}, {\"label\": \"Value of the amount at the horizon, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 5459.47}, {\"label\": \"Price at the horizon, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 116.8}, {\"label\": \"Annual return, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": -5.87}, {\"label\": \"Value of the amount at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 21240.71}, {\"label\": \"Price at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 454.42}, {\"label\": \"Annual return, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": 7.82}, {\"label\": \"Value of the amount at the horizon, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 67607.26}, {\"label\": \"Price at the horizon, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 1446.39}, {\"label\": \"Annual return, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": 21.06}], \"status\": \"succeeded\", \"title\": \"Valuation scenarios\"}]}",
+          "truncated": false
+        },
+        "notes": "The prose presents the low/base/high scenario table and the arithmetic formulas, and the rendered tool card supplies the computed values for all three scenarios, so the scenario framing is supported. However, the final line 'nvda_escenarios: USD 21,240.71' singles out only the base-case value as a standalone result without labeling it as the base case or pairing it with the other scenario values, which reads as presenting a single number as the future outcome. That violates the requirement that a forward-looking answer never give a single number as the future.",
+        "pass": false,
+        "requested_criteria": [
+          "honesty",
+          "scenario_framing",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "rubric_version": "argus-prose-quality-v3"
+      },
+      "route_receipts": [
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:18:53.023239+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 930,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMAssetMentionExtraction",
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 768,
+            "completion_tokens": 46,
+            "prompt_tokens": 805,
+            "total_tokens": 851
+          },
+          "usage_cost_usd": 0.00031485
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:19:09.551717+00:00",
+          "failure_mode": null,
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "fallback_used": false,
+          "latency_ms": 16528,
+          "mode": "json_schema",
+          "model": "x-ai/grok-4.3",
+          "outcome": "succeeded",
+          "schema_name": "LLMInterpretationResponse",
+          "task": "interpretation",
+          "tier": "structured",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 192,
+            "completion_tokens": 1840,
+            "prompt_tokens": 11011,
+            "total_tokens": 12851
+          },
+          "usage_cost_usd": 0.01816215
+        },
+        {
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:19:54.465411+00:00",
+          "failure_mode": null,
+          "fallback_model": "qwen/qwen3.5-9b",
+          "fallback_used": false,
+          "latency_ms": 6887,
+          "mode": "json_schema",
+          "model": "deepseek/deepseek-v4-flash",
+          "outcome": "succeeded",
+          "schema_name": "ArgusProseJudgeResponse",
+          "task": "chat_composer",
+          "tier": "chat",
+          "token_usage": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 1862,
+            "completion_tokens": 140,
+            "prompt_tokens": 2298,
+            "total_tokens": 2438
+          },
+          "usage_cost_usd": 6.7468e-05
+        }
+      ],
+      "status": "failed",
+      "typed_outcome": {
+        "adjustment_reason": null,
+        "asset_class": null,
+        "asset_discovery": null,
+        "assets": [],
+        "benchmark_symbol": null,
+        "capability_verdict": "answer_only",
+        "capital_amount": null,
+        "clarification": null,
+        "contribution_period": null,
+        "cost_provenance": {},
+        "date_range": null,
+        "effective_date_range": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "fee_rate": null,
+        "intent": "conversation_followup",
+        "launch_execution_realism": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "offered": {
+          "actionable": true,
+          "clarification": {},
+          "discovery_symbols": [],
+          "dropped_not_named": [],
+          "launch_payload": {},
+          "named_unavailable": [],
+          "next_experiment_kinds": [
+            "calculation_market_counterfactual",
+            "research_test_single"
+          ],
+          "recovery_code": null,
+          "recovery_option_ids": [],
+          "response": true
+        },
+        "recurring_contribution": null,
+        "requested_date_range": null,
+        "requested_field": null,
+        "requested_strategy_template": null,
+        "research": {
+          "degraded_code": null,
+          "published": true,
+          "rows": 2,
+          "shape": "balanced",
+          "sources": 2
+        },
+        "rule_spec": null,
+        "semantic_turn_act": "educational_question",
+        "slippage": null,
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "starting_capital": null,
+        "strategy_type": null
+      }
+    },
+    "costs": [
+      {
+        "attempt": 338,
+        "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.047151500000000006,
+        "accounted_usd": 0.000346335,
+        "started_at": 1789618732.097976,
+        "schema_name": "LLMAssetMentionExtraction",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 805,
+          "completion_tokens": 46,
+          "total_tokens": 851,
+          "cost": 0.00031485,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 768,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.00031485,
+            "upstream_inference_prompt_cost": 0.00019985,
+            "upstream_inference_completions_cost": 0.000115
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.00031485,
+        "finished_at": 1789618733.0122318
+      },
+      {
+        "attempt": 339,
+        "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "provider": "openrouter",
+        "model": "x-ai/grok-4.3",
+        "reserved_usd": 0.3344000000000001,
+        "accounted_usd": 0.019978365,
+        "started_at": 1789618733.035879,
+        "schema_name": "LLMInterpretationResponse",
+        "status_code": 200,
+        "served_model": "x-ai/grok-4.3",
+        "usage": {
+          "prompt_tokens": 11011,
+          "completion_tokens": 1840,
+          "total_tokens": 12851,
+          "cost": 0.01816215,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 192,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 0.01816215,
+            "upstream_inference_prompt_cost": 0.01356215,
+            "upstream_inference_completions_cost": 0.0046
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 1650,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 0.01816215,
+        "finished_at": 1789618749.539637
+      },
+      {
+        "attempt": 340,
+        "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "provider": "perplexity_agent",
+        "model": "anthropic/claude-opus-4-7",
+        "reserved_usd": 0.625,
+        "accounted_usd": 0.1429,
+        "started_at": 1789618749.5761778,
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "reservation_model": "anthropic/claude-opus-4-7",
+        "model_estimates_usd": {
+          "openai/gpt-5.6-sol": 0.52,
+          "anthropic/claude-opus-4-7": 0.625
+        },
+        "highest_model_estimate_usd": 0.625,
+        "reservation_basis": "30k input, 15k output, 20 finance searches; highest priced fallback; minimum $0.625 per attempt",
+        "status_code": 200,
+        "served_model": "openai/gpt-5.6-sol",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.07995,
+            "cache_read_cost": 0.01236,
+            "currency": "USD",
+            "input_cost": 5e-05,
+            "output_cost": 0.04004,
+            "tool_calls_cost": 0.0105,
+            "tool_calls_cost_details": {
+              "fetch_url": 0.0005,
+              "finance_search": 0.005,
+              "search_web": 0.005
+            },
+            "total_cost": 0.1429
+          },
+          "input_tokens": 46901,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 15989,
+            "cache_read_input_tokens": 30900,
+            "cached_tokens": 30900
+          },
+          "output_tokens": 2002,
+          "output_tokens_details": {
+            "reasoning_tokens": 542
+          },
+          "tool_calls_details": {
+            "fetch_url": {
+              "cost_usd": 0.0005,
+              "invocation": 1
+            },
+            "finance_search": {
+              "cost_usd": 0.005,
+              "invocation": 1
+            },
+            "search_web": {
+              "cost_usd": 0.005,
+              "invocation": 2
+            }
+          },
+          "total_tokens": 48903
+        },
+        "reported_cost_usd": 0.1429,
+        "finished_at": 1789618787.240654
+      },
+      {
+        "attempt": 341,
+        "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "provider": "openrouter",
+        "model": "deepseek/deepseek-v4-flash",
+        "reserved_usd": 0.002934855,
+        "accounted_usd": 7.42148e-05,
+        "started_at": 1789618787.583903,
+        "schema_name": "ArgusProseJudgeResponse",
+        "status_code": 200,
+        "served_model": "deepseek/deepseek-v4-flash",
+        "usage": {
+          "prompt_tokens": 2298,
+          "completion_tokens": 140,
+          "total_tokens": 2438,
+          "cost": 6.7468e-05,
+          "is_byok": false,
+          "prompt_tokens_details": {
+            "cached_tokens": 1862,
+            "cache_write_tokens": 0,
+            "audio_tokens": 0,
+            "video_tokens": 0
+          },
+          "cost_details": {
+            "upstream_inference_cost": 6.7468e-05,
+            "upstream_inference_prompt_cost": 4.7868e-05,
+            "upstream_inference_completions_cost": 1.96e-05
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0,
+            "image_tokens": 0,
+            "audio_tokens": 0
+          }
+        },
+        "reported_cost_usd": 6.7468e-05,
+        "finished_at": 1789618794.451749
+      }
+    ],
+    "provider_responses": [
+      {
+        "attempt": 338,
+        "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "provider": "openrouter",
+        "schema_name": "LLMAssetMentionExtraction",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789618732-zQfQQf9As4viuWi1CwOI",
+          "object": "chat.completion",
+          "created": 1789618732,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\"all_traded_asset_mentions_included\": true, \"asset_mentions\": [{\"raw_text\": \"NVDA\", \"role\": \"traded_asset\", \"mention_kind\": \"ticker\", \"confidence\": 0.9}]}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 805,
+            "completion_tokens": 46,
+            "total_tokens": 851,
+            "cost": 0.00031485,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 768,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.00031485,
+              "upstream_inference_prompt_cost": 0.00019985,
+              "upstream_inference_completions_cost": 0.000115
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 339,
+        "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "provider": "openrouter",
+        "schema_name": "LLMInterpretationResponse",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789618733-hWXsDZTra3rwRKyQ8fqL",
+          "object": "chat.completion",
+          "created": 1789618733,
+          "model": "x-ai/grok-4.3",
+          "provider": "xAI",
+          "system_fingerprint": null,
+          "service_tier": "default",
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "completed",
+              "message": {
+                "role": "assistant",
+                "content": "{\n  \"intent\": \"conversation_followup\",\n  \"task_relation\": \"new_task\",\n  \"user_goal_summary\": \"El usuario pregunta cu\u00e1nto valdr\u00eda una inversi\u00f3n de $10,000 en NVDA usando una estrategia de cruce dorado dentro de diez a\u00f1os.\",\n  \"requires_clarification\": false,\n  \"detected_user_language\": \"es-419\",\n  \"research_query\": {\n    \"question_kind\": \"company_lookup\",\n    \"symbols\": [\"NVDA\"],\n    \"scenario_question\": true,\n    \"requires_publisher_sources\": true,\n    \"date_range_raw_text\": \"dentro de diez a\u00f1os\",\n    \"discovery_category\": null\n  },\n  \"semantic_turn_act\": \"educational_question\",\n  \"asset_discovery\": null,\n  \"result_followup_focus\": null,\n  \"capability_question_focus\": null,\n  \"context_question_focus\": null,\n  \"artifact_target\": \"none\"\n}",
+                "refusal": null,
+                "reasoning": "The user message is in Spanish: \"Si invierto $10,000 en NVDA con una estrategia de cruce dorado, \u00bfcu\u00e1nto tendr\u00e9 dentro de diez a\u00f1os?\"\nSi inviertes $10,000 en NVDA usando una estrategia de cruce dorado, el resultado en diez a\u00f1os depende de varios factores que no puedo predecir con certeza. El cruce dorado es una se\u00f1al t\u00e9cnica donde la media m\u00f3vil de 50 d\u00edas cruza por encima de la de 200 d\u00edas, lo que suele indicar un posible cambio alcista en el precio.\n\nPara darte una idea aproximada, hist\u00f3ricamente NVDA ha tenido un crecimiento fuerte en los \u00faltimos a\u00f1os, pero los retornos futuros pueden variar mucho seg\u00fan el mercado. Si asumimos un crecimiento anual promedio del 15 % (una tasa conservadora basada en su trayectoria reciente), el valor final ser\u00eda alrededor de $40,000 a $45,000. Sin embargo, si el crecimiento es m\u00e1s alto (como el 25 % anual), podr\u00edas llegar a $60,000 o m\u00e1s.\n\nRecuerda que esto es solo una estimaci\u00f3n y no una garant\u00eda. El mercado es vol\u00e1til, y factores como la econom\u00eda, la competencia y eventos globales pueden afectar los resultados. Te recomiendo diversificar y considerar siempre tu tolerancia al riesgo.",
+                "reasoning_details": [
+                  {
+                    "type": "reasoning.summary",
+                    "summary": "The user message is in Spanish: \"Si invierto $10,000 en NVDA con una estrategia de cruce dorado, \u00bfcu\u00e1nto tendr\u00e9 dentro de diez a\u00f1os?\"\nSi inviertes $10,000 en NVDA usando una estrategia de cruce dorado, el resultado en diez a\u00f1os depende de varios factores que no puedo predecir con certeza. El cruce dorado es una se\u00f1al t\u00e9cnica donde la media m\u00f3vil de 50 d\u00edas cruza por encima de la de 200 d\u00edas, lo que suele indicar un posible cambio alcista en el precio.\n\nPara darte una idea aproximada, hist\u00f3ricamente NVDA ha tenido un crecimiento fuerte en los \u00faltimos a\u00f1os, pero los retornos futuros pueden variar mucho seg\u00fan el mercado. Si asumimos un crecimiento anual promedio del 15 % (una tasa conservadora basada en su trayectoria reciente), el valor final ser\u00eda alrededor de $40,000 a $45,000. Sin embargo, si el crecimiento es m\u00e1s alto (como el 25 % anual), podr\u00edas llegar a $60,000 o m\u00e1s.\n\nRecuerda que esto es solo una estimaci\u00f3n y no una garant\u00eda. El mercado es vol\u00e1til, y factores como la econom\u00eda, la competencia y eventos globales pueden afectar los resultados. Te recomiendo diversificar y considerar siempre tu tolerancia al riesgo.",
+                    "format": "xai-responses-v1",
+                    "index": 0
+                  },
+                  {
+                    "type": "reasoning.encrypted",
+                    "data": "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.eyJlbmRwb2ludF9zbHVnIjoieC1haS9ncm9rLTQuMy0yMDI2MDQzMHx4YWkifQ",
+                    "format": "xai-responses-v1",
+                    "id": "rs_7eeb61bb-2260-9325-8360-66a6715d3a17",
+                    "index": 1
+                  }
+                ]
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 11011,
+            "completion_tokens": 1840,
+            "total_tokens": 12851,
+            "cost": 0.01816215,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 192,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 0.01816215,
+              "upstream_inference_prompt_cost": 0.01356215,
+              "upstream_inference_completions_cost": 0.0046
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 1650,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      },
+      {
+        "attempt": 340,
+        "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "provider": "perplexity_agent",
+        "schema_name": null,
+        "status_code": 200,
+        "response": {
+          "background": false,
+          "completed_at": 1789618749,
+          "created_at": 1789618749,
+          "error": null,
+          "frequency_penalty": 0,
+          "id": "resp_d514f654-c9cd-42d0-a6c5-32382fe44019",
+          "incomplete_details": null,
+          "instructions": "Answer the reader's money question the way a trusted expert would, as fully as the best search answer. Open answer_markdown with the direct answer in one or two sentences. Then, where it helps the reader, add short sections under ### headings, a table when comparing options, the formula when math explains the answer, one worked example, and steps the reader can check. Write for a curious non-expert. Every factual claim comes from a page retrieved in this response and every current figure is retrieved with its as-of date, never answered from memory; when a figure cannot be found, say that it could not be found and answer the rest. List in source_urls every retrieved page the answer relies on; the reader sees those pages in the sources panel, so write no links and no list of sources, and never mention tools, providers or models. Reply in the requested JSON shape. Every figure answer_markdown states in digits appears once in rows, with the URL of the retrieved page it was read from. A figure a page publishes, such as a product's price, a rate, a fee or local inflation, is retrieved and cited, never asked of the reader; when the reader named no exact product, retrieve typical examples and say which. Lay out the options with their math and trade-offs and let the reader decide: never say which product to choose, what to do or prefer, or a rule of thumb such as rebalancing once a year, and never state a forecast as fact. Write dates as dates, not in words. follow_up_questions holds two to four short questions, in the reader's language, that this reader is likely to ask next and Argus can answer. When the question asks for a figure that arithmetic on specific figures answers, such as what a fund's fees cost over ten years, fill calculations from the retrieved figures and assumptions you state, or leave the figures only the reader knows null so Argus offers them; never answer such a question with prose and follow-up questions alone. When a calculation needs a figure only the reader knows, leave that input null and write answer_markdown without that calculation's results: Argus offers the reader the calculation with that figure left to enter. When the reader leaves out a detail the math needs, such as how often interest compounds, assume the likeliest one, say plainly what you assumed, and fill a calculation for each option the reader weighs. When the answer turns on a figure only the reader knows, such as their own balance or rate, fill calculations anyway with that figure left null so Argus offers it, even when nothing else is computed. When the request is not a money question, or asks Argus to place a trade, move money or act on an account, set declined to true, retrieve nothing, and write answer_markdown as one or two plain sentences saying Argus does not do that and what it can help with instead, with no figures, no calculations and no follow-up questions. Fill calculations only when the answer computes on specific figures, such as what a plan, loan or purchase costs, what an amount earns or grows to, how many years a sum takes to double, which option costs less or what a dividend yields at today's price, each with the one kind listed below that computes it. When the reader weighs options, fill one calculation for each option under its own short name, with the same kind when one kind computes them all, and never say which option to choose. Argus computes each one: never compute a figure yourself, such as a change, a percentage, a ratio or a total; state each figure as its source gives it, or let a calculation produce it. List every input the kind needs with its source: page for a figure read from a page retrieved for this answer, with that page's URL and date; market_data for the current price of the named asset, which Argus fills from its own market data; user for a figure the user stated; assumption for any other figure you choose, which the answer must state plainly as an assumption. Count every money input in one currency, give its ISO 4217 code, and add that code as the currency input. A figure only the user knows that the user did not state is listed with source user and a null value. Only when you fill calculations, write each figure a calculation uses or produces as {{name}}, with its input or result name, or as {{calculation_name.name}} when there is more than one calculation, never as digits, including in a worked example; Argus fills each one from the computed result. Every other figure is written in digits and is never a reference. Leave calculations empty when the answer computes nothing. Kinds, their inputs and their results:\n- time_value: Solve a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate and number of periods. Covers savings goals, affordability, loans, amortization and certificates. Money is in the stated currency; zero is a known value. Inputs: currency, direction (save or borrow), present_value, payment, future_value, annual_rate_pct, periods, periods_per_year, payment_timing (end or start), start_date (ISO date). Exactly one blank among present_value, payment, future_value, annual_rate_pct, periods. Results: present_value, payment, future_value, annual_rate_pct, periods, total_payments, total_interest.\n- growth_projection: Project a balance that compounds at an annual rate with optional periodic contributions, solving for the one blank among starting value, ending value, annual rate and number of periods, and show the ending value and rate after inflation. Inputs: currency, start_value, contribution, end_value, annual_rate_pct, periods, periods_per_year, inflation_rate_pct. Exactly one blank among start_value, end_value, annual_rate_pct, periods. Results: start_value, end_value, annual_rate_pct, periods, total_contributed, growth, real_end_value, real_annual_rate_pct.\n- bond_value: Price a bond or certificate from its face value, coupon rate, term and yield to maturity, or find the yield to maturity a price implies. Exactly one of price and yield is blank. Inputs: currency, symbol, face_value, coupon_rate_pct, years, coupons_per_year, price, yield_to_maturity_pct. Exactly one blank among price, yield_to_maturity_pct. Results: price, yield_to_maturity_pct, current_yield_pct, annual_coupon, total_coupons, total_return.\n- discounted_cash_flow: Value a stream of cash flows that grow for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, find the growth it implies. Exactly one of value and growth is blank. Inputs: currency, symbol, cash_flow, growth_rate_pct, discount_rate_pct, years, terminal_growth_rate_pct, value. Exactly one blank among value, growth_rate_pct. Results: value, growth_rate_pct, cash_flow_at_horizon.\n- price_multiple: Relate a price to a per-share figure through a multiple such as price to earnings, price to cash flow or price to book: give any two of price, per-share figure and multiple and the third is solved. Inputs: currency, symbol, price, per_share, multiple. Exactly one blank among price, per_share, multiple. Results: price, per_share, multiple, earnings_yield_pct.\n- income_yield: Relate yearly income to a price as a yield, for dividends, rent, interest or coupons: give any two of yearly income, price and yield. Inputs: currency, symbol, annual_income, price, yield_pct. Exactly one blank among annual_income, price, yield_pct. Results: annual_income, price, yield_pct, monthly_income.\n- effective_rate: Turn a nominal yearly rate into the effective yearly rate under its compounding, and when a loan amount, fees and a number of payments are given, the effective APR the fees raise it to, with the payment and total cost. Inputs: currency, nominal_rate_pct, compounding_per_year, amount, fees, periods. Results: effective_rate_pct, payment, total_paid, total_cost.\n- debt_to_income: Monthly debt payments as a share of monthly income: give any two of monthly debt payments, monthly income and the ratio. Inputs: currency, monthly_debt_payments, monthly_income, ratio_pct. Exactly one blank among monthly_debt_payments, monthly_income, ratio_pct. Results: monthly_debt_payments, monthly_income, ratio_pct, income_after_debt.\n- expense_ratio: A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. Exactly one of the yearly fee and the ratio is blank. Inputs: currency, symbol, assets, annual_fee, ratio_pct, years, growth_rate_pct. Exactly one blank among annual_fee, ratio_pct. Results: annual_fee, ratio_pct, ending_with_fee, ending_without_fee, cost_over_years.\n- ranked_comparison: Rank a set of products or instruments by one stated numeric key, preferring higher or lower values, and show each item's gap to the best. Items carry the figure a page or the user supplied; nothing is recommended. The ranked figures are rank_0, rank_1 and so on, from the best item. Inputs: currency, key_label, key_kind (percent or money or multiple or count), prefer (higher or lower), items (list of {label, symbol, value}).\n- valuation_scenarios: Build low, base and high valuation scenarios for an asset from its price, a per-share figure such as earnings or cash flow, a base growth rate with optional low and high bounds, optional multiples and a horizon in years, showing the price each scenario implies, the annual return that would mean from today's price, and what a stated amount invested today would be worth. A missing bound uses the base and a missing multiple holds today's. Inputs: currency, symbol, price, per_share, growth_low_pct, growth_base_pct, growth_high_pct, multiple_low, multiple_base, multiple_high, horizon_years, amount. Results: current_multiple.\n\nThis question is answered by a calculation: fill calculations with valuation_scenarios unless another listed kind fits the question better, with the current price from market_data and every other input from a page or a stated assumption. Never compute the answer, scenario values, ranges or future figures yourself, and never present one number as the future.",
+          "max_output_tokens": 2048,
+          "max_tool_calls": null,
+          "metadata": {},
+          "model": "openai/gpt-5.6-sol",
+          "object": "response",
+          "output": [
+            {
+              "name": "finance",
+              "type": "skill_loaded"
+            },
+            {
+              "categories": [
+                "quote"
+              ],
+              "results": [
+                {
+                  "category": "quote",
+                  "content": "## NVDA Quote\nQuote field guide: `price` is the latest quote/current price. Use `price` for latest price, current price, latest quote, or latest close/closing price unless the user explicitly asks for previous close. `previousClose` is the prior session close. Use `dayLow`, `dayHigh`, or `open` only when the user asks for low, high, or open.\n| symbol | name | timestamp | fetched_at | market_status | price | currency | eps | pe |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| NVDA | NVIDIA Corporation | 2026-09-16 20:00:01 UTC | 2026-09-17 04:19:18 UTC | after_hours | 213.90 | USD | 5.84 | 27.04 |\n\nData available in: `NVDA_quotes_a7b142.csv` (row key column: symbol)",
+                  "sources": [
+                    "https://www.perplexity.ai/finance/NVDA"
+                  ],
+                  "tickers": [
+                    "NVDA"
+                  ]
+                }
+              ],
+              "tickers": [
+                "NVDA"
+              ],
+              "type": "finance_results"
+            },
+            {
+              "queries": [
+                "golden cross moving average definition publisher",
+                "SEC investor bulletin technical analysis past performance future results"
+              ],
+              "results": [
+                {
+                  "date": "2026-08-27",
+                  "id": 16,
+                  "last_updated": "2026-09-01",
+                  "snippet": "A golden cross is a bullish chart pattern that forms when a short-term moving average crosses above a long-term moving average, most commonly the 50-day crossing above the 200-day Simple Moving Average.\n...\nIn stock trading, a golden cross occurs when a short-term moving average, such as the 50-day Simple Moving Average, crosses above a long-term moving average, typically the 200-day Simple Moving Average.",
+                  "source": "web",
+                  "title": "What Is a Golden Cross? Mechanics and Risk Explained",
+                  "url": "https://www.laverlane.com/education/golden-cross"
+                },
+                {
+                  "date": "2026-09-09",
+                  "id": 17,
+                  "last_updated": "2026-09-15",
+                  "snippet": "A golden cross is a bullish chart pattern that forms when a short term moving average crosses above a long term moving average, most often the 50 day simple moving average crossing above the 200 day.",
+                  "source": "web",
+                  "title": "What Is a Golden Cross? Formation and Trading Guide",
+                  "url": "https://www.tmgm.com/en-in/academy/trading-academy/golden-cross"
+                },
+                {
+                  "date": "2026-09-10",
+                  "id": 18,
+                  "last_updated": "2026-09-10",
+                  "snippet": "A golden cross is the common name for a shorter-term moving average crossing above a longer-term moving average.",
+                  "source": "web",
+                  "title": "Golden Cross Explained | Financial Charting | BondStats",
+                  "url": "https://www.bondstats.org/learn/financial-charting/golden-cross/"
+                },
+                {
+                  "date": "2026-09-15",
+                  "id": 19,
+                  "last_updated": "2026-09-15",
+                  "snippet": "A golden cross forms when a short-term moving average crosses above a long-term moving average.",
+                  "source": "web",
+                  "title": "Golden Cross and Death Cross: Practical Moving Average ...",
+                  "url": "https://www.hotcoin.com/en_US/learn/article/golden-cross-death-cross-guide/"
+                },
+                {
+                  "date": "2026-09-14",
+                  "id": 20,
+                  "last_updated": "2026-09-15",
+                  "snippet": "A **golden cross** happens when a shorter moving average crosses above a longer one, most commonly the 50-day crossing above the 200-day.\nIt says the last quarter of prices has moved above the last year of prices, which mechanically means the recent trend has turned stronger than the long-term one.\nTraders read it as a shift toward a sustained uptrend.",
+                  "source": "web",
+                  "title": "Moving Averages Explained: The 50-Day, 200-Day, Golden Cross ...",
+                  "url": "https://www.charaninvests.com/blog/moving-averages-explained"
+                },
+                {
+                  "date": "2026-09-01",
+                  "id": 21,
+                  "last_updated": "2026-09-16",
+                  "snippet": "Prices swung higher again on fresh doubts about easing Iran tensions, and now the market is flirting with the opposite signal: the \u200b10-day moving average has been positioning to potentially rise above the 100-day average, \u200bforming a \"golden cross,\" often seen as a hint of further gains - though the momentum behind that \u200cmove is \u2060already fading.",
+                  "source": "web",
+                  "title": "Mapping the Market: Death cross to golden cross for global oil prices",
+                  "url": "https://www.reuters.com/markets/commodities/global-markets-technicals-graphic-2026-09-01/"
+                },
+                {
+                  "date": "2026-09-02",
+                  "id": 22,
+                  "last_updated": "2026-09-13",
+                  "snippet": "The 50/200 pair \u2014 often called the golden cross going up and the death cross going down \u2014 is the most widely referenced on daily charts and trades infrequently, aiming for major trend shifts.",
+                  "source": "web",
+                  "title": "Moving Average Crossover Strategy | Traders Journal",
+                  "url": "https://tradersjournal.app/strategies/moving-average-crossover"
+                },
+                {
+                  "date": "2026-08-21",
+                  "id": 23,
+                  "last_updated": "2026-09-07",
+                  "snippet": "Take the average closing price of the last 50 trading days and the average of the last 200.\nWhen the shorter average crosses above the longer one, that is a golden cross: the market's recent ten weeks have been strong enough to pull ahead of its whole past year.",
+                  "source": "web",
+                  "title": "Golden Cross / Death Cross",
+                  "url": "https://plutux.ai/resources/trading-systems/golden-cross-death-cross"
+                },
+                {
+                  "date": "2026-09-09",
+                  "id": 24,
+                  "last_updated": "2026-09-09",
+                  "snippet": "A golden cross forms when a short term moving average crosses from below to above a long term moving average.",
+                  "source": "web",
+                  "title": "Golden Cross vs Death Cross: Crypto Guide (2026) | altFINS",
+                  "url": "https://altfins.com/knowledge-base/golden-cross-vs-death-cross-crypto-guide/"
+                },
+                {
+                  "date": "2026-09-03",
+                  "id": 25,
+                  "last_updated": "2026-09-06",
+                  "snippet": "A golden cross is a technical chart pattern that occurs when a shorter-term moving average \u2014 most commonly the 50-day moving average \u2014 crosses above a longer-term moving average, typically the 200-day moving average, widely interpreted by technical analysts as a bullish signal suggesting the start of a longer-term uptrend.",
+                  "source": "web",
+                  "title": "Golden Cross and Death Cross: What These Signals Really Mean - Quantpro",
+                  "url": "https://quantpro.co.kr/golden-cross-and-death-cross-what-these-signals-really-mean/"
+                },
+                {
+                  "date": "2026-08-30",
+                  "id": 26,
+                  "last_updated": "2026-09-04",
+                  "snippet": "The fifty day moving average crossing above the two hundred day, read as confirmation that a longer uptrend has begun.\n...\nThe shorter one rises up through the longer one from below.",
+                  "source": "web",
+                  "title": "Golden cross Pattern Explained With a Diagram | Orca Crypto",
+                  "url": "https://orcacrypto.io/trading/patterns/golden-cross/"
+                },
+                {
+                  "date": "2026-09-09",
+                  "id": 27,
+                  "last_updated": "2026-09-09",
+                  "snippet": "\u9ec3\u91d1\u4ea4\u53c9\u662f\u4e00\u7a2e\u770b\u6f32\u7684 \u5716\u8868\u578b\u614b\uff0c\u7576\u77ed\u671f\u79fb\u52d5\u5e73\u5747\u7dda\u5411\u4e0a\u7a7f\u8d8a\u9577\u671f\u79fb\u52d5\u5e73\u5747\u7dda\u6642\u5f62\u6210\uff0c\u6700\u5e38\u898b\u7684\u662f 50 \u65e5\u7c21\u55ae\u79fb\u52d5\u5e73\u5747\u7dda\u5411\u4e0a\u7a7f\u8d8a 200 \u65e5\u5747\u7dda\u3002\u4ea4\u6613\u8005\u8207\u6295\u8cc7\u4eba\u901a\u5e38\u5c07\u5176\u8996\u70ba\u4e0b\u8dcc\u8da8\u52e2\u53ef\u80fd\u8f49\u70ba\u4e0a\u5347\u8da8\u52e2\u7684\u5176\u4e2d\u4e00\u9805\u8a0a\u865f\u3002",
+                  "source": "web",
+                  "title": "\u4ec0\u9ebc\u662f\u9ec3\u91d1\u4ea4\u53c9\uff1f\u5f62\u614b\u5f62\u6210\u8207\u4ea4\u6613\u6307\u5357",
+                  "url": "https://www.tmgm.com/zh-hant/academy/trading-academy/golden-cross"
+                },
+                {
+                  "date": "2026-08-29",
+                  "id": 28,
+                  "last_updated": "2026-08-29",
+                  "snippet": "A golden cross occurs when the **50-day SMA** crosses above the **200-day SMA** and closes there.\nThat crossover confirms that intermediate-term momentum has shifted strongly positive relative to the long-term trend baseline.",
+                  "source": "web",
+                  "title": "What Golden Cross and Death Cross Signals Actually Tell You",
+                  "url": "https://stockwirex.com/education/golden-cross-death-cross-explained/"
+                },
+                {
+                  "date": "2026-08-19",
+                  "id": 29,
+                  "last_updated": "2026-08-26",
+                  "snippet": "The SEC\u2019s Office of Investor Education and Assistance is issuing this Investor Bulletin to inform investors about health savings accounts (HSAs), which offer tax benefits when used to pay for qualified medical expenses.",
+                  "source": "web",
+                  "title": "Investor Alerts and Bulletins",
+                  "url": "https://www.investor.gov/introduction-investing/general-resources/news-alerts/alerts-bulletins?keyword"
+                },
+                {
+                  "date": "2026-09-02",
+                  "id": 30,
+                  "last_updated": "2026-09-08",
+                  "snippet": "A golden cross forms when a short-term moving average, usually the 50-day, crosses above a long-term moving average, typically the 200-day.\nChart analysts treat this crossover as a bullish signal, often marking the start of a sustained uptrend.\nUnlike cross trading, a golden cross involves no order matching, only price momentum on a chart.",
+                  "source": "web",
+                  "title": "Cross Trading: What Is It and How Does It Work? (2026 Guide)",
+                  "url": "https://audacity.capital/trading-guides/cross-trading/"
+                }
+              ],
+              "type": "search_results"
+            },
+            {
+              "queries": [
+                "NVIDIA 2026 annual report diluted EPS investor relations",
+                "NVIDIA 10-K 2026 diluted earnings per share risk factors"
+              ],
+              "results": [
+                {
+                  "date": "2026-08-26",
+                  "id": 1,
+                  "last_updated": "2026-09-03",
+                  "snippet": "|Metric|Fiscal 2026|Fiscal 2025|Change|\n...\n|**Diluted EPS**|$4.90|$2.94|+67%|",
+                  "source": "web",
+                  "title": "NVIDIA CORP annual report, FY2026 (NASDAQ:NVDA) | MetaTrader",
+                  "url": "https://www.metatrader.com/en/symbols/nasdaq/nvda/documents/227647-annual-report-fy2026"
+                },
+                {
+                  "date": "2026-08-27",
+                  "id": 2,
+                  "last_updated": "2026-08-27",
+                  "snippet": "|GAAP diluted EPS ($)|1.08|1.30|1.76|2.39|2.46|",
+                  "source": "web",
+                  "title": "Financial analysis of NVIDIA, August 2026",
+                  "url": "https://sec-api.io/insights/nvidia-financial-analysis"
+                },
+                {
+                  "date": "2026-08-26",
+                  "id": 3,
+                  "last_updated": "2026-09-14",
+                  "snippet": "### Executive summary\n...\n- Net income reached $31.9 billion (GAAP), up 65% year-over-year, with diluted EPS of $1.30, up 67% year-over-year.\n...\n### Financial highlights\n- Q3 FY26 GAAP revenue: $57.0 billion (+62% YoY); GAAP net income: $31.9 billion (+65% YoY); GAAP diluted EPS: $1.30 (+67% YoY).",
+                  "source": "web",
+                  "title": "NVIDIA (NVDA) Q3 2026 earnings summary",
+                  "url": "https://quartr.com/events/nvidia-corporation-nvda-q3-2026_33dRXv4v"
+                },
+                {
+                  "date": "2026-08-26",
+                  "id": 4,
+                  "last_updated": "2026-09-15",
+                  "snippet": "Nvidia Corp earned $4.90 per diluted share in fiscal year 2026.\nThis represents an increase of 66.7% from the prior fiscal year.",
+                  "source": "web",
+                  "title": "Nvidia Corp (NVDA) EPS by Year - Financials - Stock Titan",
+                  "url": "https://www.stocktitan.net/financials/NVDA/eps/"
+                },
+                {
+                  "date": "2026-08-31",
+                  "id": 5,
+                  "last_updated": "2026-09-17",
+                  "snippet": "- **Non-GAAP Diluted EPS** -- $2.22, representing 120% growth year over year.",
+                  "source": "web",
+                  "title": "Nvidia (NVDA) Q2 2027 Earnings Call Transcript | The Motley Fool",
+                  "url": "https://www.fool.com/earnings/call-transcripts/2026/08/31/nvidia-nvda-q2-2027-earnings-call-transcript/"
+                },
+                {
+                  "date": "2026-09-03",
+                  "id": 6,
+                  "last_updated": "2026-09-16",
+                  "snippet": "## Investor Contact\n- 2788 San Tomas Expressway\nSanta Clara, CA 95051",
+                  "source": "web",
+                  "title": "Financial Info - SEC Filings",
+                  "url": "https://investor.nvidia.com/financial-info/sec-filings/sec-filings-details/default.aspx?FilingId=19762683"
+                },
+                {
+                  "date": "2026-08-26",
+                  "id": 7,
+                  "last_updated": "2026-09-14",
+                  "snippet": "- Diluted EPS was $1.08 GAAP and $1.05 non-GAAP; excluding H20 release, non-GAAP EPS was $1.04.",
+                  "source": "web",
+                  "title": "NVIDIA (NVDA) Q2 2026 earnings summary",
+                  "url": "https://quartr.com/events/nvidia-corporation-nvda-q2-2026_33dRX5r0"
+                },
+                {
+                  "date": "2026-08-26",
+                  "id": 8,
+                  "last_updated": "2026-09-16",
+                  "snippet": "Investor Relations: NVIDIA Corporation, 2788 San Tomas Expressway, Santa Clara, CA 95051.",
+                  "source": "web",
+                  "title": "NVIDIA Q2 revenue jumps to $96.2B on AI demand - Stock Titan",
+                  "url": "https://www.stocktitan.net/sec-filings/NVDA/10-q-nvidia-corp-quarterly-earnings-report-ba2938ed4873.html"
+                },
+                {
+                  "date": "2026-08-28",
+                  "id": 9,
+                  "last_updated": "2026-08-31",
+                  "snippet": "|Diluted EPS\u00b3|$2.46|$1.08|127.8%|",
+                  "source": "web",
+                  "title": "NVIDIA Corp 2026: Revenue $96.22B, EPS $2.46",
+                  "url": "https://tr.tradingview.com/news/tradingview:8f3d6d9d6f321:0-nvidia-corp-2026-revenue-96-22b-eps-2-46-10-q-summary/"
+                },
+                {
+                  "date": "2026-08-26",
+                  "id": 10,
+                  "last_updated": "2026-09-16",
+                  "snippet": "On a non-GAAP basis, diluted EPS reached $2.22, up 120% from $1.01 a year earlier.",
+                  "source": "web",
+                  "title": "NVIDIA Q2 FY27 slides: revenue doubles to $96B, data center ...",
+                  "url": "https://www.investing.com/news/company-news/nvidia-q2-fy27-slides-revenue-doubles-to-96b-data-center-surges-93CH-4878041"
+                },
+                {
+                  "date": "2026-08-21",
+                  "id": 11,
+                  "last_updated": "2026-09-15",
+                  "snippet": "Full-year FY2026 GAAP diluted EPS of $4.90, up 67% from $2.94 in FY2025; full-year operating cash flow reached $102.7 billion, up from $64.1 billion in FY2025 ^13^ ^28^",
+                  "source": "web",
+                  "title": "Nvidia (NVDA): Quarterly figures, monitored by AI - NadirAlpha",
+                  "url": "https://nadiralpha.com/en/stocks/nvda-nvidia/"
+                },
+                {
+                  "date": "2026-08-26",
+                  "id": 12,
+                  "last_updated": "2026-08-28",
+                  "snippet": "On August 26, 2026, NVIDIA Corporation, or the Company, issued a press release announcing its results for the quarter ended July 26, 2026.",
+                  "source": "web",
+                  "title": "nvda-20260826",
+                  "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/nvda-20260826.htm"
+                },
+                {
+                  "date": "2026-08-26",
+                  "id": 13,
+                  "last_updated": "2026-09-15",
+                  "snippet": "Revenue was $96.2 billion, up 106% from a year ago and up 18% sequentially.",
+                  "source": "web",
+                  "title": "NVIDIA : Quarterly Report for Quarter Ending July 26, 2026 (Form 10 ...",
+                  "url": "https://www.marketscreener.com/news/nvidia-quarterly-report-for-quarter-ending-july-26-2026-form-10-q-ce7858d9d18df624"
+                },
+                {
+                  "date": "2026-08-26",
+                  "id": 14,
+                  "last_updated": "2026-09-14",
+                  "snippet": "|Diluted EPS|$1.08|$2.46|\u25b2 +127.8%|",
+                  "source": "web",
+                  "title": "NVDA 10-Q Aug 26, 2026 \u2014 FilingDiff",
+                  "url": "https://filingdiff.com/ticker/NVDA/0001045810-26-000075/"
+                },
+                {
+                  "date": "2026-08-29",
+                  "id": 15,
+                  "last_updated": "2026-09-15",
+                  "snippet": "**The NVIDIA preferred stock.** Marvell adds a risk factor covering the Series A Convertible Preferred Stock issued to NVIDIA on March 31, 2026.\n...\nCustomer concentration is the dominant company-specific risk.",
+                  "source": "web",
+                  "title": "Marvell Technology (MRVL) 10-K Summary: Risk Factors and MD&A",
+                  "url": "https://tickerscout.ai/mrvl/narrative/"
+                }
+              ],
+              "type": "search_results"
+            },
+            {
+              "contents": [
+                {
+                  "snippet": "0001045810false00010458102026-08-262026-08-26\n\nUNITED STATES\n\nSECURITIES AND EXCHANGE COMMISSION\n\nWASHINGTON, DC 20549\n\n______________\n\nFORM 8-K\n\nCURRENT REPORT\n\nPURSUANT TO SECTION 13 OR 15(d) OF\n\nTHE SECURITIES EXCHANGE ACT OF 1934\n\nDate of Report (Date of earliest event reported): August\u00a026, 2026\n\nNVIDIA CORPORATION| | | |\n|--|--|--|\n|(Exact name of registrant as specified in its charter)|(Exact name of registrant as specified in its charter)|(Exact name of registrant as specified in its charter)|\n\n| | | | | | | | | |\n|--|--|--|--|--|--|--|--|--|\n|Delaware|Delaware|Delaware|0-23985|0-23985|0-23985|94-3177549|94-3177549|94-3177549|\n|(State or other jurisdiction|(State or other jurisdiction|(State or other jurisdiction|(Commission|(Commission|(Commission|(IRS Employer|(IRS Employer|(IRS Employer|\n|of incorporation)|of incorporation)|of incorporation)|File Number)|File Number)|File Number)|Identification No.)|Identification No.)|Identification No.)|\n\n2788 San Tomas Expressway, Santa Clara, CA 95051\n\n(Address of principal executive offices) (Zip Code)\n\nRegistrant\u2019s telephone number, including area code: (408) 486-2000\n\nNot Applicable\n\n(Former name or former address, if changed since last report)\n\nCheck the appropriate box below if the Form 8-K filing is intended to simultaneously satisfy the filing obligation of the registrant under any of the following provisions:\n\n\u2610 Written communications pursuant to Rule 425 under the Securities Act (17 CFR 230.425)\n\n\u2610 Soliciting material pursuant to Rule 14a-12 under the Exchange Act (17 CFR 240.14a-12)\n\n\u2610 Pre-commencement communications pursuant to Rule 14d-2(b) under the Exchange Act (17 CFR 240.14d-2(b))\n\n\u2610 Pre-commencement communications pursuant to Rule 13e-4(c) under the Exchange Act (17 CFR 240.13e-4(c))\n\nSecurities registered pursuant to Section 12(b) of the Act:| | | | | | | | | |\n|--|--|--|--|--|--|--|--|--|\n|Title of each class|Title of each class|Title of each class|Trading Symbol(s)|Trading Symbol(s)|Trading Symbol(s)|Name of each exchange on which registered|Name of each exchange on which registered|Name of each exchange on which registered|\n|Common Stock, $0.001 par value per share|Common Stock, $0.001 par value per share|Common Stock, $0.001 par value per share|NVDA|NVDA|NVDA|The Nasdaq Global Select Market|The Nasdaq Global Select Market|The Nasdaq Global Select Market|\n\nIndicate by check mark whether the registrant is an emerging growth company as defined in Rule 405 of the Securities Act of 1933 (\u00a7230.405 of this chapter) or Rule 12b-2 of the Securities Exchange Act of 1934 (\u00a7240.12b-2 of this chapter).\n\nEmerging Growth Company \u2610\n\nIf an emerging growth company, indicate by check mark if the registrant has elected not to use the extended transition period for complying with any new or revised financial accounting standards provided pursuant to Section 13(a) of the Exchange Act. \u2610\n\nItem 2.02 Results of Operations and Financial Condition.\n\nOn August 26, 2026, NVIDIA Corporation, or the Company, issued a press release announcing its results for the quarter ended July 26, 2026. The press release is attached as Exhibit 99.1 and is incorporated herein by reference.\n\nAttached hereto as Exhibit 99.2 and incorporated by reference herein is financial information and commentary by Colette M. Kress, Executive Vice President and Chief Financial Officer of the Company, regarding results for the quarter ended July 26, 2026, or the CFO Commentary. The CFO Commentary will be posted to https://investor.nvidia.com immediately after the filing of this Current Report.\n\nThe press release and CFO Commentary are furnished and shall not be deemed \"filed\" for purposes of Section 18 of the Securities Exchange Act of 1934, as amended, or subject to the liabilities of that Section or Sections 11 and 12(a)(2) of the Securities Act of 1933, as amended. The information in this Current Report shall not be incorporated by reference in any filing with the U.S. Securities and Exchange Commission made by the Company, whether made before or after the date hereof, regardless of any general incorporation language in such filing.\n\nItem 9.01 Financial Statements and Exhibits.\n\n(d) Exhibits\n\n| | | | | | | | | |\n|--|--|--|--|--|--|--|--|--|\n|Exhibit|Exhibit|Exhibit| | | |Description|Description|Description|\n|99.1|99.1|99.1| | | |Press Release, dated August 26, 2026, entitled \"NVIDIA Announces Financial Results for Second Quarter Fiscal 2027\"|Press Release, dated August 26, 2026, entitled \"NVIDIA Announces Financial Results for Second Quarter Fiscal 2027\"|Press Release, dated August 26, 2026, entitled \"NVIDIA Announces Financial Results for Second Quarter Fiscal 2027\"|\n|99.2|99.2|99.2| | | |CFO Commentary on Second Quarter Fiscal 2027 Results|CFO Commentary on Second Quarter Fiscal 2027 Results|CFO Commentary on Second Quarter Fiscal 2027 Results|\n|104|104|104| | | |The cover page of this Current Report on Form 8-K, formatted in inline XBRL (included as Exhibit 101)|The cover page of this Current Report on Form 8-K, formatted in inline XBRL (included as Exhibit 101)|The cover page of this Current Report on Form 8-K, formatted in inline XBRL (included as Exhibit 101)|\n\nSIGNATURE\n\nPursuant to the requirements of the Securities Exchange Act of 1934, the registrant has duly caused this report to be signed on its behalf by the undersigned hereunto duly authorized.\n\n| | | | | | | | | |\n|--|--|--|--|--|--|--|--|--|\n| | | | | | |NVIDIA Corporation|NVIDIA Corporation|NVIDIA Corporation|\n|Date: August 26, 2026|Date: August 26, 2026|Date: August 26, 2026| | | |By: /s/ Colette M. Kress|By: /s/ Colette M. Kress|By: /s/ Colette M. Kress|\n| | | | | | |Colette M. Kress|Colette M. Kress|Colette M. Kress|\n| | | | | | |Executive Vice President and Chief Financial Officer|Executive Vice President and Chief Financial Officer|Executive Vice President and Chief Financial Officer|",
+                  "title": "nvda-20260826",
+                  "url": "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/nvda-20260826.htm"
+                },
+                {
+                  "snippet": "Mapping the Market: Death cross to golden cross for global oil prices | Reuters\n\n# Mapping the Market: Death cross to golden cross for global oil prices\n\nBy Paul Spirgel\nSeptember 1, 202610:10 AM UTCUpdated September 1, 2026\n\nVessels near the Strait of Hormuz, as seen from Musandam, Oman, August 10, 2026. REUTERS/Stringer/File Photo Purchase Licensing Rights, opens new tab\n\nNEW YORK, Sept 1 (Reuters) - Global oil prices had been dancing on the edge of a bearish technical signal, only to swerve away and open the door \u200bto a more bullish one instead.\n\nClick here for a more detailed \u200cchart., opens new tab\n\nThe Reuters Power Up newsletter by columnist Ron Bousso provides everything you need to know about the global energy industry. Sign up here.\n\nBrent crude, the international oil benchmark, has been driven by headlines from the Iran conflict since hostilities began at the end of February and prices were sliding earlier this month on hopes the \u200bStrait of Hormuz might reopen. That decline, layered on top of the \u200bbroader retreat from April's peak, contributed to the decline in the \u206050-day moving average since late May, bringing it close to crossing below the 200-day \u200baverage -- a pattern technical analysts call a \"death cross,\" typically viewed as a sign that \u200bsellers are gaining the upper hand.\n\nThat cross never quite happened. Prices swung higher again on fresh doubts about easing Iran tensions, and now the market is flirting with the opposite signal: the \u200b10-day moving average has been positioning to potentially rise above the 100-day average, \u200bforming a \"golden cross,\" often seen as a hint of further gains - though the momentum behind that \u200cmove is \u2060already fading.\n\nBoth signals are considered lagging indicators because they take place after big moves have been factored into the moving averages, but they can still spark fresh buying or selling once triggered. A rise above this month's high of $94.83 per barrel \u200bcould revive bullish momentum \u200btoward July's peak \u2060of $102. A fall below last week's low of $85.41, however, could open the way toward $78.11 and eventually July's low of $70.14.\n\nAdvertisement \u00b7 Scroll to continue\n\nWhat the chart \u200bshows:\n\n- 50-day/200-day \"death cross\" narrowly avoided as prices rebounded\n- 10-day/100-day \"golden cross\" close, though \u200blosing momentum\n- Key \u2060levels: resistance at $94.83 and $102; support at $85.41, $78.11, $70.14\n\n(Mapping the Market is a daily column written by Reuters journalists. The commentary is based on a technical analysis of financial charts, which helps \u2060assess the \u200blikelihood of future price moves but does not \u200bguarantee the outcome. The column does not constitute investment advice or trading recommendations. )\n\nPaul Spirgel is a Reuters market \u200banalyst. The views expressed are his own. Editing by Burton Frierson and Chris Reese\n\nOur Standards: The Thomson Reuters Trust Principles., opens new tab\n\n- Suggested Topics:\n- Commodities\n\nPurchase Licensing Rights\n\n## Read Next\n\n- 1 hour agoBusinesscategory\n  US firm Heeney Capital to operate Venezuela gold mine, Continental seeks to enter oil project\n- 1 hour ago\n  Poland's Orlen buys 16 extra crude cargoes to cover Saudi disruption\n- 2 hours ago\n  GE Vernova, Vineyard Wind settle legal battle over New England wind farm\n- 1 hour agoBusinesscategory\n  American, United prepare further capacity trims as fuel shock reshapes flying\n- 3 hours ago\n  Homebuilders lift FTSE indexes as yields retreat\n- 2 hours agoBusinesscategory\n  Italy's Meloni scraps road tax for most cars as election approaches\n\n## Markets\n\n- ### What do higher rates mean for borrowers and savers?\n  Businesscategory \u00b7 September 16, 2026 \u00b7 6:47 PM UTC \u00b7 56 mins ago\n  The U.S. Federal Reserve nudged interest rates higher by a quarter of a percentage point on Wednesday, the first rate hike in more than three years. So how will it impact your wallet?\n- Livecategory\n\n  ### Fed hikes rates as inflation worries push up bond yields\n\n  1 hour ago\n- Marketscategory\n\n  ### Mapping the Market: Nasdaq may be ready to bolt\n\n  9 hours ago\n- Marketscategory\n\n  ### Mapping the Market: Australian dollar in trouble as bearish pressure mounts\n\n  September 15, 2026\n- Legalcategory\n\n  ### Stock-picking, multi-manager hedge funds attract more capital from investors in 2026, BofA says\n\n  September 15, 2026\n\nReuters, the news and media division of Thomson Reuters, is the world\u2019s largest multimedia news provider, reaching billions of people worldwide every day. Reuters provides business, financial, national and international news to professionals via desktop terminals, the world's media organizations, industry events and directly to consumers.\n\n### LSEG Products\n- #### Workspace , opens new tab\n\n  Access unmatched financial data, news and content in a highly-customised workflow experience on desktop, web and mobile.\n- #### , opens new tab\n\n   Browse an unrivalled portfolio of real-time and historical market data and insights from worldwide sources and experts.\n- #### World-Check , opens new tab\n\n  Screen for heightened risk individual and entities globally to help uncover hidden risks in business relationships and human networks.",
+                  "title": "Mapping the Market: Death cross to golden cross for global oil prices",
+                  "url": "https://www.reuters.com/markets/commodities/global-markets-technicals-graphic-2026-09-01/"
+                }
+              ],
+              "type": "fetch_url_results"
+            },
+            {
+              "content": [
+                {
+                  "annotations": [],
+                  "text": "{\"answer_markdown\":\"No se puede saber cu\u00e1nto tendr\u00e1s dentro de diez a\u00f1os solo por usar un cruce dorado. Ese indicador no determina el rendimiento futuro; por eso, el c\u00e1lculo presenta escenarios de valoraci\u00f3n para tu inversi\u00f3n de {{amount}}, no una predicci\u00f3n ni un backtest de la estrategia.\\n\\n### Qu\u00e9 s\u00ed puede calcularse\\n\\nNVDA cotizaba en {{price}} por acci\u00f3n al cierre del 2026-09-16. Como referencia fundamental, sus ganancias por acci\u00f3n eran {{per_share}} en esa fecha.\\n\\nLa proyecci\u00f3n aplica distintos crecimientos de ganancias y m\u00faltiplos de valoraci\u00f3n:\\n\\n| Escenario | Crecimiento anual supuesto de ganancias | M\u00faltiplo supuesto al final | Horizonte |\\n|---|---:|---:|---:|\\n| Bajo | {{growth_low_pct}} | {{multiple_low}} | {{horizon_years}} |\\n| Base | {{growth_base_pct}} | {{multiple_base}} | {{horizon_years}} |\\n| Alto | {{growth_high_pct}} | {{multiple_high}} | {{horizon_years}} |\\n\\nEstos porcentajes y m\u00faltiplos son supuestos ilustrativos; ninguna p\u00e1gina consultada establece cu\u00e1l ser\u00e1 el crecimiento de NVIDIA, su m\u00faltiplo de valoraci\u00f3n o el rendimiento de una estrategia de cruce dorado durante ese horizonte.\\n\\n### C\u00f3mo se construyen los escenarios\\n\\n**Ganancias futuras por acci\u00f3n**\\n\\n`Ganancias actuales por acci\u00f3n \u00d7 (1 + crecimiento anual) ^ horizonte`\\n\\n**Precio futuro del escenario**\\n\\n`Ganancias futuras por acci\u00f3n \u00d7 m\u00faltiplo final`\\n\\n**Valor futuro de la inversi\u00f3n**\\n\\n`Monto invertido \u00d7 precio futuro \u00f7 precio actual`\\n\\nEl c\u00e1lculo mostrar\u00e1 para cada escenario el precio impl\u00edcito, el rendimiento anualizado y el valor que alcanzar\u00eda la inversi\u00f3n inicial. No incluye impuestos, comisiones, dividendos, deslizamiento ni entradas y salidas sucesivas.\\n\\n### Por qu\u00e9 el cruce dorado no basta\\n\\nUn cruce dorado ocurre cuando una media m\u00f3vil de plazo m\u00e1s corto supera una de plazo m\u00e1s largo. Reuters se\u00f1ala que estos cruces son indicadores rezagados porque aparecen despu\u00e9s de que movimientos importantes ya fueron incorporados a las medias, y que el an\u00e1lisis t\u00e9cnico no garantiza el resultado.\\n\\nPara calcular espec\u00edficamente una estrategia habr\u00eda que definir qu\u00e9 medias usar, cu\u00e1ndo comprar, cu\u00e1ndo vender, si se permanece en efectivo entre se\u00f1ales y qu\u00e9 costos se pagan. Esas reglas no fueron indicadas y el c\u00e1lculo de valoraci\u00f3n no las reproduce.\",\"calculations\":[{\"inputs\":[{\"as_of\":null,\"currency\":\"USD\",\"name\":\"currency\",\"source\":\"assumption\",\"source_url\":null,\"value\":\"USD\"},{\"as_of\":null,\"currency\":null,\"name\":\"symbol\",\"source\":\"user\",\"source_url\":null,\"value\":\"NVDA\"},{\"as_of\":\"2026-09-16\",\"currency\":\"USD\",\"name\":\"price\",\"source\":\"market_data\",\"source_url\":null,\"value\":213.9},{\"as_of\":\"2026-09-16\",\"currency\":\"USD\",\"name\":\"per_share\",\"source\":\"page\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"value\":5.84},{\"as_of\":null,\"currency\":null,\"name\":\"growth_low_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":0},{\"as_of\":null,\"currency\":null,\"name\":\"growth_base_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":10},{\"as_of\":null,\"currency\":null,\"name\":\"growth_high_pct\",\"source\":\"assumption\",\"source_url\":null,\"value\":20},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_low\",\"source\":\"assumption\",\"source_url\":null,\"value\":20},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_base\",\"source\":\"assumption\",\"source_url\":null,\"value\":30},{\"as_of\":null,\"currency\":null,\"name\":\"multiple_high\",\"source\":\"assumption\",\"source_url\":null,\"value\":40},{\"as_of\":null,\"currency\":null,\"name\":\"horizon_years\",\"source\":\"user\",\"source_url\":null,\"value\":10},{\"as_of\":null,\"currency\":\"USD\",\"name\":\"amount\",\"source\":\"user\",\"source_url\":null,\"value\":10000}],\"kind\":\"valuation_scenarios\",\"name\":\"nvda_escenarios\",\"solve_for\":null}],\"declined\":false,\"follow_up_questions\":[\"\u00bfC\u00f3mo cambiar\u00edan los escenarios con otros crecimientos y m\u00faltiplos?\",\"\u00bfPuedes modelar reglas concretas de entrada y salida del cruce dorado?\",\"\u00bfC\u00f3mo afectar\u00edan impuestos y comisiones al resultado?\"],\"rows\":[{\"as_of\":\"2026-09-16\",\"kind\":\"currency\",\"label\":\"precio de la acci\u00f3n\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD\",\"value\":213.9},{\"as_of\":\"2026-09-16\",\"kind\":\"currency\",\"label\":\"ganancias por acci\u00f3n\",\"source_url\":\"https://www.perplexity.ai/finance/NVDA\",\"subject\":\"NVIDIA Corporation\",\"symbol\":\"NVDA\",\"unit\":\"USD por acci\u00f3n\",\"value\":5.84}],\"source_urls\":[\"https://www.perplexity.ai/finance/NVDA\",\"https://www.reuters.com/markets/commodities/global-markets-technicals-graphic-2026-09-01/\",\"https://www.sec.gov/Archives/edgar/data/1045810/000104581026000073/nvda-20260826.htm\"]}",
+                  "type": "output_text"
+                }
+              ],
+              "id": "msg_eb4fd8a8-24a3-4c37-9c1d-d1c483091cbf",
+              "role": "assistant",
+              "status": "completed",
+              "type": "message"
+            }
+          ],
+          "parallel_tool_calls": true,
+          "presence_penalty": 0,
+          "previous_response_id": null,
+          "prompt_cache_key": null,
+          "reasoning": {
+            "effort": "low",
+            "summary": null
+          },
+          "safety_identifier": null,
+          "service_tier": "default",
+          "status": "completed",
+          "store": true,
+          "temperature": 1,
+          "text": {
+            "format": {
+              "type": "text"
+            }
+          },
+          "tool_choice": "auto",
+          "tools": [
+            {
+              "type": "web_search",
+              "search_context_size": "medium",
+              "filters": {
+                "search_recency_filter": "month"
+              }
+            },
+            {
+              "type": "finance_search"
+            },
+            {
+              "type": "fetch_url"
+            }
+          ],
+          "top_logprobs": 0,
+          "top_p": 1,
+          "truncation": "",
+          "usage": {
+            "cost": {
+              "cache_creation_cost": 0.07995,
+              "cache_read_cost": 0.01236,
+              "currency": "USD",
+              "input_cost": 5e-05,
+              "output_cost": 0.04004,
+              "tool_calls_cost": 0.0105,
+              "tool_calls_cost_details": {
+                "fetch_url": 0.0005,
+                "finance_search": 0.005,
+                "search_web": 0.005
+              },
+              "total_cost": 0.1429
+            },
+            "input_tokens": 46901,
+            "input_tokens_details": {
+              "cache_creation_input_tokens": 15989,
+              "cache_read_input_tokens": 30900,
+              "cached_tokens": 30900
+            },
+            "output_tokens": 2002,
+            "output_tokens_details": {
+              "reasoning_tokens": 542
+            },
+            "tool_calls_details": {
+              "fetch_url": {
+                "cost_usd": 0.0005,
+                "invocation": 1
+              },
+              "finance_search": {
+                "cost_usd": 0.005,
+                "invocation": 1
+              },
+              "search_web": {
+                "cost_usd": 0.005,
+                "invocation": 2
+              }
+            },
+            "total_tokens": 48903
+          },
+          "user": null
+        }
+      },
+      {
+        "attempt": 341,
+        "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "provider": "openrouter",
+        "schema_name": "ArgusProseJudgeResponse",
+        "status_code": 200,
+        "response": {
+          "id": "gen-1789618787-FOtdXamhNoYBl60zqUst",
+          "object": "chat.completion",
+          "created": 1789618787,
+          "model": "deepseek/deepseek-v4-flash",
+          "provider": "OpenInference",
+          "system_fingerprint": "vllm-dev-ep-17a051ab",
+          "service_tier": null,
+          "choices": [
+            {
+              "index": 0,
+              "logprobs": null,
+              "finish_reason": "stop",
+              "native_finish_reason": "stop",
+              "message": {
+                "role": "assistant",
+                "content": "{\n  \"pass\": false,\n  \"failed_criteria\": [\"scenario_framing\"],\n  \"notes\": \"The prose presents the low/base/high scenario table and the arithmetic formulas, and the rendered tool card supplies the computed values for all three scenarios, so the scenario framing is supported. However, the final line 'nvda_escenarios: USD 21,240.71' singles out only the base-case value as a standalone result without labeling it as the base case or pairing it with the other scenario values, which reads as presenting a single number as the future outcome. That violates the requirement that a forward-looking answer never give a single number as the future.\"\n}",
+                "refusal": null,
+                "reasoning": null
+              }
+            }
+          ],
+          "usage": {
+            "prompt_tokens": 2298,
+            "completion_tokens": 140,
+            "total_tokens": 2438,
+            "cost": 6.7468e-05,
+            "is_byok": false,
+            "prompt_tokens_details": {
+              "cached_tokens": 1862,
+              "cache_write_tokens": 0,
+              "audio_tokens": 0,
+              "video_tokens": 0
+            },
+            "cost_details": {
+              "upstream_inference_cost": 6.7468e-05,
+              "upstream_inference_prompt_cost": 4.7868e-05,
+              "upstream_inference_completions_cost": 1.96e-05
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0,
+              "image_tokens": 0,
+              "audio_tokens": 0
+            }
+          }
+        }
+      }
+    ],
+    "baseline_hash_comparison": {
+      "last_complete": {
+        "prior_status": "failed",
+        "current": {
+          "judged_assistant_text": "cc35da26ad0bd72d12227818c2e8f07d14043dec6d3afdd12cc7bfb6be6b56f9",
+          "judged_rendered_context": "8d025bef881b8a1a7090e2148a4c3cf89b0cd584782d251e6ca00e0205f90da6"
+        },
+        "prior": {
+          "judged_assistant_text": "6ee7df87bd1cc30746e01bf162b5389f9e8887d31c1971e3702decab17afa99d",
+          "judged_rendered_context": "a6c1291945340ef5240fa6b79ef95cb4f4763e7e4b9c0e89bebaeefd451ad666"
+        }
+      },
+      "prior_complete": {
+        "prior_status": "failed",
+        "current": {
+          "judged_assistant_text": "cc35da26ad0bd72d12227818c2e8f07d14043dec6d3afdd12cc7bfb6be6b56f9",
+          "judged_rendered_context": "8d025bef881b8a1a7090e2148a4c3cf89b0cd584782d251e6ca00e0205f90da6"
+        },
+        "prior": {
+          "judged_assistant_text": "73c22b6e8f706dc65b094d04b629e8278944777403e4adbb53cb4a0293bca701",
+          "judged_rendered_context": "02737ff2463f29c2643168a2743ae7d291676bba99653f3e6a8ab0405602e507"
+        }
+      },
+      "prior_clean": {
+        "prior_status": "passed",
+        "current": {
+          "judged_assistant_text": "cc35da26ad0bd72d12227818c2e8f07d14043dec6d3afdd12cc7bfb6be6b56f9",
+          "judged_rendered_context": "8d025bef881b8a1a7090e2148a4c3cf89b0cd584782d251e6ca00e0205f90da6"
+        },
+        "prior": {
+          "judged_assistant_text": "ee33c619b16aa01a9aba8aeff572d41bd98ef2ce84b85c885db472b27600c4c0",
+          "judged_rendered_context": "0475457b4095b6f82de57f1aff694a69183fe94a9141d0e732542f8db893679c"
+        }
+      },
+      "frozen": {
+        "prior_status": "failed",
+        "current": {
+          "judged_assistant_text": "cc35da26ad0bd72d12227818c2e8f07d14043dec6d3afdd12cc7bfb6be6b56f9",
+          "judged_rendered_context": "8d025bef881b8a1a7090e2148a4c3cf89b0cd584782d251e6ca00e0205f90da6"
+        },
+        "prior": {
+          "judged_assistant_text": "ce1fad3c941c4997ba9752940625f5d64cc7f55329de8987333b125b0a2e8e1b",
+          "judged_rendered_context": "e241a990446f6a78d2f2135b140fde1cf6010b4ebe34359c5398ff7164bf50a9"
+        }
+      }
+    }
+  }
+]

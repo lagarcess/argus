@@ -1,0 +1,111 @@
+"""Approved 73-case measurement and six live writer-boundary replay turns."""
+import os,sys,json,subprocess,asyncio,time
+from pathlib import Path
+from dataclasses import asdict
+sys.path.insert(0,str(Path.cwd()));sys.path.insert(0,str(Path.cwd()/'src'));sys.path.insert(0,'/tmp')
+from dotenv import dotenv_values
+from current_reason_budget import Budget,SpendStop
+
+ROOT=Path.cwd(); OUT=ROOT/'temp/current-reason-live';OUT.mkdir(exist_ok=True)
+START_SHA=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip()
+secrets=dotenv_values('.env')
+profile=json.loads((ROOT/'.github/private-alpha-release-profile.json').read_text())['services']['api']['env']
+env={k:v for k,v in profile.items() if k.endswith('_MODEL') or v in ('true','false')}
+for key in ('OPENROUTER_API_KEY','PERPLEXITY_API_KEY','ALPACA_API_KEY','ALPACA_SECRET_KEY'):
+    assert secrets.get(key), f'missing credential {key}'
+    env[key]=secrets[key]
+env.update(ARGUS_RUN_LIVE_EVALS='1',ARGUS_MARKET_DATA_PROVIDER_MODE='live_provider',ARGUS_ASSET_PROVIDER_MODE='live_provider',ARGUS_DISCOVERY_SEARCH_PROVIDER=profile['ARGUS_DISCOVERY_SEARCH_PROVIDER'])
+envpath=OUT/'measurement.env'
+envpath.touch(mode=0o600,exist_ok=True)
+envpath.write_text('\n'.join(k+'='+json.dumps(v) for k,v in env.items())+'\n')
+os.environ.update(env);os.environ['ARGUS_EVAL_ENV_FILE']=str(envpath)
+# Keep local product/database credentials out of the isolated measurement process.
+for key in ('SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','SUPABASE_ANON_KEY','DATABASE_URL','ARGUS_WORKFLOW_DATABASE_URL'):
+    os.environ.pop(key,None)
+backup=Path('/tmp/current-reason-measurement-dotenv-link')
+assert not backup.exists() and not backup.is_symlink()
+(ROOT/'.env').rename(backup)
+guard=Budget(OUT/'budget.json',json.loads(Path('/tmp/current-reason-endpoint-prices.json').read_text()))
+try:
+    from loguru import logger
+    logger.remove();logger.add(str(OUT/'runtime.log'),level='INFO',rotation='20 MB')
+    from tests.evals.measurement_eval_scorecard import build_scorecard_provenance,write_scorecard,validated_provenance_payload
+    from tests.promotion_evidence_configuration import assert_release_configuration_matches
+    from tests.evals.measurement_eval_harness import load_eval_cases,run_eval_case
+    from argus.domain.market_data.assets import clear_asset_cache
+    saved_budget=json.loads((OUT/'budget.json').read_text());guard.rows=saved_budget['calls'];guard.blocked=saved_budget['blocked']
+    guard.install();clear_asset_cache()
+    provenance=build_scorecard_provenance(evaluation_mode='live')
+    assert_release_configuration_matches(provenance.release_configuration,shipped_sha=START_SHA,repository_root=ROOT,evidence='live measurement')
+    (OUT/'provenance.json').write_text(json.dumps(validated_provenance_payload(provenance),indent=2))
+    cases=load_eval_cases();assert len(cases)==73
+    results=json.loads((OUT/'partial-results.json').read_text())
+    saved_budget=json.loads((OUT/'budget.json').read_text())
+    guard.rows=saved_budget['calls'];guard.blocked=saved_budget['blocked']
+    # The prior attempt stopped before Agent dispatch; it is an explicit
+    # unmeasured case, not a test result reconstructed from the baseline.
+    def blocked_case(case):
+        return {'id':case.id,'category':case.category,'status':'infrastructure_error',
+          'failed_checks':[],'expected_fail':None,'typed_outcome':{},'prose_judge':None,
+          'infrastructure_errors':[{'component':'measurement_cost_guard','code':'agent_request_not_dollar_bounded'}],
+          'route_receipts':[],'measurement_note':'Stopped before Perplexity Agent dispatch. Structured/prose assertions were not completed. See shared budget ledger for earlier interpreter calls.'}
+    stopped_id=saved_budget['blocked'][-1]['label']
+    results.append(blocked_case(next(c for c in cases if c.id==stopped_id)))
+    completed={r['id'] for r in results}
+    print('LIVE START',START_SHA,'cases',len(cases),flush=True)
+    for index,case in enumerate(cases,1):
+        if case.id in completed:continue
+        guard.label=case.id
+        try:
+            result=run_eval_case(case)
+        except SpendStop as exc:
+            if str(exc)!='unpriced_write_endpoint:api.perplexity.ai/v1/agent':raise
+            result=blocked_case(case)
+        results.append(result)
+        (OUT/'partial-results.json').write_text(json.dumps(results,indent=2))
+        print(index,case.id,result['status'],result['failed_checks'],'accounted',round(guard.total(),6),flush=True)
+    scorecard=write_scorecard(results,provenance=provenance,output_dir=OUT)
+    print('SCORECARD',scorecard,flush=True)
+    # These authored stored-blocker fixtures exercise the real writer boundary.
+    # They do not claim the current validator rejects $100 (it now accepts it).
+    from argus.agent_runtime.capabilities.contract import build_default_capability_contract
+    from argus.agent_runtime.stages.clarify import clarify_stage_async
+    from argus.agent_runtime.llm_clarifier import OpenRouterClarificationGenerator
+    from argus.agent_runtime.state.models import RunState,StrategySummary
+    from argus.llm.openrouter import begin_openrouter_route_receipt_capture,end_openrouter_route_receipt_capture
+    prompts={
+      'en':['Test $100 bucks on @mrna stock from August 16 to August 19 just a few days this year','That this year check again','August 16, 2026 to August 19, 2026'],
+      'es-419':['Prueba $100 en acciones de @mrna del 16 de agosto al 19 de agosto solo unos días este año','Eso, este año, revísalo otra vez','Del 16 de agosto de 2026 al 19 de agosto de 2026']}
+    targets=[]
+    async def targeted():
+        for language,turns in prompts.items():
+            history=[]
+            for index,prompt in enumerate(turns):
+                field='date_range' if index<2 else 'capital_amount'
+                category='data_window_unavailable' if index<2 else 'unsupported_starting_capital'
+                option={'id':f'change_{field}','label':'Choose another value' if language=='en' else 'Elegir otro valor','replacement_values':{'requested_field':field}}
+                constraint={'category':category,'simplification_options':[option]}
+                state=RunState.new(current_user_message=prompt,recent_thread_history=history)
+                state.candidate_strategy_draft=StrategySummary(strategy_type='buy_and_hold',asset_class='equity',asset_universe=['MRNA'],capital_amount=100,date_range={'start':'2026-08-16','end':'2026-12-31' if index<2 else '2026-08-19'})
+                state.optional_parameter_status={'unsupported_constraints':[constraint]};state.requested_field=field
+                # Same language owner supplied by the runtime to clarification.
+                guard.label=f'targeted:{language}:turn{index+1}'
+                capture=begin_openrouter_route_receipt_capture()
+                try:
+                    result=await clarify_stage_async(state=state,contract=build_default_capability_contract(),clarification_generator=OpenRouterClarificationGenerator(),language=language)
+                finally:
+                    receipts=[x.as_dict() for x in end_openrouter_route_receipt_capture(capture)]
+                patch=result.patch
+                item={'language':language,'turn':index+1,'prompt':prompt,'stored_constraint':constraint,'patch':patch,'route_receipts':receipts}
+                targets.append(item);(OUT/'targeted-replies.json').write_text(json.dumps(targets,indent=2,default=str))
+                print('TARGET',language,index+1,patch.get('assistant_prompt'),flush=True)
+                history.extend([{'role':'user','content':prompt},{'role':'assistant','content':patch.get('assistant_prompt','')}])
+    asyncio.run(targeted())
+    print('BOUNDED CASES COMPLETE; Agent cases unmeasured',round(guard.total(),6),flush=True)
+finally:
+    guard.save()
+    backup.rename(ROOT/'.env')
+    assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==START_SHA
+    assert not subprocess.check_output(['git','status','--porcelain'],text=True).strip()
+    print('CHECKOUT UNCHANGED; dotenv restored',flush=True)

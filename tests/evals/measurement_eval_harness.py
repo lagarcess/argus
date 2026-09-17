@@ -31,6 +31,7 @@ from tests.evals.measurement_assertions import (
     _compare,
     _compare_date_range,
     _compare_subset,
+    _date_range_expectation,
 )
 from tests.evals.measurement_eval_scorecard import (
     FIXTURE_DIR,
@@ -760,9 +761,9 @@ def _case_from_raw(*, category: str, raw_case: dict[str, Any]) -> EvalCase:
             entry_rule=expected.get("entry_rule"),
             exit_rule=expected.get("exit_rule"),
             rule_spec=expected.get("rule_spec"),
-            date_range=expected.get("date_range"),
-            requested_date_range=expected.get("requested_date_range"),
-            effective_date_range=expected.get("effective_date_range"),
+            date_range=_date_range_expectation(expected.get("date_range")),
+            requested_date_range=_date_range_expectation(expected.get("requested_date_range")),
+            effective_date_range=_date_range_expectation(expected.get("effective_date_range")),
             adjustment_reason=expected.get("adjustment_reason"),
             benchmark_symbol=expected.get("benchmark_symbol"),
             capital_amount=expected.get("capital_amount"),

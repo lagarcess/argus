@@ -309,6 +309,8 @@ def compare_offered(
     fields = expected_fields or {}
     if expected.get("response") is True and not actual.get("response"):
         failures.append("offered.response: no assistant answer reached the turn")
+    if expected.get("response") is False and actual.get("response"):
+        failures.append("offered.response: confirmation turn unexpectedly carried prose")
     if expected.get("launch_matches_expected") is True:
         _compare_delivered_launch(fields, actual.get("launch_payload"), failures)
     if expected.get("clarification_matches_expected") is True:

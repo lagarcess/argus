@@ -211,6 +211,8 @@ def response_with_provider_context_assets(
         and not preserved_fuller_draft
         and not incomplete_asset_context
         and draft == response.candidate_strategy_draft
+        and "asset_universe" not in response.missing_required_fields
+        and "provider_context_incomplete_asset_mentions" not in response.reason_codes
     ):
         return response
     update: dict[str, Any] = {"candidate_strategy_draft": draft}
@@ -225,7 +227,10 @@ def response_with_provider_context_assets(
         )
     resolved_missing_asset = (
         response.intent in {"strategy_drafting", "backtest_execution"}
-        and "asset_universe" in response.missing_required_fields
+        and (
+            "asset_universe" in response.missing_required_fields
+            or "provider_context_incomplete_asset_mentions" in response.reason_codes
+        )
         and bool(traded_symbols)
         and not ambiguous_fields
         and not preserved_fuller_draft
@@ -249,7 +254,13 @@ def response_with_provider_context_assets(
                 "reason_codes": list(
                     dict.fromkeys(
                         [
-                            *(update.get("reason_codes") or response.reason_codes),
+                            *[
+                                code
+                                for code in (
+                                    update.get("reason_codes") or response.reason_codes
+                                )
+                                if code != "provider_context_incomplete_asset_mentions"
+                            ],
                             "provider_context_resolved_missing_asset",
                         ]
                     )

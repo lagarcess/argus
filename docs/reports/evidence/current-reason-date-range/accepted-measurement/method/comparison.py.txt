@@ -1,0 +1,24 @@
+import json,sys
+from pathlib import Path
+out=Path(sys.argv[1]); score=json.loads((out/'live-measurement.json').read_text()); budget=json.loads((out/'budget.json').read_text())
+frozen=json.loads(Path('.agent/interpreter_prompt_fingerprint.json').read_text())['last_measured']['scorecard']
+paths={'last_complete':'temp/current-reason-full-cbde99af/live-measurement.json','prior_complete':'temp/current-reason-full-20984904/live-measurement.json','prior_clean':'docs/reports/evidence/current-reason-date-range/clean-measurement/live-measurement.json','frozen':frozen}
+baselines={k:{r['id']:r for r in json.loads(Path(p).read_text())['results']} for k,p in paths.items()}
+raw=[json.loads(s) for s in (out/'provider-responses.jsonl').read_text().splitlines()]
+rows=[]; failure_traces=[]
+for r in score['results']:
+ calls=[x for x in budget['calls'] if x['label']==r['id']]
+ errors=[x for x in calls if x.get('transport_error') or x.get('status_code',200)>=400 or (x['provider'] in ('openrouter','perplexity_agent') and 'reported_cost_usd' not in x)]
+ prior={k:rs.get(r['id'],{}).get('status','not_present') for k,rs in baselines.items()}
+ hash_pairs={}
+ judge=r.get('prose_judge') or {}
+ for k,rs in baselines.items():
+  old=rs.get(r['id'],{}); oj=old.get('prose_judge') or {}
+  hash_pairs[k]={'prior_status':old.get('status'),'current':{key:judge.get(key,{}).get('sha256') for key in ('judged_assistant_text','judged_rendered_context')},'prior':{key:oj.get(key,{}).get('sha256') for key in ('judged_assistant_text','judged_rendered_context')}}
+ item={'id':r['id'],'status':r['status'],'failed_checks':r['failed_checks'],'infrastructure_errors':r['infrastructure_errors'],'previous_statuses':prior,'raw_status_regresses_from':[k for k,s in prior.items() if s=='passed' and r['status']!='passed'],'reported_usd':sum(c.get('reported_cost_usd',0) for c in calls),'accounted_usd':sum(c['accounted_usd'] for c in calls),'provider_error_attempts':[c['attempt'] for c in errors],'classification':'passed' if r['status']=='passed' else 'pending_trace_review'}
+ rows.append(item)
+ if r['status']!='passed':
+  failure_traces.append({'result':r,'costs':calls,'provider_responses':[x for x in raw if x['case_id']==r['id']],'baseline_hash_comparison':hash_pairs})
+comparison={'candidate_sha':score['provenance']['candidate_sha'],'baseline_paths':paths,'complete':len(rows)==73 and len({r['id'] for r in rows})==73,'acceptance_status':'pending_classification','totals':score['totals'],'cases':rows}
+(out/'comparison.json').write_text(json.dumps(comparison,indent=2)+'\n');(out/'failure-traces.json').write_text(json.dumps(failure_traces,indent=2)+'\n')
+print(json.dumps({'totals':score['totals'],'failed_cases':[r for r in rows if r['status']!='passed'],'costs':{k:v for k,v in budget.items() if k not in ('calls',)}},indent=2))

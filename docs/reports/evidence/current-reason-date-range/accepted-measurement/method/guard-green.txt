@@ -1,0 +1,5 @@
+PASS: all real-client research shapes and both model orderings use highest-priced fallback reserve
+PASS: unknown primary and unknown fallback rejected before admission
+PASS: hard cap, latched stop, per-attempt reservation, timeout reservation
+PASS: missing invoice retains reserve; recorded real invoice reconciles
+PASS: valid real-client request reaches transport; unknown fallback cannot reach transport

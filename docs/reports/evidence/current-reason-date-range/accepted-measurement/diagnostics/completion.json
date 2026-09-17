@@ -1,0 +1,18 @@
+{
+  "candidate_sha": "6e9e6d7edef24c1f849c16fee1f3cb666ced0ad5",
+  "stage": "diagnostic",
+  "completed_cases": 4,
+  "expected_cases": 4,
+  "complete": true,
+  "all_passed": true,
+  "diagnostic_repeats_completed": 4,
+  "agent_transport_attempt_limit": 1,
+  "cap_usd": 1.5,
+  "prior_discovery_accounted_usd": 0.0,
+  "agent_sends_per_repeat": {
+    "1": 0,
+    "2": 0,
+    "3": 1,
+    "4": 1
+  }
+}

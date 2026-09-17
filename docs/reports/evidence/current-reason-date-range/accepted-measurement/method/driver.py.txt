@@ -1,0 +1,138 @@
+"""Approved sequential measurement; immutable product head, isolated spend ledgers."""
+import atexit, json, os, shutil, subprocess, sys, traceback
+from pathlib import Path
+os.environ['PATH']='/Library/Developer/CommandLineTools/usr/bin:'+os.environ['PATH']
+ROOT=Path.cwd()
+sys.path[:0]=[str(ROOT),str(ROOT/'src'),'/tmp']
+from dotenv import dotenv_values
+from current_reason_12_budget import Budget, SpendStop
+STAGE='full'
+SHA=sys.argv[1]
+assert len(SHA)==40
+CAP=12.0
+TARGET_IDS={
+'dca_capital_semantics_only_have_amount_is_ceiling_issue_455',
+'dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run',
+'compound_benchmark_start_date_preserves_confirmation_issue_339',
+'asset_discovery_trending_crypto_exact_issue_344',
+'capability_honesty_future_performance_nvda_golden_cross',
+'capability_honesty_future_performance_btc_regression',
+'messy_english_explicit_end_survives_year_qualifier',
+'messy_spanish_explicit_end_survives_year_qualifier',
+}
+def git(*args):return subprocess.check_output(['git',*args],text=True).strip()
+assert git('rev-parse','HEAD')==SHA
+assert not git('status','--porcelain')
+OUT=ROOT/f'temp/current-reason-full-12-{SHA[:8]}'
+OUT.mkdir(exist_ok=False)
+secret_values=dotenv_values(ROOT/'.env')
+profile=json.loads((ROOT/'.github/private-alpha-release-profile.json').read_text())['services']['api']['env']
+env={k:v for k,v in profile.items() if k.endswith('_MODEL') or v in ('true','false')}
+keys=('OPENROUTER_API_KEY','PERPLEXITY_API_KEY','ALPACA_API_KEY','ALPACA_SECRET_KEY')
+for key in keys:
+    assert secret_values.get(key),f'missing credential {key}'
+    env[key]=secret_values[key]
+env.update(ARGUS_RUN_LIVE_EVALS='1',ARGUS_MARKET_DATA_PROVIDER_MODE='live_provider',ARGUS_ASSET_PROVIDER_MODE='live_provider',ARGUS_DISCOVERY_SEARCH_PROVIDER=profile['ARGUS_DISCOVERY_SEARCH_PROVIDER'])
+envpath=OUT/'measurement.env'
+backup=Path('/tmp/current-reason-reconciled-dotenv-link')
+assert not backup.exists() and not backup.is_symlink()
+def cleanup():
+    if backup.exists() or backup.is_symlink():
+        assert not (ROOT/'.env').exists() and not (ROOT/'.env').is_symlink()
+        backup.rename(ROOT/'.env')
+    envpath.unlink(missing_ok=True)
+atexit.register(cleanup)
+envpath.touch(mode=0o600,exist_ok=False)
+envpath.write_text('\n'.join(k+'='+json.dumps(v) for k,v in env.items())+'\n')
+for key in list(os.environ):
+    if key.startswith(('ARGUS_','SUPABASE_','ALPACA_','OPENROUTER_','PERPLEXITY_')) or key=='DATABASE_URL':os.environ.pop(key)
+os.environ.update(env);os.environ['ARGUS_EVAL_ENV_FILE']=str(envpath)
+rawpath=OUT/'provider-responses.jsonl';rawpath.touch(mode=0o600,exist_ok=False)
+class RecordingBudget(Budget):
+    def before(self,request):
+        row=super().before(request)
+        if row is not None and row['provider']=='openrouter':
+            body=json.loads(request.content)
+            row['schema_name']=body.get('response_format',{}).get('json_schema',{}).get('name')
+        return row
+    def after(self,row,response):
+        if row is not None:
+            try:data=response.json()
+            except ValueError:data={'non_json_body_excerpt':response.text[:4000]}
+            record={'attempt':row['attempt'],'case_id':row['label'],'provider':row['provider'],'schema_name':row.get('schema_name'),'status_code':response.status_code,'response':data}
+            encoded=json.dumps(record)
+            # Preserve model JSON, never credentials or headers.
+            for key in keys:encoded=encoded.replace(secret_values[key],'[REDACTED_CREDENTIAL]')
+            with self.lock:
+                with rawpath.open('a') as stream:stream.write(encoded+'\n')
+        return super().after(row,response)
+prices=json.loads(Path('/tmp/current-reason-4d-prices.json').read_text())
+guard=RecordingBudget(OUT/'budget.json',prices,cap=CAP)
+assert all(rate['input']>0 and rate['output']>0 for rate in guard.rates.values())
+method=OUT/'method';method.mkdir()
+for path,name in [('/tmp/current_reason_12_budget.py','budget.py.txt'),('/tmp/current_reason_12_measure.py','driver.py.txt'),('/tmp/current_reason_price_observer.py','price-observer.py.txt'),('/tmp/current_reason_4d_guard_tests.py','guard-tests.py.txt'),('/tmp/current-reason-12-guard-green.txt','guard-green.txt'),('/tmp/current-reason-4d-prices.json','endpoint-prices.json'),('/tmp/current-reason-4d-prices-provenance.json','pricing-provenance.json'),('/tmp/current_reason_12_driver_tests.py','driver-tests.py.txt'),('/tmp/current-reason-12-driver-green.txt','driver-green.txt')]:shutil.copyfile(path,method/name)
+(ROOT/'.env').rename(backup)
+try:
+    from loguru import logger
+    logger.remove();logger.add(str(OUT/'runtime.log'),level='INFO',rotation='20 MB')
+    from tests.evals.measurement_eval_scorecard import build_scorecard_provenance,write_scorecard,validated_provenance_payload,assert_provenance_matches_current_run
+    from tests.promotion_evidence_configuration import assert_release_configuration_matches
+    from tests.evals.measurement_eval_harness import load_eval_cases,run_eval_case
+    from argus.domain.market_data.assets import clear_asset_cache
+    from argus.domain.research import perplexity_agent
+    # Run-local no-retry policy: retain a failed first response and advance
+    # to the next case; do not stop the whole run on a provider failure.
+    perplexity_agent._MAX_ATTEMPTS = 1
+    from current_reason_price_observer import install as observe_prices
+    from argus.domain import engine
+    from argus.domain.market_data import provider as market_provider
+    from argus.agent_runtime import answer_calculation
+    def record_price(data):
+        encoded=json.dumps({'case_id':guard.label,**data},default=str)
+        for key in keys:encoded=encoded.replace(secret_values[key],'[REDACTED_CREDENTIAL]')
+        with (OUT/'market-price-observations.jsonl').open('a') as f:f.write(encoded+'\n')
+    logger.add(lambda msg: record_price({'operation':'runtime_note','message':msg.record['message'],'extra':msg.record['extra']}) if msg.record['extra'] and ('market' in msg.record['message'].lower() or 'calculation' in msg.record['message'].lower()) else None,level='INFO')
+    observe_prices(engine,market_provider,answer_calculation,record_price)
+    guard.install();clear_asset_cache()
+    provenance=build_scorecard_provenance(evaluation_mode='live')
+    assert_release_configuration_matches(provenance.release_configuration,shipped_sha=SHA,repository_root=ROOT,evidence='live measurement')
+    (OUT/'provenance.json').write_text(json.dumps(validated_provenance_payload(provenance),indent=2)+'\n')
+    all_cases=load_eval_cases();assert len(all_cases)==73
+    cases=[c for c in all_cases if STAGE=='full' or c.id in TARGET_IDS]
+    assert len(cases)==(8 if STAGE=='targeted' else 73)
+    results=[]
+    print('LIVE START',STAGE,SHA,'cases',len(cases),'cap',CAP,flush=True)
+    for index,case in enumerate(cases,1):
+        guard.label=case.id
+        try:result=run_eval_case(case)
+        except SpendStop as exc:
+            (OUT/'stop.json').write_text(json.dumps({'case_id':case.id,'completed_cases':len(results),'reason':str(exc),'not_completed':[c.id for c in cases[index-1:]]},indent=2)+'\n')
+            print('ADMISSION STOP',case.id,str(exc),flush=True);break
+        except Exception as exc:
+            detail=traceback.format_exc()
+            for key in keys:detail=detail.replace(secret_values[key],'[REDACTED_CREDENTIAL]')
+            (OUT/(case.id+'-exception.txt')).write_text(detail)
+            result={'id':case.id,'category':case.category,'status':'infrastructure_error',
+                    'failed_checks':[],'expected_fail':None,'typed_outcome':{},
+                    'prose_judge':None,'route_receipts':[],
+                    'infrastructure_errors':[{'component':'case_runner','code':type(exc).__name__}]}
+        results.append(result)
+        (OUT/'partial-results.json').write_text(json.dumps(results,indent=2)+'\n')
+        print(index,case.id,result['status'],'failed_checks',len(result['failed_checks']),'accounted',round(guard.total(),6),flush=True)
+    complete=len(results)==len(cases)
+    all_passed=complete and not guard.blocked and all(r['status']=='passed' and not r['failed_checks'] and not r['infrastructure_errors'] for r in results)
+    assert_provenance_matches_current_run(provenance)
+    if STAGE=='full' and complete:
+        scorecard=write_scorecard(results,provenance=provenance,output_dir=OUT)
+        shutil.copyfile(scorecard,OUT/'live-measurement.json')
+        print('SCORECARD',scorecard,flush=True)
+    else:
+        (OUT/'targeted-measurement.json' if STAGE=='targeted' else OUT/'incomplete-measurement.json').write_text(json.dumps({'artifact_kind':'targeted_live_measurement_not_a_full_scorecard' if STAGE=='targeted' else 'incomplete_live_measurement_not_a_scorecard','provenance':validated_provenance_payload(provenance),'selected_case_ids':[c.id for c in cases],'results':results},indent=2)+'\n')
+    completion={'candidate_sha':SHA,'stage':STAGE,'completed_cases':len(results),'expected_cases':len(cases),'complete':complete,'all_passed':all_passed,'diagnostic_retries':0,'agent_transport_attempt_limit':1,'cap_usd':CAP}
+    (OUT/'completion.json').write_text(json.dumps(completion,indent=2)+'\n')
+    print('LIVE ENDED',json.dumps(completion),'accounted',round(guard.total(),6),flush=True)
+finally:
+    guard.save()
+    cleanup()
+    assert git('rev-parse','HEAD')==SHA and not git('status','--porcelain')
+    print('CHECKOUT UNCHANGED; dotenv restored; private env deleted',flush=True)

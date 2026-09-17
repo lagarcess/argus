@@ -114,7 +114,7 @@ def test_model_history_preserves_import_through_runtime_and_checkpoint(
     assert "shared_context" not in str([message.model_dump() for message in messages])
 
 
-def test_all_model_adapters_keep_imported_pairs_without_provenance(monkeypatch):
+def test_interpretation_and_answer_adapters_keep_imports_but_clarifier_uses_current_reason(monkeypatch):
     from types import SimpleNamespace
 
     from argus.agent_runtime.calculated_answer import _messages as answer_messages
@@ -145,18 +145,16 @@ def test_all_model_adapters_keep_imported_pairs_without_provenance(monkeypatch):
         recent_thread_history=state.recent_thread_history,
         user=UserState(user_id=user_id),
     )
+    clarification_messages = OpenRouterClarificationGenerator()._messages(
+        ClarificationRequest(
+            current_user_message="Follow up",
+            recent_thread_history=state.recent_thread_history,
+        )
+    )
+    clarification_text = str([m.model_dump() for m in clarification_messages])
+    assert all(turn["content"] not in clarification_text for turn in imported)
+    assert "Follow up" in clarification_text
     outputs = [
-        str(
-            [
-                m.model_dump()
-                for m in OpenRouterClarificationGenerator()._messages(
-                    ClarificationRequest(
-                        current_user_message="Follow up",
-                        recent_thread_history=state.recent_thread_history,
-                    )
-                )
-            ]
-        ),
         _history_lines(request),
         str(
             _strategy_family_continuity_audit_messages(

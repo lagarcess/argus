@@ -1,0 +1,11 @@
+{
+  "candidate_sha": "6e9e6d7edef24c1f849c16fee1f3cb666ced0ad5",
+  "stage": "full",
+  "completed_cases": 73,
+  "expected_cases": 73,
+  "complete": true,
+  "all_passed": false,
+  "diagnostic_retries": 0,
+  "agent_transport_attempt_limit": 1,
+  "cap_usd": 12.0
+}

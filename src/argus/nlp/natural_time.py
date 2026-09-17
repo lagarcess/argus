@@ -90,6 +90,16 @@ def resolve_date_range_text(
     if len(parsed) < 2:
         return None
 
+    if any(item.period == "year" for item in parsed) and any(
+        item.period == "month"
+        or (item.period == "day" and any(char.isdigit() for char in item.span))
+        for item in parsed
+    ):
+        # A year alongside finer dates may qualify their year rather than name
+        # an endpoint. Search can also drop one of those dates. Do not let this
+        # partial reading overwrite the structured interpreter's full range.
+        return None
+
     first = parsed[0]
     last = parsed[-1]
     if (
@@ -240,6 +250,7 @@ def resolve_date_range_intent(
     if not payload:
         return None
     current_date = today or new_york_today()
+    current_year = payload.get("year_reference") == "current_year"
     if not _intent_confidence_is_usable(payload):
         return None
 
@@ -251,12 +262,23 @@ def resolve_date_range_intent(
         # historical test window (issue #241 executable boundary).
         return None
 
+    year = current_date.year if current_year else _positive_int(payload.get("year"))
+    start = _intent_date(
+        payload.get("start"), today=current_date, current_year=current_year
+    )
+    end = _intent_date(payload.get("end"), today=current_date, current_year=current_year)
+    if current_year and any(
+        payload.get(key) and value is None
+        for key, value in (("start", start), ("end", end))
+    ):
+        return None
+
     if kind == "rolling_window":
         count = _positive_number(payload.get("count"))
         unit = _intent_unit(payload.get("unit"))
         if count is None or unit is None:
             return None
-        end = _intent_date(payload.get("end"), today=current_date) or current_date
+        end = end or current_date
         start = _subtract_period(end, count=count, unit=unit)
         if end < start:
             return None
@@ -267,10 +289,9 @@ def resolve_date_range_intent(
         )
 
     if kind == "year_to_date":
-        year = _positive_int(payload.get("year")) or current_date.year
+        year = year or current_date.year
         if year > current_date.year:
             return None
-        end = _intent_date(payload.get("end"), today=current_date)
         if end is None:
             end = current_date if year == current_date.year else date(year, 12, 31)
         if end < date(year, 1, 1):
@@ -282,7 +303,6 @@ def resolve_date_range_intent(
         )
 
     if kind == "calendar_year":
-        year = _positive_int(payload.get("year"))
         if year is None or year > current_date.year:
             return None
         end = current_date if year == current_date.year else date(year, 12, 31)
@@ -293,13 +313,11 @@ def resolve_date_range_intent(
         )
 
     if kind == "since":
-        start = _intent_date(payload.get("start"), today=current_date)
-        year = _positive_int(payload.get("year"))
         if start is None and year is not None:
             start = date(year, 1, 1)
         if start is None or start > current_date:
             return None
-        end = _intent_date(payload.get("end"), today=current_date) or current_date
+        end = end or current_date
         if end < start:
             return None
         return DateRangeIntentResolution(
@@ -310,8 +328,6 @@ def resolve_date_range_intent(
 
     if kind in {"explicit_range", "endpoint_patch"}:
         patch: dict[str, str] = {}
-        start = _intent_date(payload.get("start"), today=current_date)
-        end = _intent_date(payload.get("end"), today=current_date)
         offset_date = _intent_day_offset_date(payload, today=current_date)
         endpoint = str(payload.get("endpoint") or "").strip()
         if start is not None:
@@ -661,16 +677,23 @@ def _intent_unit(value: Any) -> DateIntentUnit | None:
     return None
 
 
-def _intent_date(value: Any, *, today: date) -> date | None:
+def _intent_date(
+    value: Any, *, today: date, current_year: bool = False
+) -> date | None:
     if isinstance(value, date) and not isinstance(value, datetime):
-        return value
+        value = value.isoformat()
     text = str(value or "").strip()
     if not text:
         return None
     if text in {"today", "current_date"}:
         return today
     try:
-        return date.fromisoformat(text)
+        if current_year and text.startswith("--"):
+            # The model supplies month/day and the typed year reference only.
+            # Even a stale ISO year cannot override the runtime clock.
+            return date.fromisoformat(f"{today.year}-{text[2:]}")
+        parsed = date.fromisoformat(text)
+        return parsed.replace(year=today.year) if current_year else parsed
     except ValueError:
         return None
 

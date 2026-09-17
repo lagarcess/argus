@@ -945,19 +945,8 @@ def test_llm_strategy_draft_resolves_canonical_date_range_intent() -> None:
         "start": date(new_york_today().year - 1, new_york_today().month, new_york_today().day).isoformat(),
         "end": new_york_today().isoformat(),
     }
-    assert strategy.extra_parameters["date_range_intent"] == {
-        "kind": "rolling_window",
-            "start": None,
-            "end": None,
-            "day_offset": None,
-            "count": 12,
-        "unit": "month",
-        "anchor": "today",
-        "year": None,
-        "endpoint": None,
-        "confidence": 0.8,
-        "evidence": "durante los últimos 12 meses",
-    }
+    assert strategy.extra_parameters["date_range_intent"] == draft.date_range_intent.model_dump(mode="json")
+
 
 def test_llm_strategy_draft_keeps_untyped_evidence_as_provenance_only() -> None:
     # Issue #241: the builder no longer establishes temporal direction from
@@ -2091,19 +2080,13 @@ async def test_llm_interpreter_routes_active_confirmation_compound_asset_edit_to
     }
     assert result.candidate_strategy_draft.extra_parameters[
         "date_range_intent"
-    ] == {
-        "kind": "explicit_range",
-        "start": "2026-03-01",
-        "end": "2026-06-05",
-        "day_offset": None,
-        "count": None,
-        "unit": None,
-        "anchor": "today",
-        "year": None,
-        "endpoint": None,
-        "confidence": 0.95,
-        "evidence": "March 1, 2026 to June 5, 2026",
-    }
+    ] == LLMDateRangeIntent(
+        kind="explicit_range",
+        start="2026-03-01",
+        end="2026-06-05",
+        confidence=0.95,
+        evidence="March 1, 2026 to June 5, 2026",
+    ).model_dump(mode="json")
     assert "artifact_assumption_edit_planned" in result.reason_codes
 
 

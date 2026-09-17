@@ -1,0 +1,809 @@
+{
+  "cap_usd": 1.5,
+  "accounted_total_usd": 0.6502626984828,
+  "reported_cost_usd": 0.6336942713479999,
+  "unknown_cost_reserved_usd": 0.011000000000000001,
+  "pricing_allowance_multiplier": 1.1,
+  "calls": [
+    {
+      "attempt": 1,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.04676650000000001,
+      "accounted_usd": 0.00023496000000000001,
+      "started_at": 1789619144.947218,
+      "repeat": 1,
+      "schema_name": "LLMAssetMentionExtraction",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 782,
+        "completion_tokens": 17,
+        "total_tokens": 799,
+        "cost": 0.0002136,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 768,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0002136,
+          "upstream_inference_prompt_cost": 0.0001711,
+          "upstream_inference_completions_cost": 4.25e-05
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.0002136,
+      "finished_at": 1789619145.790428
+    },
+    {
+      "attempt": 2,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.3322385000000001,
+      "accounted_usd": 0.017182990000000002,
+      "started_at": 1789619145.8046122,
+      "repeat": 1,
+      "schema_name": "LLMInterpretationResponse",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 10900,
+        "completion_tokens": 879,
+        "total_tokens": 11779,
+        "cost": 0.0156209,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 192,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0156209,
+          "upstream_inference_prompt_cost": 0.0134234,
+          "upstream_inference_completions_cost": 0.0021975
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 649,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.0156209,
+      "finished_at": 1789619152.601506
+    },
+    {
+      "attempt": 3,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "perplexity_search",
+      "model": null,
+      "reserved_usd": 0.0055000000000000005,
+      "accounted_usd": 0.0055000000000000005,
+      "started_at": 1789619152.612629,
+      "repeat": 1,
+      "status_code": 200,
+      "finished_at": 1789619153.849569
+    },
+    {
+      "attempt": 4,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.05448300000000001,
+      "accounted_usd": 0.00471416,
+      "started_at": 1789619153.859793,
+      "repeat": 1,
+      "schema_name": "discovery_extraction",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 2612,
+        "completion_tokens": 462,
+        "total_tokens": 3074,
+        "cost": 0.0042856,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 128,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0042856,
+          "upstream_inference_prompt_cost": 0.0031306,
+          "upstream_inference_completions_cost": 0.001155
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.0042856,
+      "finished_at": 1789619157.4872792
+    },
+    {
+      "attempt": 5,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "reserved_usd": 0.0010651410000000001,
+      "accounted_usd": 1.2533400000000001e-05,
+      "started_at": 1789619161.0804448,
+      "repeat": 1,
+      "schema_name": null,
+      "status_code": 200,
+      "served_model": "deepseek/deepseek-v4-flash",
+      "usage": {
+        "prompt_tokens": 213,
+        "completion_tokens": 57,
+        "total_tokens": 270,
+        "cost": 1.1394e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 201,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 1.1394e-05,
+          "upstream_inference_prompt_cost": 3.414e-06,
+          "upstream_inference_completions_cost": 7.98e-06
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 1.1394e-05,
+      "finished_at": 1789619164.423954
+    },
+    {
+      "attempt": 6,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "reserved_usd": 0.001842225,
+      "accounted_usd": 0.00019525000000000003,
+      "started_at": 1789619164.433224,
+      "repeat": 1,
+      "schema_name": "ArgusProseJudgeResponse",
+      "status_code": 200,
+      "served_model": "deepseek/deepseek-v4-flash",
+      "usage": {
+        "prompt_tokens": 771,
+        "completion_tokens": 65,
+        "total_tokens": 836,
+        "cost": 0.0001775,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0001775,
+          "upstream_inference_prompt_cost": 0.00014527054584054976,
+          "upstream_inference_completions_cost": 3.222945415945025e-05
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.0001775,
+      "finished_at": 1789619166.5310678
+    },
+    {
+      "attempt": 7,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.04676650000000001,
+      "accounted_usd": 0.00023496000000000001,
+      "started_at": 1789619166.546923,
+      "repeat": 2,
+      "schema_name": "LLMAssetMentionExtraction",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 782,
+        "completion_tokens": 17,
+        "total_tokens": 799,
+        "cost": 0.0002136,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 768,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0002136,
+          "upstream_inference_prompt_cost": 0.0001711,
+          "upstream_inference_completions_cost": 4.25e-05
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.0002136,
+      "finished_at": 1789619167.291614
+    },
+    {
+      "attempt": 8,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.3322385000000001,
+      "accounted_usd": 0.01663167,
+      "started_at": 1789619167.311645,
+      "repeat": 2,
+      "schema_name": "LLMInterpretationResponse",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 10900,
+        "completion_tokens": 1243,
+        "total_tokens": 12143,
+        "cost": 0.0151197,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 1536,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0151197,
+          "upstream_inference_prompt_cost": 0.0120122,
+          "upstream_inference_completions_cost": 0.0031075
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1003,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.0151197,
+      "finished_at": 1789619178.240584
+    },
+    {
+      "attempt": 9,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "perplexity_search",
+      "model": null,
+      "reserved_usd": 0.0055000000000000005,
+      "accounted_usd": 0.0055000000000000005,
+      "started_at": 1789619178.250976,
+      "repeat": 2,
+      "status_code": 200,
+      "finished_at": 1789619179.423506
+    },
+    {
+      "attempt": 10,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.054197000000000016,
+      "accounted_usd": 0.004671535,
+      "started_at": 1789619179.432001,
+      "repeat": 2,
+      "schema_name": "discovery_extraction",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 2589,
+        "completion_tokens": 458,
+        "total_tokens": 3047,
+        "cost": 0.00424685,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 128,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00424685,
+          "upstream_inference_prompt_cost": 0.00310185,
+          "upstream_inference_completions_cost": 0.001145
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.00424685,
+      "finished_at": 1789619182.75517
+    },
+    {
+      "attempt": 11,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.027885000000000004,
+      "accounted_usd": 0.00156816,
+      "started_at": 1789619184.8255181,
+      "repeat": 2,
+      "schema_name": "discovery_model_knowledge",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 476,
+        "completion_tokens": 386,
+        "total_tokens": 862,
+        "cost": 0.0014256,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 128,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0014256,
+          "upstream_inference_prompt_cost": 0.0004606,
+          "upstream_inference_completions_cost": 0.000965
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.0014256,
+      "finished_at": 1789619189.410402
+    },
+    {
+      "attempt": 12,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "reserved_usd": 0.001237467,
+      "accounted_usd": 1.60204e-05,
+      "started_at": 1789619189.549174,
+      "repeat": 2,
+      "schema_name": null,
+      "status_code": 200,
+      "served_model": "deepseek/deepseek-v4-flash",
+      "usage": {
+        "prompt_tokens": 360,
+        "completion_tokens": 58,
+        "total_tokens": 418,
+        "cost": 1.4564e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 321,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 1.4564e-05,
+          "upstream_inference_prompt_cost": 6.444e-06,
+          "upstream_inference_completions_cost": 8.12e-06
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 1.4564e-05,
+      "finished_at": 1789619193.043617
+    },
+    {
+      "attempt": 13,
+      "label": "asset_discovery_trending_crypto_exact_issue_344",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "reserved_usd": 0.0018424560000000001,
+      "accounted_usd": 7.38796828e-05,
+      "started_at": 1789619193.0526369,
+      "repeat": 2,
+      "schema_name": "ArgusProseJudgeResponse",
+      "status_code": 200,
+      "served_model": "deepseek/deepseek-v4-flash",
+      "usage": {
+        "prompt_tokens": 726,
+        "completion_tokens": 16,
+        "total_tokens": 742,
+        "cost": 6.7163348e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 6.7163348e-05,
+          "upstream_inference_prompt_cost": 6.4327956e-05,
+          "upstream_inference_completions_cost": 2.835392e-06
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 6.7163348e-05,
+      "finished_at": 1789619195.049907
+    },
+    {
+      "attempt": 14,
+      "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.047151500000000006,
+      "accounted_usd": 0.000346335,
+      "started_at": 1789619195.064109,
+      "repeat": 3,
+      "schema_name": "LLMAssetMentionExtraction",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 805,
+        "completion_tokens": 46,
+        "total_tokens": 851,
+        "cost": 0.00031485,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 768,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00031485,
+          "upstream_inference_prompt_cost": 0.00019985,
+          "upstream_inference_completions_cost": 0.000115
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.00031485,
+      "finished_at": 1789619195.921269
+    },
+    {
+      "attempt": 15,
+      "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.3344000000000001,
+      "accounted_usd": 0.008064155000000002,
+      "started_at": 1789619196.09611,
+      "repeat": 3,
+      "schema_name": "LLMInterpretationResponse",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 11011,
+        "completion_tokens": 1889,
+        "total_tokens": 12900,
+        "cost": 0.00733105,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 10624,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00733105,
+          "upstream_inference_prompt_cost": 0.00260855,
+          "upstream_inference_completions_cost": 0.0047225
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1674,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.00733105,
+      "finished_at": 1789619212.038325
+    },
+    {
+      "attempt": 16,
+      "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "provider": "perplexity_agent",
+      "model": "anthropic/claude-opus-4-7",
+      "reserved_usd": 0.625,
+      "accounted_usd": 0.13569,
+      "started_at": 1789619212.061478,
+      "models": [
+        "openai/gpt-5.6-sol",
+        "anthropic/claude-opus-4-7"
+      ],
+      "reservation_model": "anthropic/claude-opus-4-7",
+      "model_estimates_usd": {
+        "openai/gpt-5.6-sol": 0.52,
+        "anthropic/claude-opus-4-7": 0.625
+      },
+      "highest_model_estimate_usd": 0.625,
+      "reservation_basis": "30k input, 15k output, 20 finance searches; highest priced fallback; minimum $0.625 per attempt",
+      "repeat": 3,
+      "status_code": 200,
+      "served_model": "openai/gpt-5.6-sol",
+      "usage": {
+        "cost": {
+          "cache_creation_cost": 0.068,
+          "cache_read_cost": 0.01194,
+          "currency": "USD",
+          "input_cost": 5e-05,
+          "output_cost": 0.0407,
+          "tool_calls_cost": 0.015,
+          "tool_calls_cost_details": {
+            "finance_search": 0.01,
+            "search_web": 0.005
+          },
+          "total_cost": 0.13569
+        },
+        "input_tokens": 43465,
+        "input_tokens_details": {
+          "cache_creation_input_tokens": 13600,
+          "cache_read_input_tokens": 29853,
+          "cached_tokens": 29853
+        },
+        "output_tokens": 2035,
+        "output_tokens_details": {
+          "reasoning_tokens": 574
+        },
+        "tool_calls_details": {
+          "finance_search": {
+            "cost_usd": 0.01,
+            "invocation": 2
+          },
+          "search_web": {
+            "cost_usd": 0.005,
+            "invocation": 2
+          }
+        },
+        "total_tokens": 45500
+      },
+      "reported_cost_usd": 0.13569,
+      "finished_at": 1789619242.849043
+    },
+    {
+      "attempt": 17,
+      "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "reserved_usd": 0.0028972020000000006,
+      "accounted_usd": 4.4277200000000004e-05,
+      "started_at": 1789619243.1267111,
+      "repeat": 3,
+      "schema_name": "ArgusProseJudgeResponse",
+      "status_code": 200,
+      "served_model": "deepseek/deepseek-v4-flash",
+      "usage": {
+        "prompt_tokens": 2206,
+        "completion_tokens": 16,
+        "total_tokens": 2222,
+        "cost": 4.0252e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 2008,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 4.0252e-05,
+          "upstream_inference_prompt_cost": 3.8012e-05,
+          "upstream_inference_completions_cost": 2.24e-06
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 4.0252e-05,
+      "finished_at": 1789619245.628685
+    },
+    {
+      "attempt": 18,
+      "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.047151500000000006,
+      "accounted_usd": 0.000346335,
+      "started_at": 1789619245.648866,
+      "repeat": 4,
+      "schema_name": "LLMAssetMentionExtraction",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 805,
+        "completion_tokens": 46,
+        "total_tokens": 851,
+        "cost": 0.00031485,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 768,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00031485,
+          "upstream_inference_prompt_cost": 0.00019985,
+          "upstream_inference_completions_cost": 0.000115
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.00031485,
+      "finished_at": 1789619246.465597
+    },
+    {
+      "attempt": 19,
+      "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "reserved_usd": 0.3344000000000001,
+      "accounted_usd": 0.006864385000000001,
+      "started_at": 1789619246.4866838,
+      "repeat": 4,
+      "schema_name": "LLMInterpretationResponse",
+      "status_code": 200,
+      "served_model": "x-ai/grok-4.3",
+      "usage": {
+        "prompt_tokens": 11011,
+        "completion_tokens": 1614,
+        "total_tokens": 12625,
+        "cost": 0.00624035,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 11008,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00624035,
+          "upstream_inference_prompt_cost": 0.00220535,
+          "upstream_inference_completions_cost": 0.004035
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 1411,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 0.00624035,
+      "finished_at": 1789619259.86541
+    },
+    {
+      "attempt": 20,
+      "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "provider": "perplexity_agent",
+      "model": "anthropic/claude-opus-4-7",
+      "reserved_usd": 0.625,
+      "accounted_usd": 0.44232,
+      "started_at": 1789619259.8967838,
+      "models": [
+        "openai/gpt-5.6-sol",
+        "anthropic/claude-opus-4-7"
+      ],
+      "reservation_model": "anthropic/claude-opus-4-7",
+      "model_estimates_usd": {
+        "openai/gpt-5.6-sol": 0.52,
+        "anthropic/claude-opus-4-7": 0.625
+      },
+      "highest_model_estimate_usd": 0.625,
+      "reservation_basis": "30k input, 15k output, 20 finance searches; highest priced fallback; minimum $0.625 per attempt",
+      "repeat": 4,
+      "status_code": 200,
+      "served_model": "openai/gpt-5.6-sol",
+      "usage": {
+        "cost": {
+          "cache_creation_cost": 0.27962,
+          "cache_read_cost": 0.04716,
+          "currency": "USD",
+          "input_cost": 0.00096,
+          "output_cost": 0.09858,
+          "tool_calls_cost": 0.016,
+          "tool_calls_cost_details": {
+            "fetch_url": 0.001,
+            "finance_search": 0.01,
+            "search_web": 0.005
+          },
+          "total_cost": 0.44232
+        },
+        "input_tokens": 174052,
+        "input_tokens_details": {
+          "cache_creation_input_tokens": 55924,
+          "cache_read_input_tokens": 117888,
+          "cached_tokens": 117888
+        },
+        "output_tokens": 4929,
+        "output_tokens_details": {
+          "reasoning_tokens": 1482
+        },
+        "tool_calls_details": {
+          "fetch_url": {
+            "cost_usd": 0.001,
+            "invocation": 2
+          },
+          "finance_search": {
+            "cost_usd": 0.01,
+            "invocation": 2
+          },
+          "search_web": {
+            "cost_usd": 0.005,
+            "invocation": 2
+          }
+        },
+        "total_tokens": 178981
+      },
+      "reported_cost_usd": 0.44232,
+      "finished_at": 1789619345.472828
+    },
+    {
+      "attempt": 21,
+      "label": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4-flash",
+      "reserved_usd": 0.002879415,
+      "accounted_usd": 5.1092800000000007e-05,
+      "started_at": 1789619345.864012,
+      "repeat": 4,
+      "schema_name": "ArgusProseJudgeResponse",
+      "status_code": 200,
+      "served_model": "deepseek/deepseek-v4-flash",
+      "usage": {
+        "prompt_tokens": 2160,
+        "completion_tokens": 16,
+        "total_tokens": 2176,
+        "cost": 4.6448e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 1772,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 4.6448e-05,
+          "upstream_inference_prompt_cost": 4.4208e-05,
+          "upstream_inference_completions_cost": 2.24e-06
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      },
+      "reported_cost_usd": 4.6448e-05,
+      "finished_at": 1789619349.257396
+    }
+  ],
+  "blocked": [],
+  "prior_diagnostic_accounted_usd": 0.0,
+  "current_run_accounted_usd": 0.6502626984828
+}

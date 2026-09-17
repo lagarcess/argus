@@ -1,0 +1,53 @@
+"""Offline guard contract checks using the production request builder."""
+import json,sys,tempfile
+from pathlib import Path
+sys.path[:0]=[str(Path.cwd()/'src'),'/tmp']
+import httpx
+from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.research.config import RESEARCH_CONFIG_SPECS
+module=__import__(sys.argv[1]);Budget=module.Budget;SpendStop=module.SpendStop
+prices=json.loads(Path('/tmp/current-reason-rerun-prices.json').read_text())
+client=PerplexityAgentClient('offline-test-key')
+def body(models=None,shape='balanced'):
+ spec=RESEARCH_CONFIG_SPECS[shape]
+ if models is not None:spec=spec.model_copy(update={'models':tuple(models)})
+ return client._request_body('Explain compound interest.',spec)
+def request(payload):return httpx.Request('POST','https://api.perplexity.ai/v1/agent',json=payload)
+def guard(cap=7):return Budget(Path(tempfile.mkdtemp())/'budget.json',prices,cap)
+for shape in RESEARCH_CONFIG_SPECS:
+ payload=body(shape=shape);assert 'models' in payload and 'model' not in payload
+ g=guard();r=g.before(request(payload));assert r['reserved_usd']==.625
+ assert r['reservation_model']=='anthropic/claude-opus-4-7'
+ assert r['models']==payload['models']
+ assert r['highest_model_estimate_usd']==.625
+ assert g.total()==.625
+print('PASS: all real-client research shapes and both model orderings use highest-priced fallback reserve')
+for models in [('unknown/unpriced','openai/gpt-5.6-sol'),('openai/gpt-5.6-sol','unknown/unpriced')]:
+ g=guard()
+ try:g.before(request(body(models)));raise AssertionError('unknown model admitted')
+ except SpendStop as error:assert str(error)=='unpriced_agent_model' and not g.rows
+print('PASS: unknown primary and unknown fallback rejected before admission')
+g=guard(.624999)
+try:g.before(request(body()));raise AssertionError('over-cap attempt admitted')
+except SpendStop:assert not g.rows
+try:g.before(request(body()));raise AssertionError('stop was not latched')
+except SpendStop:pass
+g=guard(.625);r=g.before(request(body()));g.interrupted(r,TimeoutError());assert g.total()==.625
+try:g.before(request(body()));raise AssertionError('retry without reserve admitted')
+except SpendStop:assert len(g.rows)==1
+print('PASS: hard cap, latched stop, per-attempt reservation, timeout reservation')
+g=guard();r=g.before(request(body()));g.after(r,httpx.Response(200,json={'model':'openai/gpt-5.6-sol'}));assert g.total()==.625
+fixture=json.loads(Path('tests/research/fixtures/perplexity_fast_quote_2026-09-09.json').read_text())
+g=guard();r=g.before(request(body()));g.after(r,httpx.Response(200,json=fixture['exchanges'][0]['response']));assert 0<r['reported_cost_usd']<.625
+print('PASS: missing invoice retains reserve; recorded real invoice reconciles')
+# Exercise the installed guard at HTTP dispatch, with a fake transport only.
+g=guard(.625);g.install();dispatched=[]
+def transport(req):
+ dispatched.append(json.loads(req.content))
+ return httpx.Response(200,json={'model':'openai/gpt-5.6-sol'})
+with httpx.Client(transport=httpx.MockTransport(transport)) as http:
+ response=http.post('https://api.perplexity.ai/v1/agent',json=body())
+ assert response.status_code==200 and len(dispatched)==1 and g.total()==.625
+ try:http.post('https://api.perplexity.ai/v1/agent',json=body(('openai/gpt-5.6-sol','unknown/unpriced')));raise AssertionError('unknown dispatched')
+ except SpendStop:assert len(dispatched)==1
+print('PASS: valid real-client request reaches transport; unknown fallback cannot reach transport')

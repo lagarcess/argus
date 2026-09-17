@@ -423,6 +423,8 @@
       "unsupported_recovery_for_asset": "Argus can't run that rule directly yet for {{symbol}}. Which supported direction should I use: {{options}}?",
       "unsupported_recovery_incomplete": "What rule should I test? Which supported direction should I use: {{options}}?",
       "unsupported_recovery_incomplete_for_asset": "What rule should I test for {{symbol}}? Which supported direction should I use: {{options}}?",
+      "data_window_unavailable": "That date range is outside the available market history. Choose another date range.",
+      "starting_capital_unavailable_bounds": "That starting amount cannot be used for this test. Choose another amount.",
       "starting_capital_range": "Starting capital must be between {{minimum}} and {{maximum}}. What amount in that range should I use?",
       "starting_capital_floor": "Starting capital must be at least {{minimum}}. What amount should I use?",
       "unsupported_timeframe": "That bar size is not supported. Choose daily or 1-hour bars.",
