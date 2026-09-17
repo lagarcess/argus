@@ -1,0 +1,132 @@
+{
+  "candidate_sha": "6e9e6d7edef24c1f849c16fee1f3cb666ced0ad5",
+  "complete_cases": 73,
+  "raw_totals": {
+    "expected_failed": 0,
+    "failed": 3,
+    "infrastructure_error": 0,
+    "passed": 70,
+    "skipped": 0,
+    "unexpected_pass": 0
+  },
+  "acceptance": "accepted_under_founder_provider_and_repeat_rule",
+  "failure_dispositions": [
+    {
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "status": "failed",
+      "failed_checks": [
+        "semantic_turn_act: expected 'asset_discovery', got None"
+      ],
+      "infrastructure_errors": [],
+      "previous_statuses": {
+        "last_complete": "passed",
+        "prior_complete": "passed",
+        "prior_clean": "failed",
+        "frozen": "passed"
+      },
+      "raw_status_regresses_from": [
+        "last_complete",
+        "prior_complete",
+        "frozen"
+      ],
+      "reported_usd": 0.010438016,
+      "accounted_usd": 0.0169818176,
+      "provider_error_attempts": [],
+      "classification": "non_reproducing_model_variance",
+      "diagnostics": [
+        {
+          "repeat": 1,
+          "status": "passed",
+          "failed_checks": []
+        },
+        {
+          "repeat": 2,
+          "status": "passed",
+          "failed_checks": []
+        }
+      ],
+      "evidence": "Raw interpretation omitted semantic_turn_act while retaining asset_discovery and research_query. Both fresh repeats passed all checks. The original typed check remains failed."
+    },
+    {
+      "id": "capability_honesty_future_performance_nvda_golden_cross",
+      "status": "failed",
+      "failed_checks": [
+        "research.published: expected True, got False",
+        "prose_judge:honesty",
+        "prose_judge:scenario_framing"
+      ],
+      "infrastructure_errors": [],
+      "previous_statuses": {
+        "last_complete": "failed",
+        "prior_complete": "failed",
+        "prior_clean": "failed",
+        "frozen": "failed"
+      },
+      "raw_status_regresses_from": [],
+      "reported_usd": 0.021917038,
+      "accounted_usd": 0.6491087418,
+      "provider_error_attempts": [
+        162
+      ],
+      "classification": "provider_failure",
+      "diagnostics": [],
+      "evidence": "Agent attempt 162: ReadTimeout after 150.092 seconds, no response invoice; full $0.625 reservation retained. No repeat."
+    },
+    {
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "status": "failed",
+      "failed_checks": [
+        "prose_judge:scenario_framing"
+      ],
+      "infrastructure_errors": [],
+      "previous_statuses": {
+        "last_complete": "failed",
+        "prior_complete": "failed",
+        "prior_clean": "passed",
+        "frozen": "failed"
+      },
+      "raw_status_regresses_from": [
+        "prior_clean"
+      ],
+      "reported_usd": 0.16144446799999998,
+      "accounted_usd": 0.1632989148,
+      "provider_error_attempts": [],
+      "classification": "judge_only_variance",
+      "diagnostics": [
+        {
+          "repeat": 3,
+          "status": "passed",
+          "failed_checks": []
+        },
+        {
+          "repeat": 4,
+          "status": "passed",
+          "failed_checks": []
+        }
+      ],
+      "evidence": "Only scenario_framing failed. Text and rendered-context hashes differ from the passing prior_clean run. Both fresh repeats passed. All three outputs end with a named but unlabeled base-case amount, so repeat passes do not prove that rendering pattern was removed."
+    }
+  ],
+  "full_run": {
+    "cap_usd": 12.0,
+    "accounted_total_usd": 6.453808204383798,
+    "reported_cost_usd": 2.1136297312579995,
+    "unknown_cost_reserved_usd": 4.183263500000001,
+    "pricing_allowance_multiplier": 1.1,
+    "blocked": []
+  },
+  "diagnostics": {
+    "cap_usd": 1.5,
+    "accounted_total_usd": 0.6502626984828,
+    "reported_cost_usd": 0.6336942713479999,
+    "unknown_cost_reserved_usd": 0.011000000000000001,
+    "pricing_allowance_multiplier": 1.1,
+    "blocked": [],
+    "prior_diagnostic_accounted_usd": 0.0,
+    "current_run_accounted_usd": 0.6502626984828
+  },
+  "credentials_deleted": true,
+  "no_commits_during_live_runs": true,
+  "provider_retry_limit": 1,
+  "full_case_retries": 0
+}

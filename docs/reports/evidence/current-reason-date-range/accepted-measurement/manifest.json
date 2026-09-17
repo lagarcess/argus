@@ -1,0 +1,189 @@
+{
+  "candidate_sha": "6e9e6d7edef24c1f849c16fee1f3cb666ced0ad5",
+  "artifacts": [
+    {
+      "path": "README.md",
+      "sha256": "b4056b0d23559800c84e4ef6d59abfb7f94c9df5b6642bdc74ed37f78b7bc604"
+    },
+    {
+      "path": "acceptance.json",
+      "sha256": "4e781a580a5b736bb331c7626826678ae3c1a782b9f06be08a0fd44f75436da6"
+    },
+    {
+      "path": "baselines/last_complete.json",
+      "sha256": "d14228c7e57f60847c05863c6249bab2f1fb3e01cb8e952281b23b48aa6c8bbf"
+    },
+    {
+      "path": "baselines/prior_complete.json",
+      "sha256": "8edeb6e9c6b2cdfd53fdd53a9d30789eda70fe976177e15e474fd96f58d36c21"
+    },
+    {
+      "path": "budget.json",
+      "sha256": "600b266f2fc158e34c93d3e20978be95e330380edf04917bdc402f8a7b2d851d"
+    },
+    {
+      "path": "comparison.json",
+      "sha256": "7fd98e1f6edcd03f1e537fe4c2b96b4b6af9a13d0de0e2751718506cde39fb4a"
+    },
+    {
+      "path": "comparison.md",
+      "sha256": "2e0d29226fddd7ba706425cc66fe73ba5a508949256e50756e007d32937bcee5"
+    },
+    {
+      "path": "completion.json",
+      "sha256": "329d3ba6d6667e14a2032fa368863378fce93c086a61146e0897332a47a90f43"
+    },
+    {
+      "path": "diagnostics/budget.json",
+      "sha256": "1b6dea6751ada9749c814a22103cfecfb1bf958948a9351a687006ef7654c4c1"
+    },
+    {
+      "path": "diagnostics/completion.json",
+      "sha256": "d863dfe679eea9c54970af5e9dec6c7b3ed3b312cff7b059c34398c0c46c4530"
+    },
+    {
+      "path": "diagnostics/diagnostic-measurement.json",
+      "sha256": "f83c5c5ee54ae70b56b04209e3768b5fff55c91f5da59c01bf3b098b7bf70c93"
+    },
+    {
+      "path": "diagnostics/market-price-observations.jsonl",
+      "sha256": "0dac0a210b3d769664cc63b19dd3e9a35252bbc97f1a122fe329b00b880ad121"
+    },
+    {
+      "path": "diagnostics/method/budget.py.txt",
+      "sha256": "6e3db0124ad2550efb7f9f87ba016f9298078747543a86a914b90c44be2d76a4"
+    },
+    {
+      "path": "diagnostics/method/diagnostic-preflight-green.txt",
+      "sha256": "b91deec2aeac592d43ae6751d251258e45e3459175dad2bc6d97ba847291ce07"
+    },
+    {
+      "path": "diagnostics/method/diagnostic-preflight.py.txt",
+      "sha256": "4b334d5ecd421290e67e998f44160d389620a412a728938b8b2406df95d85575"
+    },
+    {
+      "path": "diagnostics/method/driver-green.txt",
+      "sha256": "21296fe62eb4cbf9c9a50fca4cb04f283a1df5cfdcc92e8ae06919014b38d7a9"
+    },
+    {
+      "path": "diagnostics/method/driver-tests.py.txt",
+      "sha256": "4fab1131500cba1b1d46cac498163b725f878ce83ca8868577119d953cd8e83d"
+    },
+    {
+      "path": "diagnostics/method/driver.py.txt",
+      "sha256": "dd5849ceb3e27966852a3e02a76a47ae63f9000e6284e34fbcfc352efd2e389d"
+    },
+    {
+      "path": "diagnostics/method/endpoint-prices.json",
+      "sha256": "bc6c8a9c7b85e7e65255794619b2ca092980573797e0abc1ebd3a3103df8d5b6"
+    },
+    {
+      "path": "diagnostics/method/guard-green.txt",
+      "sha256": "d9c5ed0c294f0846e98c7f691919aca03cb0408fb17e557cfdd119666eaa834f"
+    },
+    {
+      "path": "diagnostics/method/guard-tests.py.txt",
+      "sha256": "d5d5ab2a9b76a1035d4226485f61e8c596f2ea24f958ed66160fe23ff6a93ee6"
+    },
+    {
+      "path": "diagnostics/method/price-observer.py.txt",
+      "sha256": "e0c08f1458b3c4a530eece4e858240a730e5f44a6c9733e68da88bb6fc34bda3"
+    },
+    {
+      "path": "diagnostics/method/pricing-provenance.json",
+      "sha256": "7bd4e8f58ff7db1332d02e8bb3a382d9cfa3fb6ad5c2714831a98c0839955980"
+    },
+    {
+      "path": "diagnostics/provenance.json",
+      "sha256": "2c6d5fc8eab4714ab7b107f4488f9e78f75c150ce551d56771c3e475ebc647bd"
+    },
+    {
+      "path": "diagnostics/provider-responses.jsonl",
+      "sha256": "07a4dffeb733f9622e9c80e452bcc3c7637d588d4d0423224b8be68ec0eb410f"
+    },
+    {
+      "path": "diagnostics/runtime.log",
+      "sha256": "81f9464cf4507a6e05b043612af4d141ff8eed5203d7ebebe72c564faaad013d"
+    },
+    {
+      "path": "failure-traces.json",
+      "sha256": "fd878635f5f664333fa245d142e9da49ff1e21784c3c984719b2b960813bd28e"
+    },
+    {
+      "path": "free-verification/full-suite.txt",
+      "sha256": "dd673a9f910297da982b4f148c1732c3d2aa2176acd4aa15bf15efa2af7bf372"
+    },
+    {
+      "path": "free-verification/lint.txt",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18"
+    },
+    {
+      "path": "free-verification/mocked-harness-rest.txt",
+      "sha256": "509742ee09718cce96abd119b7e3cad12eaed8fca4e7d14fe95869f1cd1c2256"
+    },
+    {
+      "path": "free-verification/modularity.txt",
+      "sha256": "e4f3aed2059fbb86dfeb1c621a4494fdc5314b6d1ecae60a73b55a071f90b8c3"
+    },
+    {
+      "path": "live-measurement.json",
+      "sha256": "44faa9a6660e7f2f2f86ea311b070052828705ec5bc04b24f05f0735081ebcc9"
+    },
+    {
+      "path": "market-price-observations.jsonl",
+      "sha256": "34e6fbd6cb704ec6458f2c76680fb5259ec86e836395f9843552546a3efa0790"
+    },
+    {
+      "path": "method/budget.py.txt",
+      "sha256": "6e3db0124ad2550efb7f9f87ba016f9298078747543a86a914b90c44be2d76a4"
+    },
+    {
+      "path": "method/comparison.py.txt",
+      "sha256": "57be931e70c49d5d72a32f3d6babf30ded7785d18cb83c86a4aa933d87ff5304"
+    },
+    {
+      "path": "method/driver-green.txt",
+      "sha256": "21296fe62eb4cbf9c9a50fca4cb04f283a1df5cfdcc92e8ae06919014b38d7a9"
+    },
+    {
+      "path": "method/driver-tests.py.txt",
+      "sha256": "eaabfbf0a98d243124b5a5cab3774dc06996f3429ce8786ea0e9734d7c6e9963"
+    },
+    {
+      "path": "method/driver.py.txt",
+      "sha256": "8ecb1c432a0df304180cd3002ae3ea15eceae8d9e1ad6be60bfbea93c8ae4deb"
+    },
+    {
+      "path": "method/endpoint-prices.json",
+      "sha256": "bc6c8a9c7b85e7e65255794619b2ca092980573797e0abc1ebd3a3103df8d5b6"
+    },
+    {
+      "path": "method/guard-green.txt",
+      "sha256": "d9c5ed0c294f0846e98c7f691919aca03cb0408fb17e557cfdd119666eaa834f"
+    },
+    {
+      "path": "method/guard-tests.py.txt",
+      "sha256": "d5d5ab2a9b76a1035d4226485f61e8c596f2ea24f958ed66160fe23ff6a93ee6"
+    },
+    {
+      "path": "method/price-observer.py.txt",
+      "sha256": "e0c08f1458b3c4a530eece4e858240a730e5f44a6c9733e68da88bb6fc34bda3"
+    },
+    {
+      "path": "method/pricing-provenance.json",
+      "sha256": "7bd4e8f58ff7db1332d02e8bb3a382d9cfa3fb6ad5c2714831a98c0839955980"
+    },
+    {
+      "path": "provenance.json",
+      "sha256": "2c6d5fc8eab4714ab7b107f4488f9e78f75c150ce551d56771c3e475ebc647bd"
+    },
+    {
+      "path": "provider-responses.jsonl",
+      "sha256": "ae6b3b4480778d267f90d001917322a13df11376563ca23a24e2ff4e9d207ddb"
+    },
+    {
+      "path": "runtime.log",
+      "sha256": "2fe56263150c4aff36923b3ab6ff31c3c4ff31d09f25c627b34daf4a639fbc44"
+    }
+  ]
+}

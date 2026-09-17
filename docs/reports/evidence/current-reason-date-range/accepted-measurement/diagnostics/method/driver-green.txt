@@ -1,0 +1,3 @@
+PASS: actual driver loop attempts all 73 cases once despite two failures and an exception
+PASS: budget admission stop ends the loop before another case
+PASS: run-local Agent limit prevents transport retries after a provider 500

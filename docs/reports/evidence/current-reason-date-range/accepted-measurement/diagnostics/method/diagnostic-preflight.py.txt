@@ -1,0 +1,37 @@
+import ast,json,sys,tempfile
+from pathlib import Path
+from types import SimpleNamespace
+sys.path.insert(0,'/tmp')
+import pandas as pd,httpx
+from current_reason_price_observer import install
+from current_reason_12_budget import Budget,SpendStop
+from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.research.config import RESEARCH_CONFIG_SPECS
+series=pd.Series([101.,102.],index=pd.to_datetime(['2026-09-14','2026-09-15'])); seen=[]
+e=SimpleNamespace(classify_symbol=lambda symbol:SimpleNamespace(symbol=symbol,asset_class='crypto'))
+p=SimpleNamespace(fetch_price_series=lambda *args,**kwargs:series)
+a=SimpleNamespace(latest_market_close=lambda symbol:(102.,'2026-09-15'))
+install(e,p,a,seen.append)
+assert p.fetch_price_series('BTC/USD') is series and seen[-1]['last_price']==102.
+assert a.latest_market_close('BTC/USD')==(102.,'2026-09-15')
+for error,status in [(TimeoutError('offline timeout'),'timed_out'),ValueError('offline invalid symbol') and (ValueError('offline invalid symbol'),'errored')]:
+ def fail(*args,**kwargs):raise error
+ p=SimpleNamespace(fetch_price_series=fail);e=SimpleNamespace(classify_symbol=lambda s:s);a=SimpleNamespace(latest_market_close=lambda s:None);install(e,p,a,seen.append)
+ try:p.fetch_price_series('XBT/USD');raise AssertionError('exception swallowed')
+ except type(error) as caught:assert caught is error
+ assert seen[-1]['status']==status
+print('PASS price observer preserves actual return identity and exception identity; distinguishes price, error and timeout')
+src=ast.parse(Path('/tmp/current_reason_12_diagnostic.py').read_text());cls=next(n for n in src.body if isinstance(n,ast.ClassDef));ns={'Budget':Budget,'json':json,'rawpath':Path(tempfile.mkdtemp())/'raw.jsonl','keys':[],'secret_values':{}}
+exec(compile(ast.Module(body=[cls],type_ignores=[]),'actual_recording_budget','exec'),ns)
+g=ns['RecordingBudget'](Path(tempfile.mkdtemp())/'budget.json',json.load(open('/tmp/current-reason-4d-prices.json')),cap=1.50)
+body=PerplexityAgentClient('offline-key')._request_body('Explain Bitcoin scenarios.',RESEARCH_CONFIG_SPECS['balanced']);req=httpx.Request('POST','https://api.perplexity.ai/v1/agent',json=body)
+g.repeat=1;r=g.before(req);assert r['repeat']==1 and r['reserved_usd']==.625
+try:g.before(req);raise AssertionError('second send admitted')
+except SpendStop as exc:assert str(exc)=='second_agent_send_in_one_repeat' and len(g.rows)==1
+h=ns['RecordingBudget'](Path(tempfile.mkdtemp())/'budget.json',json.load(open('/tmp/current-reason-4d-prices.json')),cap=1.50)
+for i in (1,2):h.repeat=i;h.before(req)
+assert h.total()==1.25+h.prior_diagnostic_accounted_usd
+print('PASS actual real-client Agent bodies reserve $0.625 each; second send in one repeat rejected; prior diagnostics included')
+assigns=[n for n in ast.walk(src) if isinstance(n,ast.Assign)]
+selected=next(n for n in assigns if any(isinstance(t,ast.Name) and t.id=='selected' for t in n.targets));assert ast.literal_eval(selected.value)=={'asset_discovery_trending_crypto_exact_issue_344','messy_spanish_future_performance_nvda_cruce_dorado'}
+print('PASS actual driver selects only the two non-provider failures, each twice, sets Agent transport attempt limit to one')

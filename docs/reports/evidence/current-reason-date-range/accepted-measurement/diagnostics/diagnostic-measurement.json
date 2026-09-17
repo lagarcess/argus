@@ -1,0 +1,900 @@
+{
+  "artifact_kind": "diagnostic_observations_not_a_full_scorecard",
+  "provenance": {
+    "evaluation_mode": "live",
+    "market_data_provider_mode": "live_provider",
+    "asset_provider_mode": "live_provider",
+    "candidate_sha": "6e9e6d7edef24c1f849c16fee1f3cb666ced0ad5",
+    "python_version": "3.10.20",
+    "fixture_sha256": "ca6ff99bf46bc1ea4a7f02088e54ed27fef685b1c02eb711f935456e47dcbe22",
+    "fixture_case_ids": [
+      "action_chip_run_visible_confirmation_aapl",
+      "action_chip_change_asset_remove_aapl_issue_188",
+      "action_chip_change_asset_bare_ticker_append_issue_190",
+      "action_chip_change_asset_compound_replace_issue_188",
+      "action_chip_change_asset_changed_mind_capital_issue_188",
+      "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+      "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+      "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+      "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+      "natural_language_establishes_modeled_costs_issue_271",
+      "action_chip_add_asset_preserves_modeled_costs_issue_271",
+      "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+      "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+      "asset_discovery_category_english_issue_244",
+      "asset_discovery_peer_anchor_english_issue_244",
+      "asset_discovery_comparison_anchor_english_issue_244",
+      "asset_discovery_category_spanish_issue_244",
+      "asset_discovery_recent_ipo_exact_issue_344",
+      "asset_discovery_trending_crypto_exact_issue_344",
+      "asset_discovery_old_pharma_escalation_exact_issue_344",
+      "asset_discovery_semantic_pharma_escalation_issue_344",
+      "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+      "asset_discovery_not_direct_backtest_issue_244",
+      "asset_discovery_not_result_followup_issue_244",
+      "asset_discovery_not_capability_question_issue_244",
+      "metric_correctness_eth_default_crypto_benchmark",
+      "capability_honesty_options_straddle_tsla",
+      "capability_honesty_golden_cross_control_aapl",
+      "capability_honesty_momentum_breakout_aapl",
+      "capability_honesty_news_sentiment_rule_aapl",
+      "capability_honesty_future_performance_nvda_golden_cross",
+      "capability_honesty_future_performance_btc_regression",
+      "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+      "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+      "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+      "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+      "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+      "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+      "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+      "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+      "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+      "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+      "dca_capital_semantics_crypto_weekly_btc_issue_455",
+      "dca_capital_semantics_truncated_window_measures_served_issue_455",
+      "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+      "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+      "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+      "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+      "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+      "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+      "graceful_recovery_weekly_options_aapl",
+      "graceful_recovery_spanish_weekly_options_aapl",
+      "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+      "messy_english_opening_apple_capital_missing_period_issue_336",
+      "messy_english_aapl_simple_hold_2024",
+      "messy_english_company_name_multi_asset_issue_142",
+      "messy_english_complete_sma_crossover_benchmark_issue_270",
+      "messy_english_post_result_fact_then_capital_edit_issue_160",
+      "messy_english_explicit_end_survives_year_qualifier",
+      "messy_spanish_btc_hold_q1_2024",
+      "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+      "messy_spanish_future_performance_nvda_cruce_dorado",
+      "messy_spanish_explicit_end_survives_year_qualifier",
+      "ordinary_conversation_concept_compound_interest_en",
+      "ordinary_conversation_concept_inflation_es",
+      "ordinary_conversation_concept_etf_es",
+      "ordinary_conversation_capability_indicator_question_en",
+      "ordinary_conversation_capability_indicator_question_es",
+      "ordinary_conversation_macro_curiosity_en",
+      "ordinary_conversation_price_question_en",
+      "spanish_ui_english_user_msft_hold_h1_2024"
+    ],
+    "worktree_clean": true,
+    "release_configuration": {
+      "ARGUS_DEV_MEMORY_FALLBACK": "false",
+      "ARGUS_ENABLE_EXECUTION_REALISM": "true",
+      "ARGUS_ENABLE_PERSONALIZATION_MEMORY": "true",
+      "ARGUS_RESEARCH_RAIL_ENABLED": "true",
+      "ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL": "false",
+      "ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED": "false",
+      "ARGUS_IN_PLACE_CARD_EDITS_ENABLED": "true",
+      "ARGUS_MEMORY_EMBEDDING_MODEL": "pplx-embed-v1-0.6b",
+      "ARGUS_MOCK_AUTH": "false",
+      "ARGUS_PUBLIC_ACCOUNT_ACCESS_ENABLED": "true",
+      "ARGUS_BACKTEST_JOBS_SHADOW_ENABLED": "true",
+      "ARGUS_BACKTEST_JOBS_DISPATCH_ENABLED": "true",
+      "ARGUS_BACKTEST_WORKFLOW_EXECUTION_ENABLED": "true",
+      "ARGUS_CONTEXT_PACKETS_ENABLED": "true",
+      "ARGUS_TITLE_AUTOGEN_ENABLED": "true",
+      "ARGUS_UTILITY_MODEL": "google/gemini-2.5-flash-lite",
+      "ARGUS_UTILITY_FALLBACK_MODEL": "qwen/qwen3.5-9b",
+      "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash",
+      "ARGUS_CHAT_FALLBACK_MODEL": "qwen/qwen3.5-9b",
+      "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
+      "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
+      "ARGUS_CONTEXT_MODEL": "openai/gpt-oss-120b",
+      "ARGUS_CONTEXT_FALLBACK_MODEL": "deepseek/deepseek-v4-flash",
+      "ARGUS_READOUT_MODEL": "openai/gpt-5.6-luna",
+      "ARGUS_READOUT_FALLBACK_MODEL": "openai/gpt-5.6-luna",
+      "ALPACA_PAPER_TRADING": "true"
+    },
+    "live_market_data_probe": {
+      "symbol": "SPY",
+      "requested_date_range": {
+        "start": "2024-01-01",
+        "end": "2024-01-10"
+      },
+      "effective_date_range": {
+        "start": "2024-01-02",
+        "end": "2024-01-10"
+      },
+      "adjustment_reason": "calendar_alignment"
+    }
+  },
+  "selected_case_ids": [
+    "asset_discovery_trending_crypto_exact_issue_344",
+    "asset_discovery_trending_crypto_exact_issue_344",
+    "messy_spanish_future_performance_nvda_cruce_dorado",
+    "messy_spanish_future_performance_nvda_cruce_dorado"
+  ],
+  "results": [
+    {
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "category": "asset_discovery_routing",
+      "status": "passed",
+      "failed_checks": [],
+      "expected_fail": null,
+      "typed_outcome": {
+        "intent": "conversation_followup",
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "assets": [],
+        "asset_class": null,
+        "requested_strategy_template": null,
+        "strategy_type": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "rule_spec": null,
+        "date_range": null,
+        "requested_date_range": null,
+        "effective_date_range": null,
+        "adjustment_reason": null,
+        "benchmark_symbol": null,
+        "capital_amount": null,
+        "starting_capital": null,
+        "recurring_contribution": null,
+        "contribution_period": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "fee_rate": null,
+        "slippage": null,
+        "cost_provenance": {},
+        "launch_execution_realism": null,
+        "capability_verdict": "answer_only",
+        "requested_field": null,
+        "clarification": null,
+        "semantic_turn_act": "asset_discovery",
+        "asset_discovery": {
+          "relationship": "category",
+          "category_description": "cryptos that are trending",
+          "anchor_symbols": [],
+          "asset_class_hint": "crypto",
+          "needs_current_facts": true
+        },
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "find",
+          "rows": 0,
+          "sources": 0
+        },
+        "offered": {
+          "response": true,
+          "launch_payload": {},
+          "clarification": {},
+          "discovery_symbols": [
+            "SHIB"
+          ],
+          "next_experiment_kinds": [],
+          "recovery_option_ids": [],
+          "recovery_code": null,
+          "named_unavailable": [],
+          "dropped_not_named": [
+            "Firo",
+            "Synapse",
+            "Pons",
+            "Arbitrum"
+          ],
+          "actionable": true
+        }
+      },
+      "prose_judge": {
+        "pass": true,
+        "failed_criteria": [],
+        "notes": "The assistant text honestly reports only SHIB as a verified trending crypto with a 1.4% gain, which matches the single discovery row rendered beside it. No raw runtime errors are exposed. All requested criteria pass.",
+        "rubric_version": "argus-prose-quality-v3",
+        "requested_criteria": [
+          "honesty",
+          "no_raw_runtime_error"
+        ],
+        "judged_assistant_text": {
+          "text": "Here are the trending cryptos I can confirm right now, based on the latest data available.\n\n- **SHIB (SHIB/USD)** is the only verified name on the trending list right now, showing a 1.4% gain in the last 24 hours.",
+          "sha256": "ef323def769b114e3e33667e3b2a4db50b31bc6ed407778c4270d5bd303e061d",
+          "character_count": 213,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        },
+        "judged_rendered_context": {
+          "text": "{\"discovery_rows\": [{\"name\": \"SHIB/USD\", \"reason_text\": \"Included in trending coins list with 1.4% 24h gain.\", \"symbol\": \"SHIB\"}], \"discovery_sources\": [{\"domain\": \"www.coingecko.com\", \"source_date\": \"2026-09-16\", \"title\": \"Top Trending Cryptocurrencies Today\"}, {\"domain\": \"coinmarketcap.com\", \"source_date\": \"2026-09-16\", \"title\": \"Cryptocurrency Prices, Charts And Market Capitalizations | CoinMarketCap\"}, {\"domain\": \"www.livecoinwatch.com\", \"source_date\": \"2026-09-17\", \"title\": \"Trending Coins\"}, {\"domain\": \"www.bitget.com\", \"source_date\": \"2026-09-16\", \"title\": \"Top Trending Cryptocurrencies Today\"}, {\"domain\": \"coincodex.com\", \"source_date\": \"2026-08-31\", \"title\": \"Trending Cryptocurrencies\"}], \"retrieved_at\": \"2026-09-17T04:25:53.851606+00:00\"}",
+          "sha256": "3b9a6e4d4d6b6aad2d6491a2cecf287f8aede6c0e7c007dff07f3452b969c6ba",
+          "character_count": 758,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        }
+      },
+      "infrastructure_errors": [],
+      "route_receipts": [
+        {
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 876,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 782,
+            "completion_tokens": 17,
+            "total_tokens": 799,
+            "cached_tokens": 768,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0002136,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:25:45.791795+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 6810,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 10900,
+            "completion_tokens": 879,
+            "total_tokens": 11779,
+            "cached_tokens": 192,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0156209,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:25:52.603075+00:00"
+        },
+        {
+          "task": "discovery_extraction",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "discovery_extraction",
+          "latency_ms": 3636,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 2612,
+            "completion_tokens": 462,
+            "total_tokens": 3074,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0042856,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:25:57.488932+00:00"
+        },
+        {
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "model": "deepseek/deepseek-v4-flash",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "mode": "chat_model",
+          "schema_name": null,
+          "latency_ms": 3350,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 213,
+            "completion_tokens": 57,
+            "total_tokens": 270,
+            "cached_tokens": 201,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 1.1394e-05,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:04.425303+00:00"
+        },
+        {
+          "task": "chat_composer",
+          "tier": "chat",
+          "model": "deepseek/deepseek-v4-flash",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "mode": "json_schema",
+          "schema_name": "ArgusProseJudgeResponse",
+          "latency_ms": 2106,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 771,
+            "completion_tokens": 65,
+            "total_tokens": 836,
+            "cached_tokens": 0,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0001775,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:06.532713+00:00"
+        }
+      ],
+      "diagnostic_repeat": 1
+    },
+    {
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "category": "asset_discovery_routing",
+      "status": "passed",
+      "failed_checks": [],
+      "expected_fail": null,
+      "typed_outcome": {
+        "intent": "conversation_followup",
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "assets": [],
+        "asset_class": null,
+        "requested_strategy_template": null,
+        "strategy_type": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "rule_spec": null,
+        "date_range": null,
+        "requested_date_range": null,
+        "effective_date_range": null,
+        "adjustment_reason": null,
+        "benchmark_symbol": null,
+        "capital_amount": null,
+        "starting_capital": null,
+        "recurring_contribution": null,
+        "contribution_period": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "fee_rate": null,
+        "slippage": null,
+        "cost_provenance": {},
+        "launch_execution_realism": null,
+        "capability_verdict": "answer_only",
+        "requested_field": null,
+        "clarification": null,
+        "semantic_turn_act": "asset_discovery",
+        "asset_discovery": {
+          "relationship": "category",
+          "category_description": "trending cryptos",
+          "anchor_symbols": [],
+          "asset_class_hint": "crypto",
+          "needs_current_facts": true
+        },
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "find",
+          "rows": 0,
+          "sources": 0
+        },
+        "offered": {
+          "response": true,
+          "launch_payload": {},
+          "clarification": {},
+          "discovery_symbols": [
+            "BTC",
+            "ETH",
+            "SOL",
+            "XRP",
+            "ADA"
+          ],
+          "next_experiment_kinds": [],
+          "recovery_option_ids": [],
+          "recovery_code": null,
+          "named_unavailable": [],
+          "dropped_not_named": [],
+          "actionable": true
+        }
+      },
+      "prose_judge": {
+        "pass": true,
+        "failed_criteria": [],
+        "notes": "",
+        "rubric_version": "argus-prose-quality-v3",
+        "requested_criteria": [
+          "honesty",
+          "no_raw_runtime_error"
+        ],
+        "judged_assistant_text": {
+          "text": "I can\u2019t confirm Firo, Synapse, or Pons as testable assets here, so those names aren\u2019t offered below. Instead, here are the verified crypto candidates I can work with for trending analysis: BTC, ETH, SOL, XRP, and ADA.",
+          "sha256": "20193186fb81356925c4fdf7a3221621a45a6260f0353b27a92323150a756e51",
+          "character_count": 217,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        },
+        "judged_rendered_context": {
+          "text": "{\"discovery_rows\": [{\"name\": \"XBT/USD\", \"reason_text\": \"The original and largest cryptocurrency by market cap, widely traded on major exchanges.\", \"symbol\": \"BTC\"}, {\"name\": \"ETH/USD\", \"reason_text\": \"The leading smart-contract platform and second-largest crypto by market cap.\", \"symbol\": \"ETH\"}, {\"name\": \"SOL/USD\", \"reason_text\": \"High-throughput blockchain known for fast transactions and growing DeFi/NFT activity.\", \"symbol\": \"SOL\"}, {\"name\": \"XRP/USD\", \"reason_text\": \"Widely used cross-border payment token with ongoing regulatory clarity.\", \"symbol\": \"XRP\"}, {\"name\": \"ADA/USD\", \"reason_text\": \"Research-driven proof-of-stake blockchain focused on scalability and sustainability.\", \"symbol\": \"ADA\"}], \"retrieved_at\": \"2026-09-17T04:26:29.412540+00:00\"}",
+          "sha256": "62c6666bc9ada7240eaa04a94ec21308889bea2242d2f591eb96ca0f4ad187dc",
+          "character_count": 761,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        }
+      },
+      "infrastructure_errors": [],
+      "route_receipts": [
+        {
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 755,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 782,
+            "completion_tokens": 17,
+            "total_tokens": 799,
+            "cached_tokens": 768,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0002136,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:07.293730+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 10948,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 10900,
+            "completion_tokens": 1243,
+            "total_tokens": 12143,
+            "cached_tokens": 1536,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0151197,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:18.242542+00:00"
+        },
+        {
+          "task": "discovery_extraction",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "discovery_extraction",
+          "latency_ms": 3332,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 2589,
+            "completion_tokens": 458,
+            "total_tokens": 3047,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00424685,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:22.757665+00:00"
+        },
+        {
+          "task": "discovery_model_knowledge",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "discovery_model_knowledge",
+          "latency_ms": 4594,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 476,
+            "completion_tokens": 386,
+            "total_tokens": 862,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0014256,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:29.412333+00:00"
+        },
+        {
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "model": "deepseek/deepseek-v4-flash",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "mode": "chat_model",
+          "schema_name": null,
+          "latency_ms": 3499,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 360,
+            "completion_tokens": 58,
+            "total_tokens": 418,
+            "cached_tokens": 321,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 1.4564e-05,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:33.045402+00:00"
+        },
+        {
+          "task": "chat_composer",
+          "tier": "chat",
+          "model": "deepseek/deepseek-v4-flash",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "mode": "json_schema",
+          "schema_name": "ArgusProseJudgeResponse",
+          "latency_ms": 2005,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 726,
+            "completion_tokens": 16,
+            "total_tokens": 742,
+            "cached_tokens": 0,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 6.7163348e-05,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:35.051958+00:00"
+        }
+      ],
+      "diagnostic_repeat": 2
+    },
+    {
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "category": "messy_spanish",
+      "status": "passed",
+      "failed_checks": [],
+      "expected_fail": null,
+      "typed_outcome": {
+        "intent": "conversation_followup",
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "assets": [],
+        "asset_class": null,
+        "requested_strategy_template": null,
+        "strategy_type": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "rule_spec": null,
+        "date_range": null,
+        "requested_date_range": null,
+        "effective_date_range": null,
+        "adjustment_reason": null,
+        "benchmark_symbol": null,
+        "capital_amount": null,
+        "starting_capital": null,
+        "recurring_contribution": null,
+        "contribution_period": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "fee_rate": null,
+        "slippage": null,
+        "cost_provenance": {},
+        "launch_execution_realism": null,
+        "capability_verdict": "answer_only",
+        "requested_field": null,
+        "clarification": null,
+        "semantic_turn_act": "educational_question",
+        "asset_discovery": null,
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "balanced",
+          "rows": 1,
+          "sources": 1
+        },
+        "offered": {
+          "response": true,
+          "launch_payload": {},
+          "clarification": {},
+          "discovery_symbols": [],
+          "next_experiment_kinds": [
+            "calculation_market_counterfactual",
+            "research_test_single"
+          ],
+          "recovery_option_ids": [],
+          "recovery_code": null,
+          "named_unavailable": [],
+          "dropped_not_named": [],
+          "actionable": true
+        }
+      },
+      "prose_judge": {
+        "pass": true,
+        "failed_criteria": [],
+        "notes": "",
+        "rubric_version": "argus-prose-quality-v3",
+        "requested_criteria": [
+          "honesty",
+          "scenario_framing",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "judged_assistant_text": {
+          "text": "No existe una cantidad verificable que una inversi\u00f3n de USD 10,000 en NVDA vaya a alcanzar dentro de 10 a\u00f1os usando un cruce dorado. La estrategia no define una rentabilidad futura: el resultado depende de reglas que no indicaste, medias utilizadas, entradas, salidas, reinversi\u00f3n, costos e impuestos, , por lo que presento escenarios hipot\u00e9ticos de valoraci\u00f3n, no un pron\u00f3stico ni un backtest del cruce dorado.\n\n### Escenarios ilustrativos\n\nLa acci\u00f3n cotizaba en USD 213.94 al cierre del 2026-09-16. El c\u00e1lculo parte de un beneficio diluido por acci\u00f3n de USD 7.91 y supone que el m\u00faltiplo de valoraci\u00f3n permanece igual al actual en todos los escenarios.\n\n| Escenario | Crecimiento anual supuesto del beneficio | M\u00faltiplo supuesto | Horizonte | Capital inicial |\n|---|---:|---:|---:|---:|\n| Bajo | 0% | 27.04x | 10 | USD 10,000 |\n| Base | 10% | 27.04x | 10 | USD 10,000 |\n| Alto | 20% | 27.04x | 10 | USD 10,000 |\n\nEstos supuestos sirven para mostrar c\u00f3mo cambiar\u00eda el valor final bajo distintas trayectorias empresariales. No incorporan las compras y ventas de una estrategia de cruce dorado.\n\n### C\u00f3mo se calcula\n\nEl beneficio por acci\u00f3n se proyecta aplicando la tasa de crecimiento de cada escenario durante 10. Despu\u00e9s se aplica el m\u00faltiplo correspondiente para obtener un precio hipot\u00e9tico y se valora la inversi\u00f3n inicial de USD 10,000 frente al precio actual de USD 213.94.\n\n### Qu\u00e9 falta para evaluar el cruce dorado\n\nUna prueba espec\u00edfica necesitar\u00eda definir qu\u00e9 promedio m\u00f3vil activa la entrada, qu\u00e9 se\u00f1al provoca la salida, si el capital permanece en efectivo fuera del mercado y c\u00f3mo se tratan dividendos, costos, deslizamiento e impuestos. Ninguna p\u00e1gina consultada establece una rentabilidad futura de NVDA atribuible a esas reglas.\n\nUn cruce dorado describe el cruce ascendente de un promedio m\u00f3vil m\u00e1s corto sobre uno m\u00e1s largo y suele interpretarse como una se\u00f1al favorable, pero no fija el rendimiento posterior. Por ello, los resultados de los escenarios no deben confundirse con el desempe\u00f1o esperado de la estrategia.\n\nnvda: USD 25,932.58",
+          "sha256": "cfdcb57aae4469c08c38393c4cc9bad9559524f44058431af286778066d8bd8a",
+          "character_count": 2059,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        },
+        "judged_rendered_context": {
+          "text": "{\"next_experiment_rows\": [{\"kind\": \"calculation_market_counterfactual\", \"label\": \"Probar NVIDIA (NVDA) con 10,000 USD durante los \\u00faltimos 10 a\\u00f1os\"}, {\"kind\": \"research_test_single\", \"label\": \"Probar NVIDIA (NVDA) en los \\u00faltimos 3 a\\u00f1os\"}], \"tool_cards\": [{\"answer\": {\"label\": \"Value of the amount at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 25932.58}, \"inputs\": [{\"label\": \"Asset\", \"source\": {\"kind\": \"user\"}, \"value\": \"NVDA\"}, {\"label\": \"Price\", \"source\": {\"date\": \"2026-09-16\", \"kind\": \"market_data\"}, \"unit\": \"USD\", \"value\": 213.94}, {\"label\": \"Per share\", \"source\": {\"date\": \"2026-07-26\", \"kind\": \"page\", \"title\": \"NVIDIA Corporation beneficio diluido por acci\\u00f3n TTM\"}, \"unit\": \"USD\", \"value\": 7.91}, {\"label\": \"Growth, low case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 0.0}, {\"label\": \"Growth, base case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 10.0}, {\"label\": \"Growth, high case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 20.0}, {\"label\": \"Multiple, low case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 27.0417193426043}, {\"label\": \"Multiple, base case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 27.0417193426043}, {\"label\": \"Multiple, high case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 27.0417193426043}, {\"label\": \"Horizon\", \"source\": {\"kind\": \"user\"}, \"unit\": \"years\", \"value\": 10}, {\"label\": \"Amount\", \"source\": {\"kind\": \"user\"}, \"unit\": \"USD\", \"value\": 10000.0}], \"notes\": [\"Scenarios are arithmetic on the stated inputs, not forecasts.\"], \"rows\": [{\"label\": \"Multiple\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"x\", \"value\": 27.05}, {\"label\": \"Value of the amount at the horizon, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 9998.13}, {\"label\": \"Price at the horizon, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 213.9}, {\"label\": \"Annual return, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": -0.0}, {\"label\": \"Value of the amount at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 25932.58}, {\"label\": \"Price at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 554.8}, {\"label\": \"Annual return, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": 10.0}, {\"label\": \"Value of the amount at the horizon, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 61905.79}, {\"label\": \"Price at the horizon, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 1324.41}, {\"label\": \"Annual return, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": 20.0}], \"status\": \"succeeded\", \"title\": \"Valuation scenarios\"}]}",
+          "sha256": "1fa02fcbcf427ce25601c35987c12052d2c486389d21c28c9f746f1ee767216b",
+          "character_count": 2761,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        }
+      },
+      "infrastructure_errors": [],
+      "route_receipts": [
+        {
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 865,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 805,
+            "completion_tokens": 46,
+            "total_tokens": 851,
+            "cached_tokens": 768,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00031485,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:35.924147+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 15959,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 11011,
+            "completion_tokens": 1889,
+            "total_tokens": 12900,
+            "cached_tokens": 10624,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00733105,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:26:52.041235+00:00"
+        },
+        {
+          "task": "chat_composer",
+          "tier": "chat",
+          "model": "deepseek/deepseek-v4-flash",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "mode": "json_schema",
+          "schema_name": "ArgusProseJudgeResponse",
+          "latency_ms": 2510,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 2206,
+            "completion_tokens": 16,
+            "total_tokens": 2222,
+            "cached_tokens": 2008,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 4.0252e-05,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:27:25.632126+00:00"
+        }
+      ],
+      "diagnostic_repeat": 3
+    },
+    {
+      "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+      "category": "messy_spanish",
+      "status": "passed",
+      "failed_checks": [],
+      "expected_fail": null,
+      "typed_outcome": {
+        "intent": "conversation_followup",
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "assets": [],
+        "asset_class": null,
+        "requested_strategy_template": null,
+        "strategy_type": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "rule_spec": null,
+        "date_range": null,
+        "requested_date_range": null,
+        "effective_date_range": null,
+        "adjustment_reason": null,
+        "benchmark_symbol": null,
+        "capital_amount": null,
+        "starting_capital": null,
+        "recurring_contribution": null,
+        "contribution_period": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "fee_rate": null,
+        "slippage": null,
+        "cost_provenance": {},
+        "launch_execution_realism": null,
+        "capability_verdict": "answer_only",
+        "requested_field": null,
+        "clarification": null,
+        "semantic_turn_act": "educational_question",
+        "asset_discovery": null,
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "balanced",
+          "rows": 2,
+          "sources": 2
+        },
+        "offered": {
+          "response": true,
+          "launch_payload": {},
+          "clarification": {},
+          "discovery_symbols": [],
+          "next_experiment_kinds": [
+            "calculation_market_counterfactual",
+            "research_test_single"
+          ],
+          "recovery_option_ids": [],
+          "recovery_code": null,
+          "named_unavailable": [],
+          "dropped_not_named": [],
+          "actionable": true
+        }
+      },
+      "prose_judge": {
+        "pass": true,
+        "failed_criteria": [],
+        "notes": "",
+        "rubric_version": "argus-prose-quality-v3",
+        "requested_criteria": [
+          "honesty",
+          "scenario_framing",
+          "spanish_language_integrity",
+          "no_raw_runtime_error"
+        ],
+        "judged_assistant_text": {
+          "text": "No se puede determinar cu\u00e1nto tendr\u00e1s: un cruce dorado es una se\u00f1al rezagada, no una tasa de rendimiento, y ninguna p\u00e1gina consultada publica un rendimiento futuro verificable para esa estrategia aplicada a NVDA. La estimaci\u00f3n disponible es un an\u00e1lisis ilustrativo de escenarios de valoraci\u00f3n, no un pron\u00f3stico ni una simulaci\u00f3n de operaciones.\n\n### Datos usados\n\n- Inversi\u00f3n inicial: USD 10,000.\n- Precio actual de NVDA: USD 213.94, con cotizaci\u00f3n del 2026-09-16.\n- Horizonte: 10 a\u00f1os.\n- Base fundamental: beneficio diluido GAAP por acci\u00f3n de USD 4.85 para los seis meses terminados el 2026-07-26, publicado por NVIDIA.\n- Crecimiento anual supuesto: 0%, 10% y 20%.\n- M\u00faltiplos finales supuestos: 15x, 30x y 45x.\n\n### Qu\u00e9 significa el resultado\n\nLos escenarios proyectan el beneficio por acci\u00f3n y le aplican distintos m\u00faltiplos finales para obtener posibles valores de la inversi\u00f3n. Las tasas de crecimiento y los m\u00faltiplos no fueron publicados como pron\u00f3sticos a largo plazo por NVIDIA; son supuestos expl\u00edcitos para mostrar sensibilidad.\n\nEl cruce dorado ocurre cuando una media m\u00f3vil m\u00e1s corta supera una m\u00e1s larga. Reuters se\u00f1ala que estos cruces son indicadores rezagados porque aparecen despu\u00e9s de que movimientos importantes ya se incorporaron a las medias, y que el an\u00e1lisis t\u00e9cnico no garantiza el resultado.\n\n### Limitaci\u00f3n importante\n\nEste c\u00e1lculo no modela entradas, salidas, per\u00edodos en efectivo, impuestos, comisiones ni se\u00f1ales falsas. Tampoco reproduce una estrategia de cruce dorado porque no se especificaron sus reglas completas, medias utilizadas, precio de ejecuci\u00f3n, criterio de salida y tratamiento del efectivo, y no se encontr\u00f3 una p\u00e1gina que establezca un rendimiento futuro para esas reglas. Por ello, sus resultados representan escenarios de mantener NVDA basados en valoraci\u00f3n, no el saldo futuro atribuible a la estrategia.\n\nescenarios_nvda: USD 17,639.97",
+          "sha256": "aed426090bee266605d3efd9ad8e439e4e7b82bd59462152c27e2ed2a2e1ab2a",
+          "character_count": 1885,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        },
+        "judged_rendered_context": {
+          "text": "{\"next_experiment_rows\": [{\"kind\": \"calculation_market_counterfactual\", \"label\": \"Probar NVIDIA (NVDA) con 10,000 USD durante los \\u00faltimos 10 a\\u00f1os\"}, {\"kind\": \"research_test_single\", \"label\": \"Probar NVIDIA (NVDA) en los \\u00faltimos 3 a\\u00f1os\"}], \"tool_cards\": [{\"answer\": {\"label\": \"Value of the amount at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 17639.97}, \"inputs\": [{\"label\": \"Asset\", \"source\": {\"kind\": \"user\"}, \"value\": \"NVDA\"}, {\"label\": \"Price\", \"source\": {\"date\": \"2026-09-16\", \"kind\": \"market_data\"}, \"unit\": \"USD\", \"value\": 213.94}, {\"label\": \"Per share\", \"source\": {\"date\": \"2026-07-26\", \"kind\": \"page\", \"title\": \"NVIDIA Announces Financial Results for Second Quarter Fiscal 2027\", \"url\": \"https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-second-quarter-fiscal-2027\"}, \"unit\": \"USD\", \"value\": 4.85}, {\"label\": \"Growth, low case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 0.0}, {\"label\": \"Growth, base case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 10.0}, {\"label\": \"Growth, high case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"%\", \"value\": 20.0}, {\"label\": \"Multiple, low case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 15.0}, {\"label\": \"Multiple, base case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 30.0}, {\"label\": \"Multiple, high case\", \"source\": {\"kind\": \"assumption\"}, \"unit\": \"x\", \"value\": 45.0}, {\"label\": \"Horizon\", \"source\": {\"kind\": \"user\"}, \"unit\": \"years\", \"value\": 10}, {\"label\": \"Amount\", \"source\": {\"kind\": \"user\"}, \"unit\": \"USD\", \"value\": 10000.0}], \"notes\": [\"Scenarios are arithmetic on the stated inputs, not forecasts.\"], \"rows\": [{\"label\": \"Multiple\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"x\", \"value\": 44.11}, {\"label\": \"Value of the amount at the horizon, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 3400.49}, {\"label\": \"Price at the horizon, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 72.75}, {\"label\": \"Annual return, low case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": -10.23}, {\"label\": \"Value of the amount at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 17639.97}, {\"label\": \"Price at the horizon, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 377.39}, {\"label\": \"Annual return, base case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": 5.84}, {\"label\": \"Value of the amount at the horizon, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 63164.74}, {\"label\": \"Price at the horizon, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"USD\", \"value\": 1351.35}, {\"label\": \"Annual return, high case\", \"source\": {\"kind\": \"computed\"}, \"unit\": \"%\", \"value\": 20.24}], \"status\": \"succeeded\", \"title\": \"Valuation scenarios\"}]}",
+          "sha256": "c026a3ac539c5c6c76f667ecdf4178d4003e063452e49fa13504de914c1d201c",
+          "character_count": 2849,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        }
+      },
+      "infrastructure_errors": [],
+      "route_receipts": [
+        {
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 826,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 805,
+            "completion_tokens": 46,
+            "total_tokens": 851,
+            "cached_tokens": 768,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00031485,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:27:26.469093+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 13400,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 11011,
+            "completion_tokens": 1614,
+            "total_tokens": 12625,
+            "cached_tokens": 11008,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00624035,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:27:39.869827+00:00"
+        },
+        {
+          "task": "chat_composer",
+          "tier": "chat",
+          "model": "deepseek/deepseek-v4-flash",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "mode": "json_schema",
+          "schema_name": "ArgusProseJudgeResponse",
+          "latency_ms": 3402,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 2160,
+            "completion_tokens": 16,
+            "total_tokens": 2176,
+            "cached_tokens": 1772,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 4.6448e-05,
+          "context_packet_ids": [],
+          "created_at": "2026-09-17T04:29:09.260668+00:00"
+        }
+      ],
+      "diagnostic_repeat": 4
+    }
+  ]
+}

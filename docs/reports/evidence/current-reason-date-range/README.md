@@ -1,10 +1,13 @@
 # Current reply reason and stated date range
 
-Status: **eight saved failures investigated; free fixes await new paid approval; PR #626 remains draft**.
-See the [failure classification, exact instruction changes, and two paid gates](failure-analysis.md).
-The [complete clean run at 4c4e7a00](clean-measurement/README.md) recorded 65 passes
-and 8 failures. Its scorecard is retained unchanged. The [earlier follow-up](followup.md)
-records the asset/recovery fixes and fixture corrections before that run.
+Current acceptance evidence: [complete 73-case run at 6e9e6d7e](accepted-measurement/README.md).
+It records 70 passes and three raw failures. The provider failure is classified;
+each other failure passed both authorized repeats. The fingerprint is refreshed
+under the founder's repeat rule. Final CI and Codex review are tracked on PR #626.
+
+The earlier [failure analysis](failure-analysis.md), [clean run at 4c4e7a00](clean-measurement/README.md),
+and [follow-up](followup.md) remain historical evidence. All results below this
+paragraph describe earlier runs and their then-current acceptance decisions.
 
 The first bounded measurement below remains historical evidence. The authorized
 measurement stopped within its $5 cap. It recorded all 73 case dispositions,
