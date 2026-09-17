@@ -363,13 +363,12 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-16 at integration `2d2452b7`, after production promotion
+**Updated 2026-09-17 at integration `e8a4ccee`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Recovery replies state the current reason, and a stated date range survives "this year" | PR #626, measured: no measured regression, both date phrases keep August 16 to 19, and the reply moves to the real reason. Fixing the English case that asks for an asset already resolved, an English fallback in Spanish and its own Spanish fixture, then a full rerun with the six research cases bounded, refreeze and merge. The clean 73-case rerun finished 65 passed and 8 failed, so nothing was refrozen: two monthly-buying replies and a benchmark date edit regressed, both new date cases read the year as 2024 instead of 2026, and two research answers never published. Diagnosing the causes before another measurement. |
 | Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Its 93-case measurement is approved under a $15 stop and runs after the recovery replies lane lands, since both change model-facing text. One checklist command must name the new budget setting first. |
 | One list of next steps under a result follow-up | #606. The composer asked for a prose plan and structured next steps; the fix gives next steps sole ownership. Model-facing, so its measurement ($12.50 cap) waits its turn after the two lanes above that change model-facing text. |
 | Acceptance dry run | Done on `03918912`: 30 of 46 smoke answers passed (guests 6 of 6), replay 14 of 14 with 24 turns left for the final run. Its failures drove the failure paths and calculation follow-ups lanes. The final acceptance reruns everything on the candidate. |
@@ -1454,7 +1453,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `2d2452b7`.
+shipped means live in production. Integration is `e8a4ccee`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1561,6 +1560,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Scenario answers keep their labels | outside the releases | **LANDED** `d825d3a8`, PR #650. When three scenario cards all computed but the shared formula named its figures without saying which card, the answer fell back to an unlabeled list of numbers and lost the scenarios. The fix keeps the labeled scenario prose whenever every card succeeded. Found by the measurement, not by review. |
 | An answer keeps its explanation | outside the releases | **LANDED** `97cba840`, PR #651. A Spanish answer whose prose named only its inputs lost the whole explanation and printed a strip of numbers; it now keeps the explanation with its labels. The review then caught the opposite risk, an ungrounded comparison published beside the option that contradicts it, so an incomplete comparison keeps the safe fallback. Both found by measuring, not by review. |
 | A calculation finds its price | outside the releases | **LANDED** `2d2452b7`, PR #652. A Bitcoin calculation asked market data for the exchange's own code and got nothing back, so the answer lost its price. Price lookups now use the symbol the resolver returned, in calculation and market-history answers alike. Found by repeating one measured case, not by review. |
+| Recovery replies state the current reason, and a stated date range survives "this year" | outside the releases | **LANDED** `e8a4ccee`, PR #626. A recovery reply names the reason the turn actually stopped instead of repeating an earlier complaint, and a month and day with no year, or "this year", takes the year from Argus's New York clock. Measured at 70 of 73 on the reconciled head; the three failures were a provider timeout and two cases that passed both repeats. The only model-facing change in this release. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
