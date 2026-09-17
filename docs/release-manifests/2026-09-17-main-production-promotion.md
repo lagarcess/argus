@@ -2,12 +2,13 @@
 
 ## Candidate
 
-- Candidate SHA: `3cecda6933399e53f6ea00edc8004a88d7eefad4`
+- Candidate SHA: `e5b6f95f8db1e8629c2219c7dadd749fee637684`
 - Candidate branch: `codex/production-promotion-20260917`
 - Approved integration cut / original fetched integration: `cfc1988dd80ca1a8007b8f336c107700dd57e009`.
 - Last fetched integration: `cfc1988dd80ca1a8007b8f336c107700dd57e009`.
 - Last fetched main: `3d189204c6a685b7f3bb1818b38e34a33d1f10de`.
-- Reconciliation: none needed at preparation. The would-be merged tree is exactly the candidate tree, `435271ce5e113a841bc8e3f723ff9f51bac5cca2`; modularity passes on that tree.
+- Reconciliation: none needed at preparation. The would-be merged tree is exactly the candidate tree, `f67f41155f662c016277d236d92913c2fda9cdad`; modularity passes on that tree.
+- Checkpoint semantics: this SHA pins the reviewed code-plus-evidence checkpoint, not the commit that subsequently publishes this manifest update. The native eval measured `3cecda6933399e53f6ea00edc8004a88d7eefad4`; only documentation/evidence changed between it and this checkpoint. No descendant is implicitly deploy-cleared. Before deployment, record and gate the exact landed `origin/main` SHA, then bind each service readback to that SHA.
 - Scope: the whole approved roadmap cut, plus sharing configuration and promotion evidence. No product code or migration SQL changed in this task.
 - Validation status: Live comparison complete; founder explicitly accepted both candidate-only typed failures after reviewing their concrete effects. Awaiting staging disposition before production steps. No production migration, main promotion, or deployment performed.
 - Validation surface: local deterministic checks and native provider-backed evals. No separate hosted staging surface was found.
@@ -17,7 +18,7 @@
 
 Founder decisions: sharing ON; all four pending migrations approved after backup, without a maintenance window; no spend cap on promotion runs; disable Private Alpha Canary and close #614 as not fixed; deploy all three services, then perform the signed-out sharing walk. Never git stash.
 
-The required staging choice remains pending: checklist step 12 requires an isolated database and three-service validation surface. Render lists only the production API/app with previews disabled; Supabase lists no separate staging branch. The founder was asked whether to provision temporary staging or waive that gate. No waiver has been inferred.
+The required staging choice remains pending: checklist step 12 requires an isolated database and three-service validation surface. Initial inventory found only production API/app with previews disabled and no separate Supabase branch. Opening PR #655 subsequently created isolated, data-free Supabase preview `pqpgepkpzvliyutbcwjk`; it is healthy and contains the four release migrations at their expected versions/names. The API/app/Workflow staging deployment still does not exist. The founder was asked whether to provision temporary staging or waive that gate. No waiver has been inferred.
 
 ## Live Eval Evidence
 
@@ -121,7 +122,7 @@ Evidence summary: `docs/reports/evidence/2026-09-17-main-promotion/verification.
 | Real PostgreSQL matrix | 395 passed, zero skips. |
 | Real anonymous Auth matrix | 12 passed, zero skips. |
 | Hosted staging / production acceptance | Not performed. |
-| Required hosted CI / final review | Pending release PR. |
+| Required hosted CI / final review | PR #655: all real push CI jobs passed at `e5b6f95f`; draft-event jobs skipped. First Codex review identified the stale candidate pin; this documentation update addresses it. Delta review and final-head CI remain pending. |
 
 Resolved setup failures: the initial SciPy 1.15.3 macOS wheel could not import `scipy.linalg`; the official macosx_12_0_arm64 wheel at the same locked version fixed both imports. Supabase CLI 2.117.0 created broader local grants and caused four permission-test failures (391 other cases passed). Rebuilding only the disposable stack with CI-pinned 2.109.0 restored expected grants and the full matrix passed. The first browser-storage attempt collided with local port 3100; a separate port passed. No product code was changed for these setup failures.
 
