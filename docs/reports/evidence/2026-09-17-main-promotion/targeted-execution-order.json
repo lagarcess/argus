@@ -1,0 +1,122 @@
+[
+  {
+    "round": 1,
+    "side": "baseline",
+    "status": "passed",
+    "elapsed_seconds": 137.05113695800537
+  },
+  {
+    "round": 1,
+    "side": "candidate",
+    "status": "passed",
+    "elapsed_seconds": 157.70720937501756
+  },
+  {
+    "round": 2,
+    "side": "baseline",
+    "status": "failed",
+    "elapsed_seconds": 171.4911978750024
+  },
+  {
+    "round": 2,
+    "side": "candidate",
+    "status": "failed",
+    "elapsed_seconds": 180.83801125001628
+  },
+  {
+    "round": 3,
+    "side": "baseline",
+    "status": "failed",
+    "elapsed_seconds": 166.31233516699285
+  },
+  {
+    "round": 3,
+    "side": "candidate",
+    "status": "passed",
+    "elapsed_seconds": 64.4435770829732
+  },
+  {
+    "round": 4,
+    "side": "baseline",
+    "status": "passed",
+    "elapsed_seconds": 81.80916379200062
+  },
+  {
+    "round": 4,
+    "side": "candidate",
+    "status": "passed",
+    "elapsed_seconds": 82.04331266600639
+  },
+  {
+    "round": 5,
+    "side": "baseline",
+    "status": "passed",
+    "elapsed_seconds": 97.56877312497818
+  },
+  {
+    "round": 5,
+    "side": "candidate",
+    "status": "passed",
+    "elapsed_seconds": 75.4073653749947
+  },
+  {
+    "round": 6,
+    "side": "baseline",
+    "status": "failed",
+    "elapsed_seconds": 49.953396791999694
+  },
+  {
+    "round": 6,
+    "side": "candidate",
+    "status": "passed",
+    "elapsed_seconds": 62.16618283299613
+  },
+  {
+    "round": 7,
+    "side": "baseline",
+    "status": "failed",
+    "elapsed_seconds": 107.17320829199161
+  },
+  {
+    "round": 7,
+    "side": "candidate",
+    "status": "failed",
+    "elapsed_seconds": 131.88163558300585
+  },
+  {
+    "round": 8,
+    "side": "baseline",
+    "status": "failed",
+    "elapsed_seconds": 132.96683879199554
+  },
+  {
+    "round": 8,
+    "side": "candidate",
+    "status": "failed",
+    "elapsed_seconds": 124.68285174999619
+  },
+  {
+    "round": 9,
+    "side": "baseline",
+    "status": "failed",
+    "elapsed_seconds": 168.2509354169888
+  },
+  {
+    "round": 9,
+    "side": "candidate",
+    "status": "failed",
+    "elapsed_seconds": 67.80576991598355
+  },
+  {
+    "round": 10,
+    "side": "baseline",
+    "status": "passed",
+    "elapsed_seconds": 54.33933791698655
+  },
+  {
+    "round": 10,
+    "side": "candidate",
+    "status": "failed",
+    "elapsed_seconds": 63.717898000002606
+  }
+]

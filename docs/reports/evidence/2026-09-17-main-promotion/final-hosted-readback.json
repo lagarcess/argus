@@ -1,0 +1,33 @@
+{
+  "observed_at": "2026-09-17T23:10:25.805899+00:00",
+  "new_deploys_performed": false,
+  "services": {
+    "argus-api": {
+      "status": "live",
+      "commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "deploy_id": "dep-dajii17qj5pc73dp04rg",
+      "source": "Render MCP list_deploys"
+    },
+    "argus-app": {
+      "status": "live",
+      "commit": "3d98057c1e722317f0243fb96fb647771ddae484",
+      "deploy_id": "dep-dajiisnqj5pc73dp2uc0",
+      "source": "Render MCP list_deploys"
+    },
+    "argus-backtests": {
+      "status": "ready",
+      "commit_prefix": "3d98057",
+      "version_id": "wfv-dajijpbm8hqs738ed7i0",
+      "source": "Render Workflow CLI versions list; API exposes version name prefix, not full commit"
+    }
+  },
+  "canary": {
+    "workflow_id": 298408697,
+    "state": "disabled_manually"
+  },
+  "issue_614": {
+    "state": "CLOSED",
+    "state_reason": "NOT_PLANNED",
+    "closed_at": "2026-09-17T21:14:10Z"
+  }
+}
