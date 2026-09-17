@@ -363,7 +363,7 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-16 at integration `97cba840`, after production promotion
+**Updated 2026-09-16 at integration `2d2452b7`, after production promotion
 `3d98057c`.** Landing state for every item is in "Where this board actually
 stands" below.
 
@@ -1454,7 +1454,7 @@ passing test suite told us this feature was correct for a full day.
 **Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
-shipped means live in production. Integration is `97cba840`.
+shipped means live in production. Integration is `2d2452b7`.
 
 **The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
 roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
@@ -1560,6 +1560,7 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Calculation boundaries repaired, code only | outside the releases | **LANDED** `44cd936c`, PR #649, split out of PR #634 so no measurement was needed. An uncited currency can no longer own a calculation, which is the peso shown as dollars defect this board exists to prevent; empty optional interpreter objects keep their typed facts; only a declaration's own rule may erase an input; a completed card must reference its result; and a missing educational query no longer permits research. PR #634 stays parked with the model-facing work. |
 | Scenario answers keep their labels | outside the releases | **LANDED** `d825d3a8`, PR #650. When three scenario cards all computed but the shared formula named its figures without saying which card, the answer fell back to an unlabeled list of numbers and lost the scenarios. The fix keeps the labeled scenario prose whenever every card succeeded. Found by the measurement, not by review. |
 | An answer keeps its explanation | outside the releases | **LANDED** `97cba840`, PR #651. A Spanish answer whose prose named only its inputs lost the whole explanation and printed a strip of numbers; it now keeps the explanation with its labels. The review then caught the opposite risk, an ungrounded comparison published beside the option that contradicts it, so an incomplete comparison keeps the safe fallback. Both found by measuring, not by review. |
+| A calculation finds its price | outside the releases | **LANDED** `2d2452b7`, PR #652. A Bitcoin calculation asked market data for the exchange's own code and got nothing back, so the answer lost its price. Price lookups now use the symbol the resolver returned, in calculation and market-history answers alike. Found by repeating one measured case, not by review. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes

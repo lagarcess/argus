@@ -585,7 +585,7 @@ def latest_market_close(symbol: str) -> tuple[float, str] | None:
         asset = classify_symbol(symbol)
         end = new_york_today()
         series = fetch_price_series(
-            symbol,
+            asset.symbol,
             asset.asset_class,
             end - timedelta(days=_MARKET_WINDOW_DAYS),
             end,
