@@ -1,0 +1,68 @@
+{
+  "production_test_data_only": true,
+  "backup_taken": false,
+  "canaries_run": false,
+  "results": [
+    {
+      "identity": "owner",
+      "session_revoked": true,
+      "auth_deleted": true,
+      "readback_status": 404
+    },
+    {
+      "identity": "guest",
+      "session_revoked": true,
+      "auth_deleted": true,
+      "readback_status": 404
+    }
+  ],
+  "cost_ledger": [
+    {
+      "task": "asset_mention_preflight",
+      "entries": 2,
+      "priced_entries": 2,
+      "reported_cost": "0.00180495"
+    },
+    {
+      "task": "clarification",
+      "entries": 1,
+      "priced_entries": 1,
+      "reported_cost": "0.00020598"
+    },
+    {
+      "task": "field_fidelity",
+      "entries": 1,
+      "priced_entries": 1,
+      "reported_cost": "0.00251310"
+    },
+    {
+      "task": "interpretation",
+      "entries": 2,
+      "priced_entries": 2,
+      "reported_cost": "0.02217690"
+    },
+    {
+      "task": "interpretation_repair",
+      "entries": 4,
+      "priced_entries": 4,
+      "reported_cost": "0.01506615"
+    },
+    {
+      "task": "knowledge_voicing",
+      "entries": 1,
+      "priced_entries": 1,
+      "reported_cost": "0.00449935"
+    },
+    {
+      "task": "name_suggestion",
+      "entries": 2,
+      "priced_entries": 2,
+      "reported_cost": "0.00004500"
+    }
+  ],
+  "receipt_revoke_status": 200,
+  "public_read_after_revoke": 200,
+  "public_tombstone": "revoked_without_payload",
+  "status": "complete",
+  "completed_at": "2026-09-18T02:05:42.986848+00:00"
+}

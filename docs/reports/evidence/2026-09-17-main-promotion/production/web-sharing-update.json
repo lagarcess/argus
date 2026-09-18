@@ -1,0 +1,8 @@
+{
+  "service": "web",
+  "service_id": "srv-d7ap6bmslomc73eqp8m0",
+  "updated": {
+    "NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED": "true"
+  },
+  "mcp_error": false
+}

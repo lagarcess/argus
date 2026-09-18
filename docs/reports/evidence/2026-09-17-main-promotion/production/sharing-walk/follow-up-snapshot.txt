@@ -1,0 +1,92 @@
+### Page
+- Page URL: https://arguschat.ai/chat?conversation=7107ee83-6835-4a2d-9d13-06a55d44b624
+- Page Title: Monthly Savings Investment Test · Argus
+- Console: 5 errors, 6 warnings
+### Snapshot
+```yaml
+- generic [active] [ref=e1]:
+  - alert [ref=e55]: Argus
+  - main [ref=e56]:
+    - generic [ref=e57]:
+      - complementary [ref=e58]:
+        - generic [ref=e59]:
+          - button "Expand sidebar" [ref=e60] [cursor=pointer]
+          - generic: argus
+        - generic [ref=e66]:
+          - button [ref=e67] [cursor=pointer]
+          - button [ref=e71] [cursor=pointer]
+          - button [ref=e77] [cursor=pointer]
+      - generic [ref=e83]:
+        - generic:
+          - heading "Monthly Savings Investment Test" [level=1] [ref=e170]
+          - generic [ref=e86]:
+            - button "Guest settings" [ref=e88] [cursor=pointer]
+            - button "Sign in" [ref=e92] [cursor=pointer]
+        - generic [ref=e93]:
+          - status [ref=e94]
+          - region "Conversation" [ref=e96]:
+            - generic [ref=e97]:
+              - generic [ref=e123]:
+                - paragraph [ref=e124]: From a shared conversation, September 18, 2026
+                - generic [ref=e125]: I have $1,200 saved. If I save another $300 each month with no interest, how many months until I reach $3,000?
+              - generic [ref=e127]:
+                - paragraph [ref=e128]: From a shared conversation, September 18, 2026
+                - generic [ref=e129]:
+                  - generic [ref=e130]:
+                    - paragraph [ref=e131]:
+                      - text: You reach
+                      - strong [ref=e132]: $3,000
+                      - text: after 6 months.
+                    - paragraph [ref=e133]: "months_to_goal: 6"
+                  - generic [ref=e134]:
+                    - generic [ref=e135]:
+                      - generic [ref=e136]: Read-only snapshot
+                      - generic [ref=e137]: Argus computed this on September 18, 2026
+                    - generic [ref=e138]: 6 months
+                    - paragraph [ref=e139]: Periods
+                    - generic [ref=e140]:
+                      - generic [ref=e141]:
+                        - term [ref=e142]: Total paid in
+                        - definition [ref=e143]: USD 3,000.00
+                      - generic [ref=e144]:
+                        - term [ref=e145]: Total growth
+                        - definition [ref=e146]: USD 0.00
+                      - generic [ref=e147]:
+                        - term [ref=e148]: Ending amount
+                        - definition [ref=e149]: USD 3,000.00
+                    - generic [ref=e150]:
+                      - heading "What Argus used" [level=3] [ref=e151]
+                      - generic [ref=e152]:
+                        - paragraph [ref=e154]: "Starting amount: USD 1,200.00"
+                        - paragraph [ref=e156]: "Payment per period: USD 300.00"
+                        - paragraph [ref=e158]: "Ending amount: USD 3,000.00"
+                        - paragraph [ref=e160]: "Annual rate: 0 %"
+                  - paragraph [ref=e161]: This is arithmetic on the inputs shown, frozen on that date. It is not advice or a forecast, and it does not change if those inputs change.
+              - generic [ref=e162]: What if I save $450 per month instead?
+              - generic [ref=e172]:
+                - button "Copy Plain Text" [ref=e173] [cursor=pointer]
+                - generic [ref=e178]:
+                  - paragraph [ref=e180]: Got it, $450 per month. To run that test, which asset or assets would you like to invest in, and over what date range?
+                  - generic [ref=e182]:
+                    - button "Good response" [ref=e183] [cursor=pointer]
+                    - button "Poor response" [ref=e186] [cursor=pointer]
+                    - button "More Actions" [ref=e189] [cursor=pointer]
+          - generic [ref=e107]:
+            - generic [ref=e108]:
+              - button "Mention an asset or indicator" [ref=e109] [cursor=pointer]
+              - generic [ref=e113]:
+                - combobox "Add a follow-up" [ref=e169]
+                - generic: Add a follow-up
+              - generic "Message is empty" [ref=e116] [cursor=pointer]:
+                - button "Send message" [disabled]
+            - generic [ref=e117]:
+              - paragraph [ref=e118]:
+                - text: Argus can make mistakes. For education only. Not financial advice.
+                - link "Terms" [ref=e119] [cursor=pointer]:
+                  - /url: /terms
+                - text: ·
+                - link "Privacy" [ref=e120] [cursor=pointer]:
+                  - /url: /privacy
+                - text: .
+              - time [ref=e121]: Temporary chat · available until Sep 24, 2026
+```

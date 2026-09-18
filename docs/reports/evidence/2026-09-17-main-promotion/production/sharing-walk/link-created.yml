@@ -1,0 +1,76 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - main [ref=e3]:
+    - generic [ref=e6]:
+      - complementary [ref=e7]:
+        - generic [ref=e8]:
+          - button "Expand sidebar" [ref=e9] [cursor=pointer]
+          - generic: argus
+        - generic [ref=e15]:
+          - button [ref=e16] [cursor=pointer]
+          - button [ref=e20] [cursor=pointer]
+          - button [ref=e26] [cursor=pointer]
+        - button [ref=e34] [cursor=pointer]
+      - generic [ref=e39]:
+        - generic:
+          - heading "Savings Goal Calculation" [level=1] [ref=e102]
+          - generic [ref=e70]:
+            - button "Share conversation" [ref=e71] [cursor=pointer]
+            - button "Chat options" [ref=e75] [cursor=pointer]
+        - generic [ref=e40]:
+          - status [ref=e41]
+          - region "Conversation" [ref=e80]:
+            - generic [ref=e81]:
+              - generic [ref=e82]: I have $1,200 saved. If I save another $300 each month with no interest, how many months until I reach $3,000?
+              - generic [ref=e146]:
+                - generic [ref=e148] [cursor=pointer]:
+                  - checkbox "Select this question and answer" [checked] [ref=e149]
+                  - generic [ref=e150]: Select this question and answer
+                - generic [ref=e151]:
+                  - button "Copy Plain Text" [ref=e152] [cursor=pointer]
+                  - generic [ref=e157]:
+                    - generic [ref=e158]:
+                      - paragraph [ref=e159]:
+                        - text: You reach
+                        - strong [ref=e160]: $3,000
+                        - text: after 6 months.
+                      - paragraph [ref=e161]: "months_to_goal: 6"
+                    - paragraph [ref=e162]: "Assumed for this calculation: plan save, periods per year 12, and payment timing end."
+                    - article [ref=e164]:
+                      - button "6 months Periods Show the numbers" [ref=e165] [cursor=pointer]:
+                        - generic [ref=e166]:
+                          - generic [ref=e167]: 6 months
+                          - generic [ref=e168]: Periods
+                        - generic [ref=e169]: Show the numbers
+                    - generic [ref=e171]:
+                      - button "Good response" [ref=e172] [cursor=pointer]
+                      - button "Poor response" [ref=e175] [cursor=pointer]
+                      - button "More Actions" [ref=e178] [cursor=pointer]
+              - group "How is Argus doing?" [ref=e136]:
+                - paragraph [ref=e137]: How is Argus doing?
+                - generic [ref=e138]:
+                  - button "Bad" [ref=e139] [cursor=pointer]
+                  - button "Okay" [ref=e140] [cursor=pointer]
+                  - button "Good" [ref=e141] [cursor=pointer]
+                - button "Don't ask again in this chat" [ref=e142] [cursor=pointer]
+          - generic [ref=e89]:
+            - region "Share conversation" [ref=e183]:
+              - paragraph [ref=e184]: Choose questions and answers to share.
+              - paragraph [ref=e185]: 1 of 1 selected
+              - generic [ref=e186]:
+                - button "Select all" [ref=e187] [cursor=pointer]
+                - button "Clear selection" [ref=e190] [cursor=pointer]
+                - button "Cancel" [ref=e188] [cursor=pointer]
+                - button "Continue" [ref=e189] [cursor=pointer]
+            - paragraph [ref=e99]: Argus can make mistakes. For education only. Not financial advice.
+  - generic [ref=e191]:
+    - button "Close sharing" [ref=e192] [cursor=pointer]
+    - dialog [ref=e193]:
+      - generic [ref=e194]:
+        - heading "Share conversation" [level=2] [ref=e195]
+        - button "Close sharing" [ref=e196] [cursor=pointer]
+      - generic [ref=e201]:
+        - generic [ref=e264]:
+          - textbox "Copy link" [ref=e265]: https://arguschat.ai/r/HdKtTu7VqIsJTJv1_Je67FGWTpIm0vtT
+          - button "Copy link" [ref=e266] [cursor=pointer]
+        - paragraph [ref=e270]: Your name is not on it, search engines cannot find it, and you can take it down any time from Data Controls.

@@ -1,0 +1,8 @@
+{
+  "service": "api",
+  "service_id": "srv-d78tanmuk2gs73e17nn0",
+  "updated": {
+    "ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED": "true"
+  },
+  "mcp_error": false
+}

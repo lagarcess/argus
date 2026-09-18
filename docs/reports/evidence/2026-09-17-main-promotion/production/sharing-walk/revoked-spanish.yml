@@ -1,0 +1,15 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e4]:
+    - main [ref=f1e5]:
+      - generic [ref=f1e6]:
+        - generic [ref=f1e7]: Compartido contigo
+        - generic [ref=f1e8]: Probado con Argus
+      - generic [ref=f1e10]:
+        - heading "Este ya no está" [level=1] [ref=f1e11]
+        - paragraph [ref=f1e12]: La persona que lo compartió quitó el enlace, o borró el resultado que había detrás. No queda nada por mostrar.
+        - paragraph [ref=f1e13]: Aun así puedes probar Argus por tu cuenta.
+    - generic [ref=f1e15]:
+      - paragraph [ref=f1e16]: Esto es un qué habría pasado, no un consejo.
+      - link "Continuar con Argus" [ref=f1e17] [cursor=pointer]:
+        - /url: /
+  - alert [ref=f1e18]

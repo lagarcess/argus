@@ -2,23 +2,20 @@
 
 ## Candidate
 
-- Candidate SHA: `2523e3a3dcb64fc713d978cc0e503904373de307`
-- Candidate branch: `codex/production-promotion-20260917`
-- Approved integration cut / original fetched integration: `cfc1988dd80ca1a8007b8f336c107700dd57e009`.
-- Last fetched integration: `cfc1988dd80ca1a8007b8f336c107700dd57e009`.
-- Last fetched main: `3d189204c6a685b7f3bb1818b38e34a33d1f10de`.
-- Reconciliation: none needed at preparation. The would-be merged tree is exactly the candidate tree, `ff4b5e46d3c39b8925c0c54c810227a77ca2ba8f`; modularity passes on that tree.
-- Checkpoint semantics: this SHA pins the reviewed code-plus-evidence checkpoint, not the commit that subsequently publishes this manifest update. The native eval measured `3cecda6933399e53f6ea00edc8004a88d7eefad4`; only documentation/evidence changed between it and this checkpoint. No descendant is implicitly deploy-cleared. Before deployment, record and gate the exact landed `origin/main` SHA, then bind each service readback to that SHA.
-- Scope: the whole approved roadmap cut, plus sharing configuration and promotion evidence. No product code or migration SQL changed in this task.
-- Validation status: Live comparison complete; founder explicitly accepted both candidate-only typed failures after reviewing their concrete effects. Founder replaced hosted staging with the disposable Docker validation below and explicitly directed a stop before production schema changes. Local sharing follow-up failed; no production migration, main promotion, or deployment performed.
-- Validation surface: local deterministic checks and native provider-backed evals. No separate hosted staging surface was found.
-- Promotion target: `main`, through a PR with required `ci` green; all service deploys remain manual.
-- Release captain: Codex. Approver: founder, explicit task instruction on 2026-09-17.
-- Rollback target: `3d98057c1e722317f0243fb96fb647771ddae484`.
+- Candidate SHA: `a9286b21886eb03df7a21f2f4b7d5e79af570679`.
+- Candidate branch: `main`; promoted through PR [#655](https://github.com/lagarcess/argus/pull/655).
+- Approved integration cut, original base and current integration: `cfc1988dd80ca1a8007b8f336c107700dd57e009`.
+- Pre-merge PR head: `0c47cf6ddf61568f6f496535bfa51885461bf49a`.
+- Landed parents: `3d189204c6a685b7f3bb1818b38e34a33d1f10de` and `0c47cf6ddf61568f6f496535bfa51885461bf49a`.
+- Landed tree: `4eb020142aae2505b5c45e17c7c8f9cae735d173`, identical to the CI-tested pre-merge candidate. Integration did not advance; no reconciliation or semantic overlap occurred. Modularity passed on this merged tree.
+- Scope: full approved roadmap cut plus sharing configuration and release evidence. No product code or migration SQL changed in this promotion task.
+- Native live-eval measured SHA remains `3cecda6933399e53f6ea00edc8004a88d7eefad4`. Later changes are documentation/evidence only. Clean scoped Codex review at `2523e3a3`, zero unresolved threads; captain reviewed the subsequent documentation/waiver delta with no findings. Both candidate CI runs passed at `0c47cf6d`; main CI [35297005285](https://github.com/lagarcess/argus/actions/runs/35297005285) passed at `a9286b21886eb03df7a21f2f4b7d5e79af570679`.
+- Deployment complete: API/app live, Workflow ready; production migration gate passed before and after landing. Production sharing walk completed with the accepted follow-up misread and an additional raw calculation-label display defect recorded below.
+- Release captain: Codex. Approver: founder, explicit instructions on 2026-09-17 America/Chicago; production operations occurred on 2026-09-18 UTC.
+- Rollback target: `3d98057c1e722317f0243fb96fb647771ddae484`. Retain widened compatible schema when rolling code back.
+- This manifest's publication commit records the deployment of `a9286b21886eb03df7a21f2f4b7d5e79af570679`; it is not itself a new deployment candidate. Production main was read back at the landed SHA after the walk.
 
-Founder decisions: sharing ON; all four pending migrations approved after backup, without a maintenance window; no spend cap on promotion runs; disable Private Alpha Canary and close #614 as not fixed; deploy all three services, then perform the signed-out sharing walk. Never git stash.
-
-Latest founder direction: skip provisioning staging services, use disposable local Supabase in Docker, apply/read back the four migrations, run exact `cfc1988d` with sharing ON, perform one English sharing/follow-up walk and one Spanish page, skip step 13 canaries, then tear down and stop before production schema changes. This replaces the pending staging question for this task; it is not hosted deployment clearance. The PR-managed, data-free Supabase preview remains attached to PR #655 and was not used for this walk.
+Founder decisions: sharing ON; backup and hosted staging explicitly waived; three prior observed typed/follow-up failures accepted; all three service deploys authorized; canaries skipped and #614 closed as not fixed. No spend cap. Never git stash.
 
 ## Production authorization after local acceptance
 
@@ -30,15 +27,15 @@ Founder accepted the local walk and explicitly resumed production promotion on 2
 - Production migration gate/readback, four migration applications, landing the approved `cfc1988d` roadmap cut plus already-approved sharing configuration on main, and manual deployment of API, app and backtests are explicitly authorized. Preserve existing reviewed code/eval lineage; record the actual landed commit and re-gate it before deploying.
 - Repeat one production money/share/signed-out/follow-up walk. Canaries stay skipped. No git stash.
 
-Status: production promotion authorized and in progress. The local stop recorded below was the prior checkpoint and is superseded by this authorization. This authorization does not assert that migrations or deploys have completed.
+Status: production promotion completed under these explicit waivers. The previous local stop is superseded. Deployment and schema proof are recorded below.
 
-## Disposable Docker Validation
+## Disposable Docker Validation (prior checkpoint)
 
 - Exact clean app/API source: `cfc1988dd80ca1a8007b8f336c107700dd57e009`; both sharing flags enabled through environment overrides. Next.js production build passed. API/app ran locally against a fresh Docker Supabase database with real Auth/Postgres persistence. Workflow dispatch was disabled; no staging services provisioned.
 - Four migrations applied once in repository order after initializing the earlier 75. Final readback **79/79**, no missing/unexpected migrations, name or content drift. Widened checks and SECURITY DEFINER/service-role-only claim/release permissions matched. See `docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/migrations-after.json` and `objects-after.json`.
 - Money question: starting at $1,200, saving $300 monthly without interest until $3,000. Correct answer: **six months**. Normal local signup preserved the guest answer and exposed the owner sharing control; preview and publication succeeded.
 - Signed-out public link: separate browser session with **zero cookies and no auth-token storage keys** displayed the question, answer and calculation inputs. English and Spanish public pages passed; Spanish UI/calculation labels localized while immutable authored text stayed English.
-- Follow-up: “What if I save $450 per month instead?” opened a distinct guest chat with the shared snapshot attached, but replied “Which asset or assets would you invest in monthly with that $450, and over what time period would you like to test it?” Expected four months. **Follow-up answer continuity failed.** No retry/fix was performed. This newly observed failure is not covered by the earlier two-case founder waiver.
+- Follow-up: “What if I save $450 per month instead?” opened a distinct guest chat with the shared snapshot attached, but replied “Which asset or assets would you invest in monthly with that $450, and over what time period would you like to test it?” Expected four months. **Follow-up answer continuity failed.** No retry/fix was performed. At this checkpoint it was not covered by the earlier two-case waiver; the subsequent production authorization explicitly accepted it.
 - Console: public English/Spanish pages each had zero errors and a font preload warning. Initial signed-out chat logged four 401s; the reader's guest-chat transition logged three 401s before successful guest/fork/stream requests. Signed-in sharing had zero errors. Font preload warnings remained; no uncaught JS exception appeared.
 - Evidence/report/screenshots: `docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/README.md`. Two user questions, 13 provider receipts, **$0.04288399 reported**. No canary run.
 - Cleanup: all three owned browser sessions closed; API/web listeners stopped; owned Supabase containers and data volumes removed. Exact-build worktree and local credential/status files removed after evidence preservation. No production change or git stash.
@@ -90,43 +87,50 @@ The driver invokes the native `tests/evals/test_measurement_eval_live.py` with `
 
 ## Production Migration Gate
 
-Required order: complete acceptance, take the backup before applying SQL, run the production ledger gate, apply only approved missing migrations in repository order, read back ledger and affected objects, require a passing gate, promote main, rerun with `--verify-landed-ref origin/main`, then deploy API, app, workflow in that order.
+- Production target: `lgdhvepyrzbnscqssgqq`, verified session-pooler target with `sslmode=verify-full` and the configured CA certificate.
+- **Backup: explicitly waived by founder; no backup taken. Hosted staging: explicitly waived.**
+- Before gate at `41a9ebef`: expected exit 1, only `missing_candidate_migrations`, exactly the four approved files. Historical ledger fingerprint matched the checked-in reconciliation.
+- Applied all four files in repository order in one transaction at **2026-09-18 01:41:15 UTC**, with canonical version/name/statement-array ledger entries, 10-second lock timeout and 120-second statement timeout. SQL and ledger entries committed atomically. No SQL text changed. Initial operator-script field lookup failed before opening a connection; corrected before the sole application transaction.
+- After gate at `0c47cf6d`: exit 0, `status=pass`, no missing migrations or new name/content drift.
+- After landing: gate with `--verify-landed-ref origin/main` at `a9286b21886eb03df7a21f2f4b7d5e79af570679` passed at **01:51:34 UTC**, before any deploy-capable operation.
+- Final comparison: 79 candidate files, 81 production ledger rows, zero missing, zero current name/content drift. Seven historical ledger-only rows and five historical candidate-only identities account for the row surplus; they match the committed historical reconciliation. No historical ledger rows were rewritten.
+- Evidence: `docs/reports/evidence/2026-09-17-main-promotion/production/production-{before,apply,after,landed}.json`, `production-objects-after.json`, and the existing approved-file hash record.
 
-- Production gate: **not run**, stopped before production schema changes by latest founder direction; the founder explicitly accepted both typed failures. Gate apply behavior remains `never`.
-- Production backup: **explicitly waived by founder after local acceptance; not taken**. The previously prepared backup procedure will not run for this promotion.
-- Production SQL applied: **none**. Current production ledger parity and drift are not claimed.
-- Production project from the configured target: `lgdhvepyrzbnscqssgqq`.
-- Approved file hashes: `docs/reports/evidence/2026-09-17-main-promotion/approved-migration-files.json`.
-- Local before/after ledger evidence and affected-object readback are retained in the evidence directory; they are explicitly not production clearance.
-
-| Repository order | Migration | Classification | Approved handling |
+| Order | Migration | Result | Handling |
 | --- | --- | --- | --- |
-| 1 | `20260912190000_share_calculation_receipts.sql` | destructive | Widen excerpt kind check; backup, no maintenance window. |
-| 2 | `20260913213100_admit_readout_route_receipt_tier.sql` | destructive | Widen receipt tier check to readout; backup, no maintenance window. |
-| 3 | `20260913230000_release_research_guest_claim.sql` | contract-replacing | Preserve claim signature, add guest-refund function, retain service-role-only execution. |
-| 4 | `20260914120000_share_plain_answer_receipts.sql` | destructive | Widen excerpt kind check to answer; backup, no maintenance window. |
+| 1 | `20260912190000_share_calculation_receipts` | committed | Widen excerpt kind check; backup waived, no maintenance window. |
+| 2 | `20260913213100_admit_readout_route_receipt_tier` | committed | Widen tier check for readout; backup waived, no maintenance window. |
+| 3 | `20260913230000_release_research_guest_claim` | committed | Compatible claim replacement and guest-refund function; backup waived. |
+| 4 | `20260914120000_share_plain_answer_receipts` | committed | Widen excerpt kind check for plain answers; backup waived, no maintenance window. |
 
-Local readback: 79/79 migrations match with no missing, unexpected, name or content drift. Both widened constraints are present. Claim/release functions are SECURITY DEFINER and executable by service_role, not anon/authenticated. Rollback retains widened checks and compatible functions; do not narrow checks after new-kind rows exist.
+Object readback matched the local rehearsal: excerpt kinds include backtest/research_answer/calculation/answer/mixed; route tiers include utility/chat/structured/context/readout. Claim and release functions are SECURITY DEFINER, executable by service_role, not anon/authenticated. Do not narrow these checks during code rollback after new-kind rows exist.
 
 ## Deploy Proof
 
-No release deploy has been attempted. Initial readback is retained in `docs/reports/evidence/2026-09-17-main-promotion/deploy-before.json`; fresh readback at 2026-09-17 23:10 UTC is `docs/reports/evidence/2026-09-17-main-promotion/final-hosted-readback.json`. No service changed.
+All three services were released from landed main `a9286b21886eb03df7a21f2f4b7d5e79af570679`.
 
-| Service | Observed deployed commit | Status |
-| --- | --- | --- |
-| `argus-api` | `3d98057c1e722317f0243fb96fb647771ddae484` | live |
-| `argus-app` | `3d98057c1e722317f0243fb96fb647771ddae484` | live |
-| `argus-backtests` | `3d98057` ready-version prefix | ready, version `wfv-dajijpbm8hqs738ed7i0` |
+| Service | Deployed commit proof | Deployment/version | Terminal status |
+| --- | --- | --- | --- |
+| `argus-api` | full SHA `a9286b21886eb03df7a21f2f4b7d5e79af570679` | `dep-dam9irgu01pc73erp4i0` | live, 01:54:39 UTC |
+| `argus-app` | full SHA `a9286b21886eb03df7a21f2f4b7d5e79af570679` | `dep-dam9iumk1f9s73eoe450` | live, 01:54:52 UTC |
+| `argus-backtests` | release explicitly pinned to the same full SHA; ready version reports `a9286b2` | `wfv-dam9k6942hec738qgjf0` | ready; release command exited 0 |
 
-Render MCP was reached through the repository-configured endpoint and credential. It exposes API/app deployment tools but no Workflow operations; the repository's Workflow release command uses Render's Workflow API through its CLI. This capability gap is recorded, not represented as a completed deploy.
+Render MCP environment updates started API then app deployments automatically, twelve seconds apart. Both finished before the Workflow release began. This overlapped the API/app builds rather than waiting for API completion before starting the app; no version mismatch resulted. Render MCP has no Workflow operation, so the repository's `workflow-release <full SHA>` command used Render CLI/API for backtests. Workflow API exposes a commit prefix, not an independent full-SHA field; retain the explicit release-command receipt alongside ready-version proof.
+
+Resolved operations: the first MCP writes/deploy request failed without mutation because the workspace was unspecified. Retried with the verified `argus-prod` workspace `tea-d5rdkfk9c44c73e7a1ig`. A separate API trigger added redundant queued deploy `dep-dam9j1fa9cic73dddgtg`; it was cancelled. CLI cancellation initially found an expired saved login, then succeeded with the existing valid MCP credential. The active API/app/Workflow deployments did not fail.
+
+Evidence directory: `docs/reports/evidence/2026-09-17-main-promotion/production/`, including `api-status.json`, `web-status.json`, `production-workflow-status.txt`, `production-workflow-release.txt`, `production-merge.json`, and `api-redundant-cancelled.json`.
 
 ## Environment Proof
 
-- Expected mode: `real-workflow`.
+- Release mode: `real-workflow`.
 - Release profile hash: `71659a53a4c39b129c62ab0cb42068205be3a78d60c229f95898fe64353f3733`.
-- `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED=true` and `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED=true` agree in Blueprint, release profile and declared environment example. Live sharing has not been enabled.
-- API/app were observed with `autoDeployTrigger=off`; the profile retains manual mode for all three services.
-- Hosted environment fingerprints, workflow effective-provider proof, warmup, guest controls/cleanup and post-deploy audit remain pending. No existing identity or guest workspace was modified for QA.
+- Both sharing flags are `true` in Blueprint, release profile, declared example contract and hosted API/app environment. The production browser exercised the enabled build.
+- Before audit found only the two sharing flags off. After MCP updates, release-config audit passed: `status=ready`, `workflow_env_status=ready`, `autodeploy_status=ready`; all three deploy triggers remain manual.
+- Environment fingerprint: `294a506ff6963905cc936d234f7ae4604baced5e88c52f6497b562a141952518`.
+- Workflow environment fingerprint: `3a20406b42ea9f6fc3640cac1478502e483eb1a6602fd1d7399db12bcf259747`.
+- `warmup-render.sh --expect-mode real-workflow` exited 0: API health, protected readiness, frontend response, stale-job scan, environment audit and deployed Workflow runtime proof passed. Effective provider proof: `live_provider`, `ready`. This was the runbook warmup, not either skipped canary suite.
+- Production CAPTCHA remained enabled. Temporary registered and guest QA identities were least privilege, sessions revoked and accounts deleted after the walk. The synthetic shared link was revoked and its public payload removed from readback.
 
 ## Gate Evidence
 
@@ -145,8 +149,8 @@ Evidence summary: `docs/reports/evidence/2026-09-17-main-promotion/verification.
 | Real migration gate tests | 49 passed, zero skips. |
 | Real PostgreSQL matrix | 395 passed, zero skips. |
 | Real anonymous Auth matrix | 12 passed, zero skips. |
-| Local Docker replacement / hosted acceptance | Local migrations and sharing views passed; follow-up answer continuity failed. Hosted staging and production acceptance not performed. |
-| Required hosted CI / final review | PR #655: all real CI jobs passed at `2523e3a3`; draft-event jobs skipped. Final scoped Codex review is clean at that SHA, with zero unresolved threads. Links and exact proof are in the preproduction checkpoint. |
+| Local Docker / production walk | Local rehearsal accepted with waived follow-up gap. Production share/create/read/follow-up/revoke walk completed; known misread recurred; raw calculation-label display defect recorded. |
+| Required CI / review | Both candidate CI runs passed at `0c47cf6d`; landed main CI passed at `a9286b21`. Scoped Codex review at `2523e3a3` retained with zero unresolved threads; later documentation/waiver delta reviewed clean by captain. |
 
 Resolved setup failures: the initial SciPy 1.15.3 macOS wheel could not import `scipy.linalg`; the official macosx_12_0_arm64 wheel at the same locked version fixed both imports. Supabase CLI 2.117.0 created broader local grants and caused four permission-test failures (391 other cases passed). Rebuilding only the disposable stack with CI-pinned 2.109.0 restored expected grants and the full matrix passed. The first browser-storage attempt collided with local port 3100; a separate port passed. No product code was changed for these setup failures.
 
@@ -154,15 +158,18 @@ Canary: workflow 298408697 was read back `disabled_manually`; issue #614 was clo
 
 ## Release Decision
 
-- Decision: **PRODUCTION PROMOTION AUTHORIZED; IN PROGRESS**. Founder accepted the two earlier candidate-only typed failures, then requested Docker validation and an explicit stop. The new follow-up failure remains unresolved and is now explicitly accepted as a known gap.
-- Not performed per latest stop instruction: production backup/migrations/gate, main landing and landed-ref gate, three-service deploy and hosted verification. PR #655 is draft; no readiness or deploy clearance is inferred from this preparation checkpoint. The later documentation-publication head must retain current CI before landing.
-- Signed-out sharing walk: completed locally at exact `cfc1988d` with screenshots/console evidence; link publication and viewing passed, follow-up navigation passed, follow-up calculation intent failed. Production walk and revocation acceptance were not performed.
-- Tester invitations/public exposure changes: none.
-- Rollback owner: founder/Codex within the explicit promotion authority; restore the prior code and sharing posture while retaining compatible widened schema.
-- Cleanup: original workspace dotenv link restored; both temporary native-eval worktrees removed; owned local Supabase stack stopped without retaining its disposable database. The PR-managed, data-free Supabase preview remains attached to open PR #655. No git stash was used.
+- Decision: **DEPLOYED; KNOWN GAPS AND OBSERVED DISPLAY DEFECT RECORDED.** Founder authorized production and accepted the two native typed failures plus the shared-link follow-up misread. These remain unfixed. No product-code patch or paid question retry was made during deployment.
+- **Production walk:** asked the same $1,200 + $300/month savings question; received the correct six-month answer. Previewed and published it, opened it in an independent browser with zero cookies/auth-storage keys, and sent “What if I save $450 per month instead?” The new guest chat carried the snapshot, then replied: “Got it, $450 per month. To run that test, which asset or assets would you like to invest in, and over what date range?” Expected four months. This reproduces the explicitly accepted gap.
+- Additional display defect: `months_to_goal: 6` appeared in prose and persisted into the shared page, beside the otherwise correct result. Recorded for follow-up, not claimed fixed or separately founder-waived.
+- English and Spanish public views worked. Spanish chrome, calculation labels and follow-up composer localized; immutable authored question/answer stayed English. Owner-side revocation returned success; anonymous readback was HTTP 200 with `status=revoked` and `payload=null`, and the Spanish browser showed the tombstone.
+- Console: owner zero errors/five font preload warnings; public English before follow-up zero errors/one font warning; final reader five errors/six warnings, comprising three pre-auth API 401s plus two Cloudflare challenge console errors, with font/challenge warnings. Guest/fork/stream still succeeded. Spanish page zero errors/one font warning before revocation. No uncaught application exception observed.
+- Browser evidence: `docs/reports/evidence/2026-09-17-main-promotion/production/sharing-walk/`; report `production/README.md`. Two production questions, 13 cost-ledger entries, all priced, **$0.04631143 reported**. Workflow/build compute is not included in that LLM ledger total.
+- Canaries: both skipped by founder direction; workflow remains `disabled_manually`; #614 remains CLOSED / NOT_PLANNED, not fixed. No scheduled canary follow-up created.
+- Cleanup: test share revoked; both test sessions globally signed out; registered/anonymous QA accounts deleted and absence confirmed; all three browser sessions closed. Only synthetic QA data was targeted. No tester invitations or email delivery. No git stash.
+- Rollback: restore `3d98057c1e722317f0243fb96fb647771ddae484` and the prior sharing posture if directed, keeping the compatible widened schema. No rollback was performed.
 
-Preproduction checkpoint, written after final review returned: `docs/reports/evidence/2026-09-17-main-promotion/preproduction-checkpoint.json`. It binds the reviewed/CI-tested checkpoint, retained evidence, founder acceptance, and cleanup. The only new publication changes are this status record and its artifact.
+The earlier preproduction checkpoint remains historical evidence, superseded by this final deployment record. This manifest is published on the promotion-record branch; main remains pinned to the deployed commit.
 
 ## Privacy Notes
 
-No production conversation, user, run or job rows were read. No production backup or browser transcript has been published. Native eval evidence contains authored fixture scenarios and the harness's retained/redacted output, not customer conversations. Credentials remain in ignored local files; the evidence directory was scanned against operator credential values with zero matches. Backup contents, tokens, cookies and auth storage must never be committed.
+Production reads were limited to schema/ledger/release metadata and the two synthetic QA conversations' ownership/cost aggregates. No existing customer conversation or model output was read. Screenshots and snapshots contain only authored QA prompts and responses. Credential values, auth cookies, storage state, passwords and private session handoffs are excluded from committed evidence and removed locally after cleanup. Third-party challenge URLs in console/request evidence have their path identifiers redacted. No database backup was taken because the founder explicitly waived it.

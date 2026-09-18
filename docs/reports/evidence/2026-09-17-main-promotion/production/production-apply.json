@@ -1,0 +1,41 @@
+{
+  "project_ref": "lgdhvepyrzbnscqssgqq",
+  "candidate_sha": "41a9ebef083f18328cc5673821370e5df04a862b",
+  "current_manifest_head": "0c47cf6ddf61568f6f496535bfa51885461bf49a",
+  "backup": "explicitly_waived_by_founder",
+  "staging": "explicitly_waived_by_founder",
+  "transport": "tls_verify_full",
+  "transaction": "all_four_atomically",
+  "migrations": [
+    {
+      "version": "20260912190000",
+      "name": "share_calculation_receipts",
+      "sha256": "ef2b98db4a0145a491203b3d6221ecaa3e57703e15e179ed2a0452cb61dcbb3f",
+      "statements_sha256": "73d5f7139d8fd06551f0773514ab117c2e3c71b1f7b792dd12ea987f352b8e16",
+      "statement_count": 1
+    },
+    {
+      "version": "20260913213100",
+      "name": "admit_readout_route_receipt_tier",
+      "sha256": "b5399407417bd72bac46e5b4343f335cf41a1baccaa8647f63959b2912ca5af9",
+      "statements_sha256": "e60f4d10eb1d1300355a1aab0f863112a484717e9e625bb4633eaaeb9def46eb",
+      "statement_count": 1
+    },
+    {
+      "version": "20260913230000",
+      "name": "release_research_guest_claim",
+      "sha256": "dc47f7cb5b8a6cb92e93695f29133bd55fe8b07fbc866a39e35a2458a2c0c74a",
+      "statements_sha256": "afc4659c0cfcdba33a1d8c44854f610ba2ee52cf26c23745016906d361e6a56f",
+      "statement_count": 7
+    },
+    {
+      "version": "20260914120000",
+      "name": "share_plain_answer_receipts",
+      "sha256": "05dcc5a98940fa23e46368328f4966548c2e01a0c0a5c0e742f4d65ada6b349e",
+      "statements_sha256": "f52acaf5fb2d16b242d88bbbecf78e0a3393d6a1ec8e1bce97e56d15181125d9",
+      "statement_count": 1
+    }
+  ],
+  "status": "committed",
+  "completed_at": "2026-09-18T01:41:15.012302+00:00"
+}

@@ -1,0 +1,45 @@
+{
+  "candidate_head": "0c47cf6ddf61568f6f496535bfa51885461bf49a",
+  "parents": [
+    "41a9ebef083f18328cc5673821370e5df04a862b"
+  ],
+  "integration_cut": "cfc1988dd80ca1a8007b8f336c107700dd57e009",
+  "integration_current": "cfc1988dd80ca1a8007b8f336c107700dd57e009",
+  "main_before": "3d189204c6a685b7f3bb1818b38e34a33d1f10de",
+  "merge_tree": "4eb020142aae2505b5c45e17c7c8f9cae735d173",
+  "reconciliation": "not_needed; integration unchanged; merged tree equals candidate tree",
+  "review": {
+    "prior_scoped_review_sha": "2523e3a3dcb64fc713d978cc0e503904373de307",
+    "unresolved_threads": 0,
+    "current_captain_delta_review": "clean; docs/evidence and exact founder waivers only",
+    "changed_paths": [
+      "docs/release-manifests/2026-09-17-main-production-promotion.md",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/01-money-answer.png",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/02-link-created.png",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/03-signed-out-english.png",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/04-follow-up-failure.png",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/05-signed-out-spanish.png",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/README.md",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/build.txt",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/cleanup.json",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/console-owner-initial.txt",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/console-owner-share.txt",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/console-reader.txt",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/console-spanish.txt",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/english-public.yml",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/follow-up-snapshot.txt",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/link-created.yml",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/migration-object-readback.py",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/migrations-after.json",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/migrations-before.json",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/objects-after.json",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/provider-route-receipts.json",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/reader-requests.txt",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/runtime-launcher.py",
+      "docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/spanish-snapshot.txt",
+      "docs/reports/evidence/2026-09-17-main-promotion/preproduction-checkpoint.json"
+    ]
+  },
+  "live_evidence": "retained; no changed runtime or configuration since measured 3cecda69",
+  "modularity": "passed; candidate equals merged tree"
+}

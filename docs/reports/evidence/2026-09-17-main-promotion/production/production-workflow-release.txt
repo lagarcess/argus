@@ -1,0 +1,5 @@
+Waiting for release wfv-dam9k6942hec738qgjf0 to complete...
+
+Released version wfv-dam9k6942hec738qgjf0 for workflow wfl-d8hpsmuq1p3s73duv3q0
+workflow_release_commit=a9286b21886eb03df7a21f2f4b7d5e79af570679
+workflow_release_version_id=wfv-dam9k6942hec738qgjf0

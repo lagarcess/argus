@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"commit\":{\"createdAt\":\"2026-09-18T01:51:17Z\",\"id\":\"a9286b21886eb03df7a21f2f4b7d5e79af570679\",\"message\":\"feat(release): promote the approved private alpha roadmap\\n\\nPromote cfc1988d with evidence receipt sharing enabled. Founder accepted the recorded eval and follow-up gaps and waived backup, staging services, and canaries for this promotion. Production migrations passed before landing.\"},\"createdAt\":\"2026-09-18T01:52:46.545084Z\",\"finishedAt\":\"2026-09-18T01:54:39.090405Z\",\"id\":\"dep-dam9irgu01pc73erp4i0\",\"startedAt\":\"2026-09-18T01:52:46.522014Z\",\"status\":\"live\",\"trigger\":\"api\",\"updatedAt\":\"2026-09-18T01:55:03.641418Z\"}"
+      }
+    ]
+  }
+}

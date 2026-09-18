@@ -1,0 +1,33 @@
+### Result
+Total messages: 36 (Errors: 5, Warnings: 6)
+Returning 29 messages for level "info"
+
+[WARNING] The resource https://arguschat.ai/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ https://arguschat.ai/r/HdKtTu7VqIsJTJv1_Je67FGWTpIm0vtT:0
+[ERROR] Failed to load resource: the server responded with a status of 401 () @ https://api.arguschat.ai/api/v1/conversations?limit=30&archived=false&deleted=false:0
+[ERROR] Failed to load resource: the server responded with a status of 401 () @ https://api.arguschat.ai/api/v1/me:0
+[ERROR] Failed to load resource: the server responded with a status of 401 () @ https://api.arguschat.ai/api/v1/memory/availability:0
+[LOG] /.*.*=.*/ @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[LOG] /.*.*=.*/ @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[LOG] function () { [native code] } @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[LOG] function () { [native code] } @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[LOG] JSHandle@node @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[LOG] JSHandle@node @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[COUNT] [NUL]: 1 @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[COUNT] [NUL]: 1 @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[DIR]  Error @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[DIR]  Error @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[DIRXML] %c%d font-size:0;color:transparent Error @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[DIRXML] %c%d font-size:0;color:transparent Error @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[ERROR] %c%d font-size:0;color:transparent NaN @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[ERROR] %c%d font-size:0;color:transparent NaN @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[INFO] %c%d font-size:0;color:transparent NaN @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[INFO] %c%d font-size:0;color:transparent NaN @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[LOG] %c%d font-size:0;color:transparent NaN @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[LOG] %c%d font-size:0;color:transparent NaN @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[TABLE] %c%d font-size:0;color:transparent Error @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[TABLE] %c%d font-size:0;color:transparent Error @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[WARNING] %c%d font-size:0;color:transparent NaN @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[WARNING] %c%d font-size:0;color:transparent NaN @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[WARNING] OTS parsing error: Size of decompressed WOFF 2.0 is less than compressed size @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[WARNING] No available adapters. @ https://challenges.cloudflare.com/[challenge-path-redacted]
+[WARNING] The resource https://arguschat.ai/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ https://arguschat.ai/chat?conversation=7107ee83-6835-4a2d-9d13-06a55d44b624:0

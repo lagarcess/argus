@@ -1,0 +1,14 @@
+{
+  "credential_value_scan": "zero_matches",
+  "screenshots": 6,
+  "actual_manifest_live_evidence_validation": "pass",
+  "deployed_sha": "a9286b21886eb03df7a21f2f4b7d5e79af570679",
+  "main_ci_run": 35297005285,
+  "main_ci_result": "success",
+  "backup_waived": true,
+  "hosted_staging_waived": true,
+  "canary_workflow_state": "disabled_manually",
+  "issue_614_state": "closed_not_planned",
+  "known_followup_gap_accepted": true,
+  "git_stash_used": false
+}
