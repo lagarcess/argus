@@ -338,6 +338,8 @@ reviewer should reject it on operating rule 8.
 Plus the influencer's post from the section above, which is 4 and 5 combined
 and is the one a real Dominican audience is already asking a human.
 
+**Shipped 2026-09-17.** Production is `a9286b21`, containing every item on this board plus the seven regression repairs, with sharing on and all four migrations applied. Accepted known gaps at ship: a follow-up from a shared link does not continue a calculation (it asks for investment assets), a compound edit can still drop its start date intermittently, a stated budget can be recorded as supplied capital, answers to world-claim questions cite nothing (issue for the evidence-routing field), one private-replay refusal names an unrequested capability (#653), and a display exposed the raw field `months_to_goal`. The canary is retired; #614 closed.
+
 **Question 10's bar was rewritten 2026-09-17, and the old one is not coming
 back.** It used to read "historical; compute the drawdown, show it, stop." The
 final acceptance run failed on exactly that clause, in Spanish and then in
@@ -384,7 +386,7 @@ that is not in either set, that is a signal the lane is enumerating.
 ## What is running right now
 
 **Updated 2026-09-17 at integration `e8a4ccee`, after production promotion
-`3d98057c`.** Landing state for every item is in "Where this board actually
+`a9286b21` (2026-09-17).** Landing state for every item is in "Where this board actually
 stands" below.
 
 | Lane | Where it is |
@@ -1470,7 +1472,7 @@ passing test suite told us this feature was correct for a full day.
 
 ## Where this board actually stands
 
-**Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
+**Updated 2026-09-14. Production is `a9286b21`, promoted 2026-09-17: the whole roadmap, cut `cfc1988d`, with sharing switched on.** Every
 item landed on integration through `3d379d3d` is in production, except sharing,
 which shipped switched off. Landed means merged to integration and green there;
 shipped means live in production. Integration is `e8a4ccee`.
