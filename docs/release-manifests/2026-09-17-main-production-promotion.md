@@ -10,7 +10,7 @@
 - Reconciliation: none needed at preparation. The would-be merged tree is exactly the candidate tree, `ff4b5e46d3c39b8925c0c54c810227a77ca2ba8f`; modularity passes on that tree.
 - Checkpoint semantics: this SHA pins the reviewed code-plus-evidence checkpoint, not the commit that subsequently publishes this manifest update. The native eval measured `3cecda6933399e53f6ea00edc8004a88d7eefad4`; only documentation/evidence changed between it and this checkpoint. No descendant is implicitly deploy-cleared. Before deployment, record and gate the exact landed `origin/main` SHA, then bind each service readback to that SHA.
 - Scope: the whole approved roadmap cut, plus sharing configuration and promotion evidence. No product code or migration SQL changed in this task.
-- Validation status: Live comparison complete; founder explicitly accepted both candidate-only typed failures after reviewing their concrete effects. Awaiting staging disposition before production steps. No production migration, main promotion, or deployment performed.
+- Validation status: Live comparison complete; founder explicitly accepted both candidate-only typed failures after reviewing their concrete effects. Founder replaced hosted staging with the disposable Docker validation below and explicitly directed a stop before production schema changes. Local sharing follow-up failed; no production migration, main promotion, or deployment performed.
 - Validation surface: local deterministic checks and native provider-backed evals. No separate hosted staging surface was found.
 - Promotion target: `main`, through a PR with required `ci` green; all service deploys remain manual.
 - Release captain: Codex. Approver: founder, explicit task instruction on 2026-09-17.
@@ -18,7 +18,19 @@
 
 Founder decisions: sharing ON; all four pending migrations approved after backup, without a maintenance window; no spend cap on promotion runs; disable Private Alpha Canary and close #614 as not fixed; deploy all three services, then perform the signed-out sharing walk. Never git stash.
 
-The required staging choice remains pending: checklist step 12 requires an isolated database and three-service validation surface. Initial inventory found only production API/app with previews disabled and no separate Supabase branch. Opening PR #655 subsequently created isolated, data-free Supabase preview `pqpgepkpzvliyutbcwjk`; it is healthy and contains the four release migrations at their expected versions/names. The API/app/Workflow staging deployment still does not exist. The founder was asked whether to provision temporary staging or waive that gate. No waiver has been inferred.
+Latest founder direction: skip provisioning staging services, use disposable local Supabase in Docker, apply/read back the four migrations, run exact `cfc1988d` with sharing ON, perform one English sharing/follow-up walk and one Spanish page, skip step 13 canaries, then tear down and stop before production schema changes. This replaces the pending staging question for this task; it is not hosted deployment clearance. The PR-managed, data-free Supabase preview remains attached to PR #655 and was not used for this walk.
+
+## Disposable Docker Validation
+
+- Exact clean app/API source: `cfc1988dd80ca1a8007b8f336c107700dd57e009`; both sharing flags enabled through environment overrides. Next.js production build passed. API/app ran locally against a fresh Docker Supabase database with real Auth/Postgres persistence. Workflow dispatch was disabled; no staging services provisioned.
+- Four migrations applied once in repository order after initializing the earlier 75. Final readback **79/79**, no missing/unexpected migrations, name or content drift. Widened checks and SECURITY DEFINER/service-role-only claim/release permissions matched. See `docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/migrations-after.json` and `objects-after.json`.
+- Money question: starting at $1,200, saving $300 monthly without interest until $3,000. Correct answer: **six months**. Normal local signup preserved the guest answer and exposed the owner sharing control; preview and publication succeeded.
+- Signed-out public link: separate browser session with **zero cookies and no auth-token storage keys** displayed the question, answer and calculation inputs. English and Spanish public pages passed; Spanish UI/calculation labels localized while immutable authored text stayed English.
+- Follow-up: “What if I save $450 per month instead?” opened a distinct guest chat with the shared snapshot attached, but replied “Which asset or assets would you invest in monthly with that $450, and over what time period would you like to test it?” Expected four months. **Follow-up answer continuity failed.** No retry/fix was performed. This newly observed failure is not covered by the earlier two-case founder waiver.
+- Console: public English/Spanish pages each had zero errors and a font preload warning. Initial signed-out chat logged four 401s; the reader's guest-chat transition logged three 401s before successful guest/fork/stream requests. Signed-in sharing had zero errors. Font preload warnings remained; no uncaught JS exception appeared.
+- Evidence/report/screenshots: `docs/reports/evidence/2026-09-17-main-promotion/local-sharing-walk/README.md`. Two user questions, 13 provider receipts, **$0.04288399 reported**. No canary run.
+- Cleanup: all three owned browser sessions closed; API/web listeners stopped; owned Supabase containers and data volumes removed. Exact-build worktree and local credential/status files removed after evidence preservation. No production change or git stash.
+
 
 ## Live Eval Evidence
 
@@ -68,7 +80,7 @@ The driver invokes the native `tests/evals/test_measurement_eval_live.py` with `
 
 Required order: complete acceptance, take the backup before applying SQL, run the production ledger gate, apply only approved missing migrations in repository order, read back ledger and affected objects, require a passing gate, promote main, rerun with `--verify-landed-ref origin/main`, then deploy API, app, workflow in that order.
 
-- Production gate: **not run**, pending staging disposition; the founder explicitly accepted both typed failures. Gate apply behavior remains `never`.
+- Production gate: **not run**, stopped before production schema changes by latest founder direction; the founder explicitly accepted both typed failures. Gate apply behavior remains `never`.
 - Production backup: **not taken**. A PostgreSQL 17.6 custom-format backup procedure with verified TLS, restricted file permissions and catalog validation is prepared locally.
 - Production SQL applied: **none**. Current production ledger parity and drift are not claimed.
 - Production project from the configured target: `lgdhvepyrzbnscqssgqq`.
@@ -121,7 +133,7 @@ Evidence summary: `docs/reports/evidence/2026-09-17-main-promotion/verification.
 | Real migration gate tests | 49 passed, zero skips. |
 | Real PostgreSQL matrix | 395 passed, zero skips. |
 | Real anonymous Auth matrix | 12 passed, zero skips. |
-| Hosted staging / production acceptance | Not performed. |
+| Local Docker replacement / hosted acceptance | Local migrations and sharing views passed; follow-up answer continuity failed. Hosted staging and production acceptance not performed. |
 | Required hosted CI / final review | PR #655: all real CI jobs passed at `2523e3a3`; draft-event jobs skipped. Final scoped Codex review is clean at that SHA, with zero unresolved threads. Links and exact proof are in the preproduction checkpoint. |
 
 Resolved setup failures: the initial SciPy 1.15.3 macOS wheel could not import `scipy.linalg`; the official macosx_12_0_arm64 wheel at the same locked version fixed both imports. Supabase CLI 2.117.0 created broader local grants and caused four permission-test failures (391 other cases passed). Rebuilding only the disposable stack with CI-pinned 2.109.0 restored expected grants and the full matrix passed. The first browser-storage attempt collided with local port 3100; a separate port passed. No product code was changed for these setup failures.
@@ -130,9 +142,9 @@ Canary: workflow 298408697 was read back `disabled_manually`; issue #614 was clo
 
 ## Release Decision
 
-- Decision: **WAITING FOR FOUNDER STAGING DECISION; NOT PROMOTED**. Founder explicitly accepted both candidate-only typed failures for the pinned cut after the full comparison. Staging disposition remains pending.
-- Pending: staging choice, production backup/migrations/gate, main landing and landed-ref gate, three-service deploy and hosted verification. PR #655 is draft; no readiness or deploy clearance is inferred from this preparation checkpoint. The later documentation-publication head must retain current CI before landing.
-- Signed-out sharing walk: not performed because this candidate is not deployed. Planned check: one money question, publish its answer, open in a fresh signed-out session, start a follow-up; retain observed text and screenshots, then verify revocation if completing the full sharing acceptance gate.
+- Decision: **LOCAL WALK COMPLETE WITH FOLLOW-UP FAILURE; STOPPED BEFORE PRODUCTION; NOT PROMOTED**. Founder accepted the two earlier candidate-only typed failures, then requested Docker validation and an explicit stop. The new follow-up failure remains unresolved and unwaived.
+- Not performed per latest stop instruction: production backup/migrations/gate, main landing and landed-ref gate, three-service deploy and hosted verification. PR #655 is draft; no readiness or deploy clearance is inferred from this preparation checkpoint. The later documentation-publication head must retain current CI before landing.
+- Signed-out sharing walk: completed locally at exact `cfc1988d` with screenshots/console evidence; link publication and viewing passed, follow-up navigation passed, follow-up calculation intent failed. Production walk and revocation acceptance were not performed.
 - Tester invitations/public exposure changes: none.
 - Rollback owner: founder/Codex within the explicit promotion authority; restore the prior code and sharing posture while retaining compatible widened schema.
 - Cleanup: original workspace dotenv link restored; both temporary native-eval worktrees removed; owned local Supabase stack stopped without retaining its disposable database. The PR-managed, data-free Supabase preview remains attached to open PR #655. No git stash was used.
