@@ -20,6 +20,18 @@ Founder decisions: sharing ON; all four pending migrations approved after backup
 
 Latest founder direction: skip provisioning staging services, use disposable local Supabase in Docker, apply/read back the four migrations, run exact `cfc1988d` with sharing ON, perform one English sharing/follow-up walk and one Spanish page, skip step 13 canaries, then tear down and stop before production schema changes. This replaces the pending staging question for this task; it is not hosted deployment clearance. The PR-managed, data-free Supabase preview remains attached to PR #655 and was not used for this walk.
 
+## Production authorization after local acceptance
+
+Founder accepted the local walk and explicitly resumed production promotion on 2026-09-17 (America/Chicago):
+
+- **Database backup waived for this promotion. No backup will be taken.** This explicitly replaces the earlier backup-before-SQL requirement for these four approved migrations.
+- **Hosted staging services waived.** The completed disposable Docker rehearsal is accepted for this promotion; no staging services will be provisioned.
+- **Shared-link follow-up misread accepted as a known gap, not a blocker.** The $450/month reply asking for investment assets remains unfixed; this waiver is additional to the two earlier accepted typed failures.
+- Production migration gate/readback, four migration applications, landing the approved `cfc1988d` roadmap cut plus already-approved sharing configuration on main, and manual deployment of API, app and backtests are explicitly authorized. Preserve existing reviewed code/eval lineage; record the actual landed commit and re-gate it before deploying.
+- Repeat one production money/share/signed-out/follow-up walk. Canaries stay skipped. No git stash.
+
+Status: production promotion authorized and in progress. The local stop recorded below was the prior checkpoint and is superseded by this authorization. This authorization does not assert that migrations or deploys have completed.
+
 ## Disposable Docker Validation
 
 - Exact clean app/API source: `cfc1988dd80ca1a8007b8f336c107700dd57e009`; both sharing flags enabled through environment overrides. Next.js production build passed. API/app ran locally against a fresh Docker Supabase database with real Auth/Postgres persistence. Workflow dispatch was disabled; no staging services provisioned.
@@ -81,7 +93,7 @@ The driver invokes the native `tests/evals/test_measurement_eval_live.py` with `
 Required order: complete acceptance, take the backup before applying SQL, run the production ledger gate, apply only approved missing migrations in repository order, read back ledger and affected objects, require a passing gate, promote main, rerun with `--verify-landed-ref origin/main`, then deploy API, app, workflow in that order.
 
 - Production gate: **not run**, stopped before production schema changes by latest founder direction; the founder explicitly accepted both typed failures. Gate apply behavior remains `never`.
-- Production backup: **not taken**. A PostgreSQL 17.6 custom-format backup procedure with verified TLS, restricted file permissions and catalog validation is prepared locally.
+- Production backup: **explicitly waived by founder after local acceptance; not taken**. The previously prepared backup procedure will not run for this promotion.
 - Production SQL applied: **none**. Current production ledger parity and drift are not claimed.
 - Production project from the configured target: `lgdhvepyrzbnscqssgqq`.
 - Approved file hashes: `docs/reports/evidence/2026-09-17-main-promotion/approved-migration-files.json`.
@@ -142,7 +154,7 @@ Canary: workflow 298408697 was read back `disabled_manually`; issue #614 was clo
 
 ## Release Decision
 
-- Decision: **LOCAL WALK COMPLETE WITH FOLLOW-UP FAILURE; STOPPED BEFORE PRODUCTION; NOT PROMOTED**. Founder accepted the two earlier candidate-only typed failures, then requested Docker validation and an explicit stop. The new follow-up failure remains unresolved and unwaived.
+- Decision: **PRODUCTION PROMOTION AUTHORIZED; IN PROGRESS**. Founder accepted the two earlier candidate-only typed failures, then requested Docker validation and an explicit stop. The new follow-up failure remains unresolved and is now explicitly accepted as a known gap.
 - Not performed per latest stop instruction: production backup/migrations/gate, main landing and landed-ref gate, three-service deploy and hosted verification. PR #655 is draft; no readiness or deploy clearance is inferred from this preparation checkpoint. The later documentation-publication head must retain current CI before landing.
 - Signed-out sharing walk: completed locally at exact `cfc1988d` with screenshots/console evidence; link publication and viewing passed, follow-up navigation passed, follow-up calculation intent failed. Production walk and revocation acceptance were not performed.
 - Tester invitations/public exposure changes: none.
