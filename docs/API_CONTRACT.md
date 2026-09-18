@@ -631,14 +631,26 @@ persisted solely to represent abandonment.
 
 #### Approved answer-sharing extension
 
-The Share the answer lane extends this same API and snapshot lifecycle under
-[`conversation-sharing.md`](specs/conversation-sharing.md) section 4.5, including
-the founder's 2026-09-09 selection decision. It does not introduce a second sharing
-system. Version 1 receipts retain their payload and rendering. Version 2 introduces
-typed receipt kinds and a closed `turns` wrapper, with one or more turns from
-one owned conversation in conversation order; nothing bounds the count but the
-conversation itself. The research payload is exactly the
-closed field list in that spec's section 4.2.
+Founder decision 2026-09-14: sharing is enabled by owner selection and the exact
+preview, under [conversation-sharing.md](specs/conversation-sharing.md). The
+existing API and snapshot lifecycle support a user question plus its final answer,
+selected in the conversation thread. Backtests, research, calculations and plain
+answers qualify; confirmations and clarifications are not candidate units.
+
+Version 1 receipts retain their payload and rendering. Version 2 uses the existing
+closed `turns` wrapper in conversation order, with kinds `backtest`,
+`research_answer`, `calculation`, and `answer`. New backtest leaves freeze question
+and answer text beside the public run facts. Calculation leaves retain their
+closed public card projection and freeze the final answer too. Optional additions
+keep older version 2 documents readable. Plain answers have a closed leaf rather
+than masquerading as sourced research.
+
+There is no question/answer length cap, credential-shape scan, required source
+list, link/source membership check, or refusal based on degraded output or memory
+use. Sources and dates remain visible when present. Exact matching against private
+Argus identifiers remains, and the projection adds no account data, hidden memory
+records or unselected turns. User-written calculation inputs can be shared through
+the explicit preview; absent publisher sources alone do not make them private.
 
 The owner can read share candidates, preview a selection, and create its receipt
 under `/conversations/{conversation_id}/public-excerpt-candidates`,
@@ -652,11 +664,14 @@ turn refuses the entire selection. All owner endpoints require
 turn eligibility and receipt identity. The existing public route, owner list,
 revoke, tombstone, rate limits, and flag-off byte identity continue to apply.
 
-The reader receives only a frozen snapshot. No live source reads, fork, prompt
-seed, history copy, refresh, or rerun are part of this extension. The public action
-is Continue with Argus and lands at guest entry without carried state. The
-selection preview bounds but does not eliminate the cross-turn inference risk
-explicitly accepted in section 4.5: the owner sees exactly what they publish.
+The reader receives only a frozen snapshot. Founder-locked 2026-09-14, a first
+follow-up may import trimmed public history into a receiver-owned chat. This
+supersedes the earlier no-fork clause. Reading never creates a chat or performs
+provider work. The selected question and final answer render as an Argus thread,
+with the owner's note at the top, snapshot date, and a follow-up composer. Exact
+owner preview uses the same layout. Anyone with the link can read it without an
+access list or sign-in wall; only the receiver-owned write needs authentication.
+The existing guest bootstrap supplies that authentication for signed-out users.
 
 Behind the default-off `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` flag. While it is
 off, every path below answers exactly as a route that does not exist: status 404
@@ -669,7 +684,7 @@ Owner endpoints, authenticated, registered accounts only (`can_save_decision`):
 
 | Method   | Path                                               | Purpose |
 | :------- | :------------------------------------------------- | :------ |
-| `GET`    | `/conversations/{conversation_id}/public-excerpt-candidates` | List all assistant turns with server-owned eligibility |
+| `GET`    | `/conversations/{conversation_id}/public-excerpt-candidates` | List final answer units with server-owned eligibility |
 | `POST`   | `/conversations/{conversation_id}/public-excerpt-preview` | Validate selected turns and return their exact public rendering payload |
 | `POST`   | `/conversations/{conversation_id}/public-excerpt` | Recheck and freeze the previewed selection |
 | `POST`   | `/evidence-artifacts/{artifact_id}/public-excerpt` | Compatibility adapter to the same single-message receipt |
@@ -690,8 +705,8 @@ transition emits `receipt_revoked`.
 
 Candidate reads return `{items}`, where each item is
 `{message_id, question, kind, eligible, reason, field}`; the client counts the
-eligible items, and no limit is part of the contract. Unsupported turns
-remain in the list with `eligible: false`. The reason is a closed language-neutral
+eligible items, and no limit is part of the contract. Confirmations, clarifications and intermediate messages are omitted; a final
+answer refused by the retained privacy/completion checks has `eligible: false`. The reason is a closed language-neutral
 enum, and the client displays it in the owner's language. The private message id
 is a selection input only; it never reaches a public snapshot payload.
 
@@ -723,8 +738,8 @@ acquisition funnel's creation stage.
 
 `PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range, kind,
 created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
-as ISO dates or null for research. `kind` is `backtest`, `research_answer`, or
-`mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
+as ISO dates or null for research and calculations. `kind` is `backtest`,
+`research_answer`, `calculation`, `answer`, or `mixed`; revocation reason is `owner_revoked`, `source_deleted`, or
 `removed_by_argus`. It carries no source conversation, message, run, or artifact id. Clients
 compose the shareable url as `origin + path`, so the backend owns no origin
 configuration.
@@ -759,25 +774,66 @@ timestamps cannot drop or repeat a row across pages.
   from a message.
 
 `POST /public/receipt-funnel` takes
-`{"stage": "viewed" | "try_argus", "kind": "backtest" | "research_answer" | "mixed"}`
+`{"stage": "viewed" | "try_argus" | "followed_up" | "signed_up", "kind": "backtest" | "research_answer" | "calculation" | "answer" | "mixed"}`
 (kind defaults to `backtest` for compatible callers) and returns
 `204`. It stores nothing and carries no identifier. `viewed` is reported by the
 rendered page rather than counted when the receipt is read, because that read also
 answers the metadata pass and the preview image; a link pasted into a chat would
 otherwise log views nobody caused. It exists because the Try Argus tap
-happens on a page nobody is signed in to, and the alternative, a marker on the
-guest entry url, is ruled out: sharing adds no new parameter to that surface.
+happens on a public page. Follow-up intent stays in the receiver tab for the
+bridge to normal chat; it adds no viewer identifier or tracking URL parameter.
 An owner preview reports no view, and a multi-turn public page reports one view.
 Tombstones and unavailable pages with no known kind do not emit kind-attributed
 events; they never guess that the missing document was a backtest.
+
+#### Receiver-owned fork
+
+`POST /public/receipts/{public_id}/fork` requires a current Argus user (registered
+or guest). It takes `{request_id: UUID, language?: "en" | "es-419",
+replace_guest_conversation_id?: UUID}` and returns
+`{conversation: Conversation, created: boolean}`. The request id is retry identity,
+not a viewer identifier. The client retains the text, destination and request id
+until the normal chat stream reaches a terminal frame or canonical reconciliation
+proves completion. Reload reconciles the same request before resending.
+The server reuses that receiver-owned fork on replay, including after the existing
+guest signup handoff transfers ownership. Creating the fork performs
+no model, provider, calculation, simulation or allowance operation; the submitted
+follow-up uses the existing normal chat endpoint after canonical hydration.
+
+A nonempty existing guest chat returns `409 receipt_guest_choice_required`; the
+client presents the existing Start over / create-account-or-sign-in / cancel
+choice. Only explicit Start over sends that current conversation id. A stale
+choice returns `409 receipt_guest_choice_stale`. Guest replacement and import are
+atomic and preserve existing workspace expiry and allowance counters. A revoked,
+deleted, unknown or tombstoned source cannot create a fork (`410
+receipt_unavailable`). Already-created copies survive later source revocation.
+
+Each selected turn contributes ordinary user/assistant history plus frozen public
+card metadata labeled with the snapshot date. No owner note, private source ids,
+run/job/confirmation state or calculation execution handle is copied. History
+text is trimmed deterministically to at most 64 KiB UTF-8 total, fairly divided
+across questions and final answers; text plus carried card metadata is at most
+512 KiB. Oversized facts are refused before conversation creation/replacement.
+Imported messages are excluded from naming, interest and memory, and charge no
+usage. New backtests and calculations follow the receiver's normal flow and
+allowances. Existing guest signup handoff retains the conversation and its copy.
+The bounded carried context is preserved through runtime history selection;
+normal recent-message limits apply to the receiver's own turns, not to the
+selected snapshot turns. Internal provenance is not sent as model instructions.
+No model-facing instruction or prompt fingerprint changes are part of this route.
+
+Fork admission is limited to 60 requests per client identity per hour, with the
+existing 429/Retry-After treatment. Context exceeding the documented bound returns
+`413 receipt_context_too_large`; a retry id reused for another receipt returns
+`409 receipt_request_conflict`. A deleted destination returns
+`410 receipt_fork_deleted` instead of creating another copy.
 
 Rate limits: receipt creation is 10 per hour and 30 per day, keyed by both user id
 and client identity, answering `429` with `Retry-After`. The funnel endpoint is 60
 per hour per client identity.
 
 Error codes specific to this surface: `receipt_note_rejected` (422, the note carries
-an identifier, a credential-shaped value, or a value assigned to something that names
-a credential), `receipt_source_unsupported` (422, an ineligible turn or source),
+a private Argus identifier), `receipt_source_unsupported` (422, an ineligible turn or source),
 `receipt_preview_changed` (409, the exact preview must be shown again), and
 `receipt_sanitization_failed` (500, the payload could not be proven free of
 never-expose data, so nothing was published).
@@ -804,9 +860,10 @@ tested window will not project into that form answers
 would reopen this defect under a new name.
 
 Version 2 uses the closed `turns` wrapper, including for new singleton shares.
-Research leaves freeze exactly the question, answer, typed sources and dates,
+Research leaves freeze the question, answer, available typed sources and dates,
 retrieval date, symbols, asset class, typed offered next step, note, content
-language, framing and provenance listed in section 4.2 of the sharing spec. These
+language, framing and provenance. Sources are optional; links in the answer are
+not required to appear in that list. These
 audited author fields remain in the author's language. Labels, date and number
 formats remain in the reader's language. No usage, raw card, provider, model,
 memory, executable action text or private id is included.
@@ -1106,6 +1163,20 @@ machine-readable fields alongside display labels:
   facts through their language bundles. Legacy `assumptions` prose is
   non-presentational compatibility context and must never become a fallback.
 - `actions[].label` / `actions[].labelKey`: display fallback plus frontend i18n key.
+
+A confirmation card composes no prose. Cards carry no `summary` field, and a
+card turn's message `content` is empty. Rows persisted before that carry the
+retired English `summary` sentence in both places; the reader boundary blanks
+the content and drops the field, so no reader receives it in any language.
+Every other consumer derives from the card's typed facts through
+`argus.domain.confirmation_turn_facts`, each fact from one owner with no
+fallback: `strategy_type` and the `date_range` start and end from the card, and
+`symbols` from `confirmation_payload.strategy.asset_universe`, since the card
+holds no symbol list. A legacy card missing a fact yields `null` for that fact,
+never a payload value. Model thread history and artifact naming receive
+them as `{"confirmation_card": {"strategy_type", "symbols", "date_range"}}`
+JSON, and the stored `last_message_preview` search text is the same facts
+joined by spaces.
 
 An assumptions answer has `response_intent.kind = artifact_assumptions` and
 `response_intent.facts = { artifact_kind, asset_class, display_facts }`.
@@ -2050,8 +2121,32 @@ The canonical backtest config used by the engine for execution and reproducibili
 
 ### Starting Capital
 - **Default:** 1000
-- **Allowed Range:** 1,000 to 100,000,000
+- **Allowed Range:** 10 to 100,000,000 (`MIN_STARTING_CAPITAL` and
+  `MAX_STARTING_CAPITAL` in `argus.domain.backtesting.config`)
 - *Return 422 for values outside range.*
+- The floor is the same for every strategy type except a recurring plan (below)
+  and for every way capital is set or edited: chat, a card edit turn, the
+  in-place `direct-edit` endpoint, and a retest card. Every layer reads the two
+  constants: the run-time validator, the confirm-stage launch envelope, the
+  card's `capabilities.edit_constraints.capital`, the capability contract's
+  `initial_capital` range, and this endpoint's 422 detail. The web editor shows
+  only the bounds the card carries.
+- The `unsupported_starting_capital` recovery offers the nearest accepted
+  amount: the minimum for an amount under it, the maximum for one over it.
+- **Result money precision:** the result card decides once, from the run's
+  portfolio peak, how many decimals its money shows and stores the answer as
+  `conversation_result_card.currency_fraction_digits`: `2` when the peak is
+  under `currency_cents_below` (`web/argus_display_contract/result_display_policy.json`,
+  1,000), otherwise the policy's `currency_fraction_digits` (`0`). The card
+  rows, the web hero, details, equity chart and exploration summary, and the
+  readout facts all read that stored value and round half up
+  (`currency_rounding_mode: halfExpand`), with or without a chart, so a $10 run
+  reads `$10.00 -> $12.05`. A card stored before the field existed reads whole
+  dollars. New cards also carry numeric `profit`, taken directly from the run's
+  `metrics.aggregate.performance.profit` and rounded half up at the card's
+  stored precision. The web renders this gain or loss; it never subtracts
+  rounded start/end row text. Older cards without `profit` show the return
+  percentage alone in the hero detail.
 - > [!NOTE]
   > Starting capital is simulation capital only. It does not imply real brokerage trading or account balance. The global default is `$1,000` for runnable drafts. DCA/recurring-buy contribution amounts are strategy-specific user inputs and remain separate from default starting capital.
 
@@ -2094,6 +2189,15 @@ written before this shape existed are migrated at one named site: their
   for DCA drafts. The seed rides `optional_parameters.initial_capital` and only
   counts when the user actually stated it, so the shared bankroll default never
   becomes a seed.
+
+Focused strategy repair after a failed interpretation must pass the same
+stated-field and modeled-cost audits before confirmation. A separate deposit
+must remain distinct from the recurring contribution. If the audit is unavailable
+or cannot establish that money role, Argus asks for the assumptions instead of
+issuing a card with silent defaults.
+An unresolved deposit is retained in the existing typed assumption ambiguity,
+not in the executable contribution. The pending response intent preserves it
+across replies until a typed money role resolves it.
 
 **The bankroll floor does not apply to a recurring plan.** `MIN_STARTING_CAPITAL`
 answers "is this a fundable one-time position", which a plan seeded at `$0` is
@@ -3144,6 +3248,7 @@ Both endpoints return:
 
 ```json
 {
+  "latest_message_id": "saved-message-uuid-or-null",
   "operation": {
     "status": "idle | queued | running | checking",
     "kind": "chat_turn | backtest_job | null",
@@ -3155,6 +3260,16 @@ Both endpoints return:
   }
 }
 ```
+
+`latest_message_id` identifies the latest owner-scoped saved message in the
+canonical message ordering (`created_at`, then `id`), excluding legacy onboarding
+markers. It is null for an empty transcript. The same field appears in history
+and conversation-list activity projections. It changes for an ordinary saved
+reply even without a job or lifecycle row, and marking read does not clear it.
+Clients compare this opaque identity with the last raw API message they loaded
+and reload saved messages when it differs, including on focus/visibility
+refreshes. Neither operation timestamps nor attention cursors represent
+transcript freshness. A refresh preserves the current message anchor and scroll.
 
 Operation precedence is `running > queued > checking > idle`; equal states use
 the newest source timestamp, then prefer a backtest job. Accepted turns and
@@ -3323,6 +3438,33 @@ stores nothing and makes no LLM, provider, or market-data call.
 
 # 12. Chat Streaming Endpoint
 
+`POST /chat/stream` accepts optional `failed_assistant_id: string | null`
+(1 to 128 characters when supplied). Retry sends the failed assistant reply's
+message ID alongside the original question or structured action, both live and
+after reload. The API accepts the ID only when it identifies this conversation's
+latest assistant reply and that reply has `recovery.retryable: true`. Validation
+and history selection use the same owned newest 20-message snapshot, augmented
+by the bounded imported shared context, in chronological order. This includes
+Supabase-backed conversations and needs no separate retry-validation read.
+Other IDs are ignored and
+are not persisted. The API stores an accepted ID as
+`metadata.failed_assistant_id` on the new user message, preserving any original
+`chat_action` metadata. This also applies to canonical `run_backtest` retries:
+their user-message ID is stable per confirmation and failed reply, so the retry
+is saved after the failure without changing the backtest execution identity.
+
+For that retry turn, runtime history omits only the assistant message with that
+ID from the owned conversation. The question and every other reply, including
+degraded answers, remain eligible for history. An absent, unmatched, stale, or
+nonretryable ID drops nothing. Once an assistant reply follows the persisted
+retry request, later turns omit that same failed reply through the durable retry
+link, subject to the same validation against the preceding latest assistant.
+If the retry stream is interrupted, the next ordinary user turn clears its
+pending retirement; a later assistant cannot complete that abandoned link. The legacy
+`chat_action.type: retry_last_turn` / `payload.failed_assistant_id` link remains
+read-compatible. Matching repeated question text alone does not remove replies
+from model history; that compatibility behavior belongs to transcript display.
+
 ### Declared tool calls and results
 
 The neutral transport `ToolCall` is `{tool_name, call_id, arguments}`. Each
@@ -3332,9 +3474,13 @@ supports different tools and repeated calls; a local call bypasses backtest
 launch preparation. The existing validated Run action enters this dispatcher
 with its confirmed canonical strategy.
 
-The interpreter retains its seven intents, system prompt and response schema.
-It does not select calls from this catalog in this lane. The declaration-derived
-catalog is available to runtime consumers without changing the model contract.
+The interpreter retains its seven intents and reads no calculation. Since Any
+grounded math the answering step returns one typed `calculation` beside its
+prose (see Calculation turns); the kinds and argument names it reads are
+generated from the declarations, so the catalogue the model sees and the math
+that runs share one owner. The model never emits a `ToolCall` itself: the
+runtime validates the calculation against the declaration and dispatches the
+call.
 
 An actual invocation emits `stage_start.tool_progress` containing
 `{locale_key, interpolation_args, call_id, tool_name}`. Interpolation values are
@@ -3357,6 +3503,33 @@ unknown. Their `visibility` defaults to `private`; a declaration explicitly
 marks shareable input facts `public`. This display contract does not
 replace any tool's argument or result model.
 
+Supporting row facts may carry `comparison_only: true` (absent means false).
+These facts participate in answer comparisons but are omitted from displayed
+card rows, card copy text and public receipts. Ranked comparisons retain a
+`gap_0` fact with value zero for the first item this way: every item's gap can
+be paired by item identity when the leader changes, without an extra zero row.
+
+Additive since the calculations lane (2026-09-11): every fact may carry a
+`source`, `{kind, title?, url?, date?}`, where `kind` is `user` (the user
+stated it), `page` (a retrieved page, which alone carries its title, url and
+`YYYY-MM-DD` date), `market_data` (Argus's own market data, carrying only the
+date of its bar), `assumption` (a figure the answer states as an assumption,
+carrying no citation), `computed` (derived from the other inputs; every answer
+and row) or `not_found` (readable on older cards, no longer produced). Cards
+written before this lane carry no source and remain readable. An input fact
+also carries `driving`: the declaration names the inputs that drive its result,
+most telling first, and a card marks at most five of them that carry a value,
+never the retained unknown; a computed answer's card starts collapsed under the
+prose and shows only those inputs, never a blank one. An unsuccessful
+outcome's `failure` may carry a typed `repair`, `{kind: "set_inputs", label,
+changes}`, an argument edit the recompute route accepts that the client offers
+as a tap; the backend computed it, the client never invents one. `visual.kind`
+also admits `value_path`, a computed path over dated periods such as a balance
+paid down. An argument model may carry its inputs' provenance under the one
+field `sources`, keyed by field name; the declaration projects it onto the
+card, the retained unknown reads as `computed`, an input the call left to its default is
+recorded as `assumption`, and an edited input is marked `user` by the recompute path.
+
 `tool_jobs` retains asynchronous work as
 `[{call_id, tool_name, artifact_id, job}]`. Existing job polling and result-message
 publication resolve each entry independently, including repeated calls and
@@ -3375,6 +3548,15 @@ Missing/foreign results return 404, dead artifacts return
 `409 tool_result_changed`, and rejected inputs return
 `422 tool_arguments_invalid`. A missing or incompatible declaration binding
 returns `422 tool_inputs_not_editable`.
+
+When the recomputed card belongs to a free calculation, the same write stores
+`metadata.computation` derived from every free calculation card the message
+carries, in order, by its one owner (`argus.domain.computation_marker`), so the
+marker and the cards never disagree and a decision saved afterward stores every
+option's current inputs. When the answer stated its figures through
+`metadata.answer_text_template`, `content` is re-rendered from every card the
+template names; a card that no longer computes hands the prose to Argus's own
+lead.
 
 ### Structured Action Semantics
 
@@ -3429,6 +3611,10 @@ returns `422 tool_inputs_not_editable`.
   A valid action reaches LangGraph with the pending strategy and continuity
   artifacts recovered from that exact source message, not from a newer
   checkpoint draft.
+- `calculation_offer` takes the calculation offered under the latest research
+  answer (see Calculation turns). It carries no payload and its label is the
+  display text; the offer itself is read from that answer's
+  `metadata.calculation_offer`, and a tap without one runs nothing.
 - `retest_run` replays a stored supported experiment through the latest
   available data while preserving its original start. New actions use a
   bounded v2 envelope containing exactly `source_run_id`,
@@ -3785,10 +3971,13 @@ degraded_fallback` means clients render localized deterministic copy from
 static i18n bundles using the typed fields. Legacy sidecars without
 `prompt_source` are treated as degraded fallback for reload compatibility.
 The persisted `content` on a degraded fallback remains compatibility transport
-for reload and non-upgraded clients; it is excluded from later interpreter and
-clarifier history and from `last_message_preview` (therefore Recents and
-conversation search). Exact `llm_generated` prose remains eligible for both
-model history and preview surfaces.
+for reload and non-upgraded clients; it is excluded from later interpreter
+history and from `last_message_preview` (therefore Recents and conversation
+search). Exact `llm_generated` prose remains eligible for interpreter history
+and preview surfaces. Clarification and recovery writers receive the current
+typed decision, its options, the current user message, and preferred language;
+they do not receive transcript history. Earlier replies therefore cannot supply
+a competing reason for the current question.
 
 Recoverable streaming error frames may also include the same structured fields
 so live clients can render retry controls immediately, before reload hydration:
@@ -4058,7 +4247,8 @@ final payload and persisted metadata:
       "subjects": [{"symbol": "NFLX", "name": "Netflix, Inc.", "asset_class": "equity"}],
       "comparison_set": [],
       "peer_suggestions": ["DIS"],
-      "open_thread": {"shape": "balanced", "period_of_interest": null}
+      "open_thread": {"shape": "balanced", "period_of_interest": null},
+      "questions": ["How did Netflix's margins change?", "What drove membership growth?"]
     }
   }
 }
@@ -4091,11 +4281,24 @@ Contract rules:
   persisted thorough-job replays do not claim capacity. An unreadable or
   unwritable
   claim fails closed into the existing honest capacity-exhausted response.
+  A failed provider attempt does not cost a guest a question: when the
+  provider work a claim admitted fails with no usable response (an outage that
+  outlasts the retries, a refused request, an unreadable answer, a failed
+  background submission or discovery search) and no earlier provider call in
+  the turn was served, the backend returns the guest's own claim through
+  `release_research_usage` for the day it charged. The shared ceiling keeps
+  counting the attempt. Only a confirmed release lets a later provider path in
+  the same turn claim again; a release that fails or matches no charge, like a
+  cancelled provider call, leaves the charge standing for the rest of the turn,
+  so one turn never costs a guest more than one question.
 - Pricing reconciliation does not gate a usable provider answer. Research
   `usage.cost_usd` is null when the invoice cannot be reconciled; it is never
   replaced with zero or an estimated charge. Provider billing evidence stays
   server-side. Each unreconciled provider response records an anomaly ledger
   entry, including discarded retries, independently of the public sidecar.
+  An attempt the provider may have billed without answering, after a read
+  timeout or a connection dropped mid-request, records the same anomaly with
+  reason `unanswered_attempt` and a null provider response id.
   The existing turn ledger also receives null cost for an unpriced answer.
   Unpriced calls carry the reported invoice, expected range and discrepancy
   in ledger metadata and emit an ERROR alert. Transport, malformed answer,
@@ -4124,10 +4327,63 @@ Contract rules:
   stamps `metadata.research_ledger_contract = "argus_research_ledger/v2"`.
   Unversioned historical rows retain their original values; they are not
   correctly scored successes. `degraded_code`, `cache_status`, and
-  `pricing_status` keep their existing meanings. Legacy discovery rows
+  `pricing_status` keep their existing meanings, and `degraded_status` carries
+  the sidecar's `degraded.status` when there is one. Legacy discovery rows
   (`feature_area = "discovery"`) retain status derived from `fallback_code`;
   other sources retain their existing status contract. This is ledger-only:
   no provider-read channel, sidecar field, reader projection, or backfill.
+- **A research provider failure reuses the retryable recovery** (#609). The
+  research client types every failure: HTTP 5xx, HTTP 429, a timeout and a
+  lost connection are transient; any other 4xx, a missing or rejected key
+  (`not_configured`, including HTTP 401 and 403) and an answer that cannot be
+  read are not. The HTTP status travels as a typed field, never only inside a
+  log line. The client asks again automatically only when the provider cannot
+  have started paid work: an HTTP 429, an HTTP 5xx response, or a connection
+  that failed before the request was sent. It makes at most three attempts in
+  all, waiting what the response's `Retry-After` asks (seconds or an HTTP date)
+  or else a backoff that doubles from one second, and a retry starts only while
+  at least half of the deadline is left. After a read timeout or a connection
+  dropped mid-request it does not ask again: the turn ends on the retry notice
+  so the reader decides, and the attempt is recorded as an unpriced anomaly
+  with a null provider response id. Each attempt's httpx connect, read, write
+  and pool timeouts are sized from what is left of the call's own timeout.
+  httpx applies each one to a single operation, so an attempt can run past the
+  limit: a stalled DNS lookup by as much as the system resolver's own timeout,
+  and a provider that keeps sending bytes slowly for as long as it keeps
+  sending. A background poll is not
+  retried by the client; the poller already asks again until its own deadline.
+  A call claims research capacity once, however many attempts it takes.
+- When no attempt answers, the no-search answer replies where it can run
+  (below, where a failed lookup never becomes the answer), and the lookup's
+  recovery sits under it: `content` is that answer, any rows and
+  `next_experiments` are its own, and the recovery adds `under_answer: true`.
+  Where it cannot run (no model key, a survey, or voicing that failed), the
+  recovery stands alone: the turn publishes no answer, no rows and no
+  `next_experiments`, and the persisted `content` is English compatibility
+  text. A no-search answer that asks for figures only the reader knows carries
+  no recovery, since its question waits for the reply. A transient failure
+  carries `recovery = {"code": "research_lookup_failed", "retryable": true}`
+  and finalizes its chat turn as `recoverable_failed` with a durable
+  `retry_last_turn` anchored to the persisted user request, the same
+  settlement a retryable discovery recovery takes, whether or not an answer
+  stands above it; the live final frame carries the message-shaped retry.
+  Clients render the amber retryable notice, and Retry sends the persisted
+  question again. Any other failure carries
+  `recovery = {"code": "research_lookup_unavailable", "retryable": false}`,
+  completes its turn with nothing to retry, and renders as the quiet failure
+  notice. Clients render the notice in place of the reply, or under it when
+  `under_answer` is true, in copy localized from the code. A thorough request
+  whose background submission fails ends on the same recovery, alone: the
+  no-search answer runs inside the turn, and a submission fails once the turn
+  has composed. After a read timeout or a connection dropped mid-request the
+  provider may already be running, and billing, that run, so that turn ends on
+  the quiet notice with no Retry and the attempt is recorded as unpriced.
+- That turn's `research` sidecar keeps `degraded.code =
+  "research_unavailable_<reason>"`, where the reason is `http_error`,
+  `timeout`, `transport`, `not_configured`, `malformed_response` or
+  `empty_answer`, and adds `degraded.status` with the HTTP status whenever the
+  provider answered with an error. Both reach the cost ledger, so research
+  outages can be counted by kind.
 - Retrieval evidence is independent of the invoice. The provider's returned
   output is the retrieval record: finance and web result items and the
   citations they carry. Survey grounding and the single survey retry read
@@ -4185,9 +4441,14 @@ Contract rules:
   that one panel. The model never authors a citation line: prompts forbid
   source lines and links, and only URLs the packet returned can enter the
   typed path. Provider-owned hosts remain excluded. Parsing retains a bounded
-  internal citation pool; the public selection step then drops an explicitly
-  dated source published before the period implied by the question, keeps at
-  most one page per publisher, and caps the drawer at five. An undated live
+  internal citation pool. A typed answer's candidates are only the pooled pages
+  it cites, in the order it cites them: the pages it names in `source_urls`,
+  each row's page and each page input of its calculations. A search hit the
+  answer never cites, or a page the response never retrieved, is not
+  published; prose names no pages, so its pool stands. The public selection
+  step then drops an explicitly dated source published before the period
+  implied by the question, keeps at most one page per publisher, and caps the
+  drawer at five. An undated live
   page remains eligible because it can plausibly describe the current period.
   The question date is the date the question is asked on by the New York
   calendar, never the server's date or UTC's; one owner dates it for the
@@ -4279,8 +4540,12 @@ Contract rules:
   never filtered to the past week), and the asking user's declared country
   as the reader's location on the web search tool (the profile's `country`,
   ISO 3166-1 alpha-2). A user without a country sends no location, and no
-  deployment-wide country stands in for one. A thorough job's typed request
-  carries the country, so the job sends the location of the user who asked.
+  deployment-wide country stands in for one. The research prompt names the
+  same country and the resolved currency, and asks for an answer for that
+  country unless the question names another, never asking where the reader
+  lives; a user without a country gets no such line. A thorough job's typed
+  request carries the country and currency, so the job sends the location and
+  line of the user who asked, and so does a refresh of a computed answer.
   The research cache key includes that country, so a search made for one
   country's readers never answers another's. No domain filter is sent.
 - Current external facts ("why is NVDA moving this week") are claim-shaped:
@@ -4303,9 +4568,11 @@ Contract rules:
   or more subjects were compared, peer suggestions, and the open thread, in
   a consumable shape. It is not a memory record and carries none of the four
   memory categories. The rail only emits; nothing reads or writes memory
-  here, and consumption ships in the memory lane. The app does not render
-  `follow_up`; a research answer that later offers next steps adopts the
-  `next_steps` list instead of a new shape.
+  here, and consumption ships in the memory lane. `follow_up.questions` holds the
+  two to four questions the answer suggested the reader may ask next (empty on a
+  degraded turn); the one next-steps owner builds the answer's `next_steps` from
+  them and the answer's runnable rows. The app renders that list, never
+  `follow_up` itself.
 - `etf_constituents` questions ("what's inside SPY?", top holdings, weights)
   ground through the balanced shape; the provider's `etf_holdings` table is
   parsed deterministically, weight order preserved, and each named holding
@@ -4325,11 +4592,17 @@ Contract rules:
 - Runnable next steps ride the existing typed `next_experiments` surface.
   Provider identity is absent from prose and sidecars; route receipts and the
   cost ledger own provenance.
+  Research resolution preserves `asset_class_hint` through the shared class-aware
+  resolver. An unhinted ticker found in multiple asset classes earns no test row
+  and uses the existing honest no-next line. A comparison contains only the
+  anchor subject's asset class, including its verified peers; an unresolved
+  named subject is never replaced by a peer. Background research requests retain
+  the requested symbols and class hint for the same publication behavior.
 - Thorough-shape questions run in provider background mode through the
   existing job lifecycle: the turn ends with a `backtest_job` sidecar whose
   `operation_scope` is `"chat.research"`, and the finalized answer arrives as
   a new assistant message referenced by the succeeded job's
-  `execution_metadata.research_result_message_id`. A succeeded research job
+  `execution_metadata.research_result_message_id`, and records `metadata.request_message_id`, the user message that started the job, so a computed answer's dossier and refresh read that question. A succeeded research job
   has a null `result_run_id` by design; the polling `GET /backtest-jobs/{job_id}`
   response carries that message as `result_message`, the way a backtest's
   carries `run`, and clients render it in place after the job card instead of
@@ -4355,8 +4628,11 @@ Contract rules:
 - Researched peers still outside the active basket ride the ordinary
   `next_experiments` surface of the card-bearing message as
   `research_add_peer` / `research_add_peer_set` rows, bounded by free asset
-  slots; each row's `why.params.symbols` carries the resolver-verified
-  identity the tap adds. The card itself never grows a peer section.
+  slots; each row's `why.params.peers` carries the stored resolver-verified
+  `{symbol, name, asset_class}` identities. `why.params.symbols` remains a
+  legacy projection. The tap forwards symbol and class; the server selects
+  the stored identity, including its name, without resolving the ticker
+  again. The card itself never grows a peer section.
 - The superseding card carries typed `assets_adjustment` data
   (`{code: "assets_added" | "assets_restored", added, previous_symbols,
   symbols, period_change?}`). Clients render it as motion on the freshly
@@ -4374,9 +4650,14 @@ are both on (404 otherwise; the in-place surface ships default off until
 the run-consumption guard lane closes).
 
 **Request:** exactly one mode.
-- Add: `{"symbols": ["DIS"]}` (1-4 symbols; every symbol must appear in the
-  active turn's `research_add_peer` rows, so nothing outside the
-  resolver-verified offer set is addable, whoever asks).
+- Add: `{"peers": [{"symbol": "BTC", "asset_class": "crypto"}]}` (1-4
+  identities; each must match a stored `research_add_peer` offer in the
+  active confirmation's class). The client cannot replace the stored name
+  or change the offered asset class.
+- Legacy add: `{"symbols": ["DIS"]}` remains accepted against stored offers.
+  For older rows containing only symbols, the owning confirmation supplies
+  the asset class. No add, remaining-offer, or undo path resolves a ticker
+  again.
 - Undo: `{"restore_previous": true}` re-materializes the exact previous
   asset set from the active card's own `assets_adjustment` data.
 
@@ -4388,7 +4669,7 @@ offer set is consumed). No turn was spent, so nothing new appears in the
 transcript; see the record-creation rule under the direct-edit endpoint.
 
 **Errors:** `409 artifact_action_invalid_state` uniformly for a stale or
-non-active confirmation, non-offered symbols, and restore with nothing to
+non-active confirmation, non-offered identities, and restore with nothing to
 restore; `409 confirmation_changed` when a concurrent writer changed the
 card between this request's read and its write (nothing was applied; a
 retry re-reads the current card); `422 asset_maximum_reached |
@@ -4637,7 +4918,7 @@ After every queued and running ceiling passes, a conforming direct job starts in
 - all symbols must share same `asset_class`
 - mixed asset requests rejected with **422**
 - unsupported templates/timeframes rejected with **422**
-- `starting_capital` outside range [1000, 100000000] rejected with **422**
+- `starting_capital` outside range [10, 100000000] rejected with **422**
 - A non-consuming quota exhaustion check runs before provider-backed coverage
   preflight. Coverage rejection consumes no backtest allowance; the definitive
   admission check and increment run only after coverage succeeds.
@@ -4779,8 +5060,9 @@ the reader asked what to try next (`result_followup_focus: "next_experiment"`)
 and the answer lists no steps, or no model answered and the retryable
 `recovery.code = "latest_result_followup_unavailable"` is shown, the list holds
 the result's tests alone (#590). `next_steps` is not specific to results: a
-research answer can adopt it later without a new shape, and research answers
-carry only `next_experiments` today.
+research answer, inline or finished by a background job, ends with the same list,
+its runnable tests and calculations first and then two to four of the questions
+its research suggested (`research.follow_up.questions`), at most five items.
 
 ```json
 "next_steps": {
@@ -5054,10 +5336,14 @@ A decision attaches to a computation and carries what a re-run needs. Every
   its inputs after the message is gone.
 
 A computed answer declares its computation in message metadata:
-`metadata.computation = {"kind": "<registered kind>", "inputs": {...}}`. `kind`
-is a lowercase slug of at most 80 characters; `inputs` is a JSON object of at
-most 32 keys that serializes to at most 8,192 characters. Only the backend
-writes this field. On every transcript read, the backend derives
+`metadata.computation = {"kind": "<registered kind>", "inputs": {...}}` for one
+calculation, and `{"calculations": [{"kind", "inputs"}, ...]}` for an answer
+that weighs options, one per card in order (two to four); both shapes read
+alike, and a computation stored in the first shape keeps reading. Each `kind`
+is a lowercase slug of at most 80 characters; each `inputs` is a JSON object of
+at most 32 keys that serializes to at most 8,192 characters. The answer stays
+the unit: one decision stores the whole computation, and opening it re-runs
+every calculation. Only the backend writes this field. On every transcript read, the backend derives
 `decision_note_id` and `decision_state` for the message from `decision_notes`,
 the one owner of that fact, exactly as it does for a result card; a stored copy
 on the message is never trusted, and a decision the owner no longer holds is
@@ -5087,26 +5373,29 @@ computation and `created_at`.
 
 ### `GET /decisions/{decision_id}`
 
-Open an owned decision. The backend re-runs its computation from the stored
-inputs and returns the decision, the effective computation, and the outcome.
+Open an owned decision. The backend re-runs every calculation of its
+computation from the stored inputs and returns the decision, the effective
+computation, and one outcome per calculation in `reruns`, in order.
 The re-run happens only when the decision is opened; nothing reaches out.
 
 ```json
 {
   "decision": { "...": "DecisionNote" },
   "computation": { "kind": "backtest", "inputs": { "source_run_id": "uuid" } },
-  "rerun": {
-    "kind": "backtest",
-    "inputs": { "source_run_id": "uuid" },
-    "status": "confirmation_required",
-    "result": null,
-    "retest": { "type": "retest_run", "source_run_id": "uuid", "...": "..." },
-    "reason_code": null
-  }
+  "reruns": [
+    {
+      "kind": "backtest",
+      "inputs": { "source_run_id": "uuid" },
+      "status": "confirmation_required",
+      "result": null,
+      "retest": { "type": "retest_run", "source_run_id": "uuid", "...": "..." },
+      "reason_code": null
+    }
+  ]
 }
 ```
 
-`rerun.status`:
+`reruns[].status`:
 - `computed`: `result` carries the kind's typed result; `retest` is `null`.
 - `confirmation_required`: the backtest kind. `retest` is the same typed
   `retest_run` action the run dossier offers, because a backtest earns its
@@ -5120,11 +5409,14 @@ The re-run happens only when the decision is opened; nothing reaches out.
 
 ### `POST /decisions/{decision_id}/rerun`
 
-Re-run with changed inputs. Body: `{"inputs": {...}}`, overrides merged over
-the stored inputs under the same bounds as a declared computation. Returns
+Re-run with changed inputs. Body: `{"inputs": {...}, "calculation": 0}`,
+overrides merged over the stored inputs of the calculation at that index
+(default `0`) under the same bounds as a declared computation, while every
+other calculation re-runs from its stored inputs. Returns
 `DecisionOpenResponse`. A re-run never changes the decision or its stored
-computation. Overrides that fail the kind's typed inputs return `422
-validation_error` with the field errors in `context.errors`. The backtest
+computation. Overrides that fail the kind's typed inputs, or an index with no
+calculation, return `422 validation_error` with the field errors in
+`context.errors`. The backtest
 kind's inputs are not editable: overrides answer `unavailable` with
 `inputs_not_editable` rather than minting a run.
 
@@ -5137,6 +5429,286 @@ attaches to; the conversation carries its state in `decision_states`; the
 unless the conversation also has an evidence-backed run, and
 `GET /conversations/{conversation_id}/run-dossiers` is unchanged: it projects
 runs, so only backtest decisions appear there.
+
+### Free calculations
+
+A free calculation is a declared tool that is local, never confirmed, makes no
+external call and has editable fields (`argus.domain.calculations`). Each is
+exactly four artifacts: its `ToolDeclaration`, its compute function, its tests
+and its presenter, and each registers a decision kernel of the same name in
+`argus.domain.computations` that calls the declaration's one compute function.
+Its computed answer declares `{"kind": <tool name>, "inputs": <the card's
+arguments>}` in `metadata.computation` for each of its cards, derived from the
+cards by the marker owner.
+The computation may carry `symbols`, at most five upper-case asset identities
+derived from typed `symbol` inputs; a computation about no asset omits the key,
+so earlier computations serialize unchanged.
+
+For a calculation kind, a rerun's `status` is `computed` and its `result` is the
+declaration's tool result card (`kind: "tool_result"`, identity
+`decision_rerun`), including its `outcome`: inputs with no solution are a
+computed card whose outcome is `invalid` with the field and any typed repair,
+never a `500` and never a guess. Overrides merge through the declaration's
+recompute rules: the retained unknown stays blank, an edited input is marked as
+stated by the user, and an override that changes the unknown or fails the typed
+model answers `422 validation_error`. The registered kinds are `time_value`,
+`growth_projection`, `bond_value`, `discounted_cash_flow`, `price_multiple`,
+`income_yield`, `effective_rate`, `debt_to_income`, `expense_ratio`,
+`ranked_comparison` and `valuation_scenarios`. Money inputs and outputs carry
+the calculation's `currency`, an ISO 4217 code in use; zero is a known input.
+
+### `POST /conversations/{conversation_id}/messages/{message_id}/computation/rerun`
+
+Re-run an owned computed answer from Search, decided or not, without touching
+it. Body: `{"inputs": {...}, "calculation": 0}`, overrides merged over that
+calculation of the answer's declared computation under the same rules as a
+decision re-run; an empty object re-runs the stored inputs. Returns
+`{"computation": DecisionComputation, "reruns": [DecisionRerun, ...]}`, one per
+calculation, and stores nothing: the answer, its card and its marker are
+never rewritten. In-chat edits of the latest answer keep the tool-results
+recompute route, which does rewrite the card. `404 not_found` when the message
+is missing, not owned, not in the conversation or not an assistant message;
+`409 decision_attachment_unsupported` when the message declares no computation;
+`422 validation_error` when overrides fail the kind. No model, retrieval or
+provider call.
+
+### Calculation turns
+
+The answer step owns the math. Where Argus already answers, the answering model
+returns its prose and a short list of typed calculation requests, one per option
+the reader weighs (at most four, bounded at parse time), and Argus computes each:
+the research provider under the strict answer schema
+`argus_typed_answer_calculations` for a question that needs published figures,
+and the no-search voicing answer (`CalculatedVoicedAnswer`) when the user's own
+figures are enough. A response recorded under the one-calculation schema reads
+as a list of one. Each request is `{name, kind, solve_for, inputs: [{name,
+value, source, source_url, as_of, currency}]}`: `name` is the calculation's
+short name, `kind` is a registered calculation, `solve_for` names the one
+blank for a kind with an unknown rule, and each input's `source` is `page` (read
+from a page retrieved for this answer, with its URL and date), `market_data` (a
+current price Argus fills from its own market data), `user` (the user's words)
+or `assumption` (a figure the answer states plainly as an assumption). The
+interpreter maps no calculation and its response schema carries none; no
+phrase, pattern or language check runs before either answering model. When a
+choice turns on a future figure nobody can cite, such as an exchange rate or a
+price, the research instructions ask for no projection: the answer shows what the
+recent past did, with cited and dated figures in a calculation Argus computes,
+labeled as history rather than a forecast. A scenario answer's instructions do
+not carry this rule, so a forward-valuation question keeps its computed
+scenarios (decision 10).
+
+Routing uses the primary read's existing research query. A question whose
+figure a page must supply (a product's price, a lender's or bank's rate or
+fees, local inflation or exchange rates, an asset's price or earnings) is a
+research turn, including a scenario with no subject when its kind names a
+published figure. A computed answer on the user's own numbers (the scenario bit,
+no subject, kind `none`, no other owner) is the no-search answer. A concept
+question takes the grounded balanced research path
+(`research_answers_concept_question`), and an out-of-scope verdict that typed no
+question, no refusal payload, no pending need and nothing to run is researched as
+a current external question (`research_answers_unsupported_verdict`), so a money
+question is never refused as out of scope. An educational question the primary
+read left with no research query, and with no capability focus, pending need or
+anything to run, is researched as a concept question
+(`research_answers_unkinded_question`), where the reader's country and the
+no-advice boundary apply rather than the interpreter's own prose. Typed fields cannot tell a money
+question from any other request with nothing to run, so the research answer does:
+for a request that is not a money question, or that asks Argus to place a trade,
+move money or act on an account, the typed answer sets `declined`, retrieves
+nothing, and its one or two plain sentences are published as they stand, with no
+figures, calculation or next steps (`research_declined_not_a_money_request`). When the rail still declines a
+knowledge-shaped read, its intent, act, kind and scenario bit are logged. A reply
+to the answer's one question completes its pending calculation through the
+no-search answer unless the primary read routed the reply to an action of its
+own. A capability turn spends no extra call.
+
+Each input is held to its source before the declaration computes, and every
+guard records a reason code on the turn: a page this answer did not retrieve
+feeds nothing (`answer_input_page_uncited`); `market_data` fills only a price,
+from Argus's own latest close (`answer_market_price_unavailable`,
+`answer_market_data_not_a_price`); a money input in another currency than the
+calculation feeds nothing (`calculation_input_currency_mismatch`); an
+undeclared name is dropped (`answer_input_undeclared`); an unknown kind or a
+malformed request computes nothing (`answer_calculation_kind_unknown`,
+`answer_calculation_malformed`); and money counts in the currency the request
+names, else the profile's resolved currency, else `USD`
+(`calculation_currency_defaulted`).
+
+The prose states each calculation's figures only as references to its card's
+answer, rows and inputs, `{{name}}` with one calculation or
+`{{calculation.name}}` with several, filled from the computed cards; a reference
+more than one card could fill is never guessed, and nothing publishes until
+every calculation computes. A cited figure a page published may stand in digits
+beside them, held to its row. A reference
+that does not resolve replaces the prose with Argus's own lead
+(`answer_figures_replaced`); a plan that does not solve keeps its card under
+that lead. An assumed input the prose never names leaves the prose standing:
+`metadata.answer_assumptions = [{artifact_id, name}]` names each one, the app
+lists them in one plain line under the answer from each card's own label and
+value in the reader's language, the recompute route derives the list again,
+and `answer_figures_replaced` is still recorded when one of them drives the
+result. Separately, every research or no-search answer's prose is audited:
+each figure written in digits that is neither a cited row nor a value of its
+calculation is recorded with `answer_figures_unsourced` and a log line with the
+count and the figures, and nothing is replaced. Dates, years, a day number beside its year,
+numbers inside words and a number that names a cited product or a model are not
+counted. A computed answer answers `ready_to_respond`:
+`final_response_payload.tool_result_cards` holds one card per calculation, the
+stored message carries `tool_result_cards`, the `metadata.computation` derived
+from them and `metadata.answer_text_template = {cards: {<calculation name>:
+<artifact_id>}, text, language}` (a template stored as `{artifact_id, text,
+language}` reads as its one card), the prose with its references, which the
+recompute route re-renders into `content` from the current cards. When the reader stated the starting amount or monthly deposit (a looked-up or assumed amount offers no row) and the inputs give a whole-year horizon,
+`next_experiments` offers one `calculation_market_counterfactual` row that runs
+only when tapped, and `next_steps` lists it. A loan offers no row, and neither
+does a plan with both a starting amount and deposits, stated or solved. The test's asset is the card's own symbol, or the S&P 500 proxy when the card names none. The test runs in dollars: an amount
+in another currency is converted at Argus's own latest close for its pair with
+the dollar, and the label states the amount as asked, the rate and its date. A
+currency with no such close offers no row, and
+`market_counterfactual_no_dollar_rate` is logged.
+
+A figure only the user knows answers `await_user_reply` with Argus's own one-line
+lead as `assistant_prompt`, `requested_field` naming the first missing argument,
+no card, and `clarification = {kind: "clarification", reason_code:
+"calculation_input_missing", prompt_source: "degraded_fallback", requested_field,
+requested_fields, missing_inputs: [{name, label}], semantic_needs: [], payload:
+{calculations, requested_field, requested_fields, requested_by_calculation, evidence, retrieved}, options:
+[]}`; a payload stored with one `calculation` reads as a list of one. Each missing input carries the declaration's `LocalizedText` label key and
+the app writes the question from them (`tools.calc.missing_inputs.ask`), so the
+question names exactly the figures only the user knows. `retrieved` keeps the
+pages the answer read and `evidence` the figures it cited from finance data, so
+the reply may still cite them (`calculation_pending_reply`). The stored calculations stand: the reply fills only the blanks each calculation asked for under `requested_by_calculation`, keyed by its reference name (a null input, or a requested field it never listed; a payload stored without that map applies `requested_fields` to every calculation), with a figure that is not an assumption, and a voiced reply that changed a figure they held is recorded as `calculation_pending_reply_kept_stored`. That question belongs to the no-search
+answer; a research turn whose lookup failed and whose fallback asks keeps its
+`research` sidecar, so the packet it read reaches the ledger, and a background
+job in that case stores the same `clarification` and `requested_field` on its
+message with `last_stage_outcome = "await_user_reply"`.
+
+A research answer never turns into a question. When a calculation needs a
+figure only the reader knows, the answer keeps its prose, with any reference to
+an input it already holds filled (a sentence or table row that leans on a result the offer cannot show is left
+out, `offer_prose_results_dropped`; only prose with nothing left is not
+published: `calculation_inputs_not_found`), stores
+`metadata.calculation_offer = {calculations, requested_field, requested_fields,
+requested_by_calculation, evidence, retrieved}` with the
+cited inputs and the pages it read, records `calculation_offered`, and leads its
+`next_steps` with a `calculation_offer` row. Tapping the row sends the typed chat
+action `calculation_offer` with the row's label as its display text: the turn asks
+one plain question for every figure only the reader knows
+(`calculation_offer_taken`) through the pending clarification above, and the
+reply completes the calculation with the cited inputs kept. A tap whose latest
+answer carries no offer answers with a short note and runs nothing. A background
+answer stores the same offer on its message.
+
+A failed lookup never becomes the answer and never names the conversation.
+When research is unavailable, retrieves nothing (`research_not_grounded`),
+returns a scenario without a calculation (`scenario_inputs_uncited`) or a
+calculation whose inputs were not found (`calculation_inputs_not_found`), the
+no-search answer replies from Argus market data for the named subjects and
+stated assumptions and says what could not be looked up; the degraded code stays
+on the `research` sidecar. When research is unavailable, the lookup's recovery
+sits under that answer (`under_answer`, #609 above). An answer that only restates the question is never published
+(`answer_restated_question`). Only when that answer cannot run does the honest
+note stand in, or, when research is unavailable, the lookup's recovery alone,
+and no card with blank inputs ever renders. Thorough runs compute
+and attach the same card. The research contract is frozen by the recordings
+under `docs/reports/evidence/545/probes` and
+`docs/reports/evidence/grounded-math/probes/scenario_inputs_balanced.json`.
+
+### Computed answers outside a turn
+
+Every route is owner-scoped. Listing, comparing and continuing call no model,
+retrieval or provider.
+
+| Method | Path | Purpose |
+| :----- | :--- | :------ |
+| `GET`  | `/computations/answers?kind=&exclude_message_id=` | The owner's newest computed answers of one kind in live conversations, at most 10 |
+| `POST` | `/computations/compare` | Two answers of one kind side by side |
+| `POST` | `/conversations/{conversation_id}/messages/{message_id}/continue` | A new chat carrying only this result |
+| `POST` | `/conversations/{conversation_id}/messages/{message_id}/computation/refresh` | Look the answer's cited inputs up again |
+
+Listing returns `{items: [{conversation_id, message_id, kind, asked,
+computed_at, symbols}]}`. Only an answer with one calculation is listed: an
+answer that weighs options is not a result of one kind.
+
+Compare takes `{left, right}`, each `{conversation_id, message_id}`, and
+returns `{kind, left, right, differences}`. Each side is `{conversation_id,
+message_id, asked, computed_at, card}`; each difference is `{section: "answer"
+| "row" | "input", name, label, unit, left, right, difference}`. A difference
+exists only for a fact both cards state as a number in the same section and
+unit, so money in another currency has none. `difference` is right minus left,
+computed once in Python and rounded as the card rounds that unit; the client
+only formats it. The same answer twice, two kinds, two rankings of different items or by a
+different measure or preference, or an answer with more than
+one calculation answer `422 invalid_selection`; a missing or foreign answer answers `404 not_found`; a
+message with no computation answers `409 decision_attachment_unsupported`.
+
+Continue creates a conversation and one assistant message whose metadata
+carries every card under a new `artifact_id` at input revision 0, the
+`computation` derived from those copies, the answer's `answer_text_template` and
+`answer_assumptions` pointed at those copies so a recompute there re-renders the
+prose, and `continued_from: {conversation_id, message_id}`. The source
+conversation is unchanged. It returns `{conversation, message_id}` and is for
+registered accounts only (`can_create_additional_conversation`); a guest
+answers `403 account_conversion_required`.
+
+Refresh looks up again only the inputs whose `source.kind` is `page`, on the
+balanced research configuration under the scenario contract. It is claimed
+under the research allowance before any provider work and recorded in the cost
+ledger. Stated inputs keep their values, and a cited input no page states today
+keeps its stored value and date. An answer with several calculations asks for
+each one's cited inputs under the calculation name its template gave it and
+takes each looked-up calculation back by that name. It returns `{computation,
+status, reruns, sources}`: `refreshed` carries one recomputed card per
+calculation in `reruns[].result` (identity `decision_rerun`), and
+`inputs_not_found` carries none. The stored answer, its
+card and its marker are never rewritten. It answers `409 nothing_to_refresh`
+when no input is cited, `429 research_capacity_exhausted` (context
+`guest_exhausted`) when the allowance refuses, and `503 research_unavailable`
+(context `reason`) when the provider cannot answer.
+
+### Answer dossiers in Search
+
+A computed answer gets a dossier beside the run dossier, which is unchanged. A
+`conversation` search row carries `answer_dossier`, `null` or the newest
+assistant message in the conversation whose marker and card agree:
+
+```json
+{
+  "message_id": "uuid",
+  "conversation_id": "uuid",
+  "asked": "Is Apple expensive at this P/E?",
+  "computed_at": "timestamp",
+  "symbols": ["AAPL"],
+  "cards": [{ "kind": "tool_result", "...": "..." }],
+  "decision": { "state": "watching", "note": "Wait for earnings.", "run_label": null },
+  "decision_id": "uuid",
+  "actions": [
+    { "type": "answer_decision", "availability": "available", "message_id": "uuid",
+      "decision_state": "watching", "note": "Wait for earnings." }
+  ]
+}
+```
+
+`asked` is the owner's own user message just before the answer, bounded to 500
+characters, and the only prose in the dossier. `cards` holds the answer's tool
+result cards, one per calculation in order: what Argus used, each input with
+its source, and what came out.
+`decision` and `decision_id` come from `decision_notes`; `actions` carries at
+most one `answer_decision` whose `availability` follows the same client
+capability negotiation as the run dossier's decision action and which posts to
+the message decision route. Recompute from the dossier goes through the message
+computation rerun route and never rewrites the stored answer. The dossier is
+hydrated after the search read in both persistence modes from the message's
+marker alone; the preview and opening a dossier make no model or retrieval
+call. When a conversation has both, the run dossier keeps precedence in the
+palette and the answer dossier still travels on the row.
+
+The asset row counts computed results involving the asset, not only runs:
+`asset_rollup.result_count` is completed runs plus computed answers whose
+computation names the symbol, `run_count` may now be `0`, `decision_counts`
+adds the current decisions on those answers, and a symbol known only from
+computed answers still resolves by exact match or unique prefix. Its copy says
+results in both languages.
 
 ---
 

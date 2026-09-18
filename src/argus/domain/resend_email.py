@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import json
 import os
 import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from importlib.resources import files
 
 SMTP_PASSWORD_ENV = "ARGUS_APPROVAL_EMAIL_SMTP_PASSWORD"
-# The API's one support address; the web build pins the same value in the release profile.
-SUPPORT_EMAIL_ADDRESS = "support@get-argus.com"
+# Owned by argus_display_contract/support_contact.json, which the web build also reads.
+SUPPORT_EMAIL_ADDRESS: str = json.loads(
+    files("argus_display_contract").joinpath("support_contact.json").read_text()
+)["email"]
 
 _SMTP_HOST = "smtp.resend.com"
 _SMTP_PORT = 465

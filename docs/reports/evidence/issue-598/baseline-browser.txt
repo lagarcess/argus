@@ -1,0 +1,209 @@
+$ playwright test conversation-activity-ui.spec.ts --grep "second tab|durable backtest stays|coarse pointer|resolved clarification"
+(node:20918) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:20937) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:20952) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 6 tests using 2 workers
+
+(node:21137) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21139) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:21128) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:21128) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:21137) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:21137) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:21139) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:21139) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 [chromium] › e2e/conversation-activity-ui.spec.ts:802:5 › durable backtest stays working through queued, running, and checking before canonical result hydration (6.0s)
+(node:23516) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23516) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:23516) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  3 [chromium] › e2e/conversation-activity-ui.spec.ts:1234:7 › resolved clarification clears its rail marker in en (5.3s)
+(node:24153) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:24153) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:24153) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  4 [chromium] › e2e/conversation-activity-ui.spec.ts:1234:7 › resolved clarification clears its rail marker in es-419 (5.3s)
+(node:24655) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:24655) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:24655) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  5 [chromium] › e2e/conversation-activity-ui.spec.ts:1301:7 › second tab loads the saved reply on completion without duplicating the sender (en) (10.8s)
+(node:25892) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:25892) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:25892) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [chromium] › e2e/conversation-activity-ui.spec.ts:1125:7 › 390px coarse pointer › mobile Recents keeps the touch-safe owner menu and typed activity labels (30.0s)
+  ✘  6 [chromium] › e2e/conversation-activity-ui.spec.ts:1301:7 › second tab loads the saved reply on completion without duplicating the sender (es-419) (10.8s)
+
+
+  1) [chromium] › e2e/conversation-activity-ui.spec.ts:802:5 › durable backtest stays working through queued, running, and checking before canonical result hydration 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('heading', { name: 'Buy and hold', exact: true })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('heading', { name: 'Buy and hold', exact: true })
+
+
+      841 |   await expect(
+      842 |     page.getByRole("heading", { name: "Buy and hold", exact: true }),
+    > 843 |   ).toBeVisible();
+          |     ^
+      844 |   expect(fixture.unexpectedRequests).toEqual([]);
+      845 | });
+      846 |
+        at /Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-activity-ui.spec.ts:843:5
+
+    Error Context: temp/playwright-results/1789431004189-21139/conversation-activity-ui-d-84922--canonical-result-hydration-chromium/error-context.md
+
+  2) [chromium] › e2e/conversation-activity-ui.spec.ts:1125:7 › 390px coarse pointer › mobile Recents keeps the touch-safe owner menu and typed activity labels 
+
+    Test timeout of 30000ms exceeded.
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: 'Recientes' })
+
+
+      659 |       name: language === "es-419" ? "Recientes" : "Recents",
+      660 |     })
+    > 661 |     .click();
+          |      ^
+      662 | }
+      663 |
+      664 | async function openConversation(page: Page, conversationId: ConversationId) {
+        at openRecents (/Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-activity-ui.spec.ts:661:6)
+        at /Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-activity-ui.spec.ts:1136:5
+
+    Error Context: temp/playwright-results/1789431004188-21137/conversation-activity-ui-3-64012-u-and-typed-activity-labels-chromium/error-context.md
+
+  3) [chromium] › e2e/conversation-activity-ui.spec.ts:1234:7 › resolved clarification clears its rail marker in en 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('conversation-activity-rail').getByRole('button')
+    Expected: 1
+    Received: 2
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for getByTestId('conversation-activity-rail').getByRole('button')
+        9 × locator resolved to 2 elements
+          - unexpected value "2"
+
+
+      1249 |     const rail = page.getByTestId("conversation-activity-rail");
+      1250 |     await expect(rail).toBeVisible();
+    > 1251 |     await expect(rail.getByRole("button")).toHaveCount(1);
+           |                                            ^
+      1252 |     await expect(
+      1253 |       rail.getByRole("button", { name: completedLabel }),
+      1254 |     ).toBeVisible();
+        at /Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-activity-ui.spec.ts:1251:44
+
+    Error Context: temp/playwright-results/1789431010541-23516/conversation-activity-ui-r-23db4-lears-its-rail-marker-in-en-chromium/error-context.md
+
+  4) [chromium] › e2e/conversation-activity-ui.spec.ts:1234:7 › resolved clarification clears its rail marker in es-419 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('conversation-activity-rail').getByRole('button')
+    Expected: 1
+    Received: 2
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" with timeout 5000ms
+      - waiting for getByTestId('conversation-activity-rail').getByRole('button')
+        9 × locator resolved to 2 elements
+          - unexpected value "2"
+
+
+      1249 |     const rail = page.getByTestId("conversation-activity-rail");
+      1250 |     await expect(rail).toBeVisible();
+    > 1251 |     await expect(rail.getByRole("button")).toHaveCount(1);
+           |                                            ^
+      1252 |     await expect(
+      1253 |       rail.getByRole("button", { name: completedLabel }),
+      1254 |     ).toBeVisible();
+        at /Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-activity-ui.spec.ts:1251:44
+
+    Error Context: temp/playwright-results/1789431016155-24153/conversation-activity-ui-r-0c008-s-its-rail-marker-in-es-419-chromium/error-context.md
+
+  5) [chromium] › e2e/conversation-activity-ui.spec.ts:1301:7 › second tab loads the saved reply on completion without duplicating the sender (en) 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('Terminal response for activity-a', { exact: true })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+
+
+      1326 |     try {
+      1327 |       await expect(tabA.getByText(reply, { exact: true })).toHaveCount(1);
+    > 1328 |       await expect(tabB.getByText(reply, { exact: true })).toBeVisible({ timeout: 10_000 });
+           |                                                            ^
+      1329 |       for (const tab of [tabA, tabB]) {
+      1330 |         await expect(tab.getByText(reply, { exact: true })).toHaveCount(1);
+      1331 |         await expect(tab.getByText(prompt, { exact: true })).toHaveCount(1);
+        at /Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-activity-ui.spec.ts:1328:60
+
+    Error Context: temp/playwright-results/1789431021778-24655/conversation-activity-ui-s-79d66--duplicating-the-sender-en--chromium/error-context.md
+
+  6) [chromium] › e2e/conversation-activity-ui.spec.ts:1301:7 › second tab loads the saved reply on completion without duplicating the sender (es-419) 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByText('Terminal response for activity-a', { exact: true })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 10000ms
+      - waiting for getByText('Terminal response for activity-a', { exact: true })
+
+
+      1326 |     try {
+      1327 |       await expect(tabA.getByText(reply, { exact: true })).toHaveCount(1);
+    > 1328 |       await expect(tabB.getByText(reply, { exact: true })).toBeVisible({ timeout: 10_000 });
+           |                                                            ^
+      1329 |       for (const tab of [tabA, tabB]) {
+      1330 |         await expect(tab.getByText(reply, { exact: true })).toHaveCount(1);
+      1331 |         await expect(tab.getByText(prompt, { exact: true })).toHaveCount(1);
+        at /Users/garces/.codex/worktrees/e176/private-alpha-next/web/e2e/conversation-activity-ui.spec.ts:1328:60
+
+    Error Context: temp/playwright-results/1789431032919-25892/conversation-activity-ui-s-3489a-licating-the-sender-es-419--chromium/error-context.md
+
+  6 failed
+    [chromium] › e2e/conversation-activity-ui.spec.ts:802:5 › durable backtest stays working through queued, running, and checking before canonical result hydration 
+    [chromium] › e2e/conversation-activity-ui.spec.ts:1125:7 › 390px coarse pointer › mobile Recents keeps the touch-safe owner menu and typed activity labels 
+    [chromium] › e2e/conversation-activity-ui.spec.ts:1234:7 › resolved clarification clears its rail marker in en 
+    [chromium] › e2e/conversation-activity-ui.spec.ts:1234:7 › resolved clarification clears its rail marker in es-419 
+    [chromium] › e2e/conversation-activity-ui.spec.ts:1301:7 › second tab loads the saved reply on completion without duplicating the sender (en) 
+    [chromium] › e2e/conversation-activity-ui.spec.ts:1301:7 › second tab loads the saved reply on completion without duplicating the sender (es-419) 
+error: script "test:e2e" exited with code 1

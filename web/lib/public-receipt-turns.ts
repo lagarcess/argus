@@ -1,8 +1,8 @@
 import type { AssetClass } from "./argus-types";
 import type { PublicReceiptDateRange, PublicReceiptPayload, PublicReceiptVisual } from "./public-receipt-contract";
 
-export type ReceiptKind = "backtest" | "research_answer" | "mixed";
-export type ReceiptRefusalReason = "not_completed" | "unsupported_turn" | "unsupported_shape" | "missing_sources" | "degraded" | "memory_used" | "missing_question" | "text_too_long" | "unsafe_text" | "unlisted_url" | "invalid_selection" | "preview_changed" | "invalid_source" | "unsupported_backtest";
+export type ReceiptKind = "backtest" | "research_answer" | "calculation" | "answer" | "mixed";
+export type ReceiptRefusalReason = "not_completed" | "unsupported_turn" | "unsupported_shape" | "missing_sources" | "degraded" | "memory_used" | "missing_question" | "text_too_long" | "unsafe_text" | "unlisted_url" | "invalid_selection" | "preview_changed" | "invalid_source" | "unsupported_backtest" | "private_inputs";
 export type ReceiptRefusalField = "question" | "answer" | "owner_note" | "sources";
 
 type ReceiptRuleSeries = {
@@ -13,7 +13,7 @@ type ReceiptRuleSeries = {
 type ReceiptRuleGroup = { combinator?: "all" | "any"; conditions: { left: number | ReceiptRuleSeries; right: number | ReceiptRuleSeries; operator: "lt" | "lte" | "gt" | "gte" | "cross_above" | "cross_below" }[] };
 type ReceiptRuleSpec = { entry?: ReceiptRuleGroup | null; exit?: ReceiptRuleGroup | null };
 type ReceiptLegacyRule = {
-  type?: string | null; indicator?: string | null; period?: number | null; threshold?: number | null; direction?: string | null;
+  type?: string | null; cadence?: string | null; indicator?: string | null; period?: number | null; threshold?: number | null; direction?: string | null;
   fast_indicator?: string | null; fast_period?: number | null; slow_indicator?: string | null; slow_period?: number | null; signal_period?: number | null;
 };
 type ReceiptParameters = {
@@ -45,15 +45,33 @@ type ReceiptTurnBase = {
 export type ResearchReceiptTurn = ReceiptTurnBase & {
   kind: "research_answer"; question: string; answer: string;
   sources: { title: string; domain: string; url: string; source_date?: string | null }[];
-  retrieved_at: string; anchor_symbols: string[]; asset_class?: AssetClass | null;
+  retrieved_at: string | null; anchor_symbols: string[]; asset_class?: AssetClass | null;
   offered_next_step?: { kind: "research_test_single" | "research_test_versus"; symbols: string[] } | null;
   framing: "research_snapshot_not_advice";
 };
 export type BacktestReceiptTurn = ReceiptTurnBase & {
-  kind: "backtest"; idea_title: string; fact_bank: PublicReceiptFactBank; visual?: PublicReceiptVisual | null;
+  kind: "backtest"; question?: string | null; answer?: string | null; idea_title: string; fact_bank: PublicReceiptFactBank; visual?: PublicReceiptVisual | null;
   framing: "historical_simulation_not_advice";
 };
-export type PublicReceiptTurn = ResearchReceiptTurn | BacktestReceiptTurn;
+type ReceiptText = { locale_key: string; interpolation_args: Record<string, string | number | boolean | null> };
+export type CalculationReceiptFact = {
+  label: ReceiptText; value: string | number | boolean | null; value_text?: ReceiptText | null; unit?: ReceiptText | null;
+  source?: { title?: string | null; url?: string | null; date?: string | null } | null;
+};
+/** One calculation's frozen figures: its title, answer, rows, what Argus used and its notes. */
+export type CalculationReceiptFigures = {
+  title: ReceiptText; answer: CalculationReceiptFact; rows: CalculationReceiptFact[]; inputs: CalculationReceiptFact[]; notes: ReceiptText[];
+};
+/**
+ * A computed answer frozen as typed facts; a receipt never recomputes. One
+ * calculation keeps the flat shape frozen receipts carry; several arrive in
+ * order under `calculations`.
+ */
+export type CalculationReceiptTurn = ReceiptTurnBase & {
+  kind: "calculation"; question: string; answer_text?: string | null; computed_at: string; framing: "calculation_not_advice";
+} & (CalculationReceiptFigures | { calculations: CalculationReceiptFigures[] });
+export type AnswerReceiptTurn = ReceiptTurnBase & { kind: "answer"; question: string; answer: string; framing: "answer_not_advice" };
+export type PublicReceiptTurn = ResearchReceiptTurn | BacktestReceiptTurn | CalculationReceiptTurn | AnswerReceiptTurn;
 export type PublicReceiptDocument = PublicReceiptPayload | { schema_version: 2; kind: "turns"; turns: PublicReceiptTurn[] };
 
 export function receiptDocumentKind(payload: PublicReceiptDocument): ReceiptKind {
@@ -62,6 +80,10 @@ export function receiptDocumentKind(payload: PublicReceiptDocument): ReceiptKind
   return payload.turns.every((turn) => turn.kind === first) ? first : "mixed";
 }
 
+function calculationTurnSupported(turn: CalculationReceiptTurn): boolean {
+  return "calculations" in turn ? Array.isArray(turn.calculations) && turn.calculations.length > 0 : Boolean(turn.answer);
+}
+
 export function receiptDocumentSupported(payload: PublicReceiptDocument): boolean {
-  return payload.schema_version === 1 || (payload.schema_version === 2 && payload.kind === "turns" && Array.isArray(payload.turns) && payload.turns.length > 0 && payload.turns.every((turn) => turn.kind === "backtest" || turn.kind === "research_answer"));
+  return payload.schema_version === 1 || (payload.schema_version === 2 && payload.kind === "turns" && Array.isArray(payload.turns) && payload.turns.length > 0 && payload.turns.every((turn) => turn.kind === "answer" || turn.kind === "backtest" || turn.kind === "research_answer" || (turn.kind === "calculation" && calculationTurnSupported(turn))));
 }

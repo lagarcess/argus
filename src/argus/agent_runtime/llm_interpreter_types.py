@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, BeforeValidator, Field, PrivateAttr, field_validator
 
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret_types import (
@@ -14,6 +14,15 @@ from argus.agent_runtime.stages.interpret_types import (
 )
 from argus.agent_runtime.state.models import ResponseProfileOverrides
 from argus.domain.capability_registry import RegisteredStrategyTemplate
+
+
+def _without_null_endpoints(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: endpoint for key, endpoint in value.items() if endpoint is not None}
+    return value
+
+
+LLMDateEndpoints = Annotated[dict[str, str], BeforeValidator(_without_null_endpoints)]
 
 
 class InterpretationContractError(ValueError):
@@ -107,6 +116,9 @@ class LLMDateRangeIntent(BaseModel):
             "Canonical, language-neutral temporal intent. Use this for relative "
             "or semantic windows such as last 12 months or year to date instead "
             "of asking deterministic code to parse localized prose. Use "
+            "explicit_range when the user states both endpoints; a year phrase "
+            "qualifies their year and must not replace either endpoint with "
+            "a whole-year window. Use "
             "same_as_latest_result when the user references the latest completed "
             "test's window; the runtime binds the dates from the canonical run. "
             "Use future_window whenever the user's period points forward from "
@@ -119,11 +131,11 @@ class LLMDateRangeIntent(BaseModel):
     )
     start: str | None = Field(
         default=None,
-        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+        description="ISO date, YYYY-MM-DD; --MM-DD with year_reference=current_year; or 'today'.",
     )
     end: str | None = Field(
         default=None,
-        description="ISO date, YYYY-MM-DD, or canonical sentinel 'today'.",
+        description="ISO date, YYYY-MM-DD; --MM-DD with year_reference=current_year; or 'today'.",
     )
     day_offset: int | None = Field(
         default=None,
@@ -145,6 +157,15 @@ class LLMDateRangeIntent(BaseModel):
     unit: Literal["day", "week", "month", "quarter", "year"] | None = None
     anchor: Literal["today", "current_date"] | None = "today"
     year: int | None = Field(default=None, ge=1900, le=2100)
+    year_reference: Literal["current_year"] | None = Field(
+        default=None,
+        description=(
+            "Use current_year when the user says this year, or supplies month/day "
+            "endpoints without a year. For explicit_range or endpoint_patch, return "
+            "month/day endpoints as --MM-DD; Argus supplies the year from its "
+            "New York clock. Leave null for a user-stated year."
+        ),
+    )
     endpoint: Literal["start", "end"] | None = None
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
     evidence: str | None = Field(
@@ -220,7 +241,7 @@ class LLMStrategyDraft(BaseModel):
     indicator_period: int | None = None
     entry_threshold: float | None = None
     exit_threshold: float | None = None
-    date_range: str | dict[str, str] | None = None
+    date_range: str | LLMDateEndpoints | None = None
     date_range_raw_text: str | None = Field(
         default=None,
         description=(
@@ -298,6 +319,15 @@ class LLMAmbiguousField(BaseModel):
 
 
 class LLMInterpretationResponse(BaseModel):
+    @field_validator(
+        "candidate_strategy_draft", "response_profile_overrides", mode="before"
+    )
+    @classmethod
+    def _empty_optional_objects(cls, value: Any) -> Any:
+        # Null and omitted optional objects both mean no supplied fields, not
+        # failure of an otherwise usable typed question or refusal.
+        return {} if value is None else value
+
     intent: Literal[
         "beginner_guidance",
         "strategy_drafting",
@@ -439,7 +469,7 @@ class FocusedStrategyExtraction(BaseModel):
             "or 1D for daily candles. Leave null only when the user did not state it."
         ),
     )
-    date_range: str | dict[str, str] | None = Field(
+    date_range: str | LLMDateEndpoints | None = Field(
         default=None,
         description=(
             "User-stated test window. Preserve today/current as 'today' or the runtime "
@@ -542,7 +572,7 @@ class FocusedDateWindowExtraction(BaseModel):
             "for relative windows."
         ),
     )
-    date_range: dict[str, str] | None = Field(
+    date_range: LLMDateEndpoints | None = Field(
         default=None,
         description=(
             "Use only when the user explicitly states calendar endpoints. Values "

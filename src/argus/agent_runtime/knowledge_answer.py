@@ -19,7 +19,11 @@ from pydantic import BaseModel, Field
 from argus.agent_runtime.interpreter.draft_shape import (
     strategy_has_execution_evidence,
 )
-from argus.agent_runtime.interpreter.research_routing import primary_research_query
+from argus.agent_runtime.interpreter.research_routing import (
+    educational_question_has_no_query,
+    primary_read_is_arithmetic,
+    primary_research_query,
+)
 from argus.agent_runtime.next_experiments import (
     NEXT_EXPERIMENT_ACTION_LABELS,
     NEXT_EXPERIMENTS_VERSION,
@@ -175,6 +179,25 @@ def _draft_carries_a_stated_test_window(strategy: Any) -> bool:
     return bool(str(extra.get("date_range_raw_text") or "").strip())
 
 
+def _record_rail_decline(interpretation: StructuredInterpretation) -> None:
+    """The typed facts of a knowledge-shaped read the rail did not answer, so
+    the route a turn took is traced to its read rather than guessed at."""
+    from argus.agent_runtime.interpreter.research_routing import (
+        research_turn_has_conflicting_owner,
+    )
+
+    query = interpretation.research_query
+    logger.info(
+        "Research rail declined a knowledge-shaped read intent={} act={} "
+        "question_kind={} scenario={} conflicting_owner={}",
+        interpretation.intent,
+        interpretation.semantic_turn_act,
+        getattr(query, "question_kind", None),
+        getattr(query, "scenario_question", None),
+        research_turn_has_conflicting_owner(interpretation),
+    )
+
+
 async def knowledge_answer_stage_result(
     *,
     interpretation: StructuredInterpretation,
@@ -183,8 +206,9 @@ async def knowledge_answer_stage_result(
     snapshot: TaskSnapshot | None,
     selected_thread_metadata: dict[str, Any],
 ) -> StageResult | None:
-    if selected_thread_metadata.get("last_stage_outcome") == "await_user_reply":
-        # A reply to a pending question belongs to whoever asked it.
+    if interpretation.semantic_turn_act == "answer_pending_need":
+        # The current interpretation, not the previous question's existence,
+        # decides whether this turn answers that pending need.
         return None
     if getattr(interpretation, "asset_discovery", None) is not None:
         return None
@@ -200,6 +224,17 @@ async def knowledge_answer_stage_result(
             categories=[item.category for item in interpretation.unsupported_constraints],
         )
         return None
+    if educational_question_has_no_query(interpretation):
+        return None
+    if primary_read_is_arithmetic(interpretation):
+        # The user's own numbers are enough: the no-search answer computes it.
+        from argus.agent_runtime.calculated_answer import calculated_answer_stage_result
+
+        computed = await calculated_answer_stage_result(
+            interpretation=interpretation, state=state, user=user
+        )
+        if computed is not None:
+            return computed
     rail_claim = (
         research_rail_enabled() and primary_research_query(interpretation) is not None
     )
@@ -219,9 +254,12 @@ async def knowledge_answer_stage_result(
         # No raw-message classifier may reconsider its intent here.
         from argus.agent_runtime.research_answer import research_answer_stage_result
 
-        return await research_answer_stage_result(
+        researched = await research_answer_stage_result(
             interpretation=interpretation, state=state, user=user
         )
+        if researched is None:
+            _record_rail_decline(interpretation)
+        return researched
     if not knowledge_shaped:
         # Flag off, the widened entry does not exist: only the legacy
         # knowledge shapes reach the pre-rail answerer.
@@ -381,7 +419,7 @@ async def _market_stats_answer(
         asset = classify_symbol(symbol)
         series = await asyncio.to_thread(
             fetch_price_series,
-            symbol,
+            asset.symbol,
             asset.asset_class,
             window.start,
             window.end,

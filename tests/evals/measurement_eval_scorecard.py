@@ -14,6 +14,8 @@ from typing import Any, Callable
 
 import yaml  # type: ignore[import-untyped]
 
+from tests.promotion_evidence_configuration import measured_release_configuration
+
 FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
 SCORECARD_DIR = Path("temp/argus_eval_scorecards")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -57,6 +59,7 @@ class EvalScorecardProvenance:
     fixture_sha256: str
     fixture_case_ids: tuple[str, ...]
     worktree_clean: bool
+    release_configuration: dict[str, str | None]
     live_market_data_probe: LiveMarketDataProbe | None = None
 
 
@@ -240,6 +243,9 @@ def build_scorecard_provenance(
         fixture_sha256=fixture_identity.sha256,
         fixture_case_ids=fixture_identity.case_ids,
         worktree_clean=worktree_clean,
+        release_configuration=measured_release_configuration(
+            candidate_sha, repository_root=repository_root
+        ),
         live_market_data_probe=live_probe,
     )
     validated_provenance_payload(provenance)
@@ -336,7 +342,7 @@ def scorecard_for_results(
         )
 
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "provenance": provenance_payload,
         "provider_usage": _provider_usage(results),
@@ -424,6 +430,7 @@ def validated_provenance_payload(
         "fixture_sha256": provenance.fixture_sha256,
         "fixture_case_ids": list(provenance.fixture_case_ids),
         "worktree_clean": provenance.worktree_clean,
+        "release_configuration": dict(provenance.release_configuration),
         "live_market_data_probe": live_probe_payload,
     }
 
@@ -443,6 +450,9 @@ def assert_provenance_matches_current_run(
         "fixture_sha256": fixture_identity.sha256,
         "fixture_case_ids": fixture_identity.case_ids,
         "worktree_clean": _worktree_is_clean(REPOSITORY_ROOT),
+        "release_configuration": measured_release_configuration(
+            _candidate_sha(REPOSITORY_ROOT), repository_root=REPOSITORY_ROOT
+        ),
     }
     for field_name, expected in expected_values.items():
         if getattr(provenance, field_name) != expected:
@@ -505,6 +515,91 @@ def _worktree_is_clean(repository_root: Path) -> bool:
     except (OSError, subprocess.SubprocessError) as exc:
         raise RuntimeError("scorecard_provenance:worktree_status_unavailable") from exc
     return not completed.stdout.strip()
+
+
+def assert_eval_env_file_untracked(
+    env_file: Path, *, repository_root: Path = REPOSITORY_ROOT
+) -> None:
+    """Refuse an environment file that a tracked file feeds.
+
+    Promotion evidence identity compares the repository's tree, never the eval's
+    environment, so no tracked file may feed that environment. The file is
+    refused when it, or any step on the way to it, is a tracked file or tracked
+    symlink, compared by identity so whatever path or link reaches it counts. A
+    gitignored file stays allowed, and an untracked file that is not ignored
+    already fails the clean-worktree check. The guard catches an operator
+    mistake, not a deliberate bypass.
+    """
+
+    root = repository_root.resolve()
+    # The walk ends on the real file, so the visited steps cover every link on the
+    # way and the target.
+    identities = set()
+    for path in _paths_opened(env_file):
+        try:
+            status = path.lstat()
+        except OSError:
+            continue
+        identities.add((status.st_dev, status.st_ino))
+    if identities & _tracked_file_identities(root):
+        raise RuntimeError("scorecard_provenance:eval_env_file_tracked")
+
+
+def _tracked_file_identities(root: Path) -> frozenset[tuple[int, int]]:
+    """The device and inode of every file the repository tracks."""
+
+    try:
+        listed = subprocess.run(
+            ["git", "--no-replace-objects", "ls-files", "-z"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            timeout=10,
+        ).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            "scorecard_provenance:eval_env_file_identity_unavailable"
+        ) from exc
+    identities = set()
+    for name in listed.decode("utf-8", "surrogateescape").split("\0"):
+        if not name:
+            continue
+        try:
+            status = (root / name).lstat()
+        except OSError:
+            continue
+        identities.add((status.st_dev, status.st_ino))
+    return frozenset(identities)
+
+
+# The limit the kernel applies before it reports a symlink loop.
+_MAX_SYMLINK_HOPS = 40
+
+
+def _paths_opened(path: Path) -> list[Path]:
+    """Every absolute path visited to open `path`, expanding each symlink where
+    it is met, as the operating system resolves it."""
+
+    pending = list(path.absolute().parts)
+    current = Path(pending.pop(0))
+    visited = [current]
+    hops = 0
+    while pending:
+        part = pending.pop(0)
+        if part == ".":
+            continue
+        # Every symlink is expanded when met, so the parent here is physical.
+        current = current.parent if part == ".." else current / part
+        visited.append(current)
+        if current.is_symlink():
+            hops += 1
+            if hops > _MAX_SYMLINK_HOPS:
+                raise RuntimeError("scorecard_provenance:eval_env_file_link_loop")
+            target = Path(os.readlink(current))
+            base = target if target.is_absolute() else current.parent / target
+            pending = [*base.parts, *pending]
+            current = Path(pending.pop(0))
+    return visited
 
 
 def _provider_usage(results: list[dict[str, Any]]) -> dict[str, Any]:

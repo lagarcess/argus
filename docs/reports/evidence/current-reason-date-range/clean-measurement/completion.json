@@ -1,0 +1,9 @@
+{
+  "candidate_sha": "4c4e7a001150740dddef4e97fc13b99f2b0c823b",
+  "completed_cases": 73,
+  "expected_cases": 73,
+  "complete": true,
+  "diagnostic_retries": 0,
+  "commits_during_run": 0,
+  "offline_serialization": "Original 73 results and captured provenance serialized with the canonical writer after /usr/bin/git hit an Xcode license error. Standalone Command Line Tools Git validated the same clean head, fixture hash, and release configuration. No network calls or result changes."
+}

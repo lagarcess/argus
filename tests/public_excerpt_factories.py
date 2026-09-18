@@ -680,6 +680,7 @@ def seed_result_messages(
             metadata={
                 "agent_runtime_turn": {"terminal": True, "status": "completed"},
                 "result_run_id": run.id,
+                "result_card": run.conversation_result_card,
             },
         ),
     ]

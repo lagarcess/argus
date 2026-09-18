@@ -7,7 +7,7 @@ services:
     rootDir: .
     region: virginia
     plan: standard
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: "off"
     buildCommand: poetry config virtualenvs.create false && poetry install --only main --no-interaction
     startCommand: poetry run uvicorn argus.api.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
@@ -57,7 +57,7 @@ services:
       - key: ARGUS_BACKTEST_JOBS_GLOBAL_QUEUED_LIMIT
         value: "10"
       - key: ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED
-        value: "false"
+        value: "true"
       - key: ARGUS_IN_PLACE_CARD_EDITS_ENABLED
         value: "true"
       - key: ARGUS_CONTEXT_PACKETS_ENABLED
@@ -155,7 +155,7 @@ services:
     rootDir: web
     region: virginia
     plan: starter
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: "off"
     buildCommand: npm install -g bun && bun install --frozen-lockfile && bun run build
     startCommand: bun run start -- -p $PORT
     envVars:
@@ -184,4 +184,4 @@ services:
       - key: NEXT_PUBLIC_RESEARCH_RAIL_ENABLED
         value: "true"
       - key: NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED
-        value: "false"
+        value: "true"

@@ -9,10 +9,19 @@ change and the review that comes with it.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializerFunctionWrapHandler,
+    TypeAdapter,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from argus.api.public_excerpt_fact_schemas import PublicExcerptFactBank
 from argus.api.schemas import AssetClass, Language
@@ -199,7 +208,9 @@ class PublicExcerptPayload(BaseModel):
 # owner about it, and it exists so a request of nonexistent ids cannot buy
 # unbounded work before it is refused.
 PUBLIC_EXCERPT_SELECTION_REQUEST_LIMIT = 500
-PublicExcerptKind = Literal["backtest", "research_answer", "mixed"]
+PublicExcerptKind = Literal[
+    "backtest", "research_answer", "calculation", "answer", "mixed"
+]
 PublicExcerptRefusalReason = Literal[
     "not_completed",
     "unsupported_turn",
@@ -215,6 +226,7 @@ PublicExcerptRefusalReason = Literal[
     "preview_changed",
     "invalid_source",
     "unsupported_backtest",
+    "private_inputs",
 ]
 PublicExcerptRefusalField = Literal["question", "answer", "owner_note", "sources"]
 
@@ -236,10 +248,10 @@ class PublicExcerptOfferedNextStep(BaseModel):
 class PublicExcerptResearchTurn(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     kind: Literal["research_answer"] = "research_answer"
-    question: str = Field(min_length=1, max_length=500)
-    answer: str = Field(min_length=1, max_length=4000)
-    sources: list[PublicExcerptResearchSource] = Field(min_length=1, max_length=5)
-    retrieved_at: datetime
+    question: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    sources: list[PublicExcerptResearchSource] = Field(default_factory=list)
+    retrieved_at: datetime | None = None
     anchor_symbols: list[str] = Field(default_factory=list, max_length=5)
     asset_class: AssetClass | None = None
     offered_next_step: PublicExcerptOfferedNextStep | None = None
@@ -253,6 +265,8 @@ class PublicExcerptBacktestTurn(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     kind: Literal["backtest"] = "backtest"
     idea_title: str
+    question: str | None = None
+    answer: str | None = None
     fact_bank: PublicExcerptFactBank
     visual: PublicExcerptVisual | None = None
     owner_note: str | None = Field(default=None, max_length=280)
@@ -262,9 +276,124 @@ class PublicExcerptBacktestTurn(BaseModel):
     )
     provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
 
+    @model_serializer(mode="wrap")
+    def _preserve_legacy_shape(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        for field in ("question", "answer"):
+            if data[field] is None:
+                data.pop(field)
+        return data
+
+
+class PublicExcerptCalculationText(BaseModel):
+    """A card's localized text as the receipt renders it: a key and its values."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    locale_key: str = Field(min_length=1, max_length=160, pattern=r"^[a-z][a-z0-9_.]*$")
+    interpolation_args: dict[str, str | int | float | bool | None] = Field(
+        default_factory=dict
+    )
+
+
+class PublicExcerptCalculationSource(BaseModel):
+    """The public page an input was read from, dated."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    title: str | None = Field(default=None, max_length=300)
+    url: str | None = Field(default=None, max_length=2048)
+    date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+class PublicExcerptCalculationFact(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    label: PublicExcerptCalculationText
+    value: bool | int | float | str | None = None
+    value_text: PublicExcerptCalculationText | None = None
+    unit: PublicExcerptCalculationText | None = None
+    source: PublicExcerptCalculationSource | None = None
+
+
+_CALCULATION_FIELDS = ("title", "answer", "rows", "inputs", "notes")
+
+
+class PublicExcerptCalculation(BaseModel):
+    """One calculation of a computed answer, frozen as its card's typed facts."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    title: PublicExcerptCalculationText
+    answer: PublicExcerptCalculationFact
+    rows: list[PublicExcerptCalculationFact] = Field(default_factory=list, max_length=24)
+    inputs: list[PublicExcerptCalculationFact] = Field(
+        default_factory=list, max_length=24
+    )
+    notes: list[PublicExcerptCalculationText] = Field(default_factory=list, max_length=8)
+
+
+class PublicExcerptCalculationTurn(BaseModel):
+    """A computed answer frozen as typed facts, one entry per calculation; a
+    receipt never recomputes.
+
+    One calculation serializes flat, exactly as every receipt frozen before
+    answers carried several, and more as ``calculations``; both shapes read
+    back alike. Public or user-written inputs are visible in the exact preview;
+    hidden account inputs and raw tool arguments stay in the account."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    kind: Literal["calculation"] = "calculation"
+    question: str = Field(min_length=1)
+    answer_text: str | None = None
+    calculations: list[PublicExcerptCalculation] = Field(min_length=1, max_length=4)
+    computed_at: datetime
+    owner_note: str | None = Field(default=None, max_length=280)
+    content_language: Language = "en"
+    framing: Literal["calculation_not_advice"] = "calculation_not_advice"
+    provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _one_calculation_shape(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "calculations" not in data and "title" in data:
+            single = {key: data[key] for key in _CALCULATION_FIELDS if key in data}
+            rest = {
+                key: value
+                for key, value in data.items()
+                if key not in _CALCULATION_FIELDS
+            }
+            return {**rest, "calculations": [single]}
+        return data
+
+    @model_serializer(mode="wrap")
+    def _frozen_shape(self, handler: SerializerFunctionWrapHandler):
+        data = handler(self)
+        if data.get("answer_text") is None:
+            data.pop("answer_text", None)
+        calculations = data.pop("calculations")
+        head = {"kind": data.pop("kind"), "question": data.pop("question")}
+        body = (
+            calculations[0] if len(calculations) == 1 else {"calculations": calculations}
+        )
+        return {**head, **body, **data}
+
+
+class PublicExcerptAnswerTurn(BaseModel):
+    """Only the selected question and final answer, with no runtime metadata."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    kind: Literal["answer"] = "answer"
+    question: str = Field(min_length=1)
+    answer: str = Field(min_length=1)
+    owner_note: str | None = Field(default=None, max_length=280)
+    content_language: Language = "en"
+    framing: Literal["answer_not_advice"] = "answer_not_advice"
+    provenance_mark: Literal["tested_with_argus"] = "tested_with_argus"
+
 
 PublicExcerptTurn = Annotated[
-    PublicExcerptResearchTurn | PublicExcerptBacktestTurn, Field(discriminator="kind")
+    PublicExcerptResearchTurn
+    | PublicExcerptBacktestTurn
+    | PublicExcerptCalculationTurn
+    | PublicExcerptAnswerTurn,
+    Field(discriminator="kind"),
 ]
 
 
@@ -359,7 +488,7 @@ class PublicExcerptFunnelStage(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    stage: Literal["viewed", "try_argus"]
+    stage: Literal["viewed", "try_argus", "followed_up", "signed_up"]
     kind: PublicExcerptKind = "backtest"
 
 
@@ -399,7 +528,7 @@ class PublicExcerptCandidate(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     message_id: str
     question: str | None = None
-    kind: Literal["backtest", "research_answer"] | None = None
+    kind: Literal["backtest", "research_answer", "calculation", "answer"] | None = None
     eligible: bool
     reason: PublicExcerptRefusalReason | None = None
     field: PublicExcerptRefusalField | None = None

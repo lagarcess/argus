@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from argus.domain.market_data.new_york_clock import new_york_today
+
 
 def _compare(name: str, expected: Any, actual: Any, failures: list[str]) -> None:
     if expected is None:
@@ -75,3 +77,16 @@ def _date_boundary(value: Any) -> date | None:
         return date.fromisoformat(text[:10])
     except ValueError:
         return None
+
+
+def _date_range_expectation(value: Any) -> Any:
+    """Bind fixture year qualifiers once, before mocked and live consumers read them."""
+    if not isinstance(value, dict):
+        return value
+    year = new_york_today().year
+    return {
+        key: endpoint.replace("current_year-", f"{year}-", 1)
+        if isinstance(endpoint, str) and endpoint.startswith("current_year-")
+        else endpoint
+        for key, endpoint in value.items()
+    }

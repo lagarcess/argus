@@ -9,25 +9,34 @@ models stay beside Message.
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
+
+
+class ConfirmationPeerIdentity(BaseModel):
+    symbol: str = Field(min_length=1)
+    asset_class: Literal["equity", "crypto", "currency_pair"]
 
 
 class ConfirmationPeerAssetsRequest(BaseModel):
     """Grow or restore the pending confirmation's basket without a turn.
 
     Add mode: only symbols the active turn offered as research peer rows are
-    addable; the backend re-verifies each against the resolver and coverage
+    addable; the backend checks the stored identity and coverage
     gates. Restore mode undoes the latest add by re-materializing the exact
     previous asset set from the card's own typed adjustment data.
     """
 
     symbols: list[str] | None = Field(default=None, min_length=1, max_length=4)
+    peers: list[ConfirmationPeerIdentity] | None = Field(
+        default=None, min_length=1, max_length=4
+    )
     restore_previous: bool = False
 
     @model_validator(mode="after")
     def require_one_mode(self) -> "ConfirmationPeerAssetsRequest":
-        if self.restore_previous == bool(self.symbols):
+        if sum((self.restore_previous, bool(self.symbols), bool(self.peers))) != 1:
             raise ValueError("symbols_or_restore_required")
         return self
 

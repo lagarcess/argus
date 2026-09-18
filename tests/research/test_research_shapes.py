@@ -246,7 +246,7 @@ def test_survey_shapes_degrade_honestly_when_the_provider_is_unavailable(
     assert sidecar["degraded"]["code"] == "research_unavailable_not_configured"
     answer = result.stage_patch["assistant_response"]
     # Honest, and never fabricated figures.
-    assert "couldn't complete" in answer.lower()
+    assert result.stage_patch["recovery"]["code"] == "research_lookup_unavailable"
     assert "%" not in answer
     assert "none of these" not in answer.lower()
     assert "next_experiments" not in result.stage_patch

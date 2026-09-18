@@ -85,6 +85,7 @@ from argus.api.chat.request_admission import (
 from argus.api.chat.research_evidence import (
     claim_research_provider_attempt,
     guest_research_visitor_key,
+    release_research_provider_claim,
 )
 from argus.api.chat.result_actions import result_action_request_type
 from argus.api.chat.result_link import apply_result_link_outcome
@@ -114,6 +115,7 @@ from argus.api.chat.streaming import (
 )
 from argus.api.chat.title_finalization import schedule_artifact_naming_after_stream
 from argus.api.chat.tool_results import (
+    computation_marker,
     prepare_runtime_tool_publication,
     runtime_tool_result_cards,
 )
@@ -123,7 +125,7 @@ from argus.api.dependencies import current_user, dev_memory_fallback_enabled, pr
 from argus.api.guest_access import account_context, client_identity
 from argus.api.message_store import (
     latest_unresolved_terminal_runtime_failure_metadata,
-    load_runtime_thread_history,
+    load_chat_request_history,
     reconcile_stale_chat_turns,
 )
 from argus.api.naming import get_starter_prompts
@@ -350,9 +352,10 @@ async def chat_stream(
         user_id=user.id,
         conversation_id=conversation.id,
     )
-    recent_thread_history = load_runtime_thread_history(
+    payload, recent_thread_history = load_chat_request_history(
         user_id=user.id,
         conversation_id=conversation.id,
+        payload=payload,
     )
     confirmation_action_messages = recent_confirmation_messages(
         payload=payload,
@@ -924,9 +927,7 @@ async def chat_stream(
                     conversation_id=conversation.id,
                     language=runtime_user.language_preference,
                 )
-                confirmation_anchor_text: str | None = None
                 if confirmation_card is not None:
-                    confirmation_anchor_text = str(confirmation_card["summary"])
                     assistant_text = None
                     runtime_result.pop("assistant_response", None)
                     runtime_result.pop("assistant_prompt", None)
@@ -992,7 +993,6 @@ async def chat_stream(
                     metadata["chat_action"] = persisted_chat_action(payload)
                 if result_action_type is not None and payload.action is not None:
                     confirmation_card = None
-                    confirmation_anchor_text = None
                     runtime_result.pop("confirmation", None)
                     runtime_result.pop("confirmation_payload", None)
                     runtime_result.pop("active_confirmation_reference", None)
@@ -1066,6 +1066,9 @@ async def chat_stream(
                     "discovery",
                     "next_experiments",
                     "next_steps",
+                    "answer_text_template",
+                    "answer_assumptions",
+                    "calculation_offer",
                     "research",
                 ):
                     value = runtime_result.get(key)
@@ -1120,6 +1123,9 @@ async def chat_stream(
                     metadata["result_card"] = result_card
                 if tool_result_cards:
                     metadata["tool_result_cards"] = tool_result_cards
+                    computation = computation_marker(tool_result_cards)
+                    if computation is not None:
+                        metadata["computation"] = computation
                 if runtime_result.get("tool_jobs"):
                     metadata["tool_jobs"] = runtime_result["tool_jobs"]
                 if backtest_job is not None:
@@ -1175,8 +1181,11 @@ async def chat_stream(
                     assistant_text = streamed_text
                     runtime_result["assistant_response"] = streamed_text
 
+                # A card turn persists no prose; its readers derive from the card.
                 persisted_text = (
-                    confirmation_anchor_text or assistant_text or streamed_text
+                    ""
+                    if confirmation_card is not None
+                    else assistant_text or streamed_text
                 )
                 assistant_text, persisted_text = reply_rewrites.finalize(
                     runtime_result=runtime_result,
@@ -1184,10 +1193,11 @@ async def chat_stream(
                     assistant_text=assistant_text,
                     persisted_text=persisted_text,
                 )
-                typed_artifact_answer = artifact_presentation_kind(metadata) in {
-                    "assumptions",
-                    "breakdown",
-                } or bool(tool_result_cards)
+                typed_artifact_answer = (
+                    artifact_presentation_kind(metadata) in {"assumptions", "breakdown"}
+                    or confirmation_card is not None
+                    or bool(tool_result_cards)
+                )
                 if not (
                     persisted_text
                     or confirmation_card is not None
@@ -1209,10 +1219,9 @@ async def chat_stream(
                     or typed_artifact_answer
                     or lifecycle_hooks.turn_id is not None
                 ):
-                    retryable_recovery_code = chat_retry.discovery_recovery_code(recovery)
+                    retryable_recovery_code = chat_retry.durable_retry_code(recovery)
                     if retryable_recovery_code is not None:
-                        # Retryable discovery recovery: the lifecycle owns the
-                        # durable retry; completed turns strip it by design.
+                        # The lifecycle owns durable retries on failed lookups.
                         assistant_message = lifecycle_hooks.recoverable_failure(
                             content=persisted_text or "",
                             metadata=metadata,
@@ -1413,7 +1422,10 @@ async def chat_stream(
             research_attempt_admission_context(
                 lambda: claim_research_provider_attempt(
                     guest_visitor_key=turn_guest_research_key
-                )
+                ),
+                release=lambda admission: release_research_provider_claim(
+                    admission, guest_visitor_key=turn_guest_research_key
+                ),
             ),
         ):
             workflow_input_error: Exception | None = None

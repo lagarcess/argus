@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import { confirmationPeerSelection } from "@/lib/chat-next-experiments";
 import {
   addConfirmationPeerAssets,
   directEditConfirmation,
@@ -103,20 +104,19 @@ export function confirmationSupersedingHandlers(deps: () => SupersedingDeps) {
   ): Promise<void> {
     const { activeConversationId, activeConfirmationId, showToast, t } = deps();
     const payload = action.payload ?? {};
-    const symbols = Array.isArray(payload.symbols)
-      ? payload.symbols.map((symbol) => String(symbol)).filter(Boolean)
-      : [];
+    const selection = confirmationPeerSelection(payload);
+    const count = "peers" in selection ? selection.peers.length : selection.symbols.length;
     const targetConversationId = activeConversationId();
     const confirmationId =
       String(payload.confirmation_id ?? "") || activeConfirmationId();
-    if (!targetConversationId || !confirmationId || symbols.length === 0) {
+    if (!targetConversationId || !confirmationId || count === 0) {
       return;
     }
     try {
       const updated = await addConfirmationPeerAssets(
         targetConversationId,
         confirmationId,
-        symbols,
+        selection,
       );
       if (!replaceCardMessageInPlace(updated)) {
         return;

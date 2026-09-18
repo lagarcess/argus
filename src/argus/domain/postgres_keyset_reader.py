@@ -131,10 +131,10 @@ class PostgresKeysetReader:
             with connection.cursor(row_factory=dict_row) as cursor:
                 cursor.execute(
                     """
-                    select c.id as conversation_id, latest.role, latest.content, latest.metadata
+                    select c.id as conversation_id, latest.id, latest.role, latest.content, latest.metadata
                     from public.conversations c
                     left join lateral (
-                        select m.role, m.content, m.metadata
+                        select m.id, m.role, m.content, m.metadata
                         from public.messages m
                         where m.user_id = c.user_id and m.conversation_id = c.id
                           and (m.role <> 'user' or (
@@ -153,7 +153,7 @@ class PostgresKeysetReader:
                     ),
                 )
                 return _stringify_uuid_fields(
-                    cursor.fetchall(), fields=("conversation_id",)
+                    cursor.fetchall(), fields=("conversation_id", "id"),
                 )
 
     def list_conversation_rows(
@@ -222,6 +222,24 @@ class PostgresKeysetReader:
                 )
                 rows = cursor.fetchall()
         return _stringify_uuid_fields(rows, fields=("id",))
+
+    def list_shared_message_rows(
+        self, *, user_id: str, conversation_id: str
+    ) -> list[dict[str, Any]]:
+        with self.pool.connection(timeout=_KEYSET_ACQUIRE_TIMEOUT_SECONDS) as connection:
+            with connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """select id,conversation_id,role,content,metadata,created_at
+                    from public.messages where user_id=%s and conversation_id=%s
+                    and metadata @> '{"shared_conversation":{}}'::jsonb
+                    order by created_at,id""",
+                    (
+                        _uuid(user_id, label="Message owner id"),
+                        _uuid(conversation_id, label="Message conversation id"),
+                    ),
+                )
+                rows = cursor.fetchall()
+        return _stringify_uuid_fields(rows, fields=("id", "conversation_id"))
 
     def list_message_rows(
         self,

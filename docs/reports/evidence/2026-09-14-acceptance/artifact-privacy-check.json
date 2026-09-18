@@ -1,0 +1,11 @@
+{
+  "canonical_secret_values_scanned": 24,
+  "canonical_secret_matches": 0,
+  "replay_export_contract": "explicit allowlist; finite reason codes; no transcript, assistant content or original customer identities",
+  "replay_screenshots_created": false,
+  "synthetic_smoke_turns": 46,
+  "private_replay_payload_files_in_repo": [],
+  "initial_private_turn_emitted_to_tool_history": 1,
+  "tool_history_not_locally_deletable": true,
+  "mitigation": "All later assessments emit finite codes only; no customer text or private payload is exported to the repository"
+}

@@ -68,6 +68,7 @@ def test_conversation_title_generation_prefers_current_run_facts(
     from argus.api import artifact_naming
 
     conversation = memory_conversation(
+        user_id=_user_id(),
         title="New idea",
         title_source="system_default",
         language="en",
@@ -107,6 +108,7 @@ def test_conversation_title_generation_uses_chat_context_without_run(
     from argus.api import artifact_naming
 
     conversation = memory_conversation(
+        user_id=_user_id(),
         title="New idea",
         title_source="system_default",
         language="en",
@@ -153,6 +155,7 @@ def test_conversation_title_finalizer_persists_utility_route_receipt(
     from argus.llm.openrouter import record_openrouter_route_receipt
 
     conversation = memory_conversation(
+        user_id=_user_id(),
         title="New idea",
         title_source="system_default",
         language="en",
@@ -234,6 +237,7 @@ def test_conversation_title_finalizer_records_observable_skip(
     from argus.api.chat import title_finalization
 
     conversation = memory_conversation(
+        user_id=_user_id(),
         title="My renamed thread",
         title_source="user_renamed",
         language="en",
@@ -279,6 +283,7 @@ def test_conversation_title_generation_never_overwrites_user_renamed(
     from argus.api import artifact_naming
 
     conversation = memory_conversation(
+        user_id=_user_id(),
         title="My Tesla Research",
         title_source="user_renamed",
         language="en",

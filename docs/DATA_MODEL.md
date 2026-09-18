@@ -515,6 +515,31 @@ Represents individual messages within a conversation.
   artifact identity; repeated calls remain independent through completion and
   reload. The message remains the durable owner after direct edits, rather than
   writing a competing checkpoint copy.
+- A computed answer is an artifact without a run. Its cards, one per
+  calculation, live in `metadata.tool_result_cards` and its one marker in
+  `metadata.computation`, which the chat turn, the recompute route and the
+  continue route all write from every card in order; nothing else is stored.
+  The marker is `{kind, inputs}` for one calculation and `{calculations: [{kind,
+  inputs}, ...]}` for an answer that weighs options; both read alike. A
+  research or no-search answer that computed its calculations carries the same
+  pair, beside its `research` sidecar when it retrieved, and
+  `metadata.answer_text_template` (`{cards: {<calculation name>: <artifact_id>},
+  text, language}`; one stored as `{artifact_id, text, language}` reads as its
+  one card), the prose with its figure references, which the recompute route
+  re-renders into `content` from the current cards. `metadata.answer_assumptions`
+  (`[{artifact_id, name}]`) names each assumed input that prose never names; the
+  app lists them under the answer, and the recompute route derives the list
+  again. A pending calculation
+  question keeps `{calculations, requested_field, requested_fields, evidence,
+  retrieved}` in its clarification payload until the reply completes it; a
+  payload stored with one `calculation` reads as a list of one. A research
+  answer whose calculations need figures only the reader knows stores the same
+  shape as `metadata.calculation_offer` instead; the typed `calculation_offer`
+  action turns it into that question.
+  `metadata.continued_from` (`{conversation_id, message_id}`) marks a result
+  continued in a new chat; the source message is never changed. Comparing,
+  refreshing and re-running a computed answer store nothing: the stored card
+  stays the durable truth and each read's result comes back beside it.
 - A confirmation card's liveness truth lives on its own row:
   `metadata.confirmation_card.confirmation_state` (`active`, `consumed`,
   `cancelled`, `superseded`). Run admission stamps `consumed` through the
@@ -608,6 +633,13 @@ Represents individual messages within a conversation.
   it is not projected into later model history or `last_message_preview`, so
   Recents and conversation search do not expose the fallback language. Exact
   `llm_generated` prose remains eligible for those continuity surfaces.
+  A confirmation card turn stores empty `content` and a card without
+  `summary`. Its `last_message_preview` holds the card's typed facts as
+  search text (symbols, strategy type, start and end dates), and later model
+  history reads the same facts instead of prose. Rows written before this
+  keep their stored English sentence and preview until the conversation's
+  next message; readers never receive the sentence and model history derives
+  from the stored card instead.
 - User-message `metadata.mentions` may additionally preserve a selected asset
   or indicator's optional `message_range: { start, end }`. This is a UTF-16
   display span into immutable `content`, stored only when it exactly matches
@@ -1066,7 +1098,10 @@ computation owner and stores the current decision, not an append-only history:
 - A computed-answer decision attaches to the assistant message that carried
   the answer. `source_message_id` and `computation` are set; the three lineage
   columns are null. The computation is stored so the decision survives the
-  message and can be re-run when opened.
+  message and can be re-run when opened. An answer that weighs options still
+  takes one decision, which stores every calculation and re-runs each when
+  opened; the column has no shape check, so this needed no migration, and
+  `UNIQUE(user_id, source_message_id)` still holds.
 
 Fields:
 - `id`: `uuid` (Primary Key)
@@ -1076,7 +1111,8 @@ Fields:
 - `user_id`: `uuid` (References `profiles.id` ON DELETE CASCADE)
 - `source_conversation_id`: `uuid` (Nullable, references `conversations.id`)
 - `source_message_id`: `uuid` (Nullable, references `messages.id` ON DELETE SET NULL)
-- `computation`: `jsonb` (Nullable; `{"kind": <slug>, "inputs": <object>}`)
+- `computation`: `jsonb` (Nullable; `{"kind": <slug>, "inputs": <object>}`, or
+  `{"calculations": [{"kind", "inputs"}, ...]}` for an answer that weighs options)
 - `decision_state`: `text` (`watching`, `promising`, `rejected`, `revisit_later`)
 - `note`: `text` (Nullable)
 - `created_at`: `timestamptz`
@@ -1108,6 +1144,14 @@ Constraints:
 - The public decision write contract accepts at most 500 note characters. The
   durable column remains nullable `text` so previously accepted longer notes
   stay readable; no migration or destructive truncation is introduced.
+- A stored `computation` may carry `symbols`, at most five asset identities the
+  marker owner derives from the computation's typed `symbol` inputs; a
+  computation about no asset omits the key. Search counts a computed answer
+  under an asset from `messages.metadata->'computation'->'symbols'` on the
+  owner's assistant messages, bounded and owner-scoped, with no new table,
+  index or migration. The message marker itself is written from the answer's
+  tool result card by one owner (`argus.domain.computation_marker`), on the
+  chat turn and on the recompute route alike.
 
 ### Run dossier read projection
 
@@ -1338,6 +1382,10 @@ Current write hooks:
   success is independent of invoice reconciliation. Anomaly rows have unknown
   billable quantity and no cost amount; existing capability-class turn metering
   remains unchanged. Both records retain null cost for an unpriced call.
+  An attempt the provider may have billed without answering, after a read
+  timeout or a connection dropped mid-request, appends the same anomaly row
+  with `usage_metadata.reason = "unanswered_attempt"`, null usage counts and a
+  null provider response id.
   Tool invocation counts inside `usage_metadata` are null when the invoice did
   not establish them; a null count is unknown, not zero.
 - API chat turns append OpenRouter cost rows from persisted route receipts.
@@ -1379,6 +1427,37 @@ The snapshot is frozen at creation and the public read never queries the source
 conversation, message, run or provider. Asking again or rerunning produces new
 source material and leaves the earlier receipt unchanged.
 
+### Receiver copies (founder-locked 2026-09-14)
+
+A first follow-up creates a receiver-owned conversation and ordinary message rows
+from the frozen public payload, inside one transaction. No new table, column or
+migration is needed. Receipt rows and their source deletion/revocation lifecycle
+are unchanged. The transaction serializes fork admission with revocation and uses
+receiver/request retry identity to create exactly one copy. A receiver copy has
+no source-conversation foreign key, so later revoke/delete keeps its copied text.
+Replay matches the imported request id within current message and conversation
+ownership. It does not derive replay identity from the current owner's user id:
+the existing guest handoff transfers ownership without changing message IDs or
+the imported request metadata, so the permanent account reuses the same copy.
+
+Imported message metadata uses `shared_conversation` with `snapshot_at`, public
+receipt id, request id, turn index, and the assistant's frozen public `card` where
+present. These fields are provenance and retry identity, never analytics viewer
+identity or live run/confirmation/calculation handles. All owner notes are removed,
+including notes on individual turns. Normal history readers include the carried
+user/assistant content; naming excludes imported messages. No runs, interests,
+memory records, usage records, or owner activity are imported. Cards render only
+frozen public fields and cannot be edited or recomputed in place.
+Runtime history derives internal carried-context provenance from this metadata.
+One selection rule retains that bounded context alongside the normal recent
+receiver turns; provider messages still contain ordinary roles and content only.
+
+Total ordinary history text is bounded at 64 KiB UTF-8, and total carried text and
+card metadata at 512 KiB. Oversized public facts fail before any write or guest
+replacement. Guest copies use the existing workspace, explicit nonempty-chat
+replacement choice, unchanged counters/expiry and existing signup transfer.
+Count-only followed-up and signed-up stages add no viewer identifier.
+
 Fields:
 - `id`: `uuid` (Primary Key)
 - `public_id`: `text` (Unique, `^[A-Za-z0-9_-]{22,64}$`, 24 bytes of urlsafe
@@ -1390,8 +1469,11 @@ Fields:
   ON DELETE SET NULL)
 - `source_run_id`: `uuid` (Nullable, references `backtest_runs.id`
   ON DELETE SET NULL)
-- `kind`: `text` (`backtest`, `research_answer`, or `mixed`; existing rows default
-  to `backtest`)
+- `kind`: `text` (`backtest`, `research_answer`, `calculation`, `answer`, or `mixed`;
+  existing rows default to `backtest`; migration
+  `20260912190000_share_calculation_receipts.sql` added `calculation` to the
+  check additively; `20260914120000_share_plain_answer_receipts.sql` adds
+  `answer` using the same check and must be applied at promotion)
 - `source_message_ids`: `uuid[]` (Private selected assistant messages; one or more
   for new receipts, empty for legacy rows)
 - `source_run_ids`, `source_artifact_ids`: `uuid[]` (Private selected backtest
@@ -1421,15 +1503,35 @@ on every model in `argus.api.public_excerpt_schemas`: `schema_version`,
 
 Version 2 is a closed outer `{schema_version: 2, kind: "turns", turns: [...]}`
 wrapper. It contains one or more per-turn payloads in conversation order. Each
-turn has a closed `kind` discriminator. The exact research leaf is specified by
-`docs/specs/conversation-sharing.md` section 4.2; no field is added to that leaf.
-The backtest leaf freezes the card's closed typed fact bank, title, visual, note,
+turn has a closed `kind` discriminator. The active frozen-field policy is in
+`docs/specs/conversation-sharing.md` section 4.2. Plain final answers use `answer`;
+research keeps any available typed sources and dates without requiring them. New
+backtest leaves also freeze question and final answer text; optional fields keep
+older version 2 rows readable. The backtest leaf freezes the card's closed typed
+fact bank, title, visual, note,
 content language, framing and provenance. `public_excerpt_fact_schemas.py` closes
 every nested config, rule, figure and cost field. The public renderer reads the
 same result fact and display owners as the result card.
 
-Every selected turn independently passes the shared eligibility and privacy audit
-at preview and creation. A refusal refuses the entire selection. The owner sees
+The calculation leaf is `{kind: "calculation", question, title, answer, rows,
+inputs, notes, computed_at, owner_note, content_language, framing:
+"calculation_not_advice", provenance_mark}` for one calculation. For an answer
+that weighs options it carries `calculations: [{title, answer, rows, inputs,
+notes}, ...]` in place of those five fields, one per card in order; every card
+uses the closed public presentation, and a leaf frozen in the first shape
+still renders. New leaves additionally retain the selected final answer text. The title and every label, unit,
+`value_text` and note is `{locale_key, interpolation_args}`. A fact is `{label,
+value, value_text, unit, source}`, where `source` is `{title, url, date}` and
+exists only for a page. `inputs` holds explicitly public/page-sourced inputs and user-written inputs
+selected through the owner preview. Hidden account or memory inputs are not
+added. Raw card `arguments` and its visual never enter the payload. The receipt freezes those facts at creation
+and never recomputes.
+
+Every selected final answer independently passes the shared completion,
+ownership and exact private Argus identifier audit at preview and creation.
+Credential shape, missing sources, unlisted links, question/answer length,
+degraded output and memory use are not refusal reasons. Confirmations and
+clarifications are not sharing units. A refusal refuses the entire selection. The owner sees
 the exact public rendering before creation; its digest must still match when
 creation rechecks the sources. The preview bounds the accepted cross-turn
 inference risk; it does not eliminate it.
@@ -1961,7 +2063,20 @@ projected by `GET /me/usage`.
 - `claim_research_usage` locks the shared row and optional guest row in one
   transaction, checks both limits, and increments both or neither before
   provider work starts. This is the concurrency boundary: simultaneous turns
-  from one visitor cannot both consume one remaining slot.
+  from one visitor cannot both consume one remaining slot. An admitted claim
+  returns the `period_start` it charged.
+- When the provider work a claim admitted fails with no usable response, and
+  the turn's charge does not already stand, the backend calls
+  `release_research_usage` (service-role only, like the claim) with that
+  `period_start`. It decrements only the guest's own row for that day, never
+  below zero, and never touches the shared row, which keeps the attempt. It
+  returns `released`, and only a confirmed release lets a later provider path
+  in the same turn claim again. The charge stands for the rest of the turn once
+  provider work was served, was cancelled while it may still be billing, or
+  could not be released (the function failed or matched no charge), so one
+  turn never costs a guest more than one question. Migration
+  `20260913230000_release_research_guest_claim.sql` adds the release and the
+  claim's `period_start`.
 - Cache hits, ordinary chat turns, unconfigured-provider paths, and persisted
   thorough-job replays never call the claim. Claim failures degrade to the honest
   research-capacity response and do not enter the provider path.
@@ -2227,7 +2342,7 @@ Hard-coded technical limits in the backtesting logic.
 - **Symbols**: Max 5 symbols per run.
 - **Timeframe**: 1h, 2h, 4h, 6h, 12h, 1D.
 - **Provider windows**: Stored run configs must reflect provider-available history for the selected asset class and timeframe. Alpaca equity history starts in 2016 for the launch path; Kraken OHLC currency-pair windows are limited to the latest 720 candles for the requested interval.
-- **Capital**: Min 1,000 / Max 100,000,000.
+- **Capital**: Min 10 / Max 100,000,000 (`MIN_STARTING_CAPITAL`, `MAX_STARTING_CAPITAL`). A recurring plan keeps its own seed and contribution rules.
 - **Side**: Long-only.
 
 ### Layer 2: Rate Limits

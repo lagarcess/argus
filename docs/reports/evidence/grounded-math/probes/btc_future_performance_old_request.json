@@ -1,0 +1,1096 @@
+{
+  "probe": "btc_future_performance_old_request",
+  "issue": 599,
+  "base_sha": "9ee081d1b37b785cce79b42e1bc64bf30f431571",
+  "captured_at": "2026-09-12T19:30:16.858462+00:00",
+  "question": "If I invest $10,000 in Bitcoin and just hold it, what will it be worth in ten years?",
+  "tools": [
+    "web_search",
+    "fetch_url"
+  ],
+  "timeout_seconds": 150.0,
+  "packet": {
+    "answer_markdown": "A ten-year outcome is highly uncertain. Using the published 2030 bear, base and bull targets as anchors, your **$10,000 could be worth roughly:**\n\n| Scenario | Estimated value in September 2036 |\n|---|---:|\n| Bear | **$38,700, $233,000** |\n| Base | **$91,600, $1.73 million** |\n| Bull | **$193,500, $9.83 million** |\n\n**Calculation**\n\nBitcoin was **$77,507.29 as of September 11, 2026**, so the investment would purchase approximately:\n\n`$10,000 ÷ $77,507.29 = 0.1290 BTC`\n\nPublished ARK scenarios put Bitcoin at approximately **$300,000, $710,000, or $1.5 million in 2030**. At those prices, the holding would be worth about **$38,700, $91,600, or $193,500**, respectively.\n\nNo published forecast used here covers the full ten-year period. Each range therefore uses:\n\n- **Low end:** Bitcoin reaches the corresponding 2030 target and then has no further price growth through 2036.\n- **High end:** The annualized growth required to reach that 2030 target continues through September 2036. That produces approximately **$233,000, $1.73 million, or $9.83 million** across the three cases.\n\nThese are mechanical scenarios, not predictions. They exclude transaction fees and taxes, and the actual value could fall outside every range.",
+    "categories": [],
+    "tickers": [],
+    "sources": [
+      {
+        "url": "https://bestcryptochecker.com/coin/btc/price-history/2026/9",
+        "title": "[BTC] Bitcoin September 2026 USD price history - Best Crypto ...",
+        "source_date": "2026-09-12"
+      },
+      {
+        "url": "https://www.coingecko.com/en/coins/bitcoin?ref=newzchain.com",
+        "title": "Bitcoin Price: BTC/USD Live Price Chart, Market Cap & News Today | CoinGecko",
+        "source_date": "2026-09-05"
+      },
+      {
+        "url": "https://www.poisar.com/crypto/BTCUSD",
+        "title": "BTC/USD (BTCUSD) crypto — price history & chart",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://finance.yahoo.com/quote/BTC-USD/history?period1=",
+        "title": "Bitcoin USD (BTC-USD) Price History & Historical Data",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://maketo.com/bitcoin/price",
+        "title": "Bitcoin Price Today (Live BTC/USD Chart) - Maketo",
+        "source_date": "2026-09-01"
+      },
+      {
+        "url": "https://www.investing.com/crypto/bitcoin/bitcoinfutures",
+        "title": "Bitcoin Price (BTC) | Bitcoin Value - Investing.com",
+        "source_date": "2026-08-25"
+      },
+      {
+        "url": "https://coinmarketcap.com/currencies/bitcoin/?update=1713966594234",
+        "title": "Bitcoin price today, BTC to USD live price, marketcap and chart ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.investing.com/crypto/bitcoin/btc-usd",
+        "title": "BTC to USD | Bitcoin to US Dollar - Investing.com",
+        "source_date": "2026-09-09"
+      },
+      {
+        "url": "https://www.coinboss.com/currencies/btc",
+        "title": "Bitcoin Price | Live BTC Price, Futures & Spot Data",
+        "source_date": "2026-09-07"
+      },
+      {
+        "url": "https://cryptobubblemap.com/coins/bitcoin/historical-data",
+        "title": "Bitcoin Historical Data - BTC Price History & Charts ...",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.cnbc.com/quotes/?qsearchterm=btc.cm&symbol=BTC.CM=",
+        "title": "Bitcoin/USD Coin Metrics",
+        "source_date": "2026-08-20"
+      },
+      {
+        "url": "https://www.investing.com/crypto/bitcoin/historical-data-9",
+        "title": "Bitcoin Price (BTC) | Bitcoin Value",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://www.kraken.com/prices/bitcoin?mode",
+        "title": "Bitcoin price today - BTC price chart & live trends",
+        "source_date": "2026-08-22"
+      },
+      {
+        "url": "https://in.investing.com/crypto/Bitcoin/btc-usd-historical-data",
+        "title": "BTC USD Historical Data",
+        "source_date": "2026-08-28"
+      },
+      {
+        "url": "https://fortune.com/article/price-of-bitcoin-08-21-2026/",
+        "title": "Current price of Bitcoin for August 21, 2026",
+        "source_date": "2026-08-21"
+      },
+      {
+        "url": "https://www.bitrue.com/blog/ark-invest-btc-price-300000-prediction",
+        "title": "ARK Invest Bitcoin Price Prediction: $300K by 2030 - bitrue.com",
+        "source_date": "2026-08-27"
+      },
+      {
+        "url": "https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/",
+        "title": "Bitcoin Price Prediction 2030: What Wall Street and Major ...",
+        "source_date": "2026-09-05"
+      },
+      {
+        "url": "https://nai500.com/blog/2026/08/bitcoin-regains-momentum-as-ark-investment-sees-a-path-to-797000-by-2030/",
+        "title": "Bitcoin Regains Momentum as Ark Investment Sees a Path to $797,000 by 2030",
+        "source_date": "2026-08-25"
+      },
+      {
+        "url": "https://www.bitunix.com/hub/blog/bitcoin/cathie-wood-bitcoin",
+        "title": "Cathie Wood Bitcoin: Price Targets, Holdings & Track Record",
+        "source_date": "2026-08-19"
+      },
+      {
+        "url": "https://tw.tradingview.com/news/cointelegraph:0d9801a07094b:0-ark-invest-ups-its-2030-bitcoin-bull-case-prediction-to-2-4m/",
+        "title": "ARK Invest ups its 2030 Bitcoin bull case prediction to $2.4M",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/crypto/articles/bitcoin-1-5m-trump-clarity-125347718.html",
+        "title": "Bitcoin to $1.5M? Trump's CLARITY Act and BTC Buying Support ...",
+        "source_date": "2026-08-20"
+      },
+      {
+        "url": "https://www.thestreet.com/crypto/markets/donald-trump-just-made-cathie-woods-1-5-million-bitcoin-target-look-less-crazy",
+        "title": "Donald Trump just made Cathie Wood's $1.5 million Bitcoin ...",
+        "source_date": "2026-08-20"
+      },
+      {
+        "url": "https://www.kucoin.com/news/flash/nansen-ceo-predicts-1m-bitcoin-by-2030-says-btc-may-never-drop-below-60k",
+        "title": "Nansen CEO Predicts $1M Bitcoin by 2030, Says BTC May ...",
+        "source_date": "2026-08-13"
+      },
+      {
+        "url": "https://en.cryptonomist.ch/2026/08/21/us-strategic-bitcoin-reserve/",
+        "title": "U.S. Strategic Bitcoin Reserve: Government Bitcoin Demand Impact",
+        "source_date": "2026-08-21"
+      },
+      {
+        "url": "https://coingape.com/cathie-wood-says-bitcoin-still-has-miles-to-go-after-gold-ratio-breakout/",
+        "title": "Cathie Wood Says Bitcoin Still Has “Miles to Go” After Gold-Ratio ...",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.benzinga.com/crypto/cryptocurrency/26/09/61650206/cathie-wood-bitcoin-breakout-gold-miles-to-go-ark",
+        "title": "Cathie Wood Says Bitcoin's 'Break Out' From Gold Is 'Very Reassuring': Ark CEO Says BTC Has 'Miles to Go'",
+        "source_date": "2026-09-08"
+      },
+      {
+        "url": "https://www.fool.com/investing/2026/09/01/cathie-woods-ark-has-delivered-just-a-138-annualiz/",
+        "title": "Cathie Wood's Ark Has Delivered Just a 13.8% Annualized ...",
+        "source_date": "2026-09-01"
+      },
+      {
+        "url": "https://www.kucoin.com/news/flash/slowing-etf-demand-and-corporate-selling-challenge-ark-s-16t-bitcoin-target",
+        "title": "Slowing ETF Demand and Corporate Selling Challenge ...",
+        "source_date": "2026-08-16"
+      },
+      {
+        "url": "https://note.com/umaki11/n/na694011ee082",
+        "title": "ビットコイン（BTC）は2030年にいくらになるのか 〜ARKの予想は120万...",
+        "source_date": "2026-08-20"
+      },
+      {
+        "url": "https://www.axi-solaris.com/int/blog/education/cryptocurrencies/bitcoin-btc-price-predictions",
+        "title": "Bitcoin (BTC) Price Predictions 2026, 2027, 2030, 2040 & 2050 / Axi",
+        "source_date": "2026-08-31"
+      },
+      {
+        "url": "https://www.gate.com/news/detail/standard-chartered-analyst-revises-bitcoin-forecast-after-144b-short-23652295",
+        "title": "Standard Chartered Analyst Revises Bitcoin Forecast After $1.44B Short Squeeze | Gate News",
+        "source_date": "2026-08-23"
+      },
+      {
+        "url": "https://www.bitrue.com/blog/bitcoin-price-prediction-2030-highest-price-btc-reach",
+        "title": "Bitcoin Price Prediction 2030 - What Is the Highest ...",
+        "source_date": "2026-08-24"
+      },
+      {
+        "url": "https://www.ccn.com/news/crypto/bitcoin-500k-xrp-29-clarity-act-4-ai-models-predict/",
+        "title": "Bitcoin to $500K, XRP to $29 After CLARITY Act? 4 AI Models Predict What Happens Next — One Sees a Crash First",
+        "source_date": "2026-08-26"
+      },
+      {
+        "url": "https://www.lbank.com/news/aave-token-climb-50x-end-2030-standard-chartered",
+        "title": "Crypto News Tag Aggregation & Thematic Content | LBank",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://blockchain.news/flashnews/bitcoin-standard-chartered-eyes-500k-2030",
+        "title": "Bitcoin: Standard Chartered Eyes $500K by 2030",
+        "source_date": "2026-08-23"
+      },
+      {
+        "url": "https://stocktwits.com/news-articles/markets/cryptocurrency/bitcoin-turned-the-tide-500k-target/cZYh53tRJVA",
+        "title": "Standard Chartered's Kendrick Says Bitcoin Has 'Turned The Tide ...",
+        "source_date": "2026-08-23"
+      },
+      {
+        "url": "https://www.lbank.com/questions/ar4xh11773225653-expert-bitcoin-price-predictions-2030",
+        "title": "What are expert Bitcoin price predictions for 2030? - LBank",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://baltex.io/blog/ecosystem/price-prediction-bitcoin-2030",
+        "title": "Bitcoin Price Prediction 2030 (August 2026 Update) | Baltex Exchange",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://hodl.press/standard-chartered-launches-bitcoin-ethereum-spot-trading-for-institutional-clients-in-uae/",
+        "title": "Standard Chartered Launches Bitcoin, Ethereum Spot Trading for Institutional Clients in UAE",
+        "source_date": "2026-09-03"
+      },
+      {
+        "url": "https://www.bitget.com/amp/news/detail/12560605670075",
+        "title": "This Major Bank Sees XRP Reaching $28 By 2030",
+        "source_date": "2026-08-13"
+      },
+      {
+        "url": "https://www.ccn.com/news/crypto/xrps-28-target-sheriffs-clarity-act-opposition-senator-november-passage/",
+        "title": "XRP's $28 Target Back in Focus as Key CLARITY Opposition Eased, Senators Eye November Passage",
+        "source_date": "2026-09-04"
+      },
+      {
+        "url": "https://www.bitrue.com/es/blog/ark-invest-crypto-920-percent-bitcoin-prediction",
+        "title": "Hay un crypto que aumentará un 920% según ARK Invest—Aquí está el activo en cuestión",
+        "source_date": "2026-08-27"
+      },
+      {
+        "url": "https://www.bitrue.com/fr/blog/ark-invest-crypto-920-percent-bitcoin-prediction",
+        "title": "Il y a une crypto qui va augmenter de 920 % selon ARK Invest—Voici l'actif en question",
+        "source_date": "2026-08-27"
+      },
+      {
+        "url": "https://finance.yahoo.com/markets/crypto/articles/bitcoin-never-fall-under-60k-100657257.html",
+        "title": "Bitcoin Will 'Never Fall Under $60K,' Says Nansen CEO, as ...",
+        "source_date": "2026-08-13"
+      }
+    ],
+    "name_pairs": [],
+    "rows": [
+      {
+        "subject": "Bitcoin USD",
+        "symbol": "BTC-USD",
+        "label": "Bitcoin USD price",
+        "value": 77507.29,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": "2026-09-11",
+        "source_url": "https://finance.yahoo.com/quote/BTC-USD/history?period1="
+      },
+      {
+        "subject": "Bitcoin",
+        "symbol": "BTC-USD",
+        "label": "ARK 2030 bear-case Bitcoin price target",
+        "value": 300000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": null,
+        "source_url": "https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/"
+      },
+      {
+        "subject": "Bitcoin",
+        "symbol": "BTC-USD",
+        "label": "ARK 2030 base-case Bitcoin price target",
+        "value": 710000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": null,
+        "source_url": "https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/"
+      },
+      {
+        "subject": "Bitcoin",
+        "symbol": "BTC-USD",
+        "label": "ARK 2030 bull-case Bitcoin price target",
+        "value": 1500000.0,
+        "kind": "currency",
+        "unit": "USD",
+        "as_of": null,
+        "source_url": "https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/"
+      }
+    ],
+    "typed_answer": true,
+    "unsourced_rows": [],
+    "tool_results": [
+      "search_results",
+      "search_results",
+      "search_results",
+      "search_results",
+      "fetch_url_results",
+      "fetch_url_results"
+    ],
+    "usage": {
+      "invocations": 0,
+      "finance_search_invocations": 0,
+      "web_search_invocations": 4,
+      "fetch_url_invocations": 2,
+      "model": "openai/gpt-5.6-sol",
+      "latency_ms": 37019,
+      "cost_usd": 0.13477,
+      "input_tokens": 29902,
+      "output_tokens": 2537,
+      "cache_creation_input_tokens": 13267,
+      "cache_read_input_tokens": 16623
+    },
+    "retrieved_at": "2026-09-12T19:30:53.880597Z",
+    "background_id": "resp_b85dd11a-4f80-42c6-bade-e6a05ac40f53"
+  },
+  "error": null,
+  "elapsed_s": 37.04,
+  "exchanges": [
+    {
+      "url": "https://api.perplexity.ai/v1/agent",
+      "request": {
+        "models": [
+          "openai/gpt-5.6-sol",
+          "anthropic/claude-opus-4-7"
+        ],
+        "input": "If I invest $10,000 in Bitcoin and just hold it, what will it be worth in ten years?\nTickers: Bitcoin (BTC-USD)\nTime window: ten years\nGround every narrative or causal claim in at least one public publisher, filing, investor-relations, or company page before answering. If no such page is available, say only that the claim could not be verified.\nThe answer is a set of scenarios you compute from published inputs, as the instructions describe: inputs rowed with their pages, the arithmetic written out, labeled ranges from low to high, no single number as the future, no advice.\nAnswer the question directly for a curious non-expert, leading with the answer. Use compact tables only where they genuinely help. State the as-of date for any current figure. If a figure is unavailable, say so plainly; never estimate a live number. No investment advice. Do not write a sources or citations line and do not include links: the interface lists sources beside your answer. Never name tools, providers, models, or internal systems.\nAnswer in English.",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "month"
+            }
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "max_steps": 5,
+        "max_output_tokens": 2048,
+        "reasoning": {
+          "effort": "low"
+        },
+        "language_preference": "en",
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question asks what something will be worth, what it must grow into, or what it is worth today, so the answer is a set of scenarios you compute. The retrieved figures are the inputs: the current price, published forecasts, analyst targets, growth rates and valuation multiples, each rowed with the page it was read from. The scenario values are your own arithmetic from those inputs, written out step by step in answer_markdown and never rowed; no page needs to state them. Give the result as labeled scenario ranges (for example bear, base and bull), each written as low to high. When no published forecast covers the full horizon, build the scenarios from the nearest published horizon and say what you assumed. Say that a figure could not be retrieved only when no input at all was retrieved. Never present one number as the future, and never say what the reader should do.",
+        "response_format": {
+          "type": "json_schema",
+          "json_schema": {
+            "name": "argus_typed_retrieval",
+            "strict": true,
+            "schema": {
+              "description": "A grounded answer: prose for the reader, plus every figure it states as a cited row.",
+              "properties": {
+                "answer_markdown": {
+                  "description": "The answer for the reader in markdown: no links, no list of sources, no mention of tools, providers or models.",
+                  "type": "string"
+                },
+                "rows": {
+                  "description": "Every figure answer_markdown states, one row each, with the retrieved page it was read from.",
+                  "items": {
+                    "description": "One figure read from a retrieved page: whose it is, what it is, its number, what the number measures, its date and its citation.",
+                    "properties": {
+                      "subject": {
+                        "description": "The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix.",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The exchange ticker of the security the figure describes, or null."
+                      },
+                      "label": {
+                        "description": "What the figure is, in a few words: closing share price, one-year certificate rate, revenue growth FY2025.",
+                        "type": "string"
+                      },
+                      "value": {
+                        "description": "The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000.",
+                        "type": "number"
+                      },
+                      "kind": {
+                        "description": "What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares.",
+                        "enum": [
+                          "currency",
+                          "percent",
+                          "multiple",
+                          "count"
+                        ],
+                        "type": "string"
+                      },
+                      "unit": {
+                        "description": "The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count.",
+                        "type": "string"
+                      },
+                      "as_of": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."
+                      },
+                      "source_url": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."
+                      }
+                    },
+                    "required": [
+                      "subject",
+                      "symbol",
+                      "label",
+                      "value",
+                      "kind",
+                      "unit",
+                      "as_of",
+                      "source_url"
+                    ],
+                    "type": "object",
+                    "additionalProperties": false
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "answer_markdown",
+                "rows"
+              ],
+              "type": "object",
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "http_status": 200,
+      "elapsed_s": 37.02,
+      "response": {
+        "background": false,
+        "completed_at": 1789241417,
+        "created_at": 1789241417,
+        "error": null,
+        "frequency_penalty": 0,
+        "id": "resp_b85dd11a-4f80-42c6-bade-e6a05ac40f53",
+        "incomplete_details": null,
+        "instructions": "You are the retrieval service of a finance calculator. Every current figure you state must come from a retrieval call made in this response; never answer from memory, and if retrieval returns nothing, say only that the figure could not be retrieved. Reply in the requested JSON shape. answer_markdown is the prose for the reader: no links, no list of sources, no mention of tools, providers or models. Every figure answer_markdown states appears once in rows, with the URL of the retrieved page it was read from. This question asks what something will be worth, what it must grow into, or what it is worth today, so the answer is a set of scenarios you compute. The retrieved figures are the inputs: the current price, published forecasts, analyst targets, growth rates and valuation multiples, each rowed with the page it was read from. The scenario values are your own arithmetic from those inputs, written out step by step in answer_markdown and never rowed; no page needs to state them. Give the result as labeled scenario ranges (for example bear, base and bull), each written as low to high. When no published forecast covers the full horizon, build the scenarios from the nearest published horizon and say what you assumed. Say that a figure could not be retrieved only when no input at all was retrieved. Never present one number as the future, and never say what the reader should do.",
+        "max_output_tokens": 2048,
+        "max_tool_calls": null,
+        "metadata": {},
+        "model": "openai/gpt-5.6-sol",
+        "object": "response",
+        "output": [
+          {
+            "queries": [
+              "Bitcoin BTC USD price September 12 2026",
+              "BTC USD current price public exchange"
+            ],
+            "results": [
+              {
+                "date": "2026-09-12",
+                "id": 31,
+                "last_updated": "2026-09-12",
+                "snippet": "During September 2026, Bitcoin price declined by -1.75%, starting at $78,549.60 and closing the month at $77,171.30.\n...\n|Date|Price|Growth/Decline|\n...\n|Sep 12, 2026|$77,171.30|-0.03%|",
+                "source": "web",
+                "title": "[BTC] Bitcoin September 2026 USD price history - Best Crypto ...",
+                "url": "https://bestcryptochecker.com/coin/btc/price-history/2026/9"
+              },
+              {
+                "date": "2026-09-05",
+                "id": 32,
+                "last_updated": "2026-09-05",
+                "snippet": "The price of Bitcoin (BTC) is $79,677.76 today with a 24-hour trading volume of $20,833,836,751.55.",
+                "source": "web",
+                "title": "Bitcoin Price: BTC/USD Live Price Chart, Market Cap & News Today | CoinGecko",
+                "url": "https://www.coingecko.com/en/coins/bitcoin?ref=newzchain.com"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 33,
+                "last_updated": "2026-09-11",
+                "snippet": "$77,119.60+0.72%\n...\n- **Last**\n$77,119.60",
+                "source": "web",
+                "title": "BTC/USD (BTCUSD) crypto — price history & chart",
+                "url": "https://www.poisar.com/crypto/BTCUSD"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 34,
+                "last_updated": "2026-09-11",
+                "snippet": "# Bitcoin USD Price (BTC-USD)\n77,507.29 +347.08 (+0.45%)\nAs of 4:23:02 PM UTC.\nMarket Open.",
+                "source": "web",
+                "title": "Bitcoin USD (BTC-USD) Price History & Historical Data",
+                "url": "https://finance.yahoo.com/quote/BTC-USD/history?period1="
+              },
+              {
+                "date": "2026-09-01",
+                "id": 35,
+                "last_updated": "2026-09-11",
+                "snippet": "$78,934.5024h change:+2.14%\n...\n**Bitcoin price is $78,791** as of .",
+                "source": "web",
+                "title": "Bitcoin Price Today (Live BTC/USD Chart) - Maketo",
+                "url": "https://maketo.com/bitcoin/price"
+              },
+              {
+                "date": "2026-08-25",
+                "id": 36,
+                "last_updated": "2026-08-26",
+                "snippet": "78,443.9\n...\nReal-time Data·20:43:23",
+                "source": "web",
+                "title": "Bitcoin Price (BTC) | Bitcoin Value - Investing.com",
+                "url": "https://www.investing.com/crypto/bitcoin/bitcoinfutures"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 37,
+                "last_updated": "2026-09-07",
+                "snippet": "# Bitcoin price BTC #1\n$78,990.04\n1.46% (24h)",
+                "source": "web",
+                "title": "Bitcoin price today, BTC to USD live price, marketcap and chart ...",
+                "url": "https://coinmarketcap.com/currencies/bitcoin/?update=1713966594234"
+              },
+              {
+                "date": "2026-09-09",
+                "id": 38,
+                "last_updated": "2026-09-12",
+                "snippet": "BTC/USD - Bitcoin US Dollar ; Bid/Ask: 77,357.00 / 77,361.00 ; Vol (24H): 18.89 ; Market Cap: 1.56 ; Day's Range: 76,841-78,468 ; 52 wk Range: 57,877-126,110.",
+                "source": "web",
+                "title": "BTC to USD | Bitcoin to US Dollar - Investing.com",
+                "url": "https://www.investing.com/crypto/bitcoin/btc-usd"
+              },
+              {
+                "date": "2026-09-07",
+                "id": 39,
+                "last_updated": "2026-09-07",
+                "snippet": "$79,209-0.89%\n...\n|#|Exchange|Pair|Price|24h%|24h Volume|Open Interest|24h Long/Short|24h Long Liq.|24h Short Liq.|OI/24h Vol|Liquidity ±1%|\n...\nThe current price of BTC is $79,209, down 0.89% over the past 24 hours.",
+                "source": "web",
+                "title": "Bitcoin Price | Live BTC Price, Futures & Spot Data",
+                "url": "https://www.coinboss.com/currencies/btc"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 40,
+                "last_updated": "2026-09-03",
+                "snippet": "|Date|Open|High|Low|Close|Volume|Market Cap|",
+                "source": "web",
+                "title": "Bitcoin Historical Data - BTC Price History & Charts ...",
+                "url": "https://cryptobubblemap.com/coins/bitcoin/historical-data"
+              },
+              {
+                "date": "2026-08-20",
+                "id": 41,
+                "last_updated": "2026-08-22",
+                "snippet": "Last | 3:53 AM EDT\n77,307.17+181.18 (+0.23%)\n...\n- Day High78,800.11",
+                "source": "web",
+                "title": "Bitcoin/USD Coin Metrics",
+                "url": "https://www.cnbc.com/quotes/?qsearchterm=btc.cm&symbol=BTC.CM="
+              },
+              {
+                "date": "2026-08-26",
+                "id": 42,
+                "last_updated": "2026-09-11",
+                "snippet": "Bitcoin is a groundbreaking digital currency that took the world by storm in 2009 and has transformed the landscape of finance and technology.\n...\nAt its core, Bitcoin is a decentralized digital currency.",
+                "source": "web",
+                "title": "Bitcoin Price (BTC) | Bitcoin Value",
+                "url": "https://www.investing.com/crypto/bitcoin/historical-data-9"
+              },
+              {
+                "date": "2026-08-22",
+                "id": 43,
+                "last_updated": "2026-08-22",
+                "snippet": "Bitcoin price today is **$77,263.00**.\nIn the last 24 hours Bitcoin's price moved -0.30%.\nThe current BTC to USD conversion rate is $77,263.00 per BTC.",
+                "source": "web",
+                "title": "Bitcoin price today - BTC price chart & live trends",
+                "url": "https://www.kraken.com/prices/bitcoin?mode"
+              },
+              {
+                "date": "2026-08-28",
+                "id": 44,
+                "last_updated": "2026-08-30",
+                "snippet": "Currency in\nUSD\n| |\n...\n78,147.0\n+583.0(+0.75%)",
+                "source": "web",
+                "title": "BTC USD Historical Data",
+                "url": "https://in.investing.com/crypto/Bitcoin/btc-usd-historical-data"
+              },
+              {
+                "date": "2026-08-21",
+                "id": 45,
+                "last_updated": "2026-09-11",
+                "snippet": "USD-$ 77,716.36\n...\nAt 8 a.m.\nEastern Time on August 21, 2026, the market price for a single Bitcoin (BTC) is $76,712.47.",
+                "source": "web",
+                "title": "Current price of Bitcoin for August 21, 2026",
+                "url": "https://fortune.com/article/price-of-bitcoin-08-21-2026/"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "ARK Invest Big Ideas 2025 bitcoin 2030 bear base bull price targets",
+              "Bitcoin 2030 bear base bull forecast published"
+            ],
+            "results": [
+              {
+                "date": "2026-08-27",
+                "id": 16,
+                "last_updated": "2026-09-12",
+                "snippet": "## Key Takeaways\n- ARK Invest's Big Ideas 2025 report sets a Bitcoin price in 2030 range of roughly $300,000 (bear case) to $1.5 million (bull case), with later updates pushing the bull scenario toward $2.4 million.",
+                "source": "web",
+                "title": "ARK Invest Bitcoin Price Prediction: $300K by 2030 - bitrue.com",
+                "url": "https://www.bitrue.com/blog/ark-invest-btc-price-300000-prediction"
+              },
+              {
+                "date": "2026-09-05",
+                "id": 17,
+                "last_updated": "2026-09-06",
+                "snippet": "In its 2025 *Big Ideas* research, ARK published three 2030 scenarios: approximately **$300,000 in its bear case, $710,000 in its base case and $1.5 million in its bull case**.",
+                "source": "web",
+                "title": "Bitcoin Price Prediction 2030: What Wall Street and Major ...",
+                "url": "https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/"
+              },
+              {
+                "date": "2026-08-25",
+                "id": 18,
+                "last_updated": "2026-08-25",
+                "snippet": "In its annual Big Ideas report, Ark lays out a case for Bitcoin reaching a market capitalization of $16 trillion by 2030, which would translate to roughly $797,000 per coin.",
+                "source": "web",
+                "title": "Bitcoin Regains Momentum as Ark Investment Sees a Path to $797,000 by 2030",
+                "url": "https://nai500.com/blog/2026/08/bitcoin-regains-momentum-as-ark-investment-sees-a-path-to-797000-by-2030/"
+              },
+              {
+                "date": "2026-08-19",
+                "id": 19,
+                "last_updated": "2026-09-05",
+                "snippet": "| | | |\n|--|--|--|\n|Bear case|~$500,000|~$300,000 (early 2025)|\n|Base case|~$1.2 million|~$710,000 (early 2025)|\n|Bull case|~$1.2 million (revised down Nov 2025)|~$1.5 million, then ~$2.4 million (2025)|",
+                "source": "web",
+                "title": "Cathie Wood Bitcoin: Price Targets, Holdings & Track Record",
+                "url": "https://www.bitunix.com/hub/blog/bitcoin/cathie-wood-bitcoin"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 20,
+                "last_updated": "2026-09-08",
+                "snippet": "ARK’s “bear” and “base” case scenarios for the price of Bitcoin BTCUSD were also bumped up to $500,000 and $1.2 million, ARK research analyst David Puell said in an April 24 report.",
+                "source": "web",
+                "title": "ARK Invest ups its 2030 Bitcoin bull case prediction to $2.4M",
+                "url": "https://tw.tradingview.com/news/cointelegraph:0d9801a07094b:0-ark-invest-ups-its-2030-bitcoin-bull-case-prediction-to-2-4m/"
+              },
+              {
+                "date": "2026-08-20",
+                "id": 21,
+                "last_updated": "2026-09-11",
+                "snippet": "ARK's published 2025 model set 2030 bear, base and bull cases of approximately $300,000, $710,000 and $1.5 million.",
+                "source": "web",
+                "title": "Bitcoin to $1.5M? Trump's CLARITY Act and BTC Buying Support ...",
+                "url": "https://finance.yahoo.com/markets/crypto/articles/bitcoin-1-5m-trump-clarity-125347718.html"
+              },
+              {
+                "date": "2026-08-20",
+                "id": 22,
+                "last_updated": "2026-09-09",
+                "snippet": "ARK's base case sits between $730,000 and $750,000 by 2030.",
+                "source": "web",
+                "title": "Donald Trump just made Cathie Wood's $1.5 million Bitcoin ...",
+                "url": "https://www.thestreet.com/crypto/markets/donald-trump-just-made-cathie-woods-1-5-million-bitcoin-target-look-less-crazy"
+              },
+              {
+                "date": "2026-08-13",
+                "id": 23,
+                "last_updated": "2026-09-01",
+                "snippet": "ARK Invest’s scenarios span widely: bull at $1.5 million, base around $700,000, and bear near $300,000.",
+                "source": "web",
+                "title": "Nansen CEO Predicts $1M Bitcoin by 2030, Says BTC May ...",
+                "url": "https://www.kucoin.com/news/flash/nansen-ceo-predicts-1m-bitcoin-by-2030-says-btc-may-never-drop-below-60k"
+              },
+              {
+                "date": "2026-08-21",
+                "id": 24,
+                "last_updated": "2026-08-21",
+                "snippet": "The base case sits near **$730,000** to $750,000, while the bull case reaches as high as $1.5 million.",
+                "source": "web",
+                "title": "U.S. Strategic Bitcoin Reserve: Government Bitcoin Demand Impact",
+                "url": "https://en.cryptonomist.ch/2026/08/21/us-strategic-bitcoin-reserve/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 25,
+                "last_updated": "2026-09-08",
+                "snippet": "On price targets, ARK has previously set a $1.5M bull-case BTC target, with a base case of $730,000 by 2030.",
+                "source": "web",
+                "title": "Cathie Wood Says Bitcoin Still Has “Miles to Go” After Gold-Ratio ...",
+                "url": "https://coingape.com/cathie-wood-says-bitcoin-still-has-miles-to-go-after-gold-ratio-breakout/"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 26,
+                "last_updated": "2026-09-08",
+                "snippet": "She maintains her $730,000 base case Bitcoin target for 2030.",
+                "source": "web",
+                "title": "Cathie Wood Says Bitcoin's 'Break Out' From Gold Is 'Very Reassuring': Ark CEO Says BTC Has 'Miles to Go'",
+                "url": "https://www.benzinga.com/crypto/cryptocurrency/26/09/61650206/cathie-wood-bitcoin-breakout-gold-miles-to-go-ark"
+              },
+              {
+                "date": "2026-09-01",
+                "id": 27,
+                "last_updated": "2026-09-12",
+                "snippet": "With that in mind, here's my take on a few of Wood's forecasts for 2030:\n- **The biggest crypto will reach a market capitalization of $16 trillion:** The most recent valuation model released by Ark has a base case for **Bitcoin**'s market capitalization at $16 trillion in 2030 -- working out to a token price of roughly $800,000.\nIn the bull case, the Ark team thinks that it could hit $1.25 million per token in that year.",
+                "source": "web",
+                "title": "Cathie Wood's Ark Has Delivered Just a 13.8% Annualized ...",
+                "url": "https://www.fool.com/investing/2026/09/01/cathie-woods-ark-has-delivered-just-a-138-annualiz/"
+              },
+              {
+                "date": "2026-08-16",
+                "id": 28,
+                "last_updated": "2026-08-16",
+                "snippet": "ARK's Big Ideas 2026 report states that Bitcoin could compound about 63% annually during the five years to 2030, rising from nearly $2 trillion to roughly $16 trillion.",
+                "source": "web",
+                "title": "Slowing ETF Demand and Corporate Selling Challenge ...",
+                "url": "https://www.kucoin.com/news/flash/slowing-etf-demand-and-corporate-selling-challenge-ark-s-16t-bitcoin-target"
+              },
+              {
+                "date": "2026-08-20",
+                "id": 29,
+                "last_updated": "2026-09-07",
+                "snippet": "2030年予想の代表格は、キャシー・ウッド氏率いるARKインベストです。同社は2025年の年次レポートで、2030年のビットコイン価格を弱気シナリオ約30万ドル、中間シナリオ約71万ドル、強気シナリオ約150万ドルと試算していました。",
+                "source": "web",
+                "title": "ビットコイン（BTC）は2030年にいくらになるのか 〜ARKの予想は120万...",
+                "url": "https://note.com/umaki11/n/na694011ee082"
+              },
+              {
+                "date": "2026-08-31",
+                "id": 30,
+                "last_updated": "2026-09-04",
+                "snippet": "ARK Invest's research places Bitcoin around $710,000 by 2030 as a base case, with a bear case near $300,000 and upside scenarios toward $1.5 million if adoption accelerates more quickly than expected.",
+                "source": "web",
+                "title": "Bitcoin (BTC) Price Predictions 2026, 2027, 2030, 2040 & 2050 / Axi",
+                "url": "https://www.axi-solaris.com/int/blog/education/cryptocurrencies/bitcoin-btc-price-predictions"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "Bitcoin long term price forecast 2030 public publisher report",
+              "Standard Chartered bitcoin forecast 2030"
+            ],
+            "results": [
+              {
+                "date": "2026-08-23",
+                "id": 1,
+                "last_updated": "2026-08-23",
+                "snippet": "The bank's longer-range path carries bitcoin from $100,000 this year to $500,000 by 2030, with ether at $40,000 over the same horizon.\n...\nStandard Chartered maintains a path carrying bitcoin from $100,000 this year to $500,000 by 2030.",
+                "source": "web",
+                "title": "Standard Chartered Analyst Revises Bitcoin Forecast After $1.44B Short Squeeze | Gate News",
+                "url": "https://www.gate.com/news/detail/standard-chartered-analyst-revises-bitcoin-forecast-after-144b-short-23652295"
+              },
+              {
+                "date": "2026-09-05",
+                "id": 2,
+                "last_updated": "2026-09-06",
+                "snippet": "Published forecasts and valuation models currently point to a wide range, from roughly **$300,000 to more than $1 million per Bitcoin**, depending on assumptions about institutional adoption, ETF demand, monetary conditions and Bitcoin’s role as a store of value.\n...\n|Institution / analyst|Forecast|Time frame|",
+                "source": "web",
+                "title": "Bitcoin Price Prediction 2030: What Wall Street and Major ...",
+                "url": "https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/"
+              },
+              {
+                "date": "2026-08-24",
+                "id": 3,
+                "last_updated": "2026-08-25",
+                "snippet": "Standard Chartered maintains a $500,000 target for Bitcoin by 2030 (delayed from an earlier 2028 horizon).\n...\nBernstein projects $1 million per Bitcoin by 2033, driven by ongoing institutional adoption, corporate treasury allocations, and potential nation-state balance-sheet interest.",
+                "source": "web",
+                "title": "Bitcoin Price Prediction 2030 - What Is the Highest ...",
+                "url": "https://www.bitrue.com/blog/bitcoin-price-prediction-2030-highest-price-btc-reach"
+              },
+              {
+                "date": "2026-08-26",
+                "id": 4,
+                "last_updated": "2026-08-27",
+                "snippet": "Armstrong recently said he believes Bitcoin is likely to reach $300,000–$400,000 by 2030, pointing to its fixed supply and improving US regulation.",
+                "source": "web",
+                "title": "Bitcoin to $500K, XRP to $29 After CLARITY Act? 4 AI Models Predict What Happens Next — One Sees a Crash First",
+                "url": "https://www.ccn.com/news/crypto/bitcoin-500k-xrp-29-clarity-act-4-ai-models-predict/"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 5,
+                "last_updated": "2026-09-05",
+                "snippet": "Alongside its projection of AAVE hitting $3,500 by the end of 2030, Standard Chartered’s report stated price targets of $40,000 for Ethereum (up from $1,614 as of this writing) and $500,000 for Bitcoin (currently $60,831).",
+                "source": "web",
+                "title": "Crypto News Tag Aggregation & Thematic Content | LBank",
+                "url": "https://www.lbank.com/news/aave-token-climb-50x-end-2030-standard-chartered"
+              },
+              {
+                "date": "2026-08-23",
+                "id": 6,
+                "last_updated": "2026-08-23",
+                "snippet": "Bitcoin: Standard Chartered forecasts $500K BTC by 2030.\n...\n**Bitcoin** faces a bold long-term call as **Standard Chartered** projects $500K by 2030.",
+                "source": "web",
+                "title": "Bitcoin: Standard Chartered Eyes $500K by 2030",
+                "url": "https://blockchain.news/flashnews/bitcoin-standard-chartered-eyes-500k-2030"
+              },
+              {
+                "date": "2026-08-23",
+                "id": 7,
+                "last_updated": "2026-08-26",
+                "snippet": "Standard Chartered maintained a long-term Bitcoin target of $500,000, pushed from 2028 to 2030 last December, after cutting new projections.",
+                "source": "web",
+                "title": "Standard Chartered's Kendrick Says Bitcoin Has 'Turned The Tide ...",
+                "url": "https://stocktwits.com/news-articles/markets/cryptocurrency/bitcoin-turned-the-tide-500k-target/cZYh53tRJVA"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 8,
+                "last_updated": "2026-09-12",
+                "snippet": "His institution maintains a price target of **$500,000 for Bitcoin by 2030**.",
+                "source": "web",
+                "title": "What are expert Bitcoin price predictions for 2030? - LBank",
+                "url": "https://www.lbank.com/questions/ar4xh11773225653-expert-bitcoin-price-predictions-2030"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 9,
+                "last_updated": "2026-09-06",
+                "snippet": "Standard Chartered's cryptocurrency research points to $500,000 by 2030, driven by post-halving supply constraints and maturing institutional infrastructure.",
+                "source": "web",
+                "title": "Bitcoin Price Prediction 2030 (August 2026 Update) | Baltex Exchange",
+                "url": "https://baltex.io/blog/ecosystem/price-prediction-bitcoin-2030"
+              },
+              {
+                "date": "2026-08-31",
+                "id": 10,
+                "last_updated": "2026-09-04",
+                "snippet": "- **2030 Outlook:** Projections sit between $500,000 and $1.5 million, with the bullish case built on the 2028 halving cycle and deepening institutional adoption.\n...\n|Source|2026|2027|2030|2040|2050|\n...\n|Standard Chartered|$150K|*|$500K (2030)|*|*|\n...\nStandard Chartered maintains a $500,000 target, having pushed the timeline out to 2030 from its earlier 2026 expectation.",
+                "source": "web",
+                "title": "Bitcoin (BTC) Price Predictions 2026, 2027, 2030, 2040 & 2050 / Axi",
+                "url": "https://www.axi-solaris.com/int/blog/education/cryptocurrencies/bitcoin-btc-price-predictions"
+              },
+              {
+                "date": "2026-09-03",
+                "id": 11,
+                "last_updated": "2026-09-03",
+                "snippet": "For Aave, the bank has set a target price of $3,500 by the end of 2030, citing growth in decentralized finance, broader adoption of real-world assets and the expansion of onchain lending as the main drivers.",
+                "source": "web",
+                "title": "Standard Chartered Launches Bitcoin, Ethereum Spot Trading for Institutional Clients in UAE",
+                "url": "https://hodl.press/standard-chartered-launches-bitcoin-ethereum-spot-trading-for-institutional-clients-in-uae/"
+              },
+              {
+                "date": "2026-08-25",
+                "id": 12,
+                "last_updated": "2026-08-25",
+                "snippet": "In its annual Big Ideas report, Ark lays out a case for Bitcoin reaching a market capitalization of $16 trillion by 2030, which would translate to roughly $797,000 per coin.",
+                "source": "web",
+                "title": "Bitcoin Regains Momentum as Ark Investment Sees a Path to $797,000 by 2030",
+                "url": "https://nai500.com/blog/2026/08/bitcoin-regains-momentum-as-ark-investment-sees-a-path-to-797000-by-2030/"
+              },
+              {
+                "date": "2026-08-13",
+                "id": 13,
+                "last_updated": "2026-08-13",
+                "snippet": "Despite cutting its 2026 forecast, Standard Chartered continues to project XRP at $28 by 2030.",
+                "source": "web",
+                "title": "This Major Bank Sees XRP Reaching $28 By 2030",
+                "url": "https://www.bitget.com/amp/news/detail/12560605670075"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 14,
+                "last_updated": "2026-09-12",
+                "snippet": "ARK Invest says BTC price could hit $300,000 by 2030 even in its worst-case scenario, with the firm’s Big Ideas framework projecting a bear-case target near $300,000 while its bull case stretches as high as $2.4 million, four times higher than Bitcoin’s late-August 2026 trading range in the high $70,000s to low $80,000s.\n## Key Takeaways\n- ARK Invest's Big Ideas 2025 report sets a Bitcoin price in 2030 range of roughly $300,000 (bear case) to $1.5 million (bull case), with later updates pushing the bull scenario toward $2.4 million.\n...\nIn its original Big Ideas 2025 report, the firm modeled bear, base, and bull outcomes of roughly $300,000, $710,000, and $1.5 million per coin.",
+                "source": "web",
+                "title": "ARK Invest Bitcoin Price Prediction: $300K by 2030 - bitrue.com",
+                "url": "https://www.bitrue.com/blog/ark-invest-btc-price-300000-prediction"
+              },
+              {
+                "date": "2026-09-04",
+                "id": 15,
+                "last_updated": "2026-09-04",
+                "snippet": "However, Standard Chartered left its 2030 forecast unchanged at $28.\n...\n$28 in 2030",
+                "source": "web",
+                "title": "XRP's $28 Target Back in Focus as Key CLARITY Opposition Eased, Senators Eye November Passage",
+                "url": "https://www.ccn.com/news/crypto/xrps-28-target-sheriffs-clarity-act-opposition-senator-november-passage/"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "queries": [
+              "site:ark-invest.com bitcoin 2030 bear base bull 300000 710000 1.5 million",
+              "ARK Invest official Big Ideas 2025 bitcoin 2030 price targets"
+            ],
+            "results": [
+              {
+                "date": "2026-09-05",
+                "id": 46,
+                "last_updated": "2026-09-06",
+                "snippet": "In its 2025 *Big Ideas* research, ARK published three 2030 scenarios: approximately **$300,000 in its bear case, $710,000 in its base case and $1.5 million in its bull case**.\n...\n|Institution / analyst|Forecast|Time frame|\n|--|--|--|\n|**ARK Invest — 2025 bear case**|~$300,000|2030|\n|**ARK Invest — 2025 base case**|~$710,000|2030|\n|**ARK Invest — 2025 bull case**|~$1.5 million|2030|\n|**ARK Invest — 2026 market-cap model**|~$762,000 implied|2030|",
+                "source": "web",
+                "title": "Bitcoin Price Prediction 2030: What Wall Street and Major ...",
+                "url": "https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/"
+              },
+              {
+                "date": "2026-08-25",
+                "id": 47,
+                "last_updated": "2026-08-25",
+                "snippet": "In its annual Big Ideas report, Ark lays out a case for Bitcoin reaching a market capitalization of $16 trillion by 2030, which would translate to roughly $797,000 per coin.\n...\nCathie Wood's personal forecasts have shifted over time as well.\nIn 2025, her model offered bear, base, and bull cases of roughly $300,000, $710,000, and $1.5 million by 2030.",
+                "source": "web",
+                "title": "Bitcoin Regains Momentum as Ark Investment Sees a Path to $797,000 by 2030",
+                "url": "https://nai500.com/blog/2026/08/bitcoin-regains-momentum-as-ark-investment-sees-a-path-to-797000-by-2030/"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 48,
+                "last_updated": "2026-09-12",
+                "snippet": "ARK Invest says BTC price could hit $300,000 by 2030 even in its worst-case scenario, with the firm’s Big Ideas framework projecting a bear-case target near $300,000 while its bull case stretches as high as $2.4 million, four times higher than Bitcoin’s late-August 2026 trading range in the high $70,000s to low $80,000s.\n...\n- ARK Invest's Big Ideas 2025 report sets a Bitcoin price in 2030 range of roughly $300,000 (bear case) to $1.5 million (bull case), with later updates pushing the bull scenario toward $2.4 million.\n...\nIn its original Big Ideas 2025 report, the firm modeled bear, base, and bull outcomes of roughly $300,000, $710,000, and $1.5 million per coin.\n...\nARK Invest's original model set a range of about $300,000 in its bear case, $710,000 in its base case, and $1.5 million in its bull case, with later updates pushing the bull figure as high as $2.4 million.",
+                "source": "web",
+                "title": "ARK Invest Bitcoin Price Prediction: $300K by 2030 - bitrue.com",
+                "url": "https://www.bitrue.com/blog/ark-invest-btc-price-300000-prediction"
+              },
+              {
+                "date": "2026-09-08",
+                "id": 49,
+                "last_updated": "2026-09-08",
+                "snippet": "Billion-dollar asset manager ARK Invest has raised its “bull case” Bitcoin price target from $1.5 million to $2.4 million by the end of 2030, driven largely by institutional investors and Bitcoin’s increasing acceptance as “digital gold.”\nARK’s “bear” and “base” case scenarios for the price of Bitcoin BTCUSD were also bumped up to $500,000 and $1.2 million, ARK research analyst David Puell said in an April 24 report.\nThe new bear and base targets were bumped up from ARK’s $300,000 and $710,000 Bitcoin price predictions on Feb. 11.",
+                "source": "web",
+                "title": "ARK Invest ups its 2030 Bitcoin bull case prediction to $2.4M",
+                "url": "https://tw.tradingview.com/news/cointelegraph:0d9801a07094b:0-ark-invest-ups-its-2030-bitcoin-bull-case-prediction-to-2-4m/"
+              },
+              {
+                "date": "2026-08-19",
+                "id": 50,
+                "last_updated": "2026-09-05",
+                "snippet": "- *Cathie Wood's ARK Invest is one of the most bullish major firms on Bitcoin, with a 2030 base case around $1.2 million and a bull case that has ranged from $1.5 million up to $2.4 million.*\n...\nARK Invest has published 2030 Bitcoin price targets across three scenarios: bear, base, and bull.\n...\n|Bear case|~$500,000|~$300,000 (early 2025)|\n|Base case|~$1.2 million|~$710,000 (early 2025)|\n|Bull case|~$1.2 million (revised down Nov 2025)|~$1.5 million, then ~$2.4 million (2025)|",
+                "source": "web",
+                "title": "Cathie Wood Bitcoin: Price Targets, Holdings & Track Record",
+                "url": "https://www.bitunix.com/hub/blog/bitcoin/cathie-wood-bitcoin"
+              },
+              {
+                "date": "2026-08-16",
+                "id": 51,
+                "last_updated": "2026-08-16",
+                "snippet": "ARK's Big Ideas 2026 report states that Bitcoin could compound about 63% annually during the five years to 2030, rising from nearly $2 trillion to roughly $16 trillion.",
+                "source": "web",
+                "title": "Slowing ETF Demand and Corporate Selling Challenge ...",
+                "url": "https://www.kucoin.com/news/flash/slowing-etf-demand-and-corporate-selling-challenge-ark-s-16t-bitcoin-target"
+              },
+              {
+                "date": "2026-08-20",
+                "id": 52,
+                "last_updated": "2026-09-09",
+                "snippet": "ARK's base case sits between $730,000 and $750,000 by 2030.",
+                "source": "web",
+                "title": "Donald Trump just made Cathie Wood's $1.5 million Bitcoin ...",
+                "url": "https://www.thestreet.com/crypto/markets/donald-trump-just-made-cathie-woods-1-5-million-bitcoin-target-look-less-crazy"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 53,
+                "last_updated": "2026-08-28",
+                "snippet": "En su investigación Big Ideas 2025, ARK proyectó para 2030 el precio de Bitcoin en aproximadamente $300,000 en su escenario pesimista, $710,000 en su escenario base, y $1.5 millones en su escenario optimista.",
+                "source": "web",
+                "title": "Hay un crypto que aumentará un 920% según ARK Invest—Aquí está el activo en cuestión",
+                "url": "https://www.bitrue.com/es/blog/ark-invest-crypto-920-percent-bitcoin-prediction"
+              },
+              {
+                "date": "2026-08-27",
+                "id": 54,
+                "last_updated": "2026-08-30",
+                "snippet": "Dans sa recherche Big Ideas 2025, ARK a projeté des prix de Bitcoin pour 2030 d'environ 300 000 $, 710 000 $ dans son scénario de base, et 1,5 million $ dans son scénario optimiste.",
+                "source": "web",
+                "title": "Il y a une crypto qui va augmenter de 920 % selon ARK Invest—Voici l'actif en question",
+                "url": "https://www.bitrue.com/fr/blog/ark-invest-crypto-920-percent-bitcoin-prediction"
+              },
+              {
+                "date": "2026-08-13",
+                "id": 55,
+                "last_updated": "2026-09-12",
+                "snippet": "ARK Invest's official 2030 model sets a bull case of approximately $1.5 million, a base case of $ 710,000, and a bear case of $300,000.",
+                "source": "web",
+                "title": "Bitcoin Will 'Never Fall Under $60K,' Says Nansen CEO, as ...",
+                "url": "https://finance.yahoo.com/markets/crypto/articles/bitcoin-never-fall-under-60k-100657257.html"
+              }
+            ],
+            "type": "search_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "Bitcoin USD (BTC-USD) Price History & Historical Data - Yahoo Finance\n\n- ORCL\n  151.52\n\n  -0.93%\n- ADBE\n  250.30\n\n  +0.59%\n- TNON\n  9.03\n\n  (+70.38%\n- RH\n  134.18\n\n  (+0.12%\n\n1. 1. 1. Stock market\n   2. Crypto\n   3. Housing\n   4. Magnificent 7\n   5. Private markets\n   6. Futures & Derivatives\n   2. 1. Aerospace & Defense\n   2. Enterprise Cloud\n   3. Pharma & Biotech\n   4. Cybersecurity\n2. 1. Private companies 1. 52 week gainers\n   2. Recently funded\n   3. Most funded\n   2. Options\n3. 1. 1. Compare Credit Cards\n   2. Best 0% APR cards\n   3. Best balance transfer cards\n   4. Best rewards cards\n   5. Best travel cards\n   2. 1. Federal vs. private\n   2. How to apply\n   3. FAFSA 2026-27\n   4. Student loan assistance\n   3. 1. All Calculators\n   2. 50/30/20 Budget Calculator\n   3. Compound Interest Calculator\n   4. Savings Calculator\n   5. Savings Goal Calculator\n   6. Social Security Calculator\n4. 1. 1. Morning Brief\n   2. Opening Bid\n   3. Market Catalysts\n   4. Market Domination\n   5. Market Domination Overtime\n   6. Asking for a Trend\n   7. The Daily Wolf\n   2. 1. Power Players\n   2. Trader Talk\n   3. Built Different\n   4. The Big Idea\n   3. ETF Report\n\nNetwork\n\n### U.S. markets close in 3h 37m\n\nCryptocurrencies\n\nRates\n\nCommodities\n\nCurrencies\n\nU.S. markets close in 3h 37m\n\nS&P 500 7,666.90+75.20+0.99%\n\nDow 30 52,596.16+532.06+1.02%\n\nNasdaq 26,371.12+289.40+1.11%\n\nRussell 2000 2,910.39+19.44+0.67%\n\nVIX 15.69-2.15-12.04%\n\nGold 4,407.90+0.60+0.01%\n\nBitcoin USD 77,442.43+282.22+0.37%\n\nCrude Oil Oct 26 99.79-2.69-2.62%\n\nBitcoin USD\n\n77,507.29 +0.45%\n\n- Summary\n- News\n- Chart\n- Conversations\n- Historical Data\n- Profile\n\nCryptocurrency • USD\n\n# Bitcoin USD Price (BTC-USD)\n\n77,507.29 +347.08 (+0.45%)\n\nAs of 4:23:02 PM UTC. Market Open.\n\nSep 11, 2025 - Sep 11, 2026 Historical Prices Daily Currency in USD |Date| |\n|--|--|\n|There are no in the selected time period.|There are no in the selected time period.|\n\n### Top Crypto\n\nETH-USD Ethereum USD\n\n**2,550.28** +4.20%\n\nUSDT-USD Tether USDt USD\n\n**1.00** +0.02%\n\nBNB-USD BNB USD\n\n**728.10** +2.84%\n\nXRP-USD XRP USD\n\n**1.37** +1.26%\n\nUSDC-USD USDC USD\n\n**1.00** -0.00%\n\nSOL-USD Solana USD\n\n**101.45** +1.84%\n\nTRX-USD TRON USD\n\n**0.34** -0.88%\n\nSTETH-USD Lido Staked ETH USD\n\n**2,555.60** +4.80%\n\nHYPE32196-USD Hyperliquid USD\n\n**81.41** +1.78%\n\nZEC-USD Zcash USD\n\n**1,155.36** +2.17%\n\nDOGE-USD Dogecoin USD\n\n**0.08** +1.85%\n\nWSTETH-USD Lido wstETH USD\n\n**3,197.15** +5.40%\n\nRAIN38341-USD Rain USD\n\n**0.02** -0.58%\n\nUSDS33039-USD USDS USD\n\n**1.00** +0.01%\n\n**516.31** +2.36%\n\n### Trending Tickers\n\n- ORCL\n\n  Oracle Corporation\n\n  EquityNYQ\n- ADBE\n\n  Adobe Inc.\n\n  EquityNMS\n- TNON\n\n  Tenon Medical, Inc.\n\n  EquityNCM\n- RH\n\n  RH\n\n  EquityNYQ\n- DBGI\n\n  Digital Brands Group, Inc.\n\n  EquityNCM\n- SURG\n\n  SurgePays, Inc.\n\n  EquityNCM\n\n- - 151.52(-0.93%)\n  - 9.03(+70.38%)\n  - 134.18(+0.12%)\n  - 5.72-1.07(-15.92%)",
+                "title": "Bitcoin USD (BTC-USD) Price History & Historical Data",
+                "url": "https://finance.yahoo.com/quote/BTC-USD/history?period1="
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "contents": [
+              {
+                "snippet": "div\n\nBitcoin’s long-term price outlook remains bullish among several major investment firms, but there is no Wall Street consensus on where the cryptocurrency will trade in 2030. Published forecasts and valuation models currently point to a wide range, from roughly **$300,000 to more than $1 million per Bitcoin**, depending on assumptions about institutional adoption, ETF demand, monetary conditions and Bitcoin’s role as a store of value.\n\nThe most important recent forecast comes from ARK Invest, whose 2026 research projects Bitcoin’s market capitalization could reach about **$16 trillion by 2030**. Using Bitcoin’s maximum supply of 21 million coins, that would imply roughly **$762,000 per BTC**.\n\nThat is broadly consistent with ARK’s previous base-case valuation. In its 2025 *Big Ideas* research, ARK published three 2030 scenarios: approximately **$300,000 in its bear case, $710,000 in its base case and $1.5 million in its bull case**.\n\n## ARK Invest’s latest 2030 outlook\n\nThe firm’s 2026 research estimates that the total cryptocurrency market could reach approximately **$28 trillion by 2030**, with Bitcoin accounting for about **$16 trillion** of that value. ARK expects Bitcoin to retain a dominant position as a digital store of value, supported by institutional adoption, spot Bitcoin ETFs and corporate holdings.\n\nAt $16 trillion, Bitcoin would be worth roughly $762,000 if calculated against the maximum 21 million coins.\n\n## Standard Chartered: $500,000 by 2030\n\nStandard Chartered has also emerged as one of the most bullish traditional banks on Bitcoin.\n\nReports in April 2026 said the bank had placed a **$500,000 Bitcoin price target on 2030**. The forecast was associated with the bank’s digital-assets strategist Geoff Kendrick. However, the $500,000 figure has been reported through financial media rather than presented here as a formally published Standard Chartered research report, so it should be treated as a reported bank target rather than a definitive institutional consensus forecast.\n\nStandard Chartered’s broader cryptocurrency strategy nevertheless provides evidence of increasing institutional involvement. In September 2026, the bank launched institutional spot trading in Bitcoin and Ether in the United Arab Emirates, becoming the first globally systemically important bank to offer such services there, according to Reuters.\n\nThat development does not validate the $500,000 forecast, but it shows how major banks are expanding their direct involvement in digital assets.\n\n## Bernstein: $300,000 by 2029, $1 million by 2033\n\nBernstein’s latest analysis provides a more measured long-term trajectory.\n\nThe investment firm expects Bitcoin to reach approximately **$300,000 by the end of 2029** in its base case. Its accelerated bull case sees Bitcoin reaching **$500,000 by 2029**.\n\nBernstein continues to project that Bitcoin could reach approximately **$1 million by 2033**.\n\nThe firm’s methodology is different from ARK’s. Bernstein’s analysts have based their valuation partly on Bitcoin’s historical four-year market cycles and the marginal cost of mining. Its analysts argue that higher government debt, potentially higher bond yields and the possibility of currency debasement could increase demand for scarce assets such as Bitcoin.\n\nThis means Bernstein does not require Bitcoin to reach $1 million in 2030. Its current framework places that milestone several years later.\n\n## Citi is much more cautious\n\nThe outlook from U.S. banking giant Citigroup demonstrates why a bullish long-term forecast should not be confused with a Wall Street consensus.\n\nCiti has not published a comparable $500,000 or $1 million Bitcoin target for 2030 in the research reviewed for this article.\n\nInstead, its recent forecasts have focused on shorter periods. In March 2026, Citi cut its 12-month Bitcoin target from **$143,000 to $112,000**, citing stalled U.S. cryptocurrency legislation. Its recessionary bear case at the time was approximately $58,000, while its bullish scenario was $165,000.\n\nBy July, Reuters reported that Citi had reduced its 12-month Bitcoin target again, to **$82,000**, after ETF flows weakened and investor appetite deteriorated. Its bear case was $53,000.\n\n## Fidelity: bullish on adoption, but no comparable $2030 BTC price target\n\nFidelity Digital Assets is another major institutional voice, but it should not be included in a table of 2030 Bitcoin price targets unless its research actually provides such a target.\n\nIts March 2026 research argues that Bitcoin has matured into a major investable asset and that institutional investors should explicitly consider whether a zero allocation remains appropriate. Fidelity highlights Bitcoin’s fixed supply, historical returns, portfolio diversification characteristics and growing institutional access.\n\nSeparate reporting on Fidelity’s broader digital-asset outlook has cited a projection of roughly **$10 trillion for the overall cryptocurrency market by 2030**. That is a cryptocurrency-market forecast, not a Bitcoin-specific $10 trillion valuation.\n\n## What would $500,000 Bitcoin actually mean?\n\nBitcoin’s maximum supply is 21 million coins.\n\nAt a price of **$500,000 per Bitcoin**, the theoretical fully diluted market capitalization would be:\n\n**$10.5 trillion**\n\nAt **$750,000**, it would be:\n\n**$15.75 trillion**\n\nAt **$1 million**, it would be:\n\n**$21 trillion**\n\nAt **$1.5 million**, it would be:\n\n**$31.5 trillion**\n\nThese calculations use the 21-million maximum supply and are not the same as actual circulating-market capitalization, because the number of Bitcoin in circulation is lower and some coins are believed to be permanently inaccessible.\n\nSee also Operation Lighthouse Identifies Crypto-Linked CSAM Suspects in 125 Countries\n\nARK’s approximately $16 trillion 2030 market-capitalization forecast therefore corresponds to a price around $762,000 using the maximum supply.\n\n## Why institutional adoption matters\n\nThe central argument behind the bullish forecasts is the continued institutionalization of Bitcoin.\n\nU.S. spot Bitcoin ETFs have created a conventional route for investors to gain exposure without directly holding the cryptocurrency. Corporate treasury strategies have also increased the amount of Bitcoin held by public companies.\n\nARK’s 2026 research said U.S. spot Bitcoin ETFs and public companies together held approximately **12% of Bitcoin’s total supply** at the end of 2025, compared with 8.7% a year earlier.\n\nFidelity’s own research similarly argues that Bitcoin has moved far enough into mainstream investing that institutional asset managers need to make an explicit decision about whether to hold it.\n\nBut institutionalization works in both directions. Large investors can provide substantial demand during periods of strong sentiment, while ETF outflows and institutional selling can amplify downturns.\n\nCiti’s 2026 forecast reductions demonstrate this risk: the bank specifically cited negative ETF flows and weaker investor appetite when cutting its Bitcoin projections.\n\n## Bitcoin’s biggest risks through 2030\n\nThe bullish forecasts depend on several assumptions that could fail.\n\nThe first is **institutional demand**. If pension funds, asset managers, family offices and corporations allocate less capital to Bitcoin than expected, the valuations used by ARK and other bullish analysts would become harder to achieve.\n\nThe second is **regulation**. Citi has already cited stalled U.S. crypto legislation as a reason for lowering its forecasts.\n\nThe third is **competition from other digital assets**, particularly stablecoins. ARK has acknowledged that stablecoins have reduced some of the potential role it previously expected Bitcoin to play, particularly in emerging-market payments.\n\nThe fourth is Bitcoin’s volatility. Reuters reported in September 2026 that Bitcoin had recovered sharply but still faced important technical resistance around the low-$80,000 area, illustrating how quickly the market can change even before considering a four-year forecast.\n\nAcademic research also cautions against treating long-range Bitcoin models as precise forecasts. A 2026 review of the academic literature found no consensus that existing prediction models can reliably outperform simple benchmarks across different market regimes. It also found that some popular valuation approaches have failed formal out-of-sample testing.\n\n## Bitcoin 2030 forecasts compared\n|Institution / analyst|Forecast|Time frame|\n|--|--|--|\n|**ARK Invest — 2025 bear case**|~$300,000|2030|\n|**ARK Invest — 2025 base case**|~$710,000|2030|\n|**ARK Invest — 2025 bull case**|~$1.5 million|2030|\n|**ARK Invest — 2026 market-cap model**|~$762,000 implied|2030|\n|**Standard Chartered**|~$500,000|2030|\n|**Bernstein base case**|~$300,000|End-2029|\n|**Bernstein accelerated bull case**|~$500,000|2029|\n|**Bernstein long-term target**|~$1 million|2033|\n|**Citi**|No comparable 2030 target|—|\n|**Fidelity Digital Assets**|No comparable 2030 BTC price target|—|\n\nThe table separates actual Bitcoin price forecasts from broader digital-asset projections and avoids treating research that does not provide a 2030 BTC target as though it does.\n\n## What is the most defensible Bitcoin 2030 range?\n\nBased on the institutional forecasts that can be documented, **$300,000 to around $760,000** is a more defensible range for describing the principal published scenarios around 2030.\n\nThe **$1 million-plus outcome remains a bull-case scenario**, rather than a consensus Wall Street expectation. ARK’s 2025 bull case reached $1.5 million, while Bernstein currently places its $1 million projection in 2033 rather than 2030.\n\nThe key point for investors is that these are **scenario models, not reliable point predictions**. Bitcoin would need to become a substantially larger global store of value and attract significantly more institutional capital to justify valuations in the hundreds of billions—or eventually trillions—of dollars above today’s level.\n\nFor 2030, the institutional debate is therefore less about whether Bitcoin can rise and more about **how large a share of global wealth and financial assets Bitcoin can capture**.\n\n***This article is for informational  purposes only and does not constitute investment, financial, trading, tax or legal advice.** Bitcoin and other cryptocurrencies are highly volatile and can lose substantial or all of their value. The price forecasts and valuation scenarios cited in this article are estimates published or reported by investment firms, banks and analysts and should not be interpreted as guarantees of future performance. Actual Bitcoin prices in 2030 may differ materially from these projections. Investors should conduct their own research and consult a qualified financial adviser before making investment decisions. The FINANCIAL does not recommend buying or selling Bitcoin or any other cryptocurrency based on the forecasts discussed in this article.*\n\n### Why Nike Stock Has Fallen So Much\n\nSeptember 5, 2026\n\n### Bitcoin Price Prediction 2030: What Wall Street and Major Crypto Analysts Forecast\n\nSeptember 5, 2026\n\n### Tech Layoffs 2026: TikTok, Apple, AT&T and Zoox Put U.S. Jobs Back in Focus\n\nSeptember 5, 2026\n\n### YouTuber Jack Doherty Charged With Domestic Battery in Florida as U.S. Data Show Scale of Intimate-Partner Violence\n\nSeptember 5, 2026\n\n### Oregon vs. Boise State: No. 2 Ducks Open 2026 Season Against a Dangerous Broncos Team\n\nSeptember 5, 2026",
+                "title": "Bitcoin Price Prediction 2030: What Wall Street and Major ...",
+                "url": "https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/"
+              }
+            ],
+            "type": "fetch_url_results"
+          },
+          {
+            "content": [
+              {
+                "annotations": [],
+                "text": "{\"answer_markdown\":\"A ten-year outcome is highly uncertain. Using the published 2030 bear, base and bull targets as anchors, your **$10,000 could be worth roughly:**\\n\\n| Scenario | Estimated value in September 2036 |\\n|---|---:|\\n| Bear | **$38,700–$233,000** |\\n| Base | **$91,600–$1.73 million** |\\n| Bull | **$193,500–$9.83 million** |\\n\\n**Calculation**\\n\\nBitcoin was **$77,507.29 as of September 11, 2026**, so the investment would purchase approximately:\\n\\n`$10,000 ÷ $77,507.29 = 0.1290 BTC`\\n\\nPublished ARK scenarios put Bitcoin at approximately **$300,000, $710,000, or $1.5 million in 2030**. At those prices, the holding would be worth about **$38,700, $91,600, or $193,500**, respectively.\\n\\nNo published forecast used here covers the full ten-year period. Each range therefore uses:\\n\\n- **Low end:** Bitcoin reaches the corresponding 2030 target and then has no further price growth through 2036.\\n- **High end:** The annualized growth required to reach that 2030 target continues through September 2036. That produces approximately **$233,000, $1.73 million, or $9.83 million** across the three cases.\\n\\nThese are mechanical scenarios, not predictions. They exclude transaction fees and taxes, and the actual value could fall outside every range.\",\"rows\":[{\"as_of\":\"2026-09-11\",\"kind\":\"currency\",\"label\":\"Bitcoin USD price\",\"source_url\":\"https://finance.yahoo.com/quote/BTC-USD/history?period1=\",\"subject\":\"Bitcoin USD\",\"symbol\":\"BTC-USD\",\"unit\":\"USD\",\"value\":77507.29},{\"as_of\":null,\"kind\":\"currency\",\"label\":\"ARK 2030 bear-case Bitcoin price target\",\"source_url\":\"https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/\",\"subject\":\"Bitcoin\",\"symbol\":\"BTC-USD\",\"unit\":\"USD\",\"value\":300000},{\"as_of\":null,\"kind\":\"currency\",\"label\":\"ARK 2030 base-case Bitcoin price target\",\"source_url\":\"https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/\",\"subject\":\"Bitcoin\",\"symbol\":\"BTC-USD\",\"unit\":\"USD\",\"value\":710000},{\"as_of\":null,\"kind\":\"currency\",\"label\":\"ARK 2030 bull-case Bitcoin price target\",\"source_url\":\"https://finchannel.com/bitcoin-price-prediction-2030-what-wall-street-and-major-crypto-analysts-forecast/134446/crypto/2026/09/\",\"subject\":\"Bitcoin\",\"symbol\":\"BTC-USD\",\"unit\":\"USD\",\"value\":1500000}]}",
+                "type": "output_text"
+              }
+            ],
+            "id": "msg_a85dc7a3-43a1-4257-9254-71514636da17",
+            "role": "assistant",
+            "status": "completed",
+            "type": "message"
+          }
+        ],
+        "parallel_tool_calls": true,
+        "presence_penalty": 0,
+        "previous_response_id": null,
+        "prompt_cache_key": null,
+        "reasoning": {
+          "effort": "low",
+          "summary": null
+        },
+        "safety_identifier": null,
+        "service_tier": "default",
+        "status": "completed",
+        "store": true,
+        "temperature": 1,
+        "text": {
+          "format": {
+            "type": "text"
+          }
+        },
+        "tool_choice": "auto",
+        "tools": [
+          {
+            "type": "web_search",
+            "search_context_size": "medium",
+            "filters": {
+              "search_recency_filter": "month"
+            }
+          },
+          {
+            "type": "fetch_url"
+          }
+        ],
+        "top_logprobs": 0,
+        "top_p": 1,
+        "truncation": "",
+        "usage": {
+          "cost": {
+            "cache_creation_cost": 0.06633,
+            "cache_read_cost": 0.00665,
+            "currency": "USD",
+            "input_cost": 5e-05,
+            "output_cost": 0.05074,
+            "tool_calls_cost": 0.011,
+            "tool_calls_cost_details": {
+              "fetch_url": 0.001,
+              "search_web": 0.01
+            },
+            "total_cost": 0.13477
+          },
+          "input_tokens": 29902,
+          "input_tokens_details": {
+            "cache_creation_input_tokens": 13267,
+            "cache_read_input_tokens": 16623,
+            "cached_tokens": 16623
+          },
+          "output_tokens": 2537,
+          "output_tokens_details": {
+            "reasoning_tokens": 1477
+          },
+          "tool_calls_details": {
+            "fetch_url": {
+              "cost_usd": 0.001,
+              "invocation": 2
+            },
+            "search_web": {
+              "cost_usd": 0.01,
+              "invocation": 4
+            }
+          },
+          "total_tokens": 32439
+        },
+        "user": null
+      }
+    }
+  ]
+}

@@ -97,9 +97,7 @@ describe("chat message feedback context", () => {
         confirmation_state: "active",
         title: "AAPL buy and hold",
         status: "ready_to_run",
-        statusLabel: "Ready to run",
-        summary: "Ready to test AAPL.",
-        rows: [],
+        statusLabel: "Ready to run",        rows: [],
         actions: [],
       },
     };

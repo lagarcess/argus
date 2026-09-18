@@ -19,9 +19,12 @@ from __future__ import annotations
 
 from argus.agent_runtime import research_grounded as grounded
 from argus.agent_runtime.interpreter.research_routing import (
+    concept_research_query,
+    educational_question_has_no_query,
     primary_research_query,
     research_turn_has_conflicting_owner,
     scenario_is_typed,
+    unsupported_verdict_research_query,
 )
 
 # Re-exported composition surface: the job lifecycle and tests reach these
@@ -61,9 +64,13 @@ async def research_answer_stage_result(
 
     Returns None without a supported primary-interpreter question payload.
     """
-    if not research_rail_enabled():
+    if not research_rail_enabled() or educational_question_has_no_query(interpretation):
         return None
-    query = primary_research_query(interpretation)
+    query = (
+        primary_research_query(interpretation)
+        or concept_research_query(interpretation)
+        or unsupported_verdict_research_query(interpretation)
+    )
     if query is None:
         return None
     return await _dispatch(
@@ -215,7 +222,7 @@ async def _dispatch(
             state=state,
             user=user,
         )
-    if query.question_kind in ("concept", "none") and not scenario:
+    if query.question_kind == "none" and not scenario:
         return None
     subjects = _resolved_subjects(query)
     off_coverage = [s for s in subjects if s["asset_class"] != "equity"]
@@ -244,11 +251,11 @@ async def _dispatch(
             provider_finance=False,
         )
     shape = grounded.shape_for_query(query)
-    if scenario and query.question_kind != "cross_company":
-        # A computed scenario is never a quote and needs no background job:
-        # it runs on the balanced shape with public pages, whatever kind it
-        # was typed as. Only a named multi-company comparison keeps the
-        # thorough job it would take without the scenario.
+    if scenario:
+        # A computed scenario is never a quote and never a background job: it
+        # runs on the balanced shape with public pages, whatever kind it was
+        # typed as, because the valuation math computes the answer from the
+        # retrieved inputs on that path alone.
         shape = "balanced"
     if shape == "thorough":
         return grounded.thorough_job_result(
@@ -279,9 +286,18 @@ def _resolved_subjects(query: ResearchQueryExtraction) -> list[dict[str, str]]:
         if not candidate or candidate in seen:
             continue
         try:
-            from argus.domain.market_data.assets import resolve_asset
+            from argus.agent_runtime.resolution import resolve_asset_candidate
 
-            resolved = resolve_asset(candidate)
+            resolution = resolve_asset_candidate(
+                candidate,
+                field="research_query.symbols",
+                source="llm_extraction",
+                asset_class_hint=query.asset_class_hint,
+                require_unambiguous_class=True,
+            )
+            resolved = resolution.asset
+            if resolution.status != "resolved" or resolved is None:
+                continue
         except Exception:  # noqa: BLE001
             continue
         symbol = resolved.canonical_symbol.upper()

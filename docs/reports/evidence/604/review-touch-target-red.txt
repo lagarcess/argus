@@ -1,0 +1,42 @@
+$ playwright test "e2e/receipt-sharing-service.spec.ts" "--workers=1" --grep "en dark 390"
+(node:47158) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:47159) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:47160) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:47161) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:47161) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:47161) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:47170) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:47170) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+  ✘  1 [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 390 (2.6s)
+
+
+  1) [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 390 ────
+
+    Error: expect(received).toBeGreaterThanOrEqual(expected)
+
+    Expected: >= 44
+    Received:    36
+
+      75 |     for (const control of [sharedLinks.getByRole("button", { name: copy.list.copy, exact: true }), sharedLinks.getByRole("link", { name: copy.list.open, exact: true }), sharedLinks.getByRole("button", { name: copy.list.revoke, exact: true })]) {
+      76 |       await expect(control).toBeVisible();
+    > 77 |       expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+         |                                                     ^
+      78 |     }
+      79 |     await page.screenshot({ animations: "disabled", style: "nextjs-portal { display: none; }", path: resolve(directory, `${prefix}-shared-links.png`) });
+      80 |     const publicResponse = await request.get(`${api}/api/v1/public/receipts/${receipt.public_id}`);
+        at /Users/garces/.codex/worktrees/0968/private-alpha-next/web/e2e/receipt-sharing-service.spec.ts:77:53
+
+    Error Context: temp/playwright-results/1789406867014-47161/receipt-sharing-service-real-receipt-lifecycle-en-dark-390-chromium/error-context.md
+
+  1 failed
+    [chromium] › e2e/receipt-sharing-service.spec.ts:21:7 › real receipt lifecycle en dark 390 ─────
+error: script "test:e2e" exited with code 1

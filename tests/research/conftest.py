@@ -162,7 +162,12 @@ class RecordingTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
         if not self.documents:
-            return httpx.Response(500, json={"error": "exhausted"})
+            # An exhausted script is an outage that asks for a wait longer than
+            # any call's deadline, so the client fails at once instead of
+            # retrying on a real clock.
+            return httpx.Response(
+                500, headers={"Retry-After": "86400"}, json={"error": "exhausted"}
+            )
         document = self.documents.pop(0)
         return httpx.Response(200, json=document)
 
@@ -187,9 +192,26 @@ def set_research_query(monkeypatch, namespace, **fields):
     monkeypatch.setitem(target, "_interpretation", interpreted)
 
 
-def typed_answer_text(answer: str, rows: list[dict[str, Any]]) -> str:
-    """The provider's message text under the strict typed retrieval schema."""
-    return json.dumps({"answer_markdown": answer, "rows": rows})
+def typed_answer_text(
+    answer: str,
+    rows: list[dict[str, Any]],
+    calculation: dict[str, Any] | None = None,
+    follow_up_questions: list[str] | None = None,
+    declined: bool = False,
+    source_urls: list[str] | None = None,
+) -> str:
+    """The provider's message text under the strict typed answer schema: the
+    pages it names, and its one calculation, when given, as a list of one."""
+    return json.dumps(
+        {
+            "answer_markdown": answer,
+            "rows": rows,
+            "source_urls": source_urls or [],
+            "calculations": [calculation] if calculation else [],
+            "follow_up_questions": follow_up_questions or [],
+            "declined": declined,
+        }
+    )
 
 
 def retrieved_row(
@@ -316,3 +338,55 @@ def rows_with_one_rejected() -> list[dict[str, Any]]:
             source_url="https://invented.example/target",
         ),
     ]
+
+
+@pytest.fixture
+def collision_catalog(monkeypatch, tmp_path):
+    from argus.domain.market_data import assets
+
+    listings = [
+        ("BTC", "Grayscale Bitcoin Mini Trust ETF", "us_equity"),
+        ("IBIT", "iShares Bitcoin Trust ETF", "us_equity"),
+        ("AAPL", "Apple Inc.", "us_equity"),
+        ("MSFT", "Microsoft Corporation", "us_equity"),
+        ("BTC/USD", "Bitcoin", "crypto"),
+        ("ETH/USD", "Ethereum", "crypto"),
+        ("SOL/USD", "Solana", "crypto"),
+        ("SPY", "SPDR S&P 500 ETF Trust", "us_equity"),
+    ]
+    path = tmp_path / "catalog.json"
+    path.write_text(
+        json.dumps(
+            {
+                "alpaca_assets": [
+                    {
+                        "symbol": symbol,
+                        "name": name,
+                        "asset_class": cls,
+                        "status": "active",
+                    }
+                    for symbol, name, cls in listings
+                ],
+                "kraken_asset_pairs": {},
+            }
+        )
+    )
+    monkeypatch.setenv("ARGUS_ASSET_PROVIDER_MODE", "recorded_provider_fixture")
+    monkeypatch.setenv("ARGUS_ASSET_FIXTURE_PATH", str(path))
+    assets.clear_asset_cache()
+    from argus.domain.market_data import tradability
+
+    monkeypatch.setattr(
+        tradability, "_probe", lambda symbol, cls: tradability.TradableHistory("tradable")
+    )
+    tradability.clear_tradable_history_cache()
+    etf = assets.ResolvedAsset("BTC", "equity", listings[0][1], "BTC", "alpaca")
+    # The exact provider lookup is the external boundary that favors the ETF.
+    monkeypatch.setattr(
+        assets,
+        "_resolve_live_provider_ticker",
+        lambda symbol: etf if symbol == "BTC" else None,
+    )
+    yield
+    assets.clear_asset_cache()
+    tradability.clear_tradable_history_cache()

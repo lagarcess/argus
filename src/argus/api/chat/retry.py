@@ -2,19 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from argus.agent_runtime.recovery_messages import DURABLE_RETRY_RECOVERY_CODES
 from argus.api.schemas import ChatStreamRequest, Message
 
 
-def discovery_recovery_code(recovery: Any) -> str | None:
-    """Only retryable discovery refusals use recoverable turn settlement."""
+def durable_retry_code(recovery: Any) -> str | None:
+    """The code of a retryable recovery whose turn settles with a durable retry."""
     if not isinstance(recovery, dict) or recovery.get("retryable") is not True:
         return None
     code = recovery.get("code")
-    return (
-        code
-        if code in {"discovery_search_failed", "discovery_suggestions_unavailable"}
-        else None
-    )
+    return code if code in DURABLE_RETRY_RECOVERY_CODES else None
 
 
 def durable_retry_last_turn_metadata(

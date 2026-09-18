@@ -164,6 +164,7 @@ def test_inline_and_background_research_date_the_question_alike(
         text=typed_answer_text(
             "NVIDIA fell **4.3%** this week.",
             [retrieved_row(as_of="2026-09-09", source_url=PUBLISHER)],
+            source_urls=[BEFORE_THE_PERIOD, PUBLISHER, UTC_STAMPED, TWO_DAYS_AHEAD],
         ),
         tickers=["NVDA"],
         web_search_invocations=1,

@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/tmp/test_current_reason_clean_guard.py", line 19, in <module>
+    g=guard();r=g.before(request(payload));assert r['reserved_usd']==.625
+  File "/tmp/current_reason_rerun_budget.py", line 54, in before
+    if model not in MODEL_RATE_TABLE_USD_PER_MILLION:self.stop('unpriced_agent_model')
+  File "/tmp/current_reason_rerun_budget.py", line 32, in stop
+    self.blocked.append({'label':self.label,'reason':reason});self.save();raise SpendStop(reason)
+current_reason_rerun_budget.SpendStop: unpriced_agent_model

@@ -21,6 +21,7 @@ from argus.api.chat.confirmation import (
 )
 from argus.api.main import app
 from argus.api.message_store import create_message
+from argus.domain.backtesting.config import MIN_STARTING_CAPITAL
 from fastapi.testclient import TestClient
 
 
@@ -151,7 +152,11 @@ def test_no_nonturn_change_ever_grows_the_transcript(
         )
 
     out_of_envelope = [
-        ("capital below the engine minimum", f"{base}/direct-edit", {"capital": 50}),
+        (
+            "capital below the engine minimum",
+            f"{base}/direct-edit",
+            {"capital": MIN_STARTING_CAPITAL - 0.01},
+        ),
         (
             "future end date",
             f"{base}/direct-edit",

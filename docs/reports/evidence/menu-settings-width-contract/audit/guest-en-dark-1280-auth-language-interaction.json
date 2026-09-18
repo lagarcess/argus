@@ -1,0 +1,12 @@
+{
+  "width": 1280,
+  "account": "guest",
+  "language": "en",
+  "theme": "dark",
+  "escapeDismissed": true,
+  "focus": {
+    "insideDialog": false,
+    "tag": "BODY",
+    "placeholder": null
+  }
+}

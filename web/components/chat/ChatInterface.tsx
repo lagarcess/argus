@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useReceiptFollowup, readReceiptFollowup } from "./useReceiptFollowup";
 import { useProfileUpdates } from "@/components/chat/useProfileUpdates";
 import { useTranslation } from "react-i18next";
 import { readStored, writeStored } from "@/lib/browser-storage";
@@ -29,6 +30,8 @@ import { useArchiveActiveConversation } from "@/components/chat/useArchiveActive
 import { toggleConversationUnread } from "@/components/chat/toggleConversationUnread";
 import { useRecentConversations } from "@/components/chat/useRecentConversations";
 import { conversationActivityMutationNoticeDescriptor, useConversationActivity } from "@/components/chat/useConversationActivity";
+import { useConversationTranscriptFreshness } from "./useConversationTranscriptFreshness";
+import { loadSavedConversationTranscript, type SavedConversationTranscript } from "@/lib/conversation-transcript-freshness";
 import { chatFinalPayloadOwnsVisibleTerminalArtifact, clearConversationActivityTranscript, conversationActivityMutationRequiresCanonicalHydration, createConversationActivityTerminalReadinessSession, createConversationActivityTranscriptReadiness, promoteCanonicalConversationActivityTranscript, synchronizeConversationViewRefs, useConversationActivityViewport } from "@/components/chat/useConversationActivityViewport";
 import GuestExperienceSurfaces from "@/components/guest/GuestExperienceSurfaces";
 import GuestHeader from "@/components/guest/GuestHeader";
@@ -102,7 +105,7 @@ import {
 } from "@/lib/chat-conversation-view-helpers";
 import { activeConfirmationIdFrom } from "@/lib/chat-confirmation-peers";
 import { toolResultRecomputeHandler } from "@/lib/tool-result-recompute";
-import { toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
+import { answerAssumptionsFromMetadata, toolCardsFromMetadata, hasUnavailableToolCards, toolProgressText } from "@/lib/tool-result-card";
 import { mergeFinalTextMessage } from "@/lib/chat-final-message";
 import { resultReadoutContentFromMetadata } from "@/lib/result-readout-content";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
@@ -168,6 +171,7 @@ import { renamePrefillTitle } from "@/lib/chat-title-display";
 import { useActiveConversationTitle } from "@/lib/chat-header-title-state";
 import ChatHeaderMenu from "./ChatHeaderMenu";
 import { ShareReceiptPanel } from "./ShareReceiptAction";
+import { ReceiptConversationProvider, ReceiptConversationTurn, ReceiptSelectionComposer } from "./ReceiptConversationSelection";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
 import ChatHeaderTitle from "./ChatHeaderTitle";
 import ChatInput from "./ChatInput";
@@ -312,13 +316,13 @@ export default function ChatInterface() {
   const shouldAutoScrollRef = useRef(true);
   const postTurnHistoryRefreshTimersRef = useRef<number[]>([]);
   const activeConversationIdRef = useRef<string | null>(null);
-  const hasAcceptedUserInputRef = useRef(false);
+  const hasAcceptedUserInputRef = useRef(Boolean(readReceiptFollowup()));
   const guestSendRef = useRef<GuestResumeSend | null>(null);
   const sendAdmissionInFlightRef = useRef(false);
   const guestSubmissionRetryRef = useRef<GuestPendingSubmission | null>(null);
   const currentViewRef = useRef<View>("chat");
   const [transcriptSessionCache] = useState(
-    () => new TranscriptSessionCache<Message[]>(),
+    () => new TranscriptSessionCache<SavedConversationTranscript>(),
   );
   const coldRetrievalTimerRef = useRef<number | null>(null);
   const coldRetrievalConversationIdRef = useRef<string | null>(null);
@@ -354,23 +358,27 @@ export default function ChatInterface() {
     },
     [account?.user.id, activityTranscriptReadiness, transcriptSessionCache],
   );
-  const invalidateInactiveActivityTranscript = useCallback(
-    (targetConversationId: string) =>
-      invalidateTranscriptForMutation(targetConversationId, "durable_job_completion"),
-    [invalidateTranscriptForMutation],
-  );
   const conversationActivity = useConversationActivity({
     historyItems,
     historyActivityRevision,
     activeConversationId: currentView === "chat" ? conversationId : null,
     accountScopeKey: account?.user.id ?? null,
     refreshHistory: refreshHistoryForActivity,
-    invalidateInactiveTranscript: invalidateInactiveActivityTranscript,
+    invalidateInactiveTranscript: (id) => invalidateTranscriptForMutation(id, "durable_job_completion"),
     onMutationNotice: (notice) => {
       const descriptor = conversationActivityMutationNoticeDescriptor(notice);
       showToast(t(descriptor.key, descriptor.defaultValue), descriptor.variant);
     },
     causalClock: activityCausalClock,
+  });
+  const recordLoadedTranscript = useConversationTranscriptFreshness({
+    inputs: () => {
+      const record = conversationActivity.state.byConversationId[conversationId ?? ""];
+      return { accountId: account?.user.id ?? null, conversationId: currentView === "chat" ? conversationId : null, latestMessageId: record?.canonical?.latest_message_id ?? null, activityRevision: Math.max(historyActivityRevision, record?.serverRevision ?? 0), requestId: record?.request?.requestId ?? null, ready: !isHydratingConversation && readyTranscriptConversationIdRef.current === conversationId, visibleMessages: messages };
+    },
+    invalidate: (id) => invalidateTranscriptForMutation(id, "durable_job_completion"),
+    readyTranscriptConversationIdRef, activityTranscriptReadiness, pendingScrollRestoreRef,
+    scrollContainerRef, shouldAutoScrollRef, setMessages,
   });
   const [requestSessions] = useState(() =>
     createChatRequestSessionController({
@@ -589,13 +597,13 @@ export default function ChatInterface() {
   function stageTranscriptSnapshot(
     targetConversationId: string,
     userId: string,
-    snapshot: Message[],
+    snapshot: SavedConversationTranscript,
     scrollTopOverride?: number | null,
   ): void {
     clearColdTranscriptRetrieval();
     setFailedConversationId(null);
     setIsHydratingConversation(false);
-    if (snapshot.length === 0) {
+    if (snapshot.messages.length === 0) {
       resetToEmptyChatSurface();
       return;
     }
@@ -612,7 +620,8 @@ export default function ChatInterface() {
       scrollTop,
     };
     shouldAutoScrollRef.current = scrollTop === null;
-    setMessages(snapshot);
+    recordLoadedTranscript(userId, targetConversationId, snapshot);
+    setMessages(snapshot.messages);
   }
 
   function beginColdTranscriptRetrieval(targetConversationId: string): void {
@@ -666,12 +675,9 @@ export default function ChatInterface() {
           requestedMessageId,
         });
       try {
-        const items = await loadAllConversationMessagePages(
-          targetConversationId,
-        );
+        const snapshot = await loadSavedConversationTranscript(targetConversationId);
         if (!isCurrentRequest()) return;
-        const snapshot = hydrateMessagesFromApi(items).messages;
-        const anchorMessageId = projectedTranscriptAnchorId(snapshot, requestedMessageId);
+        const anchorMessageId = projectedTranscriptAnchorId(snapshot.messages, requestedMessageId);
         if (!anchorMessageId) throw new Error("Transcript anchor was not returned.");
         clearColdTranscriptRetrieval();
         setIsHydratingConversation(false);
@@ -683,7 +689,8 @@ export default function ChatInterface() {
           messageId: anchorMessageId,
         };
         shouldAutoScrollRef.current = false;
-        setMessages(snapshot);
+        recordLoadedTranscript(userId, targetConversationId, snapshot);
+        setMessages(snapshot.messages);
       } catch (error) {
         if (!isCurrentRequest()) return;
         clearColdTranscriptRetrieval();
@@ -704,15 +711,8 @@ export default function ChatInterface() {
     const handle = transcriptSessionCache.navigate({
       userId,
       conversationId: targetConversationId,
-      load: async (signal) => {
-        const items = await loadAllConversationMessagePages(
-          targetConversationId,
-          undefined,
-          { signal },
-        );
-        return hydrateMessagesFromApi(items).messages;
-      },
-      onState: (state: TranscriptNavigationState<Message[]>) => {
+      load: (signal) => loadSavedConversationTranscript(targetConversationId, signal),
+      onState: (state: TranscriptNavigationState<SavedConversationTranscript>) => {
         if (state.phase === "loading") {
           beginColdTranscriptRetrieval(targetConversationId);
           return;
@@ -751,7 +751,8 @@ export default function ChatInterface() {
         if (state.snapshot !== null) {
           readyTranscriptConversationIdRef.current = targetConversationId;
           activityTranscriptReadiness.stageCached(targetConversationId);
-          setMessages(state.snapshot);
+          recordLoadedTranscript(userId, targetConversationId, state.snapshot);
+          setMessages(state.snapshot.messages);
           return;
         }
         clearConversationActivityTranscript(activityTranscriptReadiness, readyTranscriptConversationIdRef);
@@ -1022,7 +1023,6 @@ export default function ChatInterface() {
   );
 
   // ── Send message ───────────────────────────────────────────────────────────
-
   const handleSend = async (
     text: string,
     mentionsOrAction?: SendSelection,
@@ -1048,7 +1048,6 @@ export default function ChatInterface() {
         : (mentionsOrAction as ChatActionOption | undefined);
     const isDeferredGuestSubmission =
       guestBootstrapRequired && !options?.bypassGuestGate;
-
     sendAdmissionInFlightRef.current = true;
     if (isDeferredGuestSubmission) {
       guestSubmissionRetryRef.current = {
@@ -1085,7 +1084,7 @@ export default function ChatInterface() {
       stateConversationId: conversationId,
       action,
     });
-    const shouldCreateNewRouteConversation =
+    const shouldCreateNewRouteConversation = Boolean(options?.startNewConversation) ||
       shouldStartConversationForVisibleEmptyChat({
         routeState,
         visibleMessageCount: messages.length,
@@ -1196,7 +1195,7 @@ export default function ChatInterface() {
       action?.type === "run_backtest" ? "backtest_job" : "chat_turn";
     const initialRequestSession = requestSessions.begin(
       targetConversationId,
-      requestKind,
+      requestKind, options?.requestId,
     );
     if (!initialRequestSession) return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     guestSubmissionRetryRef.current = null;
@@ -1260,14 +1259,12 @@ export default function ChatInterface() {
         );
         const durableRetry = durableRetryLastTurnFromStreamError(errorPayload);
         const durableRetryAction = durableRetry?.action ?? null;
-        const metadataRetryAction = durableRetryAction
-          ? null
+        const visibleRetryAction = durableRetryAction
+          ? (renderUserMessage ? null : durableRetryAction)
           : retryLastTurnActionFromMetadata(errorPayload, {
               assistantMessageId: persistedErrorMessageId,
               messageRole: "assistant",
-            });
-        const visibleRetryAction =
-          metadataRetryAction ??
+            }) ??
           (retryLastTurnAction && persistedErrorMessageId
             ? retryLastTurnActionFromMessage(trimmed, {
                 assistantMessageId: persistedErrorMessageId,
@@ -1298,7 +1295,7 @@ export default function ChatInterface() {
                         strategyPathContext: errorStrategyPathContext,
                         assistantRecoveryCode: errorAssistantRecoveryCode,
                         actions:
-                          visibleRetryAction && !durableRetryAction
+                          visibleRetryAction
                             ? [visibleRetryAction]
                             : m.actions,
                       }
@@ -1314,6 +1311,7 @@ export default function ChatInterface() {
       if (event.event === "final") {
         const identityAuthorized = requestSessions.authorize(requestSession, "final");
         if (!identityAuthorized) return;
+        options?.onTerminal?.();
         clearNeutralGuestSubmission();
         setStreamStatus(null);
         if (recoverQuotaRejectedRun(event.data.final_response_payload?.code ?? event.data.code)) return;
@@ -1345,6 +1343,7 @@ export default function ChatInterface() {
         const finalNextExperimentsSourceRunId =
           nextExperimentsSourceRunIdFromMetadata(finalPayload);
         const finalNextSteps = nextStepsFromMetadata(finalPayload, finalNextExperiments);
+        const finalAnswerAssumptions = answerAssumptionsFromMetadata(finalPayload);
         const finalResponseActions = finalMessageId
           ? recoveryActionsFromMetadata(finalPayload, finalMessageId)
           : [];
@@ -1472,6 +1471,7 @@ export default function ChatInterface() {
                   resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                   nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
                   nextSteps: finalNextSteps,
+                  answerAssumptions: finalAnswerAssumptions,
                   contentPresentation: finalTextPresentation,
                 }),
               ),
@@ -1496,6 +1496,7 @@ export default function ChatInterface() {
                 resultReadoutContent: resultReadoutContentFromMetadata(finalPayload),
                 nextExperimentsSourceRunId: finalNextExperimentsSourceRunId,
                 nextSteps: finalNextSteps,
+                answerAssumptions: finalAnswerAssumptions,
                 contentPresentation: finalTextPresentation,
               },
             );
@@ -1583,16 +1584,15 @@ export default function ChatInterface() {
           runStreamFinalSeen ||= event.event === "final";
           handleStreamEvent(event);
         },
-        // Action turns drop composer mentions, but a discovery selection has no
-        // composer input to drop -- its mention *is* the resolver identity the
-        // candidate already earned, and dropping it is what forces the
-        // interpreter to re-derive the asset from the chip text.
+        // Discovery selections retain their resolver identity; other action
+        // turns drop composer mentions.
         action?.type && action.type !== "select_discovery_candidate"
           ? []
           : mentions,
         {
           requestId: requestSession.identity.requestId,
           signal: requestSession.controller.signal,
+          failedAssistantId: replacementAssistantId,
         },
       );
       throwIfAmbiguousRunStreamTermination(
@@ -1602,7 +1602,7 @@ export default function ChatInterface() {
     };
 
     guestSubmissionHandedToStream = true;
-    void (async () => {
+    const transport = (async () => {
       try {
         await streamToConversation(targetConversationId);
       } catch (err: unknown) {
@@ -1610,7 +1610,7 @@ export default function ChatInterface() {
         if (
           err instanceof ChatStreamError &&
           err.status === 404 &&
-          !action?.type
+          !action?.type && !options?.awaitCompletion
         ) {
           try {
             const retryWasVisible = canApplyVisibleStreamUpdate();
@@ -1766,7 +1766,7 @@ export default function ChatInterface() {
         finishRequestTransport(requestSession);
       }
     })();
-    return true;
+    return options?.awaitCompletion ? transport.then(() => true) : true;
     } finally {
       sendAdmissionInFlightRef.current = false;
       if (isDeferredGuestSubmission && !guestSubmissionHandedToStream) {
@@ -1788,6 +1788,7 @@ export default function ChatInterface() {
   };
 
   useGuestSendBridge(guestSendRef, handleSend);
+  const receiptFollowup = useReceiptFollowup({ profileState, account, conversationId, hydrating: isHydratingConversation, guest: guestExperience, refreshAccount, navigate: navigateConversationTranscript, send: (text, options) => handleSend(text, undefined, undefined, options) });
   // ── Action routing ─────────────────────────────────────────────────────────
 
   const handleLogout = async () => {
@@ -1989,7 +1990,8 @@ export default function ChatInterface() {
 
   const omnisearch = omnisearchActionHandlers(() => ({
     closeOverlay: () => setSearchOverlayOpen(false),
-    loadConversation,
+    loadConversation, startNewChat, requestNewChat,
+    guestGate: () => ({ accountKind: isGuest ? "guest" : "registered", hasAcceptedContent: messages.some((message) => message.role === "user") }),
     send: handleSend,
     isSourceConversationReady: (id) =>
       activeConversationIdRef.current === id &&
@@ -2130,7 +2132,7 @@ export default function ChatInterface() {
     isHydratingConversation,
     hasConversationLoadFailure,
   });
-  const conversationComposerUnavailable =
+  const conversationComposerUnavailable = Boolean(readReceiptFollowup()) ||
     isStreamingResponse ||
     isHydratingConversation ||
     guestSubmissionPending ||
@@ -2188,6 +2190,7 @@ export default function ChatInterface() {
   }
 
   return (
+    <ReceiptConversationProvider target={evidenceReceiptSharingEnabled ? guestExperience.receiptSharing.target : null} conversationId={conversationId} onClose={guestExperience.receiptSharing.close}>
     <ConversationActivityPresentationProvider
       selectPresentation={conversationActivity.selectPresentation}
       selectAggregatePresentation={conversationActivity.selectAggregatePresentation} selectOperationLabel={conversationActivity.selectOperationLabel}
@@ -2300,6 +2303,7 @@ export default function ChatInterface() {
               void loadConversation(convId, messageId, openAtLeftOff);
             }}
             onRetest={omnisearch.retest}
+            onAsk={omnisearch.ask}
             turnInFlight={turnInFlight}
             activeConversationId={conversationId}
             isGuest={isGuest}
@@ -2412,7 +2416,7 @@ export default function ChatInterface() {
               <EmptyChatSurface
                 isGuest={isGuest}
                 expiresAt={account?.guest?.expires_at}
-                guestSubmissionPending={guestSubmissionPending}
+                guestSubmissionPending={guestSubmissionPending || Boolean(readReceiptFollowup())}
                 guestSubmissionError={guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
@@ -2471,11 +2475,12 @@ export default function ChatInterface() {
                           tabIndex={-1}
                           className="scroll-m-24 outline-none"
                         >
-                          <ChatMessage
+                          <ReceiptConversationTurn messageId={msg.id}><ChatMessage
                             message={msg}
                             onAction={handleAction}
                             onDirectEdit={handleDirectEditConfirmation}
                             onToolRecompute={(card, changes) => handleToolRecompute(msg.id, card, changes)}
+                            onOpenConversation={(id) => { void loadConversation(id); }}
                             onFeedback={(type, context, rating) => {
                               void handleMessageFeedback(type, context, rating);
                             }}
@@ -2506,7 +2511,7 @@ export default function ChatInterface() {
                               msg.id === resumeDecisionMessageId ? resumeDecisionArtifactId : null
                             }
                             onDecisionResumeHandled={clearResumeDecision}
-                          />
+                          /></ReceiptConversationTurn>
                         </div>
                       );
                     })}
@@ -2540,13 +2545,13 @@ export default function ChatInterface() {
                         />
                       </div>
                     )}
-                    <ChatInput
+                    <ReceiptSelectionComposer><ChatInput
                       key={conversationId ?? "unowned-transcript"}
                       onSend={handleSend}
                       disabled={conversationComposerUnavailable}
                       placeholder={chatInputPlaceholder}
                       onToast={showToast}
-                    />
+                    /></ReceiptSelectionComposer>
                     <ChatLegalNotice
                       expiresAt={account?.guest?.expires_at}
                       isGuest={isGuest}
@@ -2575,7 +2580,7 @@ export default function ChatInterface() {
         rating={feedbackState.rating}
         context={feedbackState.context}
       />
-      <GuestExperienceSurfaces experience={guestExperience} />
+      {receiptFollowup}<GuestExperienceSurfaces experience={guestExperience} />
       {evidenceReceiptSharingEnabled && guestExperience.receiptSharing.target && <ShareReceiptPanel key={guestExperience.receiptSharing.target.conversationId} {...guestExperience.receiptSharing.target} onClose={guestExperience.receiptSharing.close} />}
       {isSidebarPreferenceModalOpen && (
         <SidebarPreferenceModal
@@ -2585,6 +2590,6 @@ export default function ChatInterface() {
         />
       )}
       </div>
-    </ConversationActivityPresentationProvider>
+    </ConversationActivityPresentationProvider></ReceiptConversationProvider>
   );
 }

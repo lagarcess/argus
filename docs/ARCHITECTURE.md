@@ -269,6 +269,8 @@ Canonical state store.
 - Legacy Strategy and Collection rows (read compatibility only)
 - Backtest jobs
 - Backtest history
+- Computed answers (a tool result card and its computation marker on an
+  assistant message; no run)
 - Archived / deleted records
 - Feedback records
 
@@ -507,8 +509,40 @@ cost ledger and persistence owners remain authoritative. The card presenter owns
 display facts while the callable owns the typed result. Local editable tools
 recompute through the guarded message-artifact writer: the original unknown
 stays blank and the input revision advances with the result. Public sharing
-continues to use its shipped selected-turn contract; connecting general tool
-results to sharing remains a separate change.
+freezes a computed answer's card as its own `calculation` leaf through the
+shipped selected-turn contract.
+
+A computed answer is an artifact without a run. The answering model, the
+research provider or the no-search voicing answer, returns its prose and one
+typed calculation request with each input's source; the runtime holds every
+input to that source, computes in process, fills the prose's figures from the
+card and publishes it, and the one marker owner
+(`argus.domain.computation_marker`) writes `metadata.computation` from it. Every
+later reader derives from that pair and nothing else: a decision stores its
+inputs and re-runs the declaration's one compute function, Search projects an
+answer dossier and counts results under an asset, the conversation rail ticks a
+result, comparison lines up two cards' typed facts in Python, continuing copies
+the card into a new chat, and sharing freezes it. None of these creates a
+backtest run, a job, an evidence artifact or a strategy. The only paid read is
+a refresh of cited inputs the user starts, which goes through the research
+allowance and the cost ledger like a turn.
+
+Recovery preserves the current question's ownership. When interpreter candidates
+fail, focused strategy repair requires a typed strategy read from that same turn;
+an outage, a ticker, or a pending test cannot supply that intent. An unread turn
+keeps the interpreter-unavailable recovery and retry contract. Likewise, the
+current interpretation must identify an answer to a pending need before it can
+block knowledge or arithmetic; the previous `await_user_reply` alone cannot.
+
+Inline research attempts share the active turn's remaining deadline. The lookup
+ladder reserves the normal knowledge-voicing timeout (at most half the remaining
+turn) for the existing answer-without-lookup path, and bounds both the provider
+transport and its async wait. The turn also owns a single-use call reservation
+for that recovery answer, so interpreter retries cannot consume its last attempt.
+A cancelled sync provider may still finish remotely,
+so its admission charge is retained and its late result is never published or
+cached. Interpreter-unavailable copy names failed question understanding in both
+locales without assuming the user requested a test.
 
 Progress is a declaration locale key with typed arguments, emitted when that
 call executes. Graph-stage events retain operational meaning and cannot select

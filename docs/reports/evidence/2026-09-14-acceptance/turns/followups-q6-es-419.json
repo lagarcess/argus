@@ -1,0 +1,915 @@
+{
+  "label": "followups-q6-es-419",
+  "phase": "followups",
+  "question": "q6",
+  "language": "es-419",
+  "country": "DO",
+  "account_kind": "registered",
+  "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+  "message": "Usa USD 300 como precio por acción. Con ese dato y sin hacer otra búsqueda, ¿qué dato sigue faltando para calcular el P/E?",
+  "answer": {
+    "id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+    "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+    "role": "assistant",
+    "content": "Falta el valor de las ganancias por acción.\n\n*La búsqueda falló.*",
+    "created_at": "2026-09-14T17:28:43.362050Z",
+    "metadata": {
+      "research": {
+        "rows": [],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.01361,
+          "latency_ms": 7681,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [],
+        "degraded": {
+          "code": "research_not_grounded"
+        },
+        "follow_up": {
+          "subjects": [
+            {
+              "name": "Apple Inc. Common Stock",
+              "symbol": "AAPL",
+              "asset_class": "equity"
+            }
+          ],
+          "questions": [],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T17:28:42.214687+00:00",
+        "anchor_symbols": [
+          "AAPL"
+        ],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "kind": "research_test_single",
+            "type": "test"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "next_experiments": {
+        "rows": [
+          {
+            "kind": "research_test_single",
+            "label": "Probar Apple (AAPL) en los últimos 3 años",
+            "label_key": "chat.next_experiments.labels.research_dynamic",
+            "send_text": "Prueba comprar y mantener AAPL durante los últimos tres años",
+            "label_parts": [
+              {
+                "type": "text",
+                "value": "Probar "
+              },
+              {
+                "type": "text",
+                "value": "Apple"
+              },
+              {
+                "type": "ticker",
+                "value": "AAPL"
+              },
+              {
+                "type": "text",
+                "value": " en los últimos 3 años"
+              }
+            ]
+          }
+        ],
+        "version": "argus_next_experiments/v1"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "d9f18d96-e915-4749-a0f7-3df60ed8efe9",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "Falta el valor de las ganancias por acción.\n\n*La búsqueda falló.*"
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "Falta el valor de las ganancias por acción.\n\n*La búsqueda falló.*",
+        "next_experiments": {
+          "version": "argus_next_experiments/v1",
+          "rows": [
+            {
+              "kind": "research_test_single",
+              "label": "Probar Apple (AAPL) en los últimos 3 años",
+              "label_parts": [
+                {
+                  "type": "text",
+                  "value": "Probar "
+                },
+                {
+                  "type": "text",
+                  "value": "Apple"
+                },
+                {
+                  "type": "ticker",
+                  "value": "AAPL"
+                },
+                {
+                  "type": "text",
+                  "value": " en los últimos 3 años"
+                }
+              ],
+              "label_key": "chat.next_experiments.labels.research_dynamic",
+              "send_text": "Prueba comprar y mantener AAPL durante los últimos tres años"
+            }
+          ]
+        },
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "test",
+              "kind": "research_test_single"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [],
+          "rows": [],
+          "retrieved_at": "2026-09-14T17:28:42.214687+00:00",
+          "anchor_symbols": [
+            "AAPL"
+          ],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 7681,
+            "cost_usd": 0.01361,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [
+              {
+                "symbol": "AAPL",
+                "name": "Apple Inc. Common Stock",
+                "asset_class": "equity"
+              }
+            ],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": []
+          },
+          "degraded": {
+            "code": "research_not_grounded"
+          }
+        },
+        "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 24.796,
+  "screenshot": {
+    "file": "screenshots/followups-q6-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Falta el valor de las ganancias por acción.\n\nLa búsqueda falló.\n\nQUÉ PROBAR DESPUÉS\n↳\nProbar Apple AAPL en los últimos 3 años"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "b0f5c311-6d2f-4901-98d3-30fb0393d02c",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "run_id": null,
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 874,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 823,
+        "cached_tokens": 768,
+        "prompt_tokens": 806,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 22.781,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:28:21.497288+00:00"
+    },
+    {
+      "id": "38e7691b-7b74-4ebe-85c9-6783cac0c3c8",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "run_id": null,
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 10486,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 11947,
+        "cached_tokens": 10560,
+        "prompt_tokens": 10843,
+        "completion_tokens": 1104,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 22.781,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:28:31.984224+00:00"
+    },
+    {
+      "id": "1c76e5fb-d4bb-4b06-bf37-745732d1c76a",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "run_id": null,
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "task": "interpretation_repair",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "FocusedStrategyExtraction",
+      "latency_ms": 2517,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3745,
+        "cached_tokens": 128,
+        "prompt_tokens": 3489,
+        "completion_tokens": 256,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "c004a34459e7c3a6c17965a22610b121e13d915e3fdb54f62e1babee0bb56c01",
+          "before_fingerprint": "c004a34459e7c3a6c17965a22610b121e13d915e3fdb54f62e1babee0bb56c01",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 22.781,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:28:34.504201+00:00"
+    },
+    {
+      "id": "f3332539-1acb-44d5-a1a9-ab95de9e4728",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "run_id": null,
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "task": "knowledge_voicing",
+      "tier": "chat",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "CalculatedVoicedAnswer",
+      "latency_ms": 1051,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 3164,
+        "cached_tokens": 128,
+        "prompt_tokens": 3137,
+        "completion_tokens": 27,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 22.781,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:28:43.327445+00:00"
+    },
+    {
+      "id": "68dba2c8-0d5f-4250-a9e8-e0efc5774b62",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "run_id": null,
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 0,
+      "outcome": "skipped",
+      "failure_mode": "title_not_generated",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:28:43.411257+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "b28d1064-dc37-4ca3-8f76-24032f4beec5",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "b0f5c311-6d2f-4901-98d3-30fb0393d02c",
+      "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+      "correlation_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8:91b31abd-2490-4e46-8cb7-dc124f4f16b1:f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 823,
+        "cached_tokens": 768,
+        "prompt_tokens": 806,
+        "usage_cost_usd": 0.0002436,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 806,
+      "output_tokens": 17,
+      "total_tokens": 823,
+      "billable_unit": "token",
+      "billable_quantity": "823.000000",
+      "cost_amount": "0.00024360",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 874,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 22.781,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:28:21.497288+00:00",
+      "created_at": "2026-09-14 17:28:43.385623+00:00"
+    },
+    {
+      "id": "c09bced0-aaa3-4010-8b24-a8b2a152eef7",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "38e7691b-7b74-4ebe-85c9-6783cac0c3c8",
+      "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+      "correlation_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8:91b31abd-2490-4e46-8cb7-dc124f4f16b1:f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 11947,
+        "cached_tokens": 10560,
+        "prompt_tokens": 10843,
+        "usage_cost_usd": 0.00522575,
+        "completion_tokens": 1104,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10843,
+      "output_tokens": 1104,
+      "total_tokens": 11947,
+      "billable_unit": "token",
+      "billable_quantity": "11947.000000",
+      "cost_amount": "0.00522575",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 10486,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 22.781,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:28:31.984224+00:00",
+      "created_at": "2026-09-14 17:28:43.392314+00:00"
+    },
+    {
+      "id": "4783e061-13b7-4fc1-bb8e-3ac782a6d1f1",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation_repair",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "1c76e5fb-d4bb-4b06-bf37-745732d1c76a",
+      "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+      "correlation_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8:91b31abd-2490-4e46-8cb7-dc124f4f16b1:f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3745,
+        "cached_tokens": 128,
+        "prompt_tokens": 3489,
+        "usage_cost_usd": 0.00486685,
+        "completion_tokens": 256,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3489,
+      "output_tokens": 256,
+      "total_tokens": 3745,
+      "billable_unit": "token",
+      "billable_quantity": "3745.000000",
+      "cost_amount": "0.00486685",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 2517,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "schema_name": "FocusedStrategyExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "repair_effect": {
+          "no_op_reason": "no_material_fields",
+          "changed_fields": [],
+          "repair_applied": false,
+          "schema_version": "argus_repair_effect/v1",
+          "trigger_reason": "required_strategy_shape_missing",
+          "after_fingerprint": "c004a34459e7c3a6c17965a22610b121e13d915e3fdb54f62e1babee0bb56c01",
+          "before_fingerprint": "c004a34459e7c3a6c17965a22610b121e13d915e3fdb54f62e1babee0bb56c01",
+          "contribution_role_preserved": false
+        },
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 22.781,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:28:34.504201+00:00",
+      "created_at": "2026-09-14 17:28:43.398821+00:00"
+    },
+    {
+      "id": "67d71cdf-1b7f-4430-8880-3f987c3714eb",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "knowledge_voicing",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "f3332539-1acb-44d5-a1a9-ab95de9e4728",
+      "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+      "correlation_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8:91b31abd-2490-4e46-8cb7-dc124f4f16b1:f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 3164,
+        "cached_tokens": 128,
+        "prompt_tokens": 3137,
+        "usage_cost_usd": 0.00385435,
+        "completion_tokens": 27,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 3137,
+      "output_tokens": 27,
+      "total_tokens": 3164,
+      "billable_unit": "token",
+      "billable_quantity": "3164.000000",
+      "cost_amount": "0.00385435",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1051,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "chat",
+        "source": "api_turn",
+        "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+        "schema_name": "CalculatedVoicedAnswer",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "qwen/qwen3.5-9b",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 4,
+          "elapsed_seconds": 22.781,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 4
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 4,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:28:43.327445+00:00",
+      "created_at": "2026-09-14 17:28:43.404805+00:00"
+    },
+    {
+      "id": "31c3fe26-0f9c-45cc-a197-36a8794a51ed",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+      "correlation_id": "research:8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "degraded_code": "research_not_grounded",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.01361000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 7681,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 17:28:43.373899+00:00",
+      "created_at": "2026-09-14 17:28:43.375311+00:00"
+    },
+    {
+      "id": "09039cf0-25fa-498b-895f-281327a0cfe4",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "91b31abd-2490-4e46-8cb7-dc124f4f16b1",
+      "message_id": "f44c984b-7c4d-48a0-871b-b3bf9db04875",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "68dba2c8-0d5f-4250-a9e8-e0efc5774b62",
+      "request_id": null,
+      "correlation_id": "api_turn:91b31abd-2490-4e46-8cb7-dc124f4f16b1:f44c984b-7c4d-48a0-871b-b3bf9db04875:68dba2c8-0d5f-4250-a9e8-e0efc5774b62",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "skipped",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": "title_not_generated",
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:28:43.411257+00:00",
+      "created_at": "2026-09-14 17:28:43.416211+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 9,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.01361,
+        "latency_ms": 7681,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [],
+      "degraded": {
+        "code": "research_not_grounded"
+      },
+      "follow_up": {
+        "subjects": [
+          {
+            "name": "Apple Inc. Common Stock",
+            "symbol": "AAPL",
+            "asset_class": "equity"
+          }
+        ],
+        "questions": [],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T17:28:42.214687+00:00",
+      "anchor_symbols": [
+        "AAPL"
+      ],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "d9f18d96-e915-4749-a0f7-3df60ed8efe9",
+      "terminal": true,
+      "request_id": "8dfdf828-aaf7-4ebe-879a-9a8bc2288ed8"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

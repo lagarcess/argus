@@ -30,12 +30,14 @@ from argus.api.chat.research_tool_results import (
     research_tool_card_for_completion,
     with_research_tool_binding,
 )
+from argus.domain.answer_dossiers import ANSWER_REQUEST_MESSAGE_KEY
 
 # Re-exported: the scope literal is owned by the settlement rule the SQL is
 # rendered from.
 from argus.domain.job_settlement import RESEARCH_OPERATION_SCOPE
 from argus.domain.research.admission import (
     ResearchCapacityExhausted,
+    admitted_provider_work,
     claim_current_research_attempt,
 )
 from argus.domain.research.config import (
@@ -87,8 +89,9 @@ def apply_research_job_request(
     """Consume a typed research job request from the runtime result.
 
     Returns the public job payload for the background path. The synchronous
-    dev fallback and the failure note mutate ``runtime_result`` in place so
-    the stream and metadata carry the finalized artifacts, and return None.
+    dev fallback, a lookup that failed and the failure note mutate
+    ``runtime_result`` in place so the stream and metadata carry the finalized
+    artifacts, and return None.
     """
     from argus.agent_runtime.research_answer import (
         compose_completed_research,
@@ -96,6 +99,7 @@ def apply_research_job_request(
         research_failure_note,
         store_research_packet_for_job,
     )
+    from argus.agent_runtime.research_grounded import research_lookup_failure_for_job
 
     job_request = runtime_result.pop("research_job_request", None)
     if not isinstance(job_request, dict):
@@ -124,6 +128,16 @@ def apply_research_job_request(
         runtime_result["research"] = composed["research"]
         _attach_completed_tool_card(runtime_result, job_request)
         return None
+    except ResearchUnavailableError as exc:
+        # No job was started here: the turn ends on the lookup recovery the
+        # inline path takes, retryable when the failure is. A submission whose
+        # answer was lost may already have started a billing run, so the client
+        # marks it not retryable and records the attempt as unpriced.
+        runtime_result.update(research_lookup_failure_for_job(job_request, failure=exc))
+        _attach_completed_tool_card(
+            runtime_result, job_request, failure_code="research_failed"
+        )
+        return None
     if job is not None:
         return job
     if sync_packet is not None:
@@ -131,9 +145,12 @@ def apply_research_job_request(
         store_research_packet_for_job(job_request, sync_packet, composed)
         runtime_result["assistant_response"] = composed["answer"]
         runtime_result["research"] = composed["research"]
-        if composed.get("next_experiments") is not None:
-            runtime_result["next_experiments"] = composed["next_experiments"]
+        for key in ("next_experiments", "next_steps", "calculation_offer"):
+            if composed.get(key) is not None:
+                runtime_result[key] = composed[key]
         _attach_completed_tool_card(runtime_result, job_request)
+        _attach_computed_answer(runtime_result, composed.get("computed"))
+        _attach_pending_question(runtime_result, composed.get("question"))
         return None
     runtime_result["assistant_response"] = research_failure_note(
         str(job_request.get("language") or "en")
@@ -154,6 +171,42 @@ def _attach_completed_tool_card(
         patch["tool_result_cards"] = [card]
 
 
+def _attach_computed_answer(patch: dict[str, Any], computed: Any) -> None:
+    """A thorough answer's computed calculation joins its research card, with
+    the prose template a recompute re-renders."""
+    from argus.agent_runtime.answer_calculation import (
+        ANSWER_ASSUMPTIONS_KEY,
+        ANSWER_TEMPLATE_KEY,
+    )
+    from argus.api.chat.tool_results import computation_marker
+
+    if not isinstance(computed, dict):
+        return
+    payload = computed.get("final_response_payload") or {}
+    cards = list(payload.get("tool_result_cards") or [])
+    if not cards:
+        return
+    patch["tool_result_cards"] = [*(patch.get("tool_result_cards") or []), *cards]
+    marker = computation_marker(patch["tool_result_cards"])
+    if marker:
+        patch["computation"] = marker
+    if computed.get(ANSWER_TEMPLATE_KEY) is not None:
+        patch[ANSWER_TEMPLATE_KEY] = computed[ANSWER_TEMPLATE_KEY]
+    if computed.get(ANSWER_ASSUMPTIONS_KEY):
+        patch[ANSWER_ASSUMPTIONS_KEY] = computed[ANSWER_ASSUMPTIONS_KEY]
+
+
+def _attach_pending_question(patch: dict[str, Any], question: Any) -> None:
+    """A thorough answer that asks for a figure only the user knows waits for
+    the reply that completes its calculation."""
+    if not isinstance(question, dict):
+        return
+    for key in ("requested_field", "clarification"):
+        if question.get(key) is not None:
+            patch[key] = question[key]
+    patch["last_stage_outcome"] = "await_user_reply"
+
+
 def start_research_job(
     *,
     job_request: dict[str, Any],
@@ -166,7 +219,8 @@ def start_research_job(
 
     Returns ``(public_job_payload, None)`` on the background path,
     ``(None, packet)`` for the synchronous dev fallback, and ``(None, None)``
-    when the provider is unavailable.
+    when the job row could not be written. A provider that cannot take the run
+    raises ``ResearchUnavailableError``.
     """
     from argus.agent_runtime.research_answer import (
         research_prompt_for_job,
@@ -175,7 +229,7 @@ def start_research_job(
 
     client = _client()
     if client is None:
-        return None, None
+        raise ResearchUnavailableError("not_configured")
     spec = retrieval_spec_for_job(job_request)
     prompt = research_prompt_for_job(job_request)
     if api_state.supabase_gateway is None:
@@ -186,13 +240,14 @@ def start_research_job(
             raise ResearchCapacityExhausted(admission)
         try:
             sync_spec = spec.model_copy(update={"timeout_seconds": 110.0})
-            packet = client.run_research(prompt, sync_spec)
+            with admitted_provider_work():
+                packet = client.run_research(prompt, sync_spec)
         except ResearchUnavailableError as exc:
             logger.warning(
                 "Synchronous thorough research failed"
-                f" reason={exc.reason} detail={exc.detail or ''}"
+                f" reason={exc.reason} status={exc.status} detail={exc.detail or ''}"
             )
-            return None, None
+            raise
         return None, packet
     idempotency_key = _research_job_identity(job_request, request_message_id)
     replay = _replayed_research_job(
@@ -210,13 +265,14 @@ def start_research_job(
     if not admission.available:
         raise ResearchCapacityExhausted(admission)
     try:
-        background_id = client.submit_background(prompt, spec)
+        with admitted_provider_work():
+            background_id = client.submit_background(prompt, spec)
     except ResearchUnavailableError as exc:
         logger.warning(
             "Research background submission failed"
-            f" reason={exc.reason} detail={exc.detail or ''}"
+            f" reason={exc.reason} status={exc.status} detail={exc.detail or ''}"
         )
-        return None, None
+        raise
     launch_payload = {
         "schema_version": "research_job_launch/v1",
         "research_request": job_request,
@@ -250,6 +306,7 @@ def start_research_job(
         user_id=user_id,
         conversation_id=conversation_id,
         request_id=request_id,
+        request_message_id=request_message_id,
     )
     return public_backtest_job_payload(job), None
 
@@ -293,6 +350,7 @@ def _spawn_poller(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     retain_research_work(
         _poll_and_finalize(
@@ -302,6 +360,7 @@ def _spawn_poller(
             user_id=user_id,
             conversation_id=conversation_id,
             request_id=request_id,
+            request_message_id=request_message_id,
         ),
         name=f"research-job-{job_id}",
     )
@@ -315,6 +374,7 @@ async def _poll_and_finalize(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     from argus.agent_runtime.research_answer import retrieval_spec_for_job
 
@@ -361,6 +421,7 @@ async def _poll_and_finalize(
                         user_id=user_id,
                         conversation_id=conversation_id,
                         request_id=request_id,
+                        request_message_id=request_message_id,
                     )
                 else:
                     _fail_job(
@@ -416,6 +477,7 @@ async def _finalize_success(
     user_id: str,
     conversation_id: str,
     request_id: str | None,
+    request_message_id: str | None = None,
 ) -> None:
     from argus.agent_runtime.research_answer import (
         compose_completed_research,
@@ -434,8 +496,15 @@ async def _finalize_success(
     )
     if card is not None:
         metadata["tool_result_cards"] = [card]
-    if composed.get("next_experiments") is not None:
-        metadata["next_experiments"] = composed["next_experiments"]
+    _attach_computed_answer(metadata, composed.get("computed"))
+    _attach_pending_question(metadata, composed.get("question"))
+    for key in ("next_experiments", "next_steps", "calculation_offer"):
+        if composed.get(key) is not None:
+            metadata[key] = composed[key]
+    if request_message_id:
+        # The answer can land after later turns, so it names the message that
+        # asked instead of leaving readers to infer it from time.
+        metadata[ANSWER_REQUEST_MESSAGE_KEY] = request_message_id
     message = await persist_research_job_answer(
         job_id=job_id,
         user_id=user_id,

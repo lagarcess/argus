@@ -178,3 +178,26 @@ cases:
       benchmark_symbol: SPY
       capital_amount: 2000
       stage_outcomes: ["ready_for_confirmation", "await_approval"]
+
+  - id: messy_english_explicit_end_survives_year_qualifier
+    prompt: "Test $100 bucks on @mrna stock from August 16 to August 19 just a few days this year"
+    user_language: en
+    ui_language: en
+    expected:
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: executable
+      assets: ["MRNA"]
+      asset_class: equity
+      strategy_type: buy_and_hold
+      capital_amount: 100
+      date_range:
+        start: "current_year-08-16"
+        end: "current_year-08-19"
+      # September 2026 acceptance: August 16 is Sunday. Requested dates stay above.
+      effective_date_range:
+        start: "current_year-08-17"
+        end: "current_year-08-19"
+      offered:
+        launch_matches_expected: true
+        response: false
+      stage_outcomes: ["ready_for_confirmation", "await_approval"]

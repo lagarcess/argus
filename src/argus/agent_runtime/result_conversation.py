@@ -21,6 +21,7 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.next_experiments_contract import NEXT_EXPERIMENT_ACTION_LABELS
 from argus.agent_runtime.response_language import response_language_instruction
 from argus.agent_runtime.result_fact_figures import (
@@ -37,7 +38,10 @@ from argus.agent_runtime.result_next_steps import (
     NextStep,
     accepted_next_steps,
 )
-from argus.domain.research.admission import claim_current_research_attempt
+from argus.domain.research.admission import (
+    admitted_provider_work,
+    claim_current_research_attempt,
+)
 from argus.domain.research.contracts import (
     ResearchSource,
     ResearchUnavailableError,
@@ -45,6 +49,7 @@ from argus.domain.research.contracts import (
 )
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
+from argus.domain.result_money import stored_currency_fraction_digits
 from argus.domain.result_readout_content import normalize_readout_language
 from argus.domain.result_readout_grounding import (
     READOUT_FIGURE_REFERENCE_INSTRUCTIONS,
@@ -337,6 +342,7 @@ def _run_sheet(metadata: dict[str, Any]) -> dict[str, Any]:
         or config.get("benchmark_symbol"),
         date_range=card.get("date_range") or config.get("date_range"),
         chart=metadata.get("chart"),
+        currency_fraction_digits=stored_currency_fraction_digits(card),
     )
 
 
@@ -439,17 +445,18 @@ async def _research_answer(
             text=None, failure_mode="research_capacity_exhausted"
         )
     try:
-        response = await asyncio.to_thread(
-            active_client.run_structured,
-            prompt,
-            result_research_spec(language, timeout_seconds=RESEARCH_TIMEOUT_SECONDS),
-            schema_model=schema,
-            schema_name="ResultConversationDraft",
-            instructions=result_conversation_instructions(
-                language=language, can_search=True
-            ),
-            limits=RESULT_RESEARCH_LIMITS,
-        )
+        with admitted_provider_work():
+            response = await asyncio.to_thread(
+                active_client.run_structured,
+                prompt,
+                result_research_spec(language, timeout_seconds=RESEARCH_TIMEOUT_SECONDS),
+                schema_model=schema,
+                schema_name="ResultConversationDraft",
+                instructions=result_conversation_instructions(
+                    language=language, can_search=True
+                ),
+                limits=RESULT_RESEARCH_LIMITS,
+            )
     except ResearchUnavailableError as exc:
         # The deployed log sink drops structured extras; the reason rides the text.
         logger.warning(f"Result follow-up research unavailable reason={exc.reason}")
@@ -609,19 +616,15 @@ def _run_start(metadata: dict[str, Any]) -> str:
 
 def _recent_conversation_lines(messages: Sequence[Any]) -> list[str]:
     lines: list[str] = []
-    for message in list(messages)[-_RECENT_MESSAGES:]:
-        if isinstance(message, dict):
-            role, content = message.get("role"), message.get("content")
-        else:
-            role, content = (
-                getattr(message, "role", None),
-                getattr(message, "content", None),
-            )
-        text = " ".join(str(content or "").split())
+    for message in select_thread_history(messages, recent_limit=_RECENT_MESSAGES):
+        role = message.role
+        text = " ".join(message.content.split())
         if role not in {"user", "assistant"} or not text:
             continue
         speaker = "Reader" if role == "user" else "Argus"
-        lines.append(f"{speaker}: {text[:_MAX_MESSAGE_CHARS]}")
+        if not message.shared_context:
+            text = text[:_MAX_MESSAGE_CHARS]
+        lines.append(f"{speaker}: {text}")
     return lines
 
 

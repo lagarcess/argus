@@ -167,9 +167,8 @@ def test_private_alpha_canary_workflow_runs_real_workflow_gate() -> None:
     assert "cd web && bun install --frozen-lockfile" in browser_steps
     assert "cli_2.20.0_linux_amd64.zip" in release_steps
     assert "cli_2.20.0_linux_amd64.zip" in browser_steps
-    assert (
-        '.github/local-smoke.sh --expected-sha "$(git rev-parse HEAD)"' in browser_steps
-    )
+    assert ".github/local-smoke.sh" not in browser_steps
+    assert "spanish-ui-smoke" not in browser_steps
     assert ".github/canary-render.sh" in release_steps
     assert ".github/canary-render.sh" in browser_steps
     assert "continue-on-error" not in CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
@@ -248,10 +247,10 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
     assert browser_steps["Provision dedicated canary identity"] == (
         browser_identity_secret_names
     )
-    assert browser_steps["Run authenticated Spanish browser journey"] == (
+    assert browser_steps["Run authenticated browser checks"] == (
         browser_operational_secret_names
     )
-    assert browser_steps["Run authenticated Spanish browser journey"].isdisjoint(
+    assert browser_steps["Run authenticated browser checks"].isdisjoint(
         {"ARGUS_OPS_TOKEN", "ARGUS_WORKFLOW_DATABASE_URL"}
     )
     for steps in (release_steps, browser_steps):
@@ -275,8 +274,8 @@ def test_private_alpha_canary_workflow_runs_authoritative_spanish_evidence() -> 
     assert "temp/canary-evidence/authenticated-browser.exit" in browser_joined
     assert "Run direct API signup-denial probe" in release_steps
     assert "Run direct API signup-denial probe" not in browser_steps
-    assert "Run authenticated Spanish browser journey" in browser_steps
-    assert "Run authenticated Spanish browser journey" not in release_steps
+    assert "Run authenticated browser checks" in browser_steps
+    assert "Run authenticated browser checks" not in release_steps
     assert "Install Chromium for the authenticated browser canary" in browser_steps
     workflow_source = CANARY_WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "private-alpha-release-coherence-evidence" in workflow_source

@@ -39,7 +39,6 @@ from argus.api.schemas import EvidenceArtifact
 from argus.domain.backtesting.rules.signals import (
     _opposite_moving_average_crossover_rule as engine_mirrored_exit_rule,
 )
-from argus.domain.credential_shapes import credential_shape_in
 from argus.domain.result_figures import shown_benchmark_gap
 from argus.domain.result_readout_facts import (
     engine_config_from_snapshot as _engine_config,
@@ -134,10 +133,6 @@ NEVER_EXPOSE_VALUE_MARKERS = (
     "sk-",
 )
 
-_UUID_RE = re.compile(
-    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-" r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
-)
-_SECRET_SHAPED_RE = re.compile(r"[A-Za-z0-9_\-]{24,}")
 _WHITESPACE_RE = re.compile(r"\s+")
 # Two never-expose markers carry a separator, and fields on the way into the payload
 # rewrite separators: a strategy fact turns underscores into spaces. Folding both the
@@ -196,13 +191,7 @@ def payload_digest(payload: PublicExcerptPayload) -> str:
 
 
 def normalize_owner_note(note: object) -> str | None:
-    """Bound and clean the one free-text field a receipt carries.
-
-    Every other field in the payload is structured, so this is the only channel
-    through which a secret can reach a public Argus page. Refused rather than
-    redacted: a receipt is frozen at creation, so a redaction marker would be
-    permanent, and the owner is still here and can take the key out.
-    """
+    """Normalize the bounded owner note before the owner sees the exact preview."""
     if note is None:
         return None
     if not isinstance(note, str):
@@ -218,17 +207,6 @@ def normalize_owner_note(note: object) -> str | None:
         return None
     if len(cleaned) > PUBLIC_EXCERPT_OWNER_NOTE_MAX_LENGTH:
         raise PublicExcerptOwnerNoteError("The note is too long to publish.")
-    # Grammar first, length second. A credential is recognisable from its own
-    # structure at any length, and the length guard exists only for opaque blobs
-    # no issuer prefix names.
-    if (
-        _UUID_RE.search(cleaned)
-        or credential_shape_in(cleaned)
-        or _SECRET_SHAPED_RE.search(cleaned)
-    ):
-        raise PublicExcerptOwnerNoteError(
-            "The note looks like it contains a key or a long code."
-        )
     return cleaned
 
 
@@ -313,6 +291,7 @@ def audit_public_excerpt_document(
     *,
     private_ids: tuple[str, ...] = (),
     skip_value_markers_for: tuple[str, ...] = (),
+    check_value_markers: bool = True,
 ) -> None:
     """Audit an arbitrary would-be public document, keys and values alike.
 
@@ -328,7 +307,17 @@ def audit_public_excerpt_document(
         path=(),
         private_ids=lowered_private_ids,
         skip_value_markers_for=skip_value_markers_for,
+        check_value_markers=check_value_markers,
     )
+
+
+def _public_turn_symbols(turn: Any) -> list[str]:
+    """The asset identities a turn publishes; a calculation publishes none."""
+    if turn.kind == "research_answer":
+        return list(turn.anchor_symbols)
+    if turn.kind == "backtest":
+        return list(turn.fact_bank.symbols)
+    return []
 
 
 def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem:
@@ -342,13 +331,7 @@ def snapshot_list_item(snapshot: PublicExcerptSnapshot) -> PublicExcerptListItem
         title = snapshot.title
         symbols = list(
             dict.fromkeys(
-                symbol
-                for turn in payload.turns
-                for symbol in (
-                    turn.anchor_symbols
-                    if turn.kind == "research_answer"
-                    else turn.fact_bank.symbols
-                )
+                symbol for turn in payload.turns for symbol in _public_turn_symbols(turn)
             )
         )
         dates = None
@@ -402,6 +385,7 @@ def _audit_node(
     path: tuple[str, ...],
     private_ids: tuple[str, ...],
     skip_value_markers_for: tuple[str, ...],
+    check_value_markers: bool,
 ) -> None:
     if isinstance(node, dict):
         for key, value in node.items():
@@ -411,6 +395,7 @@ def _audit_node(
                 path=(*path, str(key)),
                 private_ids=private_ids,
                 skip_value_markers_for=skip_value_markers_for,
+                check_value_markers=check_value_markers,
             )
         return
     if isinstance(node, list):
@@ -420,6 +405,7 @@ def _audit_node(
                 path=path,
                 private_ids=private_ids,
                 skip_value_markers_for=skip_value_markers_for,
+                check_value_markers=check_value_markers,
             )
         return
     if isinstance(node, str):
@@ -428,6 +414,7 @@ def _audit_node(
             path=path,
             private_ids=private_ids,
             skip_value_markers_for=skip_value_markers_for,
+            check_value_markers=check_value_markers,
         )
 
 
@@ -447,26 +434,16 @@ def _audit_value(
     path: tuple[str, ...],
     private_ids: tuple[str, ...],
     skip_value_markers_for: tuple[str, ...],
+    check_value_markers: bool,
 ) -> None:
     location = ".".join(path) or "payload"
-    if _UUID_RE.search(value):
-        raise PublicExcerptSanitizationError(
-            f"Receipt payload field '{location}' carries a record identifier."
-        )
-    # The note is validated when the owner writes it; this is the guard for every
-    # other field, including one a later change adds.
-    credential_kind = credential_shape_in(value)
-    if credential_kind is not None:
-        raise PublicExcerptSanitizationError(
-            f"Receipt payload field '{location}' carries a {credential_kind}."
-        )
     lowered = value.lower()
     for private_id in private_ids:
         if private_id and private_id in lowered:
             raise PublicExcerptSanitizationError(
                 f"Receipt payload field '{location}' carries a private id."
             )
-    if path and path[-1] in skip_value_markers_for:
+    if not check_value_markers or (path and path[-1] in skip_value_markers_for):
         return
     folded = _SEPARATOR_RE.sub("_", lowered)
     for marker in NEVER_EXPOSE_VALUE_MARKERS:

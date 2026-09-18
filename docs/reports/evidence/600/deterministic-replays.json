@@ -1,0 +1,351 @@
+{
+  "evidence_kind": "authored_transport_reconstruction_through_real_validation_and_stages",
+  "limitation": "Original full-run reply bodies were not retained. These are authored reconstructions, not exact recordings.",
+  "contribution_role_fix": {
+    "heads": {
+      "integration": "3d379d3d9020027ccfd1f2a4c617626520af8a44",
+      "candidate": "c72fa0e94963c347c6eaeaf1bd846f8f29f58ce5"
+    },
+    "fix_commit": "8eb7cc7510f8fd24d219258185e60ac4f3b892aa",
+    "cases": [
+      {
+        "case_id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+        "integration": {
+          "failed_check_codes": [],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply",
+            "ready_for_confirmation",
+            "await_approval"
+          ],
+          "capability_verdict": "executable",
+          "requested_field": null,
+          "clarification_kind": null,
+          "clarification_reason_code": null,
+          "guard_reason_codes": [],
+          "validation_failure_codes": [
+            "TimeoutError"
+          ]
+        },
+        "candidate": {
+          "failed_check_codes": [
+            "capability_verdict",
+            "stage_outcomes",
+            "offered.launch_payload"
+          ],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply",
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "capability_verdict": "needs_clarification",
+          "requested_field": "assumption",
+          "clarification_kind": null,
+          "clarification_reason_code": null,
+          "guard_reason_codes": [
+            [
+              "dca_contract_audit",
+              "dca_recurring_contribution_grounded_in_current_message",
+              "focused_strategy_extraction_repair",
+              "focused_repair_preserved_structured_context",
+              "focused_repair_stated_fields_unresolved"
+            ]
+          ],
+          "validation_failure_codes": [
+            "TimeoutError"
+          ]
+        },
+        "fixed_worktree": {
+          "failed_check_codes": [],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply",
+            "ready_for_confirmation",
+            "await_approval"
+          ],
+          "capability_verdict": "executable",
+          "requested_field": null,
+          "clarification_kind": null,
+          "clarification_reason_code": null,
+          "guard_reason_codes": [
+            [
+              "dca_contract_audit",
+              "dca_recurring_contribution_grounded_in_current_message",
+              "focused_strategy_extraction_repair",
+              "focused_repair_preserved_structured_context"
+            ]
+          ],
+          "validation_failure_codes": [
+            "TimeoutError"
+          ]
+        }
+      },
+      {
+        "case_id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "integration": {
+          "failed_check_codes": [
+            "intent",
+            "capability_verdict",
+            "stage_outcomes",
+            "offered.min_next_experiment_rows",
+            "research"
+          ],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification_kind": "unsupported_recovery",
+          "clarification_reason_code": "future_performance",
+          "guard_reason_codes": [],
+          "validation_failure_codes": [
+            "TimeoutError",
+            "ValidationError"
+          ]
+        },
+        "candidate": {
+          "failed_check_codes": [
+            "intent",
+            "capability_verdict",
+            "stage_outcomes",
+            "offered.min_next_experiment_rows",
+            "research"
+          ],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification_kind": "unsupported_recovery",
+          "clarification_reason_code": "future_performance",
+          "guard_reason_codes": [
+            [
+              "structured_interpretation_candidates_failed",
+              "focused_strategy_extraction_repair",
+              "focused_repair_preserved_structured_context"
+            ]
+          ],
+          "validation_failure_codes": [
+            "TimeoutError",
+            "ValidationError"
+          ]
+        },
+        "fixed_worktree": {
+          "failed_check_codes": [
+            "intent",
+            "capability_verdict",
+            "stage_outcomes",
+            "offered.min_next_experiment_rows",
+            "research"
+          ],
+          "stage_outcomes": [
+            "needs_clarification",
+            "await_user_reply"
+          ],
+          "capability_verdict": "unsupported",
+          "requested_field": null,
+          "clarification_kind": "unsupported_recovery",
+          "clarification_reason_code": "future_performance",
+          "guard_reason_codes": [
+            [
+              "structured_interpretation_candidates_failed",
+              "focused_strategy_extraction_repair",
+              "focused_repair_preserved_structured_context"
+            ]
+          ],
+          "validation_failure_codes": [
+            "TimeoutError",
+            "ValidationError"
+          ]
+        }
+      }
+    ]
+  },
+  "zero_seed_commit_comparison": {
+    "case_id": "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+    "evidence_kind": "hermetic_authored_reconstruction",
+    "exact_model_reply_recording": false,
+    "external_network": "blocked",
+    "paid_calls": 0,
+    "introducing_commit": "74f072602f01c65a9cf9aa5a0cc7a3fa3d1dbe0b",
+    "comparisons": [
+      {
+        "runtime_sha": "d53575a86641e3d37c9dfbf99bfa003e3eecc5f7",
+        "audit_zero_seed": false,
+        "stage_outcomes": [
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "missing_required_fields": [],
+        "failed_check_codes": [],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "d53575a86641e3d37c9dfbf99bfa003e3eecc5f7",
+        "audit_zero_seed": true,
+        "stage_outcomes": [
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "missing_required_fields": [],
+        "failed_check_codes": [],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "74f072602f01c65a9cf9aa5a0cc7a3fa3d1dbe0b",
+        "audit_zero_seed": false,
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "missing_required_fields": [
+          "assumption"
+        ],
+        "failed_check_codes": [
+          "capability_verdict",
+          "effective_date_range",
+          "adjustment_reason",
+          "starting_capital",
+          "recurring_contribution",
+          "stage_outcomes",
+          "offered.launch_payload"
+        ],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "74f072602f01c65a9cf9aa5a0cc7a3fa3d1dbe0b",
+        "audit_zero_seed": true,
+        "stage_outcomes": [
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "missing_required_fields": [],
+        "failed_check_codes": [],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "c72fa0e94963c347c6eaeaf1bd846f8f29f58ce5",
+        "audit_zero_seed": false,
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "missing_required_fields": [
+          "assumption"
+        ],
+        "failed_check_codes": [
+          "capability_verdict",
+          "effective_date_range",
+          "adjustment_reason",
+          "starting_capital",
+          "recurring_contribution",
+          "stage_outcomes",
+          "offered.launch_payload"
+        ],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "c72fa0e94963c347c6eaeaf1bd846f8f29f58ce5",
+        "audit_zero_seed": true,
+        "stage_outcomes": [
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "missing_required_fields": [],
+        "failed_check_codes": [],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "8eb7cc7510f8fd24d219258185e60ac4f3b892aa",
+        "audit_zero_seed": false,
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "missing_required_fields": [
+          "assumption"
+        ],
+        "failed_check_codes": [
+          "capability_verdict",
+          "effective_date_range",
+          "adjustment_reason",
+          "starting_capital",
+          "recurring_contribution",
+          "stage_outcomes",
+          "offered.launch_payload"
+        ],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "8eb7cc7510f8fd24d219258185e60ac4f3b892aa",
+        "audit_zero_seed": true,
+        "stage_outcomes": [
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "missing_required_fields": [],
+        "failed_check_codes": [],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "2ff09be41602be1bb257b3fb98d68a6713e84610",
+        "audit_zero_seed": false,
+        "stage_outcomes": [
+          "needs_clarification",
+          "await_user_reply"
+        ],
+        "missing_required_fields": [
+          "assumption"
+        ],
+        "failed_check_codes": [
+          "capability_verdict",
+          "effective_date_range",
+          "adjustment_reason",
+          "starting_capital",
+          "recurring_contribution",
+          "stage_outcomes",
+          "offered.launch_payload"
+        ],
+        "provider_failure_codes": []
+      },
+      {
+        "runtime_sha": "2ff09be41602be1bb257b3fb98d68a6713e84610",
+        "audit_zero_seed": true,
+        "stage_outcomes": [
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "missing_required_fields": [],
+        "failed_check_codes": [],
+        "provider_failure_codes": []
+      }
+    ]
+  },
+  "final_code_verification": {
+    "runtime_sha": "87462331901929711bfe5d689197e94f0f1693b5",
+    "focused_replays_passed": 10,
+    "original_issue_replays_passed": 38,
+    "runtime_guardrail_receipt_cost_and_mocked_checks_passed": 2782,
+    "unowned_contribution_with_or_without_zero_seed": "requires_assumption_clarification",
+    "unowned_contribution_preservation_flag": false,
+    "zero_seed_with_or_without_audit_corroboration": "ready_for_confirmation"
+  },
+  "historical_grok_timeout_call_sites": {
+    "primary_interpretation": 22,
+    "focused_strategy_repair": 2,
+    "stated_run_field_audit": 1,
+    "asset_mention_preflight": 3,
+    "dca_contract_audit": 1,
+    "discovery_model_knowledge": 1
+  },
+  "historical_moved_timeout_call": {
+    "case_id": "natural_language_establishes_modeled_costs_issue_271",
+    "count": 1,
+    "integration_owner": "_stated_run_field_audited_response",
+    "candidate_owner": "_repair_incomplete_strategy_extraction",
+    "same_audit_attempt_count_on_both_heads": true
+  }
+}

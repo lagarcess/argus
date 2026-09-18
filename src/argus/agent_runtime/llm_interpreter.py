@@ -15,6 +15,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from loguru import logger
 
 from argus.domain.market_data.new_york_clock import new_york_today
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.artifact_edit_planner import (  # noqa: F401
     _apply_legacy_flat_edit_fields,
     _edit_plan_reshapes_non_recurring_strategy,
@@ -164,6 +165,8 @@ from argus.agent_runtime.interpreter.executable_grounding import (  # noqa: F401
     _response_needs_launch_field_fidelity_repair,
 )
 from argus.agent_runtime.interpreter.focused_extraction import (  # noqa: F401
+    focused_stated_field_audit_guard,
+    retain_pending_focused_seed,
     response_from_focused_strategy_extraction,
     strategy_extraction_repair_is_allowed,
     _base_response_was_unsupported,
@@ -338,6 +341,7 @@ from argus.agent_runtime.interpreter.strategy_builder import (  # noqa: F401
     _unsupported_from_llm,
     _validate_indicator_rule_support,
 )
+from argus.agent_runtime.interpreter.strategy_routing import STRATEGY_TURN_ACTS, route_owner
 from argus.agent_runtime.interpreter.strategy_repair_predicates import (  # noqa: F401
     _is_vague_strategy_start,
     _is_vague_strategy_start_guidance,
@@ -515,7 +519,7 @@ class OpenRouterStructuredInterpreter:
                     )
                     if not isinstance(response, LLMInterpretationResponse):
                         continue
-                    last_raw_response = response
+                    last_raw_response = response.model_copy(deep=True)
                     response = await _response_ready_for_runtime(
                         response=response,
                         preferred_model=candidate_model,
@@ -558,6 +562,7 @@ class OpenRouterStructuredInterpreter:
                 request=request,
                 preferred_model=candidate_models[0] if candidate_models else "",
                 asset_resolution_context=asset_resolution_context,
+                failed_response=last_raw_response,
             )
             if repaired_response is not None:
                 self.last_status = "fallback_used"
@@ -581,7 +586,7 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
-                    last_raw_response = response
+                    last_raw_response = response.model_copy(deep=True)
                     record_openrouter_route_receipt(
                         task="interpretation",
                         model_name=self.model_name,
@@ -645,7 +650,7 @@ class OpenRouterStructuredInterpreter:
                     timeout=openrouter_task_timeout_seconds("interpretation"),
                 )
                 if isinstance(response, LLMInterpretationResponse):
-                    last_raw_response = response
+                    last_raw_response = response.model_copy(deep=True)
                     record_openrouter_route_receipt(
                         task="interpretation",
                         model_name=fallback_model_name,
@@ -700,6 +705,7 @@ class OpenRouterStructuredInterpreter:
             request=request,
             preferred_model=fallback_model_name or primary_model_name,
             asset_resolution_context=asset_resolution_context,
+            failed_response=last_raw_response,
         )
         if repaired_response is not None:
             self.last_status = "fallback_used"
@@ -750,15 +756,14 @@ class OpenRouterStructuredInterpreter:
             )
         )
         history: list[BaseMessage] = []
-        if not has_artifact_context:
-            for item in request.recent_thread_history[-6:]:
-                if not hasattr(item, "role") or not hasattr(item, "content"):
-                    continue
-                content = str(item.content)
-                if item.role == "assistant":
-                    history.append(AIMessage(content=content))
-                elif item.role == "user":
-                    history.append(HumanMessage(content=content))
+        for item in select_thread_history(
+            request.recent_thread_history, recent_limit=0 if has_artifact_context else 6
+        ):
+            content = str(item.content)
+            if item.role == "assistant":
+                history.append(AIMessage(content=content))
+            elif item.role == "user":
+                history.append(HumanMessage(content=content))
         asset_context_messages = (
             [
                 SystemMessage(
@@ -1128,6 +1133,7 @@ class OpenRouterStructuredInterpreter:
         *,
         request: InterpretationRequest,
     ) -> StructuredInterpretation:
+        response = retain_pending_focused_seed(response, request=request)
         strategy = _strategy_from_llm(response.candidate_strategy_draft, request.current_user_message)  # fmt: skip
         _merge_prior_strategy(strategy=strategy, request=request, response=response)
         _ground_strategy_in_current_turn(strategy=strategy, request=request)
@@ -2699,6 +2705,8 @@ async def _audited_response_ready_for_runtime(
         )
         if context_response is not None:
             return context_response
+    if (pending := retain_pending_focused_seed(response, request=request)) is not response:
+        return pending
     if _response_replays_prior_strategy_without_current_turn_update(
         response=response,
         request=request,
@@ -3198,11 +3206,13 @@ async def _audit_stated_run_fields(
     response: LLMInterpretationResponse,
     preferred_model: str,
     request: InterpretationRequest,
+    required: bool = False,
 ) -> LLMInterpretationResponse | None:
     audited_response = await _audit_stated_run_field_fidelity(
         response=response,
         preferred_model=preferred_model,
         request=request,
+        required=required,
     )
     if audited_response is not None:
         return _response_with_resolved_runtime_date_range(
@@ -3321,39 +3331,31 @@ async def _repair_incomplete_strategy_extraction(
             response=response,
             request=request,
         )
-        if _response_can_skip_optional_runtime_readiness_audits(
-            response=response,
-            request=request,
-        ):
-            _log_runtime_readiness_step(
-                "ready_after_focused_strategy_repair",
+        if not _response_can_skip_optional_runtime_readiness_audits(response=response, request=request):
+            response = await _signal_rule_checked_response(
                 response=response,
+                preferred_model=model_name,
+                request=request,
             )
-            annotate_repair(after=response, repair_applied=True)
-            return response
-        response = await _signal_rule_checked_response(
-            response=response,
-            preferred_model=model_name,
-            request=request,
-        )
-        conflict_response = await _audit_supported_strategy_capability_conflict(
-            response=response,
-            preferred_model=model_name,
-            request=request,
-        )
-        if conflict_response is not None:
-            response = conflict_response
-        date_window_response = await _focused_date_window_audited_response(
-            response=response,
-            preferred_model=model_name,
-            request=request,
-        )
-        if date_window_response is not None:
-            response = date_window_response
+            conflict_response = await _audit_supported_strategy_capability_conflict(
+                response=response,
+                preferred_model=model_name,
+                request=request,
+            )
+            if conflict_response is not None:
+                response = conflict_response
+            date_window_response = await _focused_date_window_audited_response(
+                response=response,
+                preferred_model=model_name,
+                request=request,
+            )
+            if date_window_response is not None:
+                response = date_window_response
         audited_response = await _audit_stated_run_fields(
             response=response,
             preferred_model=model_name,
             request=request,
+            required=_llm_strategy_draft_has_concrete_execution_target(response.candidate_strategy_draft),
         )
         if audited_response is not None:
             response = audited_response
@@ -4185,9 +4187,10 @@ async def _audit_stated_run_field_fidelity(
     response: LLMInterpretationResponse,
     preferred_model: str,
     request: InterpretationRequest,
+    required: bool = False,
 ) -> LLMInterpretationResponse | None:
     del preferred_model
-    if not _response_needs_stated_run_field_fidelity_audit(
+    if not required and not _response_needs_stated_run_field_fidelity_audit(
         response=response,
         request=request,
     ):
@@ -4198,7 +4201,7 @@ async def _audit_stated_run_field_fidelity(
     )
     if deterministic_repair is not None:
         response = deterministic_repair
-        if not _response_needs_stated_run_field_fidelity_audit(
+        if not required and not _response_needs_stated_run_field_fidelity_audit(
             response=response,
             request=request,
         ):
@@ -4217,6 +4220,7 @@ async def _audit_stated_run_field_fidelity(
         )
     except Exception:
         audit = None
+    valid_audit = audit if isinstance(audit, StatedRunFieldFidelityAudit) else None
     if not isinstance(audit, StatedRunFieldFidelityAudit):
         audit = StatedRunFieldFidelityAudit()
         audit_response = deterministic_repair or response
@@ -4231,6 +4235,11 @@ async def _audit_stated_run_field_fidelity(
         response=candidate_response,
         request=request,
     )
+    if capital_recheck is not None:
+        candidate_response = capital_recheck
+    if required:
+        candidate_response = focused_stated_field_audit_guard(response=candidate_response, audit=valid_audit)
+        return candidate_response
     if capital_recheck is not None:
         return capital_recheck
     if repaired is None:
@@ -4882,33 +4891,30 @@ async def _focused_strategy_repair_after_candidate_failures(
     request: InterpretationRequest,
     preferred_model: str,
     asset_resolution_context: str | None = None,
+    failed_response: LLMInterpretationResponse | None = None,
 ) -> LLMInterpretationResponse | None:
+    # Only this turn's typed read can authorize strategy repair. Outages,
+    # numbers, tickers and pending tests cannot establish the question's intent.
+    if failed_response is None or route_owner(
+        intent=failed_response.intent,
+        semantic_turn_act=failed_response.semantic_turn_act,
+    ) != "strategy":
+        return None
+    if failed_response.semantic_turn_act not in (None, "retry_failed_action", *STRATEGY_TURN_ACTS):
+        return None
     if _request_has_active_strategy_context(
         request
     ) and not _request_current_turn_has_material_execution_evidence(request):
         return None
-    # No model read the act; the owner decides it from the pending state.
-    turn = repaired_turn_act(base_act=None, base_relation=None, request=request)
-    seed_response = LLMInterpretationResponse(
-        intent="strategy_drafting",
-        task_relation=turn.task_relation,
-        requires_clarification=True,
-        user_goal_summary=request.current_user_message,
-        candidate_strategy_draft=LLMStrategyDraft(
-            raw_user_phrasing=request.current_user_message,
-            strategy_thesis=request.current_user_message,
-        ),
-        reason_codes=["structured_interpretation_candidates_failed", *turn.reason_codes],
-        semantic_turn_act=turn.semantic_turn_act,
-    )
+    seed_response = failed_response.model_copy(deep=True)
+    seed_response.reason_codes.append("structured_interpretation_candidates_failed")
     logger.bind(
         llm_task=_INTERPRETATION_REPAIR_TASK,
         preferred_model=preferred_model,
         current_message_length=len(request.current_user_message),
         reason_codes=list(seed_response.reason_codes),
     ).info("Structured interpretation candidates failed; attempting focused repair")
-    # Candidates plus their audits may have spent the whole turn allowance;
-    # this is the only rescue left, so its first call holds a reserved slot.
+    # Preserve the existing last-resort call allowance for typed test repairs.
     with turn_execution.last_resort_repair_scope():
         return await _repair_incomplete_strategy_extraction(
             failed_response=seed_response,

@@ -173,6 +173,28 @@ class SupabaseMessageReadMixin:
         )
         return bool(result.data)
 
+    def list_shared_messages(
+        self, *, user_id: str, conversation_id: str
+    ) -> list[Message]:
+        """Read the frozen import independently of the recent-message window."""
+        if self.keyset_reader is not None:
+            rows = self.keyset_reader.list_shared_message_rows(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+        else:
+            query = (
+                self.client.table("messages")
+                .select(_MESSAGE_SELECT)
+                .eq("user_id", user_id)
+                .eq("conversation_id", conversation_id)
+                .contains("metadata", {"shared_conversation": {}})
+                .order("created_at")
+                .order("id")
+            )
+            rows = self._fetch_all_rows(lambda start, end: query.range(start, end))
+        return [Message.model_validate(row) for row in rows]
+
     def list_messages(
         self,
         *,

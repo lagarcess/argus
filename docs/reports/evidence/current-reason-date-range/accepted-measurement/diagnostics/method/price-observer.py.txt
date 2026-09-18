@@ -1,0 +1,29 @@
+"""Run-local observation only: preserve arguments, return values and exceptions."""
+import time
+
+def install(engine,provider,answer,emit):
+    def wrap(owner,name,kind):
+        original=getattr(owner,name)
+        def observed(*args,**kwargs):
+            started=time.monotonic();symbol=kwargs.get('symbol',args[0] if args else None)
+            base={'operation':kind,'symbol':symbol}
+            try:result=original(*args,**kwargs)
+            except BaseException as exc:
+                emit({**base,'status':'timed_out' if isinstance(exc,TimeoutError) or 'timeout' in type(exc).__name__.lower() else 'errored','error_type':type(exc).__name__,'error':str(exc),'elapsed_ms':round((time.monotonic()-started)*1000,3)})
+                raise
+            detail={**base,'elapsed_ms':round((time.monotonic()-started)*1000,3)}
+            if kind=='fetch_price_series':
+                values=[(idx,float(value)) for idx,value in result.items() if value is not None]
+                detail.update(status='returned_price' if values else 'returned_no_price',rows=len(result))
+                if values:detail.update(last_price=values[-1][1],last_date=str(values[-1][0]))
+            elif kind=='latest_market_close':
+                detail.update(status='returned_price' if result is not None else 'returned_no_price')
+                if result is not None:detail.update(price=result[0],date=result[1])
+            else:
+                detail.update(status='resolved',resolved_symbol=getattr(result,'symbol',None),asset_class=str(getattr(result,'asset_class',None)))
+            emit(detail)
+            return result
+        setattr(owner,name,observed)
+    wrap(engine,'classify_symbol','classify_symbol')
+    wrap(provider,'fetch_price_series','fetch_price_series')
+    wrap(answer,'latest_market_close','latest_market_close')

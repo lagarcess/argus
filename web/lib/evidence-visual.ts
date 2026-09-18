@@ -2,7 +2,8 @@
 export type EvidenceVisualPoint = { time: string; value: number };
 
 export type EvidenceVisual = {
-  kind: "portfolio_equity";
+  /** A run's equity curve, or a computed path over dated periods. */
+  kind: "portfolio_equity" | "value_path";
   currency?: string | null;
   base_value?: number | null;
   series: EvidenceVisualPoint[];
@@ -11,7 +12,7 @@ export type EvidenceVisual = {
 export function parseEvidenceVisual(value: unknown): EvidenceVisual | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const visual = value as Record<string, unknown>;
-  if (visual.kind !== "portfolio_equity" ||
+  if ((visual.kind !== "portfolio_equity" && visual.kind !== "value_path") ||
     (visual.currency != null && typeof visual.currency !== "string") ||
     (visual.base_value != null && (typeof visual.base_value !== "number" || !Number.isFinite(visual.base_value))) ||
     !Array.isArray(visual.series) || !visual.series.every((point) =>

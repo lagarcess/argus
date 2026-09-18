@@ -95,6 +95,18 @@ def bind_runtime_run_card(
     return {**result_card, "tool_result_cards": bound} if bound else result_card
 
 
+# What one call's publication says for its whole turn, the recovery that settles
+# the turn included. A turn with several calls keeps each call's typed result on
+# its own card, so none of these speaks for that turn.
+_ONE_CALL_TURN_KEYS = (
+    "assistant_response",
+    "research",
+    "discovery",
+    "next_experiments",
+    "recovery",
+)
+
+
 def apply_runtime_tool_effects(
     runtime_result: dict[str, Any],
     effects: object,
@@ -128,7 +140,7 @@ def apply_runtime_tool_effects(
         # The ordered effects own publication, so it must never dispatch twice.
         runtime_result.pop("research_job_request", None)
     if len(parsed) > 1:
-        for key in ("assistant_response", "research", "discovery", "next_experiments"):
+        for key in _ONE_CALL_TURN_KEYS:
             runtime_result.pop(key, None)
     jobs = []
     for effect in parsed:
@@ -173,7 +185,7 @@ def apply_runtime_tool_effects(
     # The old one-call sidecar remains a compatibility projection. Multiple
     # calls keep their own typed results and private evidence separately.
     if len(parsed) == 1:
-        for key in ("assistant_response", "research", "discovery", "next_experiments"):
+        for key in _ONE_CALL_TURN_KEYS:
             if key in parsed[0].stage_patch:
                 runtime_result[key] = parsed[0].stage_patch[key]
     return parsed
@@ -189,6 +201,16 @@ def tool_cards_from_metadata(metadata: Mapping[str, Any]) -> list[ToolResultCard
         if len(values) != len(set(values)):
             raise ValueError(f"Tool results repeat {field}")
     return cards
+
+
+def computation_marker(cards: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """``metadata.computation`` for a turn, derived from its cards by the one owner."""
+    from argus.domain.computation_marker import computation_from_tool_cards
+
+    computation = computation_from_tool_cards(
+        tool_cards_from_metadata({"tool_result_cards": cards})
+    )
+    return None if computation is None else computation.model_dump(mode="json")
 
 
 def runtime_tool_result_cards(runtime_result: dict[str, Any]) -> list[dict[str, Any]]:

@@ -1,10 +1,10 @@
-import displayPolicy from "../argus_display_contract/result_display_policy.json";
 import type { StrategyResultPayload } from "@/components/chat/types";
 import type { AssetClass } from "@/lib/argus-types";
 import { assetClassDisplayLabel } from "@/lib/asset-class-display";
 import { contributionPhrase } from "@/lib/contribution-period-display";
 import { compactDateRangeDisplay } from "@/lib/date-range-display";
 import { benchmarkComparisonView, signedPercentText } from "@/lib/result-figures";
+import { resultCurrencyFractionDigits, resultMoneyFormatOptions } from "@/lib/result-money";
 
 type MetricLike = {
   key?: string;
@@ -257,7 +257,9 @@ export function heroDeltaEvidenceView(
   const endingValue = findMetric(result, ["cash_value", "final_value", "ending_value"]);
   const totalReturn = findMetric(result, ["total_return_pct", "contribution_return_pct"]);
   const worstDrop = findMetric(result, ["max_drawdown_pct", "max_drawdown"]);
-  const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale);
+  // Every amount of this run reads at the precision stored on its card.
+  const moneyDigits = resultCurrencyFractionDigits(result.currencyFractionDigits);
+  const parsedEndingValue = parseEndingValue(endingValue?.value, options?.locale, moneyDigits);
   const typedFacts = result.readoutFacts;
   const costs = typedFacts?.costs ?? result.executionCosts;
   const locale = options?.locale ?? "en";
@@ -266,8 +268,9 @@ export function heroDeltaEvidenceView(
     : normalizeSignedPercent(totalReturn?.value, locale);
   const isContributionReturn =
     totalReturn?.key === "contribution_return_pct" || typedFacts?.strategyType === "dca_accumulation";
-  const tone = evidenceTone(parsedEndingValue?.change, totalReturnValue);
-  const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale);
+  const profit = numberValue(result.profit);
+  const tone = evidenceTone(profit, totalReturnValue);
+  const facts = executionFacts(result, parsedEndingValue?.start, copy, options?.locale, moneyDigits);
   const benchmarkSymbol = facts.benchmark;
   const delta = typedFacts?.benchmarkDeltaPct;
   const claim = typedFacts?.benchmarkClaim;
@@ -284,11 +287,12 @@ export function heroDeltaEvidenceView(
       value: parsedEndingValue?.endingDisplay ?? copy.unavailable,
       label: copy.endingValueLabel,
       detail: heroDetail(
-        parsedEndingValue?.change,
+        profit,
         totalReturnValue,
         copy,
         options?.locale,
         isContributionReturn ? copy.contributionReturnSuffix : undefined,
+        moneyDigits,
       ),
       tone,
       // Unavailable values must read as absent, never as a healthy metric.
@@ -336,6 +340,7 @@ function executionFacts(
   parsedStartingCapital: number | undefined,
   copy: ResultCardDisplayCopy,
   locale?: string,
+  moneyDigits?: number,
 ) {
   const config = result.configSnapshot;
   // Completed runs wrap the actual launch config; older direct runs store it
@@ -354,6 +359,7 @@ function executionFacts(
     parameters,
     locale,
     copy,
+    moneyDigits,
   );
   const startingCapital =
     parsedStartingCapital ?? result.chart?.base_value ?? undefined;
@@ -365,11 +371,11 @@ function executionFacts(
   )
     ? copy.totalContributedLabel
     : copy.startingCapitalLabel;
-  const valueSummaryDetails = portfolioValueSummaryDetails(result, copy, locale);
+  const valueSummaryDetails = portfolioValueSummaryDetails(result, copy, locale, moneyDigits);
   const details: EvidenceMetric[] = [
     startingCapital == null
       ? undefined
-      : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale) },
+      : { label: capitalBasisLabel, value: formatCurrency(startingCapital, locale, "USD", moneyDigits) },
     ...valueSummaryDetails,
     { label: copy.dateRangeLabel, value: dateRangeDisplay },
     timeframe ? { label: copy.timeframeLabel, value: formatTimeframeForDisplay(timeframe, copy) ?? copy.unavailable } : undefined,
@@ -461,6 +467,7 @@ function portfolioValueSummaryDetails(
   result: StrategyResultPayload,
   copy: ResultCardDisplayCopy,
   locale?: string,
+  moneyDigits?: number,
 ) {
   const summary = recordValue(result.chart?.value_summary);
   if (!summary) {
@@ -471,11 +478,11 @@ function portfolioValueSummaryDetails(
     return [
       {
         label: copy.peakValueLabel,
-        value: formatCurrency(legacyExtrema.peak, locale, legacyExtrema.currency),
+        value: formatCurrency(legacyExtrema.peak, locale, legacyExtrema.currency, moneyDigits),
       },
       {
         label: copy.lowestValueLabel,
-        value: formatCurrency(legacyExtrema.lowest, locale, legacyExtrema.currency),
+        value: formatCurrency(legacyExtrema.lowest, locale, legacyExtrema.currency, moneyDigits),
       },
     ];
   }
@@ -488,10 +495,10 @@ function portfolioValueSummaryDetails(
   return [
     peakValue == null
       ? undefined
-      : { label: copy.peakValueLabel, value: formatCurrency(peakValue, locale) },
+      : { label: copy.peakValueLabel, value: formatCurrency(peakValue, locale, "USD", moneyDigits) },
     lowestValue == null
       ? undefined
-      : { label: copy.lowestValueLabel, value: formatCurrency(lowestValue, locale) },
+      : { label: copy.lowestValueLabel, value: formatCurrency(lowestValue, locale, "USD", moneyDigits) },
   ].filter((detail): detail is EvidenceMetric => Boolean(detail));
 }
 
@@ -523,6 +530,7 @@ function contributionFromStructuredFacts(
   parameters?: Record<string, unknown>,
   locale?: string,
   copy = defaultResultCardDisplayCopy,
+  moneyDigits?: number,
 ) {
   const rawPeriod =
     stringValue(resolvedParameters?.cadence) ?? stringValue(parameters?.dca_cadence);
@@ -536,11 +544,11 @@ function contributionFromStructuredFacts(
     amount:
       amount == null
         ? undefined
-        : copy.contributionPhrase(formatCurrency(amount, locale), rawPeriod),
+        : copy.contributionPhrase(formatCurrency(amount, locale, "USD", moneyDigits), rawPeriod),
     startingCapital:
       startingCapital == null
         ? undefined
-        : formatCurrency(startingCapital, locale),
+        : formatCurrency(startingCapital, locale, "USD", moneyDigits),
   };
 }
 
@@ -592,7 +600,7 @@ function timeframeUnitLabel(unit: string) {
   return "period";
 }
 
-function parseEndingValue(value?: string, locale?: string) {
+function parseEndingValue(value?: string, locale?: string, moneyDigits?: number) {
   const matches = value?.match(CURRENCY_VALUE_PATTERN) ?? [];
   if (matches.length === 0) return undefined;
 
@@ -605,8 +613,7 @@ function parseEndingValue(value?: string, locale?: string) {
   return {
     start,
     ending,
-    change: start == null ? undefined : ending - start,
-    endingDisplay: formatCurrency(ending, locale),
+    endingDisplay: formatCurrency(ending, locale, "USD", moneyDigits),
   };
 }
 
@@ -637,16 +644,18 @@ function heroDetail(
   copy: ResultCardDisplayCopy,
   locale?: string,
   returnSuffix?: string,
+  moneyDigits?: number,
 ) {
   const suffix = returnSuffix ?? copy.totalReturnSuffix;
   const returnLabel = totalReturn ?? copy.returnUnavailable;
-  if (change == null) return returnLabel;
-  if (Math.abs(change) < 0.5) {
-    return `${formatCurrency(0, locale)} ${copy.changeNoun} · ${returnLabel} ${suffix}`;
+  if (change == null) return `${returnLabel} ${suffix}`;
+  // A change reads as none only when it rounds to zero at this run's precision.
+  if (Math.abs(change) < 0.5 / 10 ** resultCurrencyFractionDigits(moneyDigits)) {
+    return `${formatCurrency(0, locale, "USD", moneyDigits)} ${copy.changeNoun} · ${returnLabel} ${suffix}`;
   }
   const sign = change > 0 ? "+" : "-";
   const noun = change > 0 ? copy.gainNoun : copy.lossNoun;
-  return `${sign}${formatCurrency(Math.abs(change), locale)} ${noun} · ${returnLabel} ${suffix}`;
+  return `${sign}${formatCurrency(Math.abs(change), locale, "USD", moneyDigits)} ${noun} · ${returnLabel} ${suffix}`;
 }
 
 function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
@@ -657,13 +666,16 @@ function evidenceTone(change?: number, totalReturn?: string): EvidenceTone {
   return basis > 0 ? "positive" : "negative";
 }
 
-export function formatCurrency(value: number, locale = "en-US", currency = "USD") {
+export function formatCurrency(
+  value: number,
+  locale = "en-US",
+  currency = "USD",
+  moneyDigits?: number,
+) {
   return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     currencyDisplay: "narrowSymbol",
-    minimumFractionDigits: displayPolicy.currency_fraction_digits,
-    maximumFractionDigits: displayPolicy.currency_fraction_digits,
-    roundingMode: displayPolicy.currency_rounding_mode as "halfExpand",
+    ...resultMoneyFormatOptions(moneyDigits),
   }).format(value);
 }

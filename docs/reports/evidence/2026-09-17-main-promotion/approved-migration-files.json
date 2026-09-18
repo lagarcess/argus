@@ -1,0 +1,26 @@
+[
+  {
+    "version": "20260912190000",
+    "name": "share_calculation_receipts",
+    "file": "supabase/migrations/20260912190000_share_calculation_receipts.sql",
+    "file_sha256": "ef2b98db4a0145a491203b3d6221ecaa3e57703e15e179ed2a0452cb61dcbb3f"
+  },
+  {
+    "version": "20260913213100",
+    "name": "admit_readout_route_receipt_tier",
+    "file": "supabase/migrations/20260913213100_admit_readout_route_receipt_tier.sql",
+    "file_sha256": "b5399407417bd72bac46e5b4343f335cf41a1baccaa8647f63959b2912ca5af9"
+  },
+  {
+    "version": "20260913230000",
+    "name": "release_research_guest_claim",
+    "file": "supabase/migrations/20260913230000_release_research_guest_claim.sql",
+    "file_sha256": "dc47f7cb5b8a6cb92e93695f29133bd55fe8b07fbc866a39e35a2458a2c0c74a"
+  },
+  {
+    "version": "20260914120000",
+    "name": "share_plain_answer_receipts",
+    "file": "supabase/migrations/20260914120000_share_plain_answer_receipts.sql",
+    "file_sha256": "05dcc5a98940fa23e46368328f4966548c2e01a0c0a5c0e742f4d65ada6b349e"
+  }
+]

@@ -1,8 +1,9 @@
+import { rememberReceiptFollowupClaim } from './receipt-followup-storage';
 import { parseToolProgress, type ToolProgress, type ToolResultCard, type ToolScalar } from "./tool-result-card";
 import { getSupabaseClient } from "./supabase-client";
 import i18next from "i18next";
 import { localizeArtifactFinalPayload } from "./artifact-response-transport";
-import type { AssetClass } from "./argus-types";
+import type { AssetClass, ConfirmationPeerSelection } from "./argus-types";
 import type { ConversationPreview } from "./conversation-preview-display";
 import type { ChatFinalResponsePayload } from "./chat-final-response-payload";
 import type { SearchConversationItem as SearchConversationContract } from "./search-contract";
@@ -49,7 +50,7 @@ export { apiFetch, unauthenticatedApiFetch } from "./argus-api-transport";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
-export type { AssetClass } from "./argus-types";
+export type { AssetClass, ConfirmationPeerIdentity, ConfirmationPeerSelection } from "./argus-types";
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
 export type BacktestJobStatus =
   | "queued"
@@ -84,6 +85,7 @@ export type ConversationAttention = {
 export type ConversationActivity = {
   operation: ConversationOperation;
   attention: ConversationAttention;
+  latest_message_id?: string | null;
 };
 export type ConversationActivityPatch =
   | { action: "mark_unread" }
@@ -159,6 +161,8 @@ export type ConversationResultCard = {
   actions: ChatActionOption[];
   chart?: ResultChartPayload | null;
   execution_costs?: ExecutionCostEvidence | null;
+  currency_fraction_digits?: number | null;
+  profit?: number | null;
 };
 
 // ─── Domain objects ──────────────────────────────────────────────────────────
@@ -319,6 +323,8 @@ export type SearchAssetRollupItem = {
   type: "asset_rollup";
   symbol: string;
   run_count: number;
+  /** Every result involving the asset: runs plus computed answers; absent on older builds. */
+  result_count?: number;
   decision_counts: Record<DecisionState, number>;
   last_touched_at: string;
 };
@@ -516,6 +522,8 @@ export function resultCardFromConversationCard(
     })),
     chart: card.chart ?? null,
     executionCosts: card.execution_costs ?? null,
+    currencyFractionDigits: card.currency_fraction_digits ?? undefined,
+    profit: card.profit ?? undefined,
   };
 }
 
@@ -567,12 +575,15 @@ export async function persistBrowserSession(payload: AuthResponsePayload) {
   if (!supabase) {
     return;
   }
-  const { error } = await supabase.auth.setSession({
+  const { data, error } = await supabase.auth.setSession({
     access_token: session.access_token,
     refresh_token: session.refresh_token,
   });
   if (error) {
     throw error;
+  }
+  if (payload.guest_claim && data?.session?.user.id) {
+    rememberReceiptFollowupClaim(data.session.user.id, payload.guest_claim.conversation_id);
   }
 }
 
@@ -766,7 +777,7 @@ export async function getConversationMessages(
 export async function addConfirmationPeerAssets(
   conversationId: string,
   confirmationId: string,
-  symbols: string[],
+  selection: ConfirmationPeerSelection,
 ) {
   // Deterministic basket growth: no chat turn, no allowance spend. The
   // backend re-validates every symbol against the active turn's peer rows.
@@ -775,7 +786,7 @@ export async function addConfirmationPeerAssets(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbols }),
+      body: JSON.stringify(selection),
     },
   );
   return response.message;
@@ -982,6 +993,7 @@ export async function getBacktestJob(jobId: string) {
 export type ChatStreamOptions = Readonly<{
   requestId?: string;
   signal?: AbortSignal;
+  failedAssistantId?: string;
 }>;
 
 export async function streamChatMessage(
@@ -1020,14 +1032,14 @@ export async function streamChatMessage(
     },
     body: JSON.stringify({
       conversation_id: conversationId,
+      ...(options.failedAssistantId
+        ? { failed_assistant_id: options.failedAssistantId }
+        : {}),
       ...(typeof input === "string" ? { message: input } : { action: input }),
-      // Callers decide which turns carry mentions; this layer only forwards
-      // them. Gating on a string input silently dropped the resolver identity
-      // that a discovery selection attaches to its action turn.
+      // Forward caller-owned mentions, including discovery action identity.
       ...(mentions.length > 0 ? { mentions } : {}),
       language: normalizeApiLanguage(language),
-      // Temporary chat: only ever narrows behavior, so the transport layer
-      // owns it and ordinary conversations send an unchanged body.
+      // Temporary chat narrows behavior; ordinary requests stay unchanged.
       ...(isConversationMemoryOptOut(conversationId)
         ? { memory_opt_out: true }
         : {}),

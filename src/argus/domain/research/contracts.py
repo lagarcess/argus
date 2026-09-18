@@ -68,7 +68,7 @@ class RetrievedRow(BaseModel):
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
     subject: str
-    """The entity the figure describes, as the source names it: Apple, Banco Popular, Netflix."""
+    """The entity the figure describes, as the source names it: Microsoft, Santander, Netflix."""
     symbol: str | None
     """The exchange ticker of the security the figure describes, or null."""
     label: str
@@ -76,13 +76,26 @@ class RetrievedRow(BaseModel):
     value: float = Field(strict=True, allow_inf_nan=False)
     """The figure as a plain number: 8.25 for 8.25 percent, 1250000 for 1,250,000."""
     kind: RowKind
-    """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as a P/E, count for a number of units such as shares."""
+    """What the value measures: currency for a money amount, percent for a percentage, multiple for a ratio such as price to book, count for a number of units such as shares."""
     unit: str
-    """The unit of value: the ISO 4217 code of a money amount such as USD or DOP, % for a percentage, x for a multiple, the thing counted for a count."""
+    """The unit of value: only the ISO 4217 code of a money amount such as USD or DOP, with a per-share or per-unit figure saying so in its label; % for a percentage, x for a multiple, the thing counted for a count."""
     as_of: str | None
     """The date the source gives for this figure as YYYY-MM-DD, or null when it gives none."""
     source_url: str | None
     """The URL of the retrieved page this figure was read from. Null when it was not read from a page retrieved in this response; such rows are discarded."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _currency_code_before_its_qualifier(cls, data: Any) -> Any:
+        """A money unit written with a qualifier, such as USD per share, keeps its
+        code; the label already says what the amount is per."""
+        if isinstance(data, dict) and data.get("kind") == "currency":
+            unit = data.get("unit")
+            if isinstance(unit, str):
+                code = unit.strip().replace("/", " ").split(" ")[0]
+                if code in CURRENCY_CODES and code != unit.strip():
+                    return {**data, "unit": code}
+        return data
 
     @field_validator("unit")
     @classmethod
@@ -154,6 +167,12 @@ def _strict_schema(node: Any, definitions: dict[str, Any]) -> Any:
 class ResearchUnavailableError(Exception):
     """Raised when the research provider cannot serve a request.
 
+    ``status`` is the HTTP status of a response the provider refused, and
+    ``retry_after_seconds`` the wait that response asked for, when it gave one.
+    ``sent`` is False only when the request provably never reached the
+    provider, because the connection failed before it was sent.
+    ``run_may_be_billing`` marks a background submission that failed after it
+    was sent: the provider may already be running, and billing, that run.
     ``usage`` carries the invoice of a response that was read far enough to
     establish one before being rejected. Argus paid for that response, so the
     turn that discards it still records its spend.
@@ -164,12 +183,44 @@ class ResearchUnavailableError(Exception):
         reason: str,
         detail: str | None = None,
         *,
+        status: int | None = None,
+        retry_after_seconds: float | None = None,
+        sent: bool = True,
+        run_may_be_billing: bool = False,
         usage: ResearchUsage | None = None,
     ) -> None:
         super().__init__(reason)
         self.reason = reason
         self.detail = detail
+        self.status = status
+        self.retry_after_seconds = retry_after_seconds
+        self.sent = sent
+        self.run_may_be_billing = run_may_be_billing
         self.usage = usage
+
+    @property
+    def paid_work_ruled_out(self) -> bool:
+        """Whether the provider cannot have started paid work on this request:
+        it answered with a 429 or a 5xx, or the connection failed before the
+        request was sent. Only then is asking again automatically free of a
+        second charge; after a read timeout or a connection dropped mid-request,
+        the reader decides."""
+        if self.status is not None:
+            return self.status == 429 or self.status >= 500
+        return not self.sent and self.reason in ("timeout", "transport")
+
+    @property
+    def transient(self) -> bool:
+        """Whether the reader may usefully ask the same request again: the
+        provider failed on its side (5xx), rate limited it (429), or was too slow
+        or unreachable. A request it refused, a missing key and an answer that
+        could not be read fail the same way every time, and a background
+        submission whose run may already be billing would start a second run."""
+        if self.run_may_be_billing:
+            return False
+        if self.status is not None:
+            return self.status == 429 or self.status >= 500
+        return self.reason in ("timeout", "transport")
 
 
 class ResearchPricingError(Exception):
@@ -296,6 +347,20 @@ class ResearchPacket(BaseModel):
     # cited rows; the turn names them under the answer as figures it could
     # not tie to a source, from their own typed subject and label.
     unsourced_rows: tuple[RetrievedRow, ...] = ()
+    # The calculations the answer asks Argus to compute, one per option, as the
+    # provider wrote them under the typed answer schema; the answer step
+    # validates and computes them. JSON here because the calculation catalogue
+    # imports the tool contracts that import this module.
+    calculations: tuple[dict[str, Any], ...] = ()
+    # The retrieved pages the answer says it relies on, as the provider wrote
+    # them; source selection publishes only pages the answer cites.
+    source_urls: tuple[str, ...] = ()
+    # Questions the answer suggests the reader may ask next, as the provider
+    # wrote them; the next-steps list cleans and bounds them.
+    follow_up_questions: tuple[str, ...] = ()
+    # True when the answer declined a request that is not a money question or
+    # asks Argus to act; its plain reply is published as it stands.
+    declined: bool = False
     # Tool result items in the provider's output, by item type and in order.
     # This is the retrieval record; the invoice's tool counts are billing.
     tool_results: tuple[str, ...] = ()

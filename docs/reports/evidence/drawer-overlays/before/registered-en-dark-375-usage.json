@@ -1,0 +1,15 @@
+{
+  "width": 375,
+  "account": "registered",
+  "language": "en",
+  "theme": "dark",
+  "motion": "on",
+  "surface": "usage",
+  "box": {
+    "x": 0,
+    "y": 402,
+    "width": 307.5,
+    "height": 498
+  },
+  "reducedMotion": false
+}

@@ -12,7 +12,7 @@ from tests.evals.measurement_eval_scorecard import (
     measurement_fixture_identity_at_git_sha,
 )
 from tests.release_promotion_evidence_support import (
-    assert_main_promotion_baseline_comparison,
+    assert_main_promotion_live_eval_evidence,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,14 +115,6 @@ _CLAUSE_BREAK = re.compile(
 _OTHER_ENV_VAR = re.compile(r"\b(?:ARGUS|NEXT_PUBLIC|SUPABASE|OPENROUTER|ALPACA)_\w+")
 # Self-identifying: this term means the gate is shut, whatever the subject.
 _GATE_SHUT_TERM = "allowlist-gated"
-LIVE_EVAL_RESULT_STATUSES = (
-    "passed",
-    "failed",
-    "expected_failed",
-    "unexpected_pass",
-    "skipped",
-    "infrastructure_error",
-)
 
 KNOWN_MAIN_PROMOTION_MANIFESTS_WITHOUT_LIVE_EVAL = frozenset(
     {
@@ -510,106 +502,6 @@ def _commit_measurement_fixture_candidate(
     return completed.stdout.strip()
 
 
-def _assert_main_promotion_live_eval_evidence(
-    manifest_path: Path,
-    *,
-    repository_root: Path = ROOT,
-) -> None:
-    manifest = manifest_path.read_text(encoding="utf-8")
-    scorecard_match = re.search(
-        r"^- Live eval scorecard: `([^`]+\.json)`",
-        manifest,
-        re.M,
-    )
-    assert scorecard_match is not None, (
-        f"{manifest_path.name}: missing durable live eval scorecard"
-    )
-    candidate_match = re.search(
-        r"^- (?:Runtime )?Candidate SHA:\s*`([0-9a-f]{40})`",
-        manifest,
-        re.M,
-    )
-    assert candidate_match is not None, f"{manifest_path.name}: missing candidate SHA"
-    scorecard_path = (repository_root / scorecard_match.group(1)).resolve()
-    assert scorecard_path.is_file(), (
-        f"{manifest_path.name}: live eval scorecard does not exist"
-    )
-    assert scorecard_path.is_relative_to(
-        (repository_root / "docs" / "reports" / "evidence").resolve()
-    ), f"{manifest_path.name}: live eval scorecard is not durable evidence"
-    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
-    assert scorecard.get("schema_version") == 2
-    provenance = scorecard.get("provenance", {})
-    assert provenance.get("evaluation_mode") == "live"
-    assert provenance.get("market_data_provider_mode") == "live_provider"
-    assert str(provenance.get("asset_provider_mode") or "").strip()
-    assert provenance.get("candidate_sha") == candidate_match.group(1)
-    assert re.fullmatch(r"\d+\.\d+\.\d+", provenance.get("python_version", ""))
-    assert re.fullmatch(r"[0-9a-f]{64}", provenance.get("fixture_sha256", ""))
-    assert provenance.get("worktree_clean") is True
-    probe = provenance.get("live_market_data_probe", {})
-    assert probe.get("requested_date_range") == {
-        "start": "2024-01-01",
-        "end": "2024-01-10",
-    }
-    assert probe.get("effective_date_range") == {
-        "start": "2024-01-02",
-        "end": "2024-01-10",
-    }
-    assert probe.get("adjustment_reason") == "calendar_alignment"
-    fixture_case_ids = provenance.get("fixture_case_ids")
-    assert (
-        isinstance(fixture_case_ids, list)
-        and fixture_case_ids
-        and all(isinstance(case_id, str) and case_id for case_id in fixture_case_ids)
-        and len(fixture_case_ids) == len(set(fixture_case_ids))
-    ), "live eval scorecard is missing fixture case identities"
-    candidate_fixture_identity = measurement_fixture_identity_at_git_sha(
-        candidate_sha=candidate_match.group(1),
-        repository_root=repository_root,
-    )
-    assert (
-        provenance.get("fixture_sha256") == candidate_fixture_identity.sha256
-        and fixture_case_ids == list(candidate_fixture_identity.case_ids)
-    ), "live eval scorecard does not match the candidate fixture identity"
-    results = scorecard.get("results")
-    assert isinstance(results, list), "live eval scorecard is missing results"
-    assert all(
-        isinstance(result, dict)
-        and isinstance(result.get("id"), str)
-        and isinstance(result.get("category"), str)
-        and result.get("status") in LIVE_EVAL_RESULT_STATUSES
-        for result in results
-    ), "live eval scorecard contains malformed results"
-    result_case_ids = [result["id"] for result in results]
-    assert result_case_ids == fixture_case_ids, (
-        "live eval scorecard does not contain the complete fixture result set"
-    )
-    # Scorecards written before #549 omit the zero infrastructure-error count.
-    totals = {"infrastructure_error": 0, **scorecard.get("totals", {})}
-    calculated_totals = {
-        status: sum(result["status"] == status for result in results)
-        for status in LIVE_EVAL_RESULT_STATUSES
-    }
-    assert totals == calculated_totals, (
-        "live eval scorecard totals do not match its complete results"
-    )
-    assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
-    assert totals.get("unexpected_pass") == 0
-
-    # A red candidate is gated by comparison against the deployed build, never
-    # by its own score. Runbook: "Live eval is a comparison, not a scoreboard".
-    if totals.get("failed"):
-        assert_main_promotion_baseline_comparison(
-            manifest,
-            manifest_path,
-            candidate_results=results,
-            repository_root=repository_root,
-        )
-
-
-
-
 def test_main_promotion_manifest_without_live_eval_scorecard_is_rejected(
     tmp_path: Path,
 ) -> None:
@@ -621,7 +513,7 @@ def test_main_promotion_manifest_without_live_eval_scorecard_is_rejected(
     )
 
     with pytest.raises(AssertionError, match="missing durable live eval scorecard"):
-        _assert_main_promotion_live_eval_evidence(manifest_path)
+        assert_main_promotion_live_eval_evidence(manifest_path)
 
 
 def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
@@ -696,7 +588,7 @@ def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
         encoding="utf-8",
     )
 
-    _assert_main_promotion_live_eval_evidence(
+    assert_main_promotion_live_eval_evidence(
         manifest_path,
         repository_root=tmp_path,
     )
@@ -705,7 +597,7 @@ def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
     scorecard["totals"]["passed"] = 1
     scorecard_path.write_text(json.dumps(scorecard), encoding="utf-8")
     with pytest.raises(AssertionError, match="totals do not match"):
-        _assert_main_promotion_live_eval_evidence(
+        assert_main_promotion_live_eval_evidence(
             manifest_path,
             repository_root=tmp_path,
         )
@@ -775,7 +667,7 @@ def test_main_promotion_manifest_rejects_summary_without_complete_results(
     )
 
     with pytest.raises(AssertionError, match="candidate fixture identity"):
-        _assert_main_promotion_live_eval_evidence(
+        assert_main_promotion_live_eval_evidence(
             manifest_path,
             repository_root=tmp_path,
         )
@@ -796,7 +688,7 @@ def test_main_promotion_manifests_require_live_eval_scorecard_evidence() -> None
     missing_evidence: set[str] = set()
     for manifest_path in manifests:
         try:
-            _assert_main_promotion_live_eval_evidence(manifest_path)
+            assert_main_promotion_live_eval_evidence(manifest_path)
         except AssertionError as exc:
             if "missing durable live eval scorecard" not in str(exc):
                 raise
@@ -1226,7 +1118,12 @@ def test_api_contract_does_not_exclude_supported_execution_costs() -> None:
 
 def test_private_alpha_release_manifest_template_has_required_audit_fields() -> None:
     template = _source("docs/release-manifests/TEMPLATE.md")
+    canary_checks = json.loads(RELEASE_PROFILE_PATH.read_text(encoding="utf-8"))[
+        "canary"
+    ]["required_steps"]
 
+    for check in canary_checks:
+        assert f"`{check}`" in template
     for expected in (
         "Candidate SHA",
         "Promotion target",
@@ -1245,10 +1142,10 @@ def test_private_alpha_release_manifest_template_has_required_audit_fields() -> 
         "Secret rotation / least-privilege owner",
         "Canary evidence",
         "Failed-capture replay",
-        "Authoritative Spanish release canary",
         "Release profile hash",
         "Browser signup/login proof",
-        "private-alpha-canary-evidence",
+        "private-alpha-release-coherence-evidence",
+        "private-alpha-authenticated-browser-evidence",
         "No raw conversation, user, run, or job ids",
         "sanitized replay inputs",
     ):

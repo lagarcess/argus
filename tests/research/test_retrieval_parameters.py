@@ -12,6 +12,10 @@ from typing import Any
 
 import pytest
 from argus.agent_runtime import research_grounded as grounded
+from argus.domain.research.answer_contract import (
+    TYPED_ANSWER_SCHEMA_NAME,
+    typed_answer_response_format,
+)
 from argus.domain.research.config import (
     MAX_FALLBACK_MODELS,
     MAX_SOURCE_DOMAINS,
@@ -24,9 +28,7 @@ from argus.domain.research.config import (
     retrieval_spec,
 )
 from argus.domain.research.contracts import (
-    TYPED_RETRIEVAL_SCHEMA_NAME,
     ResearchUnavailableError,
-    typed_response_format,
     typed_retrieval_json_schema,
 )
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
@@ -120,7 +122,9 @@ def test_recency_follows_the_section_7_data_class(
 
 def test_the_location_is_the_asking_users_country_and_nothing_else() -> None:
     def spec(country: str | None) -> ResearchConfigSpec:
-        return retrieval_spec("balanced", question_kind="current_external", country=country)
+        return retrieval_spec(
+            "balanced", question_kind="current_external", country=country
+        )
 
     assert spec("MX").location == RetrievalLocation(country="MX")
     assert spec(None).location is None, "a user without a country sends no location"
@@ -175,8 +179,8 @@ def test_the_request_carries_every_retrieval_parameter() -> None:
     assert "model" not in body
     assert body["language_preference"] == "es"
     assert body["instructions"] == RETRIEVAL_INSTRUCTIONS
-    assert body["response_format"] == typed_response_format()
-    assert body["response_format"]["json_schema"]["name"] == TYPED_RETRIEVAL_SCHEMA_NAME
+    assert body["response_format"] == typed_answer_response_format()
+    assert body["response_format"]["json_schema"]["name"] == TYPED_ANSWER_SCHEMA_NAME
     assert body["response_format"]["json_schema"]["strict"] is True
     assert body["tools"] == [
         {
@@ -425,7 +429,11 @@ def test_why_it_is_moving_grounds_through_the_balanced_shape(monkeypatch) -> Non
     assert sidecar["sources"][0]["source_date"] == "2026-09-04"
     assert sidecar["rows"] == [retrieved_row(source_url=PUBLISHER)]
     assert "http" not in result.stage_patch["assistant_response"]
-    assert result.decision.reason_codes == ["research_answer_balanced_lookup"]
+    # The prose states a figure with no typed row: recorded, never replaced.
+    assert result.decision.reason_codes == [
+        "answer_figures_unsourced",
+        "research_answer_balanced_lookup",
+    ]
 
 
 def test_why_it_is_moving_fails_closed_without_a_publisher_page(monkeypatch) -> None:

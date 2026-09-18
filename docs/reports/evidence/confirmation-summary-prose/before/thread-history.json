@@ -1,0 +1,32 @@
+{
+  "buy_and_hold": [
+    {
+      "role": "user",
+      "content": "Compra y mantén AAPL durante 2024 con 10000 dólares"
+    },
+    {
+      "role": "assistant",
+      "content": "Ready to test buy-and-hold for AAPL over 2 de enero de 2024 al 31 de diciembre de 2024."
+    }
+  ],
+  "recurring": [
+    {
+      "role": "user",
+      "content": "Invierte 500 dólares cada mes en AAPL durante 2024"
+    },
+    {
+      "role": "assistant",
+      "content": "Ready to test recurring buys for AAPL over 2 de enero de 2024 al 31 de diciembre de 2024."
+    }
+  ],
+  "rule": [
+    {
+      "role": "user",
+      "content": "Compra TSLA cuando el RSI baje de 30 y vende arriba de 70"
+    },
+    {
+      "role": "assistant",
+      "content": "Ready to test TSLA with an RSI threshold over 2 de enero de 2024 al 31 de diciembre de 2024."
+    }
+  ]
+}

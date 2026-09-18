@@ -18,7 +18,10 @@ from argus.domain.engine_launch.result_facts import (
     execution_note,
     resolved_rule_summary,
 )
-from argus.domain.research.admission import claim_current_research_attempt
+from argus.domain.research.admission import (
+    admitted_provider_work,
+    claim_current_research_attempt,
+)
 from argus.domain.research.config import ResearchConfigSpec
 from argus.domain.research.contracts import (
     ResearchSource,
@@ -28,6 +31,10 @@ from argus.domain.research.contracts import (
 from argus.domain.research.credentials import perplexity_api_key
 from argus.domain.research.perplexity_agent import PerplexityAgentClient
 from argus.domain.result_figures import shown_benchmark_gap
+from argus.domain.result_money import (
+    stored_currency_fraction_digits,
+    with_currency_fraction_digits,
+)
 from argus.domain.result_readout_content import (
     normalize_readout_language,
 )
@@ -81,7 +88,7 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         "trades": run.trades or [],
     }
     config_snapshot = run.config_snapshot if isinstance(run.config_snapshot, dict) else {}
-    return {
+    context = {
         "run_id": run.id,
         "chart": run.chart,
         "title": card.get("title") if isinstance(card, dict) else None,
@@ -101,6 +108,7 @@ def result_breakdown_context(run: BacktestRun) -> dict[str, Any]:
         else None,
         "language": config_snapshot.get("language"),
     }
+    return with_currency_fraction_digits(context, stored_currency_fraction_digits(card))
 
 
 def llm_result_breakdown_message(
@@ -133,6 +141,7 @@ def _llm_result_breakdown_with_metadata(
         benchmark_symbol=context.get("benchmark_symbol"),
         date_range=context.get("date_range"),
         chart=context.get("chart"),
+        currency_fraction_digits=stored_currency_fraction_digits(context),
     )
     messages = _result_breakdown_llm_messages(
         facts=facts,
@@ -146,14 +155,15 @@ def _llm_result_breakdown_with_metadata(
             return None, "llm_unavailable_or_contract_rejected", None, ()
         if not claim_current_research_attempt().available:
             return None, "research_capacity_exhausted", None, ()
-        response = active_client.run_structured(
-            messages[1]["content"],
-            result_breakdown_spec(resolved_language),
-            schema_model=result_breakdown_schema(headline_facts),
-            schema_name="ResultBreakdownDraft",
-            instructions=messages[0]["content"],
-            limits=RESULT_RESEARCH_LIMITS,
-        )
+        with admitted_provider_work():
+            response = active_client.run_structured(
+                messages[1]["content"],
+                result_breakdown_spec(resolved_language),
+                schema_model=result_breakdown_schema(headline_facts),
+                schema_name="ResultBreakdownDraft",
+                instructions=messages[0]["content"],
+                limits=RESULT_RESEARCH_LIMITS,
+            )
     except ResearchUnavailableError as exc:
         logger.warning("Result breakdown unavailable; using template", reason=exc.reason)
         return None, "llm_unavailable_or_contract_rejected", exc.usage, ()

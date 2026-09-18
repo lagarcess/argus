@@ -6,12 +6,14 @@ from __future__ import annotations
 
 from typing import Any
 
+from argus.agent_runtime.history import select_thread_history
 from argus.agent_runtime.interpreter.audits import DcaContractAudit
 from argus.agent_runtime.interpreter.shared import (
     _TOTAL_CAPITAL_SOURCES,
     _capital_source,
     _date_range_from_intent_or_bounded_evidence,
     _field_path_base,
+    _grounded_recurring_contribution,
     _llm_value_is_empty,
     _supported_dca_cadence_value,
     repaired_turn_act,
@@ -293,14 +295,25 @@ def _capability_required_missing_fields_for_canonical_strategy(
 
 
 def _dca_draft_has_recurring_amount(draft: LLMStrategyDraft) -> bool:
+    # Shape presence does not establish ownership; grounding owns that check.
     if draft.recurring_contribution is not None:
         return True
-    if draft.capital_amount is None:
-        return False
-    return _capital_source(draft.field_provenance, "capital_amount") in {
+    if _capital_source(draft.field_provenance, "capital_amount") in {
         "recurring_contribution",
         "explicit_recurring_contribution",
-    }
+    }:
+        return draft.capital_amount is not None
+    return False
+
+
+def dca_recurring_amount(draft: LLMStrategyDraft) -> float | None:
+    """Read a contribution only when canonical strategy grounding will keep it."""
+    amount = draft.recurring_contribution
+    if amount is None and _dca_draft_has_recurring_amount(draft):
+        amount = draft.capital_amount
+    return _grounded_recurring_contribution(
+        amount, field_provenance=draft.field_provenance
+    )
 
 
 def _dca_total_budget_source(value: Any) -> str:
@@ -398,8 +411,8 @@ def _strategy_family_continuity_audit_messages(
     request: InterpretationRequest,
 ) -> list[dict[str, str]]:
     recent_history = [
-        item.model_dump(mode="json")
-        for item in request.recent_thread_history[-6:]
+        {"role": item.role, "content": item.content}
+        for item in select_thread_history(request.recent_thread_history)
         if hasattr(item, "role") and hasattr(item, "content")
     ]
     return [

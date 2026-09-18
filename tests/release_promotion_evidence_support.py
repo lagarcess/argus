@@ -1,4 +1,4 @@
-"""Comparison of a promotion candidate against the deployed build.
+"""Live eval evidence for a promotion, compared against the deployed build.
 
 A promotion asks whether the candidate is worse than what users have now.
 Lives here rather than in the release-docs test so that test stays about
@@ -9,9 +9,21 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
-import sys
 from pathlib import Path
+
+from tests.evals.measurement_eval_scorecard import (
+    measurement_fixture_identity_at_git_sha,
+)
+from tests.promotion_evidence_configuration import (
+    MANIFESTS_BEFORE_CONFIGURATION,
+    release_configuration_at_commit,
+)
+from tests.promotion_evidence_identity import (
+    assert_measurement_stands_for,
+    reachable_changes,
+)
+
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 # Ten paired rounds is what settled the 2026-08-21 and 2026-09-03 disputes.
 _PROSE_AB_MINIMUM_ATTEMPTS = 10
@@ -28,71 +40,130 @@ _MANIFESTS_PREDATING_PROSE_AB_RULE = frozenset(
     }
 )
 
-_PRODUCT_PATHS = ("src/", "web/app", "web/components", "web/lib", "web/public",
-                  "render.yaml", "supabase/")
+
+LIVE_EVAL_RESULT_STATUSES = (
+    "passed",
+    "failed",
+    "expected_failed",
+    "unexpected_pass",
+    "skipped",
+    "infrastructure_error",
+)
 
 
-def _same_product_tree(left: str, right: str, *, repository_root: Path) -> bool:
-    """True when two commits ship identical product code."""
-
-    result = subprocess.run(  # noqa: S603
-        ["git", "diff", "--quiet", left, right, "--", *_PRODUCT_PATHS],
-        cwd=repository_root,
-        capture_output=True,
-        check=False,
+def assert_main_promotion_live_eval_evidence(
+    manifest_path: Path,
+    *,
+    repository_root: Path = _REPOSITORY_ROOT,
+) -> None:
+    manifest = manifest_path.read_text(encoding="utf-8")
+    scorecard_match = re.search(
+        r"^- Live eval scorecard: `([^`]+\.json)`",
+        manifest,
+        re.M,
     )
-    return result.returncode == 0
-
-
-def measured_source_files(repository_root: Path) -> frozenset[str]:
-    """Every repo file the live eval can reach, derived from its own imports.
-
-    Enumerating this by hand would be a guess that goes stale the moment an
-    import changes. Importing the harness and reading what loaded is the same
-    question the eval answers when it runs.
-    """
-
-    script = (
-        "import sys, pathlib, json;"
-        "root = pathlib.Path('.').resolve();"
-        "sys.path.insert(0, str(root));"
-        "import tests.evals.measurement_eval_harness;"
-        "out = set();"
-        "[out.add(pathlib.Path(m.__file__).resolve().relative_to(root).as_posix())"
-        " for n, m in list(sys.modules.items())"
-        " if n.startswith('argus') and getattr(m, '__file__', None)"
-        " and str(pathlib.Path(m.__file__).resolve()).startswith(str(root))];"
-        "print(json.dumps(sorted(out)))"
+    assert scorecard_match is not None, (
+        f"{manifest_path.name}: missing durable live eval scorecard"
     )
-    result = subprocess.run(  # noqa: S603
-        [sys.executable, "-c", script],
-        cwd=repository_root,
-        capture_output=True,
-        check=True,
-        text=True,
+    candidate_match = re.search(
+        r"^- (?:Runtime )?Candidate SHA:\s*`([0-9a-f]{40})`",
+        manifest,
+        re.M,
     )
-    return frozenset(json.loads(result.stdout.strip().splitlines()[-1]))
-
-
-def eval_measured_code_unchanged(
-    left: str, right: str, *, repository_root: Path
-) -> tuple[bool, list[str]]:
-    """True when no file the eval can reach differs between two commits.
-
-    A change that cannot reach the measured code cannot regress it, which is a
-    stronger statement than a scorecard whose noise floor is several cases.
-    """
-
-    result = subprocess.run(  # noqa: S603
-        ["git", "diff", "--name-only", left, right],
-        cwd=repository_root,
-        capture_output=True,
-        check=True,
-        text=True,
+    assert candidate_match is not None, f"{manifest_path.name}: missing candidate SHA"
+    scorecard_path = (repository_root / scorecard_match.group(1)).resolve()
+    assert scorecard_path.is_file(), (
+        f"{manifest_path.name}: live eval scorecard does not exist"
     )
-    changed = {line.strip() for line in result.stdout.splitlines() if line.strip()}
-    touched = sorted(changed & measured_source_files(repository_root))
-    return (not touched), touched
+    assert scorecard_path.is_relative_to(
+        (repository_root / "docs" / "reports" / "evidence").resolve()
+    ), f"{manifest_path.name}: live eval scorecard is not durable evidence"
+    scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
+    assert scorecard.get("schema_version") in {2, 3}
+    assert (
+        scorecard.get("schema_version") == 3
+        or manifest_path.name in MANIFESTS_BEFORE_CONFIGURATION
+    ), "release_configuration: new promotions require measurement scorecard schema v3"
+    provenance = scorecard.get("provenance", {})
+    assert provenance.get("evaluation_mode") == "live"
+    assert provenance.get("market_data_provider_mode") == "live_provider"
+    assert str(provenance.get("asset_provider_mode") or "").strip()
+    assert_measurement_stands_for(
+        manifest,
+        manifest_path,
+        evidence="the live eval scorecard",
+        release_configuration=provenance.get("release_configuration"),
+        measured_sha=str(provenance.get("candidate_sha") or ""),
+        shipped_sha=candidate_match.group(1),
+        repository_root=repository_root,
+    )
+    assert re.fullmatch(r"\d+\.\d+\.\d+", provenance.get("python_version", ""))
+    assert re.fullmatch(r"[0-9a-f]{64}", provenance.get("fixture_sha256", ""))
+    assert provenance.get("worktree_clean") is True
+    probe = provenance.get("live_market_data_probe", {})
+    assert probe.get("requested_date_range") == {
+        "start": "2024-01-01",
+        "end": "2024-01-10",
+    }
+    assert probe.get("effective_date_range") == {
+        "start": "2024-01-02",
+        "end": "2024-01-10",
+    }
+    assert probe.get("adjustment_reason") == "calendar_alignment"
+    fixture_case_ids = provenance.get("fixture_case_ids")
+    assert (
+        isinstance(fixture_case_ids, list)
+        and fixture_case_ids
+        and all(isinstance(case_id, str) and case_id for case_id in fixture_case_ids)
+        and len(fixture_case_ids) == len(set(fixture_case_ids))
+    ), "live eval scorecard is missing fixture case identities"
+    candidate_fixture_identity = measurement_fixture_identity_at_git_sha(
+        candidate_sha=candidate_match.group(1),
+        repository_root=repository_root,
+    )
+    assert (
+        provenance.get("fixture_sha256") == candidate_fixture_identity.sha256
+        and fixture_case_ids == list(candidate_fixture_identity.case_ids)
+    ), "live eval scorecard does not match the candidate fixture identity"
+    results = scorecard.get("results")
+    assert isinstance(results, list), "live eval scorecard is missing results"
+    assert all(
+        isinstance(result, dict)
+        and isinstance(result.get("id"), str)
+        and isinstance(result.get("category"), str)
+        and result.get("status") in LIVE_EVAL_RESULT_STATUSES
+        for result in results
+    ), "live eval scorecard contains malformed results"
+    result_case_ids = [result["id"] for result in results]
+    assert result_case_ids == fixture_case_ids, (
+        "live eval scorecard does not contain the complete fixture result set"
+    )
+    # Scorecards written before #549 omit the zero infrastructure-error count.
+    totals = {"infrastructure_error": 0, **scorecard.get("totals", {})}
+    calculated_totals = {
+        status: sum(result["status"] == status for result in results)
+        for status in LIVE_EVAL_RESULT_STATUSES
+    }
+    assert totals == calculated_totals, (
+        "live eval scorecard totals do not match its complete results"
+    )
+    assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
+    assert totals.get("unexpected_pass") == 0
+    for status in ("skipped", "infrastructure_error"):
+        assert totals[status] == 0, (
+            f"{manifest_path.name}: live eval has {totals[status]} {status} "
+            "case(s); missing measurements cannot clear promotion."
+        )
+
+    # A red candidate is gated by comparison against the deployed build, never
+    # by its own score. Runbook: "Live eval is a comparison, not a scoreboard".
+    if totals.get("failed"):
+        assert_main_promotion_baseline_comparison(
+            manifest,
+            manifest_path,
+            candidate_results=results,
+            repository_root=repository_root,
+        )
 
 
 def assert_main_promotion_baseline_comparison(
@@ -124,16 +195,22 @@ def assert_main_promotion_baseline_comparison(
     # cannot self-identify; bind provenance as soon as it can.
     if baseline.get("schema_version", 1) >= 2:
         baseline_provenance = baseline.get("provenance", {})
-        baseline_sha = str(baseline_provenance.get("candidate_sha") or "")
-        deployed_sha = rollback_match.group(1)
-        # What must hold is that the baseline measured the deployed PRODUCT
-        # code. Merging to main mints a new SHA, so string equality would fail
-        # every promotion; identical product trees is the real invariant.
-        assert baseline_sha == deployed_sha or _same_product_tree(
-            baseline_sha, deployed_sha, repository_root=repository_root
-        ), f"{manifest_path.name}: baseline did not measure the deployed build"
+        # Merging to main mints a new SHA, so what must hold is that the
+        # measurement cannot tell the baseline's commit from the deployed build.
+        assert_measurement_stands_for(
+            manifest,
+            manifest_path,
+            evidence="the baseline eval scorecard",
+            release_configuration=baseline_provenance.get("release_configuration"),
+            measured_sha=str(baseline_provenance.get("candidate_sha") or ""),
+            shipped_sha=rollback_match.group(1),
+            repository_root=repository_root,
+        )
         assert baseline_provenance.get("evaluation_mode") == "live"
     else:
+        assert manifest_path.name in MANIFESTS_BEFORE_CONFIGURATION, (
+            "baseline: missing release_configuration for a new promotion"
+        )
         assert rollback_match.group(1)[:8] in baseline_path.name, (
             f"{manifest_path.name}: a pre-provenance baseline must carry the "
             "deployed SHA in its filename"
@@ -155,14 +232,19 @@ def assert_main_promotion_baseline_comparison(
     assert candidate_match is not None
     # A change that cannot reach the measured code cannot regress it. The suite
     # flips several cases per run on identical input, so counts are noise at
-    # this resolution and this proof is the stronger one. Derived from the
-    # harness's own imports, never a hand-written path list.
-    untouched, _ = eval_measured_code_unchanged(
+    # this resolution and this proof is the stronger one.
+    if not reachable_changes(
         rollback_match.group(1),
         candidate_match.group(1),
         repository_root=repository_root,
-    )
-    if untouched:
+    ) and (
+        manifest_path.name in MANIFESTS_BEFORE_CONFIGURATION
+        or release_configuration_at_commit(
+            rollback_match.group(1), repository_root=repository_root
+        ) == release_configuration_at_commit(
+            candidate_match.group(1), repository_root=repository_root
+        )
+    ):
         return
 
     # Totals fluctuate on identical code and can both invent a regression and
@@ -214,7 +296,7 @@ def assert_prose_failure_measured_on_both_sides(
     half an hour for a suite that still could not answer the question.
 
     Evidence is matched by content, never by filename: a side-labelled document
-    naming this case, whose provenance measured the right tree.
+    naming this case, whose measurement stands for that side's commit.
     """
 
     sides: dict[str, dict[str, object]] = {}
@@ -243,13 +325,16 @@ def assert_prose_failure_measured_on_both_sides(
 
     expected_sha = {"baseline": deployed_sha, "candidate": candidate_sha}
     for side, document in sorted(sides.items()):
-        measured_sha = str((document.get("provenance") or {}).get("candidate_sha") or "")
-        assert measured_sha == expected_sha[side] or _same_product_tree(
-            measured_sha, expected_sha[side], repository_root=repository_root
-        ), (
-            f"{manifest_path.name}: the {side} A/B for {case_id} measured "
-            f"{measured_sha or '<unrecorded>'}, which is not the "
-            f"{'deployed build' if side == 'baseline' else 'candidate'}."
+        assert_measurement_stands_for(
+            manifest,
+            manifest_path,
+            evidence=f"the {side} A/B for {case_id}",
+            release_configuration=(document.get("provenance") or {}).get(
+                "release_configuration"
+            ),
+            measured_sha=str((document.get("provenance") or {}).get("candidate_sha") or ""),
+            shipped_sha=expected_sha[side],
+            repository_root=repository_root,
         )
 
         measurement = document.get("measurement")

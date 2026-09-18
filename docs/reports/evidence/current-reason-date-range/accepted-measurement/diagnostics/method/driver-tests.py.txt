@@ -1,0 +1,33 @@
+import ast,json,sys,tempfile,traceback
+from pathlib import Path
+from types import SimpleNamespace
+from contextlib import redirect_stdout
+import io
+sys.path.insert(0,'/tmp')
+from current_reason_4d_budget import SpendStop
+from argus.domain.research import perplexity_agent
+from argus.domain.research.contracts import ResearchUnavailableError
+source=ast.parse(Path('/tmp/current_reason_complete_measure.py').read_text())
+loop=next(n for n in ast.walk(source) if isinstance(n,ast.For) and isinstance(n.target,ast.Tuple) and any(isinstance(x,ast.Name) and x.id=='index' for x in n.target.elts))
+code=compile(ast.Module(body=[loop],type_ignores=[]),'<actual-run-loop>','exec')
+cases=[SimpleNamespace(id=f'case_{i}',category='offline') for i in range(73)]
+def exercise(cap_at=None):
+ calls=[];guard=SimpleNamespace(label=None,total=lambda:0.5)
+ def run(case):
+  i=cases.index(case);calls.append(case.id)
+  if i==cap_at:raise SpendStop('budget_would_exceed_cap')
+  if i==40:raise ValueError('offline injected case exception')
+  return {'id':case.id,'category':case.category,'status':'failed' if i in (32,33) else 'passed','failed_checks':['recorded failure'] if i in (32,33) else [],'infrastructure_errors':[]}
+ ns={'cases':cases,'guard':guard,'run_eval_case':run,'SpendStop':SpendStop,'OUT':Path(tempfile.mkdtemp()),'json':json,'results':[],'traceback':traceback,'keys':[],'secret_values':{}}
+ with redirect_stdout(io.StringIO()):exec(code,ns)
+ return calls,ns
+calls,ns=exercise();assert len(calls)==73 and len(set(calls))==73 and len(ns['results'])==73
+assert ns['results'][32]['status']=='failed' and ns['results'][33]['status']=='failed'
+assert ns['results'][40]['status']=='infrastructure_error'
+print('PASS: actual driver loop attempts all 73 cases once despite two failures and an exception')
+calls,ns=exercise(10);assert len(calls)==11 and len(ns['results'])==10 and (ns['OUT']/'stop.json').exists()
+print('PASS: budget admission stop ends the loop before another case')
+perplexity_agent._MAX_ATTEMPTS=1
+failure=ResearchUnavailableError('http_error',status=500)
+assert perplexity_agent._retry_delay(failure,attempt=1,remaining=180,ceiling=180) is None
+print('PASS: run-local Agent limit prevents transport retries after a provider 500')

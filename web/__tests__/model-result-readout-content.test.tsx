@@ -3,7 +3,7 @@ import { createInstance } from "i18next";
 import { renderToStaticMarkup } from "react-dom/server";
 import { I18nextProvider } from "react-i18next";
 import ChatMessage from "../components/chat/ChatMessage";
-import DiscoverySourcesPanel from "../components/chat/DiscoverySourcesPanel";
+import { DiscoverySourcesPanelSurface as DiscoverySourcesPanel } from "../components/chat/DiscoverySourcesPanel";
 import { hydrateMessagesFromApi, messageStreamPresentation, standaloneStreamStatusVisible } from "../components/chat/chat-message-projection";
 import type { Message } from "../components/chat/types";
 import { resultCardFromRun, type ApiMessage, type BacktestRun } from "../lib/argus-api";

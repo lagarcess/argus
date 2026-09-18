@@ -72,6 +72,7 @@ export function useInitialChatSession({
           router.replace("/?auth=login");
           return;
         }
+        if (hasAcceptedUserInputRef.current) return;
         const activeRoute = readActiveConversationRouteState();
         let activeConversationId = activeRoute.conversationId;
         if (!activeConversationId && meResponse?.account_kind === "guest") {

@@ -224,9 +224,7 @@ def test_exact_final_preserves_claimed_no_progress_across_private_evidence() -> 
     entry_state = _typed_state()
     final_state = _typed_state()
     final_state["pending_strategy"]["strategy"]["asset_universe"] = ["MSFT"]
-    final_state["response_intent"]["facts"] = {
-        "progress_outcome": "no_progress"
-    }
+    final_state["response_intent"]["facts"] = {"progress_outcome": "no_progress"}
 
     with turn_execution_scope(entry_state=entry_state) as execution:
         assert claim_turn_terminal("no_progress", "unchanged_typed_state") is True
@@ -558,6 +556,23 @@ async def test_calibrated_production_corridor_reaches_n_and_blocks_n_plus_one(
                         "all_traded_asset_mentions_included": True,
                     }
                 )
+            elif (
+                schema_name == "LLMInterpretationResponse"
+                and model == "structured/fallback"
+            ):
+                content = json.dumps(
+                    {
+                        "intent": "strategy_drafting",
+                        "task_relation": "new_task",
+                        "requires_clarification": True,
+                        "user_goal_summary": "Test a buy-and-hold idea.",
+                        "semantic_turn_act": "new_idea",
+                        "candidate_strategy_draft": {
+                            "raw_user_phrasing": "Test a buy-and-hold idea.",
+                            "strategy_thesis": "Test a buy-and-hold idea.",
+                        },
+                    }
+                )
             elif schema_name == "FocusedStrategyExtraction":
                 content = json.dumps(
                     {
@@ -570,10 +585,7 @@ async def test_calibrated_production_corridor_reaches_n_and_blocks_n_plus_one(
                         "confidence": 0.92,
                     }
                 )
-            elif (
-                schema_name == "ClarificationResponse"
-                and model == "chat/fallback"
-            ):
+            elif schema_name == "ClarificationResponse" and model == "chat/fallback":
                 content = json.dumps(
                     {
                         "question": "Which asset and date range should I test?",
@@ -589,12 +601,19 @@ async def test_calibrated_production_corridor_reaches_n_and_blocks_n_plus_one(
                 request=httpx.Request("POST", _url),
             )
 
+    async def unusable_typed_read(**_: Any) -> None:
+        # Exercise the last-resort budget after a typed test read fails runtime
+        # preparation. A schema/transport failure alone cannot authorize repair.
+        raise RuntimeError("scripted runtime preparation failure")
+
+    monkeypatch.setattr(
+        "argus.agent_runtime.llm_interpreter._response_ready_for_runtime",
+        unusable_typed_read,
+    )
     monkeypatch.setattr(openrouter.httpx, "AsyncClient", _AsyncClient)
     receipt_token = openrouter.begin_openrouter_route_receipt_capture()
     try:
-        with turn_execution.turn_execution_scope(
-            entry_state=_typed_state()
-        ) as execution:
+        with turn_execution.turn_execution_scope(entry_state=_typed_state()) as execution:
             interpretation = await interpreter.ainvoke(
                 InterpretationRequest(
                     current_user_message="Test a buy-and-hold idea.",
@@ -638,13 +657,12 @@ async def test_calibrated_production_corridor_reaches_n_and_blocks_n_plus_one(
         ("ClarificationResponse", "chat/fallback"),
     ]
     assert [
-        (receipt.schema_name, receipt.model, receipt.outcome)
-        for receipt in receipts[:-1]
+        (receipt.schema_name, receipt.model, receipt.outcome) for receipt in receipts[:-1]
     ] == [
         ("LLMAssetMentionExtraction", "structured/primary", "failed"),
         ("LLMAssetMentionExtraction", "structured/fallback", "succeeded"),
         ("LLMInterpretationResponse", "structured/primary", "failed"),
-        ("LLMInterpretationResponse", "structured/fallback", "failed"),
+        ("LLMInterpretationResponse", "structured/fallback", "succeeded"),
         ("FocusedStrategyExtraction", "structured/primary", "succeeded"),
         ("ClarificationResponse", "chat/primary", "failed"),
         ("ClarificationResponse", "chat/fallback", "succeeded"),
@@ -669,3 +687,47 @@ def test_call_allowance_override_can_lower_but_not_raise_policy(
     monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", "3")
     with turn_execution.turn_execution_scope(entry_state={}) as execution:
         assert execution.call_allowance == 3
+
+
+@pytest.mark.parametrize("allowance", [1, 7])
+def test_research_recovery_reserves_one_scoped_call_without_extending_deadline(
+    monkeypatch: pytest.MonkeyPatch, allowance: int
+) -> None:
+    from argus.agent_runtime import turn_execution
+
+    clock = _Clock()
+    monkeypatch.setattr(turn_execution, "_monotonic", clock)
+    monkeypatch.setenv("ARGUS_TURN_CALL_ALLOWANCE", str(allowance))
+    monkeypatch.setenv("ARGUS_TURN_DEADLINE_SECONDS", "20")
+    with turn_execution.turn_execution_scope(entry_state={}) as execution:
+        for _ in range(allowance):
+            assert turn_execution.reserve_provider_call("interpretation") is not None
+        deadline = execution.deadline_monotonic
+        assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+        clock.advance(15)
+        with turn_execution.research_recovery_scope():
+            assert turn_execution.reserve_provider_call("interpretation") is None
+            permit = turn_execution.reserve_provider_call("knowledge_voicing", 18)
+            assert permit is not None and permit.timeout_seconds == pytest.approx(5)
+            assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+        with turn_execution.research_recovery_scope():
+            assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+        assert execution.calls_reserved == allowance
+        assert execution.deadline_monotonic == deadline
+        assert turn_execution.turn_execution_summary(())["research_recovery_reserved"]
+        assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+
+
+def test_research_recovery_cannot_reserve_after_the_turn_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.agent_runtime import turn_execution
+
+    clock = _Clock()
+    monkeypatch.setattr(turn_execution, "_monotonic", clock)
+    with turn_execution.turn_execution_scope(entry_state={}) as execution:
+        clock.advance(execution.deadline_seconds)
+        with turn_execution.research_recovery_scope():
+            assert turn_execution.reserve_provider_call("knowledge_voicing") is None
+        assert execution.deadline_exhausted
+        assert not execution.research_recovery_reserved

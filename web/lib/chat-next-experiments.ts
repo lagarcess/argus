@@ -11,6 +11,7 @@
 import type { TFunction } from "i18next";
 
 import type { ChatActionOption } from "@/components/chat/types";
+import type { ConfirmationPeerIdentity, ConfirmationPeerSelection } from "@/lib/argus-api";
 import { figureText } from "@/lib/result-figures";
 
 export const NEXT_EXPERIMENTS_VERSION = "argus_next_experiments/v1";
@@ -143,6 +144,25 @@ export function nextExperimentsSourceRunIdFromMetadata(
 }
 
 const RESEARCH_ADD_PEER_KIND_PREFIX = "research_add_peer";
+/** A research answer's calculation, offered on the reader's own figures. */
+export const CALCULATION_OFFER_KIND = "calculation_offer";
+
+export function confirmationPeerSelection(
+  payload: Record<string, unknown>,
+): ConfirmationPeerSelection {
+  if (Array.isArray(payload.peers)) {
+    const peers: ConfirmationPeerIdentity[] = [];
+    for (const peer of payload.peers) {
+      if (!peer || typeof peer !== "object" || typeof peer.symbol !== "string" ||
+        !["equity", "crypto", "currency_pair"].includes(peer.asset_class)) {
+        return { peers: [] };
+      }
+      peers.push({ symbol: peer.symbol, asset_class: peer.asset_class });
+    }
+    return { peers };
+  }
+  return { symbols: Array.isArray(payload.symbols) ? payload.symbols.map(String) : [] };
+}
 
 export function nextExperimentAction(
   row: NextExperimentRow,
@@ -152,14 +172,17 @@ export function nextExperimentAction(
   if (row.kind.startsWith(RESEARCH_ADD_PEER_KIND_PREFIX)) {
     // No turn is spent: the typed endpoint patches the pending card with the
     // resolver-verified symbols the row's why payload carries.
-    const symbols = Array.isArray(row.why?.params?.symbols)
-      ? (row.why?.params?.symbols as unknown[]).map((symbol) => String(symbol))
-      : [];
     return {
       label: localizedLabel || row.label,
       type: "add_confirmation_peer",
-      payload: { symbols },
+      payload: confirmationPeerSelection(row.why?.params ?? {}),
     };
+  }
+  if (row.kind === CALCULATION_OFFER_KIND) {
+    // The typed action carries no figures: the backend keeps the ones the
+    // answer cited and asks only for the reader's own.
+    const label = localizedLabel || row.label;
+    return { label, value: label, type: "calculation_offer" };
   }
   // A prebaked row sends its fully specified ask; nothing is missing, so
   // the normal lifecycle answers with the next confirmation card.

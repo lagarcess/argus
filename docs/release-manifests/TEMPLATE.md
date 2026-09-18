@@ -21,6 +21,25 @@ privacy-safe labels from canary evidence.
 - Rollback target:
 - Decision record:
 
+## Live Eval Evidence
+
+Evidence stands for the build it names only when nothing the measurement can
+reach changed between them (`tests/promotion_evidence_identity.py`). Name the
+measured SHA beside each piece of evidence whenever it differs from that build.
+New promotions require schema-v3 measurement scorecards with
+`provenance.release_configuration`: the API service's model IDs and explicit
+`true`/`false` flags as the eval environment had them. Baseline and targeted A/B
+documents must carry the same field. The shared gate compares each side with
+its build's committed release profile; missing or different values fail. Other
+environment settings and other services are out of scope. Historical manifests
+remain unchanged under the fixed compatibility list.
+
+- Live eval scorecard:
+- Live eval measured SHA:
+- Baseline eval scorecard:
+- Baseline measured SHA:
+- Targeted A/B documents, each side's measured SHA and rate:
+
 ## Production Migration Gate
 
 - Gate command: `scripts/ops/production_migration_gate.py`
@@ -77,7 +96,7 @@ privacy-safe labels from canary evidence.
 - workflow_env_status:
 - autodeploy_fingerprint:
 - autodeploy_status:
-- all three services use `checksPass`:
+- all three services use the release profile's trigger, `off` (manual deploys):
 - workflow_runtime_provider_mode:
 - workflow_runtime_proof:
 - env_fingerprint script output:
@@ -86,7 +105,7 @@ privacy-safe labels from canary evidence.
 - Backtest service mode:
 - Workflow service proof:
   - `argus-backtests` latest deploy/status:
-  - workflow autodeploy verified: `checksPass`
+  - workflow autodeploy verified: `off`
   - workflow provider mode verified: `live_provider`
   - effective runtime provider mode verified: `live_provider`
   - effective runtime proof status:
@@ -119,13 +138,16 @@ privacy-safe labels from canary evidence.
 - Local smoke result:
 - Warmup command:
 - Warmup result:
-- Canary evidence artifact: `private-alpha-canary-evidence`
-- Authoritative Spanish release canary:
-  - JSON evidence:
+- Canary evidence artifacts: `private-alpha-release-coherence-evidence` and
+  `private-alpha-authenticated-browser-evidence`
+- Canary checks, each with its status from the evidence:
+  - `services_same_commit`:
+  - `signed_in_chat_answer`, with `sign_in_attempts`:
+  - `backtest_completes`, with the backtest job and run labels:
+  - `research_answer_with_sources`:
+  - Release guards (release config, disabled signup denial, welcome email):
   - Exact candidate SHA verified:
-  - Finalized evidence/result labels:
-  - Decision-note label and reload hydration:
-  - Omnisearch source identity:
+  - Failed check or guard and reason, if red:
 - Browser signup/login proof:
 - Guest exact-head browser evidence:
   - local candidate SHA:

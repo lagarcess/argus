@@ -952,3 +952,33 @@ describe("recoveryDisplayFromRecoveryState llm_generated prose ownership", () =>
     });
   });
 });
+
+describe("calculation missing inputs", () => {
+  test("names each missing input from its declaration label key in both languages", () => {
+    const display = recoveryDisplayFromMetadata({
+      clarification: {
+        kind: "clarification",
+        prompt_source: "degraded_fallback",
+        reason_code: "calculation_input_missing",
+        requested_field: "payment",
+        requested_fields: ["payment", "periods"],
+        missing_inputs: [
+          { name: "payment", label: { locale_key: "tools.calc.fields.payment", interpolation_args: {} } },
+          { name: "periods", label: { locale_key: "tools.calc.fields.periods", interpolation_args: {} } },
+        ],
+      },
+    });
+    expect(display?.kind).toBe("calculation_inputs");
+    const text = recoveryDisplayText as (
+      value: typeof display,
+      t: ReturnType<typeof tFromCatalog>,
+      locale: string,
+    ) => string;
+    expect(text(display, tFromCatalog(enCatalog), "en-US")).toBe(
+      "To work this out, tell me payment per period and periods.",
+    );
+    expect(text(display, tFromCatalog(esCatalog), "es-419")).toBe(
+      "Para calcularlo, dime pago por período y períodos.",
+    );
+  });
+});

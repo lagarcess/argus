@@ -317,9 +317,8 @@ describe("sidebar drawer", () => {
         <p>drawer</p>
       </SidebarShell>,
     );
-    expect(openDrawer).toContain('role="dialog"');
-    expect(openDrawer).toContain('aria-label="Navigation"');
-    expect(openDrawer).toContain("drawer");
+    // A viewport overlay is client-only; SSR must not put it inside the shell.
+    expect(openDrawer).toBe("");
   });
 });
 
@@ -661,8 +660,8 @@ describe("omnisearch below threshold", () => {
       join(import.meta.dir, "../components/sidebar/ProfileMenu.tsx"),
       "utf-8",
     );
-    expect(menu).toContain("isOpen: isOpen && isDrawerPlacement && !asSheet,");
-    expect(menu).toContain("isOpen: isOpen && !isDrawerPlacement && !asSheet,");
+    expect(menu).toContain("isOpen: isMenuVisible && isDrawerPlacement && !asSheet,");
+    expect(menu).toContain("isOpen: isMenuVisible && !isDrawerPlacement && !asSheet,");
   });
 
   test("back-dismiss callbacks are current before input resumes", () => {

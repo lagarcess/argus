@@ -1,0 +1,89 @@
+{
+  "purpose": "The saving currency and savings account answers as published at e3fa86c0, before a typed answer published only the pages it cites: their research sources and rows.",
+  "commit": "e3fa86c0",
+  "turns": {
+    "q7-en": {
+      "asked": "Should I save in pesos or in dollars?",
+      "sources": [
+        {
+          "title": "424B2 - SEC.gov",
+          "domain": "www.sec.gov",
+          "url": "https://www.sec.gov/Archives/edgar/data/0000927628/000119312526387878/d28156d424b2.htm",
+          "source_date": "2026-09-09"
+        },
+        {
+          "title": "Clearmind posts $6.8M loss, flags going concern | CMND SEC Filing",
+          "domain": "www.stocktitan.net",
+          "url": "https://www.stocktitan.net/sec-filings/CMND/6-k-clearmind-medicine-inc-current-report-foreign-issuer-d861c5ce899b.html",
+          "source_date": "2026-09-10"
+        },
+        {
+          "title": "Commission Fees for US Stocks: Guide for Singapore ...",
+          "domain": "longbridge.com",
+          "url": "https://longbridge.com/en/academy/us-stocks/blog/commission-fees-for-us-stocks-a-complete-guide-for-singapore-investors-100963",
+          "source_date": "2026-09-07"
+        },
+        {
+          "title": "Exchange rates when you invest outside the euro",
+          "domain": "briefinglens.com",
+          "url": "https://briefinglens.com/en/index-funds/currency-risk-investing-outside-the-euro/",
+          "source_date": "2026-09-09"
+        },
+        {
+          "title": "Merrill Lynch Legal Information, Policies, and Disclaimers",
+          "domain": "www.ml.com",
+          "url": "https://www.ml.com/legal.html",
+          "source_date": "2026-09-09"
+        }
+      ],
+      "rows": []
+    },
+    "q8-en": {
+      "asked": "Is my savings account actually losing money?",
+      "sources": [
+        {
+          "title": "Consumer Price Index Summary - 2026 M08 Results",
+          "domain": "www.bls.gov",
+          "url": "https://www.bls.gov/news.release/cpi.nr0.htm",
+          "source_date": "2026-09-11"
+        },
+        {
+          "title": "FDIC Federal Register Publications and Public Comments | FDIC.gov",
+          "domain": "www.fdic.gov",
+          "url": "https://www.fdic.gov/federal-register-publications",
+          "source_date": "2026-09-08"
+        },
+        {
+          "title": "FDIC Deposit Insurance Limits 2026: How Much Is Protected?",
+          "domain": "usfinnexus.com",
+          "url": "https://usfinnexus.com/blog/fdic-deposit-insurance-limits-2026",
+          "source_date": "2026-09-11"
+        },
+        {
+          "title": "FDIC: Definition, Deposit Insurance and Coverage Rules",
+          "domain": "honestcredit.org",
+          "url": "https://honestcredit.org/dictionary/fdic/",
+          "source_date": "2026-09-10"
+        },
+        {
+          "title": "FDIC Insurance - Brenham National Bank",
+          "domain": "www.bnbank.bank",
+          "url": "https://www.bnbank.bank/rates/fdic-insurance",
+          "source_date": "2026-09-09"
+        }
+      ],
+      "rows": [
+        {
+          "subject": "United States",
+          "symbol": null,
+          "label": "CPI-U change over the preceding year",
+          "value": 3.4,
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-08-31",
+          "source_url": "https://www.bls.gov/news.release/archives/cpi_09112026.htm"
+        }
+      ]
+    }
+  }
+}

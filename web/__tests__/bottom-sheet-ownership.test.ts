@@ -39,7 +39,6 @@ const DRAWER = "components/sidebar/SidebarDrawer.tsx";
  * Shrink this list; never add to it.
  */
 const UNMANAGED_MODAL_DEBT = new Set([
-  "components/SettingsMenu.tsx",
   "components/chat/DiscoverySourcesPanel.tsx",
   "components/guest/GuestConversionModal.tsx",
   "components/guest/GuestNewConversationDialog.tsx",
@@ -199,4 +198,11 @@ describe("bottom sheet ownership", () => {
     // A four-item menu at the short detent would leave a large dead gap.
     expect(primitive).not.toContain('auto: "h-[40dvh]"');
   });
+});
+
+// Full-screen surfaces can be opened from any animated shell or card. The
+// wrapper owns DOM placement; a new inline fixed overlay is a regression.
+test("every fixed full-screen overlay uses the viewport portal owner", () => {
+  const offenders = FILES.filter((file) => /\bfixed inset-0\b/.test(file.source) && !file.source.includes("withViewportPortal(")).map((file) => file.path);
+  expect(offenders).toEqual([]);
 });

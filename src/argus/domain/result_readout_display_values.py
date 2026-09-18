@@ -2,27 +2,18 @@
 
 from __future__ import annotations
 
-import json
 import math
 from collections.abc import Mapping
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
-from importlib.resources import files
+from decimal import InvalidOperation
 from typing import Any, TypedDict
 
 from babel.dates import format_date
 from babel.numbers import format_decimal
 
 from argus.domain.display_figure import DISPLAY_DECIMALS, display_figure
+from argus.domain.result_money import CURRENCY_FRACTION_DIGITS, rounded_result_money
 from argus.domain.result_readout_content import normalize_readout_language
-
-_CURRENCY_POLICY = json.loads(
-    files("argus_display_contract").joinpath("result_display_policy.json").read_text()
-)
-_CURRENCY_DIGITS = _CURRENCY_POLICY["currency_fraction_digits"]
-_CURRENCY_ROUNDING = {"halfExpand": ROUND_HALF_UP}[
-    _CURRENCY_POLICY["currency_rounding_mode"]
-]
 
 
 class ReadoutDisplayValue(TypedDict):
@@ -32,12 +23,16 @@ class ReadoutDisplayValue(TypedDict):
 
 
 def readout_display_value(
-    row: Mapping[str, Any], *, language: str
+    row: Mapping[str, Any],
+    *,
+    language: str,
+    currency_fraction_digits: int = CURRENCY_FRACTION_DIGITS,
 ) -> ReadoutDisplayValue | None:
     """Match card precision, with unsigned drawdowns and the run's USD currency.
 
     ``value`` is the display-ready reference, not a replacement for the stored
     row's value. Date references keep ISO form while ``text`` is localized.
+    ``currency_fraction_digits`` is the precision the run's result card stores.
     """
     normalized = normalize_readout_language(language)
     if normalized is None:
@@ -73,11 +68,9 @@ def readout_display_value(
         if row.get("currency", "USD") != "USD":
             return None
         # Modeled costs are small amounts whose parts must add up, so they keep cents.
-        digits = 2 if "currency_cents" in presentation else _CURRENCY_DIGITS
+        digits = 2 if "currency_cents" in presentation else currency_fraction_digits
         try:
-            amount = Decimal(str(value)).quantize(
-                Decimal(1).scaleb(-digits), rounding=_CURRENCY_ROUNDING
-            )
+            amount = rounded_result_money(value, fraction_digits=digits)
         except InvalidOperation:
             return None
         pattern = "#,##0" + ("." + "0" * digits if digits else "")

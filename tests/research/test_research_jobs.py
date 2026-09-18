@@ -5,13 +5,19 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import pytest
+from argus.agent_runtime.recovery_messages import RECOVERY_FALLBACK_MESSAGES
 from argus.api import state as api_state
 from argus.api.chat import research_jobs
 from argus.domain.research.admission import (
     ResearchAttemptAdmission,
     research_attempt_admission_context,
 )
-from argus.domain.research.contracts import BackgroundPoll, ResearchPacket
+from argus.domain.research.contracts import (
+    BackgroundPoll,
+    ResearchPacket,
+    ResearchUnavailableError,
+)
 
 
 def _job_request() -> dict[str, Any]:
@@ -215,6 +221,7 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
             user_id="u1",
             conversation_id="c1",
             request_id="r1",
+            request_message_id="m1",
         )
     )
 
@@ -226,6 +233,7 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
     message = created[0]
     assert message["role"] == "assistant"
     assert message["content"].startswith("Final research answer")
+    assert message["metadata"]["request_message_id"] == "m1"
     sidecar = message["metadata"]["research"]
     assert sidecar["capability_class"] == "thorough_research"
     # The sidecar names its subjects so later confirmation cards can find
@@ -617,14 +625,72 @@ def test_a_replayed_request_message_reuses_the_existing_job_without_spend(
     assert len(gateway.rows) == 1
 
 
-def test_missing_key_yields_no_job_and_no_sync_packet(monkeypatch) -> None:
-    monkeypatch.setattr(api_state, "supabase_gateway", _JobGateway())
+def test_missing_key_raises_before_any_job_or_spend(monkeypatch) -> None:
+    gateway = _JobGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
     monkeypatch.setattr(research_jobs, "_client", lambda: None)
-    job, packet = research_jobs.start_research_job(
-        job_request=_job_request(),
+    with pytest.raises(ResearchUnavailableError) as raised:
+        research_jobs.start_research_job(
+            job_request=_job_request(),
+            user_id="u1",
+            conversation_id="c1",
+            request_message_id="m1",
+            request_id="r1",
+        )
+    assert raised.value.reason == "not_configured"
+    assert gateway.rows == {}
+
+
+@pytest.mark.parametrize(
+    ("failure", "code"),
+    [
+        (
+            ResearchUnavailableError("http_error", "http 503", status=503),
+            "research_lookup_failed",
+        ),
+        (
+            ResearchUnavailableError("http_error", "http 400", status=400),
+            "research_lookup_unavailable",
+        ),
+        (
+            ResearchUnavailableError(
+                "timeout", "read timed out", run_may_be_billing=True
+            ),
+            "research_lookup_unavailable",
+        ),
+    ],
+    ids=["transient", "refused", "run_may_be_billing"],
+)
+def test_a_submission_the_provider_fails_ends_on_the_lookup_recovery(
+    monkeypatch, failure: ResearchUnavailableError, code: str
+) -> None:
+    gateway = _JobGateway()
+    monkeypatch.setattr(api_state, "supabase_gateway", gateway)
+
+    class _FailingSubmission(_FakeClient):
+        def submit_background(self, prompt: str, spec: Any) -> str:
+            raise failure
+
+    monkeypatch.setattr(research_jobs, "_client", lambda: _FailingSubmission([]))
+    runtime_result: dict[str, Any] = {"research_job_request": _job_request()}
+
+    job = research_jobs.apply_research_job_request(
+        runtime_result,
         user_id="u1",
         conversation_id="c1",
         request_message_id="m1",
         request_id="r1",
     )
-    assert job is None and packet is None
+
+    assert job is None
+    assert gateway.rows == {}
+    assert runtime_result["recovery"] == {"code": code, "retryable": failure.transient}
+    assert runtime_result["assistant_response"] == RECOVERY_FALLBACK_MESSAGES[code]
+    research = runtime_result["research"]
+    assert research["shape"] == "thorough"
+    assert research["degraded"] == {
+        "code": f"research_unavailable_{failure.reason}",
+        **({"status": failure.status} if failure.status is not None else {}),
+    }
+    assert research["rows"] == []
+    assert research["anchor_symbols"] == ["NFLX", "DIS"]

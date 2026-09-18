@@ -1,0 +1,625 @@
+{
+  "label": "guest-q7-es-419",
+  "phase": "guest",
+  "question": "q7",
+  "language": "es-419",
+  "country": null,
+  "account_kind": "guest",
+  "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+  "message": "¿Ahorro en pesos o en dólares?",
+  "answer": {
+    "id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+    "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+    "role": "assistant",
+    "content": "**No hay una moneda universalmente mejor: el criterio central es en qué moneda vas a gastar el dinero.** Los pesos reducen el descalce frente a gastos locales; los dólares reducen el descalce frente a obligaciones dolarizadas, pero introducen riesgo cambiario cuando el dinero finalmente se usa en pesos.\n\n### Cómo cambia la decisión\n\n| Situación del ahorro | Pesos | Dólares |\n|---|---|---|\n| Gastos cotidianos y fondo de emergencia local | Coinciden con la moneda del gasto y evitan conversiones | Exigen convertir para pagar gastos en pesos; el resultado depende del tipo de cambio y sus costos |\n| Compra o deuda pactada en dólares | Existe riesgo de que el costo en pesos cambie | Coinciden con la moneda de la obligación |\n| Meta con gastos en ambas monedas | Cubren la parte local | Cubren la parte dolarizada |\n| Meta todavía incierta | Concentración en una sola moneda | También implica concentración; repartir por moneda puede reducir el descalce, sin eliminar otros riesgos |\n\nLas fluctuaciones cambiarias pueden generar pérdidas al convertir activos denominados en una moneda distinta de la moneda de referencia. Incluso las técnicas de cobertura cambiaria buscan minimizar ese riesgo, pero no lo eliminan por completo.\n\n### Qué comparar antes de decidir\n\n- **Moneda de la meta:** alquiler, emergencia y consumo local frente a viajes, estudios, deuda o compra pactada en dólares.\n- **Rendimiento neto:** tasa del depósito menos comisiones, impuestos y costos de mantener la cuenta.\n- **Costo cambiario completo:** diferencia entre precio de compra y venta del dólar, más transferencias o cargos.\n- **Acceso al dinero:** restricciones, plazo, penalización por retiro y tiempo de disponibilidad.\n- **Protección jurídica:** cobertura aplicable al depósito y a la institución concreta.\n- **Riesgo de conversión:** una tasa más alta en pesos no garantiza un mejor resultado medido en dólares; una cuenta en dólares tampoco garantiza conservar poder de compra en pesos.\n\n### La información que falta\n\nNo es posible comparar tasas actuales ni calcular el punto de equilibrio porque “pesos” puede referirse a monedas de distintos países y no se indicaron banco, producto, plazo, monto ni tasas. Tampoco corresponde usar un tipo de cambio de otro país como sustituto.\n\nUna comparación completa convertiría ambos resultados a la moneda de la meta e incluiría intereses netos y todos los costos de cambio. Así se separa el rendimiento del depósito de la variación cambiaria, que nadie puede conocer de antemano.",
+    "created_at": "2026-09-14T17:36:59.488023Z",
+    "metadata": {
+      "research": {
+        "rows": [],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.14021,
+          "latency_ms": 36872,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://www.vanguard.co.uk/professional/product/etf/bond/E071/global-government-bond-ucits-etf-eur-hedged-distributing",
+            "title": "Global Government Bond UCITS ETF EUR Hedged Distributing",
+            "domain": "www.vanguard.co.uk",
+            "source_date": "2026-09-10"
+          },
+          {
+            "url": "https://www.caixaenginyers.com/es/web/fondosinversion/premier",
+            "title": "CI Premier, FI - Fondos de inversión - Caixa Enginyers",
+            "domain": "www.caixaenginyers.com",
+            "source_date": "2026-09-08"
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "¿De qué país son los pesos?",
+            "¿Para qué meta y plazo estás ahorrando?",
+            "¿Qué tasas te ofrecen en pesos y en dólares?",
+            "¿Tus gastos futuros serán principalmente en pesos o en dólares?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T17:36:59.464534+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "¿De qué país son los pesos?",
+            "type": "question"
+          },
+          {
+            "text": "¿Para qué meta y plazo estás ahorrando?",
+            "type": "question"
+          },
+          {
+            "text": "¿Qué tasas te ofrecen en pesos y en dólares?",
+            "type": "question"
+          },
+          {
+            "text": "¿Tus gastos futuros serán principalmente en pesos o en dólares?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "conversation_mode": "guide",
+      "agent_runtime_turn": {
+        "turn_id": "bb113bc0-9edb-4cd2-9ba8-2d5c59ca01d8",
+        "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "**No hay una moneda universalmente mejor: el criterio central es en qué moneda vas a gastar el dinero.** Los pesos reducen el descalce frente a gastos locales; los dólares reducen el descalce frente a obligaciones dolarizadas, pero introducen riesgo cambiario cuando el dinero finalmente se usa en pesos.\n\n### Cómo cambia la decisión\n\n| Situación del ahorro | Pesos | Dólares |\n|---|---|---|\n| Gastos cotidianos y fondo de emergencia local | Coinciden con la moneda del gasto y evitan conversiones | Exigen convertir para pagar gastos en pesos; el resultado depende del tipo de cambio y sus costos |\n| Compra o deuda pactada en dólares | Existe riesgo de que el costo en pesos cambie | Coinciden con la moneda de la obligación |\n| Meta con gastos en ambas monedas | Cubren la parte local | Cubren la parte dolarizada |\n| Meta todavía incierta | Concentración en una sola moneda | También implica concentración; repartir por moneda puede reducir el descalce, sin eliminar otros riesgos |\n\nLas fluctuaciones cambiarias pueden generar pérdidas al convertir activos denominados en una moneda distinta de la moneda de referencia. Incluso las técnicas de cobertura cambiaria buscan minimizar ese riesgo, pero no lo eliminan por completo.\n\n### Qué comparar antes de decidir\n\n- **Moneda de la meta:** alquiler, emergencia y consumo local frente a viajes, estudios, deuda o compra pactada en dólares.\n- **Rendimiento neto:** tasa del depósito menos comisiones, impuestos y costos de mantener la cuenta.\n- **Costo cambiario completo:** diferencia entre precio de compra y venta del dólar, más transferencias o cargos.\n- **Acceso al dinero:** restricciones, plazo, penalización por retiro y tiempo de disponibilidad.\n- **Protección jurídica:** cobertura aplicable al depósito y a la institución concreta.\n- **Riesgo de conversión:** una tasa más alta en pesos no garantiza un mejor resultado medido en dólares; una cuenta en dólares tampoco garantiza conservar poder de compra en pesos.\n\n### La información que falta\n\nNo es posible comparar tasas actuales ni calcular el punto de equilibrio porque “pesos” puede referirse a monedas de distintos países y no se indicaron banco, producto, plazo, monto ni tasas. Tampoco corresponde usar un tipo de cambio de otro país como sustituto.\n\nUna comparación completa convertiría ambos resultados a la moneda de la meta e incluiría intereses netos y todos los costos de cambio. Así se separa el rendimiento del depósito de la variación cambiaria, que nadie puede conocer de antemano."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "**No hay una moneda universalmente mejor: el criterio central es en qué moneda vas a gastar el dinero.** Los pesos reducen el descalce frente a gastos locales; los dólares reducen el descalce frente a obligaciones dolarizadas, pero introducen riesgo cambiario cuando el dinero finalmente se usa en pesos.\n\n### Cómo cambia la decisión\n\n| Situación del ahorro | Pesos | Dólares |\n|---|---|---|\n| Gastos cotidianos y fondo de emergencia local | Coinciden con la moneda del gasto y evitan conversiones | Exigen convertir para pagar gastos en pesos; el resultado depende del tipo de cambio y sus costos |\n| Compra o deuda pactada en dólares | Existe riesgo de que el costo en pesos cambie | Coinciden con la moneda de la obligación |\n| Meta con gastos en ambas monedas | Cubren la parte local | Cubren la parte dolarizada |\n| Meta todavía incierta | Concentración en una sola moneda | También implica concentración; repartir por moneda puede reducir el descalce, sin eliminar otros riesgos |\n\nLas fluctuaciones cambiarias pueden generar pérdidas al convertir activos denominados en una moneda distinta de la moneda de referencia. Incluso las técnicas de cobertura cambiaria buscan minimizar ese riesgo, pero no lo eliminan por completo.\n\n### Qué comparar antes de decidir\n\n- **Moneda de la meta:** alquiler, emergencia y consumo local frente a viajes, estudios, deuda o compra pactada en dólares.\n- **Rendimiento neto:** tasa del depósito menos comisiones, impuestos y costos de mantener la cuenta.\n- **Costo cambiario completo:** diferencia entre precio de compra y venta del dólar, más transferencias o cargos.\n- **Acceso al dinero:** restricciones, plazo, penalización por retiro y tiempo de disponibilidad.\n- **Protección jurídica:** cobertura aplicable al depósito y a la institución concreta.\n- **Riesgo de conversión:** una tasa más alta en pesos no garantiza un mejor resultado medido en dólares; una cuenta en dólares tampoco garantiza conservar poder de compra en pesos.\n\n### La información que falta\n\nNo es posible comparar tasas actuales ni calcular el punto de equilibrio porque “pesos” puede referirse a monedas de distintos países y no se indicaron banco, producto, plazo, monto ni tasas. Tampoco corresponde usar un tipo de cambio de otro país como sustituto.\n\nUna comparación completa convertiría ambos resultados a la moneda de la meta e incluiría intereses netos y todos los costos de cambio. Así se separa el rendimiento del depósito de la variación cambiaria, que nadie puede conocer de antemano.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "¿De qué país son los pesos?"
+            },
+            {
+              "type": "question",
+              "text": "¿Para qué meta y plazo estás ahorrando?"
+            },
+            {
+              "type": "question",
+              "text": "¿Qué tasas te ofrecen en pesos y en dólares?"
+            },
+            {
+              "type": "question",
+              "text": "¿Tus gastos futuros serán principalmente en pesos o en dólares?"
+            }
+          ]
+        },
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "Global Government Bond UCITS ETF EUR Hedged Distributing",
+              "domain": "www.vanguard.co.uk",
+              "url": "https://www.vanguard.co.uk/professional/product/etf/bond/E071/global-government-bond-ucits-etf-eur-hedged-distributing",
+              "source_date": "2026-09-10"
+            },
+            {
+              "title": "CI Premier, FI - Fondos de inversión - Caixa Enginyers",
+              "domain": "www.caixaenginyers.com",
+              "url": "https://www.caixaenginyers.com/es/web/fondosinversion/premier",
+              "source_date": "2026-09-08"
+            }
+          ],
+          "rows": [],
+          "retrieved_at": "2026-09-14T17:36:59.464534+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 36872,
+            "cost_usd": 0.14021,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "¿De qué país son los pesos?",
+              "¿Para qué meta y plazo estás ahorrando?",
+              "¿Qué tasas te ofrecen en pesos y en dólares?",
+              "¿Tus gastos futuros serán principalmente en pesos o en dólares?"
+            ]
+          }
+        },
+        "message_id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 56.9,
+  "screenshot": {
+    "file": "screenshots/guest-q7-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "No hay una moneda universalmente mejor: el criterio central es en qué moneda vas a gastar el dinero. Los pesos reducen el descalce frente a gastos locales; los dólares reducen el descalce frente a obligaciones dolarizadas, pero introducen riesgo cambiario cuando el dinero finalmente se usa en pesos.\n\nCómo cambia la decisión\nSITUACIÓN DEL AHORRO\tPESOS\tDÓLARES\nGastos cotidianos y fondo de emergencia local\tCoinciden con la moneda del gasto y evitan conversiones\tExigen convertir para pagar gastos en pesos; el resultado depende del tipo de cambio y sus costos\nCompra o deuda pactada en dólares\tExiste riesgo de que el costo en pesos cambie\tCoinciden con la moneda de la obligación\nMeta con gastos en ambas monedas\tCubren la parte local\tCubren la parte dolarizada\nMeta todavía incierta\tConcentración en una sola moneda\tTambién implica concentración; repartir por moneda puede reducir el descalce, sin eliminar otros riesgos\n\nLas fluctuaciones cambiarias pueden generar pérdidas al convertir activos denominados en una moneda distinta de la moneda de referencia. Incluso las técnicas de cobertura cambiaria buscan minimizar ese riesgo, pero no lo eliminan por completo.\n\nQué comparar antes de decidir\nMoneda de la meta: alquiler, emergencia y consumo local frente a viajes, estudios, deuda o compra pactada en dólares.\nRendimiento neto: tasa del depósito menos comisiones, impuestos y costos de mantener la cuenta.\nCosto cambiario completo: diferencia entre precio de compra y venta del dólar, más transferencias o cargos.\nAcceso al dinero: restricciones, plazo, penalización por retiro y tiempo de disponibilidad.\nProtección jurídica: cobertura aplicable al depósito y a la institución concreta.\nRiesgo de conversión: una tasa más alta en pesos no garantiza un mejor resultado medido en dólares; una cuenta en dólares tampoco garantiza conservar poder de compra en pesos.\nLa información que falta\n\nNo es posible comparar tasas actuales ni calcular el punto de equilibrio porque “pesos” puede referirse a monedas de distintos países y no se indicaron banco, producto, plazo, monto ni tasas. Tampoco corresponde usar un tipo de cambio de otro país como sustituto.\n\nUna comparación completa convertiría ambos resultados a la moneda de la meta e incluiría intereses netos y todos los costos de cambio. Así se separa el rendimiento del depósito de la variación cambiaria, que nadie puede conocer de antemano.\n\n2 fuentes ›\nQUÉ PROBAR DESPUÉS\n↳\n¿De qué país son los pesos?\n↳\n¿Para qué meta y plazo estás ahorrando?\n↳\n¿Qué tasas te ofrecen en pesos y en dólares?\n↳\n¿Tus gastos futuros serán principalmente en pesos o en dólares?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "d5343fd6-3a10-400b-b506-30024860d659",
+      "user_id": "426f9362-0108-41d8-b638-36db587f7aff",
+      "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+      "run_id": null,
+      "message_id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 1006,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 802,
+        "cached_tokens": 768,
+        "prompt_tokens": 785,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 54.839,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:36:05.698960+00:00"
+    },
+    {
+      "id": "474d4384-55b9-4355-a2ea-fbcaa8743008",
+      "user_id": "426f9362-0108-41d8-b638-36db587f7aff",
+      "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+      "run_id": null,
+      "message_id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 11279,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 12039,
+        "cached_tokens": 10752,
+        "prompt_tokens": 10768,
+        "completion_tokens": 1271,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 54.839,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:36:16.978825+00:00"
+    },
+    {
+      "id": "a822b05e-cc66-4a4d-8851-56de448f28ea",
+      "user_id": "426f9362-0108-41d8-b638-36db587f7aff",
+      "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+      "run_id": null,
+      "message_id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 0,
+      "outcome": "skipped",
+      "failure_mode": "title_not_generated",
+      "fallback_used": false,
+      "token_usage": null,
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:36:59.524846+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "d8468c2b-2025-46d7-afa9-941876f52353",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "426f9362-0108-41d8-b638-36db587f7aff",
+      "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+      "message_id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "d5343fd6-3a10-400b-b506-30024860d659",
+      "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+      "correlation_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0:d5850147-b1c4-4df7-95e7-d923786c09fb:9fc70774-95d0-463d-9abe-d48edbd80638",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 802,
+        "cached_tokens": 768,
+        "prompt_tokens": 785,
+        "usage_cost_usd": 0.00021735,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 785,
+      "output_tokens": 17,
+      "total_tokens": 802,
+      "billable_unit": "token",
+      "billable_quantity": "802.000000",
+      "cost_amount": "0.00021735",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1006,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 54.839,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:36:05.698960+00:00",
+      "created_at": "2026-09-14 17:36:59.509330+00:00"
+    },
+    {
+      "id": "e6f2255c-e49f-4d06-b14d-c60cdce83e59",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "426f9362-0108-41d8-b638-36db587f7aff",
+      "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+      "message_id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "474d4384-55b9-4355-a2ea-fbcaa8743008",
+      "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+      "correlation_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0:d5850147-b1c4-4df7-95e7-d923786c09fb:9fc70774-95d0-463d-9abe-d48edbd80638",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 12039,
+        "cached_tokens": 10752,
+        "prompt_tokens": 10768,
+        "usage_cost_usd": 0.0053479,
+        "completion_tokens": 1271,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10768,
+      "output_tokens": 1271,
+      "total_tokens": 12039,
+      "billable_unit": "token",
+      "billable_quantity": "12039.000000",
+      "cost_amount": "0.00534790",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 11279,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 54.839,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "18fb1b46dc7f19c7698e8a4268e73848ca82a9c7b45ddfb0c8ed8abad4bd60da",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:36:16.978825+00:00",
+      "created_at": "2026-09-14 17:36:59.516111+00:00"
+    },
+    {
+      "id": "a3554527-bf49-4bf4-bf2c-659be7d23b80",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "426f9362-0108-41d8-b638-36db587f7aff",
+      "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+      "message_id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+      "correlation_id": "research:45acd6e9-83cf-44cf-b0a8-5ee19618b2f0",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.14021000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 36872,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 17:36:59.500465+00:00",
+      "created_at": "2026-09-14 17:36:59.501265+00:00"
+    },
+    {
+      "id": "0e1c35c9-c2e9-45a4-bb68-73be3b4f9576",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "426f9362-0108-41d8-b638-36db587f7aff",
+      "conversation_id": "d5850147-b1c4-4df7-95e7-d923786c09fb",
+      "message_id": "9fc70774-95d0-463d-9abe-d48edbd80638",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "a822b05e-cc66-4a4d-8851-56de448f28ea",
+      "request_id": null,
+      "correlation_id": "api_turn:d5850147-b1c4-4df7-95e7-d923786c09fb:9fc70774-95d0-463d-9abe-d48edbd80638:a822b05e-cc66-4a4d-8851-56de448f28ea",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {},
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "token",
+      "billable_quantity": null,
+      "cost_amount": null,
+      "cost_currency": "USD",
+      "cost_source": "unavailable",
+      "latency_ms": 0,
+      "status": "skipped",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": "title_not_generated",
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:36:59.524846+00:00",
+      "created_at": "2026-09-14 17:36:59.530793+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 3,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.14021,
+        "latency_ms": 36872,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://www.vanguard.co.uk/professional/product/etf/bond/E071/global-government-bond-ucits-etf-eur-hedged-distributing",
+          "title": "Global Government Bond UCITS ETF EUR Hedged Distributing",
+          "domain": "www.vanguard.co.uk",
+          "source_date": "2026-09-10"
+        },
+        {
+          "url": "https://www.caixaenginyers.com/es/web/fondosinversion/premier",
+          "title": "CI Premier, FI - Fondos de inversión - Caixa Enginyers",
+          "domain": "www.caixaenginyers.com",
+          "source_date": "2026-09-08"
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "¿De qué país son los pesos?",
+          "¿Para qué meta y plazo estás ahorrando?",
+          "¿Qué tasas te ofrecen en pesos y en dólares?",
+          "¿Tus gastos futuros serán principalmente en pesos o en dólares?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T17:36:59.464534+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "bb113bc0-9edb-4cd2-9ba8-2d5c59ca01d8",
+      "terminal": true,
+      "request_id": "45acd6e9-83cf-44cf-b0a8-5ee19618b2f0"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

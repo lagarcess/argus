@@ -6,6 +6,7 @@ import { hydrateMessagesFromApi } from "@/components/chat/chat-message-projectio
 import type { ApiMessage } from "@/lib/argus-api";
 import {
   NEXT_EXPERIMENTS_VERSION,
+  CALCULATION_OFFER_KIND,
   nextExperimentAction,
   nextExperimentRowsFromMetadata,
   nextExperimentsSourceRunIdFromMetadata,
@@ -278,3 +279,40 @@ describe("what-next follow-up rows (issue #590)", () => {
     });
   });
 });
+
+describe("calculation offer row", () => {
+  test("sends a typed calculation offer action with its localized label", () => {
+    const action = nextExperimentAction(
+      {
+        kind: CALCULATION_OFFER_KIND,
+        label: "Work it out with your own figures",
+        labelKey: "chat.next_experiments.labels.calculation_offer",
+        labelShort: null,
+        labelShortKey: null,
+        labelParts: null,
+        detail: null,
+        sendText: null,
+        why: null,
+      },
+      "Calcúlalo con tus propios números",
+    );
+    expect(action).toEqual({
+      label: "Calcúlalo con tus propios números",
+      value: "Calcúlalo con tus propios números",
+      type: "calculation_offer",
+    });
+  });
+});
+
+ test("research peer taps carry stored symbol and class, never the display label", () => {
+  const peers = [{ symbol: "BTC", name: "Bitcoin", asset_class: "crypto" }];
+  const rows = nextExperimentRowsFromMetadata({ next_experiments: {
+    version: NEXT_EXPERIMENTS_VERSION,
+    rows: [{kind: "research_add_peer:BTC", label: "Add Bitcoin (BTC)",
+      label_key: "chat.next_experiments.labels.research_dynamic",
+      why: {code: "research_add_peer", params: {symbols: ["BTC"], peers}}}],
+  }});
+  expect(nextExperimentAction(rows![0]!).payload).toEqual({
+    peers: [{symbol: "BTC", asset_class: "crypto"}],
+  });
+ });

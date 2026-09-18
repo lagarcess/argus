@@ -1,0 +1,16 @@
+{
+  "smoke_records": 46,
+  "phone_images": 46,
+  "phone_dimensions": [
+    390,
+    844
+  ],
+  "all_followups_use_original_conversation": true,
+  "all_registered_countries_match": true,
+  "all_turns_have_routes_and_failure_metadata": true,
+  "baseline_comparisons": 20,
+  "smoke_passed": 30,
+  "smoke_failed": 16,
+  "replay_assessed": 14,
+  "replay_export_key_check": "pass"
+}

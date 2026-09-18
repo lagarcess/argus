@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useId, useRef } from "react";
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
+import { useCallback, useId, useRef, type RefObject } from "react";
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useModalSurface } from "../layout/useModalSurface";
@@ -16,16 +18,18 @@ import { useModalSurface } from "../layout/useModalSurface";
 
 export type DeleteRequestState = "idle" | "submitting" | "success" | "error";
 
-export default function ProfileDeleteRequestDialog({
+function ProfileDeleteRequestDialogSurface({
   state,
   supportMailto,
   onClose,
   onSubmit,
+  returnFocusRef,
 }: {
   state: DeleteRequestState;
   supportMailto: string;
   onClose: () => void;
   onSubmit: () => void | Promise<void>;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const { t } = useTranslation();
   const overlayId = useId();
@@ -45,6 +49,7 @@ export default function ProfileDeleteRequestDialog({
     containerRef: panelRef,
     onDismiss: onClose,
     canDismiss,
+    returnFocusRef,
     // Routed to the topmost layer, so opening this from a submenu no longer
     // depends on some other component happening to answer for it.
     onEscape: () => {
@@ -170,3 +175,5 @@ export default function ProfileDeleteRequestDialog({
     </div>
   );
 }
+
+export default withViewportPortal(ProfileDeleteRequestDialogSurface);

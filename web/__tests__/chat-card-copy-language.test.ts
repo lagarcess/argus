@@ -51,9 +51,7 @@ const confirmation: StrategyConfirmationPayload = {
   confirmation_state: "active",
   status: "ready_to_run",
   statusLabel: "Ready to run",
-  title: "AAPL Buy and Hold",
-  summary: "Ready to test buy-and-hold for AAPL over the last year.",
-  strategy_type: "buy_and_hold",
+  title: "AAPL Buy and Hold",  strategy_type: "buy_and_hold",
   asset_class: "equity",
   rows: [
     {
@@ -109,18 +107,6 @@ describe("card copy reads the language the card renders (#509)", () => {
     expect(copy).not.toContain("Starting capital");
     expect(copy).not.toContain("Buy rule");
     expect(copy).not.toContain("Assumptions:");
-  });
-
-  test("confirmation copy omits the summary the card never renders", () => {
-    const copy = confirmationCardCopyText(
-      confirmationCardViewModel(confirmation, spanish, "es-419"),
-      spanish,
-      "es-419",
-    );
-
-    // The backend composes `summary` in English regardless of workspace
-    // language, and the card does not paint it. Copy must not resurrect it.
-    expect(copy).not.toContain("Ready to test buy-and-hold");
   });
 
   test("confirmation copy still matches the card in English", () => {

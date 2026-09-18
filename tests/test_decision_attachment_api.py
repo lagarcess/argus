@@ -107,11 +107,11 @@ def test_decision_on_a_computed_answer_is_recorded_retrieved_and_rerun(
     body = opened.json()
     assert body["decision"]["id"] == decision["id"]
     assert body["computation"] == decision["computation"]
-    assert body["rerun"]["status"] == "computed"
-    assert body["rerun"]["kind"] == SAVINGS_PROJECTION_KIND
-    assert body["rerun"]["result"] == {"saved_total": 45_000.0, "shortfall": 15_000.0}
-    assert body["rerun"]["retest"] is None
-    assert body["rerun"]["reason_code"] is None
+    assert body["reruns"][0]["status"] == "computed"
+    assert body["reruns"][0]["kind"] == SAVINGS_PROJECTION_KIND
+    assert body["reruns"][0]["result"] == {"saved_total": 45_000.0, "shortfall": 15_000.0}
+    assert body["reruns"][0]["retest"] is None
+    assert body["reruns"][0]["reason_code"] is None
 
     rerun = client.post(
         f"/api/v1/decisions/{decision['id']}/rerun",
@@ -120,9 +120,9 @@ def test_decision_on_a_computed_answer_is_recorded_retrieved_and_rerun(
 
     assert rerun.status_code == 200, rerun.text
     changed = rerun.json()
-    assert changed["rerun"]["status"] == "computed"
-    assert changed["rerun"]["inputs"]["months"] == 12
-    assert changed["rerun"]["result"] == {"saved_total": 60_000.0, "shortfall": 0.0}
+    assert changed["reruns"][0]["status"] == "computed"
+    assert changed["reruns"][0]["inputs"]["months"] == 12
+    assert changed["reruns"][0]["result"] == {"saved_total": 60_000.0, "shortfall": 0.0}
     # A re-run never rewrites the decision or its stored inputs.
     assert changed["decision"] == decision
     assert changed["computation"] == decision["computation"]
@@ -337,8 +337,8 @@ def test_a_decision_whose_kind_is_no_longer_registered_opens_as_unavailable() ->
     opened = client.get(f"/api/v1/decisions/{decision['id']}")
 
     assert opened.status_code == 200
-    assert opened.json()["rerun"]["status"] == "unavailable"
-    assert opened.json()["rerun"]["reason_code"] == "kernel_unavailable"
+    assert opened.json()["reruns"][0]["status"] == "unavailable"
+    assert opened.json()["reruns"][0]["reason_code"] == "kernel_unavailable"
     assert opened.json()["computation"] == decision["computation"]
 
 
@@ -462,18 +462,18 @@ def test_existing_backtest_decisions_open_with_a_derived_computation_and_retest(
         "kind": "backtest",
         "inputs": {"source_run_id": run_id},
     }
-    assert body["rerun"]["status"] == "confirmation_required"
-    assert body["rerun"]["retest"]["type"] == "retest_run"
-    assert body["rerun"]["retest"]["source_run_id"] == run_id
-    assert body["rerun"]["result"] is None
+    assert body["reruns"][0]["status"] == "confirmation_required"
+    assert body["reruns"][0]["retest"]["type"] == "retest_run"
+    assert body["reruns"][0]["retest"]["source_run_id"] == run_id
+    assert body["reruns"][0]["result"] is None
 
     edited = client.post(
         f"/api/v1/decisions/{decision['id']}/rerun",
         json={"inputs": {"source_run_id": fake.uuid4()}},
     )
     assert edited.status_code == 200
-    assert edited.json()["rerun"]["status"] == "unavailable"
-    assert edited.json()["rerun"]["reason_code"] == "inputs_not_editable"
+    assert edited.json()["reruns"][0]["status"] == "unavailable"
+    assert edited.json()["reruns"][0]["reason_code"] == "inputs_not_editable"
 
     # The run-keyed dossier surfaces are exactly as before.
     dossiers = client.get(f"/api/v1/conversations/{conversation['id']}/run-dossiers")

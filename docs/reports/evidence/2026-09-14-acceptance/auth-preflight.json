@@ -1,0 +1,20 @@
+[
+  {
+    "language": "en",
+    "country": "US",
+    "currency": "USD",
+    "account_kind": "registered",
+    "composer": true
+  },
+  {
+    "language": "es-419",
+    "country": "DO",
+    "currency": "DOP",
+    "account_kind": "registered",
+    "composer": true
+  },
+  {
+    "account_kind": "guest",
+    "guest": true
+  }
+]

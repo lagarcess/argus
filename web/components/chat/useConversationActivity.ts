@@ -224,6 +224,7 @@ const activitiesAreEqual = (
   left: ConversationActivity | null,
   right: ConversationActivity,
 ): boolean =>
+  left?.latest_message_id === right.latest_message_id &&
   left?.operation.status === right.operation.status &&
   left.operation.kind === right.operation.kind &&
   left.operation.updated_at === right.operation.updated_at &&
@@ -565,8 +566,6 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       activity.operation.status === "idle",
     );
     if (activitiesAreEqual(priorActivity, activity) && !canSettleRequest) return;
-    const settled =
-      isUnresolvedOperation(priorActivity) && !isUnresolvedOperation(activity);
     this.dispatch({
       type: "server_projection_merged",
       conversationId,
@@ -574,14 +573,20 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
       revision,
       activeView: conversationId === this.currentActiveConversationId(),
     });
-    const requestSettled = Boolean(
-      priorRecord?.request &&
-      !this.state.byConversationId[conversationId]?.request,
-    );
-    if (
-      (settled || requestSettled) &&
-      conversationId !== this.currentActiveConversationId()
-    ) {
+    this.reconcileSettledTranscript(conversationId, priorRecord);
+  }
+
+  private reconcileSettledTranscript(
+    conversationId: string,
+    priorRecord: ConversationActivityState["byConversationId"][string] | undefined,
+  ): void {
+    // Read the accepted reducer state: stale responses cannot trigger a load.
+    const record = this.state.byConversationId[conversationId];
+    if (record?.canonical?.operation.status !== "idle") return;
+    const settled = isUnresolvedOperation(priorRecord?.canonical ?? null);
+    const requestSettled = Boolean(priorRecord?.request && !record.request);
+    if (!settled && !requestSettled) return;
+    if (conversationId !== this.currentActiveConversationId()) {
       this.callbacks.invalidateInactiveTranscript(conversationId);
     }
   }
@@ -597,12 +602,16 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
           : [],
       ),
     );
-    const omittedRequests = Object.entries(this.state.byConversationId).flatMap(
+    const omittedRequests: { conversationId: string; requestId: string | null }[] = Object.entries(this.state.byConversationId).flatMap(
       ([conversationId, record]) =>
         record.request && !projectedConversationIds.has(conversationId)
           ? [{ conversationId, requestId: record.request.requestId }]
           : [],
     );
+    const activeId = this.currentActiveConversationId();
+    if (activeId && !projectedConversationIds.has(activeId) && !omittedRequests.some((item) => item.conversationId === activeId)) {
+      omittedRequests.push({ conversationId: activeId, requestId: null });
+    }
     if (omittedRequests.length === 0) return undefined;
 
     return Promise.all(
@@ -616,7 +625,7 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
         }
         if (
           epoch !== this.accountEpoch ||
-          !this.isRequestCurrent(conversationId, requestId)
+          (requestId ? !this.isRequestCurrent(conversationId, requestId) : this.currentActiveConversationId() !== conversationId)
         ) {
           return;
         }
@@ -664,23 +673,14 @@ class ConversationActivityRuntimeOwner implements ConversationActivityRuntime {
     return request.then(
       (activity) => {
         if (!this.mutationIsCurrent(conversationId, mutationId, epoch)) return;
-        const priorActivity =
-          this.state.byConversationId[conversationId]?.canonical ?? null;
+        const priorRecord = this.state.byConversationId[conversationId];
         this.dispatch({
           type: "mutation_succeeded",
           conversationId,
           mutationId,
           activity,
         });
-        const nextActivity =
-          this.state.byConversationId[conversationId]?.canonical ?? null;
-        if (
-          isUnresolvedOperation(priorActivity) &&
-          !isUnresolvedOperation(nextActivity) &&
-          conversationId !== this.currentActiveConversationId()
-        ) {
-          this.callbacks.invalidateInactiveTranscript(conversationId);
-        }
+        this.reconcileSettledTranscript(conversationId, priorRecord);
         if (options.notifySuccess !== false) {
           this.callbacks.onMutationNotice({
             conversationId,

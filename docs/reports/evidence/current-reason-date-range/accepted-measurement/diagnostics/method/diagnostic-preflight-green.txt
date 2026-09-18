@@ -1,0 +1,3 @@
+PASS price observer preserves actual return identity and exception identity; distinguishes price, error and timeout
+PASS actual real-client Agent bodies reserve $0.625 each; second send in one repeat rejected; prior diagnostics included
+PASS actual driver selects only the two non-provider failures, each twice, sets Agent transport attempt limit to one

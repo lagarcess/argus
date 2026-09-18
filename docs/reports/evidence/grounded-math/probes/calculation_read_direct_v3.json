@@ -1,0 +1,707 @@
+{
+  "captured_at": "2026-09-12",
+  "what": "The calculation read alone on each prompt, guidance v3, task interpretation (reasoning) versus interpretation_repair (no reasoning), concurrency 2.",
+  "rows": [
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q1-es-419",
+      "seconds": 8.4,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {},
+      "solve_for": "payment",
+      "retrieve": [],
+      "follow_ups": [
+        "¿Cuál es el precio de la iPad que quieres?",
+        "¿En cuántos meses quieres ahorrar para comprarla?",
+        "¿Esperas algún rendimiento o tasa de interés anual por tus ahorros?"
+      ]
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q1-en",
+      "seconds": 15.9,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q2-en",
+      "seconds": 25.9,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {},
+      "solve_for": null,
+      "retrieve": [
+        "price"
+      ],
+      "follow_ups": [
+        "What is the price of the Porsche model you're considering?",
+        "How much can you put down as a down payment?",
+        "Over how many months or years would you want to pay for it?"
+      ]
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q2-es-419",
+      "seconds": 28.4,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {},
+      "solve_for": null,
+      "retrieve": [
+        "price"
+      ],
+      "follow_ups": [
+        "¿Cuál es el modelo de Porsche que te interesa y cuánto cuesta?",
+        "¿En cuántos años o meses planeás ahorrar para comprarlo?",
+        "¿Cuánto dinero tenés ahorrado ya, o comprarías usando financiamiento?"
+      ]
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q3-es-419",
+      "seconds": 16.1,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {
+        "present_value": 180000,
+        "annual_rate_pct": 14,
+        "direction": "borrow"
+      },
+      "solve_for": null,
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q3-en",
+      "seconds": 27.7,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {
+        "direction": "borrow",
+        "present_value": 180000,
+        "annual_rate_pct": 14
+      },
+      "solve_for": null,
+      "retrieve": [],
+      "follow_ups": [
+        "What is your current monthly payment, or how many months remain on the loan?",
+        "How much extra per month are you thinking of paying?",
+        "How long do you plan to keep the car, or what's your target payoff date?"
+      ]
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q4-en",
+      "seconds": 15.8,
+      "wants": true,
+      "kind": "bond_value",
+      "inputs": {
+        "currency": "DOP",
+        "face_value": 1000000
+      },
+      "solve_for": "yield_to_maturity_pct",
+      "retrieve": [
+        "coupon_rate_pct",
+        "years",
+        "coupons_per_year"
+      ],
+      "follow_ups": []
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q4-es-419",
+      "seconds": 27.2,
+      "wants": true,
+      "kind": "bond_value",
+      "inputs": {
+        "currency": "DOP",
+        "symbol": "POPULOBONO",
+        "face_value": 1000000
+      },
+      "solve_for": "yield_to_maturity_pct",
+      "retrieve": [
+        "coupon_rate_pct",
+        "years",
+        "coupons_per_year",
+        "price"
+      ],
+      "follow_ups": [
+        "¿Cuál es la tasa de cupón anual del bono?",
+        "¿Cuántos años faltan para el vencimiento?",
+        "¿A qué precio lo ofrecen, o desea conocer el rendimiento a vencimiento que necesitaría?"
+      ]
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q5-es-419",
+      "seconds": 13.8,
+      "wants": true,
+      "kind": "ranked_comparison",
+      "inputs": {},
+      "solve_for": null,
+      "retrieve": [],
+      "follow_ups": [
+        "¿Qué tarjetas de crédito estás considerando?",
+        "¿Qué criterio numérico es más importante para ti, como la tasa de interés o la cuota anual?",
+        "¿Cuál es tu gasto mensual aproximado con tarjeta?"
+      ]
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q5-en",
+      "seconds": 19.1,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q6-en",
+      "seconds": 14.3,
+      "wants": true,
+      "kind": "price_multiple",
+      "inputs": {
+        "symbol": "AAPL"
+      },
+      "solve_for": "multiple",
+      "retrieve": [
+        "price",
+        "per_share"
+      ],
+      "follow_ups": []
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q6-es-419",
+      "seconds": 26.6,
+      "wants": true,
+      "kind": "price_multiple",
+      "inputs": {
+        "symbol": "AAPL"
+      },
+      "solve_for": "multiple",
+      "retrieve": [
+        "price",
+        "per_share"
+      ],
+      "follow_ups": [
+        "¿Con qué P/E de comparación consideras que Apple es cara o barata? (P/E histórico de Apple, promedio del sector tecnológico, promedio del mercado, etc.)",
+        "¿Hay un rango de P/E en el que te sentirías cómodo invirtiendo en Apple?"
+      ]
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q7-en",
+      "seconds": 14.5,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q7-es-419",
+      "seconds": 24.6,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q8-en",
+      "seconds": 14.9,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q8-es-419",
+      "seconds": 26.2,
+      "wants": true,
+      "kind": "growth_projection",
+      "inputs": {},
+      "solve_for": null,
+      "retrieve": [
+        "inflation_rate_pct"
+      ],
+      "follow_ups": [
+        "¿Qué tasa de interés anual le ofrece su cuenta de ahorros?",
+        "¿Cuánto dinero tiene en la cuenta?",
+        "¿Durante cuántos años o meses ha tenido el dinero en la cuenta?"
+      ]
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "backtest-en",
+      "seconds": 2.6,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "concept-en",
+      "seconds": 5.8,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "counterfactual-en",
+      "seconds": 4.3,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "discovery-en",
+      "seconds": 5.0,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q10-en",
+      "seconds": 3.8,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "dca-es-419",
+      "seconds": 8.1,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "reasoning",
+      "task": "interpretation",
+      "label": "q9-es-419",
+      "seconds": 4.9,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q1-es-419",
+      "seconds": 1.4,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {
+        "currency": "MXN",
+        "direction": "save",
+        "present_value": 0,
+        "annual_rate_pct": 0,
+        "future_value": null,
+        "payment": null,
+        "periods": null
+      },
+      "solve_for": "payment",
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q1-en",
+      "seconds": 1.7,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {
+        "currency": "MXN",
+        "direction": "save",
+        "present_value": 0,
+        "annual_rate_pct": 0,
+        "future_value": null,
+        "payment": null,
+        "periods": null
+      },
+      "solve_for": "payment",
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q2-en",
+      "seconds": 1.2,
+      "wants": true,
+      "kind": "debt_to_income",
+      "inputs": {},
+      "solve_for": "annual_income",
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q2-es-419",
+      "seconds": 1.9,
+      "wants": true,
+      "kind": null,
+      "inputs": {},
+      "solve_for": null,
+      "retrieve": [],
+      "follow_ups": [
+        "¿Cuál es el precio del Porsche que quieres comprar?",
+        "¿Cuánto dinero tienes ahorrado o disponible para el pago inicial?",
+        "¿En cuántos años quieres comprarlo?"
+      ]
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q3-es-419",
+      "seconds": 1.5,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {
+        "present_value": 180000,
+        "annual_rate_pct": 14,
+        "direction": "borrow"
+      },
+      "solve_for": "payment",
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q3-en",
+      "seconds": 6.3,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {
+        "present_value": 180000,
+        "annual_rate_pct": 14,
+        "direction": "borrow"
+      },
+      "solve_for": "payment",
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q4-en",
+      "seconds": 1.3,
+      "wants": true,
+      "kind": "bond_value",
+      "inputs": {
+        "currency": "DOP",
+        "face_value": 1000000,
+        "symbol": "Banco Popular"
+      },
+      "solve_for": "yield_to_maturity_pct",
+      "retrieve": [
+        "coupon_rate_pct",
+        "years",
+        "coupons_per_year",
+        "price",
+        "yield_to_maturity_pct"
+      ],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q4-es-419",
+      "seconds": 1.2,
+      "wants": true,
+      "kind": "bond_value",
+      "inputs": {
+        "currency": "DOP",
+        "face_value": 1000000,
+        "symbol": "Banco Popular"
+      },
+      "solve_for": "price",
+      "retrieve": [
+        "price",
+        "yield_to_maturity_pct"
+      ],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q5-en",
+      "seconds": 0.9,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q5-es-419",
+      "seconds": 1.1,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q6-en",
+      "seconds": 1.4,
+      "wants": true,
+      "kind": "price_multiple",
+      "inputs": {
+        "symbol": "AAPL",
+        "multiple": null
+      },
+      "solve_for": "multiple",
+      "retrieve": [
+        "price",
+        "per_share"
+      ],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q6-es-419",
+      "seconds": 6.4,
+      "wants": true,
+      "kind": "price_multiple",
+      "inputs": {
+        "symbol": "AAPL",
+        "price": null,
+        "per_share": null,
+        "multiple": null
+      },
+      "solve_for": "multiple",
+      "retrieve": [
+        "price",
+        "per_share"
+      ],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q7-en",
+      "seconds": 0.8,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q7-es-419",
+      "seconds": 6.4,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q8-en",
+      "seconds": 1.0,
+      "wants": true,
+      "kind": null,
+      "inputs": {},
+      "solve_for": null,
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q8-es-419",
+      "seconds": 1.2,
+      "wants": true,
+      "kind": null,
+      "inputs": {},
+      "solve_for": null,
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "backtest-en",
+      "seconds": 0.8,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "concept-en",
+      "seconds": 1.0,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "discovery-en",
+      "seconds": 0.8,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "counterfactual-en",
+      "seconds": 6.4,
+      "wants": true,
+      "kind": "growth_projection",
+      "inputs": {
+        "symbol": "KO",
+        "contribution": null,
+        "periods": 60,
+        "periods_per_year": 12
+      },
+      "solve_for": "end_value",
+      "retrieve": [
+        "start_value",
+        "annual_rate_pct",
+        "inflation_rate_pct"
+      ],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q10-en",
+      "seconds": 0.6,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "dca-es-419",
+      "seconds": 1.5,
+      "wants": true,
+      "kind": "time_value",
+      "inputs": {
+        "currency": "USD",
+        "direction": "save",
+        "present_value": 0,
+        "payment": 200,
+        "annual_rate_pct": 10,
+        "periods": 12,
+        "periods_per_year": 12,
+        "payment_timing": "end",
+        "start_date": "2024-01-01"
+      },
+      "solve_for": "future_value",
+      "retrieve": [],
+      "follow_ups": []
+    },
+    {
+      "variant": "no_reasoning",
+      "task": "interpretation_repair",
+      "label": "q9-es-419",
+      "seconds": 1.0,
+      "wants": false,
+      "kind": null,
+      "inputs": null,
+      "solve_for": null,
+      "retrieve": null,
+      "follow_ups": null
+    }
+  ]
+}

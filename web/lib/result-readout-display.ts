@@ -59,9 +59,9 @@ export function resultBreakdownText(facts: ResultReadoutFacts | null | undefined
 export function resultReadoutPlanDetails(facts: ResultReadoutFacts | null | undefined, t: TFunction, locale: string): string[] {
   if (!facts) return [];
   const details = resultReadoutRuleDetails(facts, t, locale).map((rule) => `${rule.label}: ${rule.value}`);
-  if (facts.startingCapital !== undefined) details.push(t("chat.result_readout.starting_capital", { value: formatCurrency(facts.startingCapital, locale) }));
+  if (facts.startingCapital !== undefined) details.push(t("chat.result_readout.starting_capital", { value: formatCurrency(facts.startingCapital, locale, "USD", facts.currencyFractionDigits) }));
   if (facts.recurringContribution !== undefined) details.push(t("chat.result_readout.contribution", {
-    value: contributionPhrase(formatCurrency(facts.recurringContribution, locale), facts.contributionPeriod, t),
+    value: contributionPhrase(formatCurrency(facts.recurringContribution, locale, "USD", facts.currencyFractionDigits), facts.contributionPeriod, t),
   }));
   return details;
 }

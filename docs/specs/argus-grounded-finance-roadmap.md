@@ -333,10 +333,30 @@ reviewer should reject it on operating rule 8.
 | 7 | Currency | *"¿Ahorro en pesos o en dólares?"* | growth + comparison + retrieval |
 | 8 | Inflation | *"Is my savings account actually losing money?"* | growth + retrieval |
 | 9 | Backtest | *"Buy and hold Apple for the last year with $10,000."* | historical |
-| 10 | The boundary | *"Should I put my emergency fund in crypto?"* | historical; compute the drawdown, show it, stop |
+| 10 | The boundary | *"Should I put my emergency fund in crypto?"* | answer it straight, name the boundary, cite the sources, offer the next step |
 
 Plus the influencer's post from the section above, which is 4 and 5 combined
 and is the one a real Dominican audience is already asking a human.
+
+**Question 10's bar was rewritten 2026-09-17, and the old one is not coming
+back.** It used to read "historical; compute the drawdown, show it, stop." The
+final acceptance run failed on exactly that clause, in Spanish and then in
+English, and the failure was our test rather than the product: the calculator it
+demanded sits in a parked lane, and no reader of that answer needs it. Competitor
+answers to the same question are excellent without any drawdown. They answer
+directly, use the reader's own numbers, separate what the money is for from what
+it could earn, cite the local authority, and end with steps. That is the bar now:
+
+- answer the question asked, rather than describing a capability;
+- use the figures the reader gave, computed by Argus, not narrated by a model;
+- name the boundary plainly, since emergency money has to be there in full, on
+  short notice;
+- cite what the claim rests on, with its date;
+- end with next steps the reader can take.
+
+A calculation is welcome where it sharpens the answer, and is not required. What
+is still forbidden is the thing the acceptance sentence already forbids: a
+refusal that names a capability the reader did not ask about.
 
 **Also replay the real 2026-08-12 transcripts.** They are in the database, they
 are what actual users typed, and none of them was written by us.
@@ -363,12 +383,15 @@ that is not in either set, that is a signal the lane is enumerating.
 
 ## What is running right now
 
-**Updated 2026-09-12 at integration `f14c0dec`.** Landing state for every item is
-in "Where this board actually stands" below.
+**Updated 2026-09-17 at integration `e8a4ccee`, after production promotion
+`3d98057c`.** Landing state for every item is in "Where this board actually
+stands" below.
 
 | Lane | Where it is |
 | --- | --- |
-| Any grounded math | Phase 1 built on `claude/grounded-math-build-71d49b` at `eeffd59f` and captain-verified, not on integration. Phase 2 is unblocked now that #597 landed. |
+| Calculation follow-ups and answers | PR #634. Calculation cards reach history as typed facts, inputs fill and recompute, currency defaults to the profile, no product picks without facts, currency risk follows the current goal, a drawdown calculation, and no research when a follow-up needs no new facts. Its 93-case measurement is approved under a $15 stop and runs after the recovery replies lane lands, since both change model-facing text. One checklist command must name the new budget setting first. |
+| One list of next steps under a result follow-up | #606. The composer asked for a prose plan and structured next steps; the fix gives next steps sole ownership. Model-facing, so its measurement ($12.50 cap) waits its turn after the two lanes above that change model-facing text. |
+| Acceptance dry run | Done on `03918912`: 30 of 46 smoke answers passed (guests 6 of 6), replay 14 of 14 with 24 turns left for the final run. Its failures drove the failure paths and calculation follow-ups lanes. The final acceptance reruns everything on the candidate. |
 
 **Before landing overlapping lanes**, do a real `git merge --no-commit --no-ff` in a
 throwaway worktree. Do not read the file-overlap list and do not trust
@@ -1232,8 +1255,10 @@ phone. Enabling is a separate founder decision from any merge.
 
 **Surface.** Flags and QA. Little or no code.
 
-**Do not touch.** Guest sharing and forking stay out of scope per the sharing
-spec.
+**Scope update, founder-locked 2026-09-14.** Guest creation of shared links stays
+out of scope. Receiver follow-ups may fork frozen selected turns into the
+receiver's account or guest chat under
+`docs/superpowers/specs/2026-09-14-conversation-sharing-604.md`.
 
 **Proof.** Browser evidence of a shared receipt at mobile and desktop widths.
 The responsive shell shipped 2026-08-08 in PR #393 and is unconditional, so this
@@ -1258,9 +1283,25 @@ The four lines are `render.yaml` lines 59 and 182 and
 `.github/private-alpha-release-profile.json` lines 23 and 89, all `false` today,
 and they are the founder's to author.
 
+**Held back at the 2026-09-13 promotion.** The unattended walk of the candidate found
+no eligible answer in an ordinary backtest conversation, and the founder confirmed it
+in a live look (#604). A finished backtest was marked not complete; the Quick take
+and Breakdown were refused as unsafe text because a long publisher link looks like a
+secret; a follow-up computed from the run was refused for missing publisher sources;
+a research answer passed the 4,000-character limit; and confirmation cards were listed
+as rows. The founder promoted with sharing off. **Proposed, waiting for the founder:**
+select inside the conversation rather than from a list of titles, share a question
+with its final answer as one unit, keep Select all eligible, the note and the
+preview, and make answers shareable by default, refusing only what is private.
+
 ---
 
 ### Teach the method  ·  ships in **Grounding**
+
+**Closed by the founder 2026-09-14.** The welcome line is not built. The problem it
+targeted, visitors with money questions being told about backtests on arrival, is
+gone: guests see the A mark and a neutral greeting, and what people bring is
+answered by the calculations. The unused `chat.welcome` strings are dead copy.
 
 **Founder, 2026-09-11.** The welcome line approach below, one line stating
 the method plus a rotating example, is rejected, and the current
@@ -1429,9 +1470,26 @@ passing test suite told us this feature was correct for a full day.
 
 ## Where this board actually stands
 
-**Recorded 2026-09-09 at integration `6fa3f55a`, CI green there. Production is
-still `ee9c3491`; nothing below has been promoted.** Landed means merged to
-integration and green there, not shipped to a user.
+**Updated 2026-09-14. Production is `3d98057c`, promoted 2026-09-13 in PR #603.** Every
+item landed on integration through `3d379d3d` is in production, except sharing,
+which shipped switched off. Landed means merged to integration and green there;
+shipped means live in production. Integration is `e8a4ccee`.
+
+**The 2026-09-13 promotion.** A one-time exception to promoting only when the whole
+roadmap is done (founder, 2026-09-12). Main `3d98057c` is live on `argus-api`,
+`argus-app` and `argus-backtests`, with all seven migrations applied, including the
+`profiles.theme` drop. At the sharing-off head the full live eval passed 67 of 71,
+every failure dispositioned in the manifest, and the ten-pair A/B on the Spanish
+forward-looking case measured 0 of 10 failures deployed against 5 of 10 on the
+candidate; that research caveat is recorded and #609 is its fix. The historical
+guest replay passed 38 of 38 turns. Sharing was switched off after the walk found
+no completed answer eligible (#604). Known post-deploy exceptions: the Private Alpha
+Canary was already red on 97 of its last 100 runs (#614), the Quick take receipt
+fails the tier check until #605's migration ships, and `autoDeployTrigger` reads
+off under the founder's manual mode. Evidence:
+`docs/release-manifests/2026-09-12-main-production-promotion.md` and docs PR #613.
+Most of the delay came from release checks read too late; #608 tracks one
+provenance policy.
 
 **The overnight batch, 2026-09-09. Three of four landed; one is in review.**
 
@@ -1474,10 +1532,10 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Refusal log | Instrumentation | **Landed** `fa69466c`. #314 closed. |
 | #462 latency | Instrumentation | **Landed** `76937883`. #462 closed. |
 | Ask for feedback | Instrumentation | **LANDED** `98d9f423`, PR #594. After a result lands, Argus asks once per conversation how it is doing, with three one-tap answers in English and Spanish; "Tell us more" opens the existing dialog, and the conversation text attaches only when the user ticks its checkbox. A tap saves the same conversation, message and run pointers a thumbs rating saves, with no text. Every accepted submission emails support@get-argus.com through Resend, and a failed email never fails the save; the test email reached the founder's inbox. No migration, no new setting. The support address having separate web and API owners is deferred as #596. |
-| Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. One label pass owed before promotion. |
+| Metering | Plumbing | **Landed** `1db1aa75`. #546 closed. Labels approved by the founder 2026-09-12 and shipped 2026-09-13. |
 | Decisions | Plumbing | **Landed** `67facaf5`. |
 | Retrieval parameters | Grounding | **Landed** `41bf9930`. #404 and #545 closed. A follow-on, PR #568 `6f7e7354`, made a withheld answer keep the pages it already paid to retrieve, reframed from "sources used to inform this answer" to where Argus looked, and cached the withhold so the same unanswerable question is not billed twice. It filed #569, answered by PR #571: a turn now reports what it paid rather than what it published, so a discarded packet, a retry either kept or thrown away, and a response rejected after its invoice all reach the ledger. Eleven inline degraded turns between 2026-08-13 and 2026-09-02 recorded zero spend, under about $1.50 and not worth a backfill; the three thorough `missing_public_sources` turns on 2026-09-08 were already correct, and no research job has ever failed in production. |
-| Sharing on | Sharing | **Verified**, evidence landed `dff703d6`. The flag flip is a founder action at the next promotion. |
+| Sharing on | Sharing | **LANDED, switched off** `c8e05b4f`, PR #632, closing #604. Answers are shareable by default: selection happens inside the conversation, a question and its final answer are one unit, and the owner's choice and exact preview are the privacy boundary. Argus's own ids and account data never reach the page. The founder turns the flags on at promotion, and migration `20260914120000_share_plain_answer_receipts.sql` runs then. |
 | Share the answer | The calculations | **LANDED** `ba5a9fb7`, PR #574, 2026-09-09. Answers are shared from a header turn selection, behind `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, which is off in production. Calculations become eligible turns in Any grounded math. |
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
@@ -1493,8 +1551,36 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Let the AI answer forward and valuation questions | its own promotion | **LANDED** `4482aaa6`, PR #589, as decision 10. Forward and valuation questions get cited scenarios with shown math instead of the future-performance refusal. It also raised the balanced research timeout to 150 seconds for every question, a latency tradeoff the founder accepted. Its scorecard's three discovery failures were rerun on integration with live market data: two pass, because the lane's driver had kept the `.env`'s synthetic market data, and the third is the older dead end filed as #590. |
 | Home country per user | its own promotion | **LANDED** `65bc661b`, PR #593. A registered user picks a country in Settings, sees the currency it implies and can override it, in English and Spanish. Research sends that user's country on the inline path, thorough jobs and the research tool; a user with none sends no location. `ARGUS_RESEARCH_HOME_COUNTRY`, `home_location()`, `LOCAL_SOURCE_DOMAINS` and `local_sources` are gone. Its research-case live run sent no location on any call, matching the baseline. Apply `supabase/migrations/20260911120000_add_profile_home_country.sql` (additive) at promotion. A guest session pick is not built; the lane priced it at about a day. |
 | The conversation after a result | its own promotion | **LANDED** `f14c0dec`, PR #597, 2026-09-12. Questions after a result are answered by the model with one ordered list of next steps, runnable tests and questions together. One owner states the benchmark gap and cost drag as the difference of the shown returns. Runs record fee and slippage dollars, and a stored dollar cost is answered. A stated cost the audit cannot confirm is asked about, never shown at 0 bps, while a 0 only the model's read carries is dropped. New monthly-buy runs store the worst drop's dates; answers never invent a date, order or cause and carry no heading. A stored run fact is answered without research and the reply must state it, and an asset or benchmark reply must name each ticker. A moved start names the asset whose data sets it, from continuous history. Its live run was 64 passed and 7 failed against 67 and 4; the six new failures passed a rerun at the fix, and NVDA failed in both. The fingerprint is refrozen on that run. No migration. |
-| Any grounded math | The calculations | **Scoped end to end 2026-09-11** in its item: answers, decisions, Search, the rail widened to "result", sharing, compare and continue, and every failure, as one lane in two phases. **Phase 1 built** at `eeffd59f` on its branch and captain-verified: the prompt freeze and budget pass, and it touches no #597 files. Phase 2 is unblocked; it also owes the NVDA future-performance case, whose scenario figures show no citations on screen, and #599. Portfolio monitor, quant calculator and insider tracking stay deferred. |
-| Teach the method | Grounding | **Greetings LANDED** `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The welcome line is rejected and waits for a new direction; the broad-question follow-ups moved into Any grounded math. |
+| Any grounded math | The calculations | **LANDED** `8e9f40bc`, PR #607. Measured 69 of 71 at `dc8608c8` with the fingerprint refrozen and the browser walk done. Fourteen Codex rounds, then one final scoped review whose only finding is #622. #620 holds binding page-cited and finance-data inputs to their rows and the market test row for plans with a starting amount plus deposits. Its migration widens `public_excerpt_snapshots_kind_check` and is applied at the next promotion. |
+| Teach the method | Grounding | **Done.** Greetings LANDED `7e9efe71`, PR #601, 2026-09-12: neutral lines for everyone, testing and market lines only for a registered person with a completed run, guests always neutral and shown the A mark instead of the old heading. The broad-question follow-ups moved into Any grounded math. The welcome line was closed by the founder 2026-09-14. |
+| Production promotion 2026-09-13 | its own promotion | **SHIPPED** `3d98057c`, PR #603. See the promotion paragraph above. |
+| Readout receipts admit every model tier | outside the releases | **LANDED** `6eb93d84`, PR #610, closing #605. `route_receipts` accepts the readout tier, and a test pins the check to the runtime's tier list. Its migration, classed destructive for its dropped and re-added check, ships at the next promotion. |
+| Stated money survives a timed-out interpretation | outside the releases | **LANDED** `b7c69b54`, PR #602, closing #600. Focused repair keeps a stated deposit, contribution, fees and slippage; 22 of 22 targeted live reruns passed. Ships at the next promotion. |
+| Research provider failures take the retryable notice | outside the releases | **LANDED** `7701c980`, PR #612, closing #609. Transient provider errors retry with backoff, a failure that persists shows the retryable notice (or the quiet notice when a background run may already be billing), a guest gets the research question back, and when research still fails the answer without the lookup runs with the notice under it. A Retry still sees the failed answer as prior context: #625. Its capped live check runs after the acceptance dry run. |
+| One owner for the support address | outside the releases | **LANDED** `9630ffe2`, PR #615, closing #596. The API constant and the web fallback both read `web/argus_display_contract/support_contact.json`, and a test fails if any code types the address again. Ships at the next promotion. |
+| Canary core checks | outside the releases | **LANDED** `7adaf073`, PR #617, for #614. The canary checks that the three services run one commit, a signed-in account gets an ordinary chat answer, one backtest completes and one research answer has sources, plus the release config, signup denial and welcome email. It expects manual deploys (`autoDeployTrigger` off in `render.yaml` and the release profile). Proven twice against production `3d98057c` (runs 34796700214 and 34808072927). #614 stays open until the first scheduled run on main passes after the next promotion. |
+| One provenance policy for promotion evidence | outside the releases | **LANDED** `1bd2f8cb`, PR #616, closing #608. `tests/promotion_evidence_identity.py` owns whether evidence still stands: every file the eval could import or read counts, while `render.yaml`, `.env.example`, docs and dated evidence scripts do not. The eval refuses a tracked file as its environment. Model and flag identity in scorecards is #619. |
+| A confirmation card turn carries no prose | outside the releases | **LANDED** `14d4a870`, PR #618. A confirmation card no longer stores an English summary sentence. Card turns reach the model's history, naming and search as typed facts, and old rows are scrubbed on read. The chat-route live check passed in English and Spanish for $0.16. |
+| $10 minimum starting capital | outside the releases | **LANDED** `2cd359c8`, PR #621. One owner sets the minimum at $10 for every way capital is set or edited, and the recovery offers the minimum. A run under $1,000 shows cents, with decimals decided once per run and rounded half up. Capital in a stated currency, converted to dollars, is #623; a gain that subtracts rounded values is #624. |
+| Menus and settings follow docs/BREAKPOINTS.md | outside the releases | **LANDED** `22387583`, PR #630. Menus and settings keep the 1024px switch the design sets. The audit fixed auth settings, hidden account-deletion dialogs and undersized phone sheet controls. |
+| Promotion evidence records models and flags | outside the releases | **LANDED** `c2c08c99`, PR #629, closing #619. Scorecards record the model names and on/off flags the eval ran with, and the promotion gate compares them with the candidate's release contract. |
+| Result card gain from the run | outside the releases | **LANDED** `25f82c3a`, PR #628, closing #624. The card's gain is the run's own profit, rounded once, so the card and the readout agree. |
+| Ranked comparison leader gap | outside the releases | **LANDED** `0893c27e`, PR #627, closing #622. A ranked comparison's leader carries its gap, so a changed leader compares; the card hides the redundant row and shared receipts drop it. |
+| Acceptance dry run evidence | outside the releases | **LANDED** `6ec36797`, PR #631. Drivers, phone screenshots, findings and replay verdicts from the 03918912 run, with no customer text. |
+| Failure paths keep the money question | outside the releases | **LANDED** `6be3d58c`, PR #633. A failed interpreter no longer turns a money question into a test, a pending card no longer captures an unrelated follow-up, research gets only the turn's remaining time and falls back to the answer without the lookup, and recovery copy names what failed. |
+| Promotion readiness checklist | outside the releases | **LANDED** `1797e42a`, PR #636. `docs/release-manifests/NEXT-PROMOTION-CHECKLIST.md` lists the founder decisions, live runs and costs for the next promotion; the gate no longer accepts a skipped or unavailable live measurement. The four pending migrations rehearsed clean, three classify destructive, and none of the 44 existing scorecards qualify, so the candidate needs fresh live evidence. |
+| Sheets and dialogs from the phone drawer fill the screen | outside the releases | **LANDED** `9fea7efb`, PR #639. The drawer's slide-in animation left a transform that sized every sheet and dialog opened from it to the drawer (307px on a 375px phone). Shared overlays now render outside the drawer, animation transforms expire, and the settings audit runs with motion on. |
+| A Bitcoin question offers a Bitcoin test | outside the releases | **LANDED** `6e79366a`, PR #638, closing #611. Research subjects, Try next rows and add-peer taps carry the asset class, so Bitcoin is never offered as the BTC stock, and comparison rows stay within one asset class. Its caller audit lists classless lookups still left in backtest normalization, admission and result saving. |
+| Replies reach an open second tab | outside the releases | **LANDED** `0714aafa`, PR #635, closing #598. A second tab shows the reply when it lands, including hidden tabs, idle-only updates and plain replies with no job, and keeps message links. It keeps checking while its conversation ends in an unanswered message, up to the turn timeout. Deferred: #640 (focus before the turn is accepted) and #641. |
+| A second tab reads only what changed | outside the releases | **LANDED** `d018075b`, PR #645, closing #641. While a second tab waits for a reply, unchanged checks read only the newest messages instead of the whole conversation. |
+| Retry leaves the failed reply out of history | outside the releases | **LANDED** `46ec72a8`, PR #637, closing #625 and #642. Retry sends the failed reply's id, the API checks it is the conversation's latest retryable failure, and only that reply leaves the retry turn's history, in long conversations too. Every other reply stays. |
+| Shared links open as an Argus conversation | Sharing | **LANDED, switched off** `0044d79a`, PR #643. The shared page is a read-only Argus thread with the owner's note, dated snapshot and TradingView attribution, and a follow-up box. The first follow-up forks into the receiver's own chat (guest if signed out) with trimmed, labeled context; carried backtests and calculations stay read-only; guest caps unchanged. The $1 live check did not run (the lane's approval review blocked the provider call), so the enabled-surface walk at promotion carries it. |
+| Integration regressions repaired before promotion | outside the releases | **LANDED** `31bdf027`, PR #648, closing #647. Three flows that answered worse than production: a research question about future value kept its scenarios instead of being replaced by a request for calculation inputs, a growth rate of exactly -100% computes as the value going to zero, and a compound edit keeps the requested start date beside the benchmark change. Found by measuring integration against production, which nothing had done before. |
+| Calculation boundaries repaired, code only | outside the releases | **LANDED** `44cd936c`, PR #649, split out of PR #634 so no measurement was needed. An uncited currency can no longer own a calculation, which is the peso shown as dollars defect this board exists to prevent; empty optional interpreter objects keep their typed facts; only a declaration's own rule may erase an input; a completed card must reference its result; and a missing educational query no longer permits research. PR #634 stays parked with the model-facing work. |
+| Scenario answers keep their labels | outside the releases | **LANDED** `d825d3a8`, PR #650. When three scenario cards all computed but the shared formula named its figures without saying which card, the answer fell back to an unlabeled list of numbers and lost the scenarios. The fix keeps the labeled scenario prose whenever every card succeeded. Found by the measurement, not by review. |
+| An answer keeps its explanation | outside the releases | **LANDED** `97cba840`, PR #651. A Spanish answer whose prose named only its inputs lost the whole explanation and printed a strip of numbers; it now keeps the explanation with its labels. The review then caught the opposite risk, an ungrounded comparison published beside the option that contradicts it, so an incomplete comparison keeps the safe fallback. Both found by measuring, not by review. |
+| A calculation finds its price | outside the releases | **LANDED** `2d2452b7`, PR #652. A Bitcoin calculation asked market data for the exchange's own code and got nothing back, so the answer lost its price. Price lookups now use the symbol the resolver returned, in calculation and market-history answers alike. Found by repeating one measured case, not by review. |
+| Recovery replies state the current reason, and a stated date range survives "this year" | outside the releases | **LANDED** `e8a4ccee`, PR #626. A recovery reply names the reason the turn actually stopped instead of repeating an earlier complaint, and a month and day with no year, or "this year", takes the year from Argus's New York clock. Measured at 70 of 73 on the reconciled head; the three failures were a provider timeout and two cases that passed both repeats. The only model-facing change in this release. |
 
 **The honest read.** Five of the seven dispatched lanes were plumbing,
 instrumentation or verification, and all five landed. **None of them changes
@@ -1503,9 +1589,10 @@ shape lands on a primitive and gets computed, and today **zero calculations
 exist**. Everything shipped so far makes the next work possible; none of it is
 the work.
 
-**What stands between here and the goalpost**, in order: finish subtracting the
-guardrails, build the registry, build the five calculations. Teach the method
-and Lane B are real but neither blocks the goalpost.
+**What stands between here and the goalpost, 2026-09-13.** The spine work landed:
+guardrails subtracted, the loop lifted, the registry built. Any grounded math is the
+last build, and it is in measurement. Research resilience (#609) and working sharing
+(#604) are what make the next distribution worth doing.
 
 **Two findings from today change the estimate.** Lane C proved that relocation
 did not make the loop reusable, so the registry has to cut the catalog import
@@ -1520,11 +1607,15 @@ runtime behind it at all.
 
 **Founder, 2026-09-11: no promotion until the entire roadmap is ready.** The release names below group the work; they are not separate promotions. Every landed migration waits for that one promotion.
 
+**Founder exception, 2026-09-12.** The landed work was promoted early, once, as main
+`3d98057c` on 2026-09-13. The next promotion carries Any grounded math, #602, #610
+and #612.
+
 The board does not wait for the vision to be complete. Each checkpoint is
 cohesive on its own, and cutting them small is cheaper as well as safer:
-`eval_measured_code_unchanged` in the promotion gate returns early when a change
-cannot reach the measured code, so a checkpoint that does not touch the
-interpreter promotes **without a $1.33 live eval run**.
+the promotion gate carries a scorecard forward across any change the eval cannot
+reach (`tests/promotion_evidence_identity.py`), so a checkpoint that touches
+nothing the eval reaches promotes **without a new $1.33 live eval run**.
 
 | Release | Ships | What a user sees | Live eval |
 | --- | --- | --- | --- |
@@ -1763,11 +1854,45 @@ you, never prescribe what they should do" still stands.
 
 ### Still open
 
-- **Held-out replay needs founder approval.** Acceptance replays the real
-  2026-08-12 transcripts, which means reading production conversation text.
-- **The welcome line waits for a new direction.** Founder, 2026-09-11.
+- **The sharing redesign waits for the founder.** See Sharing on.
+- **Decision 9's interpreter-tier A/B is still owed.** See decision 9.
+- **The answer blueprint is proposed, not decided.** A small set of answer types the
+  model chooses, each an ordered set of sections; written freely first and structured
+  by a cheap model after; rendered the same way every time; graded by rubric.
+  Proposed 2026-09-13 after comparing Q7 with Perplexity's answer.
+- **Memory and private chats need scoping and a final decision for the next
+  roadmap.** Founder, 2026-09-13. Today memory is shown only to admin and developer
+  accounts, and a saved decision recalled into a chat is an annotation the model
+  never reads. "Private chat" only stops that recall and the memory prompt for one
+  chat, is kept in the browser rather than on the conversation, and does not keep
+  the chat out of history, Search or the model providers. Decide what private means
+  and whether memory reaches every registered user before continuity and saved
+  living items build on it.
 
 Resolved:
+
+- **The welcome line is closed.** Founder, 2026-09-14: what users bring is already
+  known and answered by the calculations, so no arrival line is built.
+- **The minimum starting capital is 10 in the stated currency.** Founder,
+  2026-09-14, for every way capital is set or edited. Capital has no currency today,
+  so the $10 floor ships first and capital in the stated currency is specced before
+  it is built.
+- **Held-out replay.** Approved by the founder 2026-09-12 and run on the promotion
+  candidate: 15 guest conversations from 2026-08-12 by the New York or UTC day, and
+  38 of 38 turns passed the refusal rule.
+- **A currency choice is judged on the answer, not on math.** Founder, 2026-09-13:
+  answer in the reader's home-country currency, match the currency to the goal, cite
+  current figures, never direct, and compute only what cited figures support.
+- **The history-not-forecast line reaches only non-scenario answers.** Founder,
+  2026-09-13: decision 10's scenario answers keep projecting from cited inputs.
+- **The canary keeps its purpose and loses its feature checks (#614).** Founder,
+  2026-09-13. It had failed 97 of its last 100 runs, because its browser journey
+  checked features and its release audit expected autodeploy while deploys are
+  manual. It becomes a small fixed check that never follows features: the three
+  services run the same commit, a signed-in account loads the chat and gets one
+  ordinary answer, one backtest completes, and one research question returns
+  sources. It expects manual deploys. Feature checks belong to the promotion walk.
+  Landed on integration `7adaf073`, PR #617.
 
 - **No Dominican source list.** Dropped by the founder 2026-09-10; #593 removed
   `LOCAL_SOURCE_DOMAINS` and `local_sources`.
@@ -1788,9 +1913,29 @@ Resolved:
 - **Resolved: research has a fallback chain.** Commit `02d1b03d` (#404, #545)
   sends the Agents API `models` list, and each research tier lists the other as
   its fallback (`src/argus/domain/research/config.py`).
-- **Confirmed bugs are tracked as issues:** #596 the support address has two
-  owners, #598 a second tab never shows the reply, #599 the BTC forward research
-  never publishes, #600 a timed-out interpretation drops stated money and costs.
+- **Bugs are tracked as issues:** #598 a second tab never shows the reply, #606 a result
+  follow-up lists its next steps twice, #611 a Bitcoin follow-up names the wrong
+  instrument, and #614 the canary fails on main until the next promotion. #596, #599,
+  #600, #604, #605, #608, #609, #614, #619, #622 and #624 are fixed on integration and
+  ship at the next promotion.
+- **The live measurement cannot see history building.** It gives each case its
+  history directly and never loads saved turns, so a change to how saved turns
+  become model history (PR #618) needs a live check through the chat route.
+- **A recovery reply can repeat an earlier turn's reason.** Found on production
+  2026-09-14 as a guest. A refusal stored the real blocker ($100 under the $1,000
+  minimum) but the reply repeated the previous turn's date complaint, because the
+  reply writer reads the last six messages beside the stored reason. That earlier
+  refusal came from reading "from August 16 to August 19 just a few days this year"
+  as ending December 31.
+- **The chat does not know who the person is.** Settings stores a preferred name,
+  a country and a currency, but outside Settings the name reaches only the web
+  greeting, and the country reaches only research as its search location. No answer
+  step receives either, so on production, 2026-09-13, "what's my name?" and "what's
+  my home country and currency?" were answered as unknown while Settings showed
+  both. Founder-found; it is the continuity pillar of the next direction.
+- **The backtest confirmation summary line is English in Spanish conversations.**
+  `_confirmation_summary` builds English-only text on main and integration.
+  Pre-existing; seen in the 2026-09-13 walk.
 - **A fact answer can show no next steps.** In the final walk of PR #597, one of
   four worst-drop answers had no Try next list, because the model listed none.
   Integration showed no list under fact answers before that PR. It waits under the

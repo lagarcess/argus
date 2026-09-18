@@ -33,6 +33,10 @@ ARTIFACT_ROOT_PROSE_FIELDS = frozenset(
         files("argus.domain").joinpath("artifact_root_prose_fields.json").read_text()
     )
 )
+# Legacy rows keep the retired card summary in every copy of the card, nested
+# references included, so the scrub follows the card key rather than a path.
+CONFIRMATION_CARD_KEYS = frozenset({"confirmation_card", "confirmation"})
+RETIRED_CONFIRMATION_CARD_FIELDS = frozenset({"summary"})
 
 
 def without_private_prose(value: Any) -> Any:
@@ -40,13 +44,23 @@ def without_private_prose(value: Any) -> Any:
         return {
             key: validated_readout(item)
             if key == "result_readout_content"
-            else without_private_prose(item)
+            else without_private_prose(_without_retired_card_prose(key, item))
             for key, item in value.items()
             if key not in PRIVATE_ARTIFACT_PROSE_FIELDS
         }
     if isinstance(value, list):
         return [without_private_prose(item) for item in value]
     return value
+
+
+def _without_retired_card_prose(key: str, value: Any) -> Any:
+    if key not in CONFIRMATION_CARD_KEYS or not isinstance(value, Mapping):
+        return value
+    return {
+        field: item
+        for field, item in value.items()
+        if field not in RETIRED_CONFIRMATION_CARD_FIELDS
+    }
 
 
 def reader_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -56,7 +70,7 @@ def reader_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     # The transport owns this decision, including for legacy persisted rows.
     # Readers consume it instead of independently classifying attached facts.
     public["artifact_presentation_kind"] = kind
-    if kind not in {"result", "breakdown", "assumptions"}:
+    if kind not in {"result", "breakdown", "assumptions", "confirmation"}:
         return public
     if kind == "result" and not isinstance(public.get("result_fact_bank"), dict):
         # An unavailable lookup is still a terminal result, not an empty turn.

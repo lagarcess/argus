@@ -1,0 +1,132 @@
+"""Run-local HTTP spend guard; no production code or request payload changes."""
+import json, math, threading, time
+from pathlib import Path
+from urllib.parse import urlparse
+import httpx
+
+class SpendStop(BaseException):
+    pass
+
+class Budget:
+    def __init__(self, path, prices, cap=7.0):
+        self.path=Path(path); self.cap=cap; self.label='preflight'; self.lock=threading.RLock()
+        self.rows=[]; self.blocked=[]; self.rates={}
+        for model,data in prices.items():
+            rates=[]
+            for endpoint in data['endpoints']:
+                p=endpoint['pricing']; rates.extend([p,*p.get('overrides',[])])
+            self.rates[model]={
+                'input':max(float(p.get(k,0)) for p in rates for k in ('prompt','input_cache_write','input_cache_write_1h','input_cache_read')),
+                'output':max(float(p.get(k,0)) for p in rates for k in ('completion','internal_reasoning')),
+                'request':max(float(p.get('request',0)) for p in rates),
+            }
+    def total(self):
+        return sum(r['accounted_usd'] for r in self.rows)
+    def save(self):
+        payload={'cap_usd':self.cap,'accounted_total_usd':self.total(),
+                 'reported_cost_usd':sum(r.get('reported_cost_usd',0) for r in self.rows),
+                 'unknown_cost_reserved_usd':sum(r['accounted_usd'] for r in self.rows if 'reported_cost_usd' not in r),
+                 'pricing_allowance_multiplier':1.1,'calls':self.rows,'blocked':self.blocked}
+        self.path.write_text(json.dumps(payload,indent=2))
+    def stop(self,reason):
+        self.blocked.append({'label':self.label,'reason':reason});self.save();raise SpendStop(reason)
+    def before(self,request):
+        if request.method in ('GET','HEAD','OPTIONS'):return None
+        with self.lock:
+            if self.blocked:self.stop('prior_guard_failure')
+            u=urlparse(str(request.url)); payload=json.loads(request.content)
+            if u.netloc=='openrouter.ai' and u.path=='/api/v1/chat/completions':
+                model=payload.get('model'); rate=self.rates.get(model)
+                if not rate:self.stop('unpriced_model')
+                if payload.get('tools') or payload.get('plugins') or payload.get('stream'):
+                    self.stop('unbounded_tools_or_stream')
+                limit=payload.get('max_tokens')
+                if not isinstance(limit,int) or limit<=0:self.stop('missing_output_limit')
+                # UTF-8 bytes conservatively upper-bound text tokens; include all
+                # schema bytes and extra protocol overhead, with 10% price margin.
+                reserve=((len(request.content)+1024)*rate['input']+limit*rate['output']+rate['request'])*1.1
+                provider='openrouter'
+            elif u.netloc=='api.perplexity.ai' and u.path=='/search':
+                model=None;provider='perplexity_search';reserve=0.005*1.1*max(1,len(payload['query']) if isinstance(payload.get('query'),list) else 1)
+            elif u.netloc=='api.perplexity.ai' and u.path=='/v1/agent':
+                from argus.domain.research.pricing import MODEL_RATE_TABLE_USD_PER_MILLION,TOOL_RATE_TABLE_USD_PER_INVOCATION
+                models=payload.get('models')
+                if not isinstance(models,list) or not models:self.stop('invalid_agent_model_list')
+                if any(not isinstance(m,str) or m not in MODEL_RATE_TABLE_USD_PER_MILLION for m in models):
+                    self.stop('unpriced_agent_model')
+                # Same planning envelope as the approved acceptance run. The
+                # 30k input assumption selects the applicable context tier.
+                estimates={}
+                for name in models:
+                    tier=next(t for t in MODEL_RATE_TABLE_USD_PER_MILLION[name] if t.max_input_tokens is None or 30000<=t.max_input_tokens)
+                    estimates[name]=float((30000*tier.input_usd_per_million+15000*tier.output_usd_per_million)/1000000+20*TOOL_RATE_TABLE_USD_PER_INVOCATION['finance_search'])
+                model=max(estimates,key=estimates.get)
+                provider='perplexity_agent';reserve=max(0.625,estimates[model])
+            else:self.stop('unpriced_write_endpoint:'+u.netloc+u.path)
+            if not math.isfinite(reserve) or self.total()+reserve>self.cap:
+                self.stop('budget_would_exceed_cap')
+            row={'attempt':len(self.rows)+1,'label':self.label,'provider':provider,'model':model,
+                 'reserved_usd':reserve,'accounted_usd':reserve,'started_at':time.time()}
+            if provider=='perplexity_agent':
+                row.update(models=models,reservation_model=model,model_estimates_usd=estimates,
+                           highest_model_estimate_usd=estimates[model],
+                           reservation_basis='30k input, 15k output, 20 finance searches; highest priced fallback; minimum $0.625 per attempt')
+            self.rows.append(row);self.save();return row
+    def after(self,row,response):
+        if row is None:return
+        with self.lock:
+            row['status_code']=response.status_code
+            if row['provider']=='openrouter':
+                try:
+                    data=response.json(); cost=data.get('usage',{}).get('cost')
+                    row['served_model']=data.get('model'); row['usage']=data.get('usage')
+                    if isinstance(cost,(float,int)) and math.isfinite(cost) and cost>=0:
+                        row['reported_cost_usd']=cost;row['accounted_usd']=cost*1.1
+                        if cost*1.1>row['reserved_usd']+1e-9:self.stop('provider_exceeded_reservation')
+                except (ValueError,TypeError):pass
+            if row['provider']=='perplexity_agent':
+                try:
+                    from argus.domain.research.perplexity_agent import _usage_from_response
+                    from argus.domain.research.pricing import MODEL_RATE_TABLE_USD_PER_MILLION
+                    data=response.json()
+                    row['served_model']=data.get('model');row['usage']=data.get('usage')
+                    if data.get('model') and data['model'] not in MODEL_RATE_TABLE_USD_PER_MILLION:
+                        self.stop('unpriced_served_agent_model')
+                    parsed=_usage_from_response(data,latency_ms=0,on_unpriced=lambda evidence:None)
+                    if parsed.cost_usd is not None:
+                        row['reported_cost_usd']=parsed.cost_usd
+                        row['accounted_usd']=parsed.cost_usd
+                        if parsed.cost_usd>row['reserved_usd']+1e-9:self.stop('agent_exceeded_reservation')
+                except (ValueError,TypeError):pass
+            row['finished_at']=time.time();self.save()
+    def interrupted(self,row,error):
+        if row is not None:
+            with self.lock:
+                row['transport_error']=type(error).__name__
+                row['finished_at']=time.time();self.save()
+    def install(self):
+        original_async=httpx.AsyncClient.send; original_sync=httpx.Client.send
+        guard=self
+        async def send_async(client,request,*args,**kwargs):
+            row=guard.before(request)
+            try:
+                result=await original_async(client,request,*args,**kwargs)
+                await result.aread();guard.after(row,result);return result
+            except BaseException as error:
+                guard.interrupted(row,error);raise
+        def send_sync(client,request,*args,**kwargs):
+            row=guard.before(request)
+            try:
+                result=original_sync(client,request,*args,**kwargs)
+                result.read();guard.after(row,result);return result
+            except BaseException as error:
+                guard.interrupted(row,error);raise
+        httpx.AsyncClient.send=send_async;httpx.Client.send=send_sync
+        # Alpaca uses requests for its read-only market-data calls. Reject any
+        # write that bypasses the accounted HTTP client.
+        import requests
+        original_request=requests.Session.request
+        def request(session,method,url,*args,**kwargs):
+            if method.upper() not in ('GET','HEAD','OPTIONS'):guard.stop('unaccounted_requests_write')
+            return original_request(session,method,url,*args,**kwargs)
+        requests.Session.request=request

@@ -109,7 +109,7 @@ def _asset_provider_mode() -> AssetProviderMode:
 
 
 def _normalize_symbol(symbol: str) -> str:
-    return symbol.strip().upper().replace("-", "/")
+    return symbol.strip().lstrip("@$").upper().replace("-", "/")
 
 
 def _compact_symbol(symbol: str) -> str:
@@ -658,8 +658,12 @@ def _is_explicit_ticker_query(query: str) -> bool:
         return False
     if "/" in raw or "-" in raw:
         return True
-    compact = raw.replace("/", "").replace("-", "")
-    return bool(compact and compact.isalpha() and compact == compact.upper())
+    compact = raw.lstrip("@$").replace("/", "").replace("-", "")
+    return bool(
+        compact
+        and compact.isalpha()
+        and (raw.startswith(("@", "$")) or compact == compact.upper())
+    )
 
 
 def _accepts_high_confidence_name_match(query: str, asset: ResolvedAsset) -> bool:

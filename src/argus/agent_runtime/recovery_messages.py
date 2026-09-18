@@ -41,18 +41,19 @@ RecoveryMessageCode = Literal[
     "discovery_limit_reached",
     "discovery_target_missing",
     "discovery_suggestions_unavailable",
+    "research_lookup_failed",
+    "research_lookup_unavailable",
 ]
 
 
 RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
     "interpreter_unavailable": (
-        "I saved your message, but I could not turn it into a reliable test setup. "
+        "I saved your message, but I could not reliably understand your question. "
         "Please retry in a moment."
     ),
     "interpreter_unavailable_not_retryable": (
-        "I saved your message, but I could not turn it into a reliable test setup. "
-        "Sending it again as written will hit the same problem, so try rewording "
-        "it, or tell me the asset and the period you want."
+        "I saved your message, but I could not reliably understand your question. "
+        "Try rewording it so I can help."
     ),
     "assumption_edit_unapplied": (
         "I saved your reply, but I could not safely apply that assumption change, "
@@ -207,7 +208,21 @@ RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
         "Tell me what to look for: a category like cybersecurity stocks, or a "
         "company to find peers of, and I can bring back verified candidates."
     ),
+    "research_lookup_failed": (
+        "I couldn't finish looking that up just now. Try again in a moment."
+    ),
+    "research_lookup_unavailable": "I can't look that up right now.",
 }
+
+# The retryable recoveries whose turn settles recoverable_failed with a durable
+# retry of the request; every other recovery keeps completed-turn settlement.
+DURABLE_RETRY_RECOVERY_CODES: frozenset[RecoveryMessageCode] = frozenset(
+    {
+        "discovery_search_failed",
+        "discovery_suggestions_unavailable",
+        "research_lookup_failed",
+    }
+)
 
 
 class RecoveryText(str):
@@ -260,6 +275,7 @@ def recovery_state(
     *,
     language: str | None = None,
     retryable: bool,
+    under_answer: bool = False,
     **params: Any,
 ) -> dict[str, Any]:
     _ = language
@@ -267,6 +283,10 @@ def recovery_state(
         "code": code,
         "retryable": retryable,
     }
+    if under_answer:
+        # The persisted content is an answer and this recovery its notice,
+        # not compatibility text standing in for the reply.
+        state["under_answer"] = True
     cleaned_params = {
         key: value for key, value in params.items() if value is not None and value != ""
     }
@@ -280,6 +300,7 @@ def recovery_state_stage_patch(
     *,
     language: str | None = None,
     retryable: bool,
+    under_answer: bool = False,
     **params: Any,
 ) -> dict[str, dict[str, Any]]:
     return {
@@ -287,6 +308,7 @@ def recovery_state_stage_patch(
             code,
             language=language,
             retryable=retryable,
+            under_answer=under_answer,
             **params,
         )
     }

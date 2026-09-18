@@ -16,6 +16,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+from argus.api.decision_contract import DecisionComputation
 from faker import Faker
 from psycopg.types.json import Jsonb
 from test_search_postgres import (
@@ -35,6 +36,13 @@ pytestmark = pytest.mark.skipif(
 
 ANSWER = "Nine months of 5,000 a month reaches the tablet in December."
 NOTE = "Commit to the savings plan."
+ONE_PLAN = {"kind": "savings_projection", "inputs": {"monthly_amount": 5000, "months": 9}}
+TWO_PLANS = {
+    "calculations": [
+        ONE_PLAN,
+        {"kind": "savings_projection", "inputs": {"monthly_amount": 4000, "months": 12}},
+    ]
+}
 
 
 def _insert_computed_answer_decision(
@@ -44,7 +52,9 @@ def _insert_computed_answer_decision(
     conversation_id: UUID,
     timestamp: datetime,
     decision_state: str = "promising",
+    computation: dict[str, Any] | None = None,
 ) -> dict[str, UUID]:
+    stored = computation or ONE_PLAN
     message_id = _insert_message(
         cursor,
         user_id=user_id,
@@ -52,12 +62,7 @@ def _insert_computed_answer_decision(
         timestamp=timestamp,
         role="assistant",
         content=ANSWER,
-        metadata={
-            "computation": {
-                "kind": "savings_projection",
-                "inputs": {"monthly_amount": 5000, "months": 9},
-            }
-        },
+        metadata={"computation": stored},
     )
     decision_id = uuid4()
     cursor.execute(
@@ -73,12 +78,7 @@ def _insert_computed_answer_decision(
             user_id,
             conversation_id,
             message_id,
-            Jsonb(
-                {
-                    "kind": "savings_projection",
-                    "inputs": {"monthly_amount": 5000, "months": 9},
-                }
-            ),
+            Jsonb(stored),
             decision_state,
             NOTE,
             timestamp,
@@ -184,3 +184,43 @@ def test_decision_state_filter_and_recall_carry_a_computed_answer_decision(
     assert recalled_decisions[0]["computation"]["kind"] == "savings_projection"
     assert recalled_decisions[0]["evidence_artifact_id"] is None
     assert ANSWER in str(recalled_decisions[0].get("attachment_text"))
+
+
+def test_one_decision_over_every_option_an_answer_weighed_is_found_and_recalled(
+    search_identities,  # noqa: F811 - pytest fixture
+) -> None:
+    owner_id = search_identities["owner"]
+    now = datetime(2026, 9, 12, 12, tzinfo=timezone.utc)
+    with _connect() as connection, connection.cursor() as cursor:
+        conversation_id = _insert_conversation(
+            cursor, user_id=owner_id, timestamp=now, title="Two savings plans"
+        )
+        rows = _insert_computed_answer_decision(
+            cursor,
+            user_id=owner_id,
+            conversation_id=conversation_id,
+            timestamp=now,
+            computation=TWO_PLANS,
+        )
+
+    reader, _pool = _reader()
+    found = reader.search_rows(
+        user_id=str(owner_id),
+        query="savings plan",
+        source_limit=4,
+        include_ledger_groups=True,
+    )
+    assert [item.id for _, item in _ranked(found.rows, "savings plan")] == [
+        str(conversation_id)
+    ]
+    recalled = reader.search_rows(
+        user_id=str(owner_id),
+        query="",
+        source_limit=4,
+        conversation_ids=[str(conversation_id)],
+    )
+    decisions = recalled.rows["decisions"]
+    assert [row["id"] for row in decisions] == [str(rows["decision"])]
+    assert decisions[0]["computation"] == TWO_PLANS
+    stored = DecisionComputation.model_validate(decisions[0]["computation"])
+    assert stored.kinds == ["savings_projection", "savings_projection"]

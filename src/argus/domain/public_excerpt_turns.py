@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import re
 import unicodedata
-from html.parser import HTMLParser
 from typing import Any, get_args
 from urllib.parse import urlsplit
 
-from markdown_it import MarkdownIt
 from pydantic import ValidationError
 
 from argus.api.public_excerpt_fact_schemas import (
@@ -22,6 +19,11 @@ from argus.api.public_excerpt_fact_schemas import (
 )
 from argus.api.public_excerpt_schemas import (
     PublicExcerptBacktestTurn,
+    PublicExcerptCalculation,
+    PublicExcerptCalculationFact,
+    PublicExcerptCalculationSource,
+    PublicExcerptCalculationText,
+    PublicExcerptCalculationTurn,
     PublicExcerptOfferedNextStep,
     PublicExcerptResearchSource,
     PublicExcerptResearchTurn,
@@ -31,7 +33,6 @@ from argus.domain.backtest_message_projection import result_fact_bank
 from argus.domain.capability_registry import ALLOWED_TEMPLATES, SUPPORTED_STRATEGY_TYPES
 from argus.domain.public_excerpts import (
     _CONTROL_CHARS,
-    _SECRET_SHAPED_RE,
     PublicExcerptSanitizationError,
     PublicExcerptSourceError,
     _assumptions,
@@ -41,9 +42,6 @@ from argus.domain.public_excerpts import (
 )
 from argus.domain.research.contracts import QuestionShape
 from argus.domain.result_figures import with_result_figures
-
-_TEXT_LIMITS = {"question": 500, "answer": 4000, "owner_note": 280}
-_BARE_URL = re.compile(r"(?:https?://|www\.)[^\s<>\[\]\"']+", re.IGNORECASE)
 
 
 def refuse(reason: str, field: str | None = None) -> None:
@@ -56,7 +54,7 @@ def audit_text(value: object, *, field: str, private_ids: tuple[str, ...]) -> st
     if not isinstance(value, str):
         refuse("unsafe_text", field)
     assert isinstance(value, str)
-    if field != "answer":
+    if field == "owner_note":
         value = " ".join(
             "".join(
                 " " if unicodedata.category(c) in _CONTROL_CHARS else c for c in value
@@ -70,60 +68,15 @@ def audit_text(value: object, *, field: str, private_ids: tuple[str, ...]) -> st
         if field == "owner_note":
             return None
         refuse("missing_question" if field == "question" else "unsafe_text", field)
-    if len(value) > _TEXT_LIMITS[field]:
+    if field == "owner_note" and len(value) > 280:
         refuse("text_too_long", field)
-    if _SECRET_SHAPED_RE.search(value):
-        refuse("unsafe_text", field)
     try:
-        audit_public_excerpt_document({field: value}, private_ids=private_ids)
+        audit_public_excerpt_document(
+            {field: value}, private_ids=private_ids, check_value_markers=False
+        )
     except PublicExcerptSanitizationError:
         refuse("unsafe_text", field)
     return value
-
-
-class _HTMLDestinations(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.urls: set[str] = set()
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self.urls.update(
-            value for key, value in attrs if key in {"href", "src"} and value
-        )
-
-
-def answer_destinations(answer: str) -> set[str]:
-    """Resolve actual CommonMark links and scan only unlinked prose for URLs."""
-    destinations: set[str] = set()
-
-    def visit(tokens: list[Any]) -> None:
-        inside_link = False
-        for token in tokens:
-            if token.type == "link_open":
-                inside_link = True
-            elif token.type == "link_close":
-                inside_link = False
-            for name in ("href", "src"):
-                value = token.attrGet(name)
-                if value:
-                    destinations.add(value)
-            if (
-                token.type in {"text", "code_inline", "fence", "code_block"}
-                and not inside_link
-            ):
-                for match in _BARE_URL.finditer(token.content):
-                    value = match.group().rstrip(".,;:!?")
-                    while value.endswith(")") and value.count(")") > value.count("("):
-                        value = value[:-1]
-                    destinations.add(value)
-            if token.children:
-                visit(token.children)
-
-    visit(MarkdownIt("commonmark").parse(answer))
-    html = _HTMLDestinations()
-    html.feed(answer)
-    destinations.update(html.urls)
-    return destinations
 
 
 def _offered_step(metadata: dict[str, Any]) -> PublicExcerptOfferedNextStep | None:
@@ -172,16 +125,13 @@ def project_research_turn(
     # sidecar is a list of tickers rather than an answer and is not one.
     if source.get("shape") not in set(get_args(QuestionShape)):
         refuse("unsupported_shape")
-    if source.get("degraded"):
-        refuse("degraded")
-    if not source.get("sources"):
-        refuse("missing_sources", "sources")
     question = audit_text(question, field="question", private_ids=private_ids)
     answer = audit_text(message.content, field="answer", private_ids=private_ids)
     note = audit_text(owner_note, field="owner_note", private_ids=private_ids)
     try:
         sources = [
-            PublicExcerptResearchSource.model_validate(row) for row in source["sources"]
+            PublicExcerptResearchSource.model_validate(row)
+            for row in source.get("sources", [])
         ]
         for row in sources:
             parsed = urlsplit(row.url)
@@ -194,8 +144,6 @@ def project_research_turn(
             ):
                 refuse("invalid_source", "sources")
         assert answer is not None
-        if answer_destinations(answer) - {row.url for row in sources}:
-            refuse("unlisted_url", "answer")
         payload = PublicExcerptResearchTurn(
             question=question,
             answer=answer,
@@ -208,7 +156,9 @@ def project_research_turn(
             content_language=language,
         )
         audit_public_excerpt_document(
-            payload.model_dump(mode="json"), private_ids=private_ids
+            payload.model_dump(mode="json"),
+            private_ids=private_ids,
+            check_value_markers=False,
         )
         return payload
     except (
@@ -262,6 +212,8 @@ def project_backtest_turn(
     *,
     run: Any,
     title: str,
+    question: str | None = None,
+    answer: str | None = None,
     owner_note: str | None,
     language: str,
     private_ids: tuple[str, ...],
@@ -312,6 +264,12 @@ def project_backtest_turn(
         _require_complete_figures(facts, bank["metrics"])
         payload = PublicExcerptBacktestTurn(
             idea_title=audit_text(title, field="question", private_ids=private_ids),
+            question=audit_text(question, field="question", private_ids=private_ids)
+            if question is not None
+            else None,
+            answer=audit_text(answer, field="answer", private_ids=private_ids)
+            if answer
+            else answer,
             fact_bank=facts,
             visual=_visual(run.chart),
             owner_note=audit_text(
@@ -320,8 +278,127 @@ def project_backtest_turn(
             content_language=language,
         )
         audit_public_excerpt_document(
-            payload.model_dump(mode="json"), private_ids=private_ids
+            payload.model_dump(mode="json"),
+            private_ids=private_ids,
+            check_value_markers=False,
         )
         return payload
     except (ValidationError, PublicExcerptSanitizationError, PublicExcerptSourceError):
         refuse("unsupported_backtest")
+
+
+def project_calculation_turn(
+    *,
+    message: Message,
+    question: str,
+    owner_note: str | None,
+    language: str,
+    private_ids: tuple[str, ...],
+) -> PublicExcerptCalculationTurn:
+    """A computed answer as a frozen receipt: each card's typed facts, no recompute.
+
+    The question and, for each calculation, the title, the computed answer and
+    rows and notes publish with public or explicitly user-written inputs.
+    A declaration whose rows restate inputs still requires known provenance;
+    hidden account inputs are never added to the preview or public page.
+    """
+    from argus.domain.answer_dossiers import computed_answer_cards
+    from argus.domain.capability_registry import get_tool_catalog
+
+    cards = computed_answer_cards(message.model_dump(mode="python"))
+    if not cards:
+        refuse("unsupported_turn")
+    assert cards is not None
+    catalog = get_tool_catalog(include_unavailable=True)
+    for card in cards:
+        _refuse_unpublishable(card, catalog)
+    asked = audit_text(question, field="question", private_ids=private_ids)
+    note = audit_text(owner_note, field="owner_note", private_ids=private_ids)
+    try:
+        payload = PublicExcerptCalculationTurn(
+            question=asked,
+            answer_text=audit_text(
+                message.content, field="answer", private_ids=private_ids
+            ),
+            calculations=[_public_calculation(card) for card in cards],
+            computed_at=message.created_at,
+            owner_note=note,
+            content_language=language,
+        )
+        audit_public_excerpt_document(
+            payload.model_dump(mode="json"),
+            private_ids=private_ids,
+            check_value_markers=False,
+        )
+        return payload
+    except ValidationError:
+        refuse("unsupported_turn")
+    except PublicExcerptSanitizationError:
+        refuse("unsafe_text")
+
+
+def _refuse_unpublishable(card: Any, catalog: Any) -> None:
+    declaration = catalog.get(card.tool_name)
+    policy = declaration.policy.public_receipt if declaration is not None else "disabled"
+    if policy == "disabled":
+        refuse("unsupported_turn")
+    presentation = card.presentation
+    if card.outcome.status != "succeeded" or presentation.answer is None:
+        refuse("not_completed")
+    stated = [fact for fact in presentation.inputs if fact.value is not None]
+    if policy == "cited_facts" and not all(_selected_input(fact) for fact in stated):
+        refuse("private_inputs")
+
+
+def _public_calculation(card: Any) -> PublicExcerptCalculation:
+    presentation = card.presentation
+    stated = [fact for fact in presentation.inputs if fact.value is not None]
+    return PublicExcerptCalculation(
+        title=_public_text(presentation.title),
+        answer=_public_fact(presentation.answer),
+        rows=[
+            _public_fact(fact)
+            for fact in presentation.rows
+            if not fact.comparison_only
+        ],
+        inputs=[_public_fact(fact) for fact in stated if _selected_input(fact)],
+        notes=[_public_text(item) for item in presentation.notes],
+    )
+
+
+def _selected_input(fact: Any) -> bool:
+    source = fact.source
+    return fact.visibility == "public" or (
+        source is not None and source.kind in {"page", "user"}
+    )
+
+
+def _public_text(text: Any) -> PublicExcerptCalculationText:
+    return PublicExcerptCalculationText(
+        locale_key=text.locale_key, interpolation_args=dict(text.interpolation_args)
+    )
+
+
+def _public_fact(fact: Any) -> PublicExcerptCalculationFact:
+    source = fact.source
+    cited = None
+    if source is not None and source.kind == "page":
+        if source.url is not None:
+            parsed = urlsplit(source.url)
+            if (
+                parsed.scheme not in {"http", "https"}
+                or not parsed.netloc
+                or parsed.username
+                or parsed.password
+            ):
+                refuse("invalid_source", "sources")
+        cited = PublicExcerptCalculationSource(
+            title=source.title, url=source.url, date=source.date
+        )
+    return PublicExcerptCalculationFact(
+        label=_public_text(fact.label),
+        value=fact.value,
+        value_text=_public_text(fact.value_text) if fact.value_text is not None else None,
+        unit=_public_text(fact.unit) if fact.unit is not None else None,
+        source=cited,
+    )

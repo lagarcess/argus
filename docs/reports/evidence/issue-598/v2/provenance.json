@@ -1,0 +1,11 @@
+{
+  "red_integration": "350e3dca8f573f5dfd61f1f753d8ed16a2724c9e",
+  "green_commit": "39a2e5135e741ebf3a20122004cb95587843a0c7",
+  "test_files": {
+    "web/e2e/conversation-transcript-freshness.spec.ts": "6c28c5cac4af8f0263f751da5017d4724ed02061",
+    "web/e2e/support/conversation-activity-fixture.ts": "6d2039a54f77d0884d485f562ce19ac7a96451b4"
+  },
+  "provider_calls": 0,
+  "red_result": "6 expected failures: saved reply absent",
+  "green_result": "17 passed"
+}

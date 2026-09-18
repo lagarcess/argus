@@ -141,11 +141,10 @@ async def test_focused_strategy_repair_receipt_records_applied_effect(
         "_augment_strategy_assets_from_resolvable_context",
         lambda **kwargs: kwargs["response"],
     )
-    monkeypatch.setattr(
-        interpreter_module,
-        "_response_can_skip_optional_runtime_readiness_audits",
-        lambda **_kwargs: True,
-    )
+    async def audited_response(**kwargs: Any) -> LLMInterpretationResponse:
+        return kwargs["response"]
+
+    monkeypatch.setattr(interpreter_module, "_audit_stated_run_fields", audited_response)
 
     token = openrouter.begin_openrouter_route_receipt_capture()
     try:

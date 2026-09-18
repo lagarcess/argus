@@ -1,0 +1,2358 @@
+{
+  "label": "registered-q8-es-419",
+  "phase": "registered",
+  "question": "q8",
+  "language": "es-419",
+  "country": "DO",
+  "account_kind": "registered",
+  "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+  "message": "¿Mi cuenta de ahorros de verdad está perdiendo dinero?",
+  "answer": {
+    "id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+    "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+    "role": "assistant",
+    "content": "**Sí, puede estar perdiendo poder de compra aunque el saldo en pesos no disminuya.** Al 2026-08-31, la inflación interanual de República Dominicana fue 5.13%; si el rendimiento efectivo de tu cuenta, después de cargos, queda por debajo de esa inflación, tus ahorros compran menos en términos reales.\n\n### Cómo comprobarlo\n\nBusca en tu estado de cuenta o tarifario la **tasa efectiva anual** y los cargos aplicables. Luego compara:\n\n| Situación | Resultado real |\n|---|---|\n| Rendimiento neto superior a la inflación | Aumenta el poder de compra |\n| Rendimiento neto igual a la inflación | Conserva el poder de compra |\n| Rendimiento neto inferior a la inflación | Disminuye el poder de compra |\n\nLa tasa actual de tu cuenta no puede determinarse sin conocer el banco y el producto exacto, porque las condiciones pueden variar por cuenta, saldo y tarifario.\n\n### La fórmula correcta\n\n**Rendimiento real = (1 + rendimiento neto) ÷ (1 + inflación) − 1**\n\nEl rendimiento neto debe reflejar los intereses realmente acreditados y restar los cargos de la cuenta. Comparar las tasas mediante una simple resta sirve como orientación, pero la fórmula anterior mide con mayor precisión el cambio del poder adquisitivo.\n\n### Ejemplo de referencia\n\nPara mostrar únicamente el efecto de la inflación, el cálculo usa un saldo inicial supuesto de DOP 100, sin aportes y con rendimiento nominal de 0% durante 1 período. El saldo nominal seguiría siendo DOP 100, pero su valor real bajaría a DOP 95.12.\n\nEsto no calcula tu pérdida particular: para hacerlo habría que sustituir el rendimiento supuesto por la tasa efectiva de tu cuenta e incorporar sus cargos. Además, tu inflación personal puede diferir del IPC nacional según en qué gastes el dinero.",
+    "created_at": "2026-09-14T17:13:50.580671Z",
+    "metadata": {
+      "research": {
+        "rows": [
+          {
+            "kind": "percent",
+            "unit": "%",
+            "as_of": "2026-08-31",
+            "label": "inflación interanual",
+            "value": 5.13,
+            "symbol": null,
+            "subject": "República Dominicana",
+            "source_url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/"
+          }
+        ],
+        "peers": [],
+        "shape": "balanced",
+        "usage": {
+          "cost_usd": 0.15305,
+          "latency_ms": 39863,
+          "invocations": 0,
+          "cache_status": "miss"
+        },
+        "sources": [
+          {
+            "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+            "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+            "domain": "laconsultamedica.com.do",
+            "source_date": "2026-09-08"
+          }
+        ],
+        "follow_up": {
+          "subjects": [],
+          "questions": [
+            "¿Cómo calculo la pérdida real con la tasa y los cargos de mi cuenta?",
+            "¿Qué dato debo buscar exactamente en mi estado de cuenta?",
+            "¿Puedes comparar mi tasa de ahorro con la inflación dominicana?"
+          ],
+          "open_thread": {
+            "shape": "balanced",
+            "period_of_interest": null
+          },
+          "comparison_set": [],
+          "schema_version": "argus_research_follow_up/v1",
+          "peer_suggestions": []
+        },
+        "retrieved_at": "2026-09-14T17:13:50.369871+00:00",
+        "anchor_symbols": [],
+        "schema_version": "argus_research/v1",
+        "capability_class": "balanced_lookup"
+      },
+      "next_steps": {
+        "items": [
+          {
+            "text": "¿Cómo calculo la pérdida real con la tasa y los cargos de mi cuenta?",
+            "type": "question"
+          },
+          {
+            "text": "¿Qué dato debo buscar exactamente en mi estado de cuenta?",
+            "type": "question"
+          },
+          {
+            "text": "¿Puedes comparar mi tasa de ahorro con la inflación dominicana?",
+            "type": "question"
+          }
+        ],
+        "version": "argus_next_steps/v1"
+      },
+      "computation": {
+        "kind": "growth_projection",
+        "inputs": {
+          "periods": 1,
+          "sources": {
+            "periods": {
+              "kind": "assumption"
+            },
+            "start_value": {
+              "kind": "assumption"
+            },
+            "contribution": {
+              "kind": "assumption"
+            },
+            "annual_rate_pct": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
+            },
+            "inflation_rate_pct": {
+              "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+              "date": "2026-08-31",
+              "kind": "page",
+              "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica"
+            }
+          },
+          "currency": "DOP",
+          "end_value": null,
+          "start_value": 100,
+          "contribution": 0,
+          "annual_rate_pct": 0,
+          "periods_per_year": 1,
+          "inflation_rate_pct": 5.13
+        }
+      },
+      "conversation_mode": "guide",
+      "tool_result_cards": [
+        {
+          "kind": "tool_result",
+          "call_id": "answer-168ec2a8-7331-4f75-bc2d-8c360014e955",
+          "outcome": {
+            "result": {
+              "notes": [],
+              "growth": 0,
+              "periods": 1,
+              "end_value": 100,
+              "start_value": 100,
+              "solved_field": "end_value",
+              "solved_value": 100,
+              "real_end_value": 95.12032721392562,
+              "annual_rate_pct": 0,
+              "total_contributed": 100,
+              "real_annual_rate_pct": -4.879672786074374
+            },
+            "status": "succeeded",
+            "failure": null
+          },
+          "arguments": {
+            "periods": 1,
+            "sources": {
+              "periods": {
+                "kind": "assumption"
+              },
+              "start_value": {
+                "kind": "assumption"
+              },
+              "contribution": {
+                "kind": "assumption"
+              },
+              "annual_rate_pct": {
+                "kind": "assumption"
+              },
+              "periods_per_year": {
+                "kind": "assumption"
+              },
+              "inflation_rate_pct": {
+                "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                "date": "2026-08-31",
+                "kind": "page",
+                "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica"
+              }
+            },
+            "currency": "DOP",
+            "end_value": null,
+            "start_value": 100,
+            "contribution": 0,
+            "annual_rate_pct": 0,
+            "periods_per_year": 1,
+            "inflation_rate_pct": 5.13
+          },
+          "card_type": "growth_projection",
+          "tool_name": "growth_projection",
+          "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62",
+          "card_version": 1,
+          "presentation": {
+            "rows": [
+              {
+                "name": "total_contributed",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "DOP"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.total_contributed",
+                  "interpolation_args": {}
+                },
+                "value": 100,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              },
+              {
+                "name": "growth",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "DOP"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.growth",
+                  "interpolation_args": {}
+                },
+                "value": 0,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              },
+              {
+                "name": "real_end_value",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "DOP"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.real_end_value",
+                  "interpolation_args": {}
+                },
+                "value": 95.12,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              },
+              {
+                "name": "real_annual_rate_pct",
+                "unit": {
+                  "locale_key": "chat.tools.units.percent",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.real_annual_rate_pct",
+                  "interpolation_args": {}
+                },
+                "value": -4.88,
+                "source": {
+                  "kind": "computed"
+                },
+                "value_text": null
+              }
+            ],
+            "notes": [],
+            "title": {
+              "locale_key": "tools.calc.growth_projection.title",
+              "interpolation_args": {}
+            },
+            "answer": {
+              "name": "end_value",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "DOP"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.end_value",
+                "interpolation_args": {}
+              },
+              "value": 100,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            "inputs": [
+              {
+                "name": "start_value",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "DOP"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.start_value",
+                  "interpolation_args": {}
+                },
+                "value": 100,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "contribution",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "DOP"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.contribution",
+                  "interpolation_args": {}
+                },
+                "value": 0,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "end_value",
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "DOP"
+                  }
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.end_value",
+                  "interpolation_args": {}
+                },
+                "value": null,
+                "source": {
+                  "kind": "computed"
+                },
+                "driving": false,
+                "unknown": true,
+                "editable": false,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "annual_rate_pct",
+                "unit": {
+                  "locale_key": "chat.tools.units.percent",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.annual_rate_pct",
+                  "interpolation_args": {}
+                },
+                "value": 0,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "periods",
+                "unit": {
+                  "locale_key": "tools.calc.units.years",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.periods",
+                  "interpolation_args": {}
+                },
+                "value": 1,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "periods_per_year",
+                "unit": null,
+                "label": {
+                  "locale_key": "tools.calc.fields.periods_per_year",
+                  "interpolation_args": {}
+                },
+                "value": 1,
+                "source": {
+                  "kind": "assumption"
+                },
+                "driving": false,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              },
+              {
+                "name": "inflation_rate_pct",
+                "unit": {
+                  "locale_key": "chat.tools.units.percent",
+                  "interpolation_args": {}
+                },
+                "label": {
+                  "locale_key": "tools.calc.fields.inflation_rate_pct",
+                  "interpolation_args": {}
+                },
+                "value": 5.13,
+                "source": {
+                  "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                  "date": "2026-08-31",
+                  "kind": "page",
+                  "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica"
+                },
+                "driving": true,
+                "unknown": false,
+                "editable": true,
+                "value_text": null,
+                "visibility": "private"
+              }
+            ],
+            "visual": null,
+            "sources": [],
+            "narrative": null
+          },
+          "artifact_state": "active",
+          "input_revision": 0,
+          "schema_version": 1
+        }
+      ],
+      "agent_runtime_turn": {
+        "turn_id": "0febc558-fb17-4e0a-8ce0-274316e54907",
+        "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+        "status": "completed",
+        "terminal": true,
+        "reconciled_outcome": null,
+        "failure_code": null,
+        "retryable": false
+      },
+      "answer_assumptions": [
+        {
+          "name": "contribution",
+          "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62"
+        },
+        {
+          "name": "periods_per_year",
+          "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62"
+        }
+      ],
+      "answer_text_template": {
+        "text": "**Sí, puede estar perdiendo poder de compra aunque el saldo en pesos no disminuya.** Al 2026-08-31, la inflación interanual de República Dominicana fue {{inflation_rate_pct}}; si el rendimiento efectivo de tu cuenta, después de cargos, queda por debajo de esa inflación, tus ahorros compran menos en términos reales.\n\n### Cómo comprobarlo\n\nBusca en tu estado de cuenta o tarifario la **tasa efectiva anual** y los cargos aplicables. Luego compara:\n\n| Situación | Resultado real |\n|---|---|\n| Rendimiento neto superior a la inflación | Aumenta el poder de compra |\n| Rendimiento neto igual a la inflación | Conserva el poder de compra |\n| Rendimiento neto inferior a la inflación | Disminuye el poder de compra |\n\nLa tasa actual de tu cuenta no puede determinarse sin conocer el banco y el producto exacto, porque las condiciones pueden variar por cuenta, saldo y tarifario.\n\n### La fórmula correcta\n\n**Rendimiento real = (1 + rendimiento neto) ÷ (1 + inflación) − 1**\n\nEl rendimiento neto debe reflejar los intereses realmente acreditados y restar los cargos de la cuenta. Comparar las tasas mediante una simple resta sirve como orientación, pero la fórmula anterior mide con mayor precisión el cambio del poder adquisitivo.\n\n### Ejemplo de referencia\n\nPara mostrar únicamente el efecto de la inflación, el cálculo usa un saldo inicial supuesto de {{start_value}}, sin aportes y con rendimiento nominal de {{annual_rate_pct}} durante {{periods}} período. El saldo nominal seguiría siendo {{end_value}}, pero su valor real bajaría a {{real_end_value}}.\n\nEsto no calcula tu pérdida particular: para hacerlo habría que sustituir el rendimiento supuesto por la tasa efectiva de tu cuenta e incorporar sus cargos. Además, tu inflación personal puede diferir del IPC nacional según en qué gastes el dinero.",
+        "cards": {
+          "efecto_inflacion": "bafbb68c-2d1d-421c-81a5-13953b96bc62"
+        },
+        "language": "es-419"
+      },
+      "agent_runtime_stage_outcome": "ready_to_respond",
+      "artifact_presentation_kind": null
+    }
+  },
+  "frames": [
+    {
+      "type": "stage_start",
+      "stage": "interpret"
+    },
+    {
+      "type": "stage_start",
+      "stage": "research_search",
+      "detail": "balanced"
+    },
+    {
+      "type": "stage_outcome",
+      "outcome": "ready_to_respond"
+    },
+    {
+      "type": "token",
+      "content": "**Sí, puede estar perdiendo poder de compra aunque el saldo en pesos no disminuya.** Al 2026-08-31, la inflación interanual de República Dominicana fue 5.13%; si el rendimiento efectivo de tu cuenta, después de cargos, queda por debajo de esa inflación, tus ahorros compran menos en términos reales.\n\n### Cómo comprobarlo\n\nBusca en tu estado de cuenta o tarifario la **tasa efectiva anual** y los cargos aplicables. Luego compara:\n\n| Situación | Resultado real |\n|---|---|\n| Rendimiento neto superior a la inflación | Aumenta el poder de compra |\n| Rendimiento neto igual a la inflación | Conserva el poder de compra |\n| Rendimiento neto inferior a la inflación | Disminuye el poder de compra |\n\nLa tasa actual de tu cuenta no puede determinarse sin conocer el banco y el producto exacto, porque las condiciones pueden variar por cuenta, saldo y tarifario.\n\n### La fórmula correcta\n\n**Rendimiento real = (1 + rendimiento neto) ÷ (1 + inflación) − 1**\n\nEl rendimiento neto debe reflejar los intereses realmente acreditados y restar los cargos de la cuenta. Comparar las tasas mediante una simple resta sirve como orientación, pero la fórmula anterior mide con mayor precisión el cambio del poder adquisitivo.\n\n### Ejemplo de referencia\n\nPara mostrar únicamente el efecto de la inflación, el cálculo usa un saldo inicial supuesto de DOP 100, sin aportes y con rendimiento nominal de 0% durante 1 período. El saldo nominal seguiría siendo DOP 100, pero su valor real bajaría a DOP 95.12.\n\nEsto no calcula tu pérdida particular: para hacerlo habría que sustituir el rendimiento supuesto por la tasa efectiva de tu cuenta e incorporar sus cargos. Además, tu inflación personal puede diferir del IPC nacional según en qué gastes el dinero."
+    },
+    {
+      "type": "final",
+      "payload": {
+        "artifact_references": [
+          {
+            "artifact_kind": "tool_result",
+            "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62",
+            "artifact_status": "active",
+            "metadata": {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "growth_projection",
+              "call_id": "answer-168ec2a8-7331-4f75-bc2d-8c360014e955",
+              "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62",
+              "input_revision": 0,
+              "card_type": "growth_projection",
+              "card_version": 1,
+              "arguments": {
+                "currency": "DOP",
+                "sources": {
+                  "start_value": {
+                    "kind": "assumption"
+                  },
+                  "contribution": {
+                    "kind": "assumption"
+                  },
+                  "annual_rate_pct": {
+                    "kind": "assumption"
+                  },
+                  "periods": {
+                    "kind": "assumption"
+                  },
+                  "periods_per_year": {
+                    "kind": "assumption"
+                  },
+                  "inflation_rate_pct": {
+                    "kind": "page",
+                    "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+                    "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                    "date": "2026-08-31"
+                  }
+                },
+                "start_value": 100,
+                "contribution": 0,
+                "end_value": null,
+                "annual_rate_pct": 0,
+                "periods": 1,
+                "periods_per_year": 1,
+                "inflation_rate_pct": 5.13
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "end_value",
+                  "solved_value": 100,
+                  "start_value": 100,
+                  "end_value": 100,
+                  "annual_rate_pct": 0,
+                  "periods": 1,
+                  "total_contributed": 100,
+                  "growth": 0,
+                  "real_end_value": 95.12032721392562,
+                  "real_annual_rate_pct": -4.879672786074374,
+                  "notes": []
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.growth_projection.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "end_value",
+                  "label": {
+                    "locale_key": "tools.calc.fields.end_value",
+                    "interpolation_args": {}
+                  },
+                  "value": 100,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "total_contributed",
+                    "label": {
+                      "locale_key": "tools.calc.fields.total_contributed",
+                      "interpolation_args": {}
+                    },
+                    "value": 100,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "growth",
+                    "label": {
+                      "locale_key": "tools.calc.fields.growth",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "real_end_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.real_end_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 95.12,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "real_annual_rate_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.real_annual_rate_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": -4.88,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "start_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.start_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 100,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "contribution",
+                    "label": {
+                      "locale_key": "tools.calc.fields.contribution",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "end_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.end_value",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "annual_rate_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.annual_rate_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "periods",
+                    "label": {
+                      "locale_key": "tools.calc.fields.periods",
+                      "interpolation_args": {}
+                    },
+                    "value": 1,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.years",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "periods_per_year",
+                    "label": {
+                      "locale_key": "tools.calc.fields.periods_per_year",
+                      "interpolation_args": {}
+                    },
+                    "value": 1,
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "inflation_rate_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.inflation_rate_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 5.13,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+                      "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                      "date": "2026-08-31"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          }
+        ],
+        "stage_outcome": "ready_to_respond",
+        "assistant_response": "**Sí, puede estar perdiendo poder de compra aunque el saldo en pesos no disminuya.** Al 2026-08-31, la inflación interanual de República Dominicana fue 5.13%; si el rendimiento efectivo de tu cuenta, después de cargos, queda por debajo de esa inflación, tus ahorros compran menos en términos reales.\n\n### Cómo comprobarlo\n\nBusca en tu estado de cuenta o tarifario la **tasa efectiva anual** y los cargos aplicables. Luego compara:\n\n| Situación | Resultado real |\n|---|---|\n| Rendimiento neto superior a la inflación | Aumenta el poder de compra |\n| Rendimiento neto igual a la inflación | Conserva el poder de compra |\n| Rendimiento neto inferior a la inflación | Disminuye el poder de compra |\n\nLa tasa actual de tu cuenta no puede determinarse sin conocer el banco y el producto exacto, porque las condiciones pueden variar por cuenta, saldo y tarifario.\n\n### La fórmula correcta\n\n**Rendimiento real = (1 + rendimiento neto) ÷ (1 + inflación) − 1**\n\nEl rendimiento neto debe reflejar los intereses realmente acreditados y restar los cargos de la cuenta. Comparar las tasas mediante una simple resta sirve como orientación, pero la fórmula anterior mide con mayor precisión el cambio del poder adquisitivo.\n\n### Ejemplo de referencia\n\nPara mostrar únicamente el efecto de la inflación, el cálculo usa un saldo inicial supuesto de DOP 100, sin aportes y con rendimiento nominal de 0% durante 1 período. El saldo nominal seguiría siendo DOP 100, pero su valor real bajaría a DOP 95.12.\n\nEsto no calcula tu pérdida particular: para hacerlo habría que sustituir el rendimiento supuesto por la tasa efectiva de tu cuenta e incorporar sus cargos. Además, tu inflación personal puede diferir del IPC nacional según en qué gastes el dinero.",
+        "next_steps": {
+          "version": "argus_next_steps/v1",
+          "items": [
+            {
+              "type": "question",
+              "text": "¿Cómo calculo la pérdida real con la tasa y los cargos de mi cuenta?"
+            },
+            {
+              "type": "question",
+              "text": "¿Qué dato debo buscar exactamente en mi estado de cuenta?"
+            },
+            {
+              "type": "question",
+              "text": "¿Puedes comparar mi tasa de ahorro con la inflación dominicana?"
+            }
+          ]
+        },
+        "answer_text_template": {
+          "cards": {
+            "efecto_inflacion": "bafbb68c-2d1d-421c-81a5-13953b96bc62"
+          },
+          "text": "**Sí, puede estar perdiendo poder de compra aunque el saldo en pesos no disminuya.** Al 2026-08-31, la inflación interanual de República Dominicana fue {{inflation_rate_pct}}; si el rendimiento efectivo de tu cuenta, después de cargos, queda por debajo de esa inflación, tus ahorros compran menos en términos reales.\n\n### Cómo comprobarlo\n\nBusca en tu estado de cuenta o tarifario la **tasa efectiva anual** y los cargos aplicables. Luego compara:\n\n| Situación | Resultado real |\n|---|---|\n| Rendimiento neto superior a la inflación | Aumenta el poder de compra |\n| Rendimiento neto igual a la inflación | Conserva el poder de compra |\n| Rendimiento neto inferior a la inflación | Disminuye el poder de compra |\n\nLa tasa actual de tu cuenta no puede determinarse sin conocer el banco y el producto exacto, porque las condiciones pueden variar por cuenta, saldo y tarifario.\n\n### La fórmula correcta\n\n**Rendimiento real = (1 + rendimiento neto) ÷ (1 + inflación) − 1**\n\nEl rendimiento neto debe reflejar los intereses realmente acreditados y restar los cargos de la cuenta. Comparar las tasas mediante una simple resta sirve como orientación, pero la fórmula anterior mide con mayor precisión el cambio del poder adquisitivo.\n\n### Ejemplo de referencia\n\nPara mostrar únicamente el efecto de la inflación, el cálculo usa un saldo inicial supuesto de {{start_value}}, sin aportes y con rendimiento nominal de {{annual_rate_pct}} durante {{periods}} período. El saldo nominal seguiría siendo {{end_value}}, pero su valor real bajaría a {{real_end_value}}.\n\nEsto no calcula tu pérdida particular: para hacerlo habría que sustituir el rendimiento supuesto por la tasa efectiva de tu cuenta e incorporar sus cargos. Además, tu inflación personal puede diferir del IPC nacional según en qué gastes el dinero.",
+          "language": "es-419"
+        },
+        "answer_assumptions": [
+          {
+            "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62",
+            "name": "contribution"
+          },
+          {
+            "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62",
+            "name": "periods_per_year"
+          }
+        ],
+        "research": {
+          "schema_version": "argus_research/v1",
+          "capability_class": "balanced_lookup",
+          "shape": "balanced",
+          "sources": [
+            {
+              "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+              "domain": "laconsultamedica.com.do",
+              "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+              "source_date": "2026-09-08"
+            }
+          ],
+          "rows": [
+            {
+              "subject": "República Dominicana",
+              "symbol": null,
+              "label": "inflación interanual",
+              "value": 5.13,
+              "kind": "percent",
+              "unit": "%",
+              "as_of": "2026-08-31",
+              "source_url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/"
+            }
+          ],
+          "retrieved_at": "2026-09-14T17:13:50.369871+00:00",
+          "anchor_symbols": [],
+          "peers": [],
+          "usage": {
+            "invocations": 0,
+            "latency_ms": 39863,
+            "cost_usd": 0.15305,
+            "cache_status": "miss"
+          },
+          "follow_up": {
+            "schema_version": "argus_research_follow_up/v1",
+            "subjects": [],
+            "comparison_set": [],
+            "peer_suggestions": [],
+            "open_thread": {
+              "shape": "balanced",
+              "period_of_interest": null
+            },
+            "questions": [
+              "¿Cómo calculo la pérdida real con la tasa y los cargos de mi cuenta?",
+              "¿Qué dato debo buscar exactamente en mi estado de cuenta?",
+              "¿Puedes comparar mi tasa de ahorro con la inflación dominicana?"
+            ]
+          }
+        },
+        "final_response_payload": {
+          "tool_result_cards": [
+            {
+              "kind": "tool_result",
+              "schema_version": 1,
+              "tool_name": "growth_projection",
+              "call_id": "answer-168ec2a8-7331-4f75-bc2d-8c360014e955",
+              "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62",
+              "input_revision": 0,
+              "card_type": "growth_projection",
+              "card_version": 1,
+              "arguments": {
+                "currency": "DOP",
+                "sources": {
+                  "start_value": {
+                    "kind": "assumption"
+                  },
+                  "contribution": {
+                    "kind": "assumption"
+                  },
+                  "annual_rate_pct": {
+                    "kind": "assumption"
+                  },
+                  "periods": {
+                    "kind": "assumption"
+                  },
+                  "periods_per_year": {
+                    "kind": "assumption"
+                  },
+                  "inflation_rate_pct": {
+                    "kind": "page",
+                    "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+                    "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                    "date": "2026-08-31"
+                  }
+                },
+                "start_value": 100,
+                "contribution": 0,
+                "end_value": null,
+                "annual_rate_pct": 0,
+                "periods": 1,
+                "periods_per_year": 1,
+                "inflation_rate_pct": 5.13
+              },
+              "outcome": {
+                "status": "succeeded",
+                "result": {
+                  "solved_field": "end_value",
+                  "solved_value": 100,
+                  "start_value": 100,
+                  "end_value": 100,
+                  "annual_rate_pct": 0,
+                  "periods": 1,
+                  "total_contributed": 100,
+                  "growth": 0,
+                  "real_end_value": 95.12032721392562,
+                  "real_annual_rate_pct": -4.879672786074374,
+                  "notes": []
+                },
+                "failure": null
+              },
+              "presentation": {
+                "title": {
+                  "locale_key": "tools.calc.growth_projection.title",
+                  "interpolation_args": {}
+                },
+                "answer": {
+                  "name": "end_value",
+                  "label": {
+                    "locale_key": "tools.calc.fields.end_value",
+                    "interpolation_args": {}
+                  },
+                  "value": 100,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                "narrative": null,
+                "sources": [],
+                "visual": null,
+                "rows": [
+                  {
+                    "name": "total_contributed",
+                    "label": {
+                      "locale_key": "tools.calc.fields.total_contributed",
+                      "interpolation_args": {}
+                    },
+                    "value": 100,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "growth",
+                    "label": {
+                      "locale_key": "tools.calc.fields.growth",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "real_end_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.real_end_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 95.12,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  },
+                  {
+                    "name": "real_annual_rate_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.real_annual_rate_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": -4.88,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "computed"
+                    }
+                  }
+                ],
+                "inputs": [
+                  {
+                    "name": "start_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.start_value",
+                      "interpolation_args": {}
+                    },
+                    "value": 100,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "contribution",
+                    "label": {
+                      "locale_key": "tools.calc.fields.contribution",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "end_value",
+                    "label": {
+                      "locale_key": "tools.calc.fields.end_value",
+                      "interpolation_args": {}
+                    },
+                    "value": null,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.currency",
+                      "interpolation_args": {
+                        "code": "DOP"
+                      }
+                    },
+                    "source": {
+                      "kind": "computed"
+                    },
+                    "editable": false,
+                    "unknown": true,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "annual_rate_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.annual_rate_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 0,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "periods",
+                    "label": {
+                      "locale_key": "tools.calc.fields.periods",
+                      "interpolation_args": {}
+                    },
+                    "value": 1,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "tools.calc.units.years",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "periods_per_year",
+                    "label": {
+                      "locale_key": "tools.calc.fields.periods_per_year",
+                      "interpolation_args": {}
+                    },
+                    "value": 1,
+                    "value_text": null,
+                    "unit": null,
+                    "source": {
+                      "kind": "assumption"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": false,
+                    "visibility": "private"
+                  },
+                  {
+                    "name": "inflation_rate_pct",
+                    "label": {
+                      "locale_key": "tools.calc.fields.inflation_rate_pct",
+                      "interpolation_args": {}
+                    },
+                    "value": 5.13,
+                    "value_text": null,
+                    "unit": {
+                      "locale_key": "chat.tools.units.percent",
+                      "interpolation_args": {}
+                    },
+                    "source": {
+                      "kind": "page",
+                      "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+                      "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                      "date": "2026-08-31"
+                    },
+                    "editable": true,
+                    "unknown": false,
+                    "driving": true,
+                    "visibility": "private"
+                  }
+                ],
+                "notes": []
+              },
+              "artifact_state": "active"
+            }
+          ],
+          "code": null,
+          "result": null,
+          "backtest_job": null,
+          "error": null,
+          "summary": null,
+          "result_card": null,
+          "explanation_context": null
+        },
+        "tool_result_cards": [
+          {
+            "kind": "tool_result",
+            "schema_version": 1,
+            "tool_name": "growth_projection",
+            "call_id": "answer-168ec2a8-7331-4f75-bc2d-8c360014e955",
+            "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62",
+            "input_revision": 0,
+            "card_type": "growth_projection",
+            "card_version": 1,
+            "arguments": {
+              "currency": "DOP",
+              "sources": {
+                "start_value": {
+                  "kind": "assumption"
+                },
+                "contribution": {
+                  "kind": "assumption"
+                },
+                "annual_rate_pct": {
+                  "kind": "assumption"
+                },
+                "periods": {
+                  "kind": "assumption"
+                },
+                "periods_per_year": {
+                  "kind": "assumption"
+                },
+                "inflation_rate_pct": {
+                  "kind": "page",
+                  "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+                  "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                  "date": "2026-08-31"
+                }
+              },
+              "start_value": 100,
+              "contribution": 0,
+              "end_value": null,
+              "annual_rate_pct": 0,
+              "periods": 1,
+              "periods_per_year": 1,
+              "inflation_rate_pct": 5.13
+            },
+            "outcome": {
+              "status": "succeeded",
+              "result": {
+                "solved_field": "end_value",
+                "solved_value": 100,
+                "start_value": 100,
+                "end_value": 100,
+                "annual_rate_pct": 0,
+                "periods": 1,
+                "total_contributed": 100,
+                "growth": 0,
+                "real_end_value": 95.12032721392562,
+                "real_annual_rate_pct": -4.879672786074374,
+                "notes": []
+              },
+              "failure": null
+            },
+            "presentation": {
+              "title": {
+                "locale_key": "tools.calc.growth_projection.title",
+                "interpolation_args": {}
+              },
+              "answer": {
+                "name": "end_value",
+                "label": {
+                  "locale_key": "tools.calc.fields.end_value",
+                  "interpolation_args": {}
+                },
+                "value": 100,
+                "value_text": null,
+                "unit": {
+                  "locale_key": "tools.calc.units.currency",
+                  "interpolation_args": {
+                    "code": "DOP"
+                  }
+                },
+                "source": {
+                  "kind": "computed"
+                }
+              },
+              "narrative": null,
+              "sources": [],
+              "visual": null,
+              "rows": [
+                {
+                  "name": "total_contributed",
+                  "label": {
+                    "locale_key": "tools.calc.fields.total_contributed",
+                    "interpolation_args": {}
+                  },
+                  "value": 100,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "growth",
+                  "label": {
+                    "locale_key": "tools.calc.fields.growth",
+                    "interpolation_args": {}
+                  },
+                  "value": 0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "real_end_value",
+                  "label": {
+                    "locale_key": "tools.calc.fields.real_end_value",
+                    "interpolation_args": {}
+                  },
+                  "value": 95.12,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                },
+                {
+                  "name": "real_annual_rate_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.real_annual_rate_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": -4.88,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "computed"
+                  }
+                }
+              ],
+              "inputs": [
+                {
+                  "name": "start_value",
+                  "label": {
+                    "locale_key": "tools.calc.fields.start_value",
+                    "interpolation_args": {}
+                  },
+                  "value": 100,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "contribution",
+                  "label": {
+                    "locale_key": "tools.calc.fields.contribution",
+                    "interpolation_args": {}
+                  },
+                  "value": 0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "end_value",
+                  "label": {
+                    "locale_key": "tools.calc.fields.end_value",
+                    "interpolation_args": {}
+                  },
+                  "value": null,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.currency",
+                    "interpolation_args": {
+                      "code": "DOP"
+                    }
+                  },
+                  "source": {
+                    "kind": "computed"
+                  },
+                  "editable": false,
+                  "unknown": true,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "annual_rate_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.annual_rate_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 0,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "periods",
+                  "label": {
+                    "locale_key": "tools.calc.fields.periods",
+                    "interpolation_args": {}
+                  },
+                  "value": 1,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "tools.calc.units.years",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                },
+                {
+                  "name": "periods_per_year",
+                  "label": {
+                    "locale_key": "tools.calc.fields.periods_per_year",
+                    "interpolation_args": {}
+                  },
+                  "value": 1,
+                  "value_text": null,
+                  "unit": null,
+                  "source": {
+                    "kind": "assumption"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": false,
+                  "visibility": "private"
+                },
+                {
+                  "name": "inflation_rate_pct",
+                  "label": {
+                    "locale_key": "tools.calc.fields.inflation_rate_pct",
+                    "interpolation_args": {}
+                  },
+                  "value": 5.13,
+                  "value_text": null,
+                  "unit": {
+                    "locale_key": "chat.tools.units.percent",
+                    "interpolation_args": {}
+                  },
+                  "source": {
+                    "kind": "page",
+                    "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+                    "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                    "date": "2026-08-31"
+                  },
+                  "editable": true,
+                  "unknown": false,
+                  "driving": true,
+                  "visibility": "private"
+                }
+              ],
+              "notes": []
+            },
+            "artifact_state": "active"
+          }
+        ],
+        "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+        "chat_action": null,
+        "artifact_presentation_kind": null
+      }
+    }
+  ],
+  "http_status": 200,
+  "done": true,
+  "elapsed_seconds": 84.489,
+  "screenshot": {
+    "file": "screenshots/registered-q8-es-419.png",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "rendered_text": "Sí, puede estar perdiendo poder de compra aunque el saldo en pesos no disminuya. Al 2026-08-31, la inflación interanual de República Dominicana fue 5.13%; si el rendimiento efectivo de tu cuenta, después de cargos, queda por debajo de esa inflación, tus ahorros compran menos en términos reales.\n\nCómo comprobarlo\n\nBusca en tu estado de cuenta o tarifario la tasa efectiva anual y los cargos aplicables. Luego compara:\n\nSITUACIÓN\tRESULTADO REAL\nRendimiento neto superior a la inflación\tAumenta el poder de compra\nRendimiento neto igual a la inflación\tConserva el poder de compra\nRendimiento neto inferior a la inflación\tDisminuye el poder de compra\n\nLa tasa actual de tu cuenta no puede determinarse sin conocer el banco y el producto exacto, porque las condiciones pueden variar por cuenta, saldo y tarifario.\n\nLa fórmula correcta\n\nRendimiento real = (1 + rendimiento neto) ÷ (1 + inflación) − 1\n\nEl rendimiento neto debe reflejar los intereses realmente acreditados y restar los cargos de la cuenta. Comparar las tasas mediante una simple resta sirve como orientación, pero la fórmula anterior mide con mayor precisión el cambio del poder adquisitivo.\n\nEjemplo de referencia\n\nPara mostrar únicamente el efecto de la inflación, el cálculo usa un saldo inicial supuesto de DOP 100, sin aportes y con rendimiento nominal de 0% durante 1 período. El saldo nominal seguiría siendo DOP 100, pero su valor real bajaría a DOP 95.12.\n\nEsto no calcula tu pérdida particular: para hacerlo habría que sustituir el rendimiento supuesto por la tasa efectiva de tu cuenta e incorporar sus cargos. Además, tu inflación personal puede diferir del IPC nacional según en qué gastes el dinero.\n\nSupuestos de este cálculo: aporte por período DOP 0.00 y períodos por año 1.\n\nDOP 100.00\nValor final\nVer los números\nAgregar decisión\nComparar con otro resultado\nContinuar en un chat nuevo\n1 fuente ›\nQUÉ PROBAR DESPUÉS\n↳\n¿Cómo calculo la pérdida real con la tasa y los cargos de mi cuenta?\n↳\n¿Qué dato debo buscar exactamente en mi estado de cuenta?\n↳\n¿Puedes comparar mi tasa de ahorro con la inflación dominicana?"
+  },
+  "page_errors": [],
+  "stored_route_receipts": [
+    {
+      "id": "326645fe-616f-4787-a595-9ed3090f9989",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "run_id": null,
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "task": "asset_mention_preflight",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMAssetMentionExtraction",
+      "latency_ms": 11235,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 805,
+        "cached_tokens": 768,
+        "prompt_tokens": 788,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 82.449,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "b2c99a73147521937f86368915a1d804f989fbf50addab46edd7ca5c53ccc38d",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:12:39.409683+00:00"
+    },
+    {
+      "id": "1b316038-1b3a-4c16-b59c-4e647cb7504e",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "run_id": null,
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "task": "interpretation",
+      "tier": "structured",
+      "model": "x-ai/grok-4.3",
+      "fallback_model": "anthropic/claude-haiku-4.5",
+      "mode": "json_schema",
+      "schema_name": "LLMInterpretationResponse",
+      "latency_ms": 16000,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 11777,
+        "cached_tokens": 192,
+        "prompt_tokens": 10771,
+        "completion_tokens": 1006,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "source": "api_turn",
+        "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+        "stage_outcome": "ready_to_respond",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 82.449,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "b2c99a73147521937f86368915a1d804f989fbf50addab46edd7ca5c53ccc38d",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide"
+      },
+      "created_at": "2026-09-14 17:12:55.410859+00:00"
+    },
+    {
+      "id": "2f26821e-4bfe-49ff-b6f5-4ddb7e8c46a8",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "run_id": null,
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 796,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 295,
+        "cached_tokens": 0,
+        "prompt_tokens": 277,
+        "completion_tokens": 18,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:13:51.438587+00:00"
+    },
+    {
+      "id": "ea477d86-bf16-45b7-8942-6bca71c933c3",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "run_id": null,
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "task": "name_suggestion",
+      "tier": "utility",
+      "model": "google/gemini-2.5-flash-lite",
+      "fallback_model": "qwen/qwen3.5-9b",
+      "mode": "json_schema",
+      "schema_name": "name_suggestion",
+      "latency_ms": 1231,
+      "outcome": "succeeded",
+      "failure_mode": null,
+      "fallback_used": false,
+      "token_usage": {
+        "total_tokens": 321,
+        "cached_tokens": 0,
+        "prompt_tokens": 310,
+        "completion_tokens": 11,
+        "cache_write_tokens": 0
+      },
+      "context_packet_ids": [],
+      "metadata": {
+        "runtime_artifact": "conversation_title"
+      },
+      "created_at": "2026-09-14 17:13:52.670553+00:00"
+    }
+  ],
+  "stored_cost_ledger": [
+    {
+      "id": "e0a5d6b7-fa28-451a-87a4-760d2f279899",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "asset_mention_preflight",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "326645fe-616f-4787-a595-9ed3090f9989",
+      "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+      "correlation_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e:2c402986-f873-4905-8d5f-e9479a959e30:f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 805,
+        "cached_tokens": 768,
+        "prompt_tokens": 788,
+        "usage_cost_usd": 0.0002211,
+        "completion_tokens": 17,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 788,
+      "output_tokens": 17,
+      "total_tokens": 805,
+      "billable_unit": "token",
+      "billable_quantity": "805.000000",
+      "cost_amount": "0.00022110",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 11235,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+        "schema_name": "LLMAssetMentionExtraction",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 82.449,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "b2c99a73147521937f86368915a1d804f989fbf50addab46edd7ca5c53ccc38d",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:12:39.409683+00:00",
+      "created_at": "2026-09-14 17:13:50.607664+00:00"
+    },
+    {
+      "id": "bfd9a184-6136-4564-b0f7-f689acdb6435",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "x-ai/grok-4.3",
+      "feature_area": "chat_runtime",
+      "task": "interpretation",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "1b316038-1b3a-4c16-b59c-4e647cb7504e",
+      "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+      "correlation_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e:2c402986-f873-4905-8d5f-e9479a959e30:f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 11777,
+        "cached_tokens": 192,
+        "prompt_tokens": 10771,
+        "usage_cost_usd": 0.01577715,
+        "completion_tokens": 1006,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 10771,
+      "output_tokens": 1006,
+      "total_tokens": 11777,
+      "billable_unit": "token",
+      "billable_quantity": "11777.000000",
+      "cost_amount": "0.01577715",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 16000,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "structured",
+        "source": "api_turn",
+        "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+        "schema_name": "LLMInterpretationResponse",
+        "failure_mode": null,
+        "fallback_used": false,
+        "stage_outcome": "ready_to_respond",
+        "fallback_model": "anthropic/claude-haiku-4.5",
+        "turn_execution": {
+          "terminal": "advanced",
+          "call_allowance": 7,
+          "calls_reserved": 2,
+          "elapsed_seconds": 82.449,
+          "terminal_reason": "runtime_final",
+          "deadline_seconds": 180.0,
+          "progress_outcome": "advanced",
+          "routing_reserved": false,
+          "input_fingerprint": null,
+          "provider_outcomes": {
+            "failed": 0,
+            "skipped": 0,
+            "succeeded": 2
+          },
+          "deadline_exhausted": false,
+          "output_fingerprint": "b2c99a73147521937f86368915a1d804f989fbf50addab46edd7ca5c53ccc38d",
+          "provider_receipt_count": 2,
+          "call_allowance_exhausted": false,
+          "last_resort_repair_grant_used": 0,
+          "last_resort_repair_calls_granted": 0
+        },
+        "conversation_mode": "guide",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:12:55.410859+00:00",
+      "created_at": "2026-09-14 17:13:50.617991+00:00"
+    },
+    {
+      "id": "66d67d25-c919-449e-a1c2-6f42cf9d8d50",
+      "source": "research",
+      "service": "perplexity_agent",
+      "provider": "perplexity_agent",
+      "model": null,
+      "feature_area": "research_rail",
+      "task": "balanced_lookup",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": null,
+      "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+      "correlation_id": "research:05bb9b89-c419-4bd7-99b7-4aa0ee87a29e",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "shape": "balanced",
+        "invocations": 0,
+        "cache_status": "miss",
+        "capability_class": "balanced_lookup"
+      },
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "billable_unit": "request",
+      "billable_quantity": "1.000000",
+      "cost_amount": "0.15305000",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 39863,
+      "status": null,
+      "metadata": {
+        "research_ledger_contract": "argus_research_ledger/v2"
+      },
+      "occurred_at": "2026-09-14 17:13:50.594623+00:00",
+      "created_at": "2026-09-14 17:13:50.595785+00:00"
+    },
+    {
+      "id": "c237a2a7-7bdd-47d8-b712-7448ff817593",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "2f26821e-4bfe-49ff-b6f5-4ddb7e8c46a8",
+      "request_id": null,
+      "correlation_id": "api_turn:2c402986-f873-4905-8d5f-e9479a959e30:f1b29ae0-eb94-49f0-a8f1-7309c76a17c3:2f26821e-4bfe-49ff-b6f5-4ddb7e8c46a8",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 295,
+        "cached_tokens": 0,
+        "prompt_tokens": 277,
+        "usage_cost_usd": 3.49e-05,
+        "completion_tokens": 18,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 277,
+      "output_tokens": 18,
+      "total_tokens": 295,
+      "billable_unit": "token",
+      "billable_quantity": "295.000000",
+      "cost_amount": "0.00003490",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 796,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:13:51.438587+00:00",
+      "created_at": "2026-09-14 17:13:52.684940+00:00"
+    },
+    {
+      "id": "5bf5f84a-aeec-4e44-9848-84bb4fad70ee",
+      "source": "api_turn",
+      "service": "openrouter",
+      "provider": "openrouter",
+      "model": "google/gemini-2.5-flash-lite",
+      "feature_area": "chat_runtime",
+      "task": "name_suggestion",
+      "user_id": "ae3f067f-1080-4c99-97ad-6f5db423607f",
+      "conversation_id": "2c402986-f873-4905-8d5f-e9479a959e30",
+      "message_id": "f1b29ae0-eb94-49f0-a8f1-7309c76a17c3",
+      "backtest_run_id": null,
+      "backtest_job_id": null,
+      "route_receipt_id": "ea477d86-bf16-45b7-8942-6bca71c933c3",
+      "request_id": null,
+      "correlation_id": "api_turn:2c402986-f873-4905-8d5f-e9479a959e30:f1b29ae0-eb94-49f0-a8f1-7309c76a17c3:ea477d86-bf16-45b7-8942-6bca71c933c3",
+      "provider_request_id": null,
+      "upstream_id": null,
+      "usage_metadata": {
+        "total_tokens": 321,
+        "cached_tokens": 0,
+        "prompt_tokens": 310,
+        "usage_cost_usd": 3.54e-05,
+        "completion_tokens": 11,
+        "cache_write_tokens": 0
+      },
+      "input_tokens": 310,
+      "output_tokens": 11,
+      "total_tokens": 321,
+      "billable_unit": "token",
+      "billable_quantity": "321.000000",
+      "cost_amount": "0.00003540",
+      "cost_currency": "USD",
+      "cost_source": "provider_reported",
+      "latency_ms": 1231,
+      "status": "succeeded",
+      "metadata": {
+        "mode": "json_schema",
+        "tier": "utility",
+        "schema_name": "name_suggestion",
+        "failure_mode": null,
+        "fallback_used": false,
+        "fallback_model": "qwen/qwen3.5-9b",
+        "runtime_artifact": "conversation_title",
+        "context_packet_count": 0
+      },
+      "occurred_at": "2026-09-14 17:13:52.670553+00:00",
+      "created_at": "2026-09-14 17:13:52.690374+00:00"
+    }
+  ],
+  "conversation_route_receipt_count": 17,
+  "stored_failure_metadata": {
+    "research": {
+      "rows": [
+        {
+          "kind": "percent",
+          "unit": "%",
+          "as_of": "2026-08-31",
+          "label": "inflación interanual",
+          "value": 5.13,
+          "symbol": null,
+          "subject": "República Dominicana",
+          "source_url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/"
+        }
+      ],
+      "peers": [],
+      "shape": "balanced",
+      "usage": {
+        "cost_usd": 0.15305,
+        "latency_ms": 39863,
+        "invocations": 0,
+        "cache_status": "miss"
+      },
+      "sources": [
+        {
+          "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+          "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica",
+          "domain": "laconsultamedica.com.do",
+          "source_date": "2026-09-08"
+        }
+      ],
+      "follow_up": {
+        "subjects": [],
+        "questions": [
+          "¿Cómo calculo la pérdida real con la tasa y los cargos de mi cuenta?",
+          "¿Qué dato debo buscar exactamente en mi estado de cuenta?",
+          "¿Puedes comparar mi tasa de ahorro con la inflación dominicana?"
+        ],
+        "open_thread": {
+          "shape": "balanced",
+          "period_of_interest": null
+        },
+        "comparison_set": [],
+        "schema_version": "argus_research_follow_up/v1",
+        "peer_suggestions": []
+      },
+      "retrieved_at": "2026-09-14T17:13:50.369871+00:00",
+      "anchor_symbols": [],
+      "schema_version": "argus_research/v1",
+      "capability_class": "balanced_lookup"
+    },
+    "tool_result_cards": [
+      {
+        "kind": "tool_result",
+        "call_id": "answer-168ec2a8-7331-4f75-bc2d-8c360014e955",
+        "outcome": {
+          "result": {
+            "notes": [],
+            "growth": 0.0,
+            "periods": 1.0,
+            "end_value": 100.0,
+            "start_value": 100.0,
+            "solved_field": "end_value",
+            "solved_value": 100.0,
+            "real_end_value": 95.12032721392562,
+            "annual_rate_pct": 0.0,
+            "total_contributed": 100.0,
+            "real_annual_rate_pct": -4.879672786074374
+          },
+          "status": "succeeded",
+          "failure": null
+        },
+        "arguments": {
+          "periods": 1,
+          "sources": {
+            "periods": {
+              "kind": "assumption"
+            },
+            "start_value": {
+              "kind": "assumption"
+            },
+            "contribution": {
+              "kind": "assumption"
+            },
+            "annual_rate_pct": {
+              "kind": "assumption"
+            },
+            "periods_per_year": {
+              "kind": "assumption"
+            },
+            "inflation_rate_pct": {
+              "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+              "date": "2026-08-31",
+              "kind": "page",
+              "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica"
+            }
+          },
+          "currency": "DOP",
+          "end_value": null,
+          "start_value": 100.0,
+          "contribution": 0.0,
+          "annual_rate_pct": 0.0,
+          "periods_per_year": 1,
+          "inflation_rate_pct": 5.13
+        },
+        "card_type": "growth_projection",
+        "tool_name": "growth_projection",
+        "artifact_id": "bafbb68c-2d1d-421c-81a5-13953b96bc62",
+        "card_version": 1,
+        "presentation": {
+          "rows": [
+            {
+              "name": "total_contributed",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "DOP"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.total_contributed",
+                "interpolation_args": {}
+              },
+              "value": 100.0,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            {
+              "name": "growth",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "DOP"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.growth",
+                "interpolation_args": {}
+              },
+              "value": 0.0,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            {
+              "name": "real_end_value",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "DOP"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.real_end_value",
+                "interpolation_args": {}
+              },
+              "value": 95.12,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            },
+            {
+              "name": "real_annual_rate_pct",
+              "unit": {
+                "locale_key": "chat.tools.units.percent",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.real_annual_rate_pct",
+                "interpolation_args": {}
+              },
+              "value": -4.88,
+              "source": {
+                "kind": "computed"
+              },
+              "value_text": null
+            }
+          ],
+          "notes": [],
+          "title": {
+            "locale_key": "tools.calc.growth_projection.title",
+            "interpolation_args": {}
+          },
+          "answer": {
+            "name": "end_value",
+            "unit": {
+              "locale_key": "tools.calc.units.currency",
+              "interpolation_args": {
+                "code": "DOP"
+              }
+            },
+            "label": {
+              "locale_key": "tools.calc.fields.end_value",
+              "interpolation_args": {}
+            },
+            "value": 100.0,
+            "source": {
+              "kind": "computed"
+            },
+            "value_text": null
+          },
+          "inputs": [
+            {
+              "name": "start_value",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "DOP"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.start_value",
+                "interpolation_args": {}
+              },
+              "value": 100.0,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "contribution",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "DOP"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.contribution",
+                "interpolation_args": {}
+              },
+              "value": 0.0,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "end_value",
+              "unit": {
+                "locale_key": "tools.calc.units.currency",
+                "interpolation_args": {
+                  "code": "DOP"
+                }
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.end_value",
+                "interpolation_args": {}
+              },
+              "value": null,
+              "source": {
+                "kind": "computed"
+              },
+              "driving": false,
+              "unknown": true,
+              "editable": false,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "annual_rate_pct",
+              "unit": {
+                "locale_key": "chat.tools.units.percent",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.annual_rate_pct",
+                "interpolation_args": {}
+              },
+              "value": 0.0,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "periods",
+              "unit": {
+                "locale_key": "tools.calc.units.years",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.periods",
+                "interpolation_args": {}
+              },
+              "value": 1,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "periods_per_year",
+              "unit": null,
+              "label": {
+                "locale_key": "tools.calc.fields.periods_per_year",
+                "interpolation_args": {}
+              },
+              "value": 1,
+              "source": {
+                "kind": "assumption"
+              },
+              "driving": false,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            },
+            {
+              "name": "inflation_rate_pct",
+              "unit": {
+                "locale_key": "chat.tools.units.percent",
+                "interpolation_args": {}
+              },
+              "label": {
+                "locale_key": "tools.calc.fields.inflation_rate_pct",
+                "interpolation_args": {}
+              },
+              "value": 5.13,
+              "source": {
+                "url": "https://laconsultamedica.com.do/bcrd-informa-que-la-variacion-del-ipc-en-agosto-2026-fue-de-0-38/",
+                "date": "2026-08-31",
+                "kind": "page",
+                "title": "BCRD informa que la variación del IPC en agosto 2026 fue de 0.38 % - La Consulta Medica"
+              },
+              "driving": true,
+              "unknown": false,
+              "editable": true,
+              "value_text": null,
+              "visibility": "private"
+            }
+          ],
+          "visual": null,
+          "sources": [],
+          "narrative": null
+        },
+        "artifact_state": "active",
+        "input_revision": 0,
+        "schema_version": 1
+      }
+    ],
+    "agent_runtime_turn": {
+      "status": "completed",
+      "turn_id": "0febc558-fb17-4e0a-8ce0-274316e54907",
+      "terminal": true,
+      "request_id": "05bb9b89-c419-4bd7-99b7-4aa0ee87a29e"
+    },
+    "agent_runtime_stage_outcome": "ready_to_respond"
+  }
+}

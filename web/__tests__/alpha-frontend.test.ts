@@ -32,7 +32,7 @@ async function renderConfirmationMessage(kind?: string, active = true) {
       confirmation_id: "confirmation-1",
       confirmation_state: active ? "active" : "superseded",
       title: "AAPL", status: active ? "ready_to_run" : "updated",
-      statusLabel: active ? "Ready to run" : "Updated", summary: "Review this test.",
+      statusLabel: active ? "Ready to run" : "Updated",
       rows: [{ key: "assets", label: "Assets", value: "AAPL" }],
       actions: [{ id: "run-backtest", type: "run_backtest", label: "Run backtest",
         payload: { confirmation_id: "confirmation-1" } }],
@@ -615,7 +615,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chart).not.toContain("attributionLogo: false");
     expect(chart).toContain('data-testid="result-equity-chart-attribution"');
     expect(chart).toContain("RESULT_CHART_ATTRIBUTION_URL");
-    expect(chart).toContain("https://www.tradingview.com/");
+    expect(chart).toContain('from "@/lib/chart-attribution"');
     const launchAttributionDebt =
       "TO" +
       "DO(launch): Provide correct TradingView attribution before launch.";
@@ -1350,7 +1350,7 @@ describe("Argus Alpha frontend contract", () => {
       "await navigateConversationTranscript(activeConversationId, userId, {",
     );
     expect(chat).toContain(
-      "loadAllConversationMessagePages(\n          targetConversationId,",
+      "loadSavedConversationTranscript(targetConversationId)",
     );
     expect(chat).toContain(
       "const routeState = readActiveConversationRouteState();",
@@ -1506,7 +1506,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
     expect(chat).toContain(
-      "loadAllConversationMessagePages(\n          targetConversationId,",
+      "loadSavedConversationTranscript(targetConversationId)",
     );
     expect(chat).toContain("data-message-id={msg.id}");
     expect(chat).toContain("useTranscriptTurnAnchor({");
@@ -1523,7 +1523,7 @@ describe("Argus Alpha frontend contract", () => {
       "{ anchorMessageId: requestedMessageId }",
     );
     expect(anchoredNavigation).toContain(
-      "loadAllConversationMessagePages(\n          targetConversationId,\n        )",
+      "loadSavedConversationTranscript(targetConversationId)",
     );
     expect(anchoredNavigation).toContain(
       "isCurrentAnchoredConversationRequest({",
@@ -2634,10 +2634,10 @@ describe("Argus Alpha frontend contract", () => {
     );
 
     expect(terms).toContain('kind="terms"');
-    expect(terms).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
+    expect(terms).toContain('from "@/lib/support-email"');
     expect(terms).not.toContain("TODO");
     expect(privacy).toContain('kind="privacy"');
-    expect(privacy).toContain("NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL");
+    expect(privacy).toContain('from "@/lib/support-email"');
     expect(privacy).not.toContain("TODO");
 
     expect(legalPage).toContain('"use client"');

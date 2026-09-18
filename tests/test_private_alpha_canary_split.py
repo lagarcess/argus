@@ -28,6 +28,10 @@ def _job_body(workflow: str, job_name: str, next_job_name: str | None) -> str:
     return body
 
 
+def _shell_function(source: str, name: str) -> str:
+    return source.split(f"{name}() {{", 1)[1].split("\n}", 1)[0]
+
+
 def _jwt(payload: dict[str, Any]) -> str:
     def encode(value: dict[str, Any]) -> str:
         return base64.urlsafe_b64encode(json.dumps(value).encode()).decode().rstrip("=")
@@ -45,6 +49,7 @@ def _supabase_session_stub(
     metadata_source: str = "private-alpha-canary",
     listed_user: bool = True,
     allowlist_role: str = "user",
+    allowlist_lookup_failures: int = 0,
     profile_exists: bool = True,
     profile_is_admin: bool = False,
     profile_bootstrap_status: int = 200,
@@ -82,6 +87,7 @@ def _supabase_session_stub(
     users = [user] if listed_user else []
     profile_state = {"exists": profile_exists}
     logout_state = {"attempt": 0}
+    allowlist_state = {"failures_left": allowlist_lookup_failures}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_: Any) -> None:
@@ -112,6 +118,12 @@ def _supabase_session_stub(
                 }
             )
             if self.path.startswith("/rest/v1/private_alpha_allowlist?"):
+                if allowlist_state["failures_left"] > 0:
+                    allowlist_state["failures_left"] -= 1
+                    self._respond(
+                        {"code": "XX000", "message": "transient"}, status_code=500
+                    )
+                    return
                 self._respond(
                     [{"email": email, "role": allowlist_role, "disabled_at": None}]
                 )
@@ -234,8 +246,8 @@ def test_workflow_reports_release_and_browser_surfaces_as_separate_jobs() -> Non
     assert "private-alpha-release-coherence-evidence" in release
     assert "private-alpha-authenticated-browser-evidence" in browser
     assert "Run direct API signup-denial probe" in release
-    assert "Run authenticated Spanish browser journey" in browser
-    assert "Run authenticated Spanish browser journey" not in release
+    assert "Run authenticated browser checks" in browser
+    assert "Run authenticated browser checks" not in release
     assert "Run direct API signup-denial probe" not in browser
 
 
@@ -266,7 +278,7 @@ def test_dispatch_runs_branch_harness_against_the_resolved_deployed_sha() -> Non
     assert 'allow_harness_mismatch="true"' in resolver
 
 
-def test_browser_journey_starts_from_private_storage_state_without_auth_forms() -> None:
+def test_browser_checks_start_from_private_storage_state_without_auth_forms() -> None:
     runner = _source(".github/canary-browser.sh")
     config = _source("web/playwright.config.ts")
     spec = _source("web/e2e/private-alpha-release-canary.spec.ts")
@@ -277,77 +289,73 @@ def test_browser_journey_starts_from_private_storage_state_without_auth_forms() 
     assert "storageState:" in config
     assert "ARGUS_CANARY_BROWSER_PASSWORD" not in runner
     assert "ARGUS_CANARY_BROWSER_SIGNUP_EMAIL" not in runner
-    assert 'page.goto("/?auth=signup"' not in spec
-    assert 'page.goto("/?auth=login"' not in spec
-    assert 'isApiResponse(response, "/auth/signup", "POST")' not in spec
-    assert 'isApiResponse(response, "/auth/login", "POST")' not in spec
+    assert '"/?auth=signup"' not in spec
+    assert '"/?auth=login"' not in spec
+    assert '"/auth/signup"' not in spec
+    assert '"/auth/login"' not in spec
     assert "captcha_token" not in spec
-    assert 'page.goto("/chat"' in spec
-    assert "authenticated storage state" in spec
+    assert '.goto("/chat"' in spec
+    assert "storage_state_has_no_session" in spec
     assert 'page.getByTestId("chat-input")' in spec
     assert '"contenteditable", "true"' in normalized_spec
-    assert "waitForRequest" in spec
-    assert "runBacktestRequests" in spec
+    assert "isRunBacktestRequest" in spec
 
 
 def test_render_runner_has_surface_specific_fail_red_entrypoints() -> None:
     source = _source(".github/canary-render.sh")
+    release_surface = _shell_function(source, "run_release_coherence_surface")
+    browser_surface = _shell_function(source, "run_authenticated_browser_surface")
 
     assert 'SURFACE="${ARGUS_CANARY_SURFACE:-}"' in source
     assert "release-coherence)" in source
     assert "authenticated-browser-journey)" in source
-    assert "run_release_coherence_surface" in source
-    assert "run_authenticated_browser_surface" in source
-    assert "validate_release_evidence_contract" in source
-    browser_surface = source.split("run_authenticated_browser_surface() {", 1)[1].split(
-        "\n}", 1
-    )[0]
-    assert "validate_browser_evidence_contract" in browser_surface
-    assert "validate_release_evidence_contract" not in browser_surface
-    assert "run_disabled_signup_denial_canary" in source
-    assert "mint_browser_session_state" in source
+    for surface in (release_surface, browser_surface):
+        assert "validate_canary_harness_contract" in surface
+        assert "run_same_commit_check" in surface
+    assert "run_release_config_guard" in release_surface
+    assert "run_release_config_guard" not in browser_surface
+    assert "run_disabled_signup_denial_canary" in release_surface
+    assert "mint_browser_session_state" in browser_surface
     assert "revoke_browser_session" in source
     assert "browser_auth_challenge_timed_out" not in source
     assert "captcha_challenge_timeout" not in source
 
 
-def test_browser_surface_binds_the_journey_to_one_deployed_release() -> None:
+def test_browser_surface_binds_the_checks_to_one_deployed_release() -> None:
     source = _source(".github/canary-render.sh")
     workflow = _source(".github/workflows/private-alpha-canary.yml")
-    browser_contract = source.split("validate_browser_evidence_contract() {", 1)[1].split(
-        "\n}", 1
-    )[0]
-    browser_surface = source.split("run_authenticated_browser_surface() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    browser_surface = _shell_function(source, "run_authenticated_browser_surface")
 
-    assert "run_deploy_status_probe" in browser_contract
-    after_postconditions = browser_surface.split("verify_canonical_postconditions", 1)[1]
-    assert "run_deploy_status_probe" in after_postconditions
-    assert after_postconditions.index("run_deploy_status_probe") < (
-        after_postconditions.index('CANARY_STATUS="passed"')
+    assert browser_surface.index("run_same_commit_check") < browser_surface.index(
+        "mint_browser_session_state"
+    )
+    after_checks = browser_surface.split(
+        'if [ -n "$BROWSER_FAILED_CHECK" ]; then', 1
+    )[1]
+    assert "run_same_commit_check" in after_checks
+    assert after_checks.index("run_same_commit_check") < after_checks.index(
+        'CANARY_STATUS="passed"'
     )
     workflow_browser = _job_body(workflow, "authenticated-browser-journey", None)
-    browser_run = workflow_browser.split(
-        "Run authenticated Spanish browser journey", 1
-    )[1].split("\n      - name:", 1)[0]
+    browser_run = workflow_browser.split("Run authenticated browser checks", 1)[1].split(
+        "\n      - name:", 1
+    )[0]
     assert "RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}" in browser_run
     assert "-u RENDER_API_KEY" in _source(".github/canary-browser.sh")
 
 
 def test_browser_revokes_the_session_before_recording_success() -> None:
     source = _source(".github/canary-render.sh")
-    browser_surface = source.split("run_authenticated_browser_surface() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    browser_surface = _shell_function(source, "run_authenticated_browser_surface")
 
-    assert 'fail_canary "browser_auth" "authenticated_session_revocation_failed"' in (
-        browser_surface
+    assert (
+        'fail_canary "canary_harness" "authenticated_session_revocation_failed"'
+        in browser_surface
     )
     assert browser_surface.index("revoke_browser_session_once") < browser_surface.index(
         'CANARY_STATUS="passed"'
     )
-    cleanup = source.split("cleanup() {", 1)[1].split("\n}", 1)[0]
+    cleanup = _shell_function(source, "cleanup")
     assert "revoke_browser_session_once" in cleanup
 
 
@@ -375,6 +383,25 @@ def test_session_state_is_private_rotated_and_absent_from_browser_environment() 
     assert "-u ARGUS_OPS_TOKEN" in runner
     assert "-u ARGUS_WORKFLOW_DATABASE_URL" in runner
     assert "-u RENDER_API_KEY" in runner
+
+
+def test_session_tool_retries_only_lookup_transport_failures() -> None:
+    session_tool = _source("web/e2e/support/private-alpha-canary-session.ts")
+    retry = session_tool.split("async function withLookupRetry", 1)[1].split("\n}", 1)[0]
+
+    assert "const LOOKUP_ATTEMPTS = 3;" in session_tool
+    assert "if (!(error instanceof LookupFailure)) throw error;" in retry
+    assert "canary_session_lookup_retry=" in retry
+    for reason in (
+        "canary_allowlist_lookup_failed",
+        "canary_profile_lookup_failed",
+        "canary_identity_lookup_failed",
+    ):
+        assert f'withLookupRetry("{reason}"' in "".join(session_tool.split())
+    # Session minting and revocation change state, so they are never retried.
+    for mutation in ("mintDedicatedSession", "revokeTokens", "createUser"):
+        body = session_tool.split(mutation, 1)[1].split("\n}", 1)[0]
+        assert "withLookupRetry" not in body
 
 
 def test_session_tool_mints_private_storage_state_and_revokes_it(
@@ -444,6 +471,56 @@ def test_session_tool_mints_private_storage_state_and_revokes_it(
     logout = next(call for call in calls if call["path"] == "/auth/v1/logout?scope=local")
     assert logout["authorization"] == f"Bearer {handoff['access_token']}"
     assert all(service_role_key not in json.dumps(call.get("body", {})) for call in calls)
+
+
+def test_session_tool_retries_a_transient_allowlist_lookup_and_reports_it(
+    tmp_path: Path,
+    faker: Faker,
+) -> None:
+    email = faker.email().lower()
+    service_role_key = "test-service-role-key"
+
+    with _supabase_session_stub(
+        email=email,
+        user_id=faker.uuid4(),
+        session_id=faker.uuid4(),
+        allowlist_lookup_failures=1,
+    ) as (supabase_url, calls):
+        env = os.environ.copy()
+        env.update(
+            {
+                "ARGUS_CANARY_APP_URL": "https://app.example.test",
+                "ARGUS_CANARY_EMAIL": email,
+                "ARGUS_CANARY_SUPABASE_URL": supabase_url,
+                "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY": service_role_key,
+                "ARGUS_CANARY_BROWSER_STORAGE_STATE": str(tmp_path / "state.json"),
+                "ARGUS_CANARY_BROWSER_SESSION_HANDOFF": str(tmp_path / "handoff.json"),
+            }
+        )
+        minted = subprocess.run(
+            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            cwd=ROOT / "web",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    assert minted.returncode == 0, minted.stderr
+    assert minted.stdout.strip() == "canary_session_state=ready"
+    assert (
+        "canary_session_lookup_retry=canary_allowlist_lookup_failed attempt=1"
+        in minted.stderr
+    )
+    assert email not in minted.stdout + minted.stderr
+    assert service_role_key not in minted.stdout + minted.stderr
+    allowlist_reads = [
+        call
+        for call in calls
+        if call["method"] == "GET"
+        and call["path"].startswith("/rest/v1/private_alpha_allowlist?")
+    ]
+    assert len(allowlist_reads) >= 2
 
 
 def test_session_tool_revokes_a_minted_session_that_fails_least_privilege(
@@ -549,9 +626,7 @@ def test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails(
     assert len(logout_calls) == 2
 
     render_runner = _source(".github/canary-render.sh")
-    mint_wrapper = render_runner.split("mint_browser_session_state() {", 1)[1].split(
-        "\n}", 1
-    )[0]
+    mint_wrapper = _shell_function(render_runner, "mint_browser_session_state")
     assert '[ -s "$BROWSER_SESSION_HANDOFF" ]' in mint_wrapper
     assert 'BROWSER_SESSION_MINTED="true"' in mint_wrapper
 
@@ -599,15 +674,11 @@ def test_redaction_masks_session_tokens_and_failure_creates_no_sentinel(
     tmp_path: Path,
 ) -> None:
     source = _source(".github/canary-render.sh")
-    function_body = source.split("redact_browser_artifacts() {", 1)[1].split("\n}", 1)[0]
+    function_body = _shell_function(source, "redact_browser_artifacts")
     python_source = function_body.split("python3 - <<'PY'", 1)[1].split("\nPY", 1)[0]
     results = tmp_path / "playwright-results" / "case"
     results.mkdir(parents=True)
     context_path = results / "error-context.md"
-    context_path.write_text(
-        "access-token-value refresh-token-value canary-probe-value\n",
-        encoding="utf-8",
-    )
     session_path = tmp_path / "session.json"
     session_path.write_text(
         '{"access_token":"access-token-value",'

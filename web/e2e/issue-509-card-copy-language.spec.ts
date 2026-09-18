@@ -24,9 +24,7 @@ const CONFIRMATION_CARD = {
   confirmation_state: "active",
   status: "ready_to_run",
   statusLabel: "Ready to run",
-  title: "AAPL Buy and Hold",
-  summary: "Ready to test buy-and-hold for AAPL over the last year.",
-  strategy_type: "buy_and_hold",
+  title: "AAPL Buy and Hold",  strategy_type: "buy_and_hold",
   asset_class: "equity",
   date_range: {
     start: "2025-08-01",

@@ -139,7 +139,7 @@ def test_degraded_compatibility_text_stays_durable_but_not_in_history_or_preview
     assert search_items[0][1].matched_text == ("Prueba AAPL con velas de cinco minutos.")
 
 
-def test_llm_generated_recovery_voice_remains_in_history_preview_and_model_messages() -> (
+def test_llm_voice_remains_in_history_preview_and_interpreter_only() -> (
     None
 ):
     user_id = "user-1"
@@ -198,18 +198,20 @@ def test_llm_generated_recovery_voice_remains_in_history_preview_and_model_messa
     clarifier_messages = OpenRouterClarificationGenerator()._messages(
         ClarificationRequest(
             current_user_message="Use the same idea.",
-            recent_thread_history=history,
             language="en",
         )
     )
 
-    for model_messages in (interpreter_messages, clarifier_messages):
+    for model_messages, expected in (
+        (interpreter_messages, [EXACT_LLM_VOICE]),
+        (clarifier_messages, []),
+    ):
         assistant_contents = [
             str(message.content)
             for message in model_messages
             if isinstance(message, AIMessage)
         ]
-        assert assistant_contents == [EXACT_LLM_VOICE]
+        assert assistant_contents == expected
         assert RAW_ENGLISH_FALLBACK not in assistant_contents
 
 
@@ -303,3 +305,62 @@ def test_message_append_migration_backfills_legacy_degraded_previews() -> None:
     assert "set last_message_preview = null" in sql
     assert "metadata -> 'clarification' ->> 'prompt_source'" in sql
     assert "is distinct from 'llm_generated'" in sql
+
+
+def _degraded_research(code: str) -> dict[str, Any]:
+    return {
+        "research": {"schema_version": "argus_research/v1", "degraded": {"code": code}}
+    }
+
+
+def test_chat_history_keeps_degraded_replies_and_only_naming_drops_failed_lookups() -> (
+    None
+):
+    user_id = "user-1"
+    conversation = memory_conversation(
+        title="AAPL",
+        title_source="system_default",
+        language="en",
+        user_id=user_id,
+    )
+    question = "What is Apple trading at right now?"
+    follow_up = "Why did my strategy trail SPY?"
+    turns = [
+        ("user", question, {}),
+        (
+            "assistant",
+            "I couldn't finish looking that up just now. Try again in a moment.",
+            _degraded_research("research_unavailable_http_error"),
+        ),
+        ("user", question, {}),
+        (
+            "assistant",
+            "From Argus market data, Apple last closed at $311.80.",
+            _degraded_research("research_unavailable_http_error"),
+        ),
+        ("user", follow_up, {}),
+        (
+            "assistant",
+            "It sat in cash through most of the rally.",
+            _degraded_research("result_followup_research_unused"),
+        ),
+    ]
+    for role, content, metadata in turns:
+        create_message(
+            user_id=user_id,
+            conversation_id=conversation.id,
+            role=role,
+            content=content,
+            metadata=metadata,
+        )
+
+    # Chat history keeps every reply, a valid degraded one included; only
+    # conversation naming leaves failed-lookup replies out.
+    chat = load_runtime_thread_history(user_id=user_id, conversation_id=conversation.id)
+    assert [item.content for item in chat] == [content for _, content, _ in turns]
+    naming = load_runtime_thread_history(
+        user_id=user_id,
+        conversation_id=conversation.id,
+        drop_failed_lookups=True,
+    )
+    assert [item.content for item in naming] == [question, question, follow_up]

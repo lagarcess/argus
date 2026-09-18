@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, cast
 
-from argus.api.chat.previews import accepted_user_message_preview, plain_text_preview
+from argus.api.chat.previews import (
+    accepted_user_message_preview,
+    stored_message_preview,
+)
 from argus.api.schemas import Message
 from argus.domain.store import AlphaStore, utcnow
 from argus.domain.usage_limits import settle_memory_usage
@@ -629,7 +632,9 @@ class MemoryChatTurnLifecycleGateway:
         preview = (
             accepted_user_message_preview(message.content, max_length=180)
             if message.role == "user"
-            else plain_text_preview(message.content, max_length=180)
+            else stored_message_preview(
+                message.content, role=message.role, metadata=message.metadata
+            )
         )
         if conversation is not None and preview:
             self.store.conversations[message.conversation_id] = conversation.model_copy(

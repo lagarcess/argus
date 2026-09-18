@@ -39,6 +39,8 @@ export type RecoveryDisplay =
       kind: "recovery_code";
       code: string;
       values?: Record<string, string>;
+      /** The reply's content is an answer and this recovery its notice. */
+      underAnswer?: boolean;
     }
   | {
       kind: "coverage_recovery";
@@ -69,6 +71,10 @@ export type RecoveryDisplay =
       kind: "artifact_action_recovery";
       status: string;
       values?: Record<string, string>;
+    }
+  | {
+      kind: "calculation_inputs";
+      inputs: Array<{ name: string; labelKey: string; values: Record<string, string> }>;
     };
 
 function recordOrNull(value: unknown): Record<string, unknown> | null {
@@ -129,6 +135,33 @@ export function retryableAssistantRecoveryCode(value: unknown): string | null {
   return recovery?.retryable === true ? code : null;
 }
 
+/**
+ * Codes whose recovery replaced the answer and cannot be retried: the reply is
+ * a failure statement, so it wears the quiet notice. Every other non-retryable
+ * code keeps its treatment; the amber notice stays gated on retryable alone.
+ */
+const QUIET_NOTICE_RECOVERY_CODES = new Set(["research_lookup_unavailable"]);
+
+/** Whether a reply renders as the quiet failure notice (failure-treatment.ts). */
+export function wearsQuietFailureNotice(
+  display: RecoveryDisplay | null | undefined,
+): boolean {
+  if (display?.kind === "artifact_action_recovery") return true;
+  return (
+    display?.kind === "recovery_code" && QUIET_NOTICE_RECOVERY_CODES.has(display.code)
+  );
+}
+
+/**
+ * Whether the backend marked the reply's content as an answer with this
+ * recovery's notice under it (`recovery.under_answer`), rather than
+ * compatibility text standing in for the notice.
+ */
+export function recoveryNoticeUnderAnswer(
+  display: RecoveryDisplay | null | undefined,
+): boolean {
+  return display?.kind === "recovery_code" && display.underAnswer === true;
+}
 
 export function recoveryDisplayFromRecoveryState(
   value: unknown,
@@ -148,6 +181,7 @@ export function recoveryDisplayFromRecoveryState(
     kind: "recovery_code",
     code,
     values: stringValues(params),
+    ...(recovery?.under_answer === true ? { underAnswer: true } : {}),
   };
 }
 
@@ -212,6 +246,9 @@ export function recoveryDisplayText(
     return t(`chat.coverage_recovery.${display.code}`);
   }
   if (display.kind === "unsupported_recovery") {
+    if (display.values.reasonCode === "data_window_unavailable") {
+      return t("chat.clarification.data_window_unavailable");
+    }
     if (display.values.reasonCode === "unsupported_time_granularity") {
       return display.values.rawValue
         ? t("chat.clarification.unsupported_timeframe_with_raw_value", {
@@ -250,7 +287,7 @@ export function recoveryDisplayText(
           minimum: formatUsdAmount(minimum),
         });
       }
-      return "";
+      return t("chat.clarification.starting_capital_unavailable_bounds");
     }
     const optionsText = joinLocalizedOptions(
       display.values.options.map((option) =>
@@ -279,6 +316,9 @@ export function recoveryDisplayText(
   }
   if (display.kind === "clarification") {
     return clarificationDisplayText(display, t);
+  }
+  if (display.kind === "calculation_inputs") {
+    return calculationInputsText(display, t, locale);
   }
   const statusKey = artifactActionStatusKey(display.status);
   return t(`chat.recovery.${statusKey}`, artifactActionValues(display));
@@ -359,6 +399,10 @@ function recoveryDisplayFromClarification(value: unknown): RecoveryDisplay | nul
   }
   if (kind !== "clarification") {
     return null;
+  }
+  const missingInputs = missingInputsOrNull(clarification.missing_inputs);
+  if (missingInputs) {
+    return { kind: "calculation_inputs", inputs: missingInputs };
   }
   const payload = recordOrNull(clarification.payload);
   const semanticNeeds = stringArrayOrNull(clarification.semantic_needs) ?? [];
@@ -745,6 +789,41 @@ function strategyValues(value: unknown): Record<string, string> | undefined {
     ...(symbol ? { symbol } : {}),
     ...(assetText ? { assetText } : {}),
   };
+}
+
+/** The figures a calculation still needs, named by their declaration label keys. */
+function missingInputsOrNull(
+  value: unknown,
+): Extract<RecoveryDisplay, { kind: "calculation_inputs" }>["inputs"] | null {
+  if (!Array.isArray(value)) return null;
+  const inputs = value.flatMap((item) => {
+    const raw = recordOrNull(item);
+    const label = recordOrNull(raw?.label);
+    const name = stringOrNull(raw?.name);
+    const labelKey = stringOrNull(label?.locale_key);
+    if (!name || !labelKey) return [];
+    const args = recordOrNull(label?.interpolation_args) ?? {};
+    const values = Object.fromEntries(
+      Object.entries(args).map(([key, arg]) => [key, String(arg)]),
+    );
+    return [{ name, labelKey, values }];
+  });
+  return inputs.length > 0 ? inputs : null;
+}
+
+function calculationInputsText(
+  display: Extract<RecoveryDisplay, { kind: "calculation_inputs" }>,
+  t: TFunction,
+  locale: string,
+): string {
+  const labels = display.inputs.flatMap((input) => {
+    const label = t(input.labelKey, input.values).trim();
+    if (!label || label === input.labelKey) return [];
+    return [label.charAt(0).toLocaleLowerCase(locale) + label.slice(1)];
+  });
+  if (labels.length === 0) return "";
+  const inputs = new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(labels);
+  return t("tools.calc.missing_inputs.ask", { inputs });
 }
 
 function clarificationDisplayText(

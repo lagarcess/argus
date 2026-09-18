@@ -1,0 +1,429 @@
+{
+  "purpose": "Two unchanged-head observations supporting variance classification; never spliced into the complete scorecard.",
+  "candidate_commit": "4c4e7a001150740dddef4e97fc13b99f2b0c823b",
+  "source_path": "temp/current-reason-rerun/partial-results.json",
+  "source_sha256": "412bbf1ab22864105fdec70ca0d8c69928a88b580ce67b5e42f5669f3d3c5a18",
+  "results": [
+    {
+      "id": "compound_benchmark_start_date_preserves_confirmation_issue_339",
+      "category": "action_chip_semantics",
+      "status": "passed",
+      "failed_checks": [],
+      "expected_fail": null,
+      "typed_outcome": {
+        "intent": "backtest_execution",
+        "stage_outcomes": [
+          "ready_for_confirmation",
+          "await_approval"
+        ],
+        "assets": [
+          "LOW",
+          "HD"
+        ],
+        "asset_class": "equity",
+        "requested_strategy_template": "buy_and_hold",
+        "strategy_type": "buy_and_hold",
+        "entry_rule": null,
+        "exit_rule": null,
+        "rule_spec": null,
+        "date_range": {
+          "start": "2026-04-01",
+          "end": "2026-07-30"
+        },
+        "requested_date_range": {
+          "start": "2026-04-01",
+          "end": "2026-07-30"
+        },
+        "effective_date_range": {
+          "start": "2026-04-01",
+          "end": "2026-07-30"
+        },
+        "adjustment_reason": "none",
+        "benchmark_symbol": "QQQ",
+        "capital_amount": 100000.0,
+        "starting_capital": null,
+        "recurring_contribution": null,
+        "contribution_period": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "fee_rate": null,
+        "slippage": null,
+        "cost_provenance": {},
+        "launch_execution_realism": null,
+        "capability_verdict": "executable",
+        "requested_field": null,
+        "clarification": null,
+        "semantic_turn_act": "answer_pending_need",
+        "asset_discovery": null,
+        "research": null,
+        "offered": {
+          "response": false,
+          "launch_payload": {
+            "strategy_type": "buy_and_hold",
+            "symbol": "LOW",
+            "symbols": [
+              "LOW",
+              "HD"
+            ],
+            "asset_class": "equity",
+            "timeframe": "1D",
+            "date_range": {
+              "start": "2026-04-01",
+              "end": "2026-07-30"
+            },
+            "entry_rule": null,
+            "exit_rule": null,
+            "rule_spec": null,
+            "sizing_mode": "capital_amount",
+            "capital_amount": 100000.0,
+            "starting_capital": null,
+            "recurring_contribution": null,
+            "position_size": null,
+            "cadence": null,
+            "parameters": {},
+            "risk_rules": [],
+            "benchmark_symbol": "QQQ",
+            "language": "en",
+            "requested_date_range": {
+              "start": "2026-04-01",
+              "end": "2026-07-30"
+            },
+            "coverage_preflight": {
+              "schema_version": "market_data_coverage_v1",
+              "outcome": "full_coverage",
+              "requested_date_range": {
+                "start": "2026-04-01",
+                "end": "2026-07-30"
+              },
+              "effective_date_range": {
+                "start": "2026-04-01",
+                "end": "2026-07-30"
+              },
+              "observations_by_symbol": {
+                "LOW": 83,
+                "HD": 83,
+                "QQQ": 83
+              },
+              "adjustment_reason": "none",
+              "preflight_id": "sha256:4b52e6972df5ee6e5dc27b779542c7e6576f8ca4f6ce581fc2c787a3f15a61d6"
+            }
+          },
+          "clarification": {},
+          "discovery_symbols": [],
+          "next_experiment_kinds": [],
+          "recovery_option_ids": [],
+          "recovery_code": null,
+          "named_unavailable": [],
+          "dropped_not_named": [],
+          "actionable": true
+        }
+      },
+      "prose_judge": null,
+      "infrastructure_errors": [],
+      "route_receipts": [
+        {
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 1110,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 796,
+            "completion_tokens": 44,
+            "total_tokens": 840,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0009706,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:42:02.730805+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 12150,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 11435,
+            "completion_tokens": 1152,
+            "total_tokens": 12587,
+            "cached_tokens": 192,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.01697215,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:42:15.020266+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "ArtifactAssumptionEditPlan",
+          "latency_ms": 8277,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 3092,
+            "completion_tokens": 686,
+            "total_tokens": 3778,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0054456,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:42:23.582935+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "anthropic/claude-haiku-4.5",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "ArtifactAssumptionEditPlan",
+          "latency_ms": 4604,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": true,
+          "token_usage": {
+            "prompt_tokens": 3902,
+            "completion_tokens": 539,
+            "total_tokens": 4441,
+            "cached_tokens": 0,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.006597,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:42:28.188229+00:00"
+        }
+      ]
+    },
+    {
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "category": "asset_discovery_routing",
+      "status": "passed",
+      "failed_checks": [],
+      "expected_fail": null,
+      "typed_outcome": {
+        "intent": "conversation_followup",
+        "stage_outcomes": [
+          "ready_to_respond"
+        ],
+        "assets": [],
+        "asset_class": null,
+        "requested_strategy_template": null,
+        "strategy_type": null,
+        "entry_rule": null,
+        "exit_rule": null,
+        "rule_spec": null,
+        "date_range": null,
+        "requested_date_range": null,
+        "effective_date_range": null,
+        "adjustment_reason": null,
+        "benchmark_symbol": null,
+        "capital_amount": null,
+        "starting_capital": null,
+        "recurring_contribution": null,
+        "contribution_period": null,
+        "launch_validation_code": null,
+        "missing_required_fields": [],
+        "fee_rate": null,
+        "slippage": null,
+        "cost_provenance": {},
+        "launch_execution_realism": null,
+        "capability_verdict": "answer_only",
+        "requested_field": null,
+        "clarification": null,
+        "semantic_turn_act": "asset_discovery",
+        "asset_discovery": {
+          "relationship": "category",
+          "category_description": "trending cryptos",
+          "anchor_symbols": [],
+          "asset_class_hint": "crypto",
+          "needs_current_facts": true
+        },
+        "research": {
+          "published": true,
+          "degraded_code": null,
+          "shape": "find",
+          "rows": 0,
+          "sources": 0
+        },
+        "offered": {
+          "response": true,
+          "launch_payload": {},
+          "clarification": {},
+          "discovery_symbols": [
+            "FIL",
+            "SOL"
+          ],
+          "next_experiment_kinds": [],
+          "recovery_option_ids": [],
+          "recovery_code": null,
+          "named_unavailable": [],
+          "dropped_not_named": [
+            "Lisk",
+            "Pudgy Penguins",
+            "Civic",
+            "Bitcoin",
+            "Ethereum",
+            "XRP"
+          ],
+          "actionable": true
+        }
+      },
+      "prose_judge": {
+        "pass": true,
+        "failed_criteria": [],
+        "notes": "The assistant text claims FIL and SOL are currently listed among top trending cryptocurrencies with notable price and volume movements. The rendered_beside_reply shows discovery rows for FIL/USD and SOL/USD with reason_text that cites CoinGecko, Coinranking, and Bitget for trending status, and the discovery_sources list includes those domains with today's dates. The claim is fully supported by the rendered surface. No runtime errors are exposed, and the response is honest about what the search results show.",
+        "rubric_version": "argus-prose-quality-v3",
+        "requested_criteria": [
+          "honesty",
+          "no_raw_runtime_error"
+        ],
+        "judged_assistant_text": {
+          "text": "Based on search results from today, both FIL and SOL are currently listed among the top trending cryptocurrencies with notable price and volume movements.",
+          "sha256": "b364eec8558b71c2b7bb100fc5e1aa262c25ec5e6fd095ab2354ab1c1de59dba",
+          "character_count": 154,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        },
+        "judged_rendered_context": {
+          "text": "{\"discovery_rows\": [{\"name\": \"FIL/USD\", \"reason_text\": \"Listed among the top trending cryptocurrencies on CoinGecko and Coinranking with significant 24h price gains.\", \"symbol\": \"FIL\"}, {\"name\": \"SOL/USD\", \"reason_text\": \"Listed in trending cryptocurrencies on Bitget with significant market cap and trading volume.\", \"symbol\": \"SOL\"}], \"discovery_sources\": [{\"domain\": \"www.coingecko.com\", \"source_date\": \"2026-09-14\", \"title\": \"Top Trending Cryptocurrencies Today - CoinGecko\"}, {\"domain\": \"coinmarketcap.com\", \"source_date\": \"2026-09-14\", \"title\": \"Cryptocurrency Prices, Charts And Market Capitalizations | CoinMarketCap\"}, {\"domain\": \"www.bitget.com\", \"source_date\": \"2026-09-14\", \"title\": \"Top Trending Cryptocurrencies Today - Bitget\"}, {\"domain\": \"www.investing.com\", \"source_date\": \"2026-09-15\", \"title\": \"All Cryptocurrencies\"}, {\"domain\": \"coinranking.com\", \"source_date\": \"2026-09-14\", \"title\": \"Top 50 Trending Coins Today | Coinranking\"}], \"retrieved_at\": \"2026-09-15T03:45:54.849435+00:00\"}",
+          "sha256": "2a90fc89f93d8c2939c59079ef61275184d9ca1220a1834f583aa8f888d85d39",
+          "character_count": 1005,
+          "truncated": false,
+          "omitted_character_count": 0,
+          "redactions": []
+        }
+      },
+      "infrastructure_errors": [],
+      "route_receipts": [
+        {
+          "task": "asset_mention_preflight",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMAssetMentionExtraction",
+          "latency_ms": 877,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 782,
+            "completion_tokens": 17,
+            "total_tokens": 799,
+            "cached_tokens": 768,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0002136,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:45:45.031368+00:00"
+        },
+        {
+          "task": "interpretation",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "LLMInterpretationResponse",
+          "latency_ms": 8783,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 10801,
+            "completion_tokens": 796,
+            "total_tokens": 11597,
+            "cached_tokens": 192,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.01528965,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:45:53.815501+00:00"
+        },
+        {
+          "task": "discovery_extraction",
+          "tier": "structured",
+          "model": "x-ai/grok-4.3",
+          "fallback_model": "anthropic/claude-haiku-4.5",
+          "mode": "json_schema",
+          "schema_name": "discovery_extraction",
+          "latency_ms": 5339,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 2372,
+            "completion_tokens": 463,
+            "total_tokens": 2835,
+            "cached_tokens": 128,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.0039881,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:46:00.188607+00:00"
+        },
+        {
+          "task": "discovery_voicing",
+          "tier": "chat",
+          "model": "deepseek/deepseek-v4-flash",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "mode": "chat_model",
+          "schema_name": null,
+          "latency_ms": 1063,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 240,
+            "completion_tokens": 27,
+            "total_tokens": 267,
+            "cached_tokens": 0,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 2.8812e-05,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:46:03.297498+00:00"
+        },
+        {
+          "task": "chat_composer",
+          "tier": "chat",
+          "model": "deepseek/deepseek-v4-flash",
+          "fallback_model": "qwen/qwen3.5-9b",
+          "mode": "json_schema",
+          "schema_name": "ArgusProseJudgeResponse",
+          "latency_ms": 1933,
+          "outcome": "succeeded",
+          "failure_mode": null,
+          "fallback_used": false,
+          "token_usage": {
+            "prompt_tokens": 1004,
+            "completion_tokens": 115,
+            "total_tokens": 1119,
+            "cached_tokens": 0,
+            "cache_write_tokens": 0
+          },
+          "usage_cost_usd": 0.00017276,
+          "context_packet_ids": [],
+          "created_at": "2026-09-15T03:46:05.231371+00:00"
+        }
+      ]
+    }
+  ]
+}

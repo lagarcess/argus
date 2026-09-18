@@ -97,7 +97,8 @@ export type ChatActionOption = {
     | "retry_last_turn"
     | "retry_load_conversation"
     | "retest_run"
-    | "add_confirmation_peer";
+    | "add_confirmation_peer"
+    | "calculation_offer";
   presentation?: "confirmation" | "result";
   payload?: Record<string, unknown>;
   artifactId?: string;
@@ -154,6 +155,10 @@ export type StrategyResultPayload = {
   actions?: ChatActionOption[];
   chart?: ResultChartPayload | null;
   executionCosts?: ExecutionCostEvidence | null;
+  /** Money precision the backend stored on the result card. */
+  currencyFractionDigits?: number;
+  /** Run profit rounded by the backend at the card's stored precision. */
+  profit?: number;
 };
 
 export type ExecutionCostEvidence = {
@@ -229,7 +234,6 @@ export type StrategyConfirmationPayload = {
   title: string;
   status?: StrategyConfirmationStatus;
   statusLabel: string;
-  summary: string;
   strategy_type?: string;
   display_facts?: ConfirmationDisplayFacts;
   capabilities?: StrategyConfirmationCapabilities;
@@ -303,6 +307,7 @@ export type ToolJob = {
 };
 
 export type Message = {
+  sharedConversation?: import("@/lib/shared-conversation").SharedConversation;
   id: string;
   /** Hidden durable message ids that should focus this projected transcript row. */
   transcriptAnchorIds?: string[];
@@ -325,6 +330,8 @@ export type Message = {
   selectedAction?: ChatActionOption;
   result?: StrategyResultPayload;
   toolResultCards?: import("@/lib/tool-result-card").ToolResultCard[];
+  /** Assumed inputs the backend says the prose never names, each on one of these cards. */
+  answerAssumptions?: import("@/lib/tool-result-card").AnswerAssumption[] | null;
   hasUnavailableToolResults?: boolean;
   toolJobs?: ToolJob[];
   resultReadoutFacts?: ResultReadoutFacts | null;
@@ -360,6 +367,8 @@ export type Message = {
   memoryRecalls?: MemoryRecallItem[] | null;
   /** Backend-declared computation behind a computed answer; it offers a decision. */
   computation?: import("@/lib/decision-contract").DecisionComputation | null;
+  /** A result continued from another chat; the source is linked and never changed. */
+  continuedFrom?: import("@/lib/computation-contract").ContinuedFrom | null;
   /** Current decision stamped on a computed answer by the backend. */
   decisionNoteId?: string | null;
   decisionState?: DecisionState | null;

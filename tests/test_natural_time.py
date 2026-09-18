@@ -1,7 +1,9 @@
 from datetime import date
 
+import pytest
 from argus.nlp.natural_time import (
     contains_named_date_evidence,
+    date_range_intent_matches_evidence,
     dateparser_languages_for_user_language,
     parse_date_text,
     resolve_date_range_endpoint_patch,
@@ -9,6 +11,68 @@ from argus.nlp.natural_time import (
     resolve_date_range_text,
     resolve_rolling_window_intent_text,
 )
+
+
+@pytest.mark.parametrize(
+    ("evidence", "language"),
+    [
+        ("April 1, 2026", "en"), ("1 de abril de 2026", "es-419"),
+        ("2026-04-01", "en"), ("04/01/2026", "en"),
+    ],
+)
+@pytest.mark.parametrize("endpoint", ["start", "end"])
+def test_date_quote_must_support_the_proposed_endpoint(evidence, language, endpoint):
+    intent = {
+        "kind": "endpoint_patch", "endpoint": endpoint,
+        endpoint: "2026-04-01", "evidence": evidence,
+    }
+    assert date_range_intent_matches_evidence(
+        intent, current_message=evidence, language=language,
+    )
+    assert not date_range_intent_matches_evidence(
+        {**intent, endpoint: "2026-05-01"},
+        current_message=evidence, language=language,
+    )
+
+
+@pytest.mark.parametrize(
+    ("evidence", "start", "end", "language"),
+    [
+        ("April 1, 2026 to July 30, 2026", "2026-04-01", "2026-07-30", "en"),
+        ("April 2026 to July 2026", "2026-04-01", "2026-07-31", "en"),
+        ("enero de 2021 hasta diciembre de 2024", "2021-01-01", "2024-12-31", "es-419"),
+        ("Apr. 2026", "2026-04-01", "2026-04-30", "en"),
+        ("April-2026", "2026-04-01", "2026-04-30", "en"),
+        ("ene. 2021", "2021-01-01", "2021-01-31", "es-419"),
+    ],
+)
+@pytest.mark.parametrize("target", ["range", "start", "end"])
+def test_date_quote_must_support_requested_endpoints(evidence, start, end, language, target):
+    endpoints = {"start": start, "end": end}
+    intent = {
+        "kind": "explicit_range" if target == "range" else "endpoint_patch",
+        "evidence": evidence,
+        **(endpoints if target == "range" else {target: endpoints[target], "endpoint": target}),
+    }
+    assert date_range_intent_matches_evidence(intent, current_message=evidence, language=language)
+    assert not date_range_intent_matches_evidence(
+        {**intent, "start" if target == "start" else "end": "2026-08-01"},
+        current_message=evidence, language=language,
+    )
+
+
+@pytest.mark.parametrize("endpoint", ["start", "end"])
+@pytest.mark.parametrize("evidence", ["1", "$1 in 2025", "1 in 2025"])
+def test_non_calendar_number_cannot_ground_a_planner_date(endpoint, evidence):
+    # The permissive date parser fills in a year/month for the bare fee value.
+    # That inferred date must not become current-turn evidence for an edit.
+    inferred = parse_date_text(evidence, endpoint=endpoint)
+    assert inferred is not None
+    assert not date_range_intent_matches_evidence(
+        {"kind": "endpoint_patch", "endpoint": endpoint,
+         endpoint: inferred.isoformat(), "evidence": evidence},
+        current_message=f"I made {evidence}; change the benchmark to QQQ",
+    )
 
 
 def test_resolves_spanish_month_year_range() -> None:

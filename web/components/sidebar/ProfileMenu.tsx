@@ -73,6 +73,7 @@ import {
 } from "@/lib/language-features";
 import { memoryAvailable as fetchMemoryAvailable } from "@/lib/memory-privacy";
 import { evidenceReceiptSharingEnabled } from "@/lib/private-alpha-flags";
+import { supportEmail } from "@/lib/support-email";
 import { navigateFromOverlay } from "@/lib/overlay-history";
 import { QuickJumpBadge } from "@/components/keyboard/QuickJumpBadge";
 import { useQuickJump } from "@/components/keyboard/useQuickJump";
@@ -112,9 +113,6 @@ type ProfileQuickJumpItem = {
   id: string;
   onSelect: () => void;
 };
-
-const SUPPORT_EMAIL =
-  process.env.NEXT_PUBLIC_ARGUS_SUPPORT_EMAIL ?? "support@argus.local";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -194,6 +192,7 @@ export default function ProfileMenu({
   const [avatarThemeError, setAvatarThemeError] = useState<string | null>(null);
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [isDeleteRequestOpen, setIsDeleteRequestOpen] = useState(false);
+  const isMenuVisible = isOpen && activeModal === null && !isDeleteRequestOpen;
   const [deleteRequestState, setDeleteRequestState] =
     useState<DeleteRequestState>("idle");
   const [usesCommandKey, setUsesCommandKey] = useState(false);
@@ -321,7 +320,7 @@ export default function ProfileMenu({
    * asynchronous, that leaves a phantom entry the next press spends.
    */
   useModalSurface({
-    isOpen: isOpen && isDrawerPlacement && !asSheet,
+    isOpen: isMenuVisible && isDrawerPlacement && !asSheet,
     overlayId: menuOverlayId,
     containerRef: menuRef,
     onDismiss: onClose,
@@ -343,7 +342,7 @@ export default function ProfileMenu({
   // On the rail this is a detached popover rather than a layer, so it keeps the
   // plain dismissal rules a popover has.
   useOverlayLayer({
-    isOpen: isOpen && !isDrawerPlacement && !asSheet,
+    isOpen: isMenuVisible && !isDrawerPlacement && !asSheet,
     overlayId: menuOverlayId,
     containerRef: menuRef,
     onEscape: onClose,
@@ -813,7 +812,7 @@ export default function ProfileMenu({
     [quickJumpItems],
   );
   const { isQuickJumpActive, numberFor } = useQuickJump({
-    enabled: isOpen && !activeModal && !isDeleteRequestOpen,
+    enabled: isMenuVisible,
     items: quickJumpItems,
     onSelect: handleQuickJump,
     usesCommandKey,
@@ -851,7 +850,7 @@ export default function ProfileMenu({
   }, [currentLanguage, deleteRequestState]);
 
   const accountHint = profile?.email ? ` (${profile.email})` : "";
-  const supportMailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+  const supportMailto = `mailto:${supportEmail}?subject=${encodeURIComponent(
     t(
       "settings.profile.request_deletion.email_subject",
       "Argus account deletion request",
@@ -870,10 +869,17 @@ export default function ProfileMenu({
       supportMailto={supportMailto}
       onClose={() => setIsDeleteRequestOpen(false)}
       onSubmit={handleSubmitDeleteRequest}
+      returnFocusRef={anchorRef}
     />
   ) : null;
 
   if (!isOpen && !activeModal && !isDeleteRequestOpen) return null;
+
+  // A child dialog replaces the settings surface, just like the other panels.
+  // Keeping both mounted puts the centered request beneath the tablet sheet.
+  if (deleteRequestDialog) {
+    return deleteRequestDialog;
+  }
 
   // ── Active modal rendering ──────────────────────────────────────────────
   if (activeModal !== null && activeModal !== "profile") {
@@ -939,16 +945,11 @@ export default function ProfileMenu({
         handleLanguageSelect={handleLanguageSelect}
         isSavingLanguage={isSavingLanguage}
         languageError={languageError}
-        deleteRequestDialog={deleteRequestDialog}
       />
     );
   }
 
-  if (!isOpen) {
-    return typeof document !== "undefined" && deleteRequestDialog
-      ? createPortal(deleteRequestDialog, document.body)
-      : deleteRequestDialog;
-  }
+  if (!isOpen) return null;
 
   // ── Menu rendering ──────────────────────────────────────────────────────
 
@@ -1394,22 +1395,8 @@ export default function ProfileMenu({
         {menu}
       </AdaptivePanel>
     );
-    return (
-      <>
-        {createPortal(sheet, document.body)}
-        {deleteRequestDialog
-          ? createPortal(deleteRequestDialog, document.body)
-          : null}
-      </>
-    );
+    return sheet;
   }
 
-  return (
-    <>
-      {isDrawerPlacement ? menu : createPortal(menu, document.body)}
-      {deleteRequestDialog
-        ? createPortal(deleteRequestDialog, document.body)
-        : null}
-    </>
-  );
+  return isDrawerPlacement ? menu : createPortal(menu, document.body);
 }

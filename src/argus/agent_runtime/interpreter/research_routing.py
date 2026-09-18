@@ -13,6 +13,12 @@ from argus.agent_runtime.interpreter.draft_shape import (
 from argus.agent_runtime.interpreter.strategy_routing import route_owner
 from argus.agent_runtime.research_query import ResearchQueryExtraction
 
+# Recorded when a concept question is answered by grounded research rather
+# than by the interpreter's own prose.
+CONCEPT_QUESTION_REASON_CODE = "research_answers_concept_question"
+# Recorded when an out-of-scope verdict that typed nothing to run is answered
+# by research: a money question is never refused as out of scope.
+UNSUPPORTED_VERDICT_REASON_CODE = "research_answers_unsupported_verdict"
 # Recorded on the interpretation when a strategy claim was set aside because
 # its horizon points forward: the question was answered by research, not
 # refused as a test that cannot run (decision 10).
@@ -80,22 +86,40 @@ def primary_read_asks_a_fact_question(interpretation: Any) -> bool:
 
     A read that says the answer is a computed scenario about named subjects is
     a fact question whatever kind it left (decision 10): the scenario owner
-    must see it. A scenario bit with no subject is a projection on the user's
-    own numbers and stays arithmetic; a typed horizon alone never admits, so a
-    test asked over a future window keeps its recovery."""
+    must see it. A scenario bit with no subject is research only when a page
+    must supply a figure; on the user's own numbers it is arithmetic for the
+    no-search answer, and a typed horizon alone never admits, so a test asked
+    over a future window keeps its recovery."""
     query = getattr(interpretation, "research_query", None)
     if query is None:
         return False
     if scenario_is_typed(query, interpretation) and not query.symbols:
-        # A scenario with no subject, by either typed fact, is the user's own
-        # numbers or a forward question with nothing to research: arithmetic
-        # or the future test-window recovery, never a research turn.
-        return False
+        # A scenario with no subject is research only when its bit names a
+        # published figure to look up (a product's price, a bank's rate, local
+        # inflation); on the user's own numbers it is arithmetic, and a typed
+        # horizon alone keeps a future test on its recovery.
+        return bool(getattr(query, "scenario_question", False)) and (
+            query.question_kind not in ("concept", "none")
+        )
     if query.question_kind not in ("concept", "none"):
         return True
     # A kind-none read is admitted only by the scenario bit with subjects; a
     # horizon alone keeps a test asked over a future window on its recovery.
     return bool(getattr(query, "scenario_question", False))
+
+
+def primary_read_is_arithmetic(interpretation: Any) -> bool:
+    """The primary read typed a computed answer on the user's own numbers: the
+    scenario bit, no subject, kind none, and no other owner. A concept question
+    is research's to answer."""
+    query = getattr(interpretation, "research_query", None)
+    return bool(
+        query is not None
+        and getattr(query, "scenario_question", False)
+        and not query.symbols
+        and query.question_kind == "none"
+        and not research_turn_has_conflicting_owner(interpretation)
+    )
 
 
 def primary_research_query(interpretation: Any) -> ResearchQueryExtraction | None:
@@ -106,6 +130,63 @@ def primary_research_query(interpretation: Any) -> ResearchQueryExtraction | Non
     if strategy_claim_waived_by_future_horizon(interpretation):
         _note_future_horizon_question(interpretation)
     return interpretation.research_query
+
+
+def concept_research_query(interpretation: Any) -> ResearchQueryExtraction | None:
+    """A concept question the fact gate declined takes the grounded balanced
+    path: research leads, and the no-search answer keeps kind none."""
+    query = getattr(interpretation, "research_query", None)
+    if (
+        query is None
+        or query.question_kind != "concept"
+        or research_turn_has_conflicting_owner(interpretation)
+    ):
+        return None
+    _note_research_route(interpretation, CONCEPT_QUESTION_REASON_CODE)
+    return query
+
+
+def unsupported_verdict_research_query(
+    interpretation: Any,
+) -> ResearchQueryExtraction | None:
+    """An out-of-scope verdict that typed no question, no refusal payload, no
+    pending need and nothing to run is answered by research as a current
+    external question; a typed refusal keeps its recovery route."""
+    draft = interpretation.candidate_strategy_draft
+    if (
+        (
+            interpretation.intent != "unsupported_or_out_of_scope"
+            and interpretation.semantic_turn_act != "unsupported_request"
+        )
+        or getattr(interpretation, "research_query", None) is not None
+        or interpretation.requires_clarification
+        or getattr(interpretation, "asset_discovery", None) is not None
+        or research_turn_has_conflicting_owner(interpretation)
+        or strategy_has_execution_evidence(draft, include_defaults=False)
+        or strategy_draft_future_horizon(draft)
+    ):
+        return None
+    _note_research_route(interpretation, UNSUPPORTED_VERDICT_REASON_CODE)
+    return ResearchQueryExtraction(question_kind="current_external")
+
+
+def educational_question_has_no_query(interpretation: Any) -> bool:
+    """Absence of a typed question does not authorize external research."""
+    return (
+        interpretation.semantic_turn_act == "educational_question"
+        and getattr(interpretation, "research_query", None) is None
+    )
+
+
+def _note_research_route(interpretation: Any, code: str) -> None:
+    if code not in interpretation.reason_codes:
+        interpretation.reason_codes.append(code)
+    logger.info(
+        "Research answers a read the fact gate declined intent={} act={} code={}",
+        interpretation.intent,
+        interpretation.semantic_turn_act,
+        code,
+    )
 
 
 def _note_future_horizon_question(interpretation: Any) -> None:

@@ -12,7 +12,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     const loadConversation = chat.slice(loadConversationStart, loadConversationEnd);
 
     expect(loadConversationStart).toBeGreaterThan(-1);
-    expect(chat).toContain("new TranscriptSessionCache<Message[]>()");
+    expect(chat).toContain("new TranscriptSessionCache<SavedConversationTranscript>()");
     expect(loadConversation).toContain(
       "convId, undefined, { messageId, scrollToLatest }",
     );
@@ -21,7 +21,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain("setMessages([])");
     expect(chat).toContain("COLD_TRANSCRIPT_RETRIEVAL_DELAY_MS");
     expect(chat).toContain("loadAllConversationMessagePages(");
-    expect(chat).toContain("{ signal }");
+    expect(chat).toContain("loadSavedConversationTranscript(targetConversationId, signal)");
   });
 
   test("conversation retrieval is transcript-owned accessible and localized", () => {
@@ -140,7 +140,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(initBlock).toContain("resetToEmptyChatSurface");
     expect(initBlock).toContain("navigateConversationTranscript");
     expect(initBlock).toContain("bootstrap: true");
-    expect(chat).toContain("if (snapshot.length === 0)");
+    expect(chat).toContain("if (snapshot.messages.length === 0)");
     expect(chat).toContain('import { useRouter } from "next/navigation";');
     expect(chat).toContain("const router = useRouter();");
     expect(chat).toContain("router.replace(clearedRoute, { scroll: false });");

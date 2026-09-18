@@ -1,0 +1,2729 @@
+{
+  "last_measured": {
+    "baseline_scorecard": "docs/reports/evidence/current-reason-date-range/measurement/live-measurement.json",
+    "baseline_commit": "c861d95cf0e69003e99d935ffe57c16269e9172b",
+    "candidate_commit": "4c4e7a001150740dddef4e97fc13b99f2b0c823b",
+    "comparison_kind": "Historical case-by-case comparison, not a paired causal A/B",
+    "baseline_totals": {
+      "expected_failed": 0,
+      "failed": 3,
+      "infrastructure_error": 6,
+      "passed": 64,
+      "skipped": 0,
+      "unexpected_pass": 0
+    },
+    "current_totals": {
+      "expected_failed": 0,
+      "failed": 8,
+      "infrastructure_error": 0,
+      "passed": 65,
+      "skipped": 0,
+      "unexpected_pass": 0
+    },
+    "classifications": {
+      "unchanged_pass": 60,
+      "previously_unmeasured_now_passed": 4,
+      "regression": 4,
+      "previously_unmeasured_now_failed": 2,
+      "improved": 1,
+      "changed_failure": 2
+    },
+    "cases": [
+      {
+        "id": "metric_correctness_eth_default_crypto_benchmark",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02651895,
+          "accounted_usd": 0.029170845,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_concept_compound_interest_en",
+        "baseline_status": "infrastructure_error",
+        "current_status": "passed",
+        "classification": "previously_unmeasured_now_passed",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.086760406,
+          "accounted_usd": 0.0872044466,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_concept_inflation_es",
+        "baseline_status": "infrastructure_error",
+        "current_status": "passed",
+        "classification": "previously_unmeasured_now_passed",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.15561906760000002,
+          "accounted_usd": 0.15717897436,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_concept_etf_es",
+        "baseline_status": "infrastructure_error",
+        "current_status": "passed",
+        "classification": "previously_unmeasured_now_passed",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.15683495,
+          "accounted_usd": 0.157407445,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_capability_indicator_question_en",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.016391435052000004,
+          "accounted_usd": 0.018030578557200003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_capability_indicator_question_es",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.017339042,
+          "accounted_usd": 0.019072946200000006,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_macro_curiosity_en",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.011324797999999999,
+          "accounted_usd": 0.6374572777999999,
+          "unknown_reserved_usd": 0.625
+        }
+      },
+      {
+        "id": "ordinary_conversation_price_question_en",
+        "baseline_status": "infrastructure_error",
+        "current_status": "passed",
+        "classification": "previously_unmeasured_now_passed",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.08207938,
+          "accounted_usd": 0.083779318,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "graceful_recovery_weekly_options_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.025448304994,
+          "accounted_usd": 0.027993135493400004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "graceful_recovery_spanish_weekly_options_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 12,
+          "reported_usd": 0.039883210999999995,
+          "accounted_usd": 0.04387153209999999,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 9,
+          "reported_usd": 0.034506249999999995,
+          "accounted_usd": 0.037956875,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.0280095,
+          "accounted_usd": 0.030810450000000003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 8,
+          "reported_usd": 0.019566901602,
+          "accounted_usd": 0.021523591762200003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+          "capability_verdict: expected 'unsupported', got 'answer_only'",
+          "assets: expected ['VOO'], got []",
+          "asset_class: expected 'equity', got None",
+          "missing_required_fields: expected ['capital_amount'], got []",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply'], got ['ready_to_respond']",
+          "clarification: expected mapping subset {'kind': 'unsupported_recovery', 'reason_code': 'unsupported_dca_contribution_ceiling'}, got None",
+          "offered.clarification: no clarification reached the turn",
+          "offered.min_recovery_options: expected at least 1, got []"
+        ],
+        "new_failed_checks": [
+          "asset_class: expected 'equity', got None",
+          "assets: expected ['VOO'], got []",
+          "capability_verdict: expected 'unsupported', got 'answer_only'",
+          "clarification: expected mapping subset {'kind': 'unsupported_recovery', 'reason_code': 'unsupported_dca_contribution_ceiling'}, got None",
+          "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+          "missing_required_fields: expected ['capital_amount'], got []",
+          "offered.clarification: no clarification reached the turn",
+          "offered.min_recovery_options: expected at least 1, got []",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply'], got ['ready_to_respond']"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.0226286,
+          "accounted_usd": 0.35667346000000005,
+          "unknown_reserved_usd": 0.331782
+        }
+      },
+      {
+        "id": "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 7,
+          "reported_usd": 0.01943178,
+          "accounted_usd": 0.021374958,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.01765325,
+          "accounted_usd": 0.019418575,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 8,
+          "reported_usd": 0.0369062,
+          "accounted_usd": 0.040596820000000006,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.019647710000000002,
+          "accounted_usd": 0.024229018000000005,
+          "unknown_reserved_usd": 0.0026165370000000004
+        }
+      },
+      {
+        "id": "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 9,
+          "reported_usd": 0.041731250000000004,
+          "accounted_usd": 0.045904375000000004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02555945,
+          "accounted_usd": 0.028115395,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02645195,
+          "accounted_usd": 0.029097145,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_crypto_weekly_btc_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.02641015,
+          "accounted_usd": 0.029051164999999997,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_truncated_window_measures_served_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.007544283830000001,
+          "accounted_usd": 0.008298712213000001,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.0265157,
+          "accounted_usd": 0.029167270000000006,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.026440213999999997,
+          "accounted_usd": 0.0290842354,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+          "capability_verdict: expected 'executable', got 'answer_only'",
+          "assets: expected ['KO'], got []",
+          "asset_class: expected 'equity', got None",
+          "strategy_type: expected 'dca_accumulation', got None",
+          "capital_amount: expected 200, got None",
+          "contribution_period: expected 'monthly', got None",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['ready_to_respond']",
+          "offered.launch_payload: no launch reached the turn"
+        ],
+        "new_failed_checks": [
+          "asset_class: expected 'equity', got None",
+          "assets: expected ['KO'], got []",
+          "capability_verdict: expected 'executable', got 'answer_only'",
+          "capital_amount: expected 200, got None",
+          "contribution_period: expected 'monthly', got None",
+          "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+          "offered.launch_payload: no launch reached the turn",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['ready_to_respond']",
+          "strategy_type: expected 'dca_accumulation', got None"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.0224836,
+          "accounted_usd": 0.35984146000000006,
+          "unknown_reserved_usd": 0.33510950000000006
+        }
+      },
+      {
+        "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 12,
+          "reported_usd": 0.060904711699999996,
+          "accounted_usd": 0.06699518287,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.03014815,
+          "accounted_usd": 0.033162965,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.037144500000000004,
+          "accounted_usd": 0.040858950000000005,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_run_visible_confirmation_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 0,
+          "reported_usd": 0,
+          "accounted_usd": 0,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_remove_aapl_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.025069900000000003,
+          "accounted_usd": 0.032312599000000004,
+          "unknown_reserved_usd": 0.004735709000000001
+        }
+      },
+      {
+        "id": "action_chip_change_asset_bare_ticker_append_issue_190",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.024518550000000004,
+          "accounted_usd": 0.026970405000000003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_compound_replace_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.025567631032,
+          "accounted_usd": 0.028124394135200004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_changed_mind_capital_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.0235950237,
+          "accounted_usd": 0.02595452607,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02491260261,
+          "accounted_usd": 0.027403862871000002,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.01053065,
+          "accounted_usd": 0.011583715000000001,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02354708,
+          "accounted_usd": 0.025901788000000002,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.0246332,
+          "accounted_usd": 0.029751865000000002,
+          "unknown_reserved_usd": 0.0026553450000000004
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.0241442045252,
+          "accounted_usd": 0.02655862497772,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "natural_language_establishes_modeled_costs_issue_271",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.025616749999999997,
+          "accounted_usd": 0.028178425,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_add_asset_preserves_modeled_costs_issue_271",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.025779631032,
+          "accounted_usd": 0.0283575941352,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "compound_benchmark_start_date_preserves_confirmation_issue_339",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "intent: expected 'backtest_execution', got 'strategy_drafting'",
+          "date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "requested_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "effective_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}"
+        ],
+        "new_failed_checks": [
+          "date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "effective_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "intent: expected 'backtest_execution', got 'strategy_drafting'",
+          "offered.launch_payload.date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "requested_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.038553449999999996,
+          "accounted_usd": 0.042408795000000006,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.0173135,
+          "accounted_usd": 0.019044850000000002,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.02756865,
+          "accounted_usd": 0.030325515000000004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_category_english_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.01812049,
+          "accounted_usd": 0.019932539000000003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_peer_anchor_english_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.018012766,
+          "accounted_usd": 0.0198140426,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_comparison_anchor_english_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.019012005800000002,
+          "accounted_usd": 0.02091320638,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_category_spanish_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.018197963999999997,
+          "accounted_usd": 0.0200177604,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_recent_ipo_exact_issue_344",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.020885389799999998,
+          "accounted_usd": 0.028473928780000005,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_trending_crypto_exact_issue_344",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "prose_judge:honesty"
+        ],
+        "new_failed_checks": [
+          "prose_judge:honesty"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.020300611700000002,
+          "accounted_usd": 0.027830672870000003,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.021264423999999997,
+          "accounted_usd": 0.028890866400000003,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_semantic_pharma_escalation_issue_344",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.017574442000000003,
+          "accounted_usd": 0.024831886200000004,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.021929967999999998,
+          "accounted_usd": 0.029622964800000002,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_not_direct_backtest_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.01781025,
+          "accounted_usd": 0.019591275000000002,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_not_result_followup_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.021157455999999998,
+          "accounted_usd": 0.0232732016,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_not_capability_question_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.016574638,
+          "accounted_usd": 0.0182321018,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "capability_honesty_options_straddle_tsla",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.025414414,
+          "accounted_usd": 0.027955855400000004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "capability_honesty_golden_cross_control_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.022142049999999996,
+          "accounted_usd": 0.024356255,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "capability_honesty_momentum_breakout_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 8,
+          "reported_usd": 0.016253282,
+          "accounted_usd": 0.020801453200000004,
+          "unknown_reserved_usd": 0.0029228430000000005
+        }
+      },
+      {
+        "id": "capability_honesty_news_sentiment_rule_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 7,
+          "reported_usd": 0.028059289600000002,
+          "accounted_usd": 0.030865218560000005,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "capability_honesty_future_performance_nvda_golden_cross",
+        "baseline_status": "infrastructure_error",
+        "current_status": "failed",
+        "classification": "previously_unmeasured_now_failed",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "research.published: expected True, got False"
+        ],
+        "new_failed_checks": [
+          "research.published: expected True, got False"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.012535455999999999,
+          "accounted_usd": 0.6387890016,
+          "unknown_reserved_usd": 0.625
+        }
+      },
+      {
+        "id": "capability_honesty_future_performance_btc_regression",
+        "baseline_status": "infrastructure_error",
+        "current_status": "failed",
+        "classification": "previously_unmeasured_now_failed",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "research.published: expected True, got False"
+        ],
+        "new_failed_checks": [
+          "research.published: expected True, got False"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.02241439,
+          "accounted_usd": 0.6496558290000001,
+          "unknown_reserved_usd": 0.625
+        }
+      },
+      {
+        "id": "spanish_ui_english_user_msft_hold_h1_2024",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.0069806,
+          "accounted_usd": 0.00767866,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_spanish_btc_hold_q1_2024",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.0227413,
+          "accounted_usd": 0.025015430000000005,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.02367615,
+          "accounted_usd": 0.026043765000000007,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "baseline_status": "failed",
+        "current_status": "passed",
+        "classification": "improved",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [
+          "intent: expected one of ['conversation_followup', 'beginner_guidance'], got 'backtest_execution'",
+          "capability_verdict: expected 'answer_only', got 'unsupported'",
+          "stage_outcomes: expected ['ready_to_respond'], got ['needs_clarification', 'await_user_reply']",
+          "offered.min_next_experiment_rows: expected at least 1, got []",
+          "research: expected a research sidecar, got None"
+        ],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.24851090309999999,
+          "accounted_usd": 0.25041299341,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_spanish_explicit_end_survives_year_qualifier",
+        "baseline_status": "failed",
+        "current_status": "failed",
+        "classification": "changed_failure",
+        "fixture_semantics_unchanged": false,
+        "baseline_failed_checks": [
+          "offered.launch_payload.date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2026-08-17', 'end': '2026-08-19'}",
+          "prose_judge:missing_assistant_text"
+        ],
+        "current_failed_checks": [
+          "date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "effective_date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}"
+        ],
+        "new_failed_checks": [
+          "date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "effective_date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.032654050000000004,
+          "accounted_usd": 0.035919455,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_opening_apple_capital_missing_period_issue_336",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 10,
+          "reported_usd": 0.02939077,
+          "accounted_usd": 0.032329846999999995,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_aapl_simple_hold_2024",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.00667245,
+          "accounted_usd": 0.007339695,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_company_name_multi_asset_issue_142",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.017889,
+          "accounted_usd": 0.019677899999999998,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_complete_sma_crossover_benchmark_issue_270",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02827675,
+          "accounted_usd": 0.031104425000000005,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_post_result_fact_then_capital_edit_issue_160",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.021124149999999998,
+          "accounted_usd": 0.023236565000000004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_explicit_end_survives_year_qualifier",
+        "baseline_status": "failed",
+        "current_status": "failed",
+        "classification": "changed_failure",
+        "fixture_semantics_unchanged": false,
+        "baseline_failed_checks": [
+          "capability_verdict: expected 'executable', got 'needs_clarification'",
+          "stage_outcomes: expected ['ready_for_confirmation', 'await_approval'], got ['needs_clarification', 'await_user_reply']",
+          "offered.launch_payload: no launch reached the turn"
+        ],
+        "current_failed_checks": [
+          "date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "effective_date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}"
+        ],
+        "new_failed_checks": [
+          "date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "effective_date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.03212625,
+          "accounted_usd": 0.035338875000000006,
+          "unknown_reserved_usd": 0
+        }
+      }
+    ]
+  },
+  "fingerprint": {
+    "baseline_scorecard": "docs/reports/evidence/grounded-math/measurement/live-measurement.json",
+    "baseline_commit": "dc8608c8a09252ff8c51ef077f32d449bb0b6e8b",
+    "candidate_commit": "4c4e7a001150740dddef4e97fc13b99f2b0c823b",
+    "comparison_kind": "Historical case-by-case comparison, not a paired causal A/B",
+    "baseline_totals": {
+      "expected_failed": 0,
+      "failed": 2,
+      "infrastructure_error": 0,
+      "passed": 69,
+      "skipped": 0,
+      "unexpected_pass": 0
+    },
+    "current_totals": {
+      "expected_failed": 0,
+      "failed": 8,
+      "infrastructure_error": 0,
+      "passed": 65,
+      "skipped": 0,
+      "unexpected_pass": 0
+    },
+    "classifications": {
+      "unchanged_pass": 64,
+      "regression": 5,
+      "changed_failure": 1,
+      "improved": 1,
+      "new_failure": 2
+    },
+    "cases": [
+      {
+        "id": "metric_correctness_eth_default_crypto_benchmark",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02651895,
+          "accounted_usd": 0.029170845,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_concept_compound_interest_en",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.086760406,
+          "accounted_usd": 0.0872044466,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_concept_inflation_es",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.15561906760000002,
+          "accounted_usd": 0.15717897436,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_concept_etf_es",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.15683495,
+          "accounted_usd": 0.157407445,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_capability_indicator_question_en",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.016391435052000004,
+          "accounted_usd": 0.018030578557200003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_capability_indicator_question_es",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.017339042,
+          "accounted_usd": 0.019072946200000006,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_conversation_macro_curiosity_en",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.011324797999999999,
+          "accounted_usd": 0.6374572777999999,
+          "unknown_reserved_usd": 0.625
+        }
+      },
+      {
+        "id": "ordinary_conversation_price_question_en",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.08207938,
+          "accounted_usd": 0.083779318,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "graceful_recovery_weekly_options_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.025448304994,
+          "accounted_usd": 0.027993135493400004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "graceful_recovery_spanish_weekly_options_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 12,
+          "reported_usd": 0.039883210999999995,
+          "accounted_usd": 0.04387153209999999,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "graceful_recovery_spanish_offline_clarifier_missing_period_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 9,
+          "reported_usd": 0.034506249999999995,
+          "accounted_usd": 0.037956875,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_start_by_phrase_is_contribution_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.0280095,
+          "accounted_usd": 0.030810450000000003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_missing_contribution_asks_amount_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 8,
+          "reported_usd": 0.019566901602,
+          "accounted_usd": 0.021523591762200003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_only_have_amount_is_ceiling_issue_455",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+          "capability_verdict: expected 'unsupported', got 'answer_only'",
+          "assets: expected ['VOO'], got []",
+          "asset_class: expected 'equity', got None",
+          "missing_required_fields: expected ['capital_amount'], got []",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply'], got ['ready_to_respond']",
+          "clarification: expected mapping subset {'kind': 'unsupported_recovery', 'reason_code': 'unsupported_dca_contribution_ceiling'}, got None",
+          "offered.clarification: no clarification reached the turn",
+          "offered.min_recovery_options: expected at least 1, got []"
+        ],
+        "new_failed_checks": [
+          "asset_class: expected 'equity', got None",
+          "assets: expected ['VOO'], got []",
+          "capability_verdict: expected 'unsupported', got 'answer_only'",
+          "clarification: expected mapping subset {'kind': 'unsupported_recovery', 'reason_code': 'unsupported_dca_contribution_ceiling'}, got None",
+          "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+          "missing_required_fields: expected ['capital_amount'], got []",
+          "offered.clarification: no clarification reached the turn",
+          "offered.min_recovery_options: expected at least 1, got []",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply'], got ['ready_to_respond']"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.0226286,
+          "accounted_usd": 0.35667346000000005,
+          "unknown_reserved_usd": 0.331782
+        }
+      },
+      {
+        "id": "dca_capital_semantics_explicit_cap_refused_by_name_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 7,
+          "reported_usd": 0.01943178,
+          "accounted_usd": 0.021374958,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_stated_seed_reaches_ready_to_run_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.01765325,
+          "accounted_usd": 0.019418575,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_zero_seed_small_contribution_executable_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 8,
+          "reported_usd": 0.0369062,
+          "accounted_usd": 0.040596820000000006,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_period_exceeds_window_named_refusal_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.019647710000000002,
+          "accounted_usd": 0.024229018000000005,
+          "unknown_reserved_usd": 0.0026165370000000004
+        }
+      },
+      {
+        "id": "dca_capital_semantics_zero_contribution_names_buy_and_hold_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 9,
+          "reported_usd": 0.041731250000000004,
+          "accounted_usd": 0.045904375000000004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_calendar_alignment_keeps_period_fit_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02555945,
+          "accounted_usd": 0.028115395,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_multi_symbol_equal_weight_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02645195,
+          "accounted_usd": 0.029097145,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_crypto_weekly_btc_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.02641015,
+          "accounted_usd": 0.029051164999999997,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_truncated_window_measures_served_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.007544283830000001,
+          "accounted_usd": 0.008298712213000001,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_spanish_seed_and_contribution_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.0265157,
+          "accounted_usd": 0.029167270000000006,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_spanish_period_exceeds_window_issue_455",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.026440213999999997,
+          "accounted_usd": 0.0290842354,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_prebaked_chip_bare_amount_reaches_ready_to_run",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+          "capability_verdict: expected 'executable', got 'answer_only'",
+          "assets: expected ['KO'], got []",
+          "asset_class: expected 'equity', got None",
+          "strategy_type: expected 'dca_accumulation', got None",
+          "capital_amount: expected 200, got None",
+          "contribution_period: expected 'monthly', got None",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['ready_to_respond']",
+          "offered.launch_payload: no launch reached the turn"
+        ],
+        "new_failed_checks": [
+          "asset_class: expected 'equity', got None",
+          "assets: expected ['KO'], got []",
+          "capability_verdict: expected 'executable', got 'answer_only'",
+          "capital_amount: expected 200, got None",
+          "contribution_period: expected 'monthly', got None",
+          "intent: expected one of ['backtest_execution', 'strategy_drafting'], got 'conversation_followup'",
+          "offered.launch_payload: no launch reached the turn",
+          "stage_outcomes: expected ['needs_clarification', 'await_user_reply', 'ready_for_confirmation', 'await_approval'], got ['ready_to_respond']",
+          "strategy_type: expected 'dca_accumulation', got None"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.0224836,
+          "accounted_usd": 0.35984146000000006,
+          "unknown_reserved_usd": 0.33510950000000006
+        }
+      },
+      {
+        "id": "dca_capital_semantics_prebaked_chip_spanish_pesos_reaches_ready_to_run",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 12,
+          "reported_usd": 0.060904711699999996,
+          "accounted_usd": 0.06699518287,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_2026_09_10",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.03014815,
+          "accounted_usd": 0.033162965,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "dca_capital_semantics_clarification_reply_keeps_earlier_facts_spanish_2026_09_10",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.037144500000000004,
+          "accounted_usd": 0.040858950000000005,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_run_visible_confirmation_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 0,
+          "reported_usd": 0,
+          "accounted_usd": 0,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_remove_aapl_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.025069900000000003,
+          "accounted_usd": 0.032312599000000004,
+          "unknown_reserved_usd": 0.004735709000000001
+        }
+      },
+      {
+        "id": "action_chip_change_asset_bare_ticker_append_issue_190",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.024518550000000004,
+          "accounted_usd": 0.026970405000000003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_compound_replace_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.025567631032,
+          "accounted_usd": 0.028124394135200004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_changed_mind_capital_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.0235950237,
+          "accounted_usd": 0.02595452607,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_remove_aapl_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02491260261,
+          "accounted_usd": 0.027403862871000002,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_lost_stage_remove_aapl_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.01053065,
+          "accounted_usd": 0.011583715000000001,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_multi_op_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02354708,
+          "accounted_usd": 0.025901788000000002,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_asset_and_date_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.0246332,
+          "accounted_usd": 0.029751865000000002,
+          "unknown_reserved_usd": 0.0026553450000000004
+        }
+      },
+      {
+        "id": "action_chip_change_asset_no_active_ref_fresh_idea_issue_188",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.0241442045252,
+          "accounted_usd": 0.02655862497772,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "natural_language_establishes_modeled_costs_issue_271",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.025616749999999997,
+          "accounted_usd": 0.028178425,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "action_chip_add_asset_preserves_modeled_costs_issue_271",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.025779631032,
+          "accounted_usd": 0.0283575941352,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "compound_benchmark_start_date_preserves_confirmation_issue_339",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "intent: expected 'backtest_execution', got 'strategy_drafting'",
+          "date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "requested_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "effective_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}"
+        ],
+        "new_failed_checks": [
+          "date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "effective_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "intent: expected 'backtest_execution', got 'strategy_drafting'",
+          "offered.launch_payload.date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}",
+          "requested_date_range: expected {'start': '2026-04-01', 'end': '2026-07-30'}, got {'start': '2026-03-02', 'end': '2026-07-30'}"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.038553449999999996,
+          "accounted_usd": 0.042408795000000006,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_en",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.0173135,
+          "accounted_usd": 0.019044850000000002,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "ordinary_turn_edits_owned_confirmation_after_failed_action_issue_272_es",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.02756865,
+          "accounted_usd": 0.030325515000000004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_category_english_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.01812049,
+          "accounted_usd": 0.019932539000000003,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_peer_anchor_english_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.018012766,
+          "accounted_usd": 0.0198140426,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_comparison_anchor_english_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.019012005800000002,
+          "accounted_usd": 0.02091320638,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_category_spanish_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.018197963999999997,
+          "accounted_usd": 0.0200177604,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_recent_ipo_exact_issue_344",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.020885389799999998,
+          "accounted_usd": 0.028473928780000005,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_trending_crypto_exact_issue_344",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "prose_judge:honesty"
+        ],
+        "new_failed_checks": [
+          "prose_judge:honesty"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.020300611700000002,
+          "accounted_usd": 0.027830672870000003,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_old_pharma_escalation_exact_issue_344",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.021264423999999997,
+          "accounted_usd": 0.028890866400000003,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_semantic_pharma_escalation_issue_344",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.017574442000000003,
+          "accounted_usd": 0.024831886200000004,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_spanish_generated_pharma_escalation_issue_344",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.021929967999999998,
+          "accounted_usd": 0.029622964800000002,
+          "unknown_reserved_usd": 0.0055000000000000005
+        }
+      },
+      {
+        "id": "asset_discovery_not_direct_backtest_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.01781025,
+          "accounted_usd": 0.019591275000000002,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_not_result_followup_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.021157455999999998,
+          "accounted_usd": 0.0232732016,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "asset_discovery_not_capability_question_issue_244",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.016574638,
+          "accounted_usd": 0.0182321018,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "capability_honesty_options_straddle_tsla",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.025414414,
+          "accounted_usd": 0.027955855400000004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "capability_honesty_golden_cross_control_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.022142049999999996,
+          "accounted_usd": 0.024356255,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "capability_honesty_momentum_breakout_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 8,
+          "reported_usd": 0.016253282,
+          "accounted_usd": 0.020801453200000004,
+          "unknown_reserved_usd": 0.0029228430000000005
+        }
+      },
+      {
+        "id": "capability_honesty_news_sentiment_rule_aapl",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 7,
+          "reported_usd": 0.028059289600000002,
+          "accounted_usd": 0.030865218560000005,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "capability_honesty_future_performance_nvda_golden_cross",
+        "baseline_status": "failed",
+        "current_status": "failed",
+        "classification": "changed_failure",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [
+          "intent: expected one of ['conversation_followup', 'beginner_guidance'], got 'backtest_execution'",
+          "capability_verdict: expected 'answer_only', got 'unsupported'",
+          "stage_outcomes: expected ['ready_to_respond'], got ['needs_clarification', 'await_user_reply']",
+          "offered.min_next_experiment_rows: expected at least 1, got []",
+          "research: expected a research sidecar, got None"
+        ],
+        "current_failed_checks": [
+          "research.published: expected True, got False"
+        ],
+        "new_failed_checks": [
+          "research.published: expected True, got False"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.012535455999999999,
+          "accounted_usd": 0.6387890016,
+          "unknown_reserved_usd": 0.625
+        }
+      },
+      {
+        "id": "capability_honesty_future_performance_btc_regression",
+        "baseline_status": "passed",
+        "current_status": "failed",
+        "classification": "regression",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "research.published: expected True, got False"
+        ],
+        "new_failed_checks": [
+          "research.published: expected True, got False"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 5,
+          "reported_usd": 0.02241439,
+          "accounted_usd": 0.6496558290000001,
+          "unknown_reserved_usd": 0.625
+        }
+      },
+      {
+        "id": "spanish_ui_english_user_msft_hold_h1_2024",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.0069806,
+          "accounted_usd": 0.00767866,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_spanish_btc_hold_q1_2024",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.0227413,
+          "accounted_usd": 0.025015430000000005,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_spanish_post_result_fact_then_capital_edit_issue_160",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.02367615,
+          "accounted_usd": 0.026043765000000007,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_spanish_future_performance_nvda_cruce_dorado",
+        "baseline_status": "failed",
+        "current_status": "passed",
+        "classification": "improved",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [
+          "research.published: expected True, got False",
+          "prose_judge:scenario_framing"
+        ],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.24851090309999999,
+          "accounted_usd": 0.25041299341,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_spanish_explicit_end_survives_year_qualifier",
+        "baseline_status": null,
+        "current_status": "failed",
+        "classification": "new_failure",
+        "fixture_semantics_unchanged": null,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "effective_date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}"
+        ],
+        "new_failed_checks": [
+          "date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "effective_date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.032654050000000004,
+          "accounted_usd": 0.035919455,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_opening_apple_capital_missing_period_issue_336",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 10,
+          "reported_usd": 0.02939077,
+          "accounted_usd": 0.032329846999999995,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_aapl_simple_hold_2024",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.00667245,
+          "accounted_usd": 0.007339695,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_company_name_multi_asset_issue_142",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 2,
+          "reported_usd": 0.017889,
+          "accounted_usd": 0.019677899999999998,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_complete_sma_crossover_benchmark_issue_270",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 4,
+          "reported_usd": 0.02827675,
+          "accounted_usd": 0.031104425000000005,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_post_result_fact_then_capital_edit_issue_160",
+        "baseline_status": "passed",
+        "current_status": "passed",
+        "classification": "unchanged_pass",
+        "fixture_semantics_unchanged": true,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [],
+        "new_failed_checks": [],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 3,
+          "reported_usd": 0.021124149999999998,
+          "accounted_usd": 0.023236565000000004,
+          "unknown_reserved_usd": 0
+        }
+      },
+      {
+        "id": "messy_english_explicit_end_survives_year_qualifier",
+        "baseline_status": null,
+        "current_status": "failed",
+        "classification": "new_failure",
+        "fixture_semantics_unchanged": null,
+        "baseline_failed_checks": [],
+        "current_failed_checks": [
+          "date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "effective_date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}"
+        ],
+        "new_failed_checks": [
+          "date_range: expected {'start': '2026-08-16', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "effective_date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}",
+          "offered.launch_payload.date_range: expected {'start': '2026-08-17', 'end': '2026-08-19'}, got {'start': '2024-08-16', 'end': '2024-08-19'}"
+        ],
+        "current_infrastructure_errors": [],
+        "cost": {
+          "attempts": 6,
+          "reported_usd": 0.03212625,
+          "accounted_usd": 0.035338875000000006,
+          "unknown_reserved_usd": 0
+        }
+      }
+    ]
+  }
+}

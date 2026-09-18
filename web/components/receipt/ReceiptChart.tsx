@@ -8,6 +8,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { PublicReceiptVisual } from "@/lib/public-receipt-contract";
+import { CHART_ATTRIBUTION_LABEL, CHART_ATTRIBUTION_NOTICE, CHART_ATTRIBUTION_URL } from "@/lib/chart-attribution";
 
 type ReceiptChartProps = {
   visual: PublicReceiptVisual;
@@ -60,7 +61,7 @@ export default function ReceiptChart({ visual }: ReceiptChartProps) {
       layout: {
         background: { type: ColorType.Solid, color: "transparent" },
         textColor: isDark ? "rgba(255,255,255,0.42)" : "rgba(0,0,0,0.45)",
-        attributionLogo: false,
+        attributionLogo: true,
       },
       grid: {
         vertLines: { color: "transparent" },
@@ -115,5 +116,13 @@ export default function ReceiptChart({ visual }: ReceiptChartProps) {
     };
   }, [visual, isDark]);
 
-  return <div ref={containerRef} className="h-[220px] w-full" />;
+  return <div>
+    <div ref={containerRef} className="h-[220px] w-full" />
+    <div data-testid="receipt-chart-attribution" className="border-t border-black/[0.04] pb-2 pt-1.5 text-[10px] leading-snug text-black/45 dark:border-white/[0.06] dark:text-white/45">
+      <a href={CHART_ATTRIBUTION_URL} target="_blank" rel="noreferrer" className="inline-flex max-w-full text-inherit underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 dark:focus-visible:ring-white/30">
+        {CHART_ATTRIBUTION_LABEL}™
+      </a>
+      <p>{CHART_ATTRIBUTION_NOTICE}</p>
+    </div>
+  </div>;
 }

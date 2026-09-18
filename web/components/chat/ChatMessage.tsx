@@ -5,9 +5,10 @@ import { ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning, Rotat
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
+import SharedConversationMessage from "./SharedConversationMessage";
 import StrategyResultCard from "./StrategyResultCard";
 import ToolResultCard from "./ToolResultCard";
-import type { ToolRecompute } from "@/lib/tool-result-card";
+import { answerAssumptionsText, type ToolRecompute } from "@/lib/tool-result-card";
 import { ComputedAnswerDecision } from "./DecisionAffordance";
 import StrategyConfirmationCard from "./StrategyConfirmationCard";
 import BacktestJobCard from "./BacktestJobCard";
@@ -36,7 +37,11 @@ import { chatMessageCopyText } from "@/lib/chat-message-copy-text";
 import { resultMessageReadoutText } from "@/lib/result-readout-display";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
-import { recoveryDisplayText } from "@/lib/chat-recovery-display";
+import {
+  recoveryDisplayText,
+  recoveryNoticeUnderAnswer,
+  wearsQuietFailureNotice,
+} from "@/lib/chat-recovery-display";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import FailureNotice from "./FailureNotice";
@@ -64,6 +69,8 @@ type ChatMessageProps = {
   message: Message;
   onAction?: (action: ChatActionOption) => void;
   onToolRecompute?: ToolRecompute;
+  /** Opens another conversation: a continued result, or the chat it came from. */
+  onOpenConversation?: (conversationId: string) => void;
   onDirectEdit?: (
     confirmationId: string,
     edit: ConfirmationDirectEditPayload,
@@ -94,6 +101,7 @@ export default function ChatMessage({
   onAction,
   onDirectEdit,
   onToolRecompute,
+  onOpenConversation,
   onFeedback,
   onToast,
   isLatest,
@@ -196,6 +204,8 @@ export default function ChatMessage({
     );
   };
 
+  // An answer with a recovery keeps its content; the notice renders under it.
+  const noticeUnderAnswer = !isUser && recoveryNoticeUnderAnswer(message.recoveryDisplay);
   const getDisplayContent = () => {
     if (!isUser && isStreaming && message.contentPresentation === "result_breakdown") {
       return t("chat.status.working");
@@ -203,7 +213,7 @@ export default function ChatMessage({
     const readout = resultMessageReadoutText(message, t, locale);
     if (readout !== null) return readout;
     const content = message.content ?? "";
-    if (!isUser && message.recoveryDisplay) {
+    if (!isUser && message.recoveryDisplay && !noticeUnderAnswer) {
       const recovered = recoveryDisplayText(message.recoveryDisplay, t, locale);
       if (recovered.trim()) {
         return recovered;
@@ -241,6 +251,29 @@ export default function ChatMessage({
       ? "opacity-100"
       : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100";
   const displayContent = getDisplayContent();
+  // The amber notice: in place of a failed reply, or under an answer given
+  // without a lookup that failed.
+  const retryableNotice = (text: string) => (
+    <div
+      role="status"
+      className={`${retryableNoticeContainerClass} max-w-[min(100%,660px)]`}
+    >
+      <MessageSquareWarning className={retryableNoticeIconClass} aria-hidden="true" />
+      <div className={retryableNoticeBodyClass}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+      </div>
+      {retryAction ? (
+        <button
+          type="button"
+          onClick={() => onAction?.(retryAction)}
+          className={retryableNoticeRetryPillClass}
+        >
+          {actionLabel(retryAction)}
+        </button>
+      ) : null}
+    </div>
+  );
+  const assumedInputsLine = answerAssumptionsText(message, t, locale);
   const researchSourcesOpen = researchSourcesDisplay(Boolean(message.researchDegradedCode));
   // Chips carry domains and the drawer owns the list; zero sources is the
   // ungrounded marker (derived, never asserted). Canon: DESIGN.md §11.
@@ -296,6 +329,8 @@ export default function ChatMessage({
       </div>
     );
   }
+
+  if (message.sharedConversation) return <SharedConversationMessage message={message} />;
 
   if (isUser) {
     return (
@@ -405,39 +440,21 @@ export default function ChatMessage({
               label={t("chat.result_breakdown.label", "Breakdown")}
               isWorking={Boolean(isStreaming)}
             />
-          ) : !isUser && message.assistantRecoveryCode ? (
+          ) : !isUser && message.assistantRecoveryCode && !noticeUnderAnswer ? (
             // Infrastructure failure is visibly a failure: no result chrome,
             // no normal-answer bubble (issue #249).
-            <div
-              role="status"
-              className={`${retryableNoticeContainerClass} max-w-[min(100%,660px)]`}
-            >
-              <MessageSquareWarning
-                className={retryableNoticeIconClass}
-                aria-hidden="true"
-              />
-              <div className={retryableNoticeBodyClass}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {displayContent}
-                </ReactMarkdown>
-              </div>
-              {retryAction ? (
-                <button
-                  type="button"
-                  onClick={() => onAction?.(retryAction)}
-                  className={retryableNoticeRetryPillClass}
-                >
-                  {actionLabel(retryAction)}
-                </button>
-              ) : null}
-            </div>
-          ) : !isUser &&
-            message.recoveryDisplay?.kind === "artifact_action_recovery" ? (
-            // A rejected/inactive action is still a failure statement; it
-            // must not read as an ordinary answer, only quieter than amber.
+            retryableNotice(displayContent)
+          ) : !isUser && !noticeUnderAnswer && wearsQuietFailureNotice(message.recoveryDisplay) ? (
+            // A rejected action or a lookup that cannot be retried is still a
+            // failure statement; it must not read as an ordinary answer, only
+            // quieter than amber.
             <FailureNotice
               className="max-w-[min(100%,660px)]"
-              testId="artifact-action-failure-notice"
+              testId={
+                message.recoveryDisplay?.kind === "artifact_action_recovery"
+                  ? "artifact-action-failure-notice"
+                  : "recovery-failure-notice"
+              }
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {displayContent}
@@ -450,7 +467,17 @@ export default function ChatMessage({
               </ReactMarkdown>
             </div>
           )}
+          {assumedInputsLine ? (
+            <p data-answer-assumptions className="mt-3 max-w-[min(100%,660px)] text-sm text-black/60 dark:text-white/60">{assumedInputsLine}</p>
+          ) : null}
 
+          {!isUser && message.continuedFrom && onOpenConversation ? (
+            <button type="button" data-continued-from={message.continuedFrom.conversationId}
+              onClick={() => { if (message.continuedFrom) onOpenConversation(message.continuedFrom.conversationId); }}
+              className="mt-3 inline-flex min-h-11 items-center text-left text-[13px] text-black/50 underline decoration-black/20 underline-offset-4 transition-colors hover:text-black dark:text-white/50 dark:decoration-white/20 dark:hover:text-white">
+              {t("tools.compute.continued_from")}
+            </button>
+          ) : null}
           {!isUser && message.toolJobs?.map((pending) => <div key={pending.call_id} className="mt-3 w-full max-w-[min(100%,660px)]">
             <BacktestJobCard job={pending.job} canRetry={false} />
           </div>)}
@@ -460,6 +487,19 @@ export default function ChatMessage({
               <ToolResultCard card={card} onRecompute={onToolRecompute} disabled={!toolRecomputeEligible(message.id, latestMessageId, turnInFlight || Boolean(isStreaming))} />
             </div>
           ))}
+          {noticeUnderAnswer ? (
+            <div data-recovery-under-answer className="mt-3 w-full max-w-[min(100%,660px)]">
+              {message.assistantRecoveryCode ? (
+                retryableNotice(recoveryDisplayText(message.recoveryDisplay, t, locale))
+              ) : (
+                <FailureNotice testId="recovery-failure-notice">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {recoveryDisplayText(message.recoveryDisplay, t, locale)}
+                  </ReactMarkdown>
+                </FailureNotice>
+              )}
+            </div>
+          ) : null}
 
           {!isUser && !isStreaming && message.memoryRecalls?.length ? (
             <MemoryRecallNote recalls={message.memoryRecalls} />
@@ -469,6 +509,7 @@ export default function ChatMessage({
             <ComputedAnswerDecision
               message={message}
               conversationId={conversationId}
+              onOpenConversation={onOpenConversation}
               onSaved={(decision) => onDecisionSaved?.(decision.decision_state)}
             />
           ) : null}

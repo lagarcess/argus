@@ -1,0 +1,26 @@
+{"repeat": 1, "operation": "fetch_price_series", "symbol": "ARB", "elapsed_ms": 61.277, "status": "returned_price", "rows": 20, "last_price": 29.78, "last_date": "2026-09-15 04:00:00+00:00"}
+{"repeat": 1, "operation": "fetch_price_series", "symbol": "ZEC", "status": "errored", "error_type": "ValueError", "error": "market_data_empty", "elapsed_ms": 157.708}
+{"repeat": 1, "operation": "fetch_price_series", "symbol": "SYN", "status": "errored", "error_type": "ValueError", "error": "market_data_empty", "elapsed_ms": 160.455}
+{"repeat": 1, "operation": "fetch_price_series", "symbol": "RAY", "status": "errored", "error_type": "ValueError", "error": "market_data_empty", "elapsed_ms": 163.801}
+{"repeat": 1, "operation": "fetch_price_series", "symbol": "SHIB", "elapsed_ms": 168.716, "status": "returned_price", "rows": 31, "last_price": 4.97e-06, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "BTC", "elapsed_ms": 60.641, "status": "returned_price", "rows": 21, "last_price": 33.61, "last_date": "2026-09-16 04:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "XRP", "elapsed_ms": 65.879, "status": "returned_price", "rows": 31, "last_price": 1.29442, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "SOL", "elapsed_ms": 67.001, "status": "returned_price", "rows": 31, "last_price": 99.2179, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "BTC", "elapsed_ms": 69.151, "status": "returned_price", "rows": 31, "last_price": 76145.2735, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "ETH", "elapsed_ms": 68.966, "status": "returned_price", "rows": 31, "last_price": 2426.0, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "AVAX", "elapsed_ms": 61.44, "status": "returned_price", "rows": 31, "last_price": 7.519, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "ADA", "elapsed_ms": 62.721, "status": "returned_price", "rows": 31, "last_price": 0.195016, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "DOT", "elapsed_ms": 60.645, "status": "returned_price", "rows": 31, "last_price": 1.00875, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 2, "operation": "fetch_price_series", "symbol": "LINK", "elapsed_ms": 61.717, "status": "returned_price", "rows": 31, "last_price": 11.05925, "last_date": "2026-09-17 00:00:00+00:00"}
+{"repeat": 3, "operation": "classify_symbol", "symbol": "NVDA", "elapsed_ms": 0.02, "status": "resolved", "resolved_symbol": "NVDA", "asset_class": "equity"}
+{"repeat": 3, "operation": "fetch_price_series", "symbol": "NVDA", "elapsed_ms": 57.879, "status": "returned_price", "rows": 9, "last_price": 213.94, "last_date": "2026-09-16 04:00:00+00:00"}
+{"repeat": 3, "operation": "latest_market_close", "symbol": "NVDA", "elapsed_ms": 58.368, "status": "returned_price", "price": 213.94, "date": "2026-09-16"}
+{"repeat": 3, "operation": "runtime_note", "message": "Answer calculation guard answer_figures_replaced {'failure': 'missing_computed_reference', 'unresolved': [], 'recovery': 'labeled_scenarios', 'missing_results': ['nvda.value_at_horizon_base']}", "extra": {"failure_classification": "answer_figures_replaced"}}
+{"repeat": 3, "operation": "fetch_price_series", "symbol": "NVDA", "elapsed_ms": 51.768, "status": "returned_price", "rows": 21, "last_price": 213.94, "last_date": "2026-09-16 04:00:00+00:00"}
+{"repeat": 3, "operation": "fetch_price_series", "symbol": "NVDA", "elapsed_ms": 109.287, "status": "returned_price", "rows": 752, "last_price": 213.94, "last_date": "2026-09-16 04:00:00+00:00"}
+{"repeat": 4, "operation": "runtime_note", "message": "Answer calculation guard answer_market_data_not_a_price {'name': 'currency'}", "extra": {"failure_classification": "answer_market_data_not_a_price"}}
+{"repeat": 4, "operation": "classify_symbol", "symbol": "NVDA", "elapsed_ms": 0.021, "status": "resolved", "resolved_symbol": "NVDA", "asset_class": "equity"}
+{"repeat": 4, "operation": "fetch_price_series", "symbol": "NVDA", "elapsed_ms": 189.482, "status": "returned_price", "rows": 9, "last_price": 213.94, "last_date": "2026-09-16 04:00:00+00:00"}
+{"repeat": 4, "operation": "latest_market_close", "symbol": "NVDA", "elapsed_ms": 190.014, "status": "returned_price", "price": 213.94, "date": "2026-09-16"}
+{"repeat": 4, "operation": "runtime_note", "message": "Answer calculation guard answer_figures_replaced {'failure': 'missing_computed_reference', 'unresolved': [], 'recovery': 'labeled_scenarios', 'missing_results': ['escenarios_nvda.value_at_horizon_base']}", "extra": {"failure_classification": "answer_figures_replaced"}}
+{"repeat": 4, "operation": "fetch_price_series", "symbol": "NVDA", "elapsed_ms": 154.79, "status": "returned_price", "rows": 752, "last_price": 213.94, "last_date": "2026-09-16 04:00:00+00:00"}

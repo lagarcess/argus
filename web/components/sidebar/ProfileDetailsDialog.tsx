@@ -1,5 +1,7 @@
 "use client";
 
+import { withViewportPortal } from "@/components/ui/withViewportPortal";
+
 import { useId, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronUp, Edit2, X } from "lucide-react";
@@ -90,10 +92,9 @@ type ProfileDetailsDialogProps = {
   isSavingLanguage: boolean;
   languageError: string | null;
 
-  deleteRequestDialog: React.ReactNode;
 };
 
-export default function ProfileDetailsDialog({
+function ProfileDetailsDialogSurface({
   profile,
   accountKind,
   closeProfileModal,
@@ -134,7 +135,6 @@ export default function ProfileDetailsDialog({
   handleLanguageSelect,
   isSavingLanguage,
   languageError,
-  deleteRequestDialog,
 }: ProfileDetailsDialogProps) {
   const { t } = useTranslation();
   const overlayId = useId();
@@ -567,7 +567,8 @@ export default function ProfileDetailsDialog({
         </div>
       </div>
     </div>
-    {deleteRequestDialog}
     </>
   );
 }
+
+export default withViewportPortal(ProfileDetailsDialogSurface);

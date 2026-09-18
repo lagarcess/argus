@@ -1,0 +1,36 @@
+$ playwright test conversation-activity-ui.spec.ts --grep-invert "durable backtest stays|coarse pointer|resolved clarification"
+(node:41804) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:41814) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:41817) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 11 tests using 2 workers
+
+(node:41830) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:41829) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:41832) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:41832) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:41830) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:41830) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:41829) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:41829) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 [chromium] › e2e/conversation-activity-ui.spec.ts:748:7 › simultaneous A and B requests stay isolated when activity-a settles first (1.2s)
+  ✓   1 [chromium] › e2e/conversation-activity-ui.spec.ts:694:5 › ordinary work remains owned by A after switching to B and clears only at visible latest (1.2s)
+  ✓   3 [chromium] › e2e/conversation-activity-ui.spec.ts:748:7 › simultaneous A and B requests stay isolated when activity-b settles first (898ms)
+  ✓   4 [chromium] › e2e/conversation-activity-ui.spec.ts:847:5 › completion while scrolled up keeps position and evolves the single Jump to latest control (1.7s)
+  ✓   5 [chromium] › e2e/conversation-activity-ui.spec.ts:895:5 › restored older scroll and an older message anchor retain unread until latest (1.2s)
+  ✓   6 [chromium] › e2e/conversation-activity-ui.spec.ts:950:5 › row and header menus toggle durable unread without reordering or same-view self-clear (998ms)
+  ✓   7 [chromium] › e2e/conversation-activity-ui.spec.ts:1029:5 › expanded, collapsed, Quick Peek, selected, dark, and reduced-motion projections share one precedence (898ms)
+  ✓   8 [chromium] › e2e/conversation-activity-ui.spec.ts:1161:5 › typed needs-input, attention, canceled, expired, and checking states do not alter the activity rail (581ms)
+  ✓   9 [chromium] › e2e/conversation-activity-ui.spec.ts:1260:5 › Spanish desktop exposes the complete typed activity vocabulary (383ms)
+  ✓  10 [chromium] › e2e/conversation-activity-ui.spec.ts:1301:7 › second tab loads the saved reply on completion without duplicating the sender (en) (3.8s)
+  ✓  11 [chromium] › e2e/conversation-activity-ui.spec.ts:1301:7 › second tab loads the saved reply on completion without duplicating the sender (es-419) (3.8s)
+
+  11 passed (9.2s)

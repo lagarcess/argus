@@ -27,10 +27,10 @@ STABLECOINS = {"USDC", "USDT", "DAI", "BUSD", "TUSD"}
 
 # The accepted-value envelope for a runnable configuration. Every layer that
 # admits a value the engine will execute reads these names: the run-time
-# validator below, the edit resolver's cost gate, the confirm preflight, and
-# the card's advertised edit constraints. A card may never promise a run
-# these bounds refuse.
-MIN_STARTING_CAPITAL = 1000.0
+# validator below, the edit resolver's cost gate, the confirm preflight, the
+# card's advertised edit constraints, and the capability contract's capital
+# range. A card may never promise a run these bounds refuse.
+MIN_STARTING_CAPITAL = 10.0
 MAX_STARTING_CAPITAL = 100_000_000.0
 # Slippage above five percent per trade stops modeling anything real; fees
 # ride the same ceiling until the founder retunes it.
@@ -214,7 +214,11 @@ def normalize_backtest_config(
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
         "side": payload.get("side") or "long",
-        "starting_capital": payload.get("starting_capital") or 1000,
+        # A stated amount, zero included, reaches the capital gate; only an
+        # omitted one takes the default.
+        "starting_capital": 1000
+        if payload.get("starting_capital") is None
+        else payload["starting_capital"],
         "allocation_method": payload.get("allocation_method") or "equal_weight",
         "benchmark_symbol": benchmark_symbol,
         "parameters": payload.get("parameters") or {},

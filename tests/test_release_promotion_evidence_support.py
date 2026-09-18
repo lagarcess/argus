@@ -1,76 +1,64 @@
-"""Focused tests for production-promotion baseline comparison."""
+"""Focused tests for production-promotion evidence checks."""
 
 from __future__ import annotations
 
-import json
-import subprocess
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 
+import pytest
+
+from tests.promotion_evidence_repository import (
+    REACHED_BY_THE_EVAL,
+    UNREACHED_BY_THE_EVAL,
+    commit_changes,
+    commit_measured_repository,
+    live_eval_scorecard,
+    write_evidence,
+)
 from tests.release_promotion_evidence_support import (
     assert_main_promotion_baseline_comparison,
+    assert_main_promotion_live_eval_evidence,
+    assert_prose_failure_measured_on_both_sides,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
 
-
-def _git(repository_root: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", *args],
-        cwd=repository_root,
-        capture_output=True,
-        check=True,
-        text=True,
-    )
-    return result.stdout.strip()
-
-
-def _commit(repository_root: Path, message: str) -> str:
-    _git(repository_root, "add", ".")
-    _git(repository_root, "commit", "-m", message)
-    return _git(repository_root, "rev-parse", "HEAD")
+# Every check that binds evidence to a build must answer the same way (#608).
+evidence_identity_directions = pytest.mark.parametrize(
+    ("changed", "rejection"),
+    [
+        pytest.param(
+            UNREACHED_BY_THE_EVAL["release-flags"], None, id="release-flags-keep-it"
+        ),
+        pytest.param(
+            (REACHED_BY_THE_EVAL["imported-module"],),
+            "Measure again",
+            id="imported-code-needs-a-new-measurement",
+        ),
+    ],
+)
 
 
-def _comparison_repository(repository_root: Path) -> tuple[str, str]:
-    _git(repository_root, "init")
-    _git(repository_root, "config", "user.email", "release-test@example.com")
-    _git(repository_root, "config", "user.name", "Release Test")
-
-    for package in ("tests", "tests/evals", "argus"):
-        package_path = repository_root / package
-        package_path.mkdir(parents=True, exist_ok=True)
-        (package_path / "__init__.py").write_text("", encoding="utf-8")
-    (repository_root / "tests/evals/measurement_eval_harness.py").write_text(
-        "import argus.measured\n",
-        encoding="utf-8",
-    )
-    measured_path = repository_root / "argus/measured.py"
-    measured_path.write_text("VALUE = 'baseline'\n", encoding="utf-8")
-    baseline_sha = _commit(repository_root, "baseline")
-
-    measured_path.write_text("VALUE = 'candidate'\n", encoding="utf-8")
-    candidate_sha = _commit(repository_root, "candidate")
-    return baseline_sha, candidate_sha
+def _outcome(rejection: str | None) -> AbstractContextManager[object]:
+    if rejection is None:
+        return nullcontext()
+    return pytest.raises(AssertionError, match=rejection)
 
 
 def test_documented_candidate_only_failure_is_not_blocked_by_total_count(
     tmp_path: Path,
 ) -> None:
-    baseline_sha, candidate_sha = _comparison_repository(tmp_path)
-    baseline_relative_path = (
-        f"docs/reports/evidence/promotion/baseline-{baseline_sha[:8]}.json"
-    )
-    baseline_path = tmp_path / baseline_relative_path
-    baseline_path.parent.mkdir(parents=True)
-    baseline_path.write_text(
-        json.dumps(
-            {
-                "results": [
-                    {"id": "shared-failure", "status": "failed"},
-                    {"id": "candidate-only", "status": "passed"},
-                ]
-            }
-        ),
-        encoding="utf-8",
+    baseline_sha = commit_measured_repository(tmp_path)
+    candidate_sha = commit_changes(tmp_path, [REACHED_BY_THE_EVAL["imported-module"]])
+    baseline_relative_path = write_evidence(
+        tmp_path,
+        f"baseline-{baseline_sha[:8]}.json",
+        {
+            "results": [
+                {"id": "shared-failure", "status": "failed"},
+                {"id": "candidate-only", "status": "passed"},
+            ]
+        },
     )
     manifest_path = tmp_path / "2026-08-21-main-production-promotion.md"
     manifest = (
@@ -91,6 +79,100 @@ def test_documented_candidate_only_failure_is_not_blocked_by_total_count(
     )
 
 
+@evidence_identity_directions
+def test_live_eval_scorecard_stands_for_a_candidate_it_cannot_tell_apart(
+    tmp_path: Path, changed: tuple[str, ...], rejection: str | None
+) -> None:
+    measured_sha = commit_measured_repository(tmp_path)
+    candidate_sha = commit_changes(tmp_path, changed)
+    scorecard = write_evidence(
+        tmp_path,
+        "candidate-eval-scorecard.json",
+        live_eval_scorecard(tmp_path, measured_sha=measured_sha),
+    )
+    manifest_path = tmp_path / "2026-09-13-main-production-promotion.md"
+    manifest_path.write_text(
+        f"- Candidate SHA: `{candidate_sha}`\n"
+        f"- Live eval scorecard: `{scorecard}`\n"
+        f"- Live eval measured SHA: `{measured_sha}`\n",
+        encoding="utf-8",
+    )
+
+    with _outcome(rejection):
+        assert_main_promotion_live_eval_evidence(manifest_path, repository_root=tmp_path)
+
+
+@evidence_identity_directions
+def test_baseline_stands_for_a_deployed_build_it_cannot_tell_apart(
+    tmp_path: Path, changed: tuple[str, ...], rejection: str | None
+) -> None:
+    measured_sha = commit_measured_repository(tmp_path)
+    deployed_sha = commit_changes(tmp_path, changed)
+    candidate_sha = commit_changes(
+        tmp_path, [REACHED_BY_THE_EVAL["lazily-imported-module"]]
+    )
+    baseline = write_evidence(
+        tmp_path,
+        "baseline-eval-scorecard.json",
+        live_eval_scorecard(tmp_path, measured_sha=measured_sha),
+    )
+    manifest = (
+        f"- Candidate SHA: `{candidate_sha}`\n"
+        f"- Rollback target: `{deployed_sha}`\n"
+        f"- Baseline eval scorecard: `{baseline}`\n"
+        f"- Baseline measured SHA: `{measured_sha}`\n"
+    )
+
+    with _outcome(rejection):
+        assert_main_promotion_baseline_comparison(
+            manifest,
+            tmp_path / "2026-09-13-main-production-promotion.md",
+            candidate_results=[],
+            repository_root=tmp_path,
+        )
+
+
+@evidence_identity_directions
+def test_targeted_ab_side_stands_for_a_commit_it_cannot_tell_apart(
+    tmp_path: Path, changed: tuple[str, ...], rejection: str | None
+) -> None:
+    deployed_sha = commit_measured_repository(tmp_path)
+    measured_sha = commit_changes(
+        tmp_path, [REACHED_BY_THE_EVAL["lazily-imported-module"]]
+    )
+    candidate_sha = commit_changes(tmp_path, changed)
+    sides = {
+        side: write_evidence(
+            tmp_path,
+            f"targeted-ab-{side}.json",
+            {
+                "case_id": "case-a",
+                "side": side,
+                "provenance": live_eval_scorecard(
+                    tmp_path, measured_sha=sha
+                )["provenance"],
+                "measurement": {"attempts": 10, "defect_count": 0},
+            },
+        )
+        for side, sha in (("baseline", deployed_sha), ("candidate", measured_sha))
+    }
+    manifest = (
+        f"- Targeted A/B baseline: `{sides['baseline']}`\n"
+        f"- Targeted A/B candidate: `{sides['candidate']}`, measured at "
+        f"`{measured_sha}`\n"
+    )
+
+    with _outcome(rejection):
+        assert_prose_failure_measured_on_both_sides(
+            manifest,
+            tmp_path / "2026-09-13-main-production-promotion.md",
+            case_id="case-a",
+            deployed_sha=deployed_sha,
+            candidate_sha=candidate_sha,
+            repository_root=tmp_path,
+        )
+
+
 def test_runbook_makes_founder_browser_acceptance_the_stronger_gate() -> None:
     runbook = " ".join(
         (ROOT / "docs/PRIVATE_LAUNCH_RUNBOOK.md").read_text(encoding="utf-8").split()
@@ -101,3 +183,25 @@ def test_runbook_makes_founder_browser_acceptance_the_stronger_gate() -> None:
         runbook
     )
     assert "post-deploy checklist decides whether the promotion succeeded" in runbook
+
+
+@pytest.mark.parametrize("unmeasured_status", ["infrastructure_error", "skipped"])
+def test_promotion_rejects_a_case_with_no_live_measurement(
+    tmp_path: Path, unmeasured_status: str
+) -> None:
+    measured_sha = commit_measured_repository(tmp_path)
+    scorecard = live_eval_scorecard(tmp_path, measured_sha=measured_sha)
+    # Keep a complete fixture set and internally consistent totals: the gate
+    # must reject missing measurement, not just missing rows or bad arithmetic.
+    scorecard["results"][0]["status"] = unmeasured_status
+    scorecard["totals"]["passed"] -= 1
+    scorecard["totals"][unmeasured_status] = 1
+    relative = write_evidence(tmp_path, "unmeasured-case.json", scorecard)
+    manifest = tmp_path / "next-candidate.md"
+    manifest.write_text(
+        f"- Candidate SHA: `{measured_sha}`\n"
+        f"- Live eval scorecard: `{relative}`\n"
+    )
+
+    with pytest.raises(AssertionError, match=unmeasured_status):
+        assert_main_promotion_live_eval_evidence(manifest, repository_root=tmp_path)

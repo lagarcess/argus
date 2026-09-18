@@ -84,6 +84,14 @@ ARGUS_ASSET_PROVIDER_MODE=live_provider \
 poetry run pytest tests/evals/test_measurement_eval_live.py -q
 ```
 
+`ARGUS_EVAL_ENV_FILE` must name a file no tracked file feeds, such as the
+gitignored `.env`. The harness refuses the file when it, or any step on the way
+to it, is a tracked file or tracked symlink, whatever path or link reaches it, so
+`.env.example` is refused. Promotion evidence identity compares the tree, never
+the eval's environment, so settings fed from a tracked file could change without
+a new measurement. An untracked file that is not ignored already fails the
+clean-worktree check.
+
 Warning: this deliberately spends real LLM tokens. Use it when you want to
 measure the current real interpret path, not for routine local lint loops.
 Once `ARGUS_RUN_LIVE_EVALS=1` is set, missing provider credentials fail the
@@ -107,8 +115,9 @@ Run the mocked suite everywhere; it is free and safe.
 Run the live suite at exactly three moments:
 
 1. Once pre-merge on any PR that changes runtime behavior.
-2. On every `main` promotion candidate, as a full run on the exact SHA with no
-   unexpected failures.
+2. On every `main` promotion candidate, as a full run with no unexpected
+   failures, measured at the candidate or at a commit the measurement cannot
+   tell apart from it (`tests/promotion_evidence_identity.py`).
 3. After any interpreter model or provider change.
 
 Live results can vary. If one failure is surprising, rerun once, then
@@ -127,7 +136,7 @@ scorecards include per-category totals and pass rates. Seven-session scorecards
 include stable trajectory labels, operation names, and failure prefixes only;
 they omit prompts, SSE payloads, route receipts, and runtime identifiers.
 
-Measurement scorecards use schema version 2 and cannot be written without this
+Measurement scorecards use schema version 3 and cannot be written without this
 validated `provenance` object:
 
 - `market_data_provider_mode`
@@ -137,13 +146,27 @@ validated `provenance` object:
 - `fixture_sha256`
 - `fixture_case_ids`
 - `worktree_clean`
+- `release_configuration` (API model IDs and on/off flags selected by the release profile)
 - `live_market_data_probe` for a live run
 
 The writer rechecks the provider modes, SHA, Python version, fixture hash,
-fixture case identities, and clean worktree immediately before serialization.
+fixture case identities, clean worktree, and measured release configuration
+immediately before serialization.
 If any value changed during the run, it emits no scorecard. A live scorecard
 also requires every fixture case exactly once, `market_data_provider_mode`
 set to `live_provider`, and the successful calendar probe.
+
+Configuration keys derive from the API service of the committed release profile:
+every `_MODEL` key and every value set to `true` or `false`. Model IDs use runtime
+resolution; flags come from the eval process environment, never from the desired
+contract values. Set flags explicitly to `true` or `false`: missing values remain
+unknown, and aliases are not assumed to have identical runtime semantics. The
+promotion gate compares the recorded values with the profile at the candidate
+commit and reports each mismatching key with both values. Other settings (such as
+timeouts and call allowances) and the web/workflow service settings are excluded.
+Past manifests keep their original evidence; new promotions need schema-v3
+scorecards and the same `release_configuration` field on baseline and targeted
+A/B provenance. This is a configuration-mistake check, not tamper protection.
 
 Expected-fail cases never count as passes. They are reported separately so
 known broken behavior stays visible.
