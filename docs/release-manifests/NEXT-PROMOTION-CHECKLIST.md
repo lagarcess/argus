@@ -270,7 +270,7 @@ to obtain evidence the first run should already have retained.
 
 Authority: [runbook](../PRIVATE_LAUNCH_RUNBOOK.md),
 [release discipline](../specs/private-alpha-ci-cd-sota.md),
-[active board](../specs/argus-grounded-finance-roadmap.md),
+[active board](../specs/argus-answers-that-stay-true-roadmap.md),
 [manifest template](TEMPLATE.md), `.github/workflows/ci.yml`,
 `.github/workflows/private-alpha-smoke.yml`, `.github/workflows/private-alpha-canary.yml`,
 `tests/promotion_evidence_identity.py`, `tests/promotion_evidence_configuration.py`,

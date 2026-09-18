@@ -19,7 +19,7 @@ browser turns, or real backtests solely because a merge landed.
 ## Procedure
 
 1. Read `AGENTS.md`, the active board
-   `docs/specs/argus-grounded-finance-roadmap.md`, and
+   `docs/specs/argus-answers-that-stay-true-roadmap.md`, and
    `docs/specs/private-alpha-next-integration.md` for branch process.
 2. Identify every newly merged PR in first-parent integration order. Record the
    PR number, PR head, integration parent, merge SHA/time, linked issues,
