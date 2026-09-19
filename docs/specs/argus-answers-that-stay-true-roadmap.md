@@ -225,8 +225,6 @@ the angle below holds.
 - **Perplexity:** Search API (title, link, snippet, date; country, language and
   domain filters), agentic research, and a code sandbox (Python, JavaScript,
   SQL) inside the Agent API.
-- **X Search (xAI):** keyword and semantic search over X posts, filtered by
-  handle and date, for sentiment. Billed per post fetched from 2026-09-21.
 - **News APIs:** not needed to start. GNews is a cheap fallback; NewsAPI.org's
   free plan does not allow production use.
 - **Articles open inside Argus.** Most large publishers block being framed
