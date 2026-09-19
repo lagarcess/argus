@@ -217,6 +217,25 @@ the angle below holds.
   app, reconciled in one Argus-owned table of who pays for what, switched off
   until there is something to charge for.
 
+### Distribution
+
+- **Social posts, not ads, first.** An Instagram account is reserved. Posting
+  can run through the X API (pay per use; a post with a link costs about 13
+  times one without) and the Threads API (free, gated by Meta app review),
+  using Threads and Instagram's cross-platform sharing.
+- **The product writes the posts.** Arena standings, AI-versus-human results,
+  movers explained and Dominican rate changes are generated from Argus's own
+  data, and each post links back to a share page. Higgsfield can make the
+  visuals once the marketing approach is chosen.
+- **Measure by channel.** Tag every posted link, and count share opens,
+  signups and follow-ups per channel.
+- **Ads only after a return loop exists,** as a small, capped test against
+  that baseline.
+- Automated posts follow each platform's automation rules and never read as
+  stock tips.
+- OpenExecutive (SenteLabsAI) is the founder's own decision-support tool, not
+  part of the product or of distribution.
+
 ### Data sources considered
 
 - **Alpaca:** movers, most actives, news (Benzinga, full text), corporate
