@@ -153,3 +153,111 @@ Learned on the last board, and they apply here:
    of applying the instruction literally.
 7. **Stop a review loop** at the second finding on the same mechanism, and
    report.
+
+---
+
+## Brainstorm: finding Argus's angle (2026-09-18 to 2026-09-19)
+
+Status: **brainstorm, not decisions.** Nothing here is committed scope. It
+records a founder and captain session, informed by read-only research, so later
+lanes start from it instead of from scratch. The founder may revise any line.
+
+### The problem
+
+A chat that answers money questions becomes redundant as AI improves. Personal
+data, memory, connectors, users and network effects do not protect Argus: the
+large AI labs have them or will. They are the baseline Argus must meet, not a
+moat. The goal is an angle where **AI getting better makes Argus better**, with
+the moat built piece by piece inside a finance app ecosystem, and with a real
+retention mechanism first.
+
+The current principles (`docs/PRODUCT.md`: social features out of scope, never
+prescribe) were written for the chat. The founder intends to revisit them if
+the angle below holds.
+
+### The ecosystem, as pieces that feed each other
+
+- **Paper trading strategy arena.** People learn and build confidence before
+  risking real money. Strategies come from plain words, as expressive as
+  Composer's (not a fixed menu of templates). Humans and AI models take part.
+  A social feed lives in this category, not only a leaderboard. Paper trading
+  runs on Argus's own ledger priced with Alpaca data, so nobody has to open a
+  broker account first. "Retest with current data" in omnisearch is the seed.
+- **Discover feed.** A Perplexity and Robinhood hybrid: news mixed with movers,
+  crypto, earnings, market, macro and upcoming events. The layout is a starting
+  point, not fixed. The arena, Discover and paper activity can all feed one
+  ranking, borrowing ideas from X's open-sourced feed algorithm
+  (`xai-org/x-algorithm`).
+- **A daily brief on a schedule,** the return feature.
+- **Memory and personalization for every registered user.** Three chat modes:
+  - regular (the default): memory and personalization on, under the user's
+    control;
+  - private: uses everything Argus knows about the user for that session,
+    learns nothing, and is gone when the chat is thrown away;
+  - incognito: no memory, gone when the user leaves or closes it.
+
+  A fuller profile is built through chat or in settings at any time, not a
+  wizard. Starting points: the removed onboarding goals (learn investing
+  basics, build a passive strategy, test a stock idea, explore crypto) and the
+  fields Robinhood's investor profile weighs most (time horizon, risk
+  tolerance, objective).
+- **Dominican banking.** Banco Popular's API (exchange rates, product rates,
+  account verification, ATM locations), the Superintendencia de Bancos and the
+  Banco Central feed product shopping, the grounded calculators and saved
+  answers. Questions like the AFI one go to agentic research through
+  Perplexity. The founder owns Dominican data access and outlet deals.
+- **Options.** Alpaca's chain, Greeks, implied volatility and open interest
+  support calculators, education and paper options.
+- **Read-only connections.** No company is needed for crypto exchange keys,
+  IBKR Flex or Alpaca OAuth. Bridge covers Dominican bank accounts. Argus does
+  not build its own bank-login scraper.
+- **Distribution.** Argus's data and calculators as a connector inside ChatGPT
+  and Claude; share links; marketing content (Higgsfield's MIT skills repo).
+- **Payments, later.** Lemon Squeezy for web and RevenueCat for a future iOS
+  app, reconciled in one Argus-owned table of who pays for what, switched off
+  until there is something to charge for.
+
+### Data sources considered
+
+- **Alpaca:** movers, most actives, news (Benzinga, full text), corporate
+  actions and their live stream, fixed income (T-bills and corporate bonds with
+  yields), options. No structured earnings data.
+- **Perplexity:** Search API (title, link, snippet, date; country, language and
+  domain filters), agentic research, and a code sandbox (Python, JavaScript,
+  SQL) inside the Agent API.
+- **X Search (xAI):** keyword and semantic search over X posts, filtered by
+  handle and date, for sentiment. Billed per post fetched from 2026-09-21.
+- **News APIs:** not needed to start. GNews is a cheap fallback; NewsAPI.org's
+  free plan does not allow production use.
+- **Articles open inside Argus.** Most large publishers block being framed
+  (Reuters, Benzinga and Bloomberg Línea do), so an embedded page does not
+  work in general. Show licensed text natively, show Argus's own cited story
+  otherwise, and open the original in an in-app browser once there is a native
+  app.
+
+### Facts that gate building
+
+- **Alpaca display consent.** Alpaca's terms forbid publicly displaying its
+  data without written consent and define a notice-and-consent route. This
+  already applies to backtest results shown today.
+- **Stored secrets.** Every connection that refreshes needs a stored, revocable
+  secret (a token or read-only key, never a password). Decide whether that is
+  allowed, encrypted and outside logs and model context, or whether
+  connections are one-time imports.
+- **No company yet.** This rules out Alpaca's Broker API, IBKR's third-party
+  OAuth and most broker partner programs for now.
+- **Bridge.** Ask whether an individual without an RNC can register, which
+  banks are live, and what the paid plan costs.
+- **Contest law.** No cash prizes.
+
+### Research notes worth keeping
+
+- Public.com closed its social feed in 2025 because AI now writes the recaps
+  users used to post. Scored records and friends playing in seasons retained
+  better than commentary.
+- SoFi bought Composer in 2026. Idea-to-backtest alone is not a moat.
+- The @ asset picker loads the whole symbol list on a user's request. Leading
+  products build a search index ahead of time and search a small list in the
+  browser first.
+- A research turn takes about 68 seconds and nothing streams. Speed and
+  quality both remain the target.
