@@ -22,6 +22,11 @@ Private PR base: `codex/money-placement-pilot`; implementation branch:
 `708864ef76961df2767d7e09c2fbf5f9812179c7`. PR review is authorized. Never target
 `main` or `codex/private-alpha-next`.
 
+The private base excludes only these two throwaway branches from the parent
+Argus CI, which otherwise runs disposable Supabase migrations on every codex
+push. The implementation adds a dedicated SQLite-only app workflow. This
+branch-local exclusion must not be promoted to the protected branches.
+
 ## Architecture and synthesis
 
 Use candidate A's immutable comparisons, atomic dataset publication and guarded
