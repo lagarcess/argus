@@ -1,46 +1,25 @@
 import { z } from 'zod';
+import { request as platformRequest } from './platform/client';
+export { APIError as ApiError } from './platform/client';
 import {
   homeSchema,
   interpretationSchema,
   resultSchema,
   decisionSchema,
+  confirmationSchema,
   type PlacementInputs,
   type Locale,
   type Scenario,
 } from './contracts';
 
-export class ApiError extends Error {
-  constructor(public readonly code: string) {
-    super(code);
-  }
-}
 async function request<T>(path: string, schema: z.ZodType<T>, body?: unknown): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(
-      `/api${path}`,
-      body === undefined
-        ? undefined
-        : {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          },
-    );
-  } catch {
-    throw new ApiError('network_error');
-  }
-  const data: unknown = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = z.object({ code: z.string() }).safeParse(data);
-    throw new ApiError(error.success ? error.data.code : 'request_failed');
-  }
-  const parsed = schema.safeParse(data);
-  if (!parsed.success) throw new ApiError('invalid_response');
-  return parsed.data;
+  return platformRequest(`/api${path}`, schema, body === undefined ? {} : {
+    method: 'POST', body: JSON.stringify(body),
+  });
 }
 export const api = {
   home: () => request('/home', homeSchema),
+  prepare: (inputs: PlacementInputs) => request('/confirmations', confirmationSchema, { inputs }),
   interpret: (message: string, locale: Locale, demo_example_id?: string) =>
     request('/interpret', interpretationSchema, {
       message,
@@ -53,6 +32,9 @@ export const api = {
   decision: (id: string) => request(`/decisions/${encodeURIComponent(id)}`, decisionSchema),
   readNotice: (id: string) => request(`/notices/${encodeURIComponent(id)}/read`, z.unknown(), {}),
   simulate: (scenario: Scenario) =>
-    request('/demo/events', z.object({ load_id: z.string() }), { scenario }),
+    request('/demo/events', z.object({ load_id: z.string(), job_id: z.string() }), { scenario, idempotency_key: crypto.randomUUID() }),
+  job: (id: string) => request(`/platform/jobs/${encodeURIComponent(id)}`, z.object({
+    id: z.string(), status: z.enum(['queued', 'running', 'succeeded', 'failed']), error_code: z.string().nullable(),
+  })),
   source: (id: string) => request(`/sources/${encodeURIComponent(id)}`, z.unknown()),
 };

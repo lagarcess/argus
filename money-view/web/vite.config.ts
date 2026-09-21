@@ -7,6 +7,6 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5178,
     strictPort: true,
-    proxy: { "/api": "http://127.0.0.1:8012" },
+    proxy: { "/api": { target: process.env.CLARA_TEST_API_ORIGIN ?? "http://127.0.0.1:8012", changeOrigin: false } },
   },
 });

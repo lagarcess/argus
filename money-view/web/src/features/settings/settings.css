@@ -1,0 +1,38 @@
+.platform-shell .settings-page { max-width: 840px; }
+.platform-shell .settings-page h2 { font-size: 18px; }
+.platform-shell .settings-page .p-modal[open] { display: flex; flex-direction: column; box-shadow: none; }
+.platform-shell .settings-page .p-modal-header { flex-shrink: 0; }
+.platform-shell .settings-page .p-modal-header h2 { font-size: 26px; }
+.platform-shell .settings-page .p-modal-body { min-height: 0; overflow-y: auto; }
+.platform-shell .settings-page:is([data-settings-panel="language"], [data-settings-panel="appearance"], [data-settings-panel="profile"], [data-settings-panel="regional"], [data-settings-panel="notifications"]) .p-modal { width: min(420px, calc(100% - 32px)); max-height: 70dvh; }
+.platform-shell .settings-row { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 20px; text-align: start; border: 0; border-bottom: 1px solid var(--p-line, #d8dfd2); border-radius: 0; background: transparent; padding: 18px 0; min-height: 64px; color: inherit; font: inherit; cursor: pointer; }
+.platform-shell .settings-row:hover { background: var(--p-selected, #e8efe6); }
+.platform-shell .settings-row-end { display: flex; align-items: center; gap: 14px; color: var(--p-muted, #5d6d64); font-size: 14px; text-align: end; }
+.platform-shell .settings-row-end > span:last-child { font-size: 23px; }
+.platform-shell .settings-identity { display: flex; align-items: center; gap: 16px; margin: 8px 0 32px; }
+.platform-shell .settings-identity p { margin: 4px 0; }
+.platform-shell .settings-avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; color: white; background: #205840; font-weight: 600; }
+.platform-shell .settings-avatar.ocean { background: #315a76; }
+.platform-shell .settings-avatar.clay { background: #986447; }
+.platform-shell .settings-avatar.gold { background: #806018; }
+.platform-shell .settings-avatar.plum { background: #72506c; }
+.platform-shell .settings-identity > .settings-avatar { width: 52px; height: 52px; font-size: 20px; }
+.platform-shell .settings-choices { display: grid; gap: 8px; border: none; padding: 0; margin: 0; }
+.platform-shell .settings-choices legend { font-weight: 600; margin-bottom: 12px; }
+.platform-shell .settings-choices label, .platform-shell .settings-check { display: flex; align-items: center; gap: 12px; padding: 10px 0; min-height: 44px; }
+.platform-shell .settings-choices input, .platform-shell .settings-check input { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; }
+.platform-shell .settings-session { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--p-line, #d8dfd2); }
+.platform-shell .settings-session p { margin: 4px 0; font-size: 13px; }
+.platform-shell .settings-memory { border-bottom: 1px solid var(--p-line, #d8dfd2); padding: 12px 0; overflow-wrap: anywhere; }
+.platform-shell .settings-confirm { border: 1px solid var(--p-line, #d8dfd2); border-radius: 8px; padding: 16px; }
+.platform-shell .settings-counts { margin: 0; }
+.platform-shell .settings-counts > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--p-line, #d8dfd2); }
+.platform-shell .settings-counts dd { font-variant-numeric: tabular-nums; }
+.platform-shell .settings-back { margin-bottom: 20px; }
+.platform-shell .settings-member { display: flex; gap: 12px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--p-line, #d8dfd2); }
+.platform-shell .settings-member-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.platform-shell .settings-member-name p { margin: 4px 0; }
+.platform-shell .settings-login-id { display: block; padding: 8px 0; overflow-wrap: anywhere; user-select: all; }
+.platform-shell .settings-role .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+@media (max-width: 599px) { .platform-shell .settings-row { align-items: flex-start; gap: 12px; } .platform-shell .settings-row-end { max-width: 45%; } .platform-shell .settings-session { flex-wrap: wrap; } .platform-shell .settings-member { flex-wrap: wrap; } .platform-shell .settings-member > .p-actions { width: 100%; margin-left: 52px; } }
+@media (max-width: 599px) { .platform-shell .settings-page[data-settings-panel] .p-modal { width: 100%; } .platform-shell .settings-page .p-modal-body { padding: 16px 16px max(16px, env(safe-area-inset-bottom)); } }
