@@ -1,0 +1,374 @@
+{
+  "profile_name": "bounded-development",
+  "full_retention_qualified": false,
+  "source_sha256": {
+    "server/app.py": "c1a39c231b8112806b03fef60f9b5a1230e2cf92b6010c5d49409e273a2bb3e1",
+    "server/store.py": "44625f323ae2e874105db9b31568658c4ea16324239a1a32f5a467e03992513c",
+    "server/platform/__init__.py": "60cc59da9f5148d7f0f0ec2570956d49eadbed8948f62e63daad5cc9c87417eb",
+    "server/platform/assistant.py": "2520f3658f07c942361e65e06ac997be9c3f97d98a9b13481599a6430fc025d3",
+    "server/platform/assistant_contracts.py": "66fd6b0b5a915aed7b232effc1065fade1b563cb0cc3c7f95f519ca9bfe47056",
+    "server/platform/common.py": "c1813919e2d34f50debeea0cd227cd324b8d2570ddf7fe890cf6c90984aac48f",
+    "server/platform/composition.py": "fe64e51a692df1cb9779cd8dbf58aac029ee542ce7229edd06e6f3292bc6b497",
+    "server/platform/credit.py": "6ad8b72d854c177900a19bedbeaec3b99d135b154e811a48c461da7d985f8c55",
+    "server/platform/deposits.py": "5cd32ec75a1dd5fb168982f21e466a32aa6ebdbdf88b102239130f85c9c5ee42",
+    "server/platform/identity.py": "a242dc672bdf5e4f777d5577e232f69c8fd5990ede31654ae7955b896d852a89",
+    "server/platform/identity_contracts.py": "e2948cb20aeb574a10b267dd4932ea1e7291d852a0e7179a520653ad17583217",
+    "server/platform/investing.py": "0edd36afeac5180a42a17414f219f8e8410d2925689065b239362e1a8e270645",
+    "server/platform/jobs_runtime.py": "671d95319d9913c1767e8162f2ed8a4273103b6cc8c9534ecdda7b6244e5ba0f",
+    "server/platform/ledger.py": "0ad728123b25ff579ea1550f86fb04a0d21c5017bfd69e088c091306af82f941",
+    "server/platform/ledger_contracts.py": "731868ea942ee84eebcdaea8cb5a65ebb0b2650e47138e52c2f017f262549a35",
+    "server/platform/market_data.py": "c3d010a8cff902f9b0d083c39e4cb4fe3fd7a520a03ebcfa447da01023d090e3",
+    "server/platform/market_job.py": "b4aaf773d8fbad0823cf074b4758b7d2c991b265a77183ee257f41b63a550bb5",
+    "server/platform/planning.py": "0c28d98f5c1dc28a822c3dcc2cdd0431d025ed718e320dc7a8f0000bc9d20350",
+    "server/platform/planning_contracts.py": "cd455e66da263e389e4b81ca4f55b0d08af58c0459e9623d67f0d46f6e332bdf",
+    "server/platform/runtime.py": "3c879c50db55dbfd554e1152f31d6dcc9c48e6643f802aeaf80032884833cc95",
+    "server/platform/seed.py": "41d05727685d1c76c8344178111c82226686f875ca15abfe1a5698a9d35c538d",
+    "server/platform/service_contracts.py": "853ee7b0fa899adf96d4bce0ac203ce5597ee9d1c0f8df0f2c6d5f496fcae1af",
+    "server/platform/services.py": "462f82574bbf157c656ba373efaa6919d0ef71ffee140a3f1cc2784fd17c4407",
+    "server/platform/settings.py": "5c7026a689c1ac07042fc761f7ce7a4344e2374d81a804ac7bbb9f2f85537ad4",
+    "server/platform/storage_ops.py": "230c61222b6ea0d06cd0b8af063a6cf920c36a01344d93458182dbfbe183b962",
+    "server/platform/tax_estate.py": "1aa8591709232650f8f76561ca9e013f190d0d43626ea0eb0ce03f1c407e4bd7",
+    "scripts/scale_check.py": "5a0dd9d51a7aa347d7fb2f724a27eab8776ef15688c90bf8bf66d056ec928b58"
+  },
+  "hardware": {
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "machine": "arm64",
+    "cpu_count": 18,
+    "ram_bytes": 51539607552,
+    "cpu_model": "Apple M5 Pro"
+  },
+  "started_at": "2026-09-21T04:54:23.725823+00:00",
+  "dataset": {
+    "seed": 20260920,
+    "profile": {
+      "identities": 10000,
+      "households": 8000,
+      "transactions": 5000000,
+      "heavy_households": 100,
+      "heavy_transactions": 20000,
+      "stress_transactions": 50000,
+      "batch_size": 2000
+    },
+    "preflight": {
+      "free_bytes": 324573089792,
+      "estimated_bytes": 5564000000,
+      "limit_bytes": 10737418240
+    },
+    "counts": {
+      "p_users": 10004,
+      "p_households": 8002,
+      "p_memberships": 10004,
+      "p_accounts": 67247,
+      "p_transactions": 5014401,
+      "p_transaction_splits": 104192
+    },
+    "fixture_household_count": 8000,
+    "fixture_ledger_count": 5000000,
+    "minimum_household_rows": 373,
+    "maximum_household_rows": 50000,
+    "demo_overhead_explicit": true,
+    "date_range": [
+      "2024-09-21",
+      "2026-09-20"
+    ],
+    "currencies": [
+      "USD",
+      "EUR",
+      "DOP"
+    ],
+    "indexes": [
+      "p_accounts_household",
+      "p_assistant_answer_window",
+      "p_assistant_household",
+      "p_assistant_message_window",
+      "p_assistant_saved_window",
+      "p_investment_holdings_active_symbol",
+      "p_investment_recurring_due",
+      "p_investment_recurring_run_recovery",
+      "p_market_prices_lookup",
+      "p_memories_owner",
+      "p_placement_comparison_household",
+      "p_placement_confirmation_household",
+      "p_plans_household",
+      "p_runtime_jobs_expiry",
+      "p_runtime_jobs_household",
+      "p_runtime_jobs_ready",
+      "p_runtime_model_expiry",
+      "p_runtime_model_household",
+      "p_scenarios_household",
+      "p_service_reserved_slot",
+      "p_sessions_user",
+      "p_transactions_account",
+      "p_transactions_household_date",
+      "p_transactions_transfer",
+      "sqlite_autoindex_comparisons_1",
+      "sqlite_autoindex_confirmations_1",
+      "sqlite_autoindex_datasets_1",
+      "sqlite_autoindex_decision_checks_1",
+      "sqlite_autoindex_decision_checks_2",
+      "sqlite_autoindex_deposit_rates_1",
+      "sqlite_autoindex_inflation_rates_1",
+      "sqlite_autoindex_load_attempts_1",
+      "sqlite_autoindex_load_datasets_1",
+      "sqlite_autoindex_p_accounts_1",
+      "sqlite_autoindex_p_assistant_answers_1",
+      "sqlite_autoindex_p_assistant_conversations_1",
+      "sqlite_autoindex_p_assistant_messages_1",
+      "sqlite_autoindex_p_assistant_notice_states_1",
+      "sqlite_autoindex_p_bill_occurrences_1",
+      "sqlite_autoindex_p_connections_1",
+      "sqlite_autoindex_p_credit_accounts_1",
+      "sqlite_autoindex_p_credit_reports_1",
+      "sqlite_autoindex_p_employer_enrollments_1",
+      "sqlite_autoindex_p_estate_assets_1",
+      "sqlite_autoindex_p_estate_beneficiaries_1",
+      "sqlite_autoindex_p_estate_checklist_1",
+      "sqlite_autoindex_p_estate_contacts_1",
+      "sqlite_autoindex_p_estate_documents_1",
+      "sqlite_autoindex_p_goal_allocations_1",
+      "sqlite_autoindex_p_households_1",
+      "sqlite_autoindex_p_identity_meta_1",
+      "sqlite_autoindex_p_imports_1",
+      "sqlite_autoindex_p_investment_books_1",
+      "sqlite_autoindex_p_investment_fixture_manifest_1",
+      "sqlite_autoindex_p_investment_holdings_1",
+      "sqlite_autoindex_p_investment_import_previews_1",
+      "sqlite_autoindex_p_investment_import_receipts_1",
+      "sqlite_autoindex_p_investment_import_receipts_2",
+      "sqlite_autoindex_p_investment_import_receipts_3",
+      "sqlite_autoindex_p_investment_order_previews_1",
+      "sqlite_autoindex_p_investment_order_receipts_1",
+      "sqlite_autoindex_p_investment_order_receipts_2",
+      "sqlite_autoindex_p_investment_order_receipts_3",
+      "sqlite_autoindex_p_investment_positions_1",
+      "sqlite_autoindex_p_investment_recurring_plans_1",
+      "sqlite_autoindex_p_investment_recurring_runs_1",
+      "sqlite_autoindex_p_investment_recurring_runs_2",
+      "sqlite_autoindex_p_ledger_commands_1",
+      "sqlite_autoindex_p_ledger_manifest_1",
+      "sqlite_autoindex_p_load_rechecks_1",
+      "sqlite_autoindex_p_local_feedback_1",
+      "sqlite_autoindex_p_market_price_loads_1",
+      "sqlite_autoindex_p_market_price_sets_1",
+      "sqlite_autoindex_p_market_price_sets_2",
+      "sqlite_autoindex_p_market_prices_1",
+      "sqlite_autoindex_p_membership_receipts_1",
+      "sqlite_autoindex_p_memberships_1",
+      "sqlite_autoindex_p_memories_1",
+      "sqlite_autoindex_p_memory_settings_1",
+      "sqlite_autoindex_p_placement_comparisons_1",
+      "sqlite_autoindex_p_placement_confirmations_1",
+      "sqlite_autoindex_p_planning_seed_1",
+      "sqlite_autoindex_p_plans_1",
+      "sqlite_autoindex_p_preferences_1",
+      "sqlite_autoindex_p_runtime_jobs_1",
+      "sqlite_autoindex_p_runtime_jobs_2",
+      "sqlite_autoindex_p_runtime_login_windows_1",
+      "sqlite_autoindex_p_runtime_model_daily_1",
+      "sqlite_autoindex_p_runtime_model_leases_1",
+      "sqlite_autoindex_p_scenarios_1",
+      "sqlite_autoindex_p_service_manifest_1",
+      "sqlite_autoindex_p_service_memberships_1",
+      "sqlite_autoindex_p_service_reservations_1",
+      "sqlite_autoindex_p_service_reservations_2",
+      "sqlite_autoindex_p_service_slots_1",
+      "sqlite_autoindex_p_sessions_1",
+      "sqlite_autoindex_p_sessions_2",
+      "sqlite_autoindex_p_tax_items_1",
+      "sqlite_autoindex_p_tax_organizers_1",
+      "sqlite_autoindex_p_transaction_splits_1",
+      "sqlite_autoindex_p_transactions_1",
+      "sqlite_autoindex_p_transactions_2",
+      "sqlite_autoindex_p_users_1",
+      "sqlite_autoindex_saved_decisions_1",
+      "sqlite_autoindex_saved_decisions_2"
+    ],
+    "sqlite_version": "3.53.1",
+    "sizes": {
+      "database": 2748170240,
+      "-wal": 24752,
+      "-shm": 32768
+    },
+    "seed_seconds": 0.8223727499716915
+  },
+  "http": {
+    "server_workers": 2,
+    "provider_mode": "local deterministic semantic fixture; 20ms normal; 8s fault injection using shared model_admission",
+    "outbound_policy": "allowlisted environment and loopback socket connect guard",
+    "phases": [
+      {
+        "name": "sustained",
+        "duration_seconds": 9.981822665955406,
+        "offered_rps": 20.0,
+        "max_in_flight": 2,
+        "counters": {
+          "offered": 200,
+          "status_200": 200,
+          "completed": 200,
+          "response_bytes": 3388343,
+          "request_body_bytes": 3051,
+          "success": 200
+        },
+        "normalized_route_status_counts": {
+          "transactions:200": 80,
+          "overview:200": 50,
+          "spending:200": 30,
+          "history:200": 20,
+          "write:200": 10,
+          "prepared:200": 6,
+          "semantic:200": 4
+        },
+        "queue_lag_p99_ms": 2.4200829793699086,
+        "routes": {
+          "transactions": {
+            "count": 80,
+            "p50_ms": 32.15620800619945,
+            "p95_ms": 36.0769999679178,
+            "p99_ms": 96.88187495339662
+          },
+          "overview": {
+            "count": 50,
+            "p50_ms": 16.276290989480913,
+            "p95_ms": 37.944332987535745,
+            "p99_ms": 38.94225001567975
+          },
+          "spending": {
+            "count": 30,
+            "p50_ms": 6.242915987968445,
+            "p95_ms": 10.238749964628369,
+            "p99_ms": 10.525666002649814
+          },
+          "history": {
+            "count": 20,
+            "p50_ms": 5.600499978754669,
+            "p95_ms": 11.219499981962144,
+            "p99_ms": 13.599083002191037
+          },
+          "write": {
+            "count": 10,
+            "p50_ms": 5.35295793088153,
+            "p95_ms": 5.7311249547638,
+            "p99_ms": 5.7311249547638
+          },
+          "prepared": {
+            "count": 6,
+            "p50_ms": 6.131040980108082,
+            "p95_ms": 7.339874980971217,
+            "p99_ms": 7.339874980971217
+          },
+          "semantic": {
+            "count": 4,
+            "p50_ms": 31.126707966905087,
+            "p95_ms": 31.75029094563797,
+            "p99_ms": 31.75029094563797
+          }
+        }
+      },
+      {
+        "name": "burst",
+        "duration_seconds": 5.010432209004648,
+        "offered_rps": 40.0,
+        "max_in_flight": 2,
+        "counters": {
+          "offered": 200,
+          "status_200": 200,
+          "completed": 200,
+          "response_bytes": 2990455,
+          "request_body_bytes": 3056,
+          "success": 200
+        },
+        "normalized_route_status_counts": {
+          "transactions:200": 80,
+          "overview:200": 50,
+          "spending:200": 30,
+          "history:200": 20,
+          "write:200": 10,
+          "prepared:200": 6,
+          "semantic:200": 4
+        },
+        "queue_lag_p99_ms": 2.3134590010158718,
+        "routes": {
+          "transactions": {
+            "count": 80,
+            "p50_ms": 7.952874933835119,
+            "p95_ms": 8.726791944354773,
+            "p99_ms": 26.30929200677201
+          },
+          "overview": {
+            "count": 50,
+            "p50_ms": 6.493999972008169,
+            "p95_ms": 9.367417020257562,
+            "p99_ms": 10.30320901190862
+          },
+          "spending": {
+            "count": 30,
+            "p50_ms": 5.8068339712917805,
+            "p95_ms": 8.581334026530385,
+            "p99_ms": 8.618833962827921
+          },
+          "history": {
+            "count": 20,
+            "p50_ms": 6.452042027376592,
+            "p95_ms": 9.049916989170015,
+            "p99_ms": 10.288166988175362
+          },
+          "write": {
+            "count": 10,
+            "p50_ms": 7.292916998267174,
+            "p95_ms": 8.403666957747191,
+            "p99_ms": 8.403666957747191
+          },
+          "prepared": {
+            "count": 6,
+            "p50_ms": 7.538208970800042,
+            "p95_ms": 8.749416971113533,
+            "p99_ms": 8.749416971113533
+          },
+          "semantic": {
+            "count": 4,
+            "p50_ms": 35.34116700757295,
+            "p95_ms": 65.03058399539441,
+            "p99_ms": 65.03058399539441
+          }
+        }
+      }
+    ],
+    "checks": {
+      "cross_household_account_denied": true,
+      "page_bound_100": true,
+      "heavy_and_stress_count_truth": true,
+      "write_idempotency_and_conflict": true,
+      "real_password_login_and_revocation": true,
+      "foreign_key_check": true,
+      "integrity_check": true
+    },
+    "resource_peak": {
+      "rss_bytes": 226082816,
+      "cpu_percent": 119.0,
+      "processes": 4
+    },
+    "cold_start_seconds": 0.37818537501152605,
+    "login_revocation_seconds": 0.02755883301142603,
+    "query_plan": [
+      "SEARCH p_transactions USING COVERING INDEX p_transactions_household_date (household_id=? AND deleted_at=?)"
+    ],
+    "distinct_authenticated_users": 400,
+    "delayed_semantic_burst": {
+      "concurrent_calls": 4,
+      "fake_delay_seconds": 8,
+      "ordinary_reads": 40,
+      "read_p95_ms": 31.26779099693522,
+      "read_p99_ms": 48.85895800543949,
+      "fifth_call_typed_429": true
+    },
+    "ledger_rows_after": 5014421,
+    "sizes_after": {
+      "database": 2748342272,
+      "-wal": 0,
+      "-shm": 32768
+    },
+    "passed_measured_slos": true
+  },
+  "finished_at": "2026-09-21T04:54:57.139861+00:00",
+  "generator_peak_rss_native": 96452608
+}

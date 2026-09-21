@@ -1,0 +1,13 @@
+{
+  "completed_at": "2026-09-21T05:01:47.113141+00:00",
+  "command": "bun run test:e2e --trace off",
+  "passed": 26,
+  "failed": 0,
+  "duration": "2.1m",
+  "source_files_checked": 115,
+  "changed_source_files": [],
+  "test_ports_after_run": {
+    "8022": "closed",
+    "5192": "closed"
+  }
+}
