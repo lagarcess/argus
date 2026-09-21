@@ -32,6 +32,7 @@ from .assistant_contracts import (
 from .common import (
     Context,
     PlatformError,
+    assert_active_context,
     get_context,
     get_store,
     identifier,
@@ -460,6 +461,7 @@ def update_conversation(
 ) -> dict:
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         original = _conversation(connection, context, conversation_id)
         changes = payload.model_dump(exclude_unset=True)
         connection.execute(
@@ -495,6 +497,7 @@ def answer_question(
         "interpretation": "prepared" if source_message is None else "semantic",
     }
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         if payload.conversation_id:
             _active_conversation(connection, context, payload.conversation_id)
             conversation_id = payload.conversation_id
@@ -829,6 +832,7 @@ def update_notice(
     }:
         raise PlatformError("notice_not_found", 404)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context, minimum_role="viewer")
         connection.execute(
             "INSERT INTO p_assistant_notice_states VALUES (?,?,?,?,?) ON CONFLICT(household_id,user_id,notice_id) DO UPDATE SET state=excluded.state,updated_at=excluded.updated_at",
             (
@@ -850,6 +854,7 @@ def trash_all(
 ) -> dict:
     require_owner(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context, minimum_role="owner")
         changed = connection.execute(
             "UPDATE p_assistant_conversations SET state='trashed',updated_at=? WHERE household_id=? AND state!='trashed'",
             (now().isoformat(), context.household_id),

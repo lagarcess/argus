@@ -22,7 +22,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import JSONResponse
 
 from ..store import Store
-from .common import Context, PlatformError, get_context, get_store
+from .common import Context, PlatformError, assert_active_context, get_context, get_store
 
 logger = logging.getLogger("clara.runtime")
 router = APIRouter(prefix="/api/platform")
@@ -158,6 +158,7 @@ def acquire_model(store: Store, context: Context) -> ModelLease:
     at = time.time()
     day = int(at // 86400)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         policy = read_policy(connection)
         _expire_models(connection, at)
         active = connection.execute(

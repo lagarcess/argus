@@ -15,7 +15,7 @@ from uuid import uuid4
 from pydantic import Field, ValidationError
 
 from ..store import Store
-from .common import Context, Model, PlatformError, require_owner
+from .common import Context, Model, PlatformError, assert_active_context, require_owner
 from .runtime import is_database_busy, policy_for, read_policy
 
 logger = logging.getLogger("clara.jobs")
@@ -145,6 +145,8 @@ def enqueue_job(
     scope = f"household:{household}" if context else "scheduler"
     at = time.time()
     with store.connection(write=True) as connection:
+        if context is not None:
+            assert_active_context(connection, context, minimum_role="owner")
         policy = read_policy(connection)
         previous = connection.execute(
             "SELECT * FROM p_runtime_jobs WHERE kind=? AND scope=? AND dedupe_key=?",

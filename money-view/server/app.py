@@ -88,7 +88,9 @@ def create_app(database_path: str | Path | None = None, interpreter=None) -> Fas
         context = get_context(request)
         if write:
             require_editor(context)
-        return PlacementService(request.app.state.store, context.household_id)
+        return PlacementService(
+            request.app.state.store, context.household_id, context=context
+        )
 
     @application.exception_handler(ServiceError)
     async def service_error(_request: Request, exc: ServiceError):
@@ -117,7 +119,9 @@ def create_app(database_path: str | Path | None = None, interpreter=None) -> Fas
     async def interpret(body: InterpretBody, request: Request):
         context = await run_in_threadpool(get_context, request)
         require_editor(context)
-        service = PlacementService(request.app.state.store, context.household_id)
+        service = PlacementService(
+            request.app.state.store, context.household_id, context=context
+        )
         interpretation = await semantic_interpreter.interpret(
             body.message,
             body.locale,

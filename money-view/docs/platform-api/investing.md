@@ -12,6 +12,16 @@ ledger's public `account_balances()` query and shown separately. Manual
 holdings here represent alternative assets outside those accounts. Simulated
 cash and positions are fictional and are excluded from household net worth.
 
+Every user-authored investing write rechecks the captured user, membership,
+role, and household data generation inside the same SQLite write transaction
+that mutates data or replays an idempotent receipt. A deleted user or removed
+membership returns `authentication_required`; a changed role returns
+`household_access_changed`; and a context captured before a household reset
+returns `household_data_changed`. Scheduled recurring work captures the current
+identity context before reserving a run, then carries that generation through
+quote persistence and settlement. Initialization, fixture market-data loads,
+and recurring recovery remain operational jobs rather than user writes.
+
 ## Portfolio and manual alternative holdings
 
 `GET /portfolio` returns:
@@ -57,6 +67,11 @@ cash and positions are fictional and are excluded from household net worth.
 add to ledger net worth. Linked account balances are already in the ledger;
 simulation values are fictional. When a holding has no price, its value is
 omitted, its ID is listed in `unpriced_holding_ids`, and `is_partial` is true.
+Each `totals[].source.as_of` is the newest observation among only the linked
+accounts and priced alternative holdings that contribute to that currency.
+An observation in another currency never supplies that date. The top-level
+`as_of` remains the newest contributing observation across the complete
+multi-currency portfolio.
 
 `GET /holdings` returns `{items:[holding...]}`. `POST /holdings` accepts
 `{symbol,name,quantity,total_cost,currency,as_of}`. `PATCH /holdings/{id}`
@@ -198,6 +213,21 @@ can attempt at most once per ISO week or calendar month. Repeating the call in
 that period returns the same run record and never places a second paper order.
 Any current household editor or owner may manually update or run a shared plan,
 including one created by another member.
+
+Monthly plans keep a canonical day-of-month anchor separate from the mutable
+`next_run_on` due cursor. A plan created for January 31 advances to February 28
+(February 29 in a leap year) and then returns to March 31. Pausing, resuming,
+replaying a period, or recovering an interrupted run does not change that
+anchor. An explicit `PATCH` with a new `next_run_on` establishes that new day as
+the anchor. Existing local rows are migrated idempotently in bounded batches of
+100. Legacy evidence did not track explicit reschedules, so the current
+`next_run_on` day is the only reliable known schedule and becomes the migrated
+anchor while the cursor itself remains unchanged. An older month-end intention
+cannot be reconstructed after it was clamped or rescheduled. Rows beyond one
+batch use the same current-cursor fallback when touched and persist it on
+advancement. Local migration and fixture-manifest seeding are serialized under
+one SQLite write lock, including when two processes initialize the same legacy
+database. No remote database migration is involved.
 
 ## Python query helpers
 

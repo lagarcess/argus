@@ -1,4 +1,5 @@
 """Ledger acceptance: exact money, full-filter totals, isolation and realistic volume."""
+
 import json
 import shutil
 from datetime import date
@@ -9,19 +10,22 @@ import pytest
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
+from platform_identity_factory import identity_context
 from server.platform import ledger
 from server.platform.common import Context, PlatformError, get_context
 from server.platform.ledger_contracts import TransactionCreate
 from server.store import Store
 
-CTX = Context('user-demo', 'household-demo', 'owner', 'test-session')
-OTHER = Context('user-other', 'household-other', 'owner', 'other-session')
+CTX = Context("user-demo", "household-demo", "owner", "test-session")
+OTHER = Context("user-other", "household-other", "owner", "other-session")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def seeded(tmp_path_factory):
-    path = tmp_path_factory.mktemp('ledger-seed') / 'seed.sqlite'
-    ledger.initialize(Store(path))
+    path = tmp_path_factory.mktemp("ledger-seed") / "seed.sqlite"
+    seed_store = Store(path)
+    identity_context(seed_store)
+    ledger.initialize(seed_store)
     return path
 
 
@@ -36,11 +40,13 @@ def store(tmp_path, seeded):
 def client(store):
     app = FastAPI()
     app.state.store = store
-    app.dependency_overrides[get_context] = lambda: CTX
+    app.dependency_overrides[get_context] = lambda: identity_context(store)
     app.include_router(ledger.router)
+
     @app.exception_handler(PlatformError)
     async def error(_request, exc):
-        return JSONResponse({'code': exc.code}, status_code=exc.status)
+        return JSONResponse({"code": exc.code}, status_code=exc.status)
+
     with TestClient(app) as client:
         yield client
 
@@ -101,10 +107,12 @@ def test_household_isolation_read_write_import(client):
 
 
 def test_viewer_cannot_mutate(client):
-    client.app.dependency_overrides[get_context] = lambda: Context('user-viewer', 'household-demo', 'viewer', 'viewer-session')
+    client.app.dependency_overrides[get_context] = lambda: identity_context(
+        client.app.state.store, user_id="user-viewer", role="viewer"
+    )
     assert manual(client).status_code == 403
-    assert client.delete('/api/platform/accounts/acct-demo-01').status_code == 403
-    assert client.get('/api/platform/accounts').status_code == 200
+    assert client.delete("/api/platform/accounts/acct-demo-01").status_code == 403
+    assert client.get("/api/platform/accounts").status_code == 200
 
 
 def test_idempotency_and_pending_do_not_change_balance(client):

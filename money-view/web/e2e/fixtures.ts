@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 const appDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-export const evidenceDirectory = join(appDirectory, 'docs/evidence/platform');
+export const evidenceDirectory = resolve(process.env.CLARA_EVIDENCE_DIR ?? join(appDirectory, 'docs/evidence/platform'));
 const localPython = join(appDirectory, '.venv/bin/python');
 const parentPython = resolve(appDirectory, '../.venv/bin/python');
 const python = process.env.CLARA_TEST_PYTHON ?? (existsSync(localPython) ? localPython : existsSync(parentPython) ? parentPython : 'python3');

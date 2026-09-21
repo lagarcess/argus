@@ -21,6 +21,7 @@ from server.platform.assistant_contracts import (
     Parameters,
 )
 from server.platform.common import Context, PlatformError, get_context, get_store
+from server.platform.identity import Identity
 from server.platform.ledger_contracts import TransactionCreate
 from server.platform.planning_contracts import BudgetInput
 from server.store import Store
@@ -32,6 +33,7 @@ PARAMETERS = Parameters(currency="USD", month="2026-09")
 @pytest.fixture(scope="module")
 def seeded(tmp_path_factory):
     store = Store(tmp_path_factory.mktemp("assistant") / "base.sqlite")
+    Identity(store).initialize()
     ledger.initialize(store)
     planning.initialize(store)
     services.initialize(store)
@@ -964,3 +966,185 @@ def test_answer_write_rechecks_target_after_financial_snapshot(
     assert assistant.conversation_detail(store, context, conversation_id)["answers"] == [
         initial["answer"]
     ]
+
+
+@pytest.mark.parametrize(
+    "operation,user,household,expected_status,expected_code",
+    [
+        ("reset", "user-demo", "household-demo", 409, "household_data_changed"),
+        (
+            "delete_account",
+            "user-other",
+            "household-other",
+            401,
+            "authentication_required",
+        ),
+        (
+            "remove_member",
+            "user-partner",
+            "household-demo",
+            401,
+            "authentication_required",
+        ),
+        (
+            "change_role",
+            "user-partner",
+            "household-demo",
+            409,
+            "household_access_changed",
+        ),
+    ],
+)
+def test_inflight_semantic_answer_cannot_write_after_lifecycle_change(
+    tmp_path, monkeypatch, operation, user, household, expected_status, expected_code
+):
+    import asyncio
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+
+    from server.app import create_app
+    from server.interpreter import FixtureInterpreter
+    from server.platform import runtime
+    from server.platform.assistant_contracts import SemanticChoice
+    from server.platform.identity import DEMO_PASSWORD
+
+    entered, resume = threading.Event(), threading.Event()
+
+    async def controlled_interpret(*args, store, context, **kwargs):
+        # Keep the real admission lifecycle, but never contact a model provider.
+        async with runtime.model_admission(store, context):
+            entered.set()
+            assert await asyncio.to_thread(resume.wait, 5)
+            return "answered", SemanticChoice(action="spending", parameters=PARAMETERS)
+
+    monkeypatch.setattr(assistant, "interpret", controlled_interpret)
+    app = create_app(tmp_path / "lifecycle.sqlite", FixtureInterpreter())
+    message = fake.sentence()
+    with TestClient(app) as first:
+        second = TestClient(app)
+        second_user = (
+            "user-demo" if operation in ("remove_member", "change_role") else user
+        )
+        for client, login_user in ((first, user), (second, second_user)):
+            response = client.post(
+                "/api/platform/session/login",
+                json={"user_id": login_user, "password": DEMO_PASSWORD},
+            )
+            assert response.status_code == 200, response.text
+        store = app.state.store
+
+        def count(table):
+            with store.connection() as db:
+                return db.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE household_id=?", (household,)
+                ).fetchone()[0]
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            pending = pool.submit(
+                first.post,
+                "/api/platform/assistant/ask",
+                json={"message": message, "parameters": PARAMETERS.model_dump()},
+            )
+            try:
+                assert entered.wait(5), "semantic request did not reach pause"
+                assert count("p_runtime_model_leases") == 1
+                if operation == "reset":
+                    changed = second.post(
+                        "/api/platform/settings/data/reset",
+                        json={"confirmation": "RESET THIS HOUSEHOLD"},
+                    )
+                elif operation == "delete_account":
+                    changed = second.request(
+                        "DELETE",
+                        "/api/platform/settings/account",
+                        json={
+                            "confirmation": "DELETE MY LOCAL ACCOUNT",
+                            "current_password": DEMO_PASSWORD,
+                        },
+                    )
+                elif operation == "remove_member":
+                    changed = second.delete(f"/api/platform/household/members/{user}")
+                else:
+                    changed = second.patch(
+                        f"/api/platform/household/members/{user}", json={"role": "viewer"}
+                    )
+                assert changed.status_code == 200, changed.text
+                assert count("p_assistant_conversations") == 0
+                assert count("p_runtime_model_leases") == 1
+            finally:
+                resume.set()
+            response = pending.result(timeout=10)
+        second.close()
+        assert response.status_code == expected_status, response.text
+        assert response.json() == {"code": expected_code}
+        for table in (
+            "p_assistant_conversations",
+            "p_assistant_messages",
+            "p_assistant_answers",
+            "p_assistant_notice_states",
+            "p_runtime_model_leases",
+        ):
+            assert count(table) == 0, table
+        with store.connection() as db:
+            assert not db.execute(
+                "SELECT 1 FROM p_assistant_messages WHERE document LIKE ?",
+                (f"%{message}%",),
+            ).fetchone()
+        if operation == "reset":
+            fresh = first.post(
+                "/api/platform/assistant/ask",
+                json={"action": "spending", "parameters": PARAMETERS.model_dump()},
+            )
+            assert fresh.status_code == 200, fresh.text
+            assert fresh.json()["status"] == "answered"
+            assert count("p_assistant_conversations") == 1
+        elif operation in ("delete_account", "remove_member"):
+            assert first.get("/api/platform/session").status_code == 401
+
+
+@pytest.mark.parametrize("mutation", ["conversation", "notice", "trash_all"])
+def test_assistant_mutations_reject_stale_household_generation(
+    store, context, monkeypatch, mutation
+):
+    from server.platform.assistant_contracts import NoticeUpdate, TrashAll
+
+    existing = assistant.answer_question(
+        store, context, Ask(action="spending", parameters=PARAMETERS)
+    )
+    stale_context = replace(context, data_generation=context.data_generation + 1)
+    notice_id = fake.uuid4()
+    monkeypatch.setattr(
+        assistant,
+        "review_insights",
+        lambda *args: {"notices": [{"id": notice_id}]},
+    )
+    with pytest.raises(PlatformError, match="household_data_changed"):
+        if mutation == "conversation":
+            assistant.update_conversation(
+                store,
+                stale_context,
+                existing["conversation_id"],
+                ConversationUpdate(title=fake.sentence()),
+            )
+        elif mutation == "notice":
+            assistant.update_notice(
+                notice_id=notice_id,
+                payload=NoticeUpdate(state="read"),
+                store=store,
+                context=stale_context,
+            )
+        else:
+            assistant.trash_all(
+                TrashAll(confirmation="TRASH HOUSEHOLD CONVERSATIONS"),
+                store,
+                stale_context,
+            )
+    result = assistant.conversation_detail(store, context, existing["conversation_id"])
+    assert result["conversation"]["state"] == "active"
+    assert result["conversation"]["title"] == "spending"
+    assert result["answers"] == [existing["answer"]]
+    with store.connection() as db:
+        assert (
+            db.execute("SELECT COUNT(*) FROM p_assistant_notice_states").fetchone()[0]
+            == 0
+        )

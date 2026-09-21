@@ -13,6 +13,7 @@ from .calculator import (
 )
 from .fixtures import get_countries, get_examples, get_source_document
 from .models import ComparisonResult, PlacementInputs, RateDataset, dataset_content_id
+from .platform.common import Context, assert_active_context
 from .providers import FixtureProvider
 from .store import Store
 
@@ -49,9 +50,19 @@ RECHECK_BATCH_SIZE = 200
 
 
 class PlacementService:
-    def __init__(self, store: Store, household_id: str = "household-demo"):
+    def __init__(
+        self, store: Store, household_id: str = "household-demo", *,
+        context: Context | None = None,
+    ):
+        if context is not None and context.household_id != household_id:
+            raise ValueError("placement_context_household_mismatch")
         self.store = store
         self.household_id = household_id
+        self.context = context
+
+    def _assert_writer(self, db, *, minimum_role="editor") -> None:
+        if self.context is not None:
+            assert_active_context(db, self.context, minimum_role=minimum_role)
 
     def _require_confirmation(self, db, confirmation_id: str) -> None:
         if not db.execute(
@@ -371,6 +382,7 @@ class PlacementService:
         ).isoformat()
         confirmation_id = identifier()
         with self.store.connection(write=True) as db:
+            self._assert_writer(db)
             pinned = self._current_datasets(db)
             if inputs.country not in pinned:
                 raise ServiceError("unsupported_country")
@@ -403,6 +415,7 @@ class PlacementService:
     def compute(self, confirmation_id: str, inputs: PlacementInputs) -> dict:
         input_document = input_identity(inputs)
         with self.store.connection(write=True) as db:
+            self._assert_writer(db)
             self._require_confirmation(db, confirmation_id)
             confirmation = db.execute(
                 "SELECT * FROM confirmations WHERE id=?", (confirmation_id,)
@@ -436,6 +449,7 @@ class PlacementService:
 
     def save(self, comparison_id: str) -> dict:
         with self.store.connection(write=True) as db:
+            self._assert_writer(db)
             self._require_comparison(db, comparison_id)
             self._result(db, comparison_id)
             db.execute(
@@ -670,6 +684,7 @@ class PlacementService:
 
     def read_notice(self, notice_id: str) -> dict:
         with self.store.connection(write=True) as db:
+            self._assert_writer(db, minimum_role="viewer")
             row = db.execute(
                 "SELECT dc.* FROM decision_checks dc JOIN saved_decisions sd "
                 "ON sd.id=dc.decision_id JOIN p_placement_comparisons pc ON pc.id=sd.comparison_id "

@@ -1,10 +1,12 @@
 """Planning behavioral acceptance and canonical ledger integration."""
+
 import json
 import sqlite3
 from datetime import date
 from decimal import Decimal
 
 import pytest
+from platform_identity_factory import identity_context
 from pydantic import ValidationError
 from server.platform import planning
 from server.platform.common import Context, PlatformError
@@ -21,13 +23,17 @@ from server.store import Store
 
 
 @pytest.fixture
-def context():
-    return Context("user-test", "household-test", "owner", "session-test")
+def context(request):
+    store = request.getfixturevalue(
+        "ledger_store" if "ledger_store" in request.fixturenames else "store"
+    )
+    return identity_context(store, user_id="user-test", household_id="household-test")
 
 
 @pytest.fixture
 def store(tmp_path):
     result = Store(tmp_path / "planning.sqlite")
+    identity_context(result)
     planning.initialize(result)
     return result
 
@@ -89,11 +95,20 @@ def test_saved_receipts_are_immutable_and_household_scoped(store, context):
 
 
 def test_plan_edits_and_viewer_guard_and_reset_survives_restart(store, context):
-    payload = GoalInput(name="Reserve", target_date=date(2028, 1, 1), target_amount="1000", currency="USD")
+    payload = GoalInput(
+        name="Reserve", target_date=date(2028, 1, 1), target_amount="1000", currency="USD"
+    )
     goal = planning.save_goal(store, context, payload)
-    updated = planning.save_goal(store, context, payload.model_copy(update={"target_amount": Decimal("2000")}), goal["id"])
+    updated = planning.save_goal(
+        store,
+        context,
+        payload.model_copy(update={"target_amount": Decimal("2000")}),
+        goal["id"],
+    )
     assert updated["target_amount"] == "2000"
-    viewer = Context(context.user_id, context.household_id, "viewer", context.session_id)
+    viewer = identity_context(
+        store, user_id="user-viewer", household_id=context.household_id, role="viewer"
+    )
     with pytest.raises(PlatformError, match="read_only_household"):
         planning.save_goal(store, viewer, payload)
     demo = Context("user-demo", "household-demo", "owner", "session-demo")
@@ -115,8 +130,11 @@ def test_templates_all_use_same_calculator():
 @pytest.fixture
 def ledger_store(tmp_path):
     from server.platform import ledger
+
     result = Store(tmp_path / "ledger-planning.sqlite")
+    identity_context(result)
     ledger.initialize(result)
+    identity_context(result)
     planning.initialize(result)
     return result
 
@@ -200,15 +218,22 @@ def test_http_scenario_and_role_boundary(store, context):
     from fastapi.responses import JSONResponse
     from fastapi.testclient import TestClient
     from server.platform.common import get_context, get_store
+
     app = FastAPI()
     app.include_router(planning.router)
     app.dependency_overrides[get_store] = lambda: store
     app.dependency_overrides[get_context] = lambda: context
+
     @app.exception_handler(PlatformError)
     async def platform_error(request, error):
         return JSONResponse({"error": error.code}, status_code=error.status)
+
     client = TestClient(app)
-    payload = {"name": "Baseline", "template": "home", "inputs": {"currency": "USD", "initial_balance": "100", "horizon_years": 1}}
+    payload = {
+        "name": "Baseline",
+        "template": "home",
+        "inputs": {"currency": "USD", "initial_balance": "100", "horizon_years": 1},
+    }
     calculated = client.post("/api/platform/scenarios/calculate", json=payload)
     assert calculated.status_code == 200
     assert calculated.json()["evidence"]["kind"] == "calculated"
@@ -216,8 +241,13 @@ def test_http_scenario_and_role_boundary(store, context):
     assert saved.status_code == 200
     receipt = saved.json()
     assert client.get("/api/platform/scenarios/" + receipt["id"]).json() == receipt
-    assert client.put("/api/platform/scenarios/" + receipt["id"], json=payload).status_code == 405
-    app.dependency_overrides[get_context] = lambda: Context(context.user_id, context.household_id, "viewer", context.session_id)
+    assert (
+        client.put("/api/platform/scenarios/" + receipt["id"], json=payload).status_code
+        == 405
+    )
+    app.dependency_overrides[get_context] = lambda: identity_context(
+        store, user_id="user-viewer", household_id=context.household_id, role="viewer"
+    )
     listed = client.get("/api/platform/scenarios?limit=1&offset=0")
     assert listed.status_code == 200
     assert listed.json()["total"] == 1 and listed.json()["limit"] == 1

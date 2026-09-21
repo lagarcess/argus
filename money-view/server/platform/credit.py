@@ -4,7 +4,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter
 
-from .common import CURRENCY_DIGITS, minor_units, require_editor
+from .common import CURRENCY_DIGITS, assert_active_context, minor_units, require_editor
 from .service_contracts import (
     ContextDependency,
     CreditAccount,
@@ -115,6 +115,7 @@ def add_account(
     account = new_record(payload, "credit")
     account["evidence"] = evidence(account["id"], payload.as_of)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         return save(db, "p_credit_accounts", context.household_id, account)
 
 
@@ -128,6 +129,7 @@ def update_account(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         record(db, "p_credit_accounts", context.household_id, account_id)
         account = {
             "id": account_id,

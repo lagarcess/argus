@@ -136,3 +136,40 @@ do not acquire a write transaction. Activity timestamps are approximate, updated
 only after five minutes using a conditional database update. Concurrent overdue
 requests cannot overwrite a newer activity timestamp. Activity throttling does
 not delay role changes or revocation.
+
+In-flight write lifecycle: authenticated `Context` captures `data_generation`
+(an integer, initially zero) alongside the current membership role. Identity owns
+`p_household_generations(household_id,generation)`; a missing row means zero.
+Household reset and sole-member household deletion advance this generation in the
+same transaction as clearing data. Initialization preserves it, and failed clears
+roll back both the deletion and generation change.
+
+Every user-scoped persistence owner must call the shared guard inside its existing
+`Store.connection(write=True)` transaction, before saving private state:
+
+```python
+with store.connection(write=True) as db:
+    assert_active_context(db, context, minimum_role="editor")
+    # Perform scoped writes using this same connection.
+```
+
+`assert_active_context` defaults to `minimum_role="editor"`; personal settings and
+notice state can pass `"viewer"`, while owner-only operations pass `"owner"`.
+It reloads the active user, current membership role and household generation from
+the database. Deleted users or removed memberships fail with `401
+authentication_required`; any changed role fails with `409
+household_access_changed`; a changed generation fails with `409
+household_data_changed`. Only then does it enforce the minimum role (`403
+read_only_household` or `403 owner_required`). These errors leave the attempted
+write uncommitted. The guard deliberately does not recheck sessions: work accepted
+before logout can finish, provided its user, membership, role and data generation
+remain valid.
+
+`common.active_context(db, user_id=..., household_id=..., session_id=...)` is the
+canonical current-role/generation loader for authentication and background work.
+A background operation captures this context before doing work and validates that
+same context before final persistence; refreshing it after a wait would bypass
+the fence. After reset, a fresh authenticated request captures the new generation
+and can save normally. Account deletion in a shared household and member removal
+fence the removed user through current identity/membership checks while preserving
+other members' financial records.

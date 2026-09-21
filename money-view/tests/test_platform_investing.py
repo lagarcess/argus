@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from server.app import create_app
 from server.interpreter import FixtureInterpreter
 from server.platform import identity, investing, ledger
-from server.platform.common import Context, PlatformError
+from server.platform.common import Context, PlatformError, active_context
 from server.platform.identity import DEMO_PASSWORD
 from server.platform.market_data import (
     FixtureMarketDataAdapter,
@@ -43,8 +43,19 @@ def other_context() -> Context:
 @pytest.fixture
 def store(tmp_path) -> Store:
     value = Store(tmp_path / "clara.sqlite3")
+    identity.initialize(value)
     investing.initialize(value)
     return value
+
+
+def _advance_generation(store: Store, context: Context) -> None:
+    with store.connection(write=True) as connection:
+        connection.execute(
+            """INSERT INTO p_household_generations(household_id,generation)
+            VALUES (?,1)
+            ON CONFLICT(household_id) DO UPDATE SET generation=generation+1""",
+            (context.household_id,),
+        )
 
 
 def test_portfolio_keeps_currencies_separate_and_marks_unpriced_partial(
@@ -92,6 +103,44 @@ def test_portfolio_keeps_currencies_separate_and_marks_unpriced_partial(
     assert eur["currency"] == "EUR"
 
 
+def test_portfolio_total_dates_use_only_contributors_in_each_currency(
+    store: Store, context: Context, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        investing,
+        "_linked_investment_accounts",
+        lambda *_: [
+            {
+                "id": "linked-usd-newer",
+                "name": "Newer USD account",
+                "kind": "investment",
+                "currency": "USD",
+                "balance": "100.00",
+                "opening_balance": "100.00",
+                "source": {"as_of": "2026-10-05"},
+            },
+            {
+                "id": "linked-dop-older",
+                "name": "Older DOP account",
+                "kind": "investment",
+                "currency": "DOP",
+                "balance": "5000.00",
+                "opening_balance": "5000.00",
+                "source": {"as_of": "2026-09-01"},
+            },
+        ],
+    )
+
+    portfolio = investing.portfolio_summary(store, context)
+    totals = {item["currency"]: item for item in portfolio["totals"]}
+
+    assert totals["USD"]["source"]["as_of"] == "2026-10-05"
+    assert totals["DOP"]["source"]["as_of"] == "2026-09-01"
+    assert totals["DOP"]["source"]["inputs"] == ["linked-dop-older"]
+    assert portfolio["as_of"] == "2026-10-05"
+    assert portfolio["source"]["as_of"] == "2026-10-05"
+
+
 def test_households_cannot_read_or_trade_each_others_records(
     store: Store, context: Context, other_context: Context
 ) -> None:
@@ -113,6 +162,166 @@ def test_households_cannot_read_or_trade_each_others_records(
                 quantity=Decimal("1"),
             ),
         )
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "create_holding",
+        "update_holding",
+        "delete_holding",
+        "preview_import",
+        "replay_import",
+        "preview_order",
+        "replay_order",
+        "create_plan",
+        "update_plan",
+        "run_plan",
+    ],
+)
+def test_stale_context_cannot_write_or_replay_investing_data(
+    store: Store, context: Context, operation: str
+) -> None:
+    holding = investing.create_holding(
+        store,
+        context,
+        investing.HoldingCreate(
+            symbol="ALT-WATCH",
+            name="Watch",
+            quantity=Decimal("1"),
+            total_cost=Decimal("100.00"),
+            currency="USD",
+            as_of=date(2026, 9, 20),
+        ),
+    )
+    csv_content = (
+        "symbol,name,quantity,total_cost,currency,as_of\n"
+        "ALT-CARD,Card collection,1,1200.00,USD,2026-09-20\n"
+    )
+    import_preview = investing.preview_holding_csv(store, context, csv_content)
+    import_key = f"import-{fake.uuid4()}"
+    investing.commit_holding_import(
+        store, context, str(import_preview["id"]), import_key
+    )
+    order_preview = investing.preview_order(
+        store,
+        context,
+        investing.OrderPreviewRequest(
+            book_id="book-demo-usd",
+            side="buy",
+            symbol="AAPL",
+            quantity=Decimal("1"),
+        ),
+    )
+    order_key = f"order-{fake.uuid4()}"
+    investing.confirm_order(store, context, str(order_preview["id"]), order_key)
+    plan = investing.create_recurring_plan(
+        store,
+        context,
+        investing.RecurringPlanCreate(
+            book_id="book-demo-usd",
+            cadence="monthly",
+            next_run_on=date(2026, 9, 20),
+            symbol="BND",
+            amount=Decimal("100.00"),
+        ),
+    )
+    _advance_generation(store, context)
+
+    actions = {
+        "create_holding": lambda: investing.create_holding(
+            store,
+            context,
+            investing.HoldingCreate(
+                symbol="ALT-COMIC",
+                name="Comic",
+                quantity=Decimal("1"),
+                total_cost=Decimal("50.00"),
+                currency="USD",
+                as_of=date(2026, 9, 20),
+            ),
+        ),
+        "update_holding": lambda: investing.update_holding(
+            store,
+            context,
+            str(holding["id"]),
+            investing.HoldingUpdate(name="Changed"),
+        ),
+        "delete_holding": lambda: investing.delete_holding(
+            store, context, str(holding["id"])
+        ),
+        "preview_import": lambda: investing.preview_holding_csv(
+            store, context, csv_content
+        ),
+        "replay_import": lambda: investing.commit_holding_import(
+            store, context, str(import_preview["id"]), import_key
+        ),
+        "preview_order": lambda: investing.preview_order(
+            store,
+            context,
+            investing.OrderPreviewRequest(
+                book_id="book-demo-usd",
+                side="buy",
+                symbol="SPY",
+                quantity=Decimal("1"),
+            ),
+        ),
+        "replay_order": lambda: investing.confirm_order(
+            store, context, str(order_preview["id"]), order_key
+        ),
+        "create_plan": lambda: investing.create_recurring_plan(
+            store,
+            context,
+            investing.RecurringPlanCreate(
+                book_id="book-demo-usd",
+                cadence="weekly",
+                next_run_on=date(2026, 9, 20),
+                symbol="SPY",
+                amount=Decimal("100.00"),
+            ),
+        ),
+        "update_plan": lambda: investing.update_recurring_plan(
+            store,
+            context,
+            str(plan["id"]),
+            investing.RecurringPlanUpdate(active=False),
+        ),
+        "run_plan": lambda: investing.run_recurring_plan(
+            store, context, str(plan["id"]), date(2026, 9, 20)
+        ),
+    }
+
+    with pytest.raises(PlatformError, match="household_data_changed"):
+        actions[operation]()
+
+
+def test_scheduled_recurring_job_captures_current_household_generation(
+    store: Store, context: Context
+) -> None:
+    _advance_generation(store, context)
+    with store.connection() as connection:
+        refreshed = active_context(
+            connection,
+            user_id=context.user_id,
+            household_id=context.household_id,
+            session_id="after-reset",
+        )
+    plan = investing.create_recurring_plan(
+        store,
+        refreshed,
+        investing.RecurringPlanCreate(
+            book_id="book-demo-usd",
+            cadence="monthly",
+            next_run_on=date(2026, 9, 20),
+            symbol="BND",
+            amount=Decimal("100.00"),
+        ),
+    )
+
+    result = investing.run_due_recurring_plans(store, date(2026, 9, 20))
+
+    assert [item["plan_id"] for item in result["items"]] == [plan["id"]]
+    assert result["items"][0]["status"] == "succeeded"
 
 
 def test_order_confirmation_is_atomic_and_idempotent_under_double_click(
@@ -338,6 +547,195 @@ def test_recurring_plan_runs_once_per_period(store: Store, context: Context) -> 
     assert len(investing.list_orders(store, context)["items"]) == 1
 
 
+def test_monthly_recurring_plan_keeps_month_end_anchor_through_pause_and_replay(
+    store: Store, context: Context
+) -> None:
+    plan = investing.create_recurring_plan(
+        store,
+        context,
+        investing.RecurringPlanCreate(
+            book_id="book-demo-usd",
+            cadence="monthly",
+            next_run_on=date(2027, 1, 31),
+            symbol="BND",
+            amount=Decimal("100.00"),
+        ),
+    )
+
+    january = investing.run_recurring_plan(
+        store, context, str(plan["id"]), date(2027, 1, 31)
+    )
+    paused = investing.update_recurring_plan(
+        store,
+        context,
+        str(plan["id"]),
+        investing.RecurringPlanUpdate(active=False),
+    )
+    resumed = investing.update_recurring_plan(
+        store,
+        context,
+        str(plan["id"]),
+        investing.RecurringPlanUpdate(active=True),
+    )
+    february = investing.run_recurring_plan(
+        store, context, str(plan["id"]), date(2027, 2, 28)
+    )
+    replay = investing.run_recurring_plan(
+        store, context, str(plan["id"]), date(2027, 2, 28)
+    )
+
+    assert january["status"] == "succeeded"
+    assert paused["next_run_on"] == "2027-02-28"
+    assert resumed["next_run_on"] == "2027-02-28"
+    assert february["status"] == "succeeded"
+    assert replay["id"] == february["id"]
+    assert investing.get_recurring_plan(store, context, str(plan["id"]))[
+        "next_run_on"
+    ] == "2027-03-31"
+
+
+def test_monthly_recurring_plan_uses_leap_day_without_losing_anchor(
+    store: Store, context: Context
+) -> None:
+    plan = investing.create_recurring_plan(
+        store,
+        context,
+        investing.RecurringPlanCreate(
+            book_id="book-demo-usd",
+            cadence="monthly",
+            next_run_on=date(2028, 1, 31),
+            symbol="BND",
+            amount=Decimal("100.00"),
+        ),
+    )
+
+    investing.run_recurring_plan(
+        store, context, str(plan["id"]), date(2028, 1, 31)
+    )
+    assert investing.get_recurring_plan(store, context, str(plan["id"]))[
+        "next_run_on"
+    ] == "2028-02-29"
+
+    investing.run_recurring_plan(
+        store, context, str(plan["id"]), date(2028, 2, 29)
+    )
+    assert investing.get_recurring_plan(store, context, str(plan["id"]))[
+        "next_run_on"
+    ] == "2028-03-31"
+
+
+def test_monthly_anchor_migration_is_bounded_idempotent_and_preserves_cursor(
+    store: Store, context: Context
+) -> None:
+    plan = investing.create_recurring_plan(
+        store,
+        context,
+        investing.RecurringPlanCreate(
+            book_id="book-demo-usd",
+            cadence="monthly",
+            next_run_on=date(2027, 1, 31),
+            symbol="BND",
+            amount=Decimal("1.00"),
+        ),
+    )
+    with store.connection(write=True) as connection:
+        connection.execute(
+            """
+            UPDATE p_investment_recurring_plans
+            SET next_run_on='2027-02-28',monthly_anchor_day=NULL WHERE id=?
+            """,
+            (plan["id"],),
+        )
+        for index in range(investing.RECURRING_ANCHOR_MIGRATION_BATCH):
+            connection.execute(
+                """
+                INSERT INTO p_investment_recurring_plans(
+                    id,household_id,created_by,book_id,cadence,next_run_on,
+                    monthly_anchor_day,symbol,bundle_id,amount_minor,currency,
+                    active,created_at,updated_at,source_json
+                )
+                SELECT ?,household_id,created_by,book_id,cadence,'2027-02-28',
+                       NULL,symbol,bundle_id,amount_minor,currency,active,
+                       created_at,updated_at,source_json
+                FROM p_investment_recurring_plans WHERE id=?
+                """,
+                (f"legacy-monthly-{index:03d}", plan["id"]),
+            )
+
+    investing.initialize(store)
+    with store.connection() as connection:
+        first_remaining = connection.execute(
+            """
+            SELECT COUNT(*) FROM p_investment_recurring_plans
+            WHERE cadence='monthly' AND monthly_anchor_day IS NULL
+            """
+        ).fetchone()[0]
+    investing.initialize(store)
+    investing.initialize(store)
+    with store.connection() as connection:
+        migrated = connection.execute(
+            """
+            SELECT next_run_on,monthly_anchor_day
+            FROM p_investment_recurring_plans WHERE cadence='monthly'
+            """
+        ).fetchall()
+
+    assert first_remaining == 1
+    assert len(migrated) == investing.RECURRING_ANCHOR_MIGRATION_BATCH + 1
+    assert {row["next_run_on"] for row in migrated} == {"2027-02-28"}
+    assert {row["monthly_anchor_day"] for row in migrated} == {28}
+
+
+def test_concurrent_initializers_serialize_legacy_migration_and_fixture_seed(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = Store(tmp_path / "legacy-initialize.sqlite3")
+    identity.initialize(store)
+    with store.connection(write=True) as connection:
+        connection.execute(
+            """
+            CREATE TABLE p_investment_recurring_plans (
+                id TEXT PRIMARY KEY,
+                cadence TEXT NOT NULL,
+                next_run_on TEXT NOT NULL,
+                active INTEGER NOT NULL
+            )
+            """
+        )
+    migration_write_states: list[bool] = []
+    migrate = investing._migrate_recurring_anchor
+
+    def observe_write_lock(connection) -> None:
+        migration_write_states.append(connection.in_transaction)
+        migrate(connection)
+
+    monkeypatch.setattr(investing, "_migrate_recurring_anchor", observe_write_lock)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        list(executor.map(lambda _: investing.initialize(store), range(2)))
+
+    with store.connection() as connection:
+        columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info('p_investment_recurring_plans')"
+            )
+        }
+        manifest_count = connection.execute(
+            """SELECT COUNT(*) FROM p_investment_fixture_manifest
+            WHERE module='investing'"""
+        ).fetchone()[0]
+        fixture_holding_count = connection.execute(
+            """SELECT COUNT(*) FROM p_investment_holdings
+            WHERE id IN ('holding-demo-gold','holding-other-vwce')"""
+        ).fetchone()[0]
+
+    assert migration_write_states == [True, True]
+    assert "monthly_anchor_day" in columns
+    assert manifest_count == 1
+    assert fixture_holding_count == 2
+
+
 @pytest.mark.parametrize("authority_change", ["removed", "demoted", "deleted"])
 def test_scheduled_recurring_plan_requires_current_creator_authority(
     store: Store, context: Context, authority_change: str
@@ -550,6 +948,51 @@ def test_interrupted_recurring_run_without_receipt_fails_and_advances(
     assert investing.list_orders(store, context) == {"items": []}
 
 
+def test_interrupted_month_end_recovery_retains_canonical_anchor(
+    store: Store, context: Context
+) -> None:
+    plan = investing.create_recurring_plan(
+        store,
+        context,
+        investing.RecurringPlanCreate(
+            book_id="book-demo-usd",
+            cadence="monthly",
+            next_run_on=date(2027, 1, 31),
+            symbol="BND",
+            amount=Decimal("100.00"),
+        ),
+    )
+    january_run_id = _insert_interrupted_recurring_run(
+        store,
+        str(plan["id"]),
+        created_at=datetime.now(timezone.utc)
+        - investing.RECURRING_RUN_LEASE
+        - timedelta(seconds=1),
+        period_key="2027-01",
+        run_on=date(2027, 1, 31),
+    )
+
+    recovered = investing.run_recurring_plan(
+        store, context, str(plan["id"]), date(2027, 2, 28)
+    )
+    after_recovery = investing.get_recurring_plan(store, context, str(plan["id"]))
+    february = investing.run_recurring_plan(
+        store, context, str(plan["id"]), date(2027, 2, 28)
+    )
+    january_replay = investing.run_recurring_plan(
+        store, context, str(plan["id"]), date(2027, 1, 31)
+    )
+
+    assert recovered["id"] == january_run_id
+    assert recovered["error_code"] == "recurring_run_interrupted"
+    assert after_recovery["next_run_on"] == "2027-02-28"
+    assert february["status"] == "succeeded"
+    assert january_replay["id"] == january_run_id
+    assert investing.get_recurring_plan(store, context, str(plan["id"]))[
+        "next_run_on"
+    ] == "2027-03-31"
+
+
 def test_interrupted_recurring_run_reconciles_confirmed_receipt(
     store: Store, context: Context
 ) -> None:
@@ -706,6 +1149,7 @@ def test_manual_holding_changes_net_worth_once_and_paper_order_never_does(
     tmp_path, context: Context
 ) -> None:
     store = Store(tmp_path / "integrated.sqlite3")
+    identity.initialize(store)
     ledger.initialize(store)
     investing.initialize(store)
     before = ledger.overview_summary(store, context)

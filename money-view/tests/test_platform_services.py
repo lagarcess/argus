@@ -7,8 +7,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
+from platform_identity_factory import identity_context
 from server.platform import services
-from server.platform.common import Context, PlatformError, get_context, get_store
+from server.platform.common import PlatformError, get_context, get_store
 from server.platform.credit import calculate_payoff
 from server.store import Store
 
@@ -19,9 +20,10 @@ def api(tmp_path, monkeypatch):
     monkeypatch.setattr(
         services, "now", lambda: datetime(2026, 9, 20, tzinfo=timezone.utc)
     )
+    context = identity_context(store)
     services.initialize(store)
     app = FastAPI()
-    state = {"context": Context("user-demo", "household-demo", "owner", "session-demo")}
+    state = {"context": context, "store": store}
     app.dependency_overrides[get_store] = lambda: store
     app.dependency_overrides[get_context] = lambda: state["context"]
 
@@ -35,7 +37,16 @@ def api(tmp_path, monkeypatch):
 
 
 def switch(state, household="household-other", role="owner"):
-    state["context"] = Context("test-user", household, role, "test-session")
+    user_id = (
+        "user-viewer"
+        if role == "viewer"
+        else "user-other"
+        if household == "household-other"
+        else "user-demo"
+    )
+    state["context"] = identity_context(
+        state["store"], user_id=user_id, household_id=household, role=role
+    )
 
 
 def account(balance="100", apr="0", minimum="10", currency="USD"):

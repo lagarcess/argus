@@ -15,6 +15,7 @@ from .common import (
     Context,
     Evidence,
     PlatformError,
+    assert_active_context,
     decimal_amount,
     get_context,
     get_store,
@@ -107,6 +108,7 @@ def _list_plans(store: Store, context: Context, kind: str):
 def archive_plan(store: Store, context: Context, plan_id: str, kind: str):
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         _plan(connection, context, plan_id, kind)
         connection.execute("UPDATE p_plans SET status='archived' WHERE id=? AND household_id=?", (plan_id, context.household_id))
     return {"id": plan_id, "status": "archived"}
@@ -114,6 +116,7 @@ def archive_plan(store: Store, context: Context, plan_id: str, kind: str):
 
 def save_budget(store: Store, context: Context, payload: BudgetInput, budget_id: str | None = None):
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         matches = connection.execute("SELECT id,document FROM p_plans WHERE household_id=? AND kind='budget' AND status='active'", (context.household_id,)).fetchall()
         for row in matches:
             saved = json.loads(row["document"])
@@ -145,6 +148,7 @@ def list_budgets(store: Store, context: Context, month: str | None = None):
 
 def save_goal(store: Store, context: Context, payload: GoalInput, goal_id: str | None = None):
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         if goal_id:
             previous = _plan(connection, context, goal_id, "goal")
             allocations = connection.execute("SELECT 1 FROM p_goal_allocations WHERE goal_id=? AND amount_minor>0 LIMIT 1", (goal_id,)).fetchone()
@@ -183,6 +187,7 @@ def allocate_goal(store: Store, context: Context, goal_id: str, payload: Allocat
     from .ledger import account_balance
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         goal = _plan(connection, context, goal_id, "goal")
         if goal["status"] != "active":
             raise PlatformError("planning_record_archived", 409)
@@ -223,6 +228,7 @@ def next_occurrence(anchor: date, cadence: str, after: date) -> date:
 def save_bill(store: Store, context: Context, payload: BillInput, bill_id: str | None = None):
     from .ledger import account_balance
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         account = account_balance(connection, context.household_id, payload.account_id)
         if account["currency"] != payload.currency:
             raise PlatformError("bill_currency_mismatch")
@@ -236,6 +242,7 @@ def list_bills(store: Store, context: Context):
 def pause_bill(store: Store, context: Context, bill_id: str, paused: bool):
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         bill = _plan(connection, context, bill_id, "bill")
         if bill["status"] == "archived":
             raise PlatformError("planning_record_archived", 409)
@@ -249,6 +256,7 @@ def record_occurrence(store: Store, context: Context, bill_id: str, due: date | 
     from .ledger_contracts import TransactionCreate
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         bill = _plan(connection, context, bill_id, "bill")
         due = due or date.fromisoformat(bill["next_due"])
         previous = connection.execute("SELECT * FROM p_bill_occurrences WHERE bill_id=? AND household_id=? AND due_date=?", (bill_id, context.household_id, due.isoformat())).fetchone()
@@ -337,6 +345,7 @@ def save_scenario(store: Store, context: Context, payload: ScenarioInput):
     result = calculate_scenario(payload.inputs)
     receipt = {"id": identifier("scenario"), **payload.model_dump(mode="json"), "result": result, "evidence": evidence("calculated", "Scenario calculated from recorded assumptions")}
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         connection.execute("INSERT INTO p_scenarios VALUES(?,?,?)", (receipt["id"], context.household_id, json.dumps(receipt)))
     return receipt
 

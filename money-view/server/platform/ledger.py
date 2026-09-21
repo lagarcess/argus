@@ -18,6 +18,7 @@ from .common import (
     Context,
     Evidence,
     PlatformError,
+    assert_active_context,
     decimal_amount,
     get_context,
     get_store,
@@ -187,6 +188,7 @@ def get_account(account_id: str, store: DB, ctx: CTX):
 def create_account(payload: AccountCreate, store: DB, ctx: CTX):
     opening = minor_units(payload.opening_balance, payload.currency)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         def action():
             record_id, stamp = identifier('acct'), now().isoformat()
             connection.execute('INSERT INTO p_accounts(id,household_id,owner_id,name,institution,kind,currency,opening_minor,source_kind,recorded_at,as_of) VALUES(?,?,?,?,?,?,?,?,?,?,?)', (record_id, ctx.household_id, ctx.user_id, payload.name, payload.institution, payload.kind, payload.currency, opening, 'user', stamp, stamp[:10]))
@@ -199,6 +201,7 @@ def patch_account(account_id: str, payload: AccountPatch, store: DB, ctx: CTX):
     require_editor(ctx)
     changes = payload.model_dump(exclude_none=True)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         _account(connection, ctx.household_id, account_id)
         for key, value in changes.items():
             connection.execute(f'UPDATE p_accounts SET {key}=? WHERE id=? AND household_id=?', (value, account_id, ctx.household_id))
@@ -210,6 +213,7 @@ def patch_account(account_id: str, payload: AccountPatch, store: DB, ctx: CTX):
 def set_account_deleted(store, ctx, account_id, deleted: bool):
     require_editor(ctx)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         _account(connection, ctx.household_id, account_id, active=False)
         connection.execute('UPDATE p_accounts SET deleted_at=? WHERE id=? AND household_id=?', (now().isoformat() if deleted else None, account_id, ctx.household_id))
         if deleted:
@@ -388,6 +392,7 @@ def post_transaction(connection, ctx: Context, payload: TransactionCreate) -> di
 
 def record_transaction(store: Store, ctx: Context, payload: TransactionCreate) -> dict:
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         return post_transaction(connection, ctx, payload)
 
 
@@ -400,6 +405,7 @@ def create_transaction(payload: TransactionCreate, store: DB, ctx: CTX):
 def patch_transaction(transaction_id: str, payload: TransactionPatch, store: DB, ctx: CTX):
     require_editor(ctx)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         row = _transaction(connection, ctx, transaction_id)
         if row['reversal_of'] or connection.execute('SELECT 1 FROM p_transactions WHERE reversal_of=?', (transaction_id,)).fetchone():
             raise PlatformError('reversed_transaction_immutable', 409)
@@ -417,6 +423,7 @@ def patch_transaction(transaction_id: str, payload: TransactionPatch, store: DB,
 def set_transaction_deleted(store, ctx, transaction_id, deleted: bool):
     require_editor(ctx)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         row = _transaction(connection, ctx, transaction_id, active=False)
         _account(connection, ctx.household_id, row['account_id'])
         if row['reversal_of'] or connection.execute('SELECT 1 FROM p_transactions WHERE reversal_of=?', (transaction_id,)).fetchone():
@@ -442,6 +449,7 @@ def restore_transaction(transaction_id: str, store: DB, ctx: CTX):
 @router.post('/transactions/{transaction_id}/reverse')
 def reverse_transaction(transaction_id: str, payload: Idempotent, store: DB, ctx: CTX):
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         def action():
             row = _transaction(connection, ctx, transaction_id)
             if row['kind'] == 'transfer' or row['status'] != 'posted' or row['reversal_of']:
@@ -552,6 +560,7 @@ def connect(payload: Connect, store: DB, ctx: CTX):
     if payload.connector_id not in {connector['id'] for connector in CONNECTORS}:
         raise PlatformError('connector_not_found', 404)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         def action():
             record_id, stamp = identifier('connection'), now().isoformat()
             connection.execute('INSERT INTO p_connections VALUES(?,?,?,?,?,?,?,?)', (record_id, ctx.household_id, payload.connector_id, 'connected', stamp, stamp, None, stamp))
@@ -564,6 +573,7 @@ def connect(payload: Connect, store: DB, ctx: CTX):
 @router.post('/connections/{connection_id}/sync')
 def sync(connection_id: str, payload: Sync, store: DB, ctx: CTX):
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         def action():
             current = _connection(connection, ctx, connection_id)
             stamp = now().isoformat()
@@ -587,6 +597,7 @@ def _existing_fingerprints(connection, ctx, account_id):
 def preview_import(payload: ImportPreview, store: DB, ctx: CTX):
     require_editor(ctx)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         account = _account(connection, ctx.household_id, payload.account_id)
         reader = csv.DictReader(io.StringIO(payload.csv.lstrip('\ufeff')))
         if reader.fieldnames != CSV_FIELDS:
@@ -627,6 +638,7 @@ def preview_import(payload: ImportPreview, store: DB, ctx: CTX):
 @router.post('/imports/{import_id}/commit')
 def commit_import(import_id: str, payload: Idempotent, store: DB, ctx: CTX):
     with store.connection(write=True) as connection:
+        assert_active_context(connection, ctx)
         def action():
             row = connection.execute('SELECT * FROM p_imports WHERE id=? AND household_id=?', (import_id, ctx.household_id)).fetchone()
             if row is None:

@@ -6,24 +6,25 @@ import logging
 import multiprocessing
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import replace
 from threading import Event
 
 import httpx
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from platform_identity_factory import identity_context
 from pydantic import ValidationError
 from server.platform import jobs_runtime as jobs
 from server.platform import runtime
-from server.platform.common import Context, PlatformError
+from server.platform.common import PlatformError
 from server.platform.identity import Identity
+from server.platform.identity_lifecycle import advance_household_generation
 from server.store import Store
 
 
 @pytest.fixture
-def context():
-    return Context("user-demo", "household-demo", "owner", "session-demo")
+def context(store):
+    return identity_context(store)
 
 
 @pytest.fixture
@@ -57,10 +58,11 @@ def test_replay_conflict_queue_limit_and_owned_status(store, context):
     enqueue(store, context, "second")
     assert_error("job_queue_full", enqueue, store, context, "third")
     assert enqueue(store, context) == first  # Replay remains possible when full.
-    other = replace(context, household_id="other")
+    other = identity_context(store, household_id="other")
     assert_error("job_not_found", jobs.get_job, store, other, first["id"])
     assert not set(first) & {"payload", "household_id", "requested_by", "lease_owner"}
-    assert_error("owner_required", enqueue, store, replace(context, role="viewer"))
+    viewer = identity_context(store, user_id="user-viewer", role="viewer")
+    assert_error("owner_required", enqueue, store, viewer)
     assert_error(
         "invalid_job_payload", enqueue, store, context, "bad", scenario="network"
     )
@@ -91,13 +93,15 @@ def test_independent_processes_cannot_double_claim(store, context):
     assert received.count(None) == 2
 
 
-def test_fair_claim_excludes_busy_households_and_reserves_market_slot(tmp_path, context):
+def test_fair_claim_excludes_busy_households_and_reserves_market_slot(tmp_path):
     store = Store(tmp_path / "fair.sqlite")
+    context = identity_context(store)
+    quiet_context = identity_context(store, household_id="quiet")
     runtime.initialize(store, runtime.RuntimePolicy(market_slots=2))
     enqueue(store, context, "busy-one")
     first = jobs.claim(store)
     enqueue(store, context, "busy-two")
-    quiet = enqueue(store, replace(context, household_id="quiet"), "quiet")
+    quiet = enqueue(store, quiet_context, "quiet")
     assert jobs.claim(store)["id"] == quiet["id"]
     assert jobs.claim(store) is None
     scheduled = jobs.enqueue_job(
@@ -217,10 +221,11 @@ def test_successful_deposit_restart_reuses_domain_operation(store, context):
         )
 
 
-def test_model_concurrency_daily_caps_expiry_and_isolation(
-    tmp_path, context, monkeypatch
-):
+def test_model_concurrency_daily_caps_expiry_and_isolation(tmp_path, monkeypatch):
     store = Store(tmp_path / "model.sqlite")
+    context = identity_context(store)
+    other = identity_context(store, household_id="other")
+    third_context = identity_context(store, household_id="third")
     runtime.initialize(
         store,
         runtime.RuntimePolicy(
@@ -231,13 +236,12 @@ def test_model_concurrency_daily_caps_expiry_and_isolation(
     assert_error(
         "model_concurrency_exceeded", runtime.acquire_model, Store(store.path), context
     )
-    other = replace(context, household_id="other")
     second = runtime.acquire_model(Store(store.path), other)
     assert_error(
         "model_concurrency_exceeded",
         runtime.acquire_model,
         store,
-        replace(context, household_id="third"),
+        third_context,
     )
     runtime.release_model(store, first, "failed")
     runtime.release_model(store, first, "completed")
@@ -248,7 +252,7 @@ def test_model_concurrency_daily_caps_expiry_and_isolation(
         "model_daily_limit_exceeded",
         runtime.acquire_model,
         store,
-        replace(context, household_id="third"),
+        third_context,
     )
     monkeypatch.setattr(runtime.time, "time", lambda: second.expires_at + 1)
     runtime.release_model(store, second)
@@ -258,20 +262,23 @@ def test_model_concurrency_daily_caps_expiry_and_isolation(
     assert runtime.usage(store, other)["model"]["completed"] == 0
 
 
-def test_parallel_model_admission_is_global_and_bounded(store, context):
+def test_parallel_model_admission_is_global_and_bounded(store):
+    contexts = [
+        identity_context(store, household_id=f"household-{index}") for index in range(12)
+    ]
+    independent_stores = [Store(store.path) for _ in contexts]
+
     def acquire(index):
         try:
-            return runtime.acquire_model(
-                Store(store.path), replace(context, household_id=f"household-{index}")
-            )
+            return runtime.acquire_model(independent_stores[index], contexts[index])
         except PlatformError as exc:
             return exc.code
 
-    with ThreadPoolExecutor(max_workers=12) as pool:
-        results = list(pool.map(acquire, range(12)))
+    with ThreadPoolExecutor(max_workers=len(contexts)) as pool:
+        results = list(pool.map(acquire, range(len(contexts))))
     leases = [item for item in results if isinstance(item, runtime.ModelLease)]
     assert len(leases) == runtime.RuntimePolicy().model_global_concurrent
-    assert results.count("model_concurrency_exceeded") == 8
+    assert results.count("model_concurrency_exceeded") == len(contexts) - len(leases)
     for lease in leases:
         runtime.release_model(store, lease)
 
@@ -517,7 +524,7 @@ def test_policy_conflicts_fail_instead_of_splitting_shared_limits(store):
 
 
 def test_household_cleanup_does_not_delete_other_usage(store, context):
-    other = replace(context, household_id="other")
+    other = identity_context(store, household_id="other")
     enqueue(store, context)
     untouched = enqueue(store, other, "other")
     runtime.acquire_model(store, context)
@@ -531,9 +538,10 @@ def test_household_cleanup_does_not_delete_other_usage(store, context):
 
 
 def test_household_reset_neither_releases_live_model_nor_refunds_daily_attempt(
-    tmp_path, context
+    tmp_path,
 ):
     store = Store(tmp_path / "reset-quota.sqlite")
+    context = identity_context(store)
     runtime.initialize(
         store,
         runtime.RuntimePolicy(
@@ -546,17 +554,20 @@ def test_household_reset_neither_releases_live_model_nor_refunds_daily_attempt(
     lease = runtime.acquire_model(store, context)
     with store.connection(write=True) as connection:
         jobs.clear_data(connection, context)
-    assert_error("model_concurrency_exceeded", runtime.acquire_model, store, context)
+        advance_household_generation(connection, context.household_id)
+    current = identity_context(store)
+    assert_error("model_concurrency_exceeded", runtime.acquire_model, store, current)
     assert runtime.usage(store, context)["model"]["active"] == 1
     assert runtime.usage(store, context)["model"]["attempts"] == 1
     runtime.release_model(store, lease)
-    assert_error("model_daily_limit_exceeded", runtime.acquire_model, store, context)
+    assert_error("model_daily_limit_exceeded", runtime.acquire_model, store, current)
     assert runtime.usage(store, context)["model"]["active"] == 0
     assert runtime.usage(store, context)["model"]["completed"] == 1
 
 
-def test_model_whole_call_deadline_bounds_progressing_provider(tmp_path, context):
+def test_model_whole_call_deadline_bounds_progressing_provider(tmp_path):
     store = Store(tmp_path / "deadline.sqlite")
+    context = identity_context(store)
     runtime.initialize(store, runtime.RuntimePolicy(model_call_seconds=0.05))
     chunks = []
 
@@ -582,6 +593,25 @@ def test_model_whole_call_deadline_bounds_progressing_provider(tmp_path, context
     measured = runtime.usage(store, context)["model"]
     assert measured["attempts"] == measured["timeout"] == 1
     assert measured["active"] == measured["cancelled"] == 0
+
+
+@pytest.mark.parametrize("operation", ["enqueue", "acquire_model"])
+def test_stale_context_cannot_admit_work_after_generation_change(
+    store, context, operation
+):
+    with store.connection(write=True) as connection:
+        advance_household_generation(connection, context.household_id)
+    admit = enqueue if operation == "enqueue" else runtime.acquire_model
+    assert_error("household_data_changed", admit, store, context)
+    assert jobs.list_jobs(store, context) == []
+    assert runtime.usage(store, context)["model"]["attempts"] == 0
+    current = identity_context(store)
+    assert current.data_generation > context.data_generation
+    result = admit(store, current)
+    if operation == "enqueue":
+        assert result["status"] == "queued"
+    else:
+        runtime.release_model(store, result)
 
 
 @pytest.mark.parametrize("deadline", [30, 31])

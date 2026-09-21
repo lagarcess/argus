@@ -11,10 +11,10 @@ from threading import Barrier
 import pytest
 from faker import Faker
 from fastapi.testclient import TestClient
+from platform_identity_factory import identity_context
 from server.app import create_app
 from server.interpreter import FixtureInterpreter
 from server.platform import investing
-from server.platform.common import Context
 from server.platform.identity import DEMO_PASSWORD
 from server.platform.storage_ops import backup_database, restore_database
 from server.store import Store
@@ -103,9 +103,9 @@ def test_snapshot_is_nested_read_only_path_scoped_and_cleared(store, tmp_path):
 
 
 def test_portfolio_composition_keeps_cash_and_order_in_one_snapshot(store, monkeypatch):
+    context = identity_context(store)
     investing.initialize(store)
     monkeypatch.setattr(investing, "_linked_investment_accounts", lambda *_: [])
-    context = Context("user-demo", "household-demo", "owner", fake.uuid4())
     preview = investing.preview_order(
         store,
         context,

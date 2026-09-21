@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from sqlite3 import Connection
 from typing import Annotated, Literal
 from uuid import uuid4
 
@@ -36,6 +37,7 @@ class Context:
     household_id: str
     role: Literal["owner", "editor", "viewer"]
     session_id: str
+    data_generation: int = 0
 
 
 class Evidence(Model):
@@ -66,6 +68,51 @@ def require_editor(context: Context) -> None:
 def require_owner(context: Context) -> None:
     if context.role != "owner":
         raise PlatformError("owner_required", 403)
+
+
+def active_context(
+    connection: Connection, *, user_id: str, household_id: str, session_id: str
+) -> Context:
+    """Read current membership and lifecycle truth in the caller's transaction."""
+    row = connection.execute(
+        """SELECT m.role,COALESCE(g.generation,0) AS generation
+        FROM p_memberships m JOIN p_users u ON u.id=m.user_id
+        LEFT JOIN p_household_generations g ON g.household_id=m.household_id
+        WHERE m.user_id=? AND m.household_id=? AND u.deleted_at IS NULL""",
+        (user_id, household_id),
+    ).fetchone()
+    if row is None:
+        raise PlatformError("authentication_required", 401)
+    return Context(user_id, household_id, row["role"], session_id, row["generation"])
+
+
+def assert_active_context(
+    connection: Connection,
+    context: Context,
+    *,
+    minimum_role: Literal["viewer", "editor", "owner"] = "editor",
+) -> None:
+    """Fence private writes inside their existing BEGIN IMMEDIATE transaction.
+
+    Captured authority must survive reset, deletion and membership changes. Session
+    revocation is deliberately not checked: an accepted logout may finish work.
+    """
+    if not connection.in_transaction:
+        raise RuntimeError("Private write guard requires an active write transaction")
+    current = active_context(
+        connection,
+        user_id=context.user_id,
+        household_id=context.household_id,
+        session_id=context.session_id,
+    )
+    if current.role != context.role:
+        raise PlatformError("household_access_changed", 409)
+    if current.data_generation != context.data_generation:
+        raise PlatformError("household_data_changed", 409)
+    if minimum_role == "owner":
+        require_owner(current)
+    elif minimum_role == "editor":
+        require_editor(current)
 
 
 def get_store(request: Request) -> Store:

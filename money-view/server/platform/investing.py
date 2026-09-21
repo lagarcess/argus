@@ -24,6 +24,8 @@ from .common import (
     Model,
     PlatformError,
     PositiveAmount,
+    active_context,
+    assert_active_context,
     decimal_amount,
     get_context,
     get_store,
@@ -56,6 +58,7 @@ MAX_CSV_BYTES = 1_000_000
 MAX_CSV_ROWS = 2_000
 MAX_RECURRING_BATCH = 100
 RECURRING_RUN_LEASE = timedelta(seconds=30)
+RECURRING_ANCHOR_MIGRATION_BATCH = 100
 
 
 def _upper_symbol(value: str) -> str:
@@ -255,6 +258,7 @@ CREATE TABLE IF NOT EXISTS p_investment_recurring_plans (
     book_id TEXT NOT NULL REFERENCES p_investment_books(id),
     cadence TEXT NOT NULL CHECK(cadence IN ('weekly','monthly')),
     next_run_on TEXT NOT NULL,
+    monthly_anchor_day INTEGER CHECK(monthly_anchor_day BETWEEN 1 AND 31),
     symbol TEXT,
     bundle_id TEXT,
     amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
@@ -400,12 +404,49 @@ def _calculated_evidence(
     )
 
 
+def _migrate_recurring_anchor(connection: sqlite3.Connection) -> None:
+    columns = {
+        row["name"]
+        for row in connection.execute(
+            "PRAGMA table_info('p_investment_recurring_plans')"
+        )
+    }
+    if "monthly_anchor_day" not in columns:
+        connection.execute(
+            """
+            ALTER TABLE p_investment_recurring_plans
+            ADD COLUMN monthly_anchor_day INTEGER
+            CHECK(monthly_anchor_day BETWEEN 1 AND 31)
+            """
+        )
+    rows = connection.execute(
+        """
+        SELECT id,next_run_on
+        FROM p_investment_recurring_plans
+        WHERE cadence='monthly' AND monthly_anchor_day IS NULL
+        ORDER BY id LIMIT ?
+        """,
+        (RECURRING_ANCHOR_MIGRATION_BATCH,),
+    ).fetchall()
+    for row in rows:
+        anchor_day = date.fromisoformat(row["next_run_on"]).day
+        connection.execute(
+            """
+            UPDATE p_investment_recurring_plans SET monthly_anchor_day=?
+            WHERE id=? AND monthly_anchor_day IS NULL
+            """,
+            (anchor_day, row["id"]),
+        )
+
+
 def initialize(store: Store) -> None:
     """Create tables and seed once. A cleared household is never reseeded."""
 
     initialize_market_data(store)
     with store.connection(write=True) as connection:
         connection.executescript(INVESTING_SCHEMA)
+    with store.connection(write=True) as connection:
+        _migrate_recurring_anchor(connection)
         seeded = connection.execute(
             "SELECT 1 FROM p_investment_fixture_manifest WHERE module='investing'"
         ).fetchone()
@@ -536,6 +577,7 @@ def create_holding(
     )
     try:
         with store.connection(write=True) as connection:
+            assert_active_context(connection, context)
             connection.execute(
                 """
                 INSERT INTO p_investment_holdings(
@@ -582,6 +624,7 @@ def update_holding(
 ) -> dict[str, object]:
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         row = connection.execute(
             """
             SELECT * FROM p_investment_holdings
@@ -631,6 +674,7 @@ def update_holding(
 def delete_holding(store: Store, context: Context, holding_id: str) -> dict[str, object]:
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         changed = connection.execute(
             """
             UPDATE p_investment_holdings SET deleted_at=?,updated_at=?
@@ -850,16 +894,22 @@ def _portfolio_summary(store: Store, context: Context) -> dict[str, object]:
         alternative_holdings, stats = _alternative_valuations(connection, context)
         additions = net_worth_additions(connection, context)
     linked_totals: dict[str, Decimal] = {}
+    linked_dates: dict[str, list[date]] = {}
     for account in linked_accounts:
         currency = str(account["currency"])
         linked_totals[currency] = linked_totals.get(currency, Decimal(0)) + Decimal(
             str(account["balance"])
         )
+        source = account.get("source")
+        if source and source.get("as_of"):
+            linked_dates.setdefault(currency, []).append(
+                date.fromisoformat(str(source["as_of"]))
+            )
     totals: list[dict[str, object]] = []
     observed_dates = [
-        date.fromisoformat(str(account["source"]["as_of"]))
-        for account in linked_accounts
-        if account.get("source") and account["source"].get("as_of")
+        observed
+        for currency_dates in linked_dates.values()
+        for observed in currency_dates
     ]
     currencies = sorted(set(linked_totals) | set(stats))
     for currency in currencies:
@@ -871,9 +921,13 @@ def _portfolio_summary(store: Store, context: Context) -> dict[str, object]:
         priced = int(currency_stats["priced"])
         cost = int(currency_stats["cost"])
         gain = priced - cost
+        currency_dates = list(linked_dates.get(currency, []))
+        if currency_stats["as_of"]:
+            currency_dates.append(currency_stats["as_of"])
+        currency_as_of = max(currency_dates, default=FIXTURE_AS_OF)
         evidence = _calculated_evidence(
             "Portfolio summary",
-            currency_stats["as_of"] or max(observed_dates, default=FIXTURE_AS_OF),
+            currency_as_of,
             [str(value) for value in currency_stats["inputs"]]
             + [
                 str(account["id"])
@@ -901,15 +955,16 @@ def _portfolio_summary(store: Store, context: Context) -> dict[str, object]:
         )
         if currency_stats["as_of"]:
             observed_dates.append(currency_stats["as_of"])
+    portfolio_as_of = max(observed_dates, default=FIXTURE_AS_OF)
     source = _calculated_evidence(
         "Investing portfolio read model",
-        FIXTURE_AS_OF,
+        portfolio_as_of,
         [str(item["id"]) for item in linked_accounts]
         + [str(item["id"]) for item in alternative_holdings],
         method="Household-scoped composition of ledger accounts and investing records.",
     )
     return {
-        "as_of": max(observed_dates, default=FIXTURE_AS_OF).isoformat(),
+        "as_of": portfolio_as_of.isoformat(),
         "linked_accounts": linked_accounts,
         "alternative_holdings": alternative_holdings,
         "totals": totals,
@@ -980,6 +1035,7 @@ def preview_holding_csv(
         [preview_id, context.user_id],
     )
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         connection.execute(
             """
             INSERT INTO p_investment_import_previews(
@@ -1014,6 +1070,7 @@ def commit_holding_import(
 ) -> dict[str, object]:
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         replay = connection.execute(
             """
             SELECT preview_id,document_json FROM p_investment_import_receipts
@@ -1278,6 +1335,7 @@ def preview_order(
         for leg in legs
     ]
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         connection.execute(
             """
             INSERT INTO p_investment_order_previews(
@@ -1311,6 +1369,7 @@ def confirm_order(
 ) -> dict[str, object]:
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         replay = connection.execute(
             """
             SELECT preview_id,document_json FROM p_investment_order_receipts
@@ -1636,12 +1695,14 @@ def create_recurring_plan(
         [plan_id, context.user_id],
     )
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         connection.execute(
             """
             INSERT INTO p_investment_recurring_plans(
-                id,household_id,created_by,book_id,cadence,next_run_on,symbol,
+                id,household_id,created_by,book_id,cadence,next_run_on,
+                monthly_anchor_day,symbol,
                 bundle_id,amount_minor,currency,active,created_at,updated_at,source_json
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
             (
                 plan_id,
@@ -1650,6 +1711,7 @@ def create_recurring_plan(
                 payload.book_id,
                 payload.cadence,
                 payload.next_run_on.isoformat(),
+                payload.next_run_on.day if payload.cadence == "monthly" else None,
                 payload.symbol,
                 payload.bundle_id,
                 minor_units(payload.amount, book["currency"]),
@@ -1682,6 +1744,7 @@ def update_recurring_plan(
 ) -> dict[str, object]:
     require_editor(context)
     with store.connection(write=True) as connection:
+        assert_active_context(connection, context)
         row = connection.execute(
             """
             SELECT * FROM p_investment_recurring_plans
@@ -1694,7 +1757,7 @@ def update_recurring_plan(
         connection.execute(
             """
             UPDATE p_investment_recurring_plans
-            SET amount_minor=?,next_run_on=?,active=?,updated_at=?
+            SET amount_minor=?,next_run_on=?,monthly_anchor_day=?,active=?,updated_at=?
             WHERE id=? AND household_id=?
             """,
             (
@@ -1707,6 +1770,11 @@ def update_recurring_plan(
                     payload.next_run_on.isoformat()
                     if payload.next_run_on is not None
                     else row["next_run_on"]
+                ),
+                (
+                    payload.next_run_on.day
+                    if payload.next_run_on is not None and row["cadence"] == "monthly"
+                    else row["monthly_anchor_day"]
                 ),
                 int(payload.active) if payload.active is not None else row["active"],
                 _iso(now()),
@@ -1724,12 +1792,23 @@ def _period_key(cadence: str, run_on: date) -> str:
     return run_on.strftime("%Y-%m")
 
 
-def _next_run_date(cadence: str, run_on: date) -> date:
+def _monthly_anchor_day(plan: sqlite3.Row) -> int:
+    anchor = plan["monthly_anchor_day"]
+    if anchor is not None:
+        return int(anchor)
+    return date.fromisoformat(plan["next_run_on"]).day
+
+
+def _next_run_date(
+    cadence: str, run_on: date, *, monthly_anchor_day: int | None = None
+) -> date:
     if cadence == "weekly":
         return run_on + timedelta(days=7)
+    if monthly_anchor_day is None:
+        raise ValueError("monthly recurrence requires an anchor day")
     year = run_on.year + (1 if run_on.month == 12 else 0)
     month = 1 if run_on.month == 12 else run_on.month + 1
-    day = min(run_on.day, calendar.monthrange(year, month)[1])
+    day = min(monthly_anchor_day, calendar.monthrange(year, month)[1])
     return date(year, month, day)
 
 
@@ -1801,17 +1880,25 @@ def _read_run(store: Store, context: Context, run_id: str) -> dict[str, object]:
 def _advance_recurring_plan(
     connection: sqlite3.Connection, plan: sqlite3.Row, run_on: date
 ) -> None:
-    next_run_on = _next_run_date(plan["cadence"], run_on).isoformat()
+    anchor_day = _monthly_anchor_day(plan) if plan["cadence"] == "monthly" else None
+    next_run_on = _next_run_date(
+        plan["cadence"], run_on, monthly_anchor_day=anchor_day
+    ).isoformat()
     connection.execute(
         """
         UPDATE p_investment_recurring_plans
         SET next_run_on=CASE WHEN next_run_on<=? THEN ? ELSE next_run_on END,
+            monthly_anchor_day=CASE
+                WHEN cadence='monthly' THEN COALESCE(monthly_anchor_day,?)
+                ELSE NULL
+            END,
             updated_at=?
         WHERE id=? AND household_id=?
         """,
         (
             run_on.isoformat(),
             next_run_on,
+            anchor_day,
             _iso(now()),
             plan["id"],
             plan["household_id"],
@@ -1967,6 +2054,8 @@ def _execute_recurring_plan(
                 (plan_id,),
             ).fetchone()
         else:
+            assert context is not None
+            assert_active_context(connection, context)
             plan = connection.execute(
                 """
                 SELECT * FROM p_investment_recurring_plans
@@ -1980,33 +2069,19 @@ def _execute_recurring_plan(
             raise PlatformError("recurring_plan_inactive")
         if scheduled:
             try:
-                authority = connection.execute(
-                    """
-                    SELECT memberships.role
-                    FROM p_users users
-                    JOIN p_memberships memberships ON memberships.user_id=users.id
-                    WHERE users.id=? AND users.deleted_at IS NULL
-                      AND memberships.household_id=?
-                      AND memberships.role IN ('owner','editor')
-                    """,
-                    (plan["created_by"], plan["household_id"]),
-                ).fetchone()
-            except sqlite3.OperationalError as exc:
-                if "no such table" not in str(exc):
-                    raise
-                authority = None
-            if authority is None:
+                context = active_context(
+                    connection,
+                    user_id=plan["created_by"],
+                    household_id=plan["household_id"],
+                    session_id="scheduled-investing",
+                )
+                assert_active_context(connection, context)
+            except PlatformError:
                 run_id = _record_recurring_authority_failure(
                     connection, plan, run_on
                 )
                 blocked = True
             else:
-                context = Context(
-                    user_id=plan["created_by"],
-                    household_id=plan["household_id"],
-                    role=authority["role"],
-                    session_id="scheduled-investing",
-                )
                 blocked = False
         else:
             blocked = False

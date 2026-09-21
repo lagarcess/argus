@@ -6,7 +6,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse
 
-from .common import Context, PlatformError, get_context, identifier, now, require_owner
+from .common import (
+    Context,
+    PlatformError,
+    assert_active_context,
+    get_context,
+    identifier,
+    now,
+    require_owner,
+)
 from .identity import (
     COOKIE,
     ExportReader,
@@ -27,6 +35,7 @@ from .identity_contracts import (
     Preferences,
     ProfilePatch,
 )
+from .identity_lifecycle import advance_household_generation
 
 router = APIRouter()
 
@@ -107,6 +116,7 @@ def patch_profile(
     if any(value is None for key, value in changes.items() if key != "preferred_name"):
         raise PlatformError("invalid_profile")
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         for key, value in changes.items():
             db.execute(f"UPDATE p_users SET {key}=? WHERE id=?", (value, context.user_id))
         return profile(
@@ -122,6 +132,7 @@ def patch_preferences(
 ):
     changes = command.model_dump(exclude_unset=True, exclude_none=True)
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         document = json.loads(
             db.execute(
                 "SELECT document FROM p_preferences WHERE user_id=?", (context.user_id,)
@@ -156,6 +167,7 @@ def toggle_memories(
     identity: Annotated[Identity, Depends(get_identity)],
 ):
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         db.execute(
             "INSERT INTO p_memory_settings VALUES (?,?,?) ON CONFLICT(user_id,household_id) DO UPDATE SET enabled=excluded.enabled",
             (context.user_id, context.household_id, int(command.enabled)),
@@ -171,6 +183,7 @@ def create_memory(
 ):
     memory_id, timestamp = identifier("memory"), now().isoformat()
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         db.execute(
             "INSERT INTO p_memories VALUES (?,?,?,?,?,?)",
             (
@@ -198,6 +211,7 @@ def update_memory(
     identity: Annotated[Identity, Depends(get_identity)],
 ):
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         changed = db.execute(
             "UPDATE p_memories SET content=?,updated_at=? WHERE id=? AND user_id=? AND household_id=?",
             (
@@ -225,6 +239,7 @@ def delete_memory(
     identity: Annotated[Identity, Depends(get_identity)],
 ):
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         changed = db.execute(
             "DELETE FROM p_memories WHERE id=? AND user_id=? AND household_id=?",
             (memory_id, context.user_id, context.household_id),
@@ -242,6 +257,7 @@ def reset_memories(
 ):
     require_confirmation(command, "DELETE MY MEMORIES")
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         count = db.execute(
             "DELETE FROM p_memories WHERE user_id=? AND household_id=?",
             (context.user_id, context.household_id),
@@ -357,9 +373,11 @@ def reset_data(
     require_owner(context)
     require_confirmation(command, "RESET THIS HOUSEHOLD")
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="owner")
         for domain in identity.data_domains.values():
             domain.clear(db, context)
         clear_identity_household(db, context.household_id)
+        advance_household_generation(db, context.household_id)
         db.execute(
             "UPDATE p_households SET country='DO',currency_override=NULL WHERE id=?",
             (context.household_id,),
@@ -386,6 +404,7 @@ def delete_account(
     require_confirmation(command, "DELETE MY LOCAL ACCOUNT")
     cleared = []
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         saved = db.execute(
             "SELECT password_hash FROM p_users WHERE id=?", (context.user_id,)
         ).fetchone()[0]
@@ -417,6 +436,7 @@ def delete_account(
             for domain in identity.data_domains.values():
                 domain.clear(db, private_context)
             clear_identity_household(db, household_id)
+            advance_household_generation(db, household_id)
             db.execute(
                 "UPDATE p_households SET name='Deleted local household',country='DO',currency_override=NULL WHERE id=?",
                 (household_id,),
@@ -440,6 +460,7 @@ def create_feedback(
 ):
     feedback_id, timestamp = identifier("feedback"), now().isoformat()
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         db.execute(
             "INSERT INTO p_local_feedback VALUES (?,?,?,?,?,?)",
             (

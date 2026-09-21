@@ -1,16 +1,27 @@
 """Real local identity/session and household privacy boundary checks."""
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from threading import Event
 
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from server.platform import identity as identity_module
-from server.platform.common import CURRENCY_DIGITS, Context, PlatformError, now
+from server.platform.common import (
+    CURRENCY_DIGITS,
+    Context,
+    PlatformError,
+    active_context,
+    assert_active_context,
+    now,
+)
 from server.platform.identity import COOKIE, DEMO_PASSWORD, Identity, router, token_hash
+from server.platform.identity_contracts import FeedbackWrite
+from server.platform.settings import create_feedback
 from server.store import Store
 
 BASE = "/api/platform"
@@ -887,3 +898,164 @@ def test_full_seeded_household_export_fits_budget_and_excludes_credentials(tmp_p
         serialized = response.text
         assert "password_hash" not in serialized and "token_hash" not in serialized
         assert DEMO_PASSWORD not in serialized
+
+
+def captured_context(app, user_id, household_id):
+    with app.state.store.connection() as db:
+        return active_context(
+            db, user_id=user_id, household_id=household_id, session_id="accepted-request"
+        )
+
+
+@pytest.mark.parametrize(
+    "change,user_id,household_id,error_code,status",
+    [
+        ("reset", "user-demo", "household-demo", "household_data_changed", 409),
+        ("delete", "user-other", "household-other", "authentication_required", 401),
+        ("remove", "user-partner", "household-demo", "authentication_required", 401),
+        ("promote", "user-partner", "household-demo", "household_access_changed", 409),
+        ("demote", "user-partner", "household-demo", "household_access_changed", 409),
+    ],
+)
+def test_paused_private_write_cannot_survive_lifecycle_change(
+    app, client, change, user_id, household_id, error_code, status
+):
+    captured = captured_context(app, user_id, household_id)
+    ready, resume = Event(), Event()
+    private_message = f"Private text accepted before {change}"
+
+    def accepted_request():
+        ready.set()
+        assert resume.wait(5), "lifecycle change did not release paused request"
+        return create_feedback(
+            FeedbackWrite(kind="general", message=private_message),
+            captured,
+            app.state.identity,
+        )
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(accepted_request)
+        try:
+            assert ready.wait(5)
+            if change == "reset":
+                response = client.post(
+                    f"{BASE}/settings/data/reset",
+                    json={"confirmation": "RESET THIS HOUSEHOLD"},
+                )
+            elif change == "delete":
+                with TestClient(app) as other:
+                    assert login(other, user_id).status_code == 200
+                    response = other.request(
+                        "DELETE",
+                        f"{BASE}/settings/account",
+                        json={
+                            "confirmation": "DELETE MY LOCAL ACCOUNT",
+                            "current_password": DEMO_PASSWORD,
+                        },
+                    )
+            elif change == "remove":
+                response = client.delete(f"{BASE}/household/members/{user_id}")
+            else:
+                response = client.patch(
+                    f"{BASE}/household/members/{user_id}",
+                    json={"role": "owner" if change == "promote" else "viewer"},
+                )
+            assert response.status_code == 200, response.text
+        finally:
+            resume.set()
+        with pytest.raises(PlatformError, match=error_code) as failure:
+            future.result(timeout=5)
+        assert failure.value.status == status
+    with app.state.store.connection() as db:
+        assert (
+            db.execute(
+                "SELECT COUNT(*) FROM p_local_feedback WHERE message=?",
+                (private_message,),
+            ).fetchone()[0]
+            == 0
+        )
+
+
+def test_generation_is_monotonic_scoped_and_survives_reinitialization(app, client):
+    original = captured_context(app, "user-demo", "household-demo")
+    assert original.data_generation == 0
+    for generation in (1, 2):
+        assert (
+            client.post(
+                f"{BASE}/settings/data/reset",
+                json={"confirmation": "RESET THIS HOUSEHOLD"},
+            ).status_code
+            == 200
+        )
+        app.state.identity.initialize()
+        fresh = captured_context(app, "user-demo", "household-demo")
+        assert fresh.data_generation == generation
+        assert captured_context(app, "user-other", "household-other").data_generation == 0
+        # Authentication also captures the new generation for ordinary HTTP writes.
+        assert (
+            client.post(
+                f"{BASE}/settings/feedback",
+                json={"kind": "general", "message": "Fresh generation"},
+            ).status_code
+            == 201
+        )
+        with app.state.store.connection(write=True) as db:
+            assert_active_context(db, fresh)
+            with pytest.raises(PlatformError, match="household_data_changed"):
+                assert_active_context(db, original)
+
+
+def test_failed_reset_rolls_back_generation_and_allows_previously_accepted_write(
+    app, client
+):
+    register_test_domain(app, fail_clear=True)
+    captured = captured_context(app, "user-demo", "household-demo")
+    assert (
+        client.post(
+            f"{BASE}/settings/data/reset", json={"confirmation": "RESET THIS HOUSEHOLD"}
+        ).status_code
+        == 409
+    )
+    assert (
+        captured_context(app, "user-demo", "household-demo").data_generation
+        == captured.data_generation
+    )
+    receipt = create_feedback(
+        FeedbackWrite(kind="general", message="Retained after rollback"),
+        captured,
+        app.state.identity,
+    )
+    assert receipt["status"] == "saved_locally"
+
+
+def test_logout_does_not_cancel_accepted_private_write(app, client):
+    captured = captured_context(app, "user-demo", "household-demo")
+    assert client.post(f"{BASE}/session/logout").status_code == 200
+    receipt = create_feedback(
+        FeedbackWrite(kind="general", message="Accepted before logout"),
+        captured,
+        app.state.identity,
+    )
+    assert receipt["status"] == "saved_locally"
+
+
+@pytest.mark.parametrize(
+    "role,minimum_role,expected",
+    [
+        ("viewer", "viewer", None),
+        ("viewer", "editor", "read_only_household"),
+        ("editor", "owner", "owner_required"),
+    ],
+)
+def test_current_context_minimum_role_is_enforced_in_write_transaction(
+    app, role, minimum_role, expected
+):
+    user_id = "user-viewer" if role == "viewer" else "user-partner"
+    context = captured_context(app, user_id, "household-demo")
+    with app.state.store.connection(write=True) as db:
+        if expected:
+            with pytest.raises(PlatformError, match=expected) as failure:
+                assert_active_context(db, context, minimum_role=minimum_role)
+            assert failure.value.status == 403
+        else:
+            assert_active_context(db, context, minimum_role=minimum_role)

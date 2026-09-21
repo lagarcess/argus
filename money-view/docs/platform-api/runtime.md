@@ -171,3 +171,9 @@ load retention, cleanup, bounded login storage, chunked bodies, correlations,
 busy SQLite responses, and async worker responsiveness. These tests establish
 the stated local behavior; measured capacity evidence belongs to SCALE_DESIGN
 and the separate HTTP harness.
+
+## Private writes after reset or deletion
+
+Identity captures the household data generation in each authenticated Context. Every user-owned write transaction rechecks active membership, current role and that generation before committing private records or returning an idempotent write receipt. Reset and private-household deletion advance the generation in the same transaction as data clearing. Delayed interpretation cannot recreate assistant text or deposit confirmations after clearing is acknowledged. New requests capture the new generation and can proceed.
+
+Job enqueue and model admission use the same guard before accepting work. Existing model leases and attempt counts still survive reset until normal release or retention expiry. A session logout alone does not cancel already admitted work. See the [identity contract](identity.md) for the shared guard and error codes.

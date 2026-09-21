@@ -19,6 +19,8 @@ from .common import (
     CURRENCY_DIGITS,
     Context,
     PlatformError,
+    active_context,
+    assert_active_context,
     get_context,
     identifier,
     now,
@@ -35,6 +37,7 @@ from .identity_contracts import (
     Preferences,
     SessionRevoke,
 )
+from .identity_lifecycle import SCHEMA as LIFECYCLE_SCHEMA
 
 COOKIE = "clara_session"
 DEMO_PASSWORD = "Clara-demo-2026!"
@@ -215,7 +218,7 @@ class Identity:
 
     def initialize(self) -> None:
         with self.store.connection(write=True) as db:
-            db.executescript(SCHEMA)
+            db.executescript(SCHEMA + LIFECYCLE_SCHEMA)
         with self.store.connection(write=True) as db:
             if db.execute(
                 "SELECT 1 FROM p_identity_meta WHERE id='fixtures-v1'"
@@ -272,14 +275,18 @@ class Identity:
         activity_cutoff = (timestamp - SESSION_ACTIVITY_INTERVAL).isoformat()
         with self.store.connection() as db:
             row = db.execute(
-                """SELECT s.id,s.user_id,s.household_id,s.last_seen_at,m.role FROM p_sessions s
-                JOIN p_users u ON u.id=s.user_id AND u.deleted_at IS NULL
-                JOIN p_memberships m ON m.user_id=s.user_id AND m.household_id=s.household_id
+                """SELECT s.id,s.user_id,s.household_id,s.last_seen_at FROM p_sessions s
                 WHERE s.token_hash=? AND s.revoked_at IS NULL AND s.expires_at>?""",
                 (token_hash(token), timestamp.isoformat()),
             ).fetchone()
-        if row is None:
-            raise PlatformError("authentication_required", 401)
+            if row is None:
+                raise PlatformError("authentication_required", 401)
+            context = active_context(
+                db,
+                user_id=row["user_id"],
+                household_id=row["household_id"],
+                session_id=row["id"],
+            )
         if row["last_seen_at"] <= activity_cutoff:
             with self.store.connection(write=True) as db:
                 db.execute(
@@ -292,7 +299,7 @@ class Identity:
                         timestamp.isoformat(),
                     ),
                 )
-        return Context(row["user_id"], row["household_id"], row["role"], row["id"])
+        return context
 
     def snapshot(self, context: Context) -> dict:
         with self.store.connection() as db:
@@ -496,6 +503,7 @@ def switch_household(
     identity: Annotated[Identity, Depends(get_identity)],
 ):
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         member = db.execute(
             "SELECT role FROM p_memberships WHERE household_id=? AND user_id=?",
             (command.household_id, context.user_id),
@@ -522,6 +530,7 @@ def patch_household(
     if any(value is None for key, value in changes.items() if key != "currency_override"):
         raise PlatformError("invalid_household")
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="owner")
         for key, value in changes.items():
             db.execute(
                 f"UPDATE p_households SET {key}=? WHERE id=?",
@@ -560,6 +569,7 @@ def add_member(
     require_owner(context)
     user_id = identifier("user")
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="owner")
         identity._create_user(
             db, user_id, command.display_name, command.password, now().isoformat()
         )
@@ -631,6 +641,7 @@ def change_member(
 ):
     require_owner(context)
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="owner")
         if command.role != "owner":
             protect_last_owner(db, context.household_id, user_id)
         changed = db.execute(
@@ -650,6 +661,7 @@ def remove_member(
 ):
     require_owner(context)
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="owner")
         protect_last_owner(db, context.household_id, user_id)
         db.execute(
             "DELETE FROM p_memberships WHERE household_id=? AND user_id=?",
@@ -698,6 +710,7 @@ def revoke_sessions(
     identity: Annotated[Identity, Depends(get_identity)],
 ):
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         count = db.execute(
             "UPDATE p_sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL AND expires_at>? AND (?='all' OR id!=?)",
             (
@@ -721,6 +734,7 @@ def revoke_session(
     identity: Annotated[Identity, Depends(get_identity)],
 ):
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         if not db.execute(
             "SELECT 1 FROM p_sessions WHERE id=? AND user_id=?",
             (session_id, context.user_id),
@@ -743,6 +757,7 @@ def change_password(
     identity: Annotated[Identity, Depends(get_identity)],
 ):
     with identity.store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         saved = db.execute(
             "SELECT password_hash FROM p_users WHERE id=?", (context.user_id,)
         ).fetchone()[0]

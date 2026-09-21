@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter
 from fastapi.responses import Response
 
-from .common import PlatformError, identifier, now, require_editor
+from .common import PlatformError, assert_active_context, identifier, now, require_editor
 from .credit import router as credit_router
 from .service_contracts import (
     TABLES,
@@ -264,6 +264,7 @@ def available_slot(db, slot_id, reservation_id=None):
 @router.get("/appointments")
 def appointments(*, store: StoreDependency, context: ContextDependency):
     with store.connection(write=True) as db:
+        assert_active_context(db, context, minimum_role="viewer")
         ensure_future_slots(db)
         slots = [
             dict(row)
@@ -295,6 +296,7 @@ def appointments(*, store: StoreDependency, context: ContextDependency):
 def reserve(payload: Reservation, *, store: StoreDependency, context: ContextDependency):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         previous = db.execute(
             "SELECT * FROM p_service_reservations WHERE household_id=? AND request_key=?",
             (context.household_id, payload.request_key),
@@ -330,6 +332,7 @@ def reschedule(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         current = reservation_record(db, context.household_id, reservation_id)
         if current["status"] != "reserved":
             raise PlatformError("reservation_cancelled", 409)
@@ -347,6 +350,7 @@ def cancel_reservation(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         reservation_record(db, context.household_id, reservation_id)
         db.execute(
             "UPDATE p_service_reservations SET status='cancelled' WHERE household_id=? AND id=?",
@@ -421,6 +425,7 @@ def membership_from_receipt(receipt):
 def subscribe(payload: Membership, *, store: StoreDependency, context: ContextDependency):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         for receipt in rows(db, "p_membership_receipts", context.household_id):
             if receipt["request_key"] == payload.request_key:
                 if receipt["plan_id"] != payload.plan_id:
@@ -449,6 +454,7 @@ def subscribe(payload: Membership, *, store: StoreDependency, context: ContextDe
 def cancel_membership(*, store: StoreDependency, context: ContextDependency):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         memberships = rows(db, "p_service_memberships", context.household_id)
         if not memberships:
             return {"membership": None}
@@ -480,6 +486,7 @@ def enroll(payload: Enrollment, *, store: StoreDependency, context: ContextDepen
     if payload.code != "CLARA-DEMO":
         raise PlatformError("invalid_demo_employer_code")
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         previous = rows(db, "p_employer_enrollments", context.household_id)
         if previous and previous[0]["status"] == "enrolled":
             return previous[0]
@@ -503,6 +510,7 @@ def choose_benefit(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         current = record(db, "p_employer_enrollments", context.household_id, "enrollment")
         if current["status"] != "enrolled":
             raise PlatformError("employer_not_enrolled", 409)
@@ -518,6 +526,7 @@ def choose_benefit(
 def leave_employer(*, store: StoreDependency, context: ContextDependency):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         previous = rows(db, "p_employer_enrollments", context.household_id)
         if not previous:
             return {"enrollment": None}

@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from .common import (
     CURRENCY_DIGITS,
     PlatformError,
+    assert_active_context,
     minor_units,
     now,
     require_editor,
@@ -52,6 +53,7 @@ def add_organizer(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         for current in rows(db, "p_tax_organizers", context.household_id):
             if all(current[key] == value for key, value in payload.model_dump().items()):
                 return current
@@ -67,6 +69,7 @@ def add_organizer(
 def add_tax_item(payload: TaxItem, *, store: StoreDependency, context: ContextDependency):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         organizer = record(
             db, "p_tax_organizers", context.household_id, payload.organizer_id
         )
@@ -94,6 +97,7 @@ def complete_tax_item(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         item = record(db, "p_tax_items", context.household_id, item_id)
         organizer = record(
             db, "p_tax_organizers", context.household_id, item["organizer_id"]
@@ -118,6 +122,7 @@ def complete_organizer(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         organizer = record(db, "p_tax_organizers", context.household_id, organizer_id)
         items = [
             r
@@ -269,6 +274,7 @@ def add_asset(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         return save(
             db,
             "p_estate_assets",
@@ -281,6 +287,7 @@ def add_asset(
 def add_contact(payload: Contact, *, store: StoreDependency, context: ContextDependency):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         return save(
             db,
             "p_estate_contacts",
@@ -299,6 +306,7 @@ def set_beneficiaries(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         record(db, "p_estate_assets", context.household_id, asset_id)
         for share in payload.shares:
             record(db, "p_estate_contacts", context.household_id, share.contact_id)
@@ -318,6 +326,7 @@ def add_document(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         return save(
             db,
             "p_estate_documents",
@@ -332,6 +341,7 @@ def add_checklist(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         return save(
             db,
             "p_estate_checklist",
@@ -350,6 +360,7 @@ def complete_estate_item(
 ):
     require_editor(context)
     with store.connection(write=True) as db:
+        assert_active_context(db, context)
         item = record(db, "p_estate_checklist", context.household_id, item_id)
         return save(
             db,
