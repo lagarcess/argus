@@ -1,20 +1,27 @@
-"""Local-only HTTP composition root. Hosted identity is intentionally absent."""
+"""Local-only HTTP composition root with separate fixture credentials."""
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
-from fastapi import BackgroundTasks, FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.concurrency import run_in_threadpool
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .calculator import CalculationError
 from .interpreter import create_interpreter
 from .models import PlacementInputs
-from .providers import FixtureProvider
+from .platform import composition
+from .platform.common import PlatformError, get_context, require_editor, require_owner
+from .platform.jobs_runtime import enqueue_job, run_worker
+from .platform.runtime import RuntimeMiddleware
 from .service import PlacementService, ServiceError
 from .store import Store
 
@@ -35,6 +42,9 @@ class ComputeBody(RequestBody):
 
 class DemoEventBody(RequestBody):
     scenario: Literal["same_winner", "leader_changed", "inflation_crossed", "failure"]
+    idempotency_key: str = Field(
+        default_factory=lambda: uuid4().hex, min_length=1, max_length=128
+    )
 
 
 def create_app(database_path: str | Path | None = None, interpreter=None) -> FastAPI:
@@ -49,12 +59,36 @@ def create_app(database_path: str | Path | None = None, interpreter=None) -> Fas
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
-        service = PlacementService(Store(path))
+        store = Store(path)
+        service = PlacementService(store)
+        composition.initialize(application, store)
         service.bootstrap()
         application.state.service = service
-        yield
+        stop_worker = asyncio.Event()
+        worker = asyncio.create_task(run_worker(store, stop_worker))
+        try:
+            yield
+        finally:
+            stop_worker.set()
+            await worker
 
     application = FastAPI(title="Clara local demo", lifespan=lifespan)
+    application.add_middleware(RuntimeMiddleware)
+    application.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=["127.0.0.1", "localhost", "[::1]", "testserver"],
+    )
+    composition.mount(application)
+
+    @application.exception_handler(PlatformError)
+    async def platform_error(_request: Request, exc: PlatformError):
+        return JSONResponse(status_code=exc.status, content={"code": exc.code})
+
+    def placement(request: Request, *, write: bool = False) -> PlacementService:
+        context = get_context(request)
+        if write:
+            require_editor(context)
+        return PlacementService(request.app.state.store, context.household_id)
 
     @application.exception_handler(ServiceError)
     async def service_error(_request: Request, exc: ServiceError):
@@ -73,18 +107,28 @@ def create_app(database_path: str | Path | None = None, interpreter=None) -> Fas
 
     @application.get("/api/home")
     def home(request: Request):
-        return request.app.state.service.home(semantic_interpreter.mode)
+        return placement(request).home(semantic_interpreter.mode)
+
+    @application.post("/api/confirmations")
+    def prepare(body: ComputeBody, request: Request):
+        return placement(request, write=True).create_confirmation(body.inputs)
 
     @application.post("/api/interpret")
     async def interpret(body: InterpretBody, request: Request):
+        context = await run_in_threadpool(get_context, request)
+        require_editor(context)
+        service = PlacementService(request.app.state.store, context.household_id)
         interpretation = await semantic_interpreter.interpret(
-            body.message, body.locale, body.demo_example_id
+            body.message,
+            body.locale,
+            body.demo_example_id,
+            admission=(request.app.state.store, context),
         )
         if interpretation.status == "confirmation":
             return {
                 "status": "confirmation",
-                "confirmation": request.app.state.service.create_confirmation(
-                    interpretation.inputs
+                "confirmation": await run_in_threadpool(
+                    service.create_confirmation, interpretation.inputs
                 ),
             }
         return interpretation.model_dump(
@@ -93,38 +137,52 @@ def create_app(database_path: str | Path | None = None, interpreter=None) -> Fas
 
     @application.post("/api/confirmations/{confirmation_id}/compute")
     def compute(confirmation_id: str, body: ComputeBody, request: Request):
-        return request.app.state.service.compute(confirmation_id, body.inputs)
+        return placement(request, write=True).compute(confirmation_id, body.inputs)
 
     @application.post("/api/comparisons/{comparison_id}/save")
     def save(comparison_id: str, request: Request):
-        return request.app.state.service.save(comparison_id)
+        return placement(request, write=True).save(comparison_id)
 
     @application.get("/api/decisions/{decision_id}")
     def decision(decision_id: str, request: Request):
-        return request.app.state.service.decision(decision_id)
+        return placement(request).decision(decision_id)
 
     @application.get("/api/notices")
     def notices(request: Request):
-        return request.app.state.service.notices()
+        return placement(request).notices()
+
+    @application.get("/api/notices/summary")
+    def notice_summaries(
+        request: Request,
+        limit: int = Query(20, ge=1, le=100),
+        offset: int = Query(0, ge=0),
+    ):
+        return placement(request).notice_summaries(limit=limit, offset=offset)
 
     @application.post("/api/notices/{notice_id}/read")
     def read_notice(notice_id: str, request: Request):
-        return request.app.state.service.read_notice(notice_id)
+        return placement(request).read_notice(notice_id)
 
     @application.get("/api/sources/{source_id}")
     def source(source_id: str, request: Request):
         return request.app.state.service.source(source_id)
 
     @application.post("/api/demo/events", status_code=202)
-    def demo_event(
-        body: DemoEventBody, request: Request, background_tasks: BackgroundTasks
-    ):
-        service = request.app.state.service
-        load_id = service.begin_load(body.scenario)
-        background_tasks.add_task(
-            service.finish_load, load_id, FixtureProvider(body.scenario)
+    def demo_event(body: DemoEventBody, request: Request):
+        context = get_context(request)
+        require_owner(context)
+        load_id = uuid5(
+            NAMESPACE_URL, f"clara-deposit:{context.household_id}:{body.idempotency_key}"
+        ).hex
+        job = enqueue_job(
+            request.app.state.store,
+            context,
+            "deposit_load",
+            {"scenario": body.scenario, "load_id": load_id},
+            body.idempotency_key,
+            request.state.request_id,
         )
-        return {"load_id": load_id}
+        return {"load_id": load_id, "job_id": job["id"]}
 
     # Only a built local app is mounted; API routes always take precedence.
     dist = Path(__file__).resolve().parents[1] / "web" / "dist"

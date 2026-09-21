@@ -2,19 +2,36 @@ import json
 import os
 import subprocess
 import sys
+import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from server.app import create_app
 from server.interpreter import FixtureInterpreter
+from server.platform.identity import DEMO_PASSWORD
 from server.service import PlacementService
 from server.store import Store
 
 
+@contextmanager
+def application_client(database):
+    with TestClient(create_app(database, FixtureInterpreter())) as client:
+        login = client.post(
+            "/api/platform/session/login",
+            json={
+                "user_id": "user-demo",
+                "password": DEMO_PASSWORD,
+            },
+        )
+        assert login.status_code == 200
+        yield client
+
+
 @pytest.fixture
 def client(tmp_path):
-    with TestClient(create_app(tmp_path / "api.sqlite3", FixtureInterpreter())) as value:
+    with application_client(tmp_path / "api.sqlite3") as value:
         yield value
 
 
@@ -31,6 +48,18 @@ def confirmation(client):
     assert response.status_code == 200
     assert response.json()["status"] == "confirmation"
     return response.json()["confirmation"]
+
+
+def wait_for_job(client, response):
+    assert response.status_code == 202
+    job_id = response.json()["job_id"]
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        job = client.get(f"/api/platform/jobs/{job_id}").json()
+        if job["status"] in ("succeeded", "failed"):
+            return job
+        time.sleep(0.01)
+    pytest.fail(f"Queued job {job_id} did not finish within five seconds")
 
 
 def test_http_complete_saved_notice_flow(client):
@@ -57,7 +86,7 @@ def test_http_complete_saved_notice_flow(client):
     decision = client.post(f"/api/comparisons/{result['id']}/save").json()
     assert client.get(f"/api/decisions/{decision['id']}").json() == decision
     event = client.post("/api/demo/events", json={"scenario": "leader_changed"})
-    assert event.status_code == 202
+    wait_for_job(client, event)
     home = client.get("/api/home").json()
     assert home["source_status"]["load_id"] == event.json()["load_id"]
     assert home["source_status"]["state"] == "ready"
@@ -123,9 +152,8 @@ def test_failed_background_load_is_reported_without_erasing_saved_result(client)
         json={"inputs": proposal["inputs"]},
     ).json()
     decision = client.post(f"/api/comparisons/{result['id']}/save").json()
-    assert (
-        client.post("/api/demo/events", json={"scenario": "failure"}).status_code == 202
-    )
+    event = client.post("/api/demo/events", json={"scenario": "failure"})
+    assert wait_for_job(client, event)["status"] == "failed"
     home = client.get("/api/home").json()
     assert home["source_status"]["state"] == "stale"
     assert home["saved"][0]["latest"] == decision["baseline"]
@@ -156,7 +184,7 @@ def test_scheduled_cli_writes_same_sqlite_state_without_model_configuration(tmp_
         command, cwd=root, env=environment, capture_output=True, text=True, check=True
     )
     assert json.loads(completed.stdout)["source_status"]["state"] == "ready"
-    with TestClient(create_app(database, FixtureInterpreter())) as client:
+    with application_client(database) as client:
         assert client.get("/api/home").json()["source_status"]["load_id"] == "scheduled-1"
         repeated = subprocess.run(
             command, cwd=root, env=environment, capture_output=True, text=True, check=True
@@ -166,7 +194,7 @@ def test_scheduled_cli_writes_same_sqlite_state_without_model_configuration(tmp_
 
 def test_app_restart_recovers_interrupted_load_without_changing_saved_result(tmp_path):
     database = tmp_path / "restart.sqlite3"
-    with TestClient(create_app(database, FixtureInterpreter())) as client:
+    with application_client(database) as client:
         proposal = confirmation(client)
         result = client.post(
             f"/api/confirmations/{proposal['id']}/compute",
@@ -179,7 +207,7 @@ def test_app_restart_recovers_interrupted_load_without_changing_saved_result(tmp
         assert concurrent.home("fixture")["source_status"]["state"] == "loading"
 
     for _ in range(2):
-        with TestClient(create_app(database, FixtureInterpreter())) as restarted:
+        with application_client(database) as restarted:
             home = restarted.get("/api/home").json()
             assert home["source_status"]["state"] == "stale"
             assert home["source_status"]["error_code"] == "load_interrupted"
@@ -190,13 +218,9 @@ def test_app_restart_recovers_interrupted_load_without_changing_saved_result(tmp
             assert checks[0]["status"] == "failed"
             assert checks[0]["error_code"] == "load_interrupted"
             assert home["notices"] == []
-    with TestClient(create_app(database, FixtureInterpreter())) as restarted:
-        assert (
-            restarted.post(
-                "/api/demo/events", json={"scenario": "leader_changed"}
-            ).status_code
-            == 202
-        )
+    with application_client(database) as restarted:
+        event = restarted.post("/api/demo/events", json={"scenario": "leader_changed"})
+        assert wait_for_job(restarted, event)["status"] == "succeeded"
         assert restarted.get("/api/home").json()["source_status"]["state"] == "ready"
 
 
@@ -222,7 +246,7 @@ def test_startup_recovers_interrupted_first_seed_and_publishes_fresh_attempt(tmp
     database = tmp_path / "interrupted-seed.sqlite3"
     service = PlacementService(Store(database))
     interrupted_id = service.begin_load("baseline", load_id="fixture-bootstrap-v1")
-    with TestClient(create_app(database, FixtureInterpreter())) as restarted:
+    with application_client(database) as restarted:
         home = restarted.get("/api/home").json()
         assert home["source_status"]["state"] == "ready"
         assert home["source_status"]["load_id"] != interrupted_id

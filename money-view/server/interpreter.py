@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from typing import Literal, Protocol
 
 import httpx
@@ -18,6 +19,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from server.fixtures import get_examples
 from server.models import PlacementInputs
+from server.platform.common import Context, PlatformError
+from server.store import Store
+
+ModelAdmission = tuple[Store, Context]
 
 InterpretationStatus = Literal[
     "confirmation",
@@ -86,6 +91,8 @@ class Interpreter(Protocol):
         message: str,
         locale: str,
         demo_example_id: str | None = None,
+        *,
+        admission: ModelAdmission | None = None,
     ) -> Interpretation:
         """Interpret one message without performing financial calculations."""
 
@@ -216,6 +223,8 @@ class OpenAICompatibleInterpreter:
         message: str,
         locale: str,
         demo_example_id: str | None = None,
+        *,
+        admission: ModelAdmission | None = None,
     ) -> Interpretation:
         del demo_example_id
         request = {
@@ -246,7 +255,7 @@ class OpenAICompatibleInterpreter:
         }
 
         try:
-            response = await self._post(request, headers)
+            response = await self._post(request, headers, admission=admission)
             response.raise_for_status()
             completion = _CompletionResponse.model_validate(response.json())
             output = _ModelOutput.model_validate_json(
@@ -261,6 +270,26 @@ class OpenAICompatibleInterpreter:
             return _unavailable(INVALID_MODEL_RESPONSE_CODE)
 
     async def _post(
+        self,
+        request: dict[str, object],
+        headers: dict[str, str],
+        *,
+        admission: ModelAdmission | None = None,
+    ) -> httpx.Response:
+        if admission is not None:
+            from server.platform.runtime import model_admission
+
+            scope = model_admission(*admission)
+        elif isinstance(self._transport, httpx.MockTransport):
+            scope = nullcontext()
+        else:
+            raise PlatformError("model_admission_context_required", 503)
+        async with scope:
+            response = await self._send(request, headers)
+            response.raise_for_status()
+            return response
+
+    async def _send(
         self,
         request: dict[str, object],
         headers: dict[str, str],
@@ -298,6 +327,8 @@ class FixtureInterpreter:
         message: str,
         locale: str,
         demo_example_id: str | None = None,
+        *,
+        admission: ModelAdmission | None = None,
     ) -> Interpretation:
         if demo_example_id is not None:
             example = next(
@@ -313,6 +344,7 @@ class FixtureInterpreter:
                     message,
                     locale,
                     DEMO_NOT_FOUND_CODE,
+                    admission=admission,
                 )
 
             messages = example["messages"]
@@ -321,6 +353,7 @@ class FixtureInterpreter:
                     message,
                     locale,
                     DEMO_TEXT_MISMATCH_CODE,
+                    admission=admission,
                 )
             recorded_message = messages[locale]
             if not isinstance(recorded_message, str):
@@ -328,12 +361,14 @@ class FixtureInterpreter:
                     message,
                     locale,
                     DEMO_TEXT_MISMATCH_CODE,
+                    admission=admission,
                 )
             if message.strip() != recorded_message.strip():
                 return await self._fallback_or_unavailable(
                     message,
                     locale,
                     DEMO_TEXT_MISMATCH_CODE,
+                    admission=admission,
                 )
 
             inputs = PlacementInputs.model_validate(example["inputs"])
@@ -343,6 +378,7 @@ class FixtureInterpreter:
             message,
             locale,
             MODEL_UNAVAILABLE_CODE,
+            admission=admission,
         )
 
     async def _fallback_or_unavailable(
@@ -350,10 +386,12 @@ class FixtureInterpreter:
         message: str,
         locale: str,
         code: str,
+        *,
+        admission: ModelAdmission | None = None,
     ) -> Interpretation:
         if self._fallback is None:
             return _unavailable(code)
-        return await self._fallback.interpret(message, locale)
+        return await self._fallback.interpret(message, locale, admission=admission)
 
 
 def configured_interpreter() -> FixtureInterpreter:

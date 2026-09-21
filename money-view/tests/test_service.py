@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
-from server.fixtures import get_examples
+from server.fixtures import get_countries, get_examples
 from server.models import PlacementInputs
 from server.providers import FixtureProvider
 from server.service import PlacementService, ServiceError
@@ -326,3 +326,271 @@ def test_recheck_preserves_original_confirmation_receipts(
     assert (
         service.notices()["items"][0]["after"]["input_source"] == original["input_source"]
     )
+
+
+def test_bootstrap_is_atomic_across_workers(tmp_path):
+    from threading import Barrier
+
+    from server.platform.runtime import initialize
+
+    store = Store(tmp_path / "concurrent-seed.sqlite")
+    initialize(store)
+    barrier = Barrier(4)
+
+    def start_worker(_):
+        service = PlacementService(store)
+        barrier.wait()
+        service.bootstrap()
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(start_worker, range(4)))
+    with store.connection() as db:
+        attempts = db.execute("SELECT status FROM load_attempts").fetchall()
+        assert [row["status"] for row in attempts] == ["succeeded"]
+        assert db.execute("SELECT COUNT(*) FROM load_datasets").fetchone()[0] == len(
+            get_countries()
+        )
+
+
+@pytest.mark.parametrize("state", ["queued", "running", "expired"])
+def test_startup_preserves_queue_owned_loads_and_recovers_legacy_orphans(service, state):
+    from server.platform.jobs_runtime import claim, enqueue_job
+    from server.platform.runtime import initialize
+
+    initialize(service.store)
+    job = enqueue_job(
+        service.store,
+        None,
+        "deposit_load",
+        {"scenario": "leader_changed", "load_id": "queue-owned"},
+        "queue-owned",
+    )
+    if state != "queued":
+        claimed = claim(service.store)
+        assert claimed["id"] == job["id"]
+        if state == "expired":
+            with service.store.connection(write=True) as db:
+                db.execute(
+                    "UPDATE p_runtime_jobs SET lease_until=0 WHERE id=?", (job["id"],)
+                )
+    orphan = service.begin_load("baseline", load_id="legacy-orphan")
+    service.bootstrap()
+    assert service.load_status("queue-owned")["status"] == "loading"
+    assert service.load_status(orphan)["error_code"] == "load_interrupted"
+
+
+def test_empty_startup_preserves_owned_seed_without_publishing_over_it(tmp_path):
+    from server.platform.jobs_runtime import enqueue_job, worker_tick
+    from server.platform.runtime import initialize
+
+    store = Store(tmp_path / "owned-seed.sqlite")
+    initialize(store)
+    enqueue_job(
+        store,
+        None,
+        "deposit_load",
+        {"scenario": "baseline", "load_id": "owned-seed"},
+        "owned-seed",
+    )
+    service = PlacementService(store)
+    service.bootstrap()
+    assert service.load_status("owned-seed")["status"] == "loading"
+    with store.connection() as db:
+        assert db.execute("SELECT COUNT(*) FROM load_attempts").fetchone()[0] == 1
+    assert worker_tick(store)["status"] == "succeeded"
+    assert service.home("fixture")["source_status"]["state"] == "ready"
+
+
+def test_terminal_queue_failure_records_domain_failure_atomically(service, inputs):
+    from server.platform.jobs_runtime import claim, enqueue_job, fail
+    from server.platform.runtime import initialize
+
+    initialize(service.store)
+    decision = saved(service, inputs)
+    enqueue_job(
+        service.store,
+        None,
+        "deposit_load",
+        {"scenario": "leader_changed", "load_id": "failed-job"},
+        "failed-job",
+    )
+    job = claim(service.store)
+    assert fail(service.store, job, "job_failed")
+    assert service.load_status("failed-job")["error_code"] == "job_failed"
+    service.fail_load("failed-job", "another-failure")
+    after = service.decision(decision["id"])
+    assert after["latest"] == decision["baseline"]
+    assert after["checks"] == []
+    assert service.load_status("failed-job")["recheck_status"] == "failed"
+
+
+def test_notice_summary_pages_and_counts_owned_dated_sources(service, inputs):
+    first = saved(service, inputs)
+    second = saved(service, inputs.model_copy(update={"amount": Decimal("500000")}))
+    other = PlacementService(service.store, household_id="household-other")
+    saved(other, inputs)
+    load(service, "leader_changed")
+    summary = service.notice_summaries(limit=1)
+    assert summary["total"] == summary["unread_count"] == 2
+    assert len(summary["items"]) == 1
+    item = summary["items"][0]
+    assert item["decision_id"] in {first["id"], second["id"]}
+    assert all(
+        source["published_on"] and source["kind"] == "synthetic"
+        for source in item["source_dates"]
+    )
+    assert "before" not in item and "after" not in item
+    service.read_notice(item["id"])
+    next_page = service.notice_summaries(limit=1, offset=1)
+    assert next_page["unread_count"] == 1
+    assert next_page["items"][0]["id"] != item["id"]
+    assert other.notice_summaries()["total"] == 1
+    with pytest.raises(ServiceError, match="invalid_notice_page"):
+        service.notice_summaries(limit=101)
+
+
+def test_rechecks_resume_committed_batches_without_refetch_or_duplicate_checks(
+    service, inputs, monkeypatch
+):
+    import server.service as module
+
+    monkeypatch.setattr(module, "RECHECK_BATCH_SIZE", 2)
+    decisions = [
+        saved(service, inputs.model_copy(update={"amount": Decimal(1000 + index)}))
+        for index in range(5)
+    ]
+    load_id = service.begin_load("leader_changed")
+    real_batch = service._recheck_batch
+
+    def crash_after_commit(*args):
+        assert real_batch(*args)
+        raise RuntimeError("simulated worker exit after committed batch")
+
+    monkeypatch.setattr(service, "_recheck_batch", crash_after_commit)
+    with pytest.raises(RuntimeError, match="simulated worker exit"):
+        service.finish_load(load_id, FixtureProvider("leader_changed"))
+    assert service.load_status(load_id)["status"] == "succeeded"
+    assert service.load_status(load_id)["checked_count"] == 2
+    assert service.load_status(load_id)["recheck_status"] == "pending"
+
+    class NoFetch:
+        def fetch(self, country):
+            pytest.fail("An already-published load must resume its pinned data")
+
+    reopened = PlacementService(service.store)
+    reopened.finish_load(load_id, NoFetch())
+    assert reopened.load_status(load_id)["recheck_status"] == "completed"
+    assert reopened.load_status(load_id)["checked_count"] == len(decisions)
+    for decision in decisions:
+        after = reopened.decision(decision["id"])
+        assert len(after["checks"]) == 1
+        assert after["baseline"] == decision["baseline"]
+
+
+def test_new_publication_supersedes_pending_rechecks_without_rollback(
+    service, inputs, monkeypatch
+):
+    import server.service as module
+
+    monkeypatch.setattr(module, "RECHECK_BATCH_SIZE", 2)
+    decisions = [
+        saved(service, inputs.model_copy(update={"amount": Decimal(1000 + index)}))
+        for index in range(5)
+    ]
+    older = service.begin_load("same_winner")
+    datasets, error = service._fetch_datasets(FixtureProvider("same_winner"))
+    with service.store.connection(write=True) as db:
+        service._publish_load(db, older, datasets, error)
+    assert service._recheck_batch(older, datasets)
+    newer = load(service, "leader_changed")
+    service.finish_load(older, FixtureProvider("same_winner"))
+    assert service.load_status(older)["recheck_status"] == "superseded"
+    assert service.load_status(older)["checked_count"] == 2
+    assert service.source_status()["load_id"] == newer
+    for decision in decisions:
+        after = service.decision(decision["id"])
+        assert after["checks"][-1]["load_id"] == newer
+        assert after["baseline"] == decision["baseline"]
+
+
+def test_save_during_rechecks_uses_published_bundle_and_stays_outside_snapshot(
+    service, inputs, monkeypatch
+):
+    import server.service as module
+
+    monkeypatch.setattr(module, "RECHECK_BATCH_SIZE", 2)
+    for index in range(5):
+        saved(service, inputs.model_copy(update={"amount": Decimal(1000 + index)}))
+    load_id = service.begin_load("leader_changed")
+    datasets, error = service._fetch_datasets(FixtureProvider("leader_changed"))
+    with service.store.connection(write=True) as db:
+        service._publish_load(db, load_id, datasets, error)
+    assert service._recheck_batch(load_id, datasets)
+    decision = saved(service, inputs.model_copy(update={"amount": Decimal(9000)}))
+    assert decision["baseline"]["dataset_id"] == next(
+        dataset.id for dataset in datasets if dataset.country == inputs.country
+    )
+    service.finish_load(load_id, FixtureProvider("leader_changed"))
+    assert service.decision(decision["id"])["checks"] == []
+    assert service.load_status(load_id)["checked_count"] == 5
+
+
+def test_terminal_job_failure_preserves_published_bundle_and_completed_batch(
+    service, inputs, monkeypatch
+):
+    import server.service as module
+
+    monkeypatch.setattr(module, "RECHECK_BATCH_SIZE", 2)
+    decisions = [
+        saved(service, inputs.model_copy(update={"amount": Decimal(1000 + index)}))
+        for index in range(5)
+    ]
+    load_id = service.begin_load("leader_changed")
+    datasets, error = service._fetch_datasets(FixtureProvider("leader_changed"))
+    with service.store.connection(write=True) as db:
+        service._publish_load(db, load_id, datasets, error)
+    assert service._recheck_batch(load_id, datasets)
+    service.fail_load(load_id, "job_attempts_exhausted")
+    status = service.load_status(load_id)
+    assert status["status"] == "succeeded"
+    assert status["recheck_status"] == "failed" and status["checked_count"] == 2
+    assert status["recheck_error_code"] == "job_attempts_exhausted"
+    assert service.source_status()["load_id"] == load_id
+    assert len(service.decision(decisions[0]["id"])["checks"]) == 1
+
+
+def test_competing_writer_commits_between_recheck_batches(service, inputs, monkeypatch):
+    from threading import Event
+
+    import server.service as module
+
+    monkeypatch.setattr(module, "RECHECK_BATCH_SIZE", 2)
+    for index in range(5):
+        saved(service, inputs.model_copy(update={"amount": Decimal(1000 + index)}))
+    with service.store.connection(write=True) as db:
+        db.execute("CREATE TABLE competing_writer(value INTEGER)")
+    first_batch = Event()
+    writer_done = Event()
+
+    def write_during_job():
+        assert first_batch.wait(2)
+        with service.store.connection(write=True) as db:
+            db.execute("INSERT INTO competing_writer VALUES(1)")
+        writer_done.set()
+
+    original = service._recheck_batch
+
+    def batch_with_competing_writer(*args):
+        pending = original(*args)
+        if not first_batch.is_set():
+            first_batch.set()
+            assert writer_done.wait(2), (
+                "A completed batch retained the SQLite writer lock"
+            )
+        return pending
+
+    monkeypatch.setattr(service, "_recheck_batch", batch_with_competing_writer)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        writer = pool.submit(write_during_job)
+        load(service, "leader_changed")
+        writer.result()

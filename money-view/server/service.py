@@ -45,6 +45,9 @@ class ServiceError(Exception):
         super().__init__(code)
 
 
+RECHECK_BATCH_SIZE = 200
+
+
 class PlacementService:
     def __init__(self, store: Store, household_id: str = "household-demo"):
         self.store = store
@@ -65,28 +68,44 @@ class PlacementService:
             raise ServiceError("comparison_not_found", 404)
 
     def bootstrap(self) -> None:
-        """Recover abandoned jobs at single-owner app startup, then seed if empty."""
+        """Preserve queued work, recover legacy orphans, and seed atomically."""
+        from .platform.jobs_runtime import owns_deposit_load
+
+        interrupted = []
         with self.store.connection(write=True) as db:
-            interrupted = db.execute(
+            owned_loading = False
+            for attempt in db.execute(
                 "SELECT id FROM load_attempts WHERE status='loading' ORDER BY sequence"
-            ).fetchall()
-            for attempt in interrupted:
-                self._complete_attempt(db, attempt["id"], [], "load_interrupted")
-            if db.execute("SELECT 1 FROM datasets LIMIT 1").fetchone():
-                return
-            previous_seed = db.execute(
-                "SELECT 1 FROM load_attempts WHERE id='fixture-bootstrap-v1'"
-            ).fetchone()
-        load_id = self.begin_load(
-            "baseline", load_id=identifier() if previous_seed else "fixture-bootstrap-v1"
-        )
-        self.finish_load(load_id, FixtureProvider("baseline"))
+            ).fetchall():
+                if owns_deposit_load(db, attempt["id"]):
+                    owned_loading = True
+                else:
+                    self._complete_attempt(db, attempt["id"], [], "load_interrupted")
+                    interrupted.append(attempt["id"])
+            if (
+                not db.execute("SELECT 1 FROM datasets LIMIT 1").fetchone()
+                and not owned_loading
+            ):
+                previous_seed = db.execute(
+                    "SELECT 1 FROM load_attempts WHERE id='fixture-bootstrap-v1'"
+                ).fetchone()
+                load_id = self.begin_load(
+                    "baseline",
+                    load_id=identifier() if previous_seed else "fixture-bootstrap-v1",
+                    connection=db,
+                )
+                # This provider is a bounded local fixture, never a network request.
+                datasets, error = self._fetch_datasets(FixtureProvider("baseline"))
+                self._publish_load(db, load_id, datasets, error)
+        for load_id in interrupted:
+            self._run_rechecks(load_id)
 
     def load_status(self, load_id: str) -> dict:
         with self.store.connection() as db:
             attempt = db.execute(
-                "SELECT id, status, created_at, completed_at, error_code "
-                "FROM load_attempts WHERE id=?",
+                "SELECT la.id,la.status,la.created_at,la.completed_at,la.error_code,"
+                "rc.status recheck_status,rc.error_code recheck_error_code,rc.checked_count,rc.high_water recheck_high_water "
+                "FROM load_attempts la LEFT JOIN p_load_rechecks rc ON rc.load_id=la.id WHERE la.id=?",
                 (load_id,),
             ).fetchone()
             if attempt is None:
@@ -94,31 +113,54 @@ class PlacementService:
             return dict(attempt)
 
     def begin_load(
-        self, scenario: str, *, load_id: str | None = None, provider: str = "fixture"
+        self,
+        scenario: str,
+        *,
+        load_id: str | None = None,
+        provider: str = "fixture",
+        connection=None,
     ) -> str:
         load_id = load_id or identifier()
-        with self.store.connection(write=True) as db:
-            db.execute(
-                "INSERT OR IGNORE INTO load_attempts"
-                "(id,provider,scenario,created_at,status) VALUES(?,?,?,?, 'loading')",
-                (load_id, provider, scenario, now()),
-            )
-            existing = db.execute(
-                "SELECT * FROM load_attempts WHERE id=?", (load_id,)
-            ).fetchone()
-            if existing["scenario"] != scenario or existing["provider"] != provider:
-                raise ServiceError("load_identity_conflict", 409)
+        if connection is None:
+            with self.store.connection(write=True) as db:
+                return self.begin_load(
+                    scenario, load_id=load_id, provider=provider, connection=db
+                )
+        connection.execute(
+            "INSERT OR IGNORE INTO load_attempts"
+            "(id,provider,scenario,created_at,status) VALUES(?,?,?,?, 'loading')",
+            (load_id, provider, scenario, now()),
+        )
+        existing = connection.execute(
+            "SELECT * FROM load_attempts WHERE id=?", (load_id,)
+        ).fetchone()
+        if existing["scenario"] != scenario or existing["provider"] != provider:
+            raise ServiceError("load_identity_conflict", 409)
         return load_id
+
+    def fail_load(self, load_id: str, error_code: str, *, connection=None) -> None:
+        if connection is not None:
+            fail_load_in_transaction(connection, load_id, error_code)
+        else:
+            with self.store.connection(write=True) as db:
+                fail_load_in_transaction(db, load_id, error_code)
 
     def finish_load(self, load_id: str, provider) -> None:
         with self.store.connection() as db:
             attempt = db.execute(
-                "SELECT * FROM load_attempts WHERE id=?", (load_id,)
+                "SELECT status FROM load_attempts WHERE id=?", (load_id,)
             ).fetchone()
             if attempt is None:
                 raise ServiceError("load_not_found", 404)
-            if attempt["status"] != "loading":
-                return
+            needs_ingestion = attempt["status"] == "loading"
+        if needs_ingestion:
+            datasets, error = self._fetch_datasets(provider)
+            with self.store.connection(write=True) as db:
+                self._publish_load(db, load_id, datasets, error)
+        self._run_rechecks(load_id)
+
+    @staticmethod
+    def _fetch_datasets(provider):
         error = None
         datasets = []
         try:
@@ -132,46 +174,123 @@ class PlacementService:
         except Exception as exc:
             # A provider boundary records failures without exposing transport secrets.
             error = getattr(exc, "code", "provider_load_failed")
-        with self.store.connection(write=True) as db:
-            attempt = db.execute(
-                "SELECT * FROM load_attempts WHERE id=?", (load_id,)
-            ).fetchone()
-            if attempt["status"] != "loading":
-                return
-            newer = db.execute(
-                "SELECT 1 FROM load_attempts WHERE sequence>? AND status='succeeded' LIMIT 1",
-                (attempt["sequence"],),
-            ).fetchone()
-            if newer:
-                error = "superseded_load"
-            if not error:
-                current = self._current_datasets(db)
-                if any(
-                    dataset.country in current
-                    and dataset.published_on
-                    < self._dataset(db, current[dataset.country]).published_on
-                    for dataset in datasets
-                ):
-                    error = "stale_dataset"
-            if not error:
-                for dataset in datasets:
-                    self._insert_dataset(db, dataset)
-                    db.execute(
-                        "INSERT INTO load_datasets VALUES(?,?,?)",
-                        (load_id, dataset.country, dataset.id),
-                    )
-            self._complete_attempt(db, load_id, datasets, error)
+        return datasets, error
 
-    def _complete_attempt(
+    def _publish_load(
         self, db, load_id: str, datasets: list[RateDataset], error: str | None
     ) -> None:
+        attempt = db.execute(
+            "SELECT * FROM load_attempts WHERE id=?", (load_id,)
+        ).fetchone()
+        if attempt["status"] != "loading":
+            return
+        newer = db.execute(
+            "SELECT 1 FROM load_attempts WHERE sequence>? AND status='succeeded' LIMIT 1",
+            (attempt["sequence"],),
+        ).fetchone()
+        if newer:
+            error = "superseded_load"
+        if not error:
+            current = self._current_datasets(db)
+            if any(
+                dataset.country in current
+                and dataset.published_on
+                < self._dataset(db, current[dataset.country]).published_on
+                for dataset in datasets
+            ):
+                error = "stale_dataset"
+        if not error:
+            for dataset in datasets:
+                self._insert_dataset(db, dataset)
+                db.execute(
+                    "INSERT INTO load_datasets VALUES(?,?,?)",
+                    (load_id, dataset.country, dataset.id),
+                )
+        self._complete_attempt(db, load_id, datasets, error)
+
+    @staticmethod
+    def _complete_attempt(
+        db, load_id: str, datasets: list[RateDataset], error: str | None
+    ) -> None:
         completed_at = now()
-        for decision in db.execute("SELECT * FROM saved_decisions").fetchall():
-            self._check(db, decision, load_id, completed_at, datasets, error)
+        high_water = db.execute(
+            "SELECT COALESCE(MAX(rowid),0) FROM saved_decisions"
+        ).fetchone()[0]
+        db.execute(
+            "INSERT OR IGNORE INTO p_load_rechecks(load_id,status,high_water,error_code,completed_at) VALUES(?,?,?,?,?)",
+            (
+                load_id,
+                "pending" if high_water else "completed",
+                high_water,
+                error,
+                None if high_water else completed_at,
+            ),
+        )
         db.execute(
             "UPDATE load_attempts SET completed_at=?,status=?,error_code=? WHERE id=?",
             (completed_at, "failed" if error else "succeeded", error, load_id),
         )
+
+    def _run_rechecks(self, load_id: str) -> None:
+        """Resume immutable receipts in short transactions from one durable cursor."""
+        with self.store.connection() as db:
+            datasets = [
+                self._dataset(db, row["dataset_id"])
+                for row in db.execute(
+                    "SELECT dataset_id FROM load_datasets WHERE load_id=?", (load_id,)
+                )
+            ]
+        while self._recheck_batch(load_id, datasets):
+            pass
+
+    def _recheck_batch(self, load_id: str, datasets: list[RateDataset]) -> bool:
+        with self.store.connection(write=True) as db:
+            checkpoint = db.execute(
+                "SELECT * FROM p_load_rechecks WHERE load_id=?", (load_id,)
+            ).fetchone()
+            if checkpoint is None or checkpoint["status"] != "pending":
+                return False
+            attempt = db.execute(
+                "SELECT * FROM load_attempts WHERE id=?", (load_id,)
+            ).fetchone()
+            if (
+                checkpoint["error_code"] is None
+                and db.execute(
+                    "SELECT 1 FROM load_attempts WHERE sequence>? AND status='succeeded' LIMIT 1",
+                    (attempt["sequence"],),
+                ).fetchone()
+            ):
+                db.execute(
+                    "UPDATE p_load_rechecks SET status='superseded',completed_at=? WHERE load_id=?",
+                    (now(), load_id),
+                )
+                return False
+            decisions = db.execute(
+                "SELECT rowid AS decision_cursor,* FROM saved_decisions WHERE rowid>? AND rowid<=? ORDER BY rowid LIMIT ?",
+                (checkpoint["cursor"], checkpoint["high_water"], RECHECK_BATCH_SIZE),
+            ).fetchall()
+            stamp = now()
+            for decision in decisions:
+                self._check(
+                    db, decision, load_id, stamp, datasets, checkpoint["error_code"]
+                )
+            cursor = (
+                decisions[-1]["decision_cursor"]
+                if decisions
+                else checkpoint["high_water"]
+            )
+            pending = cursor < checkpoint["high_water"]
+            db.execute(
+                "UPDATE p_load_rechecks SET cursor=?,checked_count=checked_count+?,status=?,completed_at=? WHERE load_id=?",
+                (
+                    cursor,
+                    len(decisions),
+                    "pending" if pending else "completed",
+                    None if pending else stamp,
+                    load_id,
+                ),
+            )
+            return pending
 
     def _insert_dataset(self, db, dataset: RateDataset) -> None:
         document = dataset.model_dump(mode="json")
@@ -223,7 +342,8 @@ class PlacementService:
         ).fetchall()
         return {row["country"]: row["dataset_id"] for row in rows}
 
-    def _result(self, db, comparison_id: str) -> ComparisonResult:
+    @staticmethod
+    def _result(db, comparison_id: str) -> ComparisonResult:
         row = db.execute(
             "SELECT document FROM comparisons WHERE id=?", (comparison_id,)
         ).fetchone()
@@ -231,15 +351,17 @@ class PlacementService:
             raise ServiceError("comparison_not_found", 404)
         return ComparisonResult.model_validate_json(row["document"])
 
-    def _insert_result(
-        self, db, result: ComparisonResult, household_id: str | None = None
-    ) -> None:
+    def _insert_result(self, db, result: ComparisonResult) -> None:
+        self._insert_owned_result(db, result, self.household_id)
+
+    @staticmethod
+    def _insert_owned_result(db, result: ComparisonResult, household_id: str) -> None:
         db.execute(
             "INSERT INTO comparisons VALUES(?,?)", (result.id, result.model_dump_json())
         )
         db.execute(
             "INSERT INTO p_placement_comparisons VALUES(?,?)",
-            (result.id, household_id if household_id is not None else self.household_id),
+            (result.id, household_id),
         )
 
     def create_confirmation(self, inputs: PlacementInputs) -> dict:
@@ -325,16 +447,19 @@ class PlacementService:
             ).fetchone()
             return self._decision(db, row["id"])
 
-    def _latest(self, db, decision) -> ComparisonResult:
+    @staticmethod
+    def _latest(db, decision) -> ComparisonResult:
         row = db.execute(
             "SELECT after_id FROM decision_checks WHERE decision_id=? AND status='succeeded' "
             "ORDER BY sequence DESC LIMIT 1",
             (decision["id"],),
         ).fetchone()
-        return self._result(db, row["after_id"] if row else decision["comparison_id"])
+        return PlacementService._result(
+            db, row["after_id"] if row else decision["comparison_id"]
+        )
 
+    @staticmethod
     def _check(
-        self,
         db,
         decision,
         load_id: str,
@@ -342,11 +467,11 @@ class PlacementService:
         datasets: list[RateDataset],
         load_error: str | None,
     ) -> None:
-        before = self._latest(db, decision)
+        before = PlacementService._latest(db, decision)
         after = before
         error = load_error
         reasons = []
-        original = self._result(db, decision["comparison_id"])
+        original = PlacementService._result(db, decision["comparison_id"])
         reference = before.inputs.current_annual_rate_pct
         if reference is None:
             deposits = [row for row in original.rows if not row.is_baseline]
@@ -381,7 +506,9 @@ class PlacementService:
                         "SELECT household_id FROM p_placement_comparisons WHERE id=?",
                         (original.id,),
                     ).fetchone()
-                    self._insert_result(db, after, owner["household_id"])
+                    PlacementService._insert_owned_result(
+                        db, after, owner["household_id"]
+                    )
                     if set(before.winner_ids) != set(after.winner_ids):
                         reasons.append("winner_changed")
                     if (
@@ -486,6 +613,61 @@ class PlacementService:
         with self.store.connection() as db:
             return {"items": self._notices(db)}
 
+    def notice_summaries(self, limit: int = 20, offset: int = 0) -> dict:
+        if not 1 <= limit <= 100 or offset < 0:
+            raise ServiceError("invalid_notice_page")
+        ownership = (
+            " FROM decision_checks dc JOIN saved_decisions sd ON sd.id=dc.decision_id "
+            "JOIN p_placement_comparisons pc ON pc.id=sd.comparison_id "
+            "WHERE dc.reasons!='[]' AND pc.household_id=?"
+        )
+        with self.store.connection() as db:
+            counts = db.execute(
+                "SELECT COUNT(*) total,COALESCE(SUM(dc.read_at IS NULL),0) unread_count"
+                + ownership,
+                (self.household_id,),
+            ).fetchone()
+            rows = db.execute(
+                "SELECT dc.id,dc.decision_id,dc.created_at,dc.reasons,dc.read_at,"
+                "(SELECT document FROM comparisons WHERE id=dc.after_id) after_document"
+                + ownership
+                + " ORDER BY dc.sequence DESC LIMIT ? OFFSET ?",
+                (self.household_id, limit, offset),
+            ).fetchall()
+        items = []
+        for row in rows:
+            after = json.loads(row["after_document"])
+            sources = [after["inflation"]["source"]]
+            for result in after["rows"]:
+                sources.append(result["source"])
+                if result.get("fee_source"):
+                    sources.append(result["fee_source"])
+            source_dates = {
+                (source["published_on"], source["kind"], source["title"])
+                for source in sources
+                if "published_on" in source
+            }
+            items.append(
+                {
+                    "id": row["id"],
+                    "decision_id": row["decision_id"],
+                    "created_at": row["created_at"],
+                    "reasons": json.loads(row["reasons"]),
+                    "read_at": row["read_at"],
+                    "source_dates": [
+                        dict(zip(("published_on", "kind", "title"), source, strict=True))
+                        for source in sorted(source_dates)
+                    ],
+                }
+            )
+        return {
+            "items": items,
+            "total": counts["total"],
+            "unread_count": counts["unread_count"],
+            "limit": limit,
+            "offset": offset,
+        }
+
     def read_notice(self, notice_id: str) -> dict:
         with self.store.connection(write=True) as db:
             row = db.execute(
@@ -528,14 +710,26 @@ class PlacementService:
                     else "unavailable"
                 )
             )
+        rechecks = (
+            db.execute(
+                "SELECT status FROM p_load_rechecks WHERE load_id=?", (latest["id"],)
+            ).fetchone()
+            if latest
+            else None
+        )
         return {
             "state": state,
+            "recheck_status": rechecks["status"] if rechecks else None,
             "last_success_at": success["completed_at"] if success else None,
             "last_attempt_at": latest["created_at"] if latest else None,
             "error_code": latest["error_code"] if latest else None,
             "dataset_id": next(iter(datasets.values()), None),
             "load_id": latest["id"] if latest else None,
         }
+
+    def source_status(self) -> dict:
+        with self.store.connection() as db:
+            return self._source_status(db)
 
     def home(self, interpreter_mode: str) -> dict:
         with self.store.connection() as db:
@@ -589,3 +783,26 @@ class PlacementService:
         if document is None:
             raise ServiceError("source_not_found", 404)
         return document
+
+
+def fail_load_in_transaction(connection, load_id: str, error_code: str) -> None:
+    """Stop unfinished work without retracting a complete published bundle."""
+    attempt = connection.execute(
+        "SELECT status FROM load_attempts WHERE id=?", (load_id,)
+    ).fetchone()
+    if attempt is None:
+        return
+    stamp = now()
+    if attempt["status"] == "loading":
+        connection.execute(
+            "UPDATE load_attempts SET status='failed',error_code=?,completed_at=? WHERE id=?",
+            (error_code, stamp, load_id),
+        )
+        connection.execute(
+            "INSERT OR IGNORE INTO p_load_rechecks(load_id,status,high_water,error_code,completed_at) VALUES(?,'failed',0,?,?)",
+            (load_id, error_code, stamp),
+        )
+    connection.execute(
+        "UPDATE p_load_rechecks SET status='failed',error_code=?,completed_at=? WHERE load_id=? AND status='pending'",
+        (error_code, stamp, load_id),
+    )

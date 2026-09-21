@@ -2,8 +2,11 @@
 
 import argparse
 import json
+import time
+from uuid import uuid4
 
-from .providers import FixtureProvider
+from .platform.jobs_runtime import enqueue_job, get_job_internal, worker_tick
+from .platform.runtime import initialize
 from .service import PlacementService
 from .store import Store
 
@@ -30,17 +33,34 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     service = PlacementService(Store(args.database))
-    load_id = service.begin_load(args.scenario, load_id=args.load_id)
-    service.finish_load(load_id, FixtureProvider(args.scenario))
+    initialize(service.store)
+    load_id = args.load_id or str(uuid4())
+    job = enqueue_job(
+        service.store,
+        None,
+        "deposit_load",
+        {"scenario": args.scenario, "load_id": load_id},
+        load_id,
+    )
+    # Waiting belongs to this scheduled CLI, never to an HTTP request handler.
+    while job["status"] in ("queued", "running"):
+        if worker_tick(service.store) is None:
+            time.sleep(0.05)
+        job = get_job_internal(service.store, job["id"])
     attempt = service.load_status(load_id)
-    status = service.home("fixture")["source_status"]
+    status = service.source_status()
     print(
         json.dumps(
-            {"load_id": load_id, "load_status": attempt, "source_status": status},
+            {
+                "load_id": load_id,
+                "job_id": job["id"],
+                "load_status": attempt,
+                "source_status": status,
+            },
             sort_keys=True,
         )
     )
-    return 0 if attempt["status"] == "succeeded" else 1
+    return 0 if job["status"] == "succeeded" and attempt["status"] == "succeeded" else 1
 
 
 if __name__ == "__main__":

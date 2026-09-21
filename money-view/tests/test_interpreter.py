@@ -282,3 +282,91 @@ async def test_missing_clara_config_ignores_parent_model_keys(
         "code": "model_unavailable",
         "missing_fields": [],
     }
+
+
+@pytest.mark.asyncio
+async def test_prepared_deposit_bypasses_admission_and_fallback_uses_shared_gate(
+    tmp_path, monkeypatch
+):
+    from contextlib import asynccontextmanager
+
+    from server.platform import runtime
+    from server.platform.common import Context
+    from server.store import Store
+
+    store = Store(tmp_path / "admission.sqlite")
+    context = Context("user-demo", "household-demo", "owner", "session-demo")
+    events = []
+
+    @asynccontextmanager
+    async def admitted(selected, owner):
+        assert selected is store and owner == context
+        events.append("admitted")
+        yield
+        events.append("released")
+
+    monkeypatch.setattr(runtime, "model_admission", admitted)
+
+    def completion(request):
+        events.append("request")
+        return _completion(
+            {
+                "status": "unsupported",
+                "inputs": None,
+                "code": "outside_scope",
+                "missing_fields": [],
+            }
+        )
+
+    interpreter = FixtureInterpreter(_model_interpreter(httpx.MockTransport(completion)))
+    example = get_examples()[0]
+    result = await interpreter.interpret(
+        example["messages"]["en"], "en", example["id"], admission=(store, context)
+    )
+    assert result.status == "confirmation"
+    assert events == []
+    result = await interpreter.interpret(
+        "An edited natural language question",
+        "en",
+        example["id"],
+        admission=(store, context),
+    )
+    assert result.status == "unsupported"
+    assert events == ["admitted", "request", "released"]
+
+
+@pytest.mark.asyncio
+async def test_deposit_admission_rejection_prevents_http(tmp_path, monkeypatch):
+    from contextlib import asynccontextmanager
+
+    from server.platform import runtime
+    from server.platform.common import Context, PlatformError
+    from server.store import Store
+
+    @asynccontextmanager
+    async def rejected(*args):
+        raise PlatformError("model_daily_limit_exceeded", 429)
+        yield
+
+    monkeypatch.setattr(runtime, "model_admission", rejected)
+
+    def never_call(request):
+        pytest.fail("admission rejection must prevent deposit HTTP")
+
+    store = Store(tmp_path / "admission.sqlite")
+    context = Context("user-demo", "household-demo", "owner", "session-demo")
+    with pytest.raises(PlatformError, match="model_daily_limit_exceeded"):
+        await _model_interpreter(httpx.MockTransport(never_call)).interpret(
+            "Compare deposits", "en", admission=(store, context)
+        )
+
+
+@pytest.mark.asyncio
+async def test_real_deposit_transport_requires_explicit_admission_context():
+    from server.platform.common import PlatformError
+
+    interpreter = OpenAICompatibleInterpreter(
+        api_key="test", base_url="https://example.test/v1", model="test"
+    )
+    with pytest.raises(PlatformError, match="model_admission_context_required"):
+        await interpreter.interpret("Compare deposits", "en")
