@@ -55,3 +55,42 @@ contains its exact reviewed head, timestamps, links and findings.
 GitHub Codex review and required CI for this expansion follow this checkpoint.
 The final PR audit records their terminal state. No production changes,
 Supabase migrations, protected-branch merges or deployments were performed.
+
+
+## Review follow-up checkpoint
+
+The follow-up implementation is commit `919cc0f4bd036fbfb3d7374a6e519ae2b8ef8703`,
+with the harness ownership fix in `df14e5ec`. The original checkpoint above
+remains preserved. Fresh evidence is stored separately under `review-followup/`.
+
+The three GitHub P2 findings concerned currency-scoped portfolio evidence,
+monthly schedule anchors and harness preflight ordering. The schedule review
+also addressed legacy rescheduling ambiguity and concurrent initialization.
+A controlled lifecycle probe found that an in-flight interpretation could
+recreate private records after reset or account deletion. Identity now owns
+one generation and current-authority check used inside private write
+transactions across the platform. Delayed assistant and deposit requests
+cannot recreate cleared records; fresh requests after reset remain usable.
+The scoped [lifecycle review](reviews/lifecycle-review.md) and
+[investing follow-ups](reviews/investing-review.md) are explicitly clean.
+
+| Follow-up check | Result | Evidence |
+| --- | --- | --- |
+| Complete Python suite | 419 passed | [Backend log](review-followup/backend.log) |
+| Ruff and TypeScript/build | Passed; entry JS 98.05 kB gzip | [Lint](review-followup/lint.log), [build](review-followup/build.log) |
+| Real-API browser journeys | 26 passed, 0 failed; 30 screenshots | [Browser summary](review-followup/browser-acceptance-summary.json), [log](review-followup/browser-acceptance.log) |
+| Browser source continuity | 116 files unchanged | [Before](review-followup/browser-source-hashes.json), [after](review-followup/browser-source-hashes-after.json), [artifact hashes](review-followup/browser-artifact-hashes.json) |
+
+The only subsequent unit-test edit during browser verification supplied the
+real identity fixture to the storage snapshot test. Backend unit-test modules
+are outside the browser dependency manifest. Unrelated formatter changes
+were removed while verifying identical Python ASTs. No application source
+changed during the fresh browser run. Required GitHub CI verifies the final
+committed tree. The final scoped Codex acknowledgment, unresolved-thread
+count and private merge belong to the terminal audit on
+[PR #658](https://github.com/lagarcess/argus/pull/658).
+
+Fresh post-review capacity verification also passed: [2,400 requests on a
+fresh five-million-row fixture](../scale/lifecycle-capacity-5m.json), with
+current lifecycle guards, two API workers and delayed semantic admission.
+See [capacity evidence](../../SCALE_EVIDENCE.md) for the measured mix and limits.

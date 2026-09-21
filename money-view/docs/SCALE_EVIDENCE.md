@@ -99,10 +99,12 @@ rendering, real provider latency, model quality or provider cost is measured.
   updates; changed financial records and immutable-receipt preservation are
   covered by focused storage tests, not claimed by this large-file probe.
 
-Five focused harness tests verify the acceptance distribution, restart
+Seven focused harness tests verify the acceptance distribution, restart
 idempotency, valid transfer/split/account-currency shapes, and omission of
 provider credentials from the worker environment, and refusal to change an
-unowned database with a nonzero CLI exit. The worker environment is
+unowned database with a nonzero CLI exit, including low-disk hosts. Ownership
+validation precedes capacity checks; eligible new paths still stop before
+creating a database when disk capacity is insufficient. The worker environment is
 an allowlist with empty Clara LLM settings; socket DNS/connect/connect-ex
 guards permit loopback only.
 
@@ -164,3 +166,39 @@ Concurrent import/export jobs and worker-crash recovery are covered by focused
 domain/runtime tests, not included in this HTTP traffic mix. WAL size was
 observed at approximately 4 MiB during the soak and zero after it; no claim
 of continuously sampled peak WAL or under-load checkpoint timing is made.
+
+
+## Revalidation after PR review fixes
+
+Commit `919cc0f4` adds current membership and household-generation checks to
+private writes and semantic/job admission, and corrects portfolio dates and
+recurring schedules. The earlier longer run remains historical evidence.
+A fresh five-million-row fixture and new worker processes revalidated these
+changes; this is a shorter follow-up, not another ten-minute qualification.
+
+- [Fresh seed](evidence/scale/lifecycle-seed-5m.json): 5,000,000 generated
+  transactions, 10,000 identities and 8,000 households, plus the explicitly
+  reported built-in demo overhead. Seed time 67.25 seconds.
+- [Follow-up traffic](evidence/scale/lifecycle-capacity-5m.json): **2,400 of
+  2,400 HTTP requests succeeded**, across **2,400 distinct authenticated
+  identities**. Offered load was 20 RPS for 60 seconds, then 40 RPS for
+  30 seconds, with at most two ordinary requests in flight.
+- Transaction-list p95 was **33.49 ms** sustained and **8.47 ms** burst;
+  ledger-write p95 was **10.44 ms** and **7.21 ms**. Peak combined API RSS
+  was **212.6 MiB**. Four eight-second semantic fixtures kept competing-read
+  p95 at **34.71 ms** and p99 at **50.05 ms**; the fifth call received the
+  expected 429.
+- Isolation, pagination, heavy/stress-household counts, real local login and
+  revocation, write replay/conflict, foreign keys and integrity passed.
+  Final rows were **5,013,801**, exactly the seed plus 120 load writes and
+  one deduplicated precheck write.
+
+The [source manifest](evidence/scale/lifecycle-source-manifest.json) records
+before/after application and harness hashes. This revalidation preserves
+all the target-host, retention, provider and hosted-operation limitations
+above. It does not turn local measurements into a production SLA.
+
+The [follow-up cleanup receipt](evidence/scale/lifecycle-cleanup.json) confirms
+that owned workers stopped and only the fresh fixture database and its
+sidecars were removed, reclaiming 2,745,200,640 bytes. The captain rechecked
+all 116 browser and 36 capacity source hashes before packaging; all matched.

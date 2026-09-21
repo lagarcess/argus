@@ -13,3 +13,4 @@ web/playwright-report/
 !docs/evidence/platform/browser-acceptance.log
 !docs/evidence/platform/frontend-build.log
 !docs/evidence/platform/lint-verification.log
+!docs/evidence/platform/review-followup/*.log

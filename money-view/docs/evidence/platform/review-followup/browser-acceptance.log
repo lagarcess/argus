@@ -1,0 +1,41 @@
+$ playwright test --trace off
+(node:73459) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2m[WebServer] [22m(node:73460) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[2m[WebServer] [22m(Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 26 tests using 1 worker
+
+(node:73462) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:73462) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:73462) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/assistant-export.spec.ts:3:1 › expired assistant export clears loaded household answers (3.4s)
+  ✓   2 e2e/frontend-review.spec.ts:27:3 › new editor signs in using the copied local ID and retains role boundaries (4.8s)
+  ✓   3 e2e/frontend-review.spec.ts:27:3 › new viewer signs in using the copied local ID and retains role boundaries (4.7s)
+  ✓   4 e2e/frontend-review.spec.ts:88:1 › real session revocation through another client makes CSV export remove private UI (2.8s)
+  ✓   5 e2e/frontend-review.spec.ts:105:1 › notice selected while compute is pending hydrates its before and after record (4.4s)
+  ✓   6 e2e/frontend-review.spec.ts:131:1 › an invalid deposit target requests once and remains recoverable (2.8s)
+  ✓   7 e2e/frontend-review.spec.ts:147:1 › a saved deposit refresh settles when another tab publishes a newer source load (5.9s)
+  ✓   8 e2e/pilot.spec.ts:24:3 › es 1440: confirm, save, unchanged check, changed notice and receipts (4.9s)
+  ✓   9 e2e/pilot.spec.ts:24:3 › en 1440: confirm, save, unchanged check, changed notice and receipts (6.3s)
+  ✓  10 e2e/pilot.spec.ts:24:3 › es 390: confirm, save, unchanged check, changed notice and receipts (5.1s)
+  ✓  11 e2e/pilot.spec.ts:66:1 › edited replay stays honest and the second country uses the same flow (3.8s)
+  ✓  12 e2e/pilot.spec.ts:104:1 › mobile money view fits the maximum supported amount (2.0s)
+  ✓  13 e2e/platform.spec.ts:6:3 › en: real ledger import, edit and bounded full-volume pagination (4.8s)
+  ✓  14 e2e/platform.spec.ts:6:3 › es: real ledger import, edit and bounded full-volume pagination (3.9s)
+  ✓  15 e2e/platform.spec.ts:58:1 › budget, recurring payment, allocated goal and immutable scenario (5.5s)
+  ✓  16 e2e/platform.spec.ts:112:1 › paper investment preview confirms once and preserves linked net worth (4.6s)
+  ✓  17 e2e/platform.spec.ts:143:1 › mobile settings, confirmed memory, privacy and keyless saved assistant (4.4s)
+  ✓  18 e2e/platform.spec.ts:188:3 › Spanish 1440: route coverage, dated sources, no overflow and keyboard escape (4.9s)
+  ✓  19 e2e/platform.spec.ts:188:3 › Spanish 1024: route coverage, dated sources, no overflow and keyboard escape (4.3s)
+  ✓  20 e2e/platform.spec.ts:188:3 › Spanish 768: route coverage, dated sources, no overflow and keyboard escape (6.0s)
+  ✓  21 e2e/platform.spec.ts:188:3 › Spanish 390: route coverage, dated sources, no overflow and keyboard escape (6.7s)
+  ✓  22 e2e/platform.spec.ts:188:3 › Spanish 320: route coverage, dated sources, no overflow and keyboard escape (6.0s)
+  ✓  23 e2e/platform.spec.ts:215:1 › credit, tax, estate and membership produce local receipts (8.2s)
+  ✓  24 e2e/platform.spec.ts:289:1 › viewer permissions and other-household isolation are visible (4.0s)
+  ✓  25 e2e/platform.spec.ts:316:1 › household export and deliberate local reset survive reload (3.0s)
+  ✓  26 e2e/platform.spec.ts:340:1 › 320px initial overview derives household currency before any user change (1.5s)
+
+  26 passed (2.0m)

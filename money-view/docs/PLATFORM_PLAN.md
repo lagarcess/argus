@@ -8,7 +8,7 @@ Clara opens on an account-first overview. Direct pages own ordinary tasks; a con
 
 Two designs were evaluated: a central financial ledger and federated domain modules with an outbox and projections. Choose one SQLite transaction owner with a canonical account/transaction ledger for financial totals, and natural typed records for goals, scenarios, identity and service workflows. Query bounded summaries directly rather than duplicating them in an outbox/projection system. The local volume does not justify a second consistency mechanism.
 
-All modules use Store.connection. Platform tables are prefixed p_. Context carries user, household, session and role. Every household-owned query is scoped. Ledger amounts use integer minor units; external money and calculations use bounded Decimal strings. Currency totals remain separate without a dated FX quote. Sources distinguish publication, observation and recording dates. Saved scenario inputs and results are immutable.
+All modules use Store.connection. Platform tables are prefixed p_. Context carries user, household, session, role and the captured household data generation. Private writes check current membership and generation inside their transaction. Every household-owned query is scoped. Ledger amounts use integer minor units; external money and calculations use bounded Decimal strings. Currency totals remain separate without a dated FX quote. Sources distinguish publication, observation and recording dates. Saved scenario inputs and results are immutable.
 
 Python Faker seeds 24 months and 13,680 transactions across 14 accounts and four currencies with deterministic identities, repeated merchants, salaries, refunds, transfers, multiple currencies and pending entries. Seed only an empty fixture manifest. Lists are paged on the server; summary queries cover the full filter. A failed connector refresh keeps its last data. No browser or request-time vendor polling.
 
@@ -42,9 +42,9 @@ Domain workers write a concise API handoff in docs/platform-api/<domain>.md befo
 - [x] Shell: responsive navigation, home, shared controls/evidence/dialogs, loading/error states, theme (shell worker).
 - [x] Feature views: ledger, planning, investing/services, settings, deposit integration (assigned UI workers/captain).
 - [x] Independent implementation reviews and scoped re-reviews closed clean for the implemented domains.
-- [x] Local verification: 367 backend tests, lint/build, and 26 browser journeys with 115 unchanged source hashes and durable screenshots. See the [verification checkpoint](evidence/platform/verification.md).
+- [x] Local verification: 419 backend tests, lint/build, and 26 browser journeys with 116 unchanged source hashes and durable screenshots. See the [verification checkpoint](evidence/platform/verification.md).
 - [x] Bounded local capacity acceptance: 10,000 identities, five million generated rows, 20 RPS for ten minutes and 40 RPS for one minute, followed by a fresh-source probe. Full retention and target-host qualification remain explicitly unverified in [SCALE_EVIDENCE.md](SCALE_EVIDENCE.md).
-- [ ] Final whole-diff/Codex review and required CI; merge only the private branch after clean closure.
+- Final GitHub review, CI and private integration: the terminal audit on [PR #658](https://github.com/lagarcess/argus/pull/658) is the authoritative record. Only `codex/money-placement-pilot` may receive the merge.
 
 ## Acceptance journeys
 
@@ -58,7 +58,7 @@ Domain workers write a concise API handoff in docs/platform-api/<domain>.md befo
 
 ## Progress and evidence
 
-Private base: d48249dc8f0fd955fa6ee16c11d99d4eb111aedb. Prior deposit delivery: PR #657. The expanded modules are implemented and independent scoped reviews are clean. Final CI, final review and scale acceptance remain in progress. Implementation completion is not a final release or hosted-capacity claim.
+Private base: d48249dc8f0fd955fa6ee16c11d99d4eb111aedb. Prior deposit delivery: PR #657. The expanded modules are implemented. The verification checkpoint and PR terminal audit distinguish local acceptance, review closure and the authorized private merge. This is not a deployment or hosted-capacity claim.
 
 ### Capacity and review amendment
 
@@ -72,7 +72,7 @@ Household export shares a 50,000-source-row and 32-MiB serialized-source-byte bu
 
 Ledger, identity/settings, planning, services, investing, assistant, deposits and direct frontend pages are implemented. Independent implementation reviews and their scoped follow-ups have closed clean. Fixes addressed domain ownership, including identity cleanup, planning category/page consistency, service membership authority, calendar expiry, historical replay and tax provenance. The account/transaction ledger remains the single owner of financial totals. The platform preserves deposit confirmation inputs, source-owned synthetic country labels and immutable saved receipts from PR #657.
 
-The deterministic fixture contains 13,680 transactions over 24 months, 14 accounts and four currencies. Focused tests and browser evidence exist; the final combined verification, CI, review and capacity checks remain open above. Current measurements belong in [SCALE_EVIDENCE.md](SCALE_EVIDENCE.md), not duplicated pass counts here. The 10,000-monthly-user target still requires the declared sustained workload, full retention/heavy-household tests and target-host qualification.
+The deterministic fixture contains 13,680 transactions over 24 months, 14 accounts and four currencies. Combined verification, browser evidence and bounded capacity measurements are linked above. Follow-up review fixes and their checks are recorded in the verification checkpoint and PR audit. Current measurements belong in [SCALE_EVIDENCE.md](SCALE_EVIDENCE.md). The 10,000-monthly-user target still requires the declared sustained workload, full retention/heavy-household tests and target-host qualification.
 
 ### Capability truth
 

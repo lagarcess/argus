@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-09-21T05:40:53.382908+00:00",
+  "implementation_commit": "919cc0f4bd036fbfb3d7374a6e519ae2b8ef8703",
+  "checks": {
+    "browser": {
+      "files": 116,
+      "changed": []
+    },
+    "capacity": {
+      "files": 36,
+      "changed": []
+    }
+  },
+  "backend_passed": 419,
+  "browser_passed": 26,
+  "scope": "Current application files match the recorded browser and capacity acceptance content"
+}

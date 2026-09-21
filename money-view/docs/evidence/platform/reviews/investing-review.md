@@ -32,3 +32,30 @@ Both P2 findings are addressed in the inspected fix. No new actionable findings 
 - **Recovery:** `confirm_order` checks the supplied recurring run's current status, active plan, book and plan/period idempotency key while holding the same SQLite write transaction that mutates cash/positions and writes the receipt. Receipt replay remains before that guard. The former detached `still_running` read is gone. The new controlled interleaving test recovers the run immediately before old-worker settlement and checks that the failed state remains, no receipt appears and cash/positions stay unchanged. Existing receipt-first recovery coverage remains.
 
 The worker reports 24 investing tests passed, Ruff/diff-check clean and the UI build passed. This re-review inspected the changed code and tests; it did not rerun tests or call providers. Scope is the two original findings and their fixes; this is not a fresh whole-module or browser acceptance claim.
+
+## PR #658 evidence-date and monthly-anchor re-review: clean
+
+Scoped review of the latest two fixes in investing code, focused tests and API documentation. No new actionable findings in this delta.
+
+- **Portfolio evidence dates:** Currency totals now derive their observation date from that currency's linked accounts and priced alternative holdings. The top-level `as_of` and source date share the newest contributing observation across currencies. The regression test exercises newer linked USD data, older USD holding data, and an independently older DOP account.
+- **Monthly recurrence:** Creation persists the requested day separately from the due cursor. Month advancement clips that day to the target month's length without overwriting it; pause/resume and replay preserve it. Explicit next-run edits establish the new anchor. Recovery uses the same advancement helper. The migration adds the nullable column when absent, backfills at most 100 null monthly rows per initialization from original evidence, preserves due cursors, and is idempotent. Remaining null rows derive the same anchor when used and persist it on advancement.
+
+The five added tests cover currency dates, ordinary February, leap February, bounded migration/reinitialization and interrupted-run recovery. The worker reports those tests passed and Ruff/diff-check passed. Full investing collection was reported blocked by the concurrent assistant import of identity's not-yet-landed `assert_active_context`; this review does not claim a full-suite pass. No tests or provider calls were run by the reviewer.
+
+## Legacy anchor correction and investing lifecycle checks: clean
+
+The latest legacy-anchor correction is clean. This verdict supersedes the earlier statement that legacy source evidence reliably supplies the original anchor: that assumption was incorrect because preexisting explicit reschedules did not update the evidence.
+
+Null-anchor legacy rows now use the current `next_run_on.day` in both bounded migration and runtime fallback. Migration leaves the cursor unchanged, retains the 100-row limit and idempotent null-only update, and does not alter already-persisted anchors. New plans still preserve an independent monthly anchor. The updated regression correctly expects February 28 from a February 28 cursor even when creation evidence says January 31. Documentation states that older month-end intent cannot be reconstructed reliably.
+
+Also inspected the new investing calls to the shared lifecycle authority helper. User mutation transactions check current account/membership/generation before writing; import and order confirmation perform that check before receipt replay. Scheduled recurring work obtains the current context and generation through the shared helper and passes that context into preview/confirmation. The stale-context operation matrix and current-generation scheduled-run test cover these integration paths. No new actionable findings in this scoped delta.
+
+No implementation edits, Git/network/provider calls or test runs were performed by this review. No new full-suite pass is claimed.
+
+## Initialization transaction correction: clean
+
+Reviewed only the latest initialization transaction boundary and its concurrent-initializer regression. No actionable findings in this delta.
+
+The schema script now finishes in its own connection. A subsequent fresh `Store.connection(write=True)` starts `BEGIN IMMEDIATE` before the migration's schema inspection/ALTER/backfill and before the fixture manifest check and seed writes. Concurrent initializers therefore serialize the check-and-change operations, and a failure rolls back migration/seed work inside that transaction. The new two-thread legacy-schema test observes active transactions for both migration calls and checks the added column, single fixture manifest and expected holdings.
+
+The worker reports the complete investing suite at 41 passed, with Ruff and diff-check clean. This reviewer did not rerun checks or perform Git/network/provider actions. Prior clean verdicts remain closed; unchanged code was not rescanned.
