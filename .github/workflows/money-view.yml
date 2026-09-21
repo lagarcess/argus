@@ -2,7 +2,7 @@ name: Clara local pilot
 
 on:
   push:
-    branches: ["codex/money-placement-pilot-impl"]
+    branches: ["codex/money-placement-pilot-impl", "codex/clara-platform"]
     paths: ["money-view/**", ".github/workflows/money-view.yml"]
   pull_request:
     branches: ["codex/money-placement-pilot"]

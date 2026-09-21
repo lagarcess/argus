@@ -46,8 +46,23 @@ class ServiceError(Exception):
 
 
 class PlacementService:
-    def __init__(self, store: Store):
+    def __init__(self, store: Store, household_id: str = "household-demo"):
         self.store = store
+        self.household_id = household_id
+
+    def _require_confirmation(self, db, confirmation_id: str) -> None:
+        if not db.execute(
+            "SELECT 1 FROM p_placement_confirmations WHERE id=? AND household_id=?",
+            (confirmation_id, self.household_id),
+        ).fetchone():
+            raise ServiceError("confirmation_not_found", 404)
+
+    def _require_comparison(self, db, comparison_id: str) -> None:
+        if not db.execute(
+            "SELECT 1 FROM p_placement_comparisons WHERE id=? AND household_id=?",
+            (comparison_id, self.household_id),
+        ).fetchone():
+            raise ServiceError("comparison_not_found", 404)
 
     def bootstrap(self) -> None:
         """Recover abandoned jobs at single-owner app startup, then seed if empty."""
@@ -216,9 +231,15 @@ class PlacementService:
             raise ServiceError("comparison_not_found", 404)
         return ComparisonResult.model_validate_json(row["document"])
 
-    def _insert_result(self, db, result: ComparisonResult) -> None:
+    def _insert_result(
+        self, db, result: ComparisonResult, household_id: str | None = None
+    ) -> None:
         db.execute(
             "INSERT INTO comparisons VALUES(?,?)", (result.id, result.model_dump_json())
+        )
+        db.execute(
+            "INSERT INTO p_placement_comparisons VALUES(?,?)",
+            (result.id, household_id if household_id is not None else self.household_id),
         )
 
     def create_confirmation(self, inputs: PlacementInputs) -> dict:
@@ -243,6 +264,10 @@ class PlacementService:
                     expires_at,
                 ),
             )
+            db.execute(
+                "INSERT INTO p_placement_confirmations VALUES(?,?)",
+                (confirmation_id, self.household_id),
+            )
         return {
             "id": confirmation_id,
             "inputs": inputs.model_dump(mode="json"),
@@ -256,6 +281,7 @@ class PlacementService:
     def compute(self, confirmation_id: str, inputs: PlacementInputs) -> dict:
         input_document = input_identity(inputs)
         with self.store.connection(write=True) as db:
+            self._require_confirmation(db, confirmation_id)
             confirmation = db.execute(
                 "SELECT * FROM confirmations WHERE id=?", (confirmation_id,)
             ).fetchone()
@@ -288,6 +314,7 @@ class PlacementService:
 
     def save(self, comparison_id: str) -> dict:
         with self.store.connection(write=True) as db:
+            self._require_comparison(db, comparison_id)
             self._result(db, comparison_id)
             db.execute(
                 "INSERT OR IGNORE INTO saved_decisions VALUES(?,?,?)",
@@ -350,7 +377,11 @@ class PlacementService:
                             ],
                         }
                     )
-                    self._insert_result(db, after)
+                    owner = db.execute(
+                        "SELECT household_id FROM p_placement_comparisons WHERE id=?",
+                        (original.id,),
+                    ).fetchone()
+                    self._insert_result(db, after, owner["household_id"])
                     if set(before.winner_ids) != set(after.winner_ids):
                         reasons.append("winner_changed")
                     if (
@@ -403,7 +434,9 @@ class PlacementService:
 
     def _decision(self, db, decision_id: str) -> dict:
         row = db.execute(
-            "SELECT * FROM saved_decisions WHERE id=?", (decision_id,)
+            "SELECT sd.* FROM saved_decisions sd JOIN p_placement_comparisons pc "
+            "ON pc.id=sd.comparison_id WHERE sd.id=? AND pc.household_id=?",
+            (decision_id, self.household_id),
         ).fetchone()
         if row is None:
             raise ServiceError("decision_not_found", 404)
@@ -442,7 +475,10 @@ class PlacementService:
         return [
             self._notice(db, row)
             for row in db.execute(
-                "SELECT * FROM decision_checks WHERE reasons!='[]' ORDER BY sequence DESC"
+                "SELECT dc.* FROM decision_checks dc JOIN saved_decisions sd "
+                "ON sd.id=dc.decision_id JOIN p_placement_comparisons pc ON pc.id=sd.comparison_id "
+                "WHERE dc.reasons!='[]' AND pc.household_id=? ORDER BY dc.sequence DESC",
+                (self.household_id,),
             )
         ]
 
@@ -453,7 +489,10 @@ class PlacementService:
     def read_notice(self, notice_id: str) -> dict:
         with self.store.connection(write=True) as db:
             row = db.execute(
-                "SELECT * FROM decision_checks WHERE id=? AND reasons!='[]'", (notice_id,)
+                "SELECT dc.* FROM decision_checks dc JOIN saved_decisions sd "
+                "ON sd.id=dc.decision_id JOIN p_placement_comparisons pc ON pc.id=sd.comparison_id "
+                "WHERE dc.id=? AND dc.reasons!='[]' AND pc.household_id=?",
+                (notice_id, self.household_id),
             ).fetchone()
             if row is None:
                 raise ServiceError("notice_not_found", 404)
@@ -509,7 +548,9 @@ class PlacementService:
                 "saved": [
                     self._decision(db, row["id"])
                     for row in db.execute(
-                        "SELECT id FROM saved_decisions ORDER BY created_at DESC"
+                        "SELECT sd.id FROM saved_decisions sd JOIN p_placement_comparisons pc "
+                        "ON pc.id=sd.comparison_id WHERE pc.household_id=? ORDER BY sd.created_at DESC",
+                        (self.household_id,),
                     )
                 ],
                 "notices": self._notices(db),

@@ -48,6 +48,21 @@ CREATE TABLE IF NOT EXISTS decision_checks (
     reference_rate_pct TEXT, error_code TEXT, read_at TEXT,
     UNIQUE(decision_id,load_id)
 );
+CREATE TABLE IF NOT EXISTS p_placement_confirmations (
+    id TEXT PRIMARY KEY REFERENCES confirmations(id) ON DELETE CASCADE,
+    household_id TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS p_placement_comparisons (
+    id TEXT PRIMARY KEY REFERENCES comparisons(id) ON DELETE CASCADE,
+    household_id TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS p_placement_confirmation_household
+    ON p_placement_confirmations(household_id);
+CREATE INDEX IF NOT EXISTS p_placement_comparison_household
+    ON p_placement_comparisons(household_id);
+-- The original single-household local demo belongs to the seeded household.
+INSERT OR IGNORE INTO p_placement_confirmations SELECT id, 'household-demo' FROM confirmations;
+INSERT OR IGNORE INTO p_placement_comparisons SELECT id, 'household-demo' FROM comparisons;
 """
 
 
