@@ -1,0 +1,15 @@
+{
+  "provider": "Alpaca market data",
+  "endpoint": "https://data.alpaca.markets/v2/stocks/bars/latest",
+  "method": "GET",
+  "symbols": [
+    "SPY"
+  ],
+  "feed": "iex",
+  "status": "succeeded",
+  "error_code": null,
+  "as_of": "2026-09-18",
+  "completed_at": "2026-09-21T04:29:28.814539+00:00",
+  "real_money_execution": false,
+  "database": "isolated local verification database"
+}

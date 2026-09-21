@@ -1,0 +1,25 @@
+{
+  "cleaned_at": "2026-09-21T05:39:42.528318+00:00",
+  "owned_8032_workers_stopped": true,
+  "removed_files": [
+    {
+      "path": "/Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/.local/lifecycle-capacity.sqlite3",
+      "bytes": 2745167872
+    },
+    {
+      "path": "/Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/.local/lifecycle-capacity.sqlite3-wal",
+      "bytes": 0
+    },
+    {
+      "path": "/Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/.local/lifecycle-capacity.sqlite3-shm",
+      "bytes": 32768
+    }
+  ],
+  "bytes_reclaimed": 2745200640,
+  "database_ownership_checked": true,
+  "final_ledger_rows": 5013801,
+  "only_named_lifecycle_database_and_sidecars_removed": true,
+  "other_fixtures_and_preview_databases_preserved": true,
+  "source_manifest": "lifecycle-source-manifest.json",
+  "capacity_evidence": "lifecycle-capacity-5m.json"
+}

@@ -1,9 +1,10 @@
 # Clara
 
-A standalone, local money view for comparing bank deposits with visible math
-and dated receipts. Spanish opens first; English is available in the header.
-The demonstration uses fictional institutions, synthetic rates and inflation,
-and prepared example conversations. No API key is needed.
+Clara is a local personal finance app with an account-first overview, direct task
+pages and a contextual assistant. It opens in Spanish and supports English.
+The seeded household has 14 accounts and 13,680 Faker-generated transactions
+over 24 months, including salaries, refunds, transfers, pending entries and four
+currencies. No API key is needed to explore the demo.
 
 ## Run locally
 
@@ -19,129 +20,167 @@ cd ..
 .venv/bin/python -m uvicorn server.app:app --host 127.0.0.1 --port 8012
 ```
 
-Open <http://127.0.0.1:8012>. The API serves the built app and stores local data
-in `.local/clara.sqlite3`. It reads no `.env` and imports no Argus runtime.
-`CLARA_DATABASE_PATH` can point to a separate SQLite file.
+Open [Clara on port 8012](http://127.0.0.1:8012). Select a local demo profile and
+use the password `Clara-demo-2026!`. The profiles include owner, editor and viewer
+roles, plus a separate household for isolation checks. These are deliberately
+public fixture credentials, not credentials for a hosted service.
 
-For frontend development, run the same API and `bun run dev` in `web/`; open
-<http://127.0.0.1:5178>. Its `/api` proxy points only to the loopback API.
+The API serves the built app and stores data in `.local/clara.sqlite3`.
+`CLARA_DATABASE_PATH` selects a different local database. Clara reads no `.env`
+and imports no Argus runtime. Set any optional configuration explicitly in the
+Clara process environment; do not edit or reuse parent `.env` files.
 
-## Walk the demo
+For frontend development, keep the API running and run this in another terminal
+from `money-view/web/`:
 
-1. Select the prepared Dominican Republic example inside the chat.
-2. Send it, inspect or edit the amount, currency, horizon and current rate,
-   then confirm. No comparison computes before confirmation.
-3. Inspect the comparison and open a source receipt or calculation detail.
-4. Save the comparison. Reloading keeps it in **Guardados / Saved**.
-5. Simulate a publication using the demo controls. A change that preserves
-   the leading option is recorded quietly. A changed leader or an inflation
-   crossing creates a notice.
-6. Open the notice to compare the prior result with the new result. The
-   original saved receipt remains unchanged.
-7. Simulate a failed load: the source status reports the failure while the
-   last good data remains available.
+```sh
+bun run dev
+```
 
-The interface identifies all synthetic figures and simulated publication
-dates. User-entered inputs instead carry their confirmation date. A real
-publisher's retrieval time is never substituted for its publication date.
+Open [the development app on port 5178](http://127.0.0.1:5178). Vite proxies
+`/api` to the loopback API on port 8012.
 
-## Data loading and scheduling
+## Explore the platform
 
-User calculations read the database. They never fetch rates or inflation.
-The same loader serves a scheduled command and the asynchronous demo controls:
+| Page | Local workflows |
+| --- | --- |
+| Overview and accounts | Inspect dated balances, net worth and spending by currency; review connections and failed refreshes. |
+| Transactions | Search and filter the full ledger, page through results, edit categories, split transactions, and preview validated CSV imports before committing. |
+| Planning | Set budgets, record recurring bill payments, allocate goals, and save life-event or retirement scenarios with immutable assumptions and results. |
+| Investing | Inspect holdings, allocation and performance; preview and confirm simulated orders, bundles and recurring plans in a separate fictional cash book. |
+| Services | Explore credit and payoff calculations, tax organizers, estate records, local appointment reservations, memberships and employer benefits. |
+| Settings | Manage local sessions, passwords, profiles, language, appearance, household roles, confirmed memories, history, export, reset, account deletion and locally saved feedback. |
+| Assistant | Ask prepared grounded questions, open their source records, save conversations and reopen history. Optional configured semantic interpretation supports free text. |
+| Deposits | Edit an amount and horizon, confirm, calculate, inspect dated receipts, save, and compare before/after results when a simulated publication changes. |
+
+Financial totals derive from the account and transaction ledger. Currencies stay
+separate without a dated conversion quote. Simulated investment cash and orders
+do not change linked-account net worth. Household records are scoped to the
+active session, and viewer roles cannot change shared financial records.
+
+The assistant explains stored facts and computed results. With no model
+configuration, free-text interpretation is explicitly unavailable. Prepared
+questions use typed actions; the demo does not guess intent from keywords.
+
+## What is simulated and what is verified
+
+The demo uses fictional identities, institutions, account activity, deposit rates,
+fees, inflation, investment prices and service workflows. Receipts identify
+synthetic observations and their dates. User records carry recording or effective
+dates; a retrieval timestamp never substitutes for a publisher's date.
+
+Local confirmations create local records only. No real order, money movement,
+payment, invitation, appointment booking, tax filing or legal submission occurs.
+There is no public hosting or outbound email service. Feedback stays local.
+
+One explicit Alpaca adapter call was verified on September 21, 2026: one
+read-only HTTP GET for `SPY` using the `iex` feed, with a market observation dated
+September 18. It used an isolated verification database. The ordinary demo
+database remains seeded with fixtures. This verifies that bounded read, not
+broker execution or broad market-data coverage. See the
+[Alpaca receipt](docs/evidence/scale/alpaca-readonly.json) and
+[investing adapter contract](docs/platform-api/investing.md).
+
+Live SB and BCRD bank/inflation loading remains unverified. SB raw records cannot
+become calculation-ready rates without verified maturity, publication dates and
+rate semantics. BCRD's machine schema and real-data reuse permission remain
+unresolved. Missing credentials or metadata never silently become fixture data.
+See [provider feasibility](docs/provider-feasibility.md).
+
+No live language-model evaluation has been completed. An optional
+OpenAI-compatible interpreter reads `CLARA_LLM_API_KEY`, `CLARA_LLM_BASE_URL`
+and `CLARA_LLM_MODEL` from explicit process configuration. It interprets the
+question; deterministic domain code owns financial values and calculations.
+Shared semantic admission counts attempts and concurrent calls. Those limits
+are not dollar budgets, and provider pricing is reported as unknown.
+
+## Data loading, jobs and backups
+
+Pages and calculations read persisted data. They do not poll vendors. Deposit
+publications, fixture price refreshes and recurring investment work use the
+shared durable SQLite queue. API processes claim work through shared limits and
+leases. Failed loads retain the last good data.
+
+From `money-view/`, submit and wait for a fixture publication:
 
 ```sh
 .venv/bin/python -m server.jobs --database .local/clara.sqlite3 --provider fixture load --scenario baseline
 ```
 
-Example future cron schedule: `0 7 * * *`, one load daily at 07:00 in the cron
-host's timezone. Set the host timezone explicitly; this repository does not
-install a cron entry. Use absolute paths for the interpreter, app directory
-and database. A successful publication atomically records rates and inflation,
-then rechecks saved decisions without a model call. A failure records a load
-attempt and retains the prior publication. Repeat attempts are safe.
+The CLI uses the same queue as HTTP demo controls. Supply `--load-id` after
+`load` to replay one logical attempt. Fixture scenarios are `baseline`,
+`same_winner`, `leader_changed`, `inflation_crossed`, and `failure`. A publication
+rechecks saved deposit decisions without a model call and preserves each original
+receipt. No cron entry or external scheduler is installed.
 
-Fixtures support `baseline`, `same_winner`, `leader_changed`,
-`inflation_crossed`, and `failure`. The second synthetic country demonstrates
-that the interface and arithmetic do not depend on the Dominican Republic.
+Create a local SQLite backup and restore it to a new file:
 
-## Optional language model
+```sh
+mkdir -p .local/backups
+.venv/bin/python -m server.platform.storage_ops backup .local/clara.sqlite3 .local/backups/clara.sqlite3
+.venv/bin/python -m server.platform.storage_ops restore .local/backups/clara.sqlite3 .local/clara-restored.sqlite3
+```
 
-The seeded demo replays an explicitly selected example's structured reading.
-It does not interpret arbitrary text. Editing the example clears that replay
-identity, so the app cannot silently apply someone else's amount or horizon.
+Destination files must not already exist. Keep the adjacent `.manifest.json`
+with the backup. Restore validates integrity and recorded row counts; it does
+not replace the running database. Keep backups outside publicly served folders.
+Local backup support does not provide encrypted off-host storage or disaster
+recovery operations.
 
-An optional OpenAI-compatible structured-output interpreter reads ordinary
-language by meaning. Supply these only as process environment variables:
+Household JSON export has one shared budget across domains: 50,000 source rows
+and 32 MiB of serialized source-row bytes. Exceeding either returns
+`household_export_too_large` with HTTP 413 and no partial download. See the
+[identity contract](docs/platform-api/identity.md) for export and deletion rules,
+and the [runtime contract](docs/platform-api/runtime.md) for queue, request,
+login and semantic limits.
 
-- `CLARA_LLM_API_KEY`
-- `CLARA_LLM_BASE_URL`
-- `CLARA_LLM_MODEL`
+## Deposit calculation boundaries
 
-No parent-repository key is reused. The interpreter extracts deposit intent and
-user inputs, never rates, rankings or computed results. Confirmation, data
-selection, calculation and notices remain deterministic. Live model behavior
-is not certified by the fixture demonstration.
+The deposit comparison supports bank savings and certificates. It uses simple
+annual ACT/365 interest, no rollover or currency conversion, and a disclosed
+constant annual inflation scenario. Known sourced fees are included; unknown
+fees and taxes are excluded. Certificates must match the requested horizon.
+Decimal math retains precision until presentation. Each result includes the
+confirmed current rate or explicitly confirmed zero-interest cash baseline.
 
-## Real data: deliberately incomplete
+The calculation accepts amounts from 0.001 to 1 trillion and verified annual
+fees from zero to 1 trillion, with at most three decimal places. Annual rates
+and inflation must be greater than -100% and at most 1000%, with at most six
+decimal places. Unsupported magnitudes fail validation. Receipt substitutions
+use approximate signs because displayed figures are rounded; stored calculations
+retain full precision.
 
-The SB adapter documents and validates the actual public API wire fields,
-including their spelling. However the public schema lacks maturity and
-publication date, and does not establish rate units/annualization. Its raw
-observations cannot become calculation-ready rates without those facts.
-BCRD's inflation API schema requires access that is not available here.
-Missing credentials or metadata never silently fall back to fixtures.
+The top row means highest modeled end value among comparable rows. It is not
+investment advice or a statement about an actual bank quote. Real regulator
+rates describe averages paid on balances; a branch may quote something different.
 
-See [provider-feasibility.md](docs/provider-feasibility.md) for verified source
-links, authentication, schema and gaps. A future SB key belongs in the explicit
-provider configuration, not a committed file. No live SB/BCRD load was verified.
-Reuse permission must be resolved before displaying real regulator data to users.
+## Verification and capacity
 
-The provider protocol is the US extension point. Add a provider returning the
-same validated country/currency/source/rate/inflation contract and test it through
-the same loader. No US provider or US market-data behavior is implemented.
-
-## Calculation and product boundaries
-
-Bank savings and certificates only. The modeled comparison uses simple annual
-ACT/365 interest, no rollover or currency conversion, and a disclosed constant
-annual inflation scenario. Known sourced fees are included; unknown fees and
-taxes are excluded. Certificates must match the requested horizon. Decimal math
-keeps precision until the presentation boundary. Each result includes a baseline
-for the confirmed current rate or explicitly confirmed zero-interest cash.
-
-The calculation boundary accepts amounts from 0.001 to 1 trillion and verified
-annual fees from zero to 1 trillion, with at most three decimal places. Annual
-rates and inflation must be greater than -100% and at most 1000%, with at most
-six decimal places. Unsupported magnitudes fail validation instead of producing
-overflow or silently rounded inputs. Receipt substitutions use approximate signs
-because displayed figures are rounded; stored calculations retain full precision.
-
-The top row means highest modeled end value among comparable rows. It is not a
-recommendation or a statement about a bank's actual quote. Real regulator data
-describes average rates paid on balances; a branch may quote something different.
-
-This is a single-user local pilot. Hosted authentication, authorization,
-multi-instance operation and production deployment are not implemented. No
-Supabase connection or migration is needed or applied.
-
-## Verify
+Run deterministic checks from `money-view/`:
 
 ```sh
 .venv/bin/python -m pytest -c pytest.ini tests -q
+.venv/bin/python -m ruff check server tests
 cd web
 bun run build
 bun run test:e2e
 ```
 
-Browser tests start isolated local processes and exercise the actual API and
-SQLite database. See [the build plan](docs/BUILD_PLAN.md) for ownership and
-acceptance, and `docs/evidence/` for the final verification report/screenshots.
+Browser checks use isolated loopback processes, the actual API and temporary
+SQLite data. Browser installation may require `bunx playwright install chromium`
+once. Final CI, final review and capacity acceptance remain in progress. See the
+[platform plan](docs/PLATFORM_PLAN.md) for the current delivery checklist and the
+[prior PR audit](docs/PR_REVIEW_AUDIT.md) for the completed deposit review loop.
 
-Backend checks cover interrupted-job recovery, per-attempt CLI exit codes,
-immutable user-input dates during rechecks, verified zero-fee receipts, and
-numeric boundary errors. The browser suite also rejects an edited prepared
-message honestly and completes the same flow for the second country.
+Clara supports local authenticated households and multiple processes sharing
+one SQLite database on one host. That does not qualify it for public hosting.
+The [scale design](docs/SCALE_DESIGN.md) defines the proposed 10,000-monthly-user
+workload; [scale evidence](docs/SCALE_EVIDENCE.md) separates local measurements
+from remaining qualification. Full retention volume, sustained heavy-household
+traffic and the target hosting hardware still require acceptance evidence.
+Monthly active users are not simultaneous connections.
 
-All work stays on the isolated lane and its private PR target. Nothing merges
-to `main` or `codex/private-alpha-next`; nothing deploys.
+All delivery remains in the isolated Clara lane. The only authorized PR target
+and merge destination is `codex/money-placement-pilot`. There is no merge to
+`main` or `codex/private-alpha-next`, deployment, production change, Supabase
+connection or migration in this work.

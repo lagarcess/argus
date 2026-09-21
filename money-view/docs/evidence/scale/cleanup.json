@@ -1,0 +1,21 @@
+{
+  "owned_capacity_servers_stopped": true,
+  "owned_temporary_files_removed": [
+    "/private/tmp/clara-capacity-5m-v1/fixture.sqlite3",
+    "/private/tmp/clara-capacity-5m-v1/fixture.sqlite3-wal",
+    "/private/tmp/clara-capacity-5m-v1/fixture.sqlite3-shm",
+    "/private/tmp/clara-capacity-5m-v1/backup.sqlite3",
+    "/private/tmp/clara-capacity-5m-v1/backup.sqlite3.manifest.json",
+    "/private/tmp/clara-capacity-5m-v1/restored.sqlite3",
+    "/private/tmp/clara-capacity-5m-v1/server.log",
+    "/private/tmp/clara-capacity-smoke-v1/fixture.sqlite3",
+    "/private/tmp/clara-capacity-smoke-v1/fixture.sqlite3-wal",
+    "/private/tmp/clara-capacity-smoke-v1/fixture.sqlite3-shm",
+    "/private/tmp/clara-capacity-smoke-v1/server.log",
+    "/private/tmp/clara-capacity-backup-probe.py"
+  ],
+  "bytes_reclaimed": 8248168887,
+  "production_or_demo_database_touched": false,
+  "reproduction": "money-view/scripts/scale_check.py",
+  "validation_before_cleanup": "final-validation.json"
+}

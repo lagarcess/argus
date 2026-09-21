@@ -1,0 +1,14 @@
+{
+  "completed_at": "2026-09-21T05:36:03.486309+00:00",
+  "command": "CLARA_EVIDENCE_DIR=/Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/docs/evidence/platform/review-followup bun run test:e2e --trace off",
+  "passed": 26,
+  "failed": 0,
+  "duration": "2.0m",
+  "source_files_checked": 116,
+  "changed_source_files": [],
+  "added_source_files": [],
+  "test_ports_after_run": {
+    "8022": "closed",
+    "5192": "closed"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "scope": "Synthetic local deposit rechecks; no provider/model/network calls",
+  "saved_decisions": 50000,
+  "households": 10000,
+  "decisions_per_household": 5,
+  "template_shapes": 10,
+  "shapes": "Both supported example countries, five principal multipliers per example; original dated receipts cloned to distinct owners/ids",
+  "writer_probe": "One independent Store writer started at completion entry during each load; SQLite busy timeout 5000ms",
+  "batch_size": 200,
+  "before": [
+    {
+      "scenario": "baseline",
+      "seconds": 2.586056625004858,
+      "checks": 50000,
+      "concurrent_writer": {
+        "status": "succeeded",
+        "seconds": 2.6413041669875383
+      },
+      "max_rss_bytes": 74317824
+    },
+    {
+      "scenario": "leader_changed",
+      "seconds": 11.889909332967363,
+      "checks": 50000,
+      "concurrent_writer": {
+        "status": "database is locked",
+        "seconds": 5.388596792006865
+      },
+      "max_rss_bytes": 75137024
+    }
+  ],
+  "after": [
+    {
+      "scenario": "baseline",
+      "seconds": 3.321970416989643,
+      "checks": 50000,
+      "concurrent_writer": {
+        "status": "succeeded",
+        "seconds": 1.539205084030982
+      },
+      "max_rss_bytes": 55951360
+    },
+    {
+      "scenario": "leader_changed",
+      "seconds": 14.913889749965165,
+      "checks": 50000,
+      "concurrent_writer": {
+        "status": "succeeded",
+        "seconds": 0.10369283298496157
+      },
+      "max_rss_bytes": 56180736
+    }
+  ],
+  "interpretation": "Changed-rate monolithic writes exhausted the 5-second competing writer timeout. Both bounded-batch cases permit the competing writer; dataset ingestion remains atomic, and each 200-decision checkpoint commits with its immutable receipts. Total throughput is lower in exchange for bounded lock occupancy. This is one local run per scenario, not a production capacity claim.",
+  "recorded_at": "2026-09-21T04:50:56.705883+00:00",
+  "verification": {
+    "tests": 69,
+    "suites": [
+      "tests/test_service.py",
+      "tests/test_api.py",
+      "tests/test_platform_runtime.py"
+    ],
+    "seconds": 8.39,
+    "lint": "ruff passed"
+  }
+}

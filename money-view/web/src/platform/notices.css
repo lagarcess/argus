@@ -1,0 +1,104 @@
+.platform-shell .p-notice-trigger {
+  position: relative;
+  border: 1px solid var(--p-line);
+  border-radius: 7px;
+  flex: none;
+}
+.platform-shell .p-notice-count {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 9px;
+  padding: 1px 4px;
+  background: var(--p-action);
+  color: var(--p-canvas);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 15px;
+  border: 1px solid var(--p-canvas);
+}
+.platform-shell .p-notice-center {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.platform-shell .p-notice-row {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--p-line);
+}
+.platform-shell .p-notice-row-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 9px;
+  font-size: 11px;
+  color: var(--p-muted);
+}
+.platform-shell .p-notice-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  min-height: 44px;
+  width: 100%;
+  padding: 5px 0;
+  text-align: left;
+  background: transparent;
+  color: var(--p-forest);
+  border: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.platform-shell .p-notice-link svg {
+  flex: none;
+}
+.platform-shell .p-notice-source-dates {
+  margin: 9px 0;
+  font-size: 11px;
+  color: var(--p-muted);
+}
+.platform-shell .p-notice-source-dates p {
+  margin: 8px 0;
+}
+.platform-shell .p-notice-source-dates span {
+  display: block;
+  font-size: 10px;
+}
+.platform-shell .p-notice-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--p-error);
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .platform-shell .p-topbar {
+    gap: 6px;
+  }
+  .platform-shell .p-topbar .p-household-name {
+    max-width: 100px;
+  }
+  .platform-shell .p-topbar .p-notice-trigger {
+    width: 40px;
+    height: 44px;
+    padding: 8px;
+  }
+  .platform-shell .p-notice-link {
+    font-size: 13px;
+  }
+}
+@media (max-width: 350px) {
+  .platform-shell .p-topbar {
+    gap: 3px;
+  }
+  .platform-shell .p-topbar .p-household-name {
+    max-width: 76px;
+  }
+  .platform-shell .p-topbar .p-avatar {
+    display: none;
+  }
+}

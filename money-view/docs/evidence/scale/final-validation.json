@@ -1,0 +1,74 @@
+{
+  "capacity-5m": {
+    "passed": true,
+    "source_changes_since_start": [
+      "server/app.py",
+      "server/store.py",
+      "server/platform/assistant.py",
+      "server/platform/composition.py",
+      "server/platform/investing.py",
+      "server/platform/jobs_runtime.py",
+      "server/platform/ledger.py",
+      "server/platform/planning.py",
+      "server/platform/runtime.py",
+      "scripts/scale_check.py"
+    ],
+    "requests": 14400,
+    "writes": 720,
+    "delayed_semantic_burst": {
+      "concurrent_calls": 4,
+      "fake_delay_seconds": 10,
+      "ordinary_reads": 40,
+      "read_p95_ms": 30.568249989300966,
+      "read_p99_ms": 49.82895799912512,
+      "fifth_call_typed_429": true
+    }
+  },
+  "intermediate-source-probe-5m": {
+    "passed": true,
+    "source_changes_since_start": [
+      "server/platform/jobs_runtime.py",
+      "server/platform/ledger.py",
+      "server/platform/planning.py",
+      "scripts/scale_check.py"
+    ],
+    "requests": 400,
+    "writes": 20,
+    "delayed_semantic_burst": {
+      "concurrent_calls": 4,
+      "fake_delay_seconds": 8,
+      "ordinary_reads": 40,
+      "read_p95_ms": 31.26779099693522,
+      "read_p99_ms": 48.85895800543949,
+      "fifth_call_typed_429": true
+    }
+  },
+  "final-source-probe-5m": {
+    "passed": true,
+    "source_changes_since_start": [],
+    "requests": 400,
+    "writes": 20,
+    "delayed_semantic_burst": {
+      "concurrent_calls": 4,
+      "fake_delay_seconds": 8,
+      "ordinary_reads": 40,
+      "read_p95_ms": 35.41695902822539,
+      "read_p99_ms": 42.311832949053496,
+      "fifth_call_typed_429": true
+    }
+  },
+  "final_database_validation": {
+    "ledger_rows": 5014441,
+    "initial_rows": 5013680,
+    "successful_load_writes": 760,
+    "deduplicated_precheck_writes": 1,
+    "capacity_command_receipts": 761,
+    "exact_row_growth": true,
+    "idle_checkpoint_seconds": 3.0041032005101442e-05,
+    "idle_checkpoint_result": [
+      0,
+      0,
+      0
+    ]
+  }
+}

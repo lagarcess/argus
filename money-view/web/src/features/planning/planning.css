@@ -1,0 +1,441 @@
+.platform-shell .planning-page {
+  display: grid;
+  gap: 32px;
+  min-width: 0;
+}
+
+.platform-shell .planning-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.platform-shell .planning-section-heading h2,
+.platform-shell .planning-goal-title h2,
+.platform-shell .planning-comparison-columns h3 {
+  margin: 0;
+}
+
+.platform-shell .planning-section-heading p,
+.platform-shell .planning-goal-title + p {
+  margin: 4px 0 0;
+}
+
+.platform-shell .planning-period-toolbar {
+  align-items: end;
+}
+
+.platform-shell .planning-period-toolbar .p-field {
+  max-width: 220px;
+}
+
+.platform-shell .planning-table-wrap {
+  margin-inline: -4px;
+}
+
+.platform-shell .planning-table td {
+  vertical-align: top;
+}
+
+.platform-shell .planning-table td > strong,
+.platform-shell .planning-table td > .p-money,
+.platform-shell .planning-table td > .p-muted,
+.platform-shell .planning-table td > .p-badge {
+  display: block;
+}
+
+.platform-shell .planning-table .p-evidence {
+  margin-top: 7px;
+}
+
+.platform-shell .planning-action-column {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.platform-shell .planning-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.platform-shell .planning-status-text {
+  display: block;
+  margin-top: 4px;
+  color: var(--p-error, #984e4d);
+}
+
+.platform-shell .planning-negative,
+.platform-shell .planning-warning-text {
+  color: var(--p-error, #984e4d);
+}
+
+.platform-shell .planning-allocation-details {
+  margin-top: 12px;
+}
+
+.platform-shell .planning-allocation-details summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  cursor: pointer;
+  color: var(--p-action, #205840);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.platform-shell .planning-allocation-details ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.platform-shell .planning-allocation-details li {
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--p-rule, #d8dfd2);
+}
+
+.platform-shell .planning-allocation-details li > div:first-child,
+.platform-shell .planning-allocation-balance {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.platform-shell .planning-allocation-balance {
+  margin-top: 6px;
+  color: var(--p-muted, #5d6d64);
+  font-size: 12px;
+}
+
+.platform-shell .planning-allocation-balance .p-evidence {
+  flex-basis: 100%;
+}
+
+.platform-shell .planning-warning-text {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.platform-shell .planning-page input[readonly] {
+  color: var(--p-muted, #5d6d64);
+  background: var(--p-sidebar, #f1f3ea);
+}
+
+.platform-shell .planning-error-state {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding-block: 32px;
+}
+
+.platform-shell .planning-goal-ledger {
+  display: grid;
+}
+
+.platform-shell .planning-goal-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) minmax(230px, 0.9fr) auto;
+  gap: 28px;
+  align-items: center;
+}
+
+.platform-shell .planning-goal-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.platform-shell .planning-progress-group {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.platform-shell .planning-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.platform-shell .planning-progress-group progress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  color: var(--p-action, #205840);
+  background: var(--p-rule, #d8dfd2);
+}
+
+.platform-shell .planning-progress-group progress::-webkit-progress-bar {
+  background: var(--p-rule, #d8dfd2);
+}
+
+.platform-shell .planning-progress-group progress::-webkit-progress-value {
+  background: var(--p-action, #205840);
+}
+
+.platform-shell .planning-progress-group progress::-moz-progress-bar {
+  background: var(--p-action, #205840);
+}
+
+.platform-shell .planning-goal-values dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+  margin: 0;
+}
+
+.platform-shell .planning-goal-values dt {
+  color: var(--p-muted, #5d6d64);
+  font-size: 12px;
+}
+
+.platform-shell .planning-goal-values dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+}
+
+.platform-shell .planning-template-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.platform-shell .planning-template-tabs button {
+  flex: 0 0 auto;
+}
+
+.platform-shell .planning-scenario-workspace {
+  display: grid;
+  gap: 28px;
+}
+
+.platform-shell .planning-scenario-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.platform-shell .planning-scenario-result {
+  display: grid;
+  gap: 20px;
+  padding-top: 28px;
+  border-top: 1px solid var(--p-rule, #d8dfd2);
+}
+
+.platform-shell .planning-scenario-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.platform-shell .planning-primary-metric {
+  grid-column: span 2;
+}
+
+.platform-shell .planning-depletion {
+  margin: 0;
+}
+
+.platform-shell .planning-yearly-results summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  cursor: pointer;
+  color: var(--p-action, #205840);
+  font-weight: 600;
+}
+
+.platform-shell .planning-yearly-results[open] summary {
+  margin-bottom: 12px;
+}
+
+.platform-shell .planning-yearly-results .p-table-wrap {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.platform-shell .planning-compare-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.platform-shell .planning-comparison-result {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--p-rule, #d8dfd2);
+}
+
+.platform-shell .planning-comparison-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--p-rule, #d8dfd2);
+  border: 1px solid var(--p-rule, #d8dfd2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.platform-shell .planning-comparison-columns section {
+  min-width: 0;
+  padding: 20px;
+  background: var(--p-surface, #fffefa);
+}
+
+.platform-shell .planning-compare-value {
+  margin: 12px 0 6px;
+  color: var(--p-forest, #082f26);
+  font-size: clamp(23px, 3vw, 32px);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.platform-shell .planning-delta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0 0;
+}
+
+.platform-shell .planning-delta strong {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+.platform-shell .planning-highlight {
+  outline: 2px solid var(--p-focus, #326f54);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+@media (max-width: 980px) {
+  .platform-shell .planning-goal-row {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr);
+  }
+
+  .platform-shell .planning-goal-row > .p-row-actions {
+    grid-column: 1 / -1;
+  }
+
+  .platform-shell .planning-scenario-grid,
+  .platform-shell .planning-scenario-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .platform-shell .planning-page {
+    gap: 24px;
+  }
+
+  .platform-shell .planning-section-heading,
+  .platform-shell .planning-delta {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .platform-shell .planning-section-heading > button {
+    width: 100%;
+  }
+
+  .platform-shell .planning-table-wrap {
+    overflow: visible;
+  }
+
+  .platform-shell .planning-table,
+  .platform-shell .planning-table tbody,
+  .platform-shell .planning-table tr,
+  .platform-shell .planning-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .platform-shell .planning-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+  }
+
+  .platform-shell .planning-table tr {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--p-rule, #d8dfd2);
+  }
+
+  .platform-shell .planning-table td {
+    display: grid;
+    grid-template-columns: minmax(96px, 0.72fr) minmax(0, 1.28fr);
+    gap: 12px;
+    padding: 6px 0;
+    text-align: start;
+  }
+
+  .platform-shell .planning-table td::before {
+    content: attr(data-label);
+    color: var(--p-muted, #5d6d64);
+    font-size: 12px;
+  }
+
+  .platform-shell .planning-table td > .planning-row-actions,
+  .platform-shell .planning-table td > button {
+    justify-self: start;
+  }
+
+  .platform-shell .planning-table td .p-evidence {
+    grid-column: 2;
+  }
+
+  .platform-shell .planning-goal-row {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .platform-shell .planning-goal-row > .p-row-actions {
+    grid-column: auto;
+  }
+
+  .platform-shell .planning-scenario-grid,
+  .platform-shell .planning-scenario-metrics,
+  .platform-shell .planning-compare-controls,
+  .platform-shell .planning-comparison-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-shell .planning-primary-metric {
+    grid-column: auto;
+  }
+
+  .platform-shell .planning-comparison-columns {
+    gap: 0;
+  }
+
+  .platform-shell .planning-comparison-columns section + section {
+    border-top: 1px solid var(--p-rule, #d8dfd2);
+  }
+}
+
+@media (max-width: 390px) {
+  .platform-shell .planning-goal-values dl {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-shell .planning-table td {
+    grid-template-columns: minmax(84px, 0.65fr) minmax(0, 1.35fr);
+  }
+}

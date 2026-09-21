@@ -26,7 +26,7 @@ export function useMoneyView(locale: Locale) {
     'interpret' | 'compute' | 'save' | 'open' | 'simulate' | null
   >(null);
   const [savedView, setSavedView] = useState<SavedView | null>(null);
-  const [pendingLoad, setPendingLoad] = useState<string | null>(null);
+  const [pendingLoad, setPendingLoad] = useState<{load_id: string; job_id: string} | null>(null);
   const [page, setPage] = useState<'money' | 'saved'>('money');
   const [draft, setDraft] = useState('');
   const [exampleId, setExampleId] = useState<string | undefined>();
@@ -51,13 +51,30 @@ export function useMoneyView(locale: Locale) {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
+      if (pendingLoad) {
+        try {
+          const job = await api.job(pendingLoad.job_id);
+          if (disposed) return;
+          if (job.status === 'failed') {
+            setPendingLoad(null);
+            setError(job.error_code ?? 'request_failed');
+            await refresh();
+            return;
+          }
+          if (job.status === 'queued' || job.status === 'running') {
+            timer = setTimeout(() => {void poll();}, 800);
+            return;
+          }
+        } catch (failure) {
+          if (disposed) return;
+          setPendingLoad(null);
+          setError(code(failure));
+          return;
+        }
+      }
       const next = await refresh();
       if (disposed) return;
-      if (
-        next &&
-        next.source_status.state !== 'loading' &&
-        (!pendingLoad || next.source_status.load_id === pendingLoad)
-      ) {
+      if (next && next.source_status.state !== 'loading') {
         setPendingLoad(null);
         if (savedView) {
           try {
@@ -127,6 +144,20 @@ export function useMoneyView(locale: Locale) {
       setPending(null);
     }
   }
+  async function prepare(inputs: PlacementInputs) {
+    if (pending) return;
+    setPending('interpret');
+    setError(null);
+    try {
+      const confirmation = await api.prepare(inputs);
+      setConversation({ stage: 'confirmation', message: '', confirmation });
+      setPage('money');
+    } catch (failure) {
+      setError(code(failure));
+    } finally {
+      setPending(null);
+    }
+  }
   function editConfirmation(inputs: PlacementInputs) {
     if (pending) return;
     setConversation((current) =>
@@ -188,7 +219,7 @@ export function useMoneyView(locale: Locale) {
     setError(null);
     try {
       const response = await api.simulate(scenario);
-      setPendingLoad(response.load_id);
+      setPendingLoad(response);
     } catch (failure) {
       setError(code(failure));
     } finally {
@@ -207,6 +238,8 @@ export function useMoneyView(locale: Locale) {
     chooseExample,
     editDraft,
     send,
+    prepare,
+    restart: () => { setConversation({ stage: 'start' }); setError(null); },
     compute,
     editConfirmation,
     save,
