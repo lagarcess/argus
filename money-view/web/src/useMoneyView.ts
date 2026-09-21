@@ -127,12 +127,23 @@ export function useMoneyView(locale: Locale) {
       setPending(null);
     }
   }
-  async function compute(inputs: PlacementInputs) {
+  function editConfirmation(inputs: PlacementInputs) {
+    if (pending) return;
+    setConversation((current) =>
+      current.stage === 'confirmation'
+        ? { ...current, confirmation: { ...current.confirmation, inputs } }
+        : current,
+    );
+  }
+  async function compute() {
     if (conversation.stage !== 'confirmation' || pending) return;
     setPending('compute');
     setError(null);
     try {
-      const result = await api.compute(conversation.confirmation.id, inputs);
+      const result = await api.compute(
+        conversation.confirmation.id,
+        conversation.confirmation.inputs,
+      );
       setConversation({ stage: 'result', result, message: conversation.message });
     } catch (failure) {
       setError(code(failure));
@@ -197,6 +208,7 @@ export function useMoneyView(locale: Locale) {
     editDraft,
     send,
     compute,
+    editConfirmation,
     save,
     savedView,
     setSavedView,

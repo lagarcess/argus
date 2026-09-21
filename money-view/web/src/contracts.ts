@@ -139,7 +139,11 @@ export const homeSchema = z.object({
   demo: z.boolean(),
   interpreter_mode: z.string(),
   countries: z.array(
-    z.object({ code: z.string(), name: z.string(), currencies: z.array(z.string()) }),
+    z.object({
+      code: z.string(),
+      names: z.object({ 'es-419': z.string(), en: z.string() }),
+      currencies: z.array(z.string()),
+    }),
   ),
   examples: z.array(exampleSchema),
   source_status: z.object({

@@ -17,10 +17,18 @@ export default function App() {
   const home = view.home;
   const example = home?.examples[0];
   const result = view.conversation.stage === 'result' ? view.conversation.result : null;
-  const amountInputs = result?.inputs ?? example?.inputs;
-  const formattedAmount = amountInputs
+  const confirmation =
+    view.conversation.stage === 'confirmation' ? view.conversation.confirmation : null;
+  const amountInputs = confirmation?.inputs ?? result?.inputs ?? example?.inputs;
+  const validAmount =
+    amountInputs &&
+    amountInputs.amount.trim() !== '' &&
+    Number.isFinite(Number(amountInputs.amount)) &&
+    Number(amountInputs.amount) > 0 &&
+    Number(amountInputs.amount) <= 1e12;
+  const formattedAmount = validAmount
     ? money(amountInputs.amount, amountInputs.currency, locale)
-    : '';
+    : t.enterAmount;
   useEffect(() => {
     document.documentElement.lang = locale;
     try {
@@ -30,6 +38,10 @@ export default function App() {
     }
   }, [locale]);
   function beginExample() {
+    if (confirmation) {
+      document.getElementById('confirmation-amount')?.focus();
+      return;
+    }
     if (example) {
       view.chooseExample(example);
       document.getElementById('chat-input')?.focus();
@@ -104,17 +116,21 @@ export default function App() {
               <h1 className="display">{view.page === 'money' ? t.headline : t.saved}</h1>
               {view.page === 'money' ? (
                 <>
-                  {(result || example) && (
-                    <div className="balance-section">
+                  {amountInputs && (
+                    <div className="balance-section" data-testid="money-summary">
                       <button
-                        className="balance"
+                        className={`balance ${formattedAmount.length > 18 ? 'long-amount' : ''}`}
                         onClick={beginExample}
                         aria-label={`${t.amount}: ${formattedAmount}. ${t.confirmHelp}`}
                       >
                         <span>{formattedAmount}</span>
                         <Pencil size={19} aria-hidden="true" />
                       </button>
-                      {result ? (
+                      {confirmation ? (
+                        <p className="small">
+                          {t.pendingInputs} · {date(confirmation.created_at, locale)}
+                        </p>
+                      ) : result ? (
                         <SourceLink
                           source={result.input_source}
                           locale={locale}
@@ -229,9 +245,10 @@ export default function App() {
               onSend={() => {
                 void view.send();
               }}
-              onCompute={(inputs) => {
-                void view.compute(inputs);
+              onCompute={() => {
+                void view.compute();
               }}
+              onConfirmationEdit={view.editConfirmation}
               onSave={() => {
                 void view.save();
               }}

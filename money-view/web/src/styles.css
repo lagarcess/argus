@@ -1229,3 +1229,29 @@ summary {
 .saved-detail > .source-status {
   margin-bottom: 18px;
 }
+
+.balance.long-amount span {
+  min-width: 0;
+  font-size: clamp(18px, 2.4vw, 30px);
+  overflow-wrap: anywhere;
+}
+.comparison-row.long-amount {
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr);
+  gap: 14px;
+}
+.comparison-row.long-amount .end-figure {
+  grid-column: 1 / -1;
+  margin-left: 0;
+  padding: 12px 0 0;
+  border-left: 0;
+  border-top: 1px solid #d8e0d4;
+}
+.comparison-row.long-amount .end-figure strong {
+  font-size: 21px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.confirmed-summary > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

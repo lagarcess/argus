@@ -19,10 +19,11 @@ export function Comparison({
   const deposits = result.rows.filter((row) => !row.is_baseline);
   const renderRow = (row: ComparisonRow) => {
     const receiptId = `receipt-${result.id}-${row.id}`;
+    const endValue = money(row.end_value, result.inputs.currency, locale);
     return (
       <article
         key={row.id}
-        className={`comparison-row ${result.winner_ids.includes(row.id) ? 'leading' : ''}`}
+        className={`comparison-row ${result.winner_ids.includes(row.id) ? 'leading' : ''} ${endValue.length > 18 ? 'long-amount' : ''}`}
         aria-describedby={`${receiptId} context-${result.id}`}
       >
         <div className="institution">
@@ -40,7 +41,7 @@ export function Comparison({
           <span>{row.is_baseline ? t.currentRate : t.averageRate}</span>
         </div>
         <div className="end-figure">
-          <strong>{money(row.end_value, result.inputs.currency, locale)}</strong>
+          <strong>{endValue}</strong>
           <span>{t.finalValue}</span>
         </div>
       </article>

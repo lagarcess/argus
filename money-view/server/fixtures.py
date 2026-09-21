@@ -43,10 +43,20 @@ _SCENARIO_DATES = {
 _COUNTRIES = [
     {
         "code": "DO",
-        "name": "República Dominicana",
+        "names": {
+            "es-419": "República Dominicana",
+            "en": "Dominican Republic",
+        },
         "currencies": ["DOP", "USD"],
     },
-    {"code": "NZ", "name": "New Zealand synthetic demo", "currencies": ["NZD"]},
+    {
+        "code": "NZ",
+        "names": {
+            "es-419": "Nueva Zelanda (demostración sintética)",
+            "en": "New Zealand (synthetic demo)",
+        },
+        "currencies": ["NZD"],
+    },
 ]
 
 _COUNTRY_CONFIG = {

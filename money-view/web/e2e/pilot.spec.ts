@@ -41,10 +41,12 @@ test.beforeEach(async ({ request }) => {
 });
 
 test.afterEach(async () => {
-  if (backend && backend.exitCode === null) {
+  if (backend && backend.exitCode === null && backend.signalCode === null) {
     const stopped = new Promise<void>((resolveStop) => backend.once("exit", () => resolveStop()));
+    const forceStop = setTimeout(() => { backend.kill("SIGKILL"); }, 3000);
     backend.kill("SIGTERM");
     await stopped;
+    clearTimeout(forceStop);
   }
   if (temporaryDirectory) rmSync(temporaryDirectory, { recursive: true, force: true });
 });
@@ -129,7 +131,13 @@ test("edited replay stays honest and the second country uses the same flow", asy
   await page.getByTestId("send-message").click();
   const confirmation = page.getByTestId("confirmation");
   await expect(confirmation.locator("select[name=country]")).toHaveValue("NZ");
+  await expect(confirmation.locator("select[name=country] option:checked")).toHaveText("New Zealand (synthetic demo)");
+  await expect(page.getByTestId("money-summary")).toContainText("NZD");
+  await expect(page.getByTestId("money-summary")).not.toContainText("DOP");
+  await expect(page.getByTestId("money-summary")).toContainText("Awaiting confirmation");
   await confirmation.locator("input[name=amount]").fill("13500");
+  await expect(page.getByTestId("money-summary")).toContainText("13,500");
+  await page.screenshot({ path: join(evidenceDirectory, "en-nz-confirmation.png"), fullPage: true, animations: "disabled" });
   await page.getByTestId("confirm-comparison").click();
   await expect(page.getByTestId("comparison")).toContainText("NZD");
   await expect(page.getByTestId("comparison")).not.toContainText("DOP");
@@ -141,4 +149,17 @@ test("edited replay stays honest and the second country uses the same flow", asy
   await page.reload();
   await expect(page.getByTestId("lang-en")).toHaveAttribute("aria-pressed", "true");
   expect(externalRequests).toEqual([]);
+});
+
+test("mobile money view fits the maximum supported amount", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByTestId("demo-example").click();
+  await page.getByTestId("send-message").click();
+  await page.getByTestId("confirmation").locator("input[name=amount]").fill("1000000000000");
+  await expect(page.getByTestId("money-summary")).toContainText("1,000,000,000,000");
+  await page.getByTestId("confirm-comparison").click();
+  await expect(page.getByTestId("comparison")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+  await page.screenshot({ path: join(evidenceDirectory, "es-390-maximum-amount.png"), fullPage: true, animations: "disabled" });
 });

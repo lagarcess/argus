@@ -16,6 +16,7 @@ export function Chat({
   onExample,
   onSend,
   onCompute,
+  onConfirmationEdit,
   onSave,
 }: {
   home: Home;
@@ -27,7 +28,8 @@ export function Chat({
   onDraft: (value: string) => void;
   onExample: (example: Example) => void;
   onSend: () => void;
-  onCompute: (inputs: PlacementInputs) => void;
+  onCompute: () => void;
+  onConfirmationEdit: (inputs: PlacementInputs) => void;
   onSave: () => void;
 }) {
   const t = copy(locale);
@@ -82,6 +84,7 @@ export function Chat({
                 locale={locale}
                 pending={pending !== null}
                 onConfirm={onCompute}
+                onInputsChange={onConfirmationEdit}
               />
             )}
             {conversation.stage === 'result' && (

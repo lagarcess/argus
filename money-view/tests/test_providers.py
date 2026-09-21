@@ -99,10 +99,20 @@ def test_fixture_provider_satisfies_provider_protocol_and_has_two_countries() ->
     assert get_countries() == [
         {
             "code": "DO",
-            "name": "República Dominicana",
+            "names": {
+                "es-419": "República Dominicana",
+                "en": "Dominican Republic",
+            },
             "currencies": ["DOP", "USD"],
         },
-        {"code": "NZ", "name": "New Zealand synthetic demo", "currencies": ["NZD"]},
+        {
+            "code": "NZ",
+            "names": {
+                "es-419": "Nueva Zelanda (demostración sintética)",
+                "en": "New Zealand (synthetic demo)",
+            },
+            "currencies": ["NZD"],
+        },
     ]
     assert provider.fetch("DO").country == "DO"
     assert provider.fetch("NZ").country == "NZ"

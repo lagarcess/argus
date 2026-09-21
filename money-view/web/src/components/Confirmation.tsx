@@ -9,16 +9,17 @@ export function Confirmation({
   locale,
   pending,
   onConfirm,
+  onInputsChange,
 }: {
   confirmation: ConfirmationData;
   countries: Home['countries'];
   locale: Locale;
   pending: boolean;
-  onConfirm: (inputs: PlacementInputs) => void;
+  onConfirm: () => void;
+  onInputsChange: (inputs: PlacementInputs) => void;
 }) {
   const t = copy(locale);
-  const regions = new Intl.DisplayNames(locale, { type: 'region' });
-  const [inputs, setInputs] = useState(confirmation.inputs);
+  const inputs = confirmation.inputs;
   const [invalid, setInvalid] = useState(false);
   const currencies = countries.find((country) => country.code === inputs.country)?.currencies ?? [
     inputs.currency,
@@ -39,7 +40,7 @@ export function Confirmation({
       return;
     }
     setInvalid(false);
-    onConfirm(inputs);
+    onConfirm();
   }
   return (
     <form className="confirmation" data-testid="confirmation" onSubmit={submit}>
@@ -49,6 +50,8 @@ export function Confirmation({
         <label>
           {t.amount}
           <input
+            disabled={pending}
+            id="confirmation-amount"
             name="amount"
             inputMode="decimal"
             type="number"
@@ -57,12 +60,13 @@ export function Confirmation({
             step="any"
             required
             value={inputs.amount}
-            onChange={(event) => setInputs({ ...inputs, amount: event.target.value })}
+            onChange={(event) => onInputsChange({ ...inputs, amount: event.target.value })}
           />
         </label>
         <label>
           {t.horizon}
           <input
+            disabled={pending}
             name="horizon_days"
             inputMode="numeric"
             type="number"
@@ -70,18 +74,21 @@ export function Confirmation({
             max="3650"
             required
             value={inputs.horizon_days}
-            onChange={(event) => setInputs({ ...inputs, horizon_days: Number(event.target.value) })}
+            onChange={(event) =>
+              onInputsChange({ ...inputs, horizon_days: Number(event.target.value) })
+            }
           />
         </label>
         <label>
           {t.country}
           <select
+            disabled={pending}
             name="country"
             value={inputs.country}
             onChange={(event) => {
               const country = countries.find((item) => item.code === event.target.value);
               if (country)
-                setInputs({
+                onInputsChange({
                   ...inputs,
                   country: country.code,
                   currency: country.currencies.includes(inputs.currency)
@@ -92,7 +99,7 @@ export function Confirmation({
           >
             {countries.map((country) => (
               <option key={country.code} value={country.code}>
-                {regions.of(country.code) ?? country.code}
+                {country.names[locale]}
               </option>
             ))}
           </select>
@@ -100,9 +107,10 @@ export function Confirmation({
         <label>
           {t.currency}
           <select
+            disabled={pending}
             name="currency"
             value={inputs.currency}
-            onChange={(event) => setInputs({ ...inputs, currency: event.target.value })}
+            onChange={(event) => onInputsChange({ ...inputs, currency: event.target.value })}
           >
             {currencies.map((currency) => (
               <option key={currency}>{currency}</option>
@@ -113,13 +121,14 @@ export function Confirmation({
       <label>
         {t.currentInput}
         <input
+          disabled={pending}
           name="current_annual_rate_pct"
           type="number"
           step="any"
           inputMode="decimal"
           value={inputs.current_annual_rate_pct ?? ''}
           onChange={(event) =>
-            setInputs({
+            onInputsChange({
               ...inputs,
               current_annual_rate_pct: event.target.value === '' ? null : event.target.value,
             })
@@ -128,7 +137,7 @@ export function Confirmation({
       </label>
       <p className="small">{t.baselineHint}</p>
       <p className="small">
-        {t.recorded} {date(confirmation.created_at, locale)} · {t.illustration}
+        {t.pendingInputs} · {date(confirmation.created_at, locale)} · {t.illustration}
       </p>
       {invalid && (
         <p role="alert" className="error">
