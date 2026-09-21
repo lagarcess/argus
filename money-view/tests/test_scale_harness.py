@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+from types import SimpleNamespace
 
 import pytest
 from scripts.scale_check import (
@@ -88,13 +89,21 @@ def test_nearest_rank_percentile_and_invalid_distribution():
         Profile(households=50).distribution()
 
 
+@pytest.mark.parametrize(
+    "free_bytes", [1024**3, 100 * 1024**3], ids=["low-disk", "ample-disk"]
+)
 def test_seed_only_failure_exits_nonzero_and_preserves_unowned_database(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, free_bytes
 ):
     path = tmp_path / "unrelated.sqlite3"
     with sqlite3.connect(path) as db:
         db.execute("CREATE TABLE unrelated (id INTEGER)")
         db.execute("INSERT INTO unrelated VALUES (1)")
+    original = path.read_bytes()
+    monkeypatch.setattr(
+        "scripts.scale_check.shutil.disk_usage",
+        lambda _: SimpleNamespace(free=free_bytes),
+    )
     output = tmp_path / "evidence.json"
     monkeypatch.setattr(
         "sys.argv",
@@ -102,8 +111,21 @@ def test_seed_only_failure_exits_nonzero_and_preserves_unowned_database(
     )
     assert main() == 1
     assert "not owned" in json.loads(output.read_text())["stopped"]
+    assert path.read_bytes() == original
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT id FROM unrelated").fetchall() == [(1,)]
         assert not db.execute(
             "SELECT 1 FROM sqlite_master WHERE name='capacity_fixture'"
         ).fetchall()
+
+
+def test_low_disk_still_stops_eligible_path_before_database_creation(
+    tmp_path, monkeypatch
+):
+    path = tmp_path / "new-fixture.sqlite3"
+    monkeypatch.setattr(
+        "scripts.scale_check.shutil.disk_usage", lambda _: SimpleNamespace(free=1024**3)
+    )
+    with pytest.raises(RuntimeError, match="resource_stop"):
+        seed_database(path, Profile())
+    assert not path.exists()

@@ -101,8 +101,6 @@ def seed_database(path: Path, profile: Profile):
     from server.store import Store
 
     distribution = profile.distribution()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    preflight = check_disk(path.parent, profile.transactions * 1100 + 64_000_000)
     if path.exists():
         with sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True) as existing:
             if not existing.execute(
@@ -111,6 +109,8 @@ def seed_database(path: Path, profile: Profile):
                 raise ValueError(
                     "Refusing an existing database not owned by this harness"
                 )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    preflight = check_disk(path.parent, profile.transactions * 1100 + 64_000_000)
     if not path.exists():
         path.touch(mode=0o600)
     store = Store(path)
