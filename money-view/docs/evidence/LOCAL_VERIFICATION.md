@@ -1,7 +1,7 @@
 # Clara local verification
 
 Verified 2026-09-20 in the standalone app environment. Runtime source commit:
-`72aa24f84ea3f548caa35d885dc88ca35528213f`. The following evidence commit adds
+`cb7402bb79f5229e0948f651a160ebed4a5be990`. The following evidence commit adds
 only this record and screenshots; it does not change the verified runtime.
 GitHub CI and the requested Codex PR review are recorded separately after they
 finish.
@@ -24,7 +24,7 @@ DO/USD and an independent synthetic NZ/NZD provider dataset.
 | `.venv/bin/python -m pytest -c pytest.ini tests -q` | 95 passed; one third-party Starlette deprecation warning |
 | `.venv/bin/python -m ruff check server tests` | Passed |
 | `bun run build` | TypeScript and Vite passed |
-| `bun run test:e2e` | 4 passed, actual loopback API and temporary SQLite |
+| `bun run test:e2e` | 5 passed, actual loopback API and temporary SQLite |
 | CLI baseline load | Exit 0, attempt succeeded, source state ready |
 | CLI failed load | Exit 1, failed attempt, same last-good dataset retained |
 | Codex in-app browser | Confirmed, calculated, saved, changed data, opened both before/after tabs, inspected receipts, switched language |
@@ -35,7 +35,10 @@ save/reload, silent same-winner changes, changed-winner notice, before/after
 navigation, failed-load retention, no horizontal overflow, and no JavaScript
 page exceptions. The fourth case rejects an edited example instead of guessing,
 then edits and saves an NZ/NZD comparison and verifies locale persistence.
-That case also checks that the browser made no non-loopback requests.
+It also verifies that the pending money summary shares the edited confirmation
+inputs, the localized country label retains its synthetic qualifier, and the
+browser makes no non-loopback requests. The fifth case confirms the maximum
+supported amount fits the 390px mobile view without clipping or changing values.
 
 Screenshots use completed animations. They were visually inspected against the
 accepted design concept:
@@ -46,6 +49,8 @@ accepted design concept:
 - [English saved answer](en-1440-before-after.png)
 - [Mobile comparison](es-390-comparison.png)
 - [Mobile saved answer](es-390-before-after.png)
+- [Edited New Zealand confirmation](en-nz-confirmation.png)
+- [Maximum amount on mobile](es-390-maximum-amount.png)
 
 ## Independent review
 
@@ -57,10 +62,11 @@ Corrections proved by regressions include numeric overflow limits, sourced zero
 fees, strict documented SB wire types, interrupted-load recovery, CLI result
 attribution, immutable input dates, dated notice evidence, exact inflation
 references from the original saved answer, failure visibility, and accessible
-amounts. A proposed second synthetic marker on countries was declined: country
-codes name real countries; the existing comparison/source origin owns whether
-their data is simulated. Confirmation, answers and dated receipts already show
-that origin. This avoids a second competing data-origin flag.
+amounts. The first GitHub Codex review found two UI ownership defects: the pending
+money summary ignored edited confirmation inputs, and browser-generated country
+labels discarded the supplied synthetic qualifier. Both are corrected and covered
+by browser regressions. Country labels are now localized server catalog data;
+the existing comparison/source origin still owns whether data is simulated.
 
 The captain owned architecture, interfaces, source research synthesis, branch
 isolation, verification and PR delivery. Bounded workers owned the domain,
