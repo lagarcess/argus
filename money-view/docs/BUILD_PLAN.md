@@ -95,10 +95,12 @@ Notice ranking uses the same calculator and full tied-winner set, including cash
 ## HTTP interface (captain-owned contract)
 
 `GET /api/home` returns `{demo, interpreter_mode, countries, examples, source_status,
-saved, notices}`. `countries[]` is `{code, name, currencies}`. Country names are
-display data; country handling is never inferred from UI language.
+saved, notices}`. `countries[]` is
+`{code, names: {'es-419': string, en: string}, currencies}`. Country handling is
+never inferred from UI language.
 `examples[]` is `{id, messages: {'es-419': string, en: string}, inputs, source}`.
-Home shows an explicitly labeled sample balance from an example, not a fabricated
+Country display names are locale-keyed data in `names`, rendered directly by the
+browser. Home shows an explicitly labeled sample balance from an example, not a fabricated
 account balance. There are no calculated result figures before confirmation.
 
 `POST /api/interpret` body `{message, locale, demo_example_id?}` returns
@@ -182,17 +184,17 @@ Mobile 390px and desktop 1440px must work, controls labeled, keyboard usable.
 
 ## Tasks and ownership
 
-- [ ] 1. Domain worker: `server/models.py`, `calculator.py`, `providers.py`,
+- [x] 1. Domain worker: `server/models.py`, `calculator.py`, `providers.py`,
   `fixtures.py`, `tests/test_domain.py`, `tests/test_providers.py`. Typed receipts,
   two-country fixtures, math/currency/fees/inflation, real-source fail-closed parser.
-- [ ] 2. Service worker: `server/store.py`, `service.py`, `app.py`, `jobs.py`,
+- [x] 2. Service worker: `server/store.py`, `service.py`, `app.py`, `jobs.py`,
   `tests/test_service.py`, `tests/test_api.py`. Durable full flow, confirmations,
   saved history, recheck notices, loader CLI/background job. Must consume domain
   contract. No live data/model calls during implementation/tests.
-- [ ] 3. Interpreter worker: `server/interpreter.py`, `tests/test_interpreter.py`.
+- [x] 3. Interpreter worker: `server/interpreter.py`, `tests/test_interpreter.py`.
   Fixture replay + optional structured semantic model adapter via explicit process
   config only. No dotenv or inherited Argus API keys. Live adapter not invoked.
-- [ ] 4. Web worker: `web/` except captain-owned build config. React components,
+- [x] 4. Web worker: `web/` except captain-owned build config. React components,
   complete bilingual UI, receipt drawer, correct backend actions, before/after,
   pending/error/empty states. No frontend calculation or internal fake API store.
 - [ ] 5. Captain: dependency/build config, isolated run scripts, README, synthesis,

@@ -1,0 +1,11 @@
+.local/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+*.sqlite3*
+*.log
