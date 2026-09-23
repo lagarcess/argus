@@ -1,0 +1,19 @@
+$ playwright test --grep "es 320:|Spanish 320:|en 320:"
+(node:88204) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:88205) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+(node:88209) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:88209) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:88209) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/experience.spec.ts:27:5 › en 320: guest money and Omnisearch keyboard selection preserve record identity (4.8s)
+  ✓  2 e2e/experience.spec.ts:27:5 › es 320: guest money and Omnisearch keyboard selection preserve record identity (4.5s)
+  ✓  3 e2e/platform.spec.ts:200:1 › Spanish 320: header actions reflow with increased text spacing (2.0s)
+  ✓  4 e2e/platform.spec.ts:213:3 › Spanish 320: route coverage, dated sources, no overflow and keyboard escape (8.5s)
+
+  4 passed (20.4s)

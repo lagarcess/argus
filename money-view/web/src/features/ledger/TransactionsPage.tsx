@@ -180,7 +180,7 @@ export function TransactionsPage(props: PlatformPageProps) {
         title={t.transactions}
         description={t.transactionsIntro}
         actions={
-          <div className="p-actions">
+          <>
             <button
               className="p-button-secondary"
               onClick={() => {
@@ -199,7 +199,7 @@ export function TransactionsPage(props: PlatformPageProps) {
             >
               {t.addTransaction}
             </button>
-          </div>
+          </>
         }
       />
       {targetLoading && (

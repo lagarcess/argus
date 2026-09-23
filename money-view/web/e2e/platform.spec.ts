@@ -197,6 +197,18 @@ test('mobile settings, confirmed memory, privacy and keyless saved assistant', a
   await noOverflow(page);
 });
 
+test('Spanish 320: header actions reflow with increased text spacing', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  await login(page, 'es');
+  await navigate(page, 'transactions');
+  await page.addStyleTag({ content: '.p-page-header button { letter-spacing: .12em; word-spacing: .16em; }' });
+  await noOverflow(page);
+  await screenshot(page, 'es-320-transactions-text-spacing');
+  await page.getByRole('button', { name: 'Importar CSV', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await noOverflow(page);
+});
+
 for (const width of [1440, 1024, 768, 390, 320]) {
   test(`Spanish ${width}: route coverage, dated sources, no overflow and keyboard escape`, async ({ page }) => {
     const errors: string[] = [];

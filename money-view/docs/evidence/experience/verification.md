@@ -39,7 +39,10 @@ The test now waits for the canonical overlay marker to clear. The affected
 EN/ES import flows and the complete responsive experience matrix then passed,
 14/14. See [summary](final/summary.json), [full run](final/browser-full.txt) and
 [follow-up](final/browser-followup.txt). No application source changed for this
-correction. GitHub CI will rerun all 60 cases together.
+correction. GitHub CI then found a Linux-only 320px header overflow in two cases.
+The [responsive correction](responsive/README.md) fixes the shared layout owner
+and adds a text-spacing regression. Four affected local cases pass; the final
+CI rerun now includes 61 cases. The terminal result is recorded in the PR audit.
 
 Browser acceptance under [final](final/) uses
 loopback-only Vite/API processes and temporary databases with all provider keys

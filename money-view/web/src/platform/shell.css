@@ -344,8 +344,9 @@
   font-size: 13px;
   color: var(--p-muted);
 }
-.platform-shell .p-page-header .p-actions {
-  flex-shrink: 0;
+.platform-shell .p-page-header > .p-actions {
+  flex-shrink: 1;
+  min-width: 0;
 }
 .platform-shell .p-page-footer {
   display: flex;

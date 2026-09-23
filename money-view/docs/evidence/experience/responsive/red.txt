@@ -1,0 +1,54 @@
+$ playwright test --grep "header actions reflow"
+(node:88041) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:88042) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:88046) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:88046) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:88046) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/platform.spec.ts:200:1 › Spanish 320: header actions reflow with increased text spacing (1.9s)
+
+
+  1) e2e/platform.spec.ts:200:1 › Spanish 320: header actions reflow with increased text spacing ───
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 1
+    Received:    55
+
+       at fixtures.ts:124
+
+      122 | }
+      123 | export async function noOverflow(page: Page) {
+    > 124 |   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+          |                                                                                        ^
+      125 | }
+      126 |
+        at noOverflow (/Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/web/e2e/fixtures.ts:124:88)
+        at /Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/web/e2e/platform.spec.ts:205:3
+
+    Test timeout of 60000ms exceeded.
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/platform-Spanish-320-heade-65057-with-increased-text-spacing/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: backend-log (text/plain) ────────────────────────────────────────────────────────
+    INFO:     Started server process [88053]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8022 (Press CTRL+C to quit)
+    INFO:     127.0.0.1:49443 - "GET /api/platform/demo/personas HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:4945...
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/platform-Spanish-320-heade-65057-with-increased-text-spacing/error-context.md
+
+  1 failed
+    e2e/platform.spec.ts:200:1 › Spanish 320: header actions reflow with increased text spacing ────
+error: script "test:e2e" exited with code 1
