@@ -377,3 +377,17 @@ fragment of the secret survives rather than that a marker appears.
 Live scorecards land in gitignored `temp/`, but they are routinely promoted into
 `docs/reports/evidence/` as durable acceptance evidence. Treat the bound and the
 redaction pass as requirements of that committed path, not as local hygiene.
+
+## Acceptance attribution export (#653)
+
+`tests/evals/acceptance_attribution.py` is the allowlisted projector for a later
+authorized acceptance recheck. Historical `export_replay.py` drivers call it.
+It copies anonymous case-adjacent finite reason, state, and route codes only.
+It does not run acceptance, spend tokens, or close the runtime refusal issue.
+
+Free regression:
+
+```bash
+poetry run pytest tests/evals/test_acceptance_attribution.py \
+  tests/test_acceptance_replay_export.py -q --no-cov
+```
