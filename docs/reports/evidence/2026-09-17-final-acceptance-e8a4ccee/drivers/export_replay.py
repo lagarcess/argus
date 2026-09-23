@@ -31,7 +31,7 @@ with psycopg.connect('postgresql://postgres:postgres@127.0.0.1:56732/postgres',r
    costs=conn.execute('select * from cost_ledger_entries where message_id=%s or request_id=%s order by occurred_at',(mid,request)).fetchall()
    r['stored_routes']=[allowlisted_route_row(x) for x in rows]
    r['stored_costs']=[allowlisted_cost_row(x) for x in costs]
-   r['stored_failure_metadata']=allowlisted_failure_metadata(meta, routes=rows)
+   r['stored_failure_metadata']=allowlisted_failure_metadata(meta)
   records.append(r)
 inputs=json.loads((R/'private-replay/inputs.json').read_text())
 report={'product_sha':'e8a4ccee45c390180d2979881a977fcd050f6b1b','cohort':{'window':'union of UTC and America/New_York 2026-08-12','conversations':len(inputs['cases']),'user_turns':sum(len(c['messages']) for c in inputs['cases']),'internal_and_canary_excluded':True,'fresh_guest_per_started_conversation':True},'turns':records,'passed':sum(r['outcome']=='pass' for r in records),'failed':sum(r['outcome']=='fail' for r in records),'allowance':sum(r['outcome']=='allowance' for r in records),'not_run':sum(len(c['messages']) for c in inputs['cases'])-len(records),'customer_text_included':False}

@@ -382,8 +382,10 @@ redaction pass as requirements of that committed path, not as local hygiene.
 
 `tests/evals/acceptance_attribution.py` is the allowlisted projector for a later
 authorized acceptance recheck. Historical `export_replay.py` drivers call it.
-It copies anonymous case-adjacent finite reason, state, and route codes only.
-It does not run acceptance, spend tokens, or close the runtime refusal issue.
+The confirmed #653 capture is only top-level `clarification.reason_code`,
+research `declined` plus the capability-footer boolean, and interpreter reason
+/ capability verdict. It does not run acceptance, spend tokens, or close the
+runtime refusal issue.
 
 Free regression:
 

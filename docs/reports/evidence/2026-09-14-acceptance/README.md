@@ -42,11 +42,12 @@ Only drivers and evidence are changed in this lane. Nothing was fixed or deploye
   separate replay budget. This is model-assessed evidence, not a claim that a
   human independently reviewed every customer reply. Low confidence is a fail.
 - `export_replay.py` exports only explicit allowlisted metadata and fixed verdict
-  reasons through `tests/evals/acceptance_attribution.py`. It reads top-level
-  `clarification.reason_code` and records the nested payload reason separately.
-  It exports no user text, assistant text, artifact payloads or original
-  customer identifiers. Private replay screenshots are not committed because
-  they would contain customer text. This projector does not close #653.
+  reasons through `tests/evals/acceptance_attribution.py`. The #653 capture is
+  top-level `clarification.reason_code`, research declined plus the capability
+  footer boolean, and interpreter reason / capability verdict. It exports no
+  user text, assistant text, artifact payloads or original customer identifiers.
+  Private replay screenshots are not committed because they would contain
+  customer text. This projector does not close #653.
 - Before cleanup, export final stored metadata, verdicts and meter. Then run the
   cleanup driver, which stops only owned processes and the disposable stack,
   deletes private inputs, responses, logs and local database volumes, and writes

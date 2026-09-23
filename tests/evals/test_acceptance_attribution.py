@@ -1,4 +1,4 @@
-"""#653 allowlisted attribution: stored codes only, no customer text."""
+"""#653 allowlisted attribution: confirmed capture shape only."""
 
 from __future__ import annotations
 
@@ -45,6 +45,18 @@ def test_declined_reason_code_matches_runtime_owner() -> None:
     assert assigned == STORED_RESEARCH_DECLINED_CODE
 
 
+def test_export_shape_is_exactly_the_confirmed_keys() -> None:
+    exported = allowlisted_failure_metadata({})
+
+    assert tuple(exported) == FAILURE_METADATA_KEYS
+    assert set(exported).isdisjoint(FORBIDDEN_EXPORT_KEYS)
+    assert "clarification_payload_reason" not in exported
+    assert "clarification_kind" not in exported
+    assert "unsupported_categories" not in exported
+    assert "route_receipt_kinds" not in exported
+    assert "recovery_code" not in exported
+
+
 def test_top_level_clarification_reason_is_exported() -> None:
     exported = allowlisted_failure_metadata(
         {
@@ -56,7 +68,6 @@ def test_top_level_clarification_reason_is_exported() -> None:
     )
 
     assert exported["clarification_reason"] == "unsupported_time_granularity"
-    assert exported["clarification_payload_reason"] is None
 
 
 def test_top_level_owner_wins_over_nested_payload_reason() -> None:
@@ -70,164 +81,59 @@ def test_top_level_owner_wins_over_nested_payload_reason() -> None:
     )
 
     assert exported["clarification_reason"] == "unsupported_time_granularity"
-    assert exported["clarification_payload_reason"] == "stale_nested_reason"
+    assert "stale_nested_reason" not in json.dumps(exported)
 
 
-def test_nested_payload_reason_is_not_the_only_source() -> None:
+def test_nested_payload_reason_is_not_the_clarification_owner() -> None:
     exported = allowlisted_failure_metadata(
         {"clarification": {"payload": {"reason_code": "stale_nested_reason"}}}
     )
 
     assert exported["clarification_reason"] is None
-    assert exported["clarification_payload_reason"] == "stale_nested_reason"
+    assert "stale_nested_reason" not in json.dumps(exported)
 
 
-def test_required_keys_appear_in_the_allowlisted_schema() -> None:
-    exported = allowlisted_failure_metadata({})
-
-    assert tuple(exported) == FAILURE_METADATA_KEYS
-    assert set(exported) <= set(FAILURE_METADATA_KEYS)
-    assert set(exported).isdisjoint(FORBIDDEN_EXPORT_KEYS)
-
-
-def test_clarification_kind_field_and_prompt_source_are_exported() -> None:
-    exported = allowlisted_failure_metadata(
-        {
-            "clarification": {
-                "kind": "unsupported_recovery",
-                "reason_code": "unsupported_strategy_logic",
-                "prompt_source": "degraded_fallback",
-                "requested_field": "unsupported_constraints",
-            }
-        }
-    )
-
-    assert exported["clarification_kind"] == "unsupported_recovery"
-    assert exported["clarification_requested_field"] == "unsupported_constraints"
-    assert exported["clarification_prompt_source"] == "degraded_fallback"
-
-
-def test_recovery_code_reads_contract_owner_not_reason_code() -> None:
-    exported = allowlisted_failure_metadata(
-        {
-            "recovery": {
-                "code": "research_lookup_failed",
-                "reason_code": "stale_nested_reason",
-            }
-        }
-    )
-
-    assert exported["recovery_code"] == "research_lookup_failed"
-    assert exported["recovery_reason_code"] == "stale_nested_reason"
-
-
-def test_interpreter_reason_codes_are_exported_when_stored() -> None:
-    exported = allowlisted_failure_metadata(
-        {
-            "reason_codes": [
-                STORED_RESEARCH_DECLINED_CODE,
-                "scenario_contract_from_horizon",
-            ]
-        }
-    )
-
-    assert exported["interpreter_reason_codes"] == [
-        STORED_RESEARCH_DECLINED_CODE,
-        "scenario_contract_from_horizon",
-    ]
-    assert exported["research_declined"] is True
-
-
-def test_missing_interpreter_reason_codes_stay_none() -> None:
-    exported = allowlisted_failure_metadata({"research": {"degraded": {"code": "x"}}})
-
-    assert exported["interpreter_reason_codes"] is None
-    assert exported["research_declined"] is None
-
-
-def test_capability_verdict_marks_harness_derivation() -> None:
-    stored = allowlisted_failure_metadata({"capability_verdict": "answer_only"})
-    harness = allowlisted_failure_metadata(
-        {},
-        harness_capability_verdict="unsupported",
-    )
-    both = allowlisted_failure_metadata(
-        {"capability_verdict": "answer_only"},
-        harness_capability_verdict="unsupported",
-    )
-
-    assert stored["capability_verdict"] == "answer_only"
-    assert stored["capability_verdict_measurement_harness_derived"] is False
-    assert harness["capability_verdict"] == "unsupported"
-    assert harness["capability_verdict_measurement_harness_derived"] is True
-    assert both["capability_verdict"] == "answer_only"
-    assert both["capability_verdict_measurement_harness_derived"] is False
-
-
-def test_research_declined_and_degraded_and_footer_flag() -> None:
+def test_research_declined_and_capability_footer_booleans() -> None:
     stored_declined = allowlisted_failure_metadata({"research": {"declined": True}})
     stored_footer = allowlisted_failure_metadata(
-        {
-            "research": {
-                "degraded": {"code": "research_unavailable_timeout"},
-                "capability_footer_appended": False,
-            }
-        }
+        {"research": {"capability_footer_appended": False}}
     )
     missing = allowlisted_failure_metadata({"research": {"shape": "balanced"}})
 
     assert stored_declined["research_declined"] is True
-    assert stored_footer["research_degraded_code"] == "research_unavailable_timeout"
     assert stored_footer["research_capability_footer_appended"] is False
     assert missing["research_declined"] is None
     assert missing["research_capability_footer_appended"] is None
 
 
-def test_unsupported_categories_are_codes_not_raw_values() -> None:
-    raw_value = fake.sentence()
-    exported = allowlisted_failure_metadata(
+def test_interpreter_reason_and_capability_verdict() -> None:
+    stored = allowlisted_failure_metadata(
         {
-            "clarification": {
-                "deferred_unsupported_categories": ["future_performance"],
-            },
-            "optional_parameter_status": {
-                "unsupported_constraints": [
-                    {"category": "strategy_type", "raw_value": raw_value}
-                ]
-            },
+            "reason_codes": [
+                STORED_RESEARCH_DECLINED_CODE,
+                "scenario_contract_from_horizon",
+            ],
+            "capability_verdict": "answer_only",
         }
     )
-
-    assert exported["unsupported_categories"] == [
-        "future_performance",
-        "strategy_type",
-    ]
-    assert raw_value not in json.dumps(exported)
-
-
-def test_route_receipt_kinds_are_task_schema_outcome_failure() -> None:
-    exported = allowlisted_failure_metadata(
+    harness = allowlisted_failure_metadata(
         {},
-        routes=[
-            {
-                "task": "interpretation",
-                "schema_name": "LLMInterpretationResponse",
-                "outcome": "failed",
-                "failure_mode": "TimeoutError",
-                "user_id": fake.uuid4(),
-                "content": fake.paragraph(),
-            }
-        ],
+        harness_capability_verdict="unsupported",
     )
+    missing = allowlisted_failure_metadata({})
 
-    assert exported["route_receipt_kinds"] == [
-        {
-            "task": "interpretation",
-            "schema_name": "LLMInterpretationResponse",
-            "outcome": "failed",
-            "failure_mode": "TimeoutError",
-        }
+    assert stored["interpreter_reason_codes"] == [
+        STORED_RESEARCH_DECLINED_CODE,
+        "scenario_contract_from_horizon",
     ]
+    assert stored["research_declined"] is True
+    assert stored["capability_verdict"] == "answer_only"
+    assert stored["capability_verdict_measurement_harness_derived"] is False
+    assert harness["capability_verdict"] == "unsupported"
+    assert harness["capability_verdict_measurement_harness_derived"] is True
+    assert missing["interpreter_reason_codes"] is None
+    assert missing["capability_verdict"] is None
+    assert missing["capability_verdict_measurement_harness_derived"] is False
 
 
 def test_export_shape_does_not_leak_customer_text() -> None:
@@ -255,29 +161,23 @@ def test_export_shape_does_not_leak_customer_text() -> None:
             },
             "research": {
                 "declined": True,
-                "degraded": {"code": "research_unavailable_timeout"},
                 "capability_footer_appended": True,
                 "answer": customer_text,
             },
             "recovery": {"code": "runtime_failure"},
             "reason_codes": [STORED_RESEARCH_DECLINED_CODE],
-            "agent_runtime_stage_outcome": "ready_to_respond",
-            "agent_runtime_turn": {
-                "status": "completed",
-                "terminal": True,
-                "request_id": fake.uuid4(),
-            },
-        },
-        routes=[{"task": "balanced_lookup", "content": customer_text}],
+            "capability_verdict": "answer_only",
+        }
     )
     serialized = json.dumps(exported, default=str)
 
+    assert tuple(exported) == FAILURE_METADATA_KEYS
     assert customer_text not in serialized
     assert prompt not in serialized
     assert user_id not in serialized
     assert conversation_id not in serialized
+    assert "stale_nested_reason" not in serialized
     assert set(exported).isdisjoint(FORBIDDEN_EXPORT_KEYS)
-    assert "payload" not in exported
     leaked = _string_leaves(exported)
     assert customer_text not in leaked
     assert prompt not in leaked
@@ -309,9 +209,7 @@ def test_route_and_cost_rows_drop_identifiers() -> None:
     )
 
     assert route["task"] == "clarification"
-    assert route["failure_mode"] == "turn_call_allowance_exhausted"
     assert set(route).isdisjoint(FORBIDDEN_EXPORT_KEYS)
-    assert set(cost).isdisjoint(FORBIDDEN_EXPORT_KEYS)
     assert user_id not in json.dumps(route)
     assert message_id not in json.dumps(cost)
 
@@ -339,7 +237,6 @@ def test_historical_exporters_call_the_durable_owner() -> None:
             for alias in node.names
         }
         assert "allowlisted_failure_metadata" in imported
-        assert path.name == "export_replay.py"
         assert (
             "(meta.get('clarification') or {}).get('payload',{}).get('reason_code')"
             not in source

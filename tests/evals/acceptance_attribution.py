@@ -1,13 +1,18 @@
-"""Allowlisted acceptance-turn attribution for later authorized rechecks.
+"""Allowlisted #653 attribution. Confirmed capture shape only.
 
-Issue #653 needs a later acceptance run to name the producing path for
-``unrequested_capability_refusal`` without customer text. This module is the
-single owner of that export shape. Historical replay drivers must call it
-instead of projecting nested sidecar paths themselves.
+A later authorized acceptance recheck needs these stored codes, and no
+customer text, to name the producing path for
+``unrequested_capability_refusal``:
 
-It only copies finite reason, state, and route codes already stored on the
-turn or route receipts. Missing keys stay ``None``; this file does not invent
-runtime fields or read assistant prose.
+1. top-level ``clarification.reason_code``
+2. research ``declined`` and the capability-footer boolean
+3. interpreter reason codes and capability verdict
+
+This module is the single owner of that export. Historical replay drivers
+must call it. Missing keys stay ``None``. Nested
+``clarification.payload.reason_code`` is never the owner. This file does
+not invent runtime fields, match assistant prose, or close the runtime
+refusal issue.
 """
 
 from __future__ import annotations
@@ -16,20 +21,9 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 # Same token `research_grounded.DECLINED_REASON_CODE` writes onto an
-# in-memory interpretation. This exporter does not import that module: the
-# research runtime is not an attribution dependency. The lock is
-# `test_declined_reason_code_matches_runtime_owner`.
+# in-memory interpretation. This exporter does not import that module.
+# The lock is `test_declined_reason_code_matches_runtime_owner`.
 STORED_RESEARCH_DECLINED_CODE = "research_declined_not_a_money_request"
-
-# Lifecycle columns the historical exporters already allowlisted. Identifiers
-# such as turn_id and request_id stay out.
-TURN_LIFECYCLE_KEYS: tuple[str, ...] = (
-    "status",
-    "terminal",
-    "reconciled_outcome",
-    "failure_code",
-    "retryable",
-)
 
 ROUTE_KEYS: tuple[str, ...] = (
     "task",
@@ -62,15 +56,6 @@ COST_KEYS: tuple[str, ...] = (
     "status",
 )
 
-ROUTE_KIND_KEYS: tuple[str, ...] = (
-    "task",
-    "schema_name",
-    "outcome",
-    "failure_mode",
-)
-
-# Stored locations the runtime may already have written. Do not add a new
-# product writer here; a missing read stays None until storage exists.
 _REASON_CODE_PATHS: tuple[tuple[str, ...], ...] = (
     ("reason_codes",),
     ("interpretation", "reason_codes"),
@@ -87,41 +72,24 @@ _CAPABILITY_FOOTER_PATHS: tuple[tuple[str, ...], ...] = (
     ("follow_up", "appended_capability_footer"),
 )
 
-_UNSUPPORTED_LIST_PATHS: tuple[tuple[str, ...], ...] = (
-    ("clarification", "deferred_unsupported_categories"),
-    ("unsupported",),
-    ("optional_parameter_status", "unsupported_constraints"),
-    ("response_intent", "facts", "unsupported_constraints"),
-    ("pending_strategy", "unsupported_constraints"),
-    ("pending_strategy", "optional_parameter_status", "unsupported_constraints"),
-)
-
-# #653 checklist keys. A later authorized run attributes from this schema.
+# Confirmed #653 schema. Do not add sibling keys.
 FAILURE_METADATA_KEYS: tuple[str, ...] = (
-    "lifecycle",
-    "stage_outcome",
+    "clarification_reason",
+    "research_declined",
+    "research_capability_footer_appended",
     "interpreter_reason_codes",
     "capability_verdict",
     "capability_verdict_measurement_harness_derived",
-    "research_declined",
-    "research_degraded_code",
-    "research_capability_footer_appended",
-    "clarification_reason",
-    "clarification_payload_reason",
-    "clarification_requested_field",
-    "clarification_kind",
-    "clarification_prompt_source",
-    "recovery_code",
-    "recovery_reason_code",
-    "unsupported_categories",
-    "route_receipt_kinds",
 )
 
-# Keys that would reintroduce customer text or identifiers into the export.
 FORBIDDEN_EXPORT_KEYS: frozenset[str] = frozenset(
     {
         "assistant_prompt",
         "assistant_response",
+        "clarification_kind",
+        "clarification_payload_reason",
+        "clarification_prompt_source",
+        "clarification_requested_field",
         "content",
         "conversation_id",
         "frames",
@@ -130,8 +98,13 @@ FORBIDDEN_EXPORT_KEYS: frozenset[str] = frozenset(
         "payload",
         "prompt",
         "raw_value",
+        "recovery_code",
+        "recovery_reason_code",
         "request_id",
+        "research_degraded_code",
+        "route_receipt_kinds",
         "stored_messages",
+        "unsupported_categories",
         "user_id",
         "user_message",
     }
@@ -143,58 +116,35 @@ _MAX_FINITE_CODE_LEN = 80
 def allowlisted_failure_metadata(
     meta: Mapping[str, Any] | None,
     *,
-    routes: Sequence[Mapping[str, Any]] = (),
     harness_capability_verdict: str | None = None,
 ) -> dict[str, Any]:
-    """Project stored turn metadata into the #653 allowlisted schema.
+    """Project stored turn metadata into the confirmed #653 schema.
 
-    ``clarification_reason`` reads the contract owner
-    ``clarification.reason_code``. The nested payload path is recorded
-    separately and never stands in for a missing top-level reason.
+    ``clarification_reason`` reads ``clarification.reason_code`` only.
+    A nested ``payload.reason_code`` does not fill a missing owner.
 
-    ``capability_verdict_measurement_harness_derived`` is true only when the
-    exported verdict came from ``harness_capability_verdict`` because the
-    stored turn had none. Runtime does not currently persist a verdict.
+    ``capability_verdict_measurement_harness_derived`` is true only when
+    the exported verdict came from ``harness_capability_verdict`` because
+    the stored turn had none.
     """
 
     stored = meta if isinstance(meta, Mapping) else {}
     clarification = _mapping(stored.get("clarification"))
-    payload = _mapping(clarification.get("payload"))
     research = _mapping(stored.get("research"))
-    recovery = _mapping(stored.get("recovery"))
-    turn = _mapping(stored.get("agent_runtime_turn"))
     stored_verdict = _finite_code(stored.get("capability_verdict"))
     harness_verdict = _finite_code(harness_capability_verdict)
     reason_codes = _first_code_list(stored, _REASON_CODE_PATHS)
     return {
-        "lifecycle": _lifecycle(turn),
-        "stage_outcome": _finite_code(stored.get("agent_runtime_stage_outcome")),
+        "clarification_reason": _finite_code(clarification.get("reason_code")),
+        "research_declined": _research_declined(research, reason_codes),
+        "research_capability_footer_appended": _first_bool(
+            research, _CAPABILITY_FOOTER_PATHS
+        ),
         "interpreter_reason_codes": reason_codes,
         "capability_verdict": stored_verdict or harness_verdict,
         "capability_verdict_measurement_harness_derived": (
             stored_verdict is None and harness_verdict is not None
         ),
-        "research_declined": _research_declined(research, reason_codes),
-        "research_degraded_code": _finite_code(
-            _mapping(research.get("degraded")).get("code")
-        ),
-        "research_capability_footer_appended": _first_bool(
-            research, _CAPABILITY_FOOTER_PATHS
-        ),
-        "clarification_reason": _finite_code(clarification.get("reason_code")),
-        "clarification_payload_reason": _finite_code(payload.get("reason_code")),
-        "clarification_requested_field": _finite_code(
-            clarification.get("requested_field")
-        ),
-        "clarification_kind": _finite_code(clarification.get("kind")),
-        "clarification_prompt_source": _finite_code(clarification.get("prompt_source")),
-        "recovery_code": _finite_code(recovery.get("code")),
-        "recovery_reason_code": _finite_code(recovery.get("reason_code")),
-        "unsupported_categories": _unsupported_categories(stored, clarification),
-        "route_receipt_kinds": [
-            {key: allowlisted_route_row(row).get(key) for key in ROUTE_KIND_KEYS}
-            for row in routes
-        ],
     }
 
 
@@ -204,17 +154,6 @@ def allowlisted_route_row(row: Mapping[str, Any] | None) -> dict[str, Any]:
 
 def allowlisted_cost_row(row: Mapping[str, Any] | None) -> dict[str, Any]:
     return _project(row, COST_KEYS)
-
-
-def _lifecycle(turn: Mapping[str, Any]) -> dict[str, Any]:
-    projected: dict[str, Any] = {}
-    for key in TURN_LIFECYCLE_KEYS:
-        value = turn.get(key)
-        if key in {"terminal", "retryable"}:
-            projected[key] = value if isinstance(value, bool) else None
-        else:
-            projected[key] = _finite_code(value)
-    return projected
 
 
 def _research_declined(
@@ -230,43 +169,6 @@ def _research_declined(
     if reason_codes is not None and STORED_RESEARCH_DECLINED_CODE in reason_codes:
         return True
     return None
-
-
-def _unsupported_categories(
-    stored: Mapping[str, Any],
-    clarification: Mapping[str, Any],
-) -> list[str] | None:
-    collected: list[str] = []
-    seen: set[str] = set()
-    found = False
-    for path in _UNSUPPORTED_LIST_PATHS:
-        container = (
-            {"clarification": clarification} if path[0] == "clarification" else stored
-        )
-        raw = _walk(container, path)
-        codes = _category_codes(raw)
-        if codes is None:
-            continue
-        found = True
-        for code in codes:
-            if code not in seen:
-                seen.add(code)
-                collected.append(code)
-    return collected if found else None
-
-
-def _category_codes(value: Any) -> list[str] | None:
-    if not isinstance(value, list):
-        return None
-    codes: list[str] = []
-    for item in value:
-        if isinstance(item, Mapping):
-            code = _finite_code(item.get("category"))
-        else:
-            code = _finite_code(item)
-        if code is not None:
-            codes.append(code)
-    return codes
 
 
 def _first_code_list(
