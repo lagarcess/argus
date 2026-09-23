@@ -17,7 +17,25 @@ from argus.agent_runtime.state.models import (
     UserState,
     dedupe_resolution_provenance_items,
 )
+from argus.domain.visible_reply import rewrite_visible_reply
 from pydantic import BaseModel, Field
+
+
+def _rewrite_visible_stage_copy(stage_patch: dict[str, Any]) -> None:
+    """Send composed assistant replies through the one punctuation owner.
+
+    Discovery voicing and interpret answers write `assistant_response` here.
+    Evals and LangGraph read `.patch`, not the later API SSE/persist door.
+    Clarifier prompts stay on `assistant_prompt` and already pass the API
+    stream door.
+    """
+    value = stage_patch.get("assistant_response")
+    if not isinstance(value, str):
+        return
+    rewritten = rewrite_visible_reply(value, surface="stage_result")
+    if rewritten.text != value:
+        stage_patch["assistant_response"] = rewritten.text
+
 
 StageOutcome = Literal[
     "needs_clarification",
@@ -188,6 +206,7 @@ class StageResult(BaseModel):
 
     @property
     def patch(self) -> dict[str, Any]:
+        _rewrite_visible_stage_copy(self.stage_patch)
         patch = dict(self.stage_patch)
         if self.decision is not None:
             patch = {**self.decision.to_patch(), **patch}

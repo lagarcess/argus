@@ -37,7 +37,13 @@ from argus.domain.research.search import (
     discovery_search_config,
     selection,
 )
+from argus.domain.visible_reply import rewrite_visible_reply
 from argus.llm.openrouter import invoke_openrouter_chat_completion
+
+
+def _visible_discovery_reply(text: str | None) -> str | None:
+    """Discovery voicing is a sidecar LLM call, not a streamed token node."""
+    return rewrite_visible_reply(text, surface="discovery").text
 
 
 async def discovery_stage_result_for(
@@ -762,7 +768,7 @@ async def _voiced_discovery_recovery(
     except Exception:
         return None
     cleaned = str(response or "").strip()
-    return cleaned or None
+    return _visible_discovery_reply(cleaned or None)
 
 
 async def _voiced_discovery_response(
@@ -848,7 +854,7 @@ async def _voiced_discovery_response(
         )
         return None
     cleaned = str(response or "").strip()
-    return cleaned or None
+    return _visible_discovery_reply(cleaned or None)
 
 
 def _discovery_sidecar(
