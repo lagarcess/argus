@@ -131,6 +131,20 @@ def test_currency_precision(client, amount, currency, status):
     assert response.status_code == status
 
 
+@pytest.mark.parametrize('currency', ['USD', 'JPY', 'KWD'])
+def test_account_without_opening_balance_defaults_to_exact_zero(client, currency):
+    response = client.post('/api/platform/accounts', json={
+        'name': 'New manual account', 'kind': 'cash', 'currency': currency,
+        'idempotency_key': f'empty-account-{currency}',
+    })
+    assert response.status_code == 200, response.text
+    account = response.json()
+    assert account['currency'] == currency
+    assert Decimal(account['opening_balance']) == Decimal(0)
+    assert Decimal(account['balance']) == Decimal(0)
+    assert client.get(f"/api/platform/accounts/{account['id']}").json() == account
+
+
 def test_transfer_conserves_net_worth_and_does_not_change_spending(client, store):
     before = {r['id']: Decimal(r['balance']) for r in ledger.account_balances(store, CTX, 'USD')}
     spending = ledger.spending_summary(store, CTX, '2026-09', 'USD')
@@ -268,3 +282,28 @@ def test_account_pagination_is_sql_bounded(client):
     assert first['total'] == second['total'] == 14
     assert len(first['items']) == len(second['items']) == 2
     assert not {a['id'] for a in first['items']} & {a['id'] for a in second['items']}
+
+
+def test_exact_transaction_read_ignores_list_page_and_currency(client, store):
+    with store.connection() as db:
+        target=db.execute("SELECT id FROM p_transactions WHERE household_id=? AND currency='EUR' AND deleted_at IS NULL ORDER BY date,id LIMIT 1",(CTX.household_id,)).fetchone()['id']
+    visible=client.get('/api/platform/transactions?currency=USD&limit=25').json()['items']
+    assert target not in {row['id'] for row in visible}
+    response=client.get(f'/api/platform/transactions/{target}')
+    assert response.status_code == 200,response.text
+    assert response.json()['id'] == target
+    assert response.json()['currency'] == 'EUR'
+    assert 'source' in response.json() and 'splits' in response.json()
+
+
+def test_exact_transaction_read_preserves_household_and_active_account_scope(client, store):
+    with store.connection() as db:
+        own=db.execute('SELECT id,account_id FROM p_transactions WHERE household_id=? AND deleted_at IS NULL LIMIT 1',(CTX.household_id,)).fetchone()
+    other_context=identity_context(store,user_id=OTHER.user_id,household_id=OTHER.household_id)
+    foreign=ledger.record_transaction(store,other_context,TransactionCreate(account_id='acct-other-01',date='2026-09-20',merchant='Foreign transaction',amount='-1',category='other',idempotency_key='foreign'))['id']
+    assert client.get(f'/api/platform/transactions/{foreign}').status_code == 404
+    assert client.get(f"/api/platform/transactions/{own['id']}").status_code == 200
+    assert client.delete(f"/api/platform/accounts/{own['account_id']}").status_code == 200
+    response=client.get(f"/api/platform/transactions/{own['id']}")
+    assert response.status_code == 404
+    assert response.json()['code'] == 'transaction_not_found'

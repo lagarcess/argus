@@ -1,0 +1,52 @@
+F.F                                                                      [100%]
+=================================== FAILURES ===================================
+_ test_shared_chat_mutations_require_editor_but_reads_remain_available[user-viewer] _
+
+client = <starlette.testclient.TestClient object at 0x10bbf49d0>
+user = 'user-viewer'
+
+    @pytest.mark.parametrize("user", ["user-viewer", "user-partner"])
+    def test_shared_chat_mutations_require_editor_but_reads_remain_available(client, user):
+        existing, original, _ = turn(client, action={"kind": "read", "action": "spending"})
+        conversation_id = existing["conversation_id"]
+        path = f"/api/platform/chat/conversations/{conversation_id}"
+        before = client.get(path).json()
+        store = client.app.state.store
+        with store.connection() as db:
+            counts = {table: db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                      for table in ("p_chat_conversations", "p_chat_turns", "p_chat_messages")}
+        login(client, user)
+        viewer = user == "user-viewer"
+        assert client.get(path).json() == before
+        assert client.get(path + "/export").status_code == 200
+        assert client.get("/api/platform/chat/conversations").status_code == 200
+        response = client.post("/api/platform/chat/conversations", json={"title": "Shared notes"})
+>       assert response.status_code == (403 if viewer else 201)
+E       assert 201 == 403
+E        +  where 201 = <Response [201 Created]>.status_code
+
+tests/test_platform_chat.py:1204: AssertionError
+_________ test_chat_checkpoint_and_settlement_reject_viewer_authority __________
+
+client = <starlette.testclient.TestClient object at 0x10c3cc370>
+
+    def test_chat_checkpoint_and_settlement_reject_viewer_authority(client):
+        store = client.app.state.store
+        owner = Context("user-demo", "household-demo", "owner", "test")
+        viewer = Context("user-viewer", "household-demo", "viewer", "test")
+        request = TurnRequest(turn_id=uuid4().hex, text="Review my spending")
+        reservation = chat.begin_turn(store, owner, request)
+>       with pytest.raises(PlatformError, match="read_only_household"):
+E       Failed: DID NOT RAISE <class 'server.platform.common.PlatformError'>
+
+tests/test_platform_chat.py:1226: Failed
+=============================== warnings summary ===============================
+.venv/lib/python3.10/site-packages/starlette/testclient.py:45
+  /Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/.venv/lib/python3.10/site-packages/starlette/testclient.py:45: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_platform_chat.py::test_shared_chat_mutations_require_editor_but_reads_remain_available[user-viewer]
+FAILED tests/test_platform_chat.py::test_chat_checkpoint_and_settlement_reject_viewer_authority
+2 failed, 1 passed, 75 deselected, 1 warning in 2.15s

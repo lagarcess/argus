@@ -104,6 +104,11 @@ def initialize(store):
             db.execute(
                 f"CREATE TABLE IF NOT EXISTS {table}(id TEXT NOT NULL,household_id TEXT NOT NULL,document TEXT NOT NULL,PRIMARY KEY(household_id,id))"
             )
+        db.execute("""CREATE TRIGGER IF NOT EXISTS p_tax_scenarios_immutable
+            BEFORE UPDATE ON p_tax_scenarios
+            BEGIN SELECT RAISE(ABORT,'immutable_tax_scenario'); END""")
+        db.execute("""CREATE INDEX IF NOT EXISTS p_tax_scenarios_organizer
+            ON p_tax_scenarios(household_id,json_extract(document,'$.organizer_id'))""")
         db.execute("CREATE TABLE IF NOT EXISTS p_service_manifest(id TEXT PRIMARY KEY)")
         db.execute(
             "CREATE TABLE IF NOT EXISTS p_service_slots(id TEXT PRIMARY KEY,specialist_id TEXT NOT NULL,starts_at TEXT NOT NULL,ends_at TEXT NOT NULL)"

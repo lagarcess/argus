@@ -78,8 +78,10 @@ def active_context(
         """SELECT m.role,COALESCE(g.generation,0) AS generation
         FROM p_memberships m JOIN p_users u ON u.id=m.user_id
         LEFT JOIN p_household_generations g ON g.household_id=m.household_id
-        WHERE m.user_id=? AND m.household_id=? AND u.deleted_at IS NULL""",
-        (user_id, household_id),
+        LEFT JOIN p_guest_workspaces w ON w.user_id=u.id
+        WHERE m.user_id=? AND m.household_id=? AND u.deleted_at IS NULL
+        AND (w.user_id IS NULL OR w.claimed_at IS NOT NULL OR w.expires_at>?)""",
+        (user_id, household_id, now().isoformat()),
     ).fetchone()
     if row is None:
         raise PlatformError("authentication_required", 401)

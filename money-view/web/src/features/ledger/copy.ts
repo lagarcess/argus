@@ -313,3 +313,253 @@ export function dateLabel(value: string, locale: Locale) {
     timeZone: "UTC",
   }).format(new Date(value.length === 10 ? `${value}T12:00:00Z` : value));
 }
+
+const statementEs = {
+  title: "Importar estado de cuenta",
+  intro:
+    "Agrega movimientos de un banco que no esté conectado. Revisa todo antes de guardar.",
+  supported:
+    "Archivos CSV y TSV de tu banco, hasta 1 MB y 2,000 filas. PDF, Excel e imágenes todavía no se pueden importar. Descarga la versión CSV o TSV.",
+  fileStep: "1. Archivo y cuenta",
+  mappingStep: "2. Relacionar columnas",
+  reviewStep: "3. Revisar movimientos",
+  readColumns: "Leer columnas",
+  reading: "Leyendo archivo…",
+  paste: "Pegar contenido",
+  format: "Formato del archivo",
+  delimiter: "Separador de columnas",
+  comma: "Coma",
+  semicolon: "Punto y coma",
+  tab: "Tabulación",
+  headerRow: "Fila que contiene los títulos",
+  mapIntro:
+    "Elige la columna de tu archivo que corresponde a cada dato. La cuenta seleccionada aporta la moneda.",
+  column: "Columna",
+  choose: "Seleccionar columna",
+  notIncluded: "No incluida",
+  signed: "Una columna con importe y signo",
+  separate: "Columnas separadas de salida y entrada",
+  amountLayout: "Cómo aparecen los importes",
+  debit: "Salida / débito",
+  credit: "Entrada / crédito",
+  sourceId: "Identificador del movimiento del banco (opcional)",
+  dateFormat: "Formato de fecha",
+  ymd: "Año-mes-día (2026-09-20)",
+  dmy: "Día/mes/año (20/09/2026)",
+  mdy: "Mes/día/año (09/20/2026)",
+  decimal: "Separador decimal",
+  dotDecimal: "Punto (12.50)",
+  commaDecimal: "Coma (12,50)",
+  decimalHelp:
+    "Sin separadores de miles. Si el banco los incluye, elimínalos en el archivo antes de importar.",
+  optional: "Más columnas (opcional)",
+  positiveKind: "Cómo registrar las entradas sin tipo en el archivo",
+  chooseKind: "Elegir si el archivo contiene entradas",
+  positiveHelp:
+    "Esta elección se aplica a todas las entradas sin tipo. Las transferencias se registran desde el formulario de movimientos.",
+  currencyHelp:
+    "Sin conversión. Si asignas una columna de moneda, todas sus filas deben coincidir con la cuenta.",
+  sourceHelp:
+    "Si el banco incluye una referencia única por movimiento, permite reconocer duplicados exactos.",
+  kindHelp:
+    "Los tipos y categorías del archivo deben usar los códigos del ejemplo de Argus.",
+  back: "Atrás",
+  prepare: "Preparar revisión",
+  exact: "Duplicado exacto, se omite",
+  possible: "Parece repetido",
+  newRow: "Nuevo",
+  decision: "Qué hacer",
+  undecided: "Revisar",
+  keep: "Importar también",
+  skip: "Omitir",
+  keepAll: "Importar todos los similares",
+  skipAll: "Omitir todos los similares",
+  reviewHelp:
+    "Dos compras iguales pueden ser distintas. Decide si importar u omitir cada movimiento que parece repetido.",
+  reviewRemaining: "movimientos similares pendientes de revisar",
+  confirm: "Guardar movimientos revisados",
+  expired: "La revisión vence a las",
+  imported: "movimientos guardados",
+  done: "Listo",
+  noFile: "Selecciona un archivo o pega su contenido.",
+  invalidFile:
+    "No pudimos leer el archivo. Usa CSV o TSV con codificación UTF-8.",
+  changed:
+    "La revisión cambió o venció. Vuelve atrás y prepara una revisión nueva.",
+  empty: "El archivo no tiene movimientos para importar.",
+};
+const statementEn: typeof statementEs = {
+  title: "Import bank statement",
+  intro:
+    "Add transactions from a bank that is not connected. Review everything before saving.",
+  supported:
+    "Bank CSV and TSV files, up to 1 MB and 2,000 rows. PDF, Excel, and images cannot be imported yet. Download the CSV or TSV version.",
+  fileStep: "1. File and account",
+  mappingStep: "2. Match columns",
+  reviewStep: "3. Review transactions",
+  readColumns: "Read columns",
+  reading: "Reading file…",
+  paste: "Paste content",
+  format: "File format",
+  delimiter: "Column separator",
+  comma: "Comma",
+  semicolon: "Semicolon",
+  tab: "Tab",
+  headerRow: "Row containing column headings",
+  mapIntro:
+    "Choose the file column that matches each field. The selected account supplies the currency.",
+  column: "Column",
+  choose: "Choose column",
+  notIncluded: "Not included",
+  signed: "One column with signed amounts",
+  separate: "Separate money out and money in columns",
+  amountLayout: "How amounts appear",
+  debit: "Money out / debit",
+  credit: "Money in / credit",
+  sourceId: "Bank transaction identifier (optional)",
+  dateFormat: "Date format",
+  ymd: "Year-month-day (2026-09-20)",
+  dmy: "Day/month/year (20/09/2026)",
+  mdy: "Month/day/year (09/20/2026)",
+  decimal: "Decimal separator",
+  dotDecimal: "Period (12.50)",
+  commaDecimal: "Comma (12,50)",
+  decimalHelp:
+    "No thousands separators. If your bank includes them, remove them from the file before importing.",
+  optional: "More columns (optional)",
+  positiveKind: "How to record money in when the file has no type",
+  chooseKind: "Choose if the file contains money in",
+  positiveHelp:
+    "This choice applies to every incoming amount without a type. Record transfers using the transaction form.",
+  currencyHelp:
+    "No conversion. If you map a currency column, every row must match the account.",
+  sourceHelp:
+    "A unique transaction reference supplied by the bank identifies exact duplicates.",
+  kindHelp: "File types and categories must use the codes in the Argus sample.",
+  back: "Back",
+  prepare: "Prepare review",
+  exact: "Exact duplicate, skipped",
+  possible: "Looks repeated",
+  newRow: "New",
+  decision: "What to do",
+  undecided: "Review",
+  keep: "Import as well",
+  skip: "Skip",
+  keepAll: "Import all similar transactions",
+  skipAll: "Skip all similar transactions",
+  reviewHelp:
+    "Two identical purchases may be separate transactions. Choose whether to import or skip each possible repeat.",
+  reviewRemaining: "similar transactions still need review",
+  confirm: "Save reviewed transactions",
+  expired: "Review expires at",
+  imported: "transactions saved",
+  done: "Done",
+  noFile: "Choose a file or paste its content.",
+  invalidFile:
+    "We could not read the file. Use a UTF-8 encoded CSV or TSV file.",
+  changed: "The review changed or expired. Go back and prepare a new review.",
+  empty: "The file has no transactions to import.",
+};
+export const statementCopy = (locale: Locale) =>
+  locale === "en" ? statementEn : statementEs;
+export function statementError(code: string, locale: Locale) {
+  const errors: Record<string, [string, string]> = {
+    unsupported_statement_file: [
+      "Usa CSV o TSV. PDF, Excel e imágenes todavía no son compatibles.",
+      "Use CSV or TSV. PDF, Excel, and images are not supported yet.",
+    ],
+    invalid_statement_amount: [
+      "Revisa el importe y el separador decimal. No se admiten separadores de miles.",
+      "Check the amount and decimal separator. Thousands separators are not supported.",
+    ],
+    invalid_statement_date: [
+      "La fecha no coincide con el formato seleccionado.",
+      "The date does not match the selected format.",
+    ],
+    invalid_debit_credit: [
+      "Debe haber una sola salida o entrada positiva por fila.",
+      "Each row needs only one positive debit or credit.",
+    ],
+    statement_positive_kind_required: [
+      "Elige cómo registrar las entradas o asigna la columna de tipo.",
+      "Choose how to record incoming amounts or map the type column.",
+    ],
+    import_currency_mismatch: [
+      "La moneda no coincide con la cuenta seleccionada.",
+      "The currency does not match the selected account.",
+    ],
+    invalid_money_precision: [
+      "El importe supera el límite o tiene demasiados decimales para esta moneda.",
+      "The amount exceeds the limit or has too many decimal places for this currency.",
+    ],
+    source_transaction_changed: [
+      "La referencia del banco coincide, pero sus datos cambiaron. Revisa este movimiento antes de importar.",
+      "The bank reference matches, but its details changed. Check this transaction before importing.",
+    ],
+    invalid_column_mapping: [
+      "Revisa las columnas seleccionadas.",
+      "Check the selected columns.",
+    ],
+    invalid_csv_headers: [
+      "Los títulos de columna deben existir y no repetirse. Revisa la fila de títulos y el separador.",
+      "Column headings must be present and unique. Check the heading row and separator.",
+    ],
+    invalid_csv_row: [
+      "Revisa los campos de esta fila, su tipo y su categoría.",
+      "Check the fields, type, and category in this row.",
+    ],
+    invalid_category: [
+      "El tipo y la categoría deben corresponder a los códigos del ejemplo de Argus.",
+      "Type and category must match the codes in the Argus sample.",
+    ],
+    invalid_csv_quoting: [
+      "El archivo contiene comillas incompletas o mal ubicadas.",
+      "The file contains incomplete or misplaced quotes.",
+    ],
+    invalid_csv: [
+      "No pudimos leer las filas del archivo. Revisa su formato.",
+      "We could not read the file rows. Check the format.",
+    ],
+    invalid_file_content: [
+      "El archivo contiene caracteres no admitidos. Descárgalo como CSV o TSV UTF-8.",
+      "The file contains unsupported characters. Download it as UTF-8 CSV or TSV.",
+    ],
+    invalid_file_encoding: [
+      "Descarga el archivo con codificación UTF-8.",
+      "Download the file with UTF-8 encoding.",
+    ],
+    import_too_large: [
+      "El archivo supera 1 MB. Divide el archivo antes de importarlo.",
+      "The file exceeds 1 MB. Split it before importing.",
+    ],
+    import_too_many_rows: [
+      "El archivo supera 2,000 filas. Divide el periodo antes de importar.",
+      "The file exceeds 2,000 rows. Split the period before importing.",
+    ],
+    import_too_many_columns: [
+      "El archivo supera 64 columnas. Conserva las columnas del estado de cuenta.",
+      "The file exceeds 64 columns. Keep only the statement columns.",
+    ],
+    import_cell_too_large: [
+      "Una celda supera 4,096 caracteres. Revisa el archivo.",
+      "A cell exceeds 4,096 characters. Check the file.",
+    ],
+    import_review_required: [
+      "Decide qué hacer con todos los movimientos similares.",
+      "Choose what to do with every similar transaction.",
+    ],
+    csv_transfer_unsupported: [
+      "Registra las transferencias con el formulario de movimientos.",
+      "Record transfers using the transaction form.",
+    ],
+  };
+  if (
+    [
+      "import_preview_changed",
+      "import_preview_expired",
+      "import_decisions_changed",
+    ].includes(code)
+  )
+    return statementCopy(locale).changed;
+  return errors[code]?.[locale === "en" ? 1 : 0] ?? null;
+}

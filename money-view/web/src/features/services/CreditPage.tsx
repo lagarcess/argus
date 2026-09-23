@@ -1,6 +1,7 @@
-import { useState,type FormEvent } from 'react';
+import { useEffect, useState,type FormEvent } from 'react';
 import { z } from 'zod';
 import { request } from '../../platform/client';
+import { useRecordFocus } from '../../argus/useRecordFocus';
 import { useResource } from '../../platform/hooks';
 import { PageHeader,Panel,Field,EvidenceLine,Money,EmptyState } from '../../platform/ui';
 import { evidenceSchema,type PlatformPageProps } from '../../platform/types';
@@ -14,7 +15,8 @@ const factorLabels: Record<string,[
   string
 ]>={ payment_history: ['Historial de pagos','Payment history'],utilization: ['Uso del crédito','Credit utilization'],credit_utilization: ['Uso del crédito','Credit utilization'],credit_age: ['Antigüedad del crédito','Credit age'],credit_mix: ['Tipos de crédito','Credit mix'],recent_inquiries: ['Consultas recientes','Recent inquiries'],on_time_payments: ['Pagos a tiempo','On-time payments'],revolving_utilization: ['Uso del crédito rotativo','Revolving utilization'] };
 export function CreditPage(props: PlatformPageProps) {
-  const { locale,revision,onChanged,currency }=props;
+  const { locale,revision,onChanged,currency,query }=props;
+  const targetId=query.get('record_id') ?? query.get('account_id');
   const t=(es: string,en: string) => text(locale,es,en);
   const resource=useResource(() => request('/credit',creditSchema),[revision]);
   const [edit,setEdit]=useState<Account|'new'|null>(null);
@@ -25,6 +27,10 @@ export function CreditPage(props: PlatformPageProps) {
   const [error,setError]=useState<unknown>(null);
   const changed=() => { resource.reload(); onChanged(); setPayoff(null); };
   const data=resource.data;
+  const recordRef=useRecordFocus(targetId,[data]);
+  useEffect(() => {
+    if(targetId && data?.accounts.some(account => account.id===targetId)) { setAccountId(targetId); setPayoff(null); }
+  },[targetId,data]);
   const selected=data?.accounts.find(a => a.id===(accountId||data.accounts[0]?.id));
   async function calculate(e: FormEvent) {
     e.preventDefault(); if(!selected)
@@ -40,7 +46,7 @@ export function CreditPage(props: PlatformPageProps) {
   }
   const current=edit&&edit!=='new'? edit:null;
   const fields: InputSpec[]=[{ name: 'name',es: 'Nombre de la deuda',en: 'Debt name',value: current?.name },{ name: 'currency',es: 'Moneda',en: 'Currency',options: currencies,value: current?.currency||currency },{ name: 'balance',es: 'Saldo pendiente',en: 'Outstanding balance',type: 'number',min: '0',step: 'any',value: current?.balance },{ name: 'credit_limit',es: 'Límite de crédito',en: 'Credit limit',type: 'number',min: '0',step: 'any',value: current?.credit_limit },{ name: 'apr_pct',es: 'Tasa anual (%)',en: 'Annual rate (%)',type: 'number',min: '0',max: '1000',step: 'any',value: current?.apr_pct },{ name: 'minimum_payment',es: 'Pago mensual fijo',en: 'Fixed monthly payment',type: 'number',min: '0',step: 'any',value: current?.minimum_payment },{ name: 'as_of',es: 'Fecha de los valores',en: 'Values as of',type: 'date',value: current?.evidence.as_of.slice(0,10)||today() }];
-  return <div className="p-stack services-page">
+  return <div className="p-stack services-page" ref={recordRef}>
     <PageHeader eyebrow={t('CRÉDITO','CREDIT')} title={t('Entiende tu deuda.','Understand your debt.')} description={t('Revisa tus saldos y calcula qué cambia con un pago adicional.','Review balances and calculate what changes with an extra payment.')} actions={
       <button className="p-button" onClick={() => setEdit('new')}>
         {t('Añadir deuda','Add debt')}
@@ -123,7 +129,7 @@ export function CreditPage(props: PlatformPageProps) {
         {data.accounts.length===0?
           <EmptyState title={t('Añade tu primera deuda','Add your first debt')} description={t('Registra saldo, tasa y pago para calcular un escenario.','Record a balance, rate and payment to calculate a scenario.')} />
           :data.accounts.map(a =>
-            <article className="services-account" key={a.id}>
+            <article className="services-account" key={a.id} data-record-id={a.id} tabIndex={-1}>
               <div className="p-toolbar">
                 <h3>
                   {a.name}

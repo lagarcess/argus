@@ -1,0 +1,56 @@
+{
+  "innerHeight": 900,
+  "innerWidth": 390,
+  "visualViewportHeight": 900,
+  "scrollY": 0,
+  "elements": {
+    ".p-main": {
+      "top": 68,
+      "bottom": 900,
+      "height": 832,
+      "width": 390
+    },
+    ".argus-conversation": {
+      "top": 68,
+      "bottom": 900,
+      "height": 832,
+      "width": 362
+    },
+    ".argus-transcript": {
+      "top": 136,
+      "bottom": 765,
+      "height": 629,
+      "width": 362
+    },
+    ".argus-composer-dock": {
+      "top": 765,
+      "bottom": 900,
+      "height": 135,
+      "width": 362
+    },
+    ".argus-composer": {
+      "top": 822,
+      "bottom": 886,
+      "height": 64,
+      "width": 354
+    },
+    ".argus-composer-editor": {
+      "top": 834,
+      "bottom": 874,
+      "height": 40,
+      "width": 192
+    },
+    ".argus-composer-send": {
+      "top": 833,
+      "bottom": 877,
+      "height": 44,
+      "width": 44
+    },
+    ".argus-composer-attach": {
+      "top": 833,
+      "bottom": 877,
+      "height": 44,
+      "width": 44
+    }
+  }
+}

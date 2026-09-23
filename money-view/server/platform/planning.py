@@ -125,13 +125,10 @@ def save_budget(store: Store, context: Context, payload: BudgetInput, budget_id:
         return _write_plan(connection, context, "budget", payload, budget_id)
 
 
-def list_budgets(store: Store, context: Context, month: str | None = None):
+def _project_budgets(store: Store, context: Context, items):
     from .ledger import spending_summary
-    items = _list_plans(store, context, "budget")
     summaries = {}
     for item in items:
-        if month and month != item["month"]:
-            continue
         key = (item["month"], item["currency"])
         if key not in summaries:
             summaries[key] = spending_summary(store, context, *key)
@@ -143,7 +140,20 @@ def list_budgets(store: Store, context: Context, month: str | None = None):
         item["evidence"] = Evidence(id=identifier("source"), kind="calculated", title="Budget compared with current ledger spending", as_of=now().date(), recorded_at=now(), method="Saved budget limit minus category spending from the canonical ledger. Source records retain synthetic or user provenance.", inputs=[item["input_evidence"]["id"], summary["source"]["id"]]).model_dump(mode="json")
         item["actual"] = str(actual)
         item["remaining"] = str(Decimal(item["limit"]) - actual)
-    return {"items": [item for item in items if not month or item["month"] == month]}
+    return items
+
+
+def list_budgets(store: Store, context: Context, month: str | None = None):
+    items = [item for item in _list_plans(store, context, "budget") if not month or item["month"] == month]
+    return {"items": _project_budgets(store, context, items)}
+
+
+def get_budget(store: Store, context: Context, budget_id: str):
+    with store.connection() as connection:
+        item = _plan(connection, context, budget_id, "budget")
+    if item["status"] == "archived":
+        raise PlatformError("planning_record_not_found", 404)
+    return _project_budgets(store, context, [item])[0]
 
 
 def save_goal(store: Store, context: Context, payload: GoalInput, goal_id: str | None = None):
@@ -425,6 +435,11 @@ def initialize(store: Store):
 @router.get("/budgets")
 def budgets(*, month: str | None = None, store: DB, context: CTX):
     return list_budgets(store, context, month)
+
+
+@router.get("/budgets/{budget_id}")
+def budget_read(*, budget_id: str, store: DB, context: CTX):
+    return get_budget(store, context, budget_id)
 
 
 @router.post("/budgets")

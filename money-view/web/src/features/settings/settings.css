@@ -1,38 +1,87 @@
-.platform-shell .settings-page { max-width: 840px; }
-.platform-shell .settings-page h2 { font-size: 18px; }
-.platform-shell .settings-page .p-modal[open] { display: flex; flex-direction: column; box-shadow: none; }
+.platform-shell .settings-page { max-width: 980px; min-width: 0; }
+.platform-shell .settings-page h2 { font-size: 18px; line-height: 1.4; }
+.platform-shell .settings-page :is(h2, h3, p, label, small, strong, button) { overflow-wrap: anywhere; }
+.platform-shell .settings-page :is(input, select, textarea) { font-size: 16px; min-width: 0; width: 100%; }
+.platform-shell .settings-page :is(input[type=checkbox], input[type=radio]) { width: 20px; }
+.platform-shell .settings-identity { display: flex; align-items: center; gap: 14px; padding-block: 0 28px; min-width: 0; }
+.platform-shell .settings-identity > div { min-width: 0; }
+.platform-shell .settings-identity strong { font-size: 16px; font-weight: 600; }
+.platform-shell .settings-identity p { margin-block: 4px 0; font-size: 13px; }
+.platform-shell .settings-avatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; color: var(--p-body); background: var(--p-teal-wash, #e4efeb); border: 1px solid var(--p-teal, #428c86); font-weight: 600; }
+.platform-shell .settings-avatar.ocean { background: var(--p-blue-wash, #e7eef4); border-color: var(--p-blue, #638fa5); }
+.platform-shell .settings-avatar.clay { background: var(--p-rose-wash, #f3e7e5); border-color: var(--p-rose, #b5686e); }
+.platform-shell .settings-avatar.gold { background: var(--p-gold-wash, #f3eedc); border-color: var(--p-gold, #b28d49); }
+.platform-shell .settings-avatar.plum { background: var(--p-rose-wash, #f3e7e5); border-color: var(--p-muted); }
+.platform-shell .settings-workspace { display: grid; grid-template-columns: 248px minmax(0, 1fr); gap: 32px; border-block-start: 1px solid var(--p-line); padding-block: 24px; align-items: start; }
+.platform-shell .settings-section-nav { display: grid; gap: 6px; }
+.platform-shell .settings-section-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 12px; width: 100%; min-height: 64px; border: 1px solid transparent; border-radius: 10px; background: transparent; text-align: start; color: var(--p-body); }
+.platform-shell .settings-section-link > span:first-child { display: grid; min-width: 0; gap: 4px; }
+.platform-shell .settings-section-link strong { font-size: 14px; font-weight: 600; }
+.platform-shell .settings-section-link small { font-size: 12px; line-height: 1.45; color: var(--p-muted); }
+.platform-shell .settings-section-link > span:last-child { flex-shrink: 0; font-size: 22px; color: var(--p-muted); }
+.platform-shell .settings-section-link[aria-current=page] { background: var(--p-selected); border-color: var(--p-line); }
+.platform-shell .settings-section-detail { min-width: 0; padding-inline-start: 28px; border-inline-start: 1px solid var(--p-line); }
+.platform-shell .settings-section-detail > h2 { margin-block: 8px 16px; }
+.platform-shell .settings-section-back { display: none; }
+.platform-shell .settings-row { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 20px; text-align: start; border: 0; border-block-end: 1px solid var(--p-line); border-radius: 0; background: transparent; padding: 16px 4px; min-height: 60px; color: inherit; font: inherit; cursor: pointer; }
+.platform-shell .settings-row > span:first-child { min-width: 0; flex: 1 1 45%; }
+.platform-shell .settings-row-end { display: flex; align-items: center; justify-content: end; gap: 12px; max-width: 48%; min-width: 0; color: var(--p-muted); font-size: 13px; text-align: end; }
+.platform-shell .settings-row-end > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.platform-shell .settings-row-end > span:last-child { font-size: 22px; flex-shrink: 0; }
+.platform-shell .settings-page .p-modal[open] { display: flex; flex-direction: column; overflow: hidden; box-shadow: none; max-height: min(85dvh, 820px); }
 .platform-shell .settings-page .p-modal-header { flex-shrink: 0; }
-.platform-shell .settings-page .p-modal-header h2 { font-size: 26px; }
-.platform-shell .settings-page .p-modal-body { min-height: 0; overflow-y: auto; }
-.platform-shell .settings-page:is([data-settings-panel="language"], [data-settings-panel="appearance"], [data-settings-panel="profile"], [data-settings-panel="regional"], [data-settings-panel="notifications"]) .p-modal { width: min(420px, calc(100% - 32px)); max-height: 70dvh; }
-.platform-shell .settings-row { display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 20px; text-align: start; border: 0; border-bottom: 1px solid var(--p-line, #d8dfd2); border-radius: 0; background: transparent; padding: 18px 0; min-height: 64px; color: inherit; font: inherit; cursor: pointer; }
-.platform-shell .settings-row:hover { background: var(--p-selected, #e8efe6); }
-.platform-shell .settings-row-end { display: flex; align-items: center; gap: 14px; color: var(--p-muted, #5d6d64); font-size: 14px; text-align: end; }
-.platform-shell .settings-row-end > span:last-child { font-size: 23px; }
-.platform-shell .settings-identity { display: flex; align-items: center; gap: 16px; margin: 8px 0 32px; }
-.platform-shell .settings-identity p { margin: 4px 0; }
-.platform-shell .settings-avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; color: white; background: #205840; font-weight: 600; }
-.platform-shell .settings-avatar.ocean { background: #315a76; }
-.platform-shell .settings-avatar.clay { background: #986447; }
-.platform-shell .settings-avatar.gold { background: #806018; }
-.platform-shell .settings-avatar.plum { background: #72506c; }
-.platform-shell .settings-identity > .settings-avatar { width: 52px; height: 52px; font-size: 20px; }
-.platform-shell .settings-choices { display: grid; gap: 8px; border: none; padding: 0; margin: 0; }
-.platform-shell .settings-choices legend { font-weight: 600; margin-bottom: 12px; }
-.platform-shell .settings-choices label, .platform-shell .settings-check { display: flex; align-items: center; gap: 12px; padding: 10px 0; min-height: 44px; }
+.platform-shell .settings-page .p-modal-header h2 { font-family: inherit; font-size: 18px; font-weight: 600; line-height: 1.4; }
+.platform-shell .settings-page .p-modal-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; }
+.platform-shell .settings-page:is([data-settings-panel=language], [data-settings-panel=appearance], [data-settings-panel=profile], [data-settings-panel=regional], [data-settings-panel=notifications]) .p-modal { width: min(440px, calc(100% - 32px)); }
+.platform-shell .settings-back { margin-block-end: 16px; min-height: 44px; }
+.platform-shell .settings-choices { display: grid; gap: 8px; border: none; padding: 0; margin: 0; min-width: 0; }
+.platform-shell .settings-choices legend { font-weight: 600; margin-block-end: 12px; }
+.platform-shell .settings-choices label, .platform-shell .settings-check { display: flex; align-items: center; gap: 12px; padding: 12px; min-height: 48px; border: 1px solid var(--p-line); border-radius: 10px; cursor: pointer; }
+.platform-shell .settings-choices label:has(input:checked), .platform-shell .settings-check:has(input:checked) { background: var(--p-selected); border-color: var(--p-control); }
 .platform-shell .settings-choices input, .platform-shell .settings-check input { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; }
-.platform-shell .settings-session { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--p-line, #d8dfd2); }
-.platform-shell .settings-session p { margin: 4px 0; font-size: 13px; }
-.platform-shell .settings-memory { border-bottom: 1px solid var(--p-line, #d8dfd2); padding: 12px 0; overflow-wrap: anywhere; }
-.platform-shell .settings-confirm { border: 1px solid var(--p-line, #d8dfd2); border-radius: 8px; padding: 16px; }
+.platform-shell .settings-form-actions { padding-block: 16px 0; margin-block-start: 4px; border-block-start: 1px solid var(--p-line); }
+.platform-shell .settings-page .p-actions { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
+.platform-shell .settings-page .p-actions > button { white-space: normal; min-height: 44px; max-width: 100%; }
+.platform-shell .settings-session { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 16px; padding-block: 16px; border-block-end: 1px solid var(--p-line); }
+.platform-shell .settings-session > div { flex: 1 1 180px; min-width: 0; }
+.platform-shell .settings-session p { margin-block: 4px 0; font-size: 13px; }
+.platform-shell .settings-memory { border-block-end: 1px solid var(--p-line); padding-block: 16px; overflow-wrap: anywhere; }
+.platform-shell .settings-memory > p { white-space: pre-wrap; }
+.platform-shell .settings-memory .p-actions { margin-block-start: 10px; }
+.platform-shell .settings-confirm { border: 1px solid var(--p-line); border-inline-start: 3px solid var(--p-rose, #b5686e); border-radius: 10px; padding: 16px; min-width: 0; }
+.platform-shell .settings-confirm blockquote { margin-inline: 0; overflow-wrap: anywhere; }
 .platform-shell .settings-counts { margin: 0; }
-.platform-shell .settings-counts > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--p-line, #d8dfd2); }
-.platform-shell .settings-counts dd { font-variant-numeric: tabular-nums; }
-.platform-shell .settings-back { margin-bottom: 20px; }
-.platform-shell .settings-member { display: flex; gap: 12px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--p-line, #d8dfd2); }
-.platform-shell .settings-member-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.platform-shell .settings-member-name p { margin: 4px 0; }
-.platform-shell .settings-login-id { display: block; padding: 8px 0; overflow-wrap: anywhere; user-select: all; }
+.platform-shell .settings-counts > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding-block: 12px; border-block-end: 1px solid var(--p-line); }
+.platform-shell .settings-counts dt { min-width: 0; overflow-wrap: anywhere; }
+.platform-shell .settings-counts dd { margin: 0; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.platform-shell .settings-member { display: flex; gap: 12px; align-items: center; padding-block: 20px; border-block-end: 1px solid var(--p-line); min-width: 0; }
+.platform-shell .settings-member-name { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.platform-shell .settings-member-name p { margin-block: 4px 0; }
+.platform-shell .settings-member-name summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--p-action); font-size: 13px; }
+.platform-shell .settings-login-id { display: block; padding-block: 8px; overflow-wrap: anywhere; user-select: all; }
+.platform-shell .settings-role { min-width: 0; }
 .platform-shell .settings-role .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
-@media (max-width: 599px) { .platform-shell .settings-row { align-items: flex-start; gap: 12px; } .platform-shell .settings-row-end { max-width: 45%; } .platform-shell .settings-session { flex-wrap: wrap; } .platform-shell .settings-member { flex-wrap: wrap; } .platform-shell .settings-member > .p-actions { width: 100%; margin-left: 52px; } }
-@media (max-width: 599px) { .platform-shell .settings-page[data-settings-panel] .p-modal { width: 100%; } .platform-shell .settings-page .p-modal-body { padding: 16px 16px max(16px, env(safe-area-inset-bottom)); } }
+@media (hover: hover) { .platform-shell .settings-row:hover, .platform-shell .settings-section-link:hover, .platform-shell .settings-choices label:hover, .platform-shell .settings-check:hover { background: var(--p-selected); } }
+@media (max-width: 1023px) {
+  .platform-shell .settings-workspace { grid-template-columns: minmax(0, 1fr); gap: 0; padding-block: 12px; }
+  .platform-shell .settings-workspace[data-section-open=false] .settings-section-detail, .platform-shell .settings-workspace[data-section-open=true] .settings-section-nav { display: none; }
+  .platform-shell .settings-section-detail { border: 0; padding-inline-start: 0; }
+  .platform-shell .settings-section-link { min-height: 76px; padding-inline: 8px; border-radius: 0; border-block-end: 1px solid var(--p-line); }
+  .platform-shell .settings-section-link strong { font-size: 16px; }
+  .platform-shell .settings-section-link small { font-size: 13px; }
+  .platform-shell .settings-section-back { display: flex; margin-block-end: 12px; }
+  .platform-shell .settings-section-detail > h2 { margin-block: 0 8px; }
+  .platform-shell .settings-page[data-settings-panel] .p-modal { width: 100%; max-height: 85dvh; }
+  .platform-shell .settings-page .p-modal-body { padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
+}
+@media (max-width: 599px) {
+  .platform-shell .settings-identity { padding-block-end: 20px; }
+  .platform-shell .settings-row { gap: 12px; }
+  .platform-shell .settings-row-end { max-width: 45%; }
+  .platform-shell .settings-member { flex-wrap: wrap; align-items: start; }
+  .platform-shell .settings-member > .p-actions { width: 100%; margin-inline-start: 0; }
+  .platform-shell .settings-member > .p-actions .settings-role { flex: 1; }
+  .platform-shell .settings-form-actions > button { flex: 1 1 120px; }
+  .platform-shell .settings-page .p-pagination { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+  .platform-shell .settings-page .p-pagination > span { order: -1; width: 100%; }
+}

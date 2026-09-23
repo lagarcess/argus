@@ -1,10 +1,10 @@
-import { test, expect, login, navigate, read, screenshot } from './fixtures';
+import { test, expect, login, navigate, read, screenshot, openProfile } from './fixtures';
 import type { Page } from '@playwright/test';
 
 async function signOut(page: Page) {
-  await page.locator('.p-household-button').click();
+  await openProfile(page);
   await page.getByRole('dialog').getByRole('button', { name: /^(Sign out|Cerrar sesión)$/ }).click();
-  await expect(page.getByRole('button', { name: 'Abrir espacio' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^(Sign in|Iniciar sesión)$/ })).toBeVisible();
 }
 async function createSavedDeposit(page: Page) {
   await navigate(page, 'deposits');
@@ -54,6 +54,7 @@ for (const role of ['editor', 'viewer'] as const) {
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(id);
     await screenshot(page, `en-created-${role}-receipt`);
     await signOut(page);
+    await page.getByRole('button', { name: /^(Sign in|Iniciar sesión)$/ }).click();
     await page.getByRole('button', { name: 'Usar un identificador local' }).click();
     await page.getByLabel('Identificador de cuenta local', { exact: false }).fill(id);
     await page.getByLabel('Contraseña local', { exact: false }).fill('Incorrect-member-password');
@@ -96,7 +97,7 @@ test('real session revocation through another client makes CSV export remove pri
     const response = page.waitForResponse(response => response.url().includes('/transactions/export.csv'));
     await page.getByRole('button', { name: 'Export CSV', exact: true }).click();
     expect((await response).status()).toBe(401);
-    await expect(page.getByRole('button', { name: 'Abrir espacio' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(Sign in|Iniciar sesión)$/ })).toBeVisible();
     await expect(page.locator('.p-main')).toHaveCount(0);
     await expect(page.locator('tbody tr')).toHaveCount(0);
   } finally { await other.dispose(); }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileUp, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { request } from '../../platform/client';
+import { useRecordFocus } from '../../argus/useRecordFocus';
 import { useResource } from '../../platform/hooks';
 import type { PlatformPageProps } from '../../platform/types';
 import { EmptyState, EvidenceLine, Modal, Money, PageHeader, Panel } from '../../platform/ui';
@@ -121,7 +122,7 @@ function PortfolioView({
 
       <Panel aria-labelledby="linked-title">
         <div className="investing-section-header"><div><h2 id="linked-title">{t.linkedAccounts}</h2><p className="p-muted">{t.linkedIntro}</p></div></div>
-        {portfolio.linked_accounts.length > 0 ? <div className="p-ledger">{portfolio.linked_accounts.map(account => <article className="p-ledger-row" key={account.id}>
+        {portfolio.linked_accounts.length > 0 ? <div className="p-ledger">{portfolio.linked_accounts.map(account => <article className="p-ledger-row" key={account.id} data-record-id={account.id} tabIndex={-1}>
           <div className="p-row-main"><strong>{account.name}</strong><EvidenceLine evidence={account.source} locale={locale} /></div>
           <div className="p-row-value"><strong><Money amount={account.balance} currency={account.currency} locale={locale} /></strong><span className="p-muted">{account.currency}</span></div>
         </article>)}</div> : <EmptyState title={t.noLinked} />}
@@ -138,7 +139,7 @@ function PortfolioView({
         </div>
         {portfolio.alternative_holdings.length > 0 ? <div className="p-ledger investing-holdings">{portfolio.alternative_holdings.map(holding => {
           const allocation = Math.max(0, Math.min(100, Number(holding.allocation_pct ?? 0)));
-          return <article className="p-ledger-row investing-holding" key={holding.id}>
+          return <article className="p-ledger-row investing-holding" key={holding.id} data-record-id={holding.id} tabIndex={-1}>
             <div className="p-row-main">
               <div className="investing-holding-name"><strong>{holding.name}</strong><span>{holding.symbol} · {quantityLabel(holding.quantity, locale)} {t.quantity.toLowerCase()}</span></div>
               <div className="investing-allocation" aria-label={`${t.allocation}: ${percentLabel(holding.allocation_pct, locale) ?? t.unavailable}`}><span style={{ width: `${allocation}%` }} /></div>
@@ -163,7 +164,7 @@ function PortfolioView({
 
 function ReceiptRow({ receipt, locale }: { receipt: OrderReceipt; locale: PlatformPageProps['locale'] }) {
   const t = copy(locale);
-  return <article className="p-ledger-row"><div className="p-row-main"><strong>{receipt.side === 'buy' ? t.buy : t.sell} · {receipt.symbol ?? receipt.bundle_id}</strong><span>{dateLabel(receipt.confirmed_at, locale)}</span><EvidenceLine evidence={receipt.source} locale={locale} /></div><div className="p-row-value"><strong><Money amount={receipt.gross} currency={receipt.currency} locale={locale} /></strong><span>{t.roundingCost}: <data value={receipt.rounding_cost}>{exactCurrencyLabel(receipt.rounding_cost, receipt.currency)}</data></span><span>{t.cashAfter}: <Money amount={receipt.cash_after} currency={receipt.currency} locale={locale} /></span></div></article>;
+  return <article className="p-ledger-row" data-record-id={receipt.id} tabIndex={-1}><div className="p-row-main"><strong>{receipt.side === 'buy' ? t.buy : t.sell} · {receipt.symbol ?? receipt.bundle_id}</strong><span>{dateLabel(receipt.confirmed_at, locale)}</span><EvidenceLine evidence={receipt.source} locale={locale} /></div><div className="p-row-value"><strong><Money amount={receipt.gross} currency={receipt.currency} locale={locale} /></strong><span>{t.roundingCost}: <data value={receipt.rounding_cost}>{exactCurrencyLabel(receipt.rounding_cost, receipt.currency)}</data></span><span>{t.cashAfter}: <Money amount={receipt.cash_after} currency={receipt.currency} locale={locale} /></span></div></article>;
 }
 
 function SimulationView({
@@ -189,10 +190,10 @@ function SimulationView({
   const { portfolio } = workspace;
   return <div className="investing-sections">
     <div className="investing-boundary" role="note"><strong>{t.simulation}</strong><span>{t.simulatedBoundary}</span><button className="p-button" onClick={onOrder}>{t.simulateChange}</button></div>
-    <Panel aria-labelledby="cash-title"><div className="investing-section-header"><div><h2 id="cash-title">{t.fictionalCash}</h2><p className="p-muted">{t.simulatedBoundary}</p></div></div>{portfolio.simulation.books.length > 0 ? <div className="p-ledger">{portfolio.simulation.books.map(book => <article className="p-ledger-row" key={book.id}><div className="p-row-main"><strong>{book.name}</strong><EvidenceLine evidence={book.source} locale={locale} /></div><div className="investing-book-values"><span><small>{t.fictionalCash}</small><strong><Money amount={book.cash} currency={book.currency} locale={locale} /></strong></span><span><small>{t.initialCash}</small><strong><Money amount={book.initial_cash} currency={book.currency} locale={locale} /></strong></span></div></article>)}</div> : <EmptyState title={t.unavailable} />}</Panel>
+    <Panel aria-labelledby="cash-title"><div className="investing-section-header"><div><h2 id="cash-title">{t.fictionalCash}</h2><p className="p-muted">{t.simulatedBoundary}</p></div></div>{portfolio.simulation.books.length > 0 ? <div className="p-ledger">{portfolio.simulation.books.map(book => <article className="p-ledger-row" key={book.id} data-record-id={book.id} tabIndex={-1}><div className="p-row-main"><strong>{book.name}</strong><EvidenceLine evidence={book.source} locale={locale} /></div><div className="investing-book-values"><span><small>{t.fictionalCash}</small><strong><Money amount={book.cash} currency={book.currency} locale={locale} /></strong></span><span><small>{t.initialCash}</small><strong><Money amount={book.initial_cash} currency={book.currency} locale={locale} /></strong></span></div></article>)}</div> : <EmptyState title={t.unavailable} />}</Panel>
     <Panel aria-labelledby="positions-title"><div className="investing-section-header"><div><h2 id="positions-title">{t.practicePositions}</h2></div></div>{portfolio.simulation.positions.length > 0 ? <div className="p-ledger">{portfolio.simulation.positions.map(position => <article className="p-ledger-row" key={`${position.book_id}-${position.symbol}`}><div className="p-row-main"><strong>{position.symbol}</strong><span>{quantityLabel(position.quantity, locale)} {t.quantity.toLowerCase()}</span><EvidenceLine evidence={position.source} locale={locale} /></div><div className="investing-holding-values"><dl><div><dt>{t.cost}</dt><dd><Money amount={position.total_cost} currency={position.currency} locale={locale} /></dd></div><div><dt>{t.marketValue}</dt><dd>{position.market_value === null ? t.unavailable : <Money amount={position.market_value} currency={position.currency} locale={locale} />}</dd></div><div><dt>{t.gainLoss}</dt><dd>{position.gain_loss === null ? t.unavailable : <><Money amount={position.gain_loss} currency={position.currency} locale={locale} /> <small><SignedPercent value={position.gain_loss_pct} locale={locale} /></small></>}</dd></div></dl></div></article>)}</div> : <EmptyState title={t.noPositions} action={<button className="p-button" onClick={onOrder}>{t.simulateChange}</button>} />}</Panel>
     <Panel aria-labelledby="bundles-title"><div className="investing-section-header"><div><h2 id="bundles-title">{t.bundles}</h2><p className="p-muted">{t.bundleIntro}</p></div></div><div className="investing-bundle-grid">{workspace.bundles.map(bundle => <article className="investing-bundle" key={bundle.id}><div><h3>{bundle.name}</h3><p>{bundle.description}</p></div><ul>{bundle.legs.map(leg => <li key={leg.symbol}><strong>{leg.symbol}</strong><span>{percentLabel(leg.weight_pct, locale)} {t.weight}</span></li>)}</ul><EvidenceLine evidence={bundle.source} locale={locale} /><button className="p-button-secondary" onClick={() => onBundle(bundle)}>{t.useBundle}</button></article>)}</div></Panel>
-    <Panel aria-labelledby="recurring-title"><div className="investing-section-header"><div><h2 id="recurring-title">{t.recurring}</h2><p className="p-muted">{t.recurringIntro}</p></div><button className="p-button" onClick={onPlan}><Plus size={16} />{t.createPlan}</button></div>{workspace.plans.length > 0 ? <div className="p-ledger">{workspace.plans.map(plan => <article className="p-ledger-row" key={plan.id}><div className="p-row-main"><strong>{plan.symbol ?? plan.bundle_id}</strong><span>{plan.cadence === 'weekly' ? t.weekly : t.monthly} · {t.nextRun}: {dateLabel(plan.next_run_on, locale)}</span><EvidenceLine evidence={plan.source} locale={locale} /></div><div className="p-row-value"><strong><Money amount={plan.amount} currency={plan.currency} locale={locale} /></strong><span>{plan.active ? t.active : t.paused}</span><div className="p-row-actions"><button className="p-button-ghost" disabled={pendingPlanId === plan.id} onClick={() => onTogglePlan(plan)}>{plan.active ? t.pause : t.resume}</button><button className="p-button-secondary" disabled={!plan.active || pendingPlanId === plan.id} onClick={() => onRunPlan(plan)}>{pendingPlanId === plan.id ? t.running : t.runPeriod}</button></div></div></article>)}</div> : <EmptyState title={t.noPlans} action={<button className="p-button" onClick={onPlan}>{t.createPlan}</button>} />}</Panel>
+    <Panel aria-labelledby="recurring-title"><div className="investing-section-header"><div><h2 id="recurring-title">{t.recurring}</h2><p className="p-muted">{t.recurringIntro}</p></div><button className="p-button" onClick={onPlan}><Plus size={16} />{t.createPlan}</button></div>{workspace.plans.length > 0 ? <div className="p-ledger">{workspace.plans.map(plan => <article className="p-ledger-row" key={plan.id} data-record-id={plan.id} tabIndex={-1}><div className="p-row-main"><strong>{plan.symbol ?? plan.bundle_id}</strong><span>{plan.cadence === 'weekly' ? t.weekly : t.monthly} · {t.nextRun}: {dateLabel(plan.next_run_on, locale)}</span><EvidenceLine evidence={plan.source} locale={locale} /></div><div className="p-row-value"><strong><Money amount={plan.amount} currency={plan.currency} locale={locale} /></strong><span>{plan.active ? t.active : t.paused}</span><div className="p-row-actions"><button className="p-button-ghost" disabled={pendingPlanId === plan.id} onClick={() => onTogglePlan(plan)}>{plan.active ? t.pause : t.resume}</button><button className="p-button-secondary" disabled={!plan.active || pendingPlanId === plan.id} onClick={() => onRunPlan(plan)}>{pendingPlanId === plan.id ? t.running : t.runPeriod}</button></div></div></article>)}</div> : <EmptyState title={t.noPlans} action={<button className="p-button" onClick={onPlan}>{t.createPlan}</button>} />}</Panel>
     <Panel aria-labelledby="orders-title"><div className="investing-section-header"><div><h2 id="orders-title">{t.recentOrders}</h2></div></div>{portfolio.simulation.recent_orders.length > 0 ? <div className="p-ledger">{portfolio.simulation.recent_orders.map(receipt => <ReceiptRow key={receipt.id} receipt={receipt} locale={locale} />)}</div> : <EmptyState title={t.noOrders} />}</Panel>
   </div>;
 }
@@ -200,8 +201,8 @@ function SimulationView({
 export function InvestmentsPage(props: PlatformPageProps) {
   const { locale, currency, query, revision, onNavigate, onChanged } = props;
   const t = copy(locale);
-  const activeTab = query.get('tab') === 'simulation' ? 'simulation' : 'portfolio';
   const focusCurrency = query.get('currency')?.toUpperCase();
+  const targetId = query.get('record_id') ?? query.get('account_id');
   const resource = useResource(async () => {
     const [portfolio, bundles, plans] = await Promise.all([
       request('/investing/portfolio', portfolioSchema),
@@ -210,6 +211,10 @@ export function InvestmentsPage(props: PlatformPageProps) {
     ]);
     return investingWorkspaceSchema.parse({ portfolio, bundles: bundles.items, plans: plans.items });
   }, [locale, currency, query.toString(), revision]);
+  const simulationRecords = resource.data ? [...resource.data.portfolio.simulation.books, ...resource.data.portfolio.simulation.recent_orders, ...resource.data.plans] : [];
+  const targetIsSimulation = simulationRecords.some(record => record.id === targetId);
+  const activeTab = query.get('tab') === 'simulation' || (!query.has('tab') && targetIsSimulation) ? 'simulation' : 'portfolio';
+  const recordRef = useRecordFocus<HTMLElement>(targetId, [resource.data, activeTab]);
   const [holdingDialog, setHoldingDialog] = useState<Holding | 'new' | null>(null);
   const [removeHolding, setRemoveHolding] = useState<Holding | null>(null);
   const [showImport, setShowImport] = useState(false);
@@ -259,7 +264,7 @@ export function InvestmentsPage(props: PlatformPageProps) {
     } catch (caught) { setActionError(caught); }
     finally { setPendingPlanId(null); }
   }
-  return <main className="investments-page">
+  return <main className="investments-page" ref={recordRef}>
     <PageHeader title={t.title} description={t.intro} actions={activeTab === 'simulation' ? <button className="p-button" onClick={() => { setSelectedBundle(undefined); setShowOrder(true); }}>{t.simulateChange}</button> : undefined}>
       <p className="p-muted">{resource.data ? `${t.asOf} ${dateLabel(resource.data.portfolio.as_of, locale)}` : ''}</p>
     </PageHeader>

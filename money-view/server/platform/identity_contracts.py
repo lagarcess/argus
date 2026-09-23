@@ -101,6 +101,16 @@ class Login(Model):
     household_id: str | None = Field(default=None, max_length=100)
 
 
+class GuestStart(Model):
+    locale: Literal["en", "es-419"]
+    mode: Literal["demo", "empty"]
+
+
+class GuestClaim(Model):
+    display_name: Name
+    password: Password
+
+
 class HouseholdSwitch(Model):
     household_id: str = Field(min_length=1, max_length=100)
 

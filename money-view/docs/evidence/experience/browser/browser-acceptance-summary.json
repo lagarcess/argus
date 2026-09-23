@@ -1,0 +1,15 @@
+{
+  "completed_at": "2026-09-21T07:08:58.938872+00:00",
+  "command": "CLARA_EVIDENCE_DIR=/Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/docs/evidence/experience/browser bun run test:e2e --trace off",
+  "passed": 50,
+  "failed": 1,
+  "duration": "3.7m",
+  "source_files_checked": 195,
+  "changed_source_files": [],
+  "added_source_files": [],
+  "test_ports_after_run": {
+    "8022": "closed",
+    "5192": "closed"
+  },
+  "screenshots": 107
+}

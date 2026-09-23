@@ -1,20 +1,43 @@
-import { z } from 'zod';
-import type { Locale } from '../contracts';
+import { z } from "zod";
+import type { Locale } from "../contracts";
 
-export type Page = 'overview' | 'accounts' | 'transactions' | 'spending' | 'budgets' | 'goals' | 'scenarios' | 'investments' | 'deposits' | 'credit' | 'tax-estate' | 'household' | 'membership' | 'help' | 'employer' | 'settings' | 'saved';
+export type Page =
+  | "chat"
+  | "overview"
+  | "accounts"
+  | "transactions"
+  | "spending"
+  | "budgets"
+  | "goals"
+  | "scenarios"
+  | "investments"
+  | "deposits"
+  | "credit"
+  | "tax-estate"
+  | "household"
+  | "membership"
+  | "help"
+  | "employer"
+  | "settings"
+  | "saved";
 
 export interface PlatformPageProps {
+  workspaceKey: string;
   locale: Locale;
   currency: string;
   query: URLSearchParams;
   revision: number;
-  onNavigate: (page: Page, query?: Record<string, string>) => void;
+  onNavigate: (
+    page: Page,
+    query?: Record<string, string>,
+    options?: { replace?: boolean },
+  ) => void;
   onChanged: () => void;
 }
 
 export const evidenceSchema = z.object({
   id: z.string(),
-  kind: z.enum(['synthetic', 'user', 'calculated', 'published']),
+  kind: z.enum(["synthetic", "user", "calculated", "published"]),
   title: z.string(),
   as_of: z.string(),
   recorded_at: z.string(),

@@ -1,3 +1,4 @@
+import { useModalBackDismiss } from "../argus/useModalBackDismiss";
 import {
   cloneElement,
   isValidElement,
@@ -221,18 +222,30 @@ export function Modal({
   children,
   footer,
   destructive = false,
+  variant = "default",
+  dismissible = true,
+  historyMode = "overlay",
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
   destructive?: boolean;
+  variant?: "default" | "search" | "drawer";
+  dismissible?: boolean;
+  historyMode?: "overlay" | "route";
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const locale = document.documentElement.lang;
+  useModalBackDismiss({
+    isOpen: historyMode === "overlay",
+    overlayId: id,
+    onDismiss: onClose,
+    canDismiss: () => dismissible,
+  });
   useEffect(() => {
     const dialog = ref.current;
     const opener =
@@ -260,15 +273,16 @@ export function Modal({
     <dialog
       ref={ref}
       className="p-modal"
+      data-variant={variant}
       role={destructive ? "alertdialog" : "dialog"}
       aria-labelledby={id}
       aria-modal="true"
       onCancel={(event) => {
         event.preventDefault();
-        closeRef.current();
+        if (dismissible) closeRef.current();
       }}
       onClick={(event) => {
-        if (event.target === event.currentTarget) {
+        if (dismissible && event.target === event.currentTarget) {
           const rect = event.currentTarget.getBoundingClientRect();
           if (
             event.clientX < rect.left ||
@@ -286,6 +300,7 @@ export function Modal({
           type="button"
           className="p-icon-button"
           data-modal-close
+          disabled={!dismissible}
           aria-label={locale === "en" ? "Close" : "Cerrar"}
           onClick={onClose}
         >

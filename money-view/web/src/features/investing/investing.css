@@ -67,9 +67,9 @@
 }
 
 .investing-currency.is-focused {
-  border-color: var(--p-accent, #315b3b);
-  box-shadow: inset 3px 0 0 var(--p-accent, #315b3b);
-  padding-left: 14px;
+  border-color: var(--p-blue, #638fa5);
+  box-shadow: inset 3px 0 0 var(--p-blue, #638fa5);
+  padding-inline-start: 14px;
 }
 
 .investing-currency-title .p-badge {
@@ -90,7 +90,7 @@
 
 .investments-page .investing-metrics .p-metric strong {
   font-size: 20px;
-  overflow-wrap: normal;
+  overflow-wrap: anywhere;
 }
 
 .investments-page .investing-primary-metric {
@@ -128,8 +128,8 @@
 }
 
 .investing-holding-name span,
-.p-row-main > span,
-.p-row-value > span {
+.investments-page .p-row-main > span,
+.investments-page .p-row-value > span {
   color: var(--p-muted, #5d6d64);
   font-size: 13px;
 }
@@ -147,11 +147,11 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #3d7568;
+  background: var(--p-teal, #428c86);
 }
 
 .investing-holding-values {
-  min-width: min(100%, 480px);
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -160,10 +160,10 @@
 
 .investing-holding-values dl {
   display: grid;
-  grid-template-columns: repeat(3, minmax(104px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px 24px;
   margin: 0;
-  text-align: right;
+  text-align: end;
 }
 
 .investing-holding-values dl div {
@@ -201,7 +201,7 @@
 }
 
 .investing-return {
-  color: #3d7568;
+  color: var(--p-teal, #428c86);
   font-size: 18px;
 }
 
@@ -220,14 +220,14 @@
 
 .investing-line {
   fill: none;
-  stroke: #3d7568;
+  stroke: var(--p-teal, #428c86);
   stroke-width: 3;
   stroke-linecap: round;
 }
 
 .investing-point {
   fill: var(--p-surface, #fffefa);
-  stroke: #205840;
+  stroke: var(--p-teal, #428c86);
   stroke-width: 3;
 }
 
@@ -242,20 +242,20 @@
   align-items: center;
   gap: 12px 20px;
   padding: 16px 18px;
-  border: 1px solid #819482;
+  border: 1px solid var(--p-control);
   border-radius: 10px;
   background: var(--p-selected, #e8efe6);
 }
 
 .investing-boundary > span {
-  color: #3f514a;
+  color: var(--p-body);
 }
 
 .investing-book-values {
   display: grid;
-  grid-template-columns: repeat(2, minmax(130px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 28px;
-  text-align: right;
+  text-align: end;
 }
 
 .investing-book-values > span {
@@ -393,7 +393,7 @@
 
   .investing-holding-values dl {
     grid-template-columns: 1fr;
-    text-align: left;
+    text-align: start;
   }
 
   .investing-holding-values dl div {
@@ -403,7 +403,7 @@
   }
 
   .investing-holding-values dd {
-    text-align: right;
+    text-align: end;
   }
 
   .investing-holding-values .p-row-actions {
@@ -420,11 +420,11 @@
 
   .investing-book-values {
     width: 100%;
-    text-align: left;
+    text-align: start;
   }
 
   .investing-book-values > span:last-child {
-    text-align: right;
+    text-align: end;
   }
 }
 
@@ -434,7 +434,7 @@
   }
 
   .investing-book-values > span:last-child {
-    text-align: left;
+    text-align: start;
   }
 
   .investing-benchmark-heading,
@@ -451,4 +451,32 @@
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+.platform-shell .investments-page :is(.p-page-header, .p-actions, .p-row-actions, .p-row-main, .p-field, .investing-holding-name, .investing-currency-title, .investing-book-values) { min-width: 0; }
+.platform-shell .investments-page :is(h2, h3, p, strong, .p-money, .p-badge) { overflow-wrap: anywhere; }
+.platform-shell .investments-page :is(button, input, select, textarea) { min-height: 44px; font-size: 16px; }
+.platform-shell .investments-page :is(input, select, textarea) { width: 100%; min-width: 0; }
+.platform-shell .investments-page :is(input[type=checkbox], input[type=radio]) { width: 20px; min-height: 20px; }
+.platform-shell .investments-page .p-actions { flex-wrap: wrap; gap: 10px; }
+.platform-shell .investments-page .p-actions > button { white-space: normal; max-width: 100%; }
+.platform-shell .investments-page .p-tabs { flex-wrap: wrap; overflow: visible; gap: 8px; }
+.platform-shell .investments-page .p-tabs button { white-space: normal; }
+.platform-shell .investments-page .p-evidence-detail { max-width: 100%; }
+.platform-shell .investments-page .investing-holding-values { flex: 1 1 100%; }
+.platform-shell .investments-page .investing-holding-values dl { min-width: 0; }
+.platform-shell .investments-page .investing-chart-table { width: 100%; table-layout: fixed; }
+.platform-shell .investments-page .investing-chart-table :is(th, td) { white-space: normal; overflow-wrap: anywhere; padding: 12px 8px; }
+@media (max-width: 1023px) {
+  .platform-shell .investments-page .p-page-header > .p-actions { width: 100%; justify-content: start; }
+  .platform-shell .investments-page .investing-boundary { grid-template-columns: minmax(0, 1fr); }
+  .platform-shell .investments-page .investing-holding-values dl { grid-template-columns: repeat(3, minmax(0, 1fr)); text-align: start; }
+}
+@media (max-width: 599px) {
+  .platform-shell .investments-page .investing-holding-values dl { grid-template-columns: minmax(0, 1fr); }
+  .platform-shell .investments-page .investing-holding-values dl div { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .platform-shell .investments-page .investing-book-values { grid-template-columns: minmax(0, 1fr); text-align: start; }
+  .platform-shell .investments-page .investing-book-values > span:last-child { text-align: start; }
+  .platform-shell .investments-page .investing-receipt .p-metrics { gap: 16px; }
+  .platform-shell .investments-page .p-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

@@ -3,7 +3,7 @@ const es = {
   money: 'Tu dinero',
   saved: 'Guardados',
   headline: 'Tu dinero, con más claridad.',
-  withClara: 'Con Clara',
+  withClara: 'Con Argus',
   sample: 'Ejemplo ilustrativo',
   syntheticSource: 'Fuente simulada',
   publishedSource: 'Fuente publicada',
@@ -93,7 +93,7 @@ const es = {
   unavailable: 'No hay una fuente completa disponible para calcular.',
   lastGood: 'Última carga válida',
   networkError:
-    'No pudimos conectar con Clara. Comprueba que el servidor local siga abierto e inténtalo de nuevo.',
+    'No pudimos conectar con Argus. Comprueba que el servidor local siga abierto e inténtalo de nuevo.',
   genericError: 'No se pudo completar la solicitud. Inténtalo de nuevo.',
   invalidResponse:
     'La respuesta no tiene todos los datos necesarios. No se muestran valores incompletos.',
@@ -138,7 +138,7 @@ const en: Copy = {
   money: 'Your money',
   saved: 'Saved',
   headline: 'Your money, with more clarity.',
-  withClara: 'With Clara',
+  withClara: 'With Argus',
   sample: 'Illustrative example',
   syntheticSource: 'Simulated source',
   publishedSource: 'Published source',
@@ -227,7 +227,7 @@ const en: Copy = {
   stale: 'Sources could not be updated. The last valid data is preserved.',
   unavailable: 'No complete source is available to calculate.',
   lastGood: 'Last valid load',
-  networkError: 'Could not connect to Clara. Check that the local server is running and try again.',
+  networkError: 'Could not connect to Argus. Check that the local server is running and try again.',
   genericError: 'The request could not be completed. Try again.',
   invalidResponse: 'The response is missing required data. Incomplete values are not displayed.',
   noModel:

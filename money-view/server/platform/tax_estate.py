@@ -1,9 +1,10 @@
 """Personal worksheets and inventories, without tax or legal execution."""
 
+import json
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from .common import (
     CURRENCY_DIGITS,
@@ -145,15 +146,38 @@ def complete_organizer(
 def tax_scenario(
     payload: TaxScenario, *, store: StoreDependency, context: ContextDependency
 ):
-    with store.connection() as db:
+    """Save one immutable worksheet from the source records visible now."""
+    with store.connection(write=True) as db:
+        assert_active_context(db, context)
         organizer = record(
             db, "p_tax_organizers", context.household_id, payload.organizer_id
         )
         items = [
-            r
-            for r in rows(db, "p_tax_items", context.household_id)
-            if r["organizer_id"] == payload.organizer_id
+            json.loads(row[0])
+            for row in db.execute(
+                "SELECT document FROM p_tax_items WHERE household_id=? AND json_extract(document,'$.organizer_id')=? ORDER BY id",
+                (context.household_id, payload.organizer_id),
+            )
         ]
+        scenario = new_record(payload, "tax-scenario")
+        result = calculate_tax_scenario(payload, organizer, items, scenario)
+        document = {
+            **scenario,
+            **result,
+            "inputs": {
+                "organizer": organizer,
+                "items": items,
+                "user_rate_pct": str(payload.user_rate_pct),
+            },
+        }
+        db.execute(
+            "INSERT INTO p_tax_scenarios(id,household_id,document) VALUES(?,?,?)",
+            (scenario["id"], context.household_id, json.dumps(document)),
+        )
+        return document
+
+
+def calculate_tax_scenario(payload, organizer, items, scenario):
     income = sum(
         (Decimal(r["amount"]) for r in items if r["kind"] == "income"), Decimal(0)
     )
@@ -167,7 +191,7 @@ def tax_scenario(
     financial_items = [item for item in items if item["kind"] in ("income", "expense")]
     calculated_at = now()
     source = evidence(
-        f"tax-scenario-{organizer['id']}",
+        scenario["id"],
         min(
             (item["effective_on"] for item in financial_items),
             default=calculated_at.date().isoformat(),
@@ -176,7 +200,7 @@ def tax_scenario(
         "(recorded income - recorded expenses) * user_rate_pct / 100",
     )
     source["inputs"] = [organizer["id"], *[item["id"] for item in financial_items]]
-    return {
+    result = {
         "income": str(income),
         "expenses": str(expenses),
         "net_amount": str(net),
@@ -195,8 +219,43 @@ def tax_scenario(
             }
             for item in financial_items
         ],
-        "rate_evidence": evidence(f"tax-rate-{organizer['id']}", calculated_at.date()),
+        "rate_evidence": evidence(f"{scenario['id']}-rate", calculated_at.date()),
     }
+    return result
+
+
+@router.get("/tax/scenarios/{scenario_id}")
+def get_tax_scenario(
+    scenario_id: str, *, store: StoreDependency, context: ContextDependency
+):
+    with store.connection() as db:
+        return record(db, "p_tax_scenarios", context.household_id, scenario_id)
+
+
+@router.get("/tax/scenarios")
+def list_tax_scenarios(
+    *,
+    store: StoreDependency,
+    context: ContextDependency,
+    organizer_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    with store.connection() as db:
+        record(db, "p_tax_organizers", context.household_id, organizer_id)
+        parameters = (context.household_id, organizer_id)
+        condition = "household_id=? AND json_extract(document,'$.organizer_id')=?"
+        count = db.execute(
+            f"SELECT COUNT(*) FROM p_tax_scenarios WHERE {condition}", parameters
+        ).fetchone()[0]
+        items = [
+            dict(row)
+            for row in db.execute(
+                f"SELECT id,json_extract(document,'$.recorded_at') AS recorded_at,json_extract(document,'$.user_rate_pct') AS user_rate_pct FROM p_tax_scenarios WHERE {condition} ORDER BY rowid DESC LIMIT ? OFFSET ?",
+                (*parameters, limit, offset),
+            )
+        ]
+        return {"items": items, "count": count, "limit": limit, "offset": offset}
 
 
 @router.get("/tax/organizers/{organizer_id}/export")

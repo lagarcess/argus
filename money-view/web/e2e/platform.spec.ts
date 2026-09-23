@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test, expect, login, navigate, read, screenshot, noOverflow, evidenceDirectory } from './fixtures';
+import { test, expect, login, navigate, read, screenshot, noOverflow, evidenceDirectory, openSettingsPanel } from './fixtures';
 
 for (const locale of ['en', 'es'] as const) {
   test(`${locale}: real ledger import, edit and bounded full-volume pagination`, async ({ page }, testInfo) => {
@@ -30,9 +30,11 @@ for (const locale of ['en', 'es'] as const) {
     await navigate(page, 'transactions');
     await page.getByRole('button', { name: en ? 'Import CSV' : 'Importar CSV', exact: true }).click();
     await dialog.getByRole('combobox', { name: en ? 'Account' : 'Cuenta', exact: true }).selectOption(account.id);
+    await dialog.locator('summary').filter({ hasText: en ? 'Paste content' : 'Pegar contenido' }).click();
     await dialog.getByLabel(en ? 'CSV content' : 'Contenido CSV').fill('date,merchant,description,amount,currency,category,kind\n2026-09-18,Browser market,Weekly groceries,-45.50,USD,groceries,expense\n');
-    await dialog.getByRole('button', { name: en ? 'Validate file' : 'Validar archivo' }).click();
-    await dialog.getByRole('button', { name: en ? 'Confirm import' : 'Confirmar importación' }).click();
+    await dialog.getByRole('button', { name: en ? 'Read columns' : 'Leer columnas' }).click();
+    await dialog.getByRole('button', { name: en ? 'Prepare review' : 'Preparar revisión' }).click();
+    await dialog.getByRole('button', { name: en ? 'Save reviewed transactions' : 'Guardar movimientos revisados' }).click();
     await expect(dialog.getByRole('status')).toContainText('1');
     await dialog.getByRole('button', { name: en ? 'Done' : 'Listo', exact: true }).click();
     // The same UI filter scopes the displayed rows and the full-filter totals.
@@ -90,7 +92,7 @@ test('budget, recurring payment, allocated goal and immutable scenario', async (
   await page.getByLabel('Scenario name').fill('Browser retirement baseline');
   await page.getByRole('button', { name: 'Calculate', exact: true }).click();
   await page.getByRole('button', { name: 'Save receipt', exact: true }).click();
-  await expect(page.getByRole('status')).toBeVisible();
+  await expect.poll(async () => (await read(page, '/scenarios')).items.some((item: {name:string}) => item.name === 'Browser retirement baseline')).toBe(true);
   const baseline = (await read(page, '/scenarios')).items.find((item: {name:string}) => item.name === 'Browser retirement baseline');
   const original = await read(page, `/scenarios/${baseline.id}`);
   await page.getByLabel('Scenario name').fill('Browser retirement revised');
@@ -144,43 +146,66 @@ test('mobile settings, confirmed memory, privacy and keyless saved assistant', a
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
   await navigate(page, 'settings');
-  await page.getByRole('button', { name: /^Profile / }).click();
+  await openSettingsPanel(page, 'profile');
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Display name', { exact: true }).fill('Browser household owner');
   await dialog.getByRole('button', { name: 'Save changes' }).click();
   await expect(dialog).toHaveCount(0);
-  await page.getByRole('button', { name: /^Appearance / }).click();
+  await openSettingsPanel(page, 'appearance');
   await dialog.getByRole('radio', { name: 'Dark', exact: true }).check();
   await dialog.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.locator('.platform-shell')).toHaveAttribute('data-theme', 'dark');
-  await page.getByRole('button', { name: /^Confirmed memories / }).click();
+  await openSettingsPanel(page, 'memories');
   await dialog.getByRole('button', { name: 'Add memory' }).click();
   await dialog.getByLabel('Memory', { exact: true }).fill('Keep a separate emergency reserve.');
   await dialog.getByRole('checkbox', { name: 'I confirm this fact is correct and want to save it.' }).check();
   await dialog.getByRole('button', { name: 'Save changes' }).click();
   await expect(dialog.getByText('Keep a separate emergency reserve.', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Privacy', exact: true }).click();
+  await openSettingsPanel(page, 'privacy');
   await expect(dialog).toContainText(/local/i);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Ask Clara', exact: true }).click();
-  await dialog.getByLabel('Your question').fill('What should my next step be?');
-  await dialog.getByRole('button', { name: 'Ask', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toHaveText('Text interpretation is unavailable. You can use the prepared questions.');
-  await dialog.getByRole('button', { name: 'See my net worth', exact: true }).click();
-  await expect(dialog.locator('.ca-fact')).not.toHaveCount(0);
-  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(dialog.getByRole('button', { name: 'Remove from saved' })).toBeVisible();
+  await navigate(page, 'chat');
+  await page.getByTestId('chat-input').fill('What should my next step be?');
+  await page.getByTestId('chat-send').click();
+  await expect(page.getByRole('alert')).toContainText('Text interpretation is unavailable');
+  await navigate(page, 'chat');
+  const netWorthResponse = page.waitForResponse(response => response.url().endsWith('/api/platform/chat/turn'));
+  await page.locator('[data-example-id="net-worth"]').click();
+  const netWorth = await netWorthResponse;
+  expect(netWorth.ok(), `net-worth turn: ${netWorth.status()} ${netWorth.ok() ? '' : await netWorth.text()}`).toBe(true);
+  await expect(page.locator('.argus-fact')).not.toHaveCount(0);
+  const conversationId = new URLSearchParams(new URL(page.url()).hash.split('?')[1]).get('conversation_id');
+  expect(conversationId).toBeTruthy();
+  const thread = page.getByTestId('conversation-page');
+  await thread.locator('summary[aria-label="Conversation actions"]').click();
+  await thread.getByRole('menuitem', { name: 'Pin', exact: true }).click();
+  await expect.poll(async () => (await read(page, `/chat/conversations/${conversationId}`)).conversation.pinned).toBe(true);
+  const savedMessages = (await read(page, `/chat/conversations/${conversationId}`)).messages;
   await screenshot(page, 'en-390-assistant-sources');
-  await dialog.locator('.ca-fact').first().scrollIntoViewIfNeeded();
+  await page.locator('.argus-fact').first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(evidenceDirectory, 'en-390-assistant-facts.png'), fullPage: false, animations: 'disabled' });
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Ask Clara', exact: true })).toBeFocused();
   await page.reload();
   expect((await read(page, '/settings')).profile.display_name).toBe('Browser household owner');
   expect((await read(page, '/settings/memories')).items).toHaveLength(1);
-  await navigate(page, 'saved');
-  await expect(page.getByText('See my net worth').first()).toBeVisible();
+  expect((await read(page, `/chat/conversations/${conversationId}`)).messages).toEqual(savedMessages);
+  await navigate(page, 'overview');
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.getByTestId('recent-conversations').locator(`[data-conversation-id="${conversationId}"]`).getByRole('button').first().click();
+  await expect(page).toHaveURL(new RegExp(`conversation_id=${conversationId}`));
+  await expect(page.locator('.argus-fact')).not.toHaveCount(0);
+  await noOverflow(page);
+});
+
+test('Spanish 320: header actions reflow with increased text spacing', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  await login(page, 'es');
+  await navigate(page, 'transactions');
+  await page.addStyleTag({ content: '.p-page-header button { letter-spacing: .12em; word-spacing: .16em; }' });
+  await noOverflow(page);
+  await screenshot(page, 'es-320-transactions-text-spacing');
+  await page.getByRole('button', { name: 'Importar CSV', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
   await noOverflow(page);
 });
 
@@ -201,7 +226,7 @@ for (const width of [1440, 1024, 768, 390, 320]) {
       await noOverflow(page);
       if ([1440, 390].includes(width) && ['overview', 'transactions'].includes(route)) await screenshot(page, `es-${width}-${route}`);
     }
-    await page.getByRole('button', { name: 'Privacidad', exact: true }).click();
+    await openSettingsPanel(page, 'privacy');
     await expect(page.getByRole('dialog')).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -248,6 +273,21 @@ test('credit, tax, estate and membership produce local receipts', async ({ page 
   const downloadEvent = page.waitForEvent('download');
   await page.getByRole('link', { name: 'Download JSON records', exact: true }).click();
   expect((await downloadEvent).suggestedFilename()).toMatch(/\.json$/);
+  await page.getByLabel('Scenario rate (%)', { exact: true }).fill('10');
+  await page.getByRole('button', { name: 'Calculate worksheet', exact: true }).click();
+  await expect(page).toHaveURL(/record_id=tax-scenario-/);
+  const taxId = new URLSearchParams(new URL(page.url()).hash.split('?')[1]).get('record_id');
+  const worksheet = page.locator(`.services-result[data-record-id="${taxId}"]`);
+  await expect(worksheet).toBeVisible();
+  const worksheetText = await worksheet.innerText();
+  await page.reload();
+  await expect(worksheet).toHaveText(worksheetText, { useInnerText: true });
+  await expect(page.getByRole('combobox', { name: 'Saved worksheets', exact: true })).toHaveValue(taxId!);
+  await page.getByLabel('Scenario rate (%)', { exact: true }).fill('12');
+  await page.getByRole('button', { name: 'Calculate worksheet', exact: true }).click();
+  await expect(page.locator('.services-result')).toContainText('(12%)');
+  await page.getByRole('combobox', { name: 'Saved worksheets', exact: true }).selectOption(taxId!);
+  await expect(worksheet).toHaveText(worksheetText, { useInnerText: true });
   await page.getByRole('button', { name: 'Estate inventory', exact: true }).click();
   await page.getByRole('button', { name: 'Add asset', exact: true }).click();
   await dialog.getByLabel('Asset name', { exact: true }).fill('Browser keepsake');
@@ -289,7 +329,7 @@ test('credit, tax, estate and membership produce local receipts', async ({ page 
 test('viewer permissions and other-household isolation are visible', async ({ page }) => {
   await login(page, 'en', 'user-viewer');
   await navigate(page, 'settings');
-  await page.getByRole('button', { name: /^Data controls / }).click();
+  await openSettingsPanel(page, 'data');
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('button', { name: 'Reset household data' })).toBeDisabled();
   await page.keyboard.press('Escape');
@@ -303,10 +343,10 @@ test('viewer permissions and other-household isolation are visible', async ({ pa
   expect((await read(page, '/accounts')).total).toBe(before.total);
   await page.keyboard.press('Escape');
   await navigate(page, 'settings');
-  await page.getByRole('button', { name: /^Security and sessions / }).click();
+  await openSettingsPanel(page, 'security');
   await dialog.getByRole('button', { name: 'End all sessions' }).click();
   await dialog.getByRole('button', { name: 'Confirm sign out' }).click();
-  await expect(page.getByRole('button', { name: 'Abrir espacio' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^(Sign in|Iniciar sesión)$/ })).toBeVisible();
   await login(page, 'es', 'user-other');
   const other = await read(page, '/transactions?limit=25');
   expect(other.total).toBeLessThan(12_000);
@@ -317,11 +357,11 @@ test('household export and deliberate local reset survive reload', async ({ page
   await login(page);
   const settings = await read(page, '/settings');
   await navigate(page, 'settings');
-  await page.getByRole('button', { name: /^Data controls / }).click();
+  await openSettingsPanel(page, 'data');
   const dialog = page.getByRole('dialog');
   const download = page.waitForEvent('download');
   await dialog.getByRole('button', { name: 'Export household data (JSON)' }).click();
-  expect((await download).suggestedFilename()).toBe('clara-household.json');
+  expect((await download).suggestedFilename()).toBe('argus-household.json');
   await dialog.getByRole('button', { name: 'Reset household data' }).click();
   await expect(dialog.getByRole('button', { name: 'Empty this household' })).toBeDisabled();
   await dialog.getByLabel('Confirm the name', { exact: false }).fill(settings.household.name);
@@ -332,7 +372,7 @@ test('household export and deliberate local reset survive reload', async ({ page
   expect((await read(page, '/transactions')).total).toBe(0);
   await page.keyboard.press('Escape');
   await navigate(page, 'overview');
-  await expect(page.getByText('Empieza con una cuenta', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Empieza con una cuenta', exact: true })).toBeVisible();
   await screenshot(page, 'es-reset-empty-state');
 });
 
@@ -345,10 +385,14 @@ test('320px initial overview derives household currency before any user change',
     if (url.pathname === '/api/platform/overview') currencies.push(url.searchParams.get('currency') ?? '');
   });
   await login(page, 'es', 'user-demo', 'default');
-  await expect(page.locator('.p-networth-main')).toContainText('DOP');
+  await navigate(page, 'overview');
+  const session = await read(page, '/session');
+  const initialCurrency = session.currency_context.currency;
+  expect(initialCurrency).not.toBeNull();
+  await expect(page.locator('.p-networth-main')).toContainText(initialCurrency);
   expect(currencies.length).toBeGreaterThan(0);
-  expect(currencies.every(currency => currency === 'DOP')).toBe(true);
-  await expect(page.getByText('Modo demo', { exact: true })).toBeVisible();
+  expect(currencies.every(currency => currency === initialCurrency)).toBe(true);
+  await expect(page.getByText('Espacio local', { exact: true }).first()).toBeVisible();
   await noOverflow(page);
   await page.getByRole('button', { name: /^Avisos/ }).click();
   await expect(page.getByRole('dialog', { name: 'Tus avisos' })).toBeVisible();

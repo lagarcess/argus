@@ -1,0 +1,29 @@
+$ playwright test --trace off "e2e/experience.spec.ts" "e2e/experience-import.spec.ts"
+(node:86485) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:86486) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 14 tests using 1 worker
+
+(node:86488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:86488) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:86488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/experience-import.spec.ts:6:3 › en: empty guest maps a statement in owned currency and reviews duplicate intake (5.0s)
+  ✓   2 e2e/experience-import.spec.ts:6:3 › es: empty guest maps a statement in owned currency and reviews duplicate intake (4.8s)
+  ✓   3 e2e/experience.spec.ts:7:3 › en: empty guest begins with unknown currency and no manufactured money (2.5s)
+  ✓   4 e2e/experience.spec.ts:27:5 › en 1440: guest money and Omnisearch keyboard selection preserve record identity (6.0s)
+  ✓   5 e2e/experience.spec.ts:27:5 › en 1024: guest money and Omnisearch keyboard selection preserve record identity (5.8s)
+  ✓   6 e2e/experience.spec.ts:27:5 › en 768: guest money and Omnisearch keyboard selection preserve record identity (5.9s)
+  ✓   7 e2e/experience.spec.ts:27:5 › en 390: guest money and Omnisearch keyboard selection preserve record identity (5.6s)
+  ✓   8 e2e/experience.spec.ts:27:5 › en 320: guest money and Omnisearch keyboard selection preserve record identity (5.4s)
+  ✓   9 e2e/experience.spec.ts:7:3 › es: empty guest begins with unknown currency and no manufactured money (2.6s)
+  ✓  10 e2e/experience.spec.ts:27:5 › es 1440: guest money and Omnisearch keyboard selection preserve record identity (5.7s)
+  ✓  11 e2e/experience.spec.ts:27:5 › es 1024: guest money and Omnisearch keyboard selection preserve record identity (5.8s)
+  ✓  12 e2e/experience.spec.ts:27:5 › es 768: guest money and Omnisearch keyboard selection preserve record identity (5.9s)
+  ✓  13 e2e/experience.spec.ts:27:5 › es 390: guest money and Omnisearch keyboard selection preserve record identity (5.6s)
+  ✓  14 e2e/experience.spec.ts:27:5 › es 320: guest money and Omnisearch keyboard selection preserve record identity (5.6s)
+
+  14 passed (1.2m)

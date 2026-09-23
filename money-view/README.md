@@ -1,10 +1,17 @@
-# Clara
+# Argus, local finance workspace
 
-Clara is a local personal finance app with an account-first overview, direct task
-pages and a contextual assistant. It opens in Spanish and supports English.
-The seeded household has 14 accounts and 13,680 Faker-generated transactions
+Argus combines a money view with its familiar conversation, composer and
+Omnisearch. Inspect a financial record, ask about it, confirm a proposed change
+and reopen the same artifact from either surface. Spanish comes first; English
+is available. The cream and forest palette uses the existing Argus fonts,
+interaction patterns and responsive navigation.
+
+The guest entry offers an isolated prepared household or an empty workspace.
+The larger demo profile has 14 accounts and 13,680 Faker-generated transactions
 over 24 months, including salaries, refunds, transfers, pending entries and four
-currencies. No API key is needed to explore the demo.
+currencies. Prepared questions and artifact confirmations work without an API
+key. Free text requires an explicitly configured model; the demo does not fake
+language interpretation.
 
 ## Run locally
 
@@ -20,15 +27,19 @@ cd ..
 .venv/bin/python -m uvicorn server.app:app --host 127.0.0.1 --port 8012
 ```
 
-Open [Clara on port 8012](http://127.0.0.1:8012). Select a local demo profile and
-use the password `Clara-demo-2026!`. The profiles include owner, editor and viewer
+Open [Argus on port 8012](http://127.0.0.1:8012). Explore the guest demo, start
+with an empty workspace, or open Sign in and select a local demo profile. Use
+the password `Clara-demo-2026!`. The profiles include owner, editor and viewer
 roles, plus a separate household for isolation checks. These are deliberately
 public fixture credentials, not credentials for a hosted service.
 
 The API serves the built app and stores data in `.local/clara.sqlite3`.
-`CLARA_DATABASE_PATH` selects a different local database. Clara reads no `.env`
-and imports no Argus runtime. Set any optional configuration explicitly in the
-Clara process environment; do not edit or reuse parent `.env` files.
+`CLARA_DATABASE_PATH` selects a different local database. The existing `CLARA_*`
+configuration names and fixture password remain compatible. The local app reads
+no `.env` and does not import the production application bootstrap. Pure Argus
+calculators are generated from hash-pinned source files; the local LangGraph
+planner uses explicitly configured OpenRouter transport. Do not edit or reuse
+parent `.env` files.
 
 For frontend development, keep the API running and run this in another terminal
 from `money-view/web/`:
@@ -45,12 +56,12 @@ Open [the development app on port 5178](http://127.0.0.1:5178). Vite proxies
 | Page | Local workflows |
 | --- | --- |
 | Overview and accounts | Inspect dated balances, net worth and spending by currency; review connections and failed refreshes. |
-| Transactions | Search and filter the full ledger, page through results, edit categories, split transactions, and preview validated CSV imports before committing. |
+| Transactions | Search and filter the full ledger, page through results, edit categories, split transactions, and map CSV/TSV statement columns, review duplicates and confirm a frozen import before writing. |
 | Planning | Set budgets, record recurring bill payments, allocate goals, and save life-event or retirement scenarios with immutable assumptions and results. |
 | Investing | Inspect holdings, allocation and performance; preview and confirm simulated orders, bundles and recurring plans in a separate fictional cash book. |
 | Services | Explore credit and payoff calculations, tax organizers, estate records, local appointment reservations, memberships and employer benefits. |
 | Settings | Manage local sessions, passwords, profiles, language, appearance, household roles, confirmed memories, history, export, reset, account deletion and locally saved feedback. |
-| Assistant | Ask prepared grounded questions, open their source records, save conversations and reopen history. Optional configured semantic interpretation supports free text. |
+| Chat and Omnisearch | Read owned records, use Argus calculations, confirm typed artifact changes, pin/rename/archive conversations and reopen exact records. Export complete bounded conversations; older receipts remain accessible. |
 | Deposits | Edit an amount and horizon, confirm, calculate, inspect dated receipts, save, and compare before/after results when a simulated publication changes. |
 
 Financial totals derive from the account and transaction ledger. Currencies stay
@@ -87,10 +98,13 @@ rate semantics. BCRD's machine schema and real-data reuse permission remain
 unresolved. Missing credentials or metadata never silently become fixture data.
 See [provider feasibility](docs/provider-feasibility.md).
 
-No live language-model evaluation has been completed. An optional
-OpenAI-compatible interpreter reads `CLARA_LLM_API_KEY`, `CLARA_LLM_BASE_URL`
+No live language-model evaluation has been completed. The local structured
+OpenRouter planner reads `CLARA_LLM_API_KEY`, `CLARA_LLM_BASE_URL`
 and `CLARA_LLM_MODEL` from explicit process configuration. It interprets the
-question; deterministic domain code owns financial values and calculations.
+question once; deterministic domain code owns financial values and calculations.
+The transport explicitly disables SDK retries, ambient tracing and redirects.
+Jev was investigated as a classification candidate; it is not enabled and no
+application latency improvement has been measured. See [Jev findings](docs/experience/JEV.md).
 Shared semantic admission counts attempts and concurrent calls. Those limits
 are not dollar budgets, and provider pricing is reported as unknown.
 
@@ -159,20 +173,23 @@ rates describe averages paid on balances; a branch may quote something different
 Run deterministic checks from `money-view/`:
 
 ```sh
+.venv/bin/python scripts/sync_argus_core.py --check
 .venv/bin/python -m pytest -c pytest.ini tests -q
-.venv/bin/python -m ruff check server tests
+.venv/bin/python -m ruff check server tests scripts
 cd web
 bun run build
+bun run test:unit
 bun run test:e2e
 ```
 
 Browser checks use isolated loopback processes, the actual API and temporary
 SQLite data. Browser installation may require `bunx playwright install chromium`
-once. Final CI, final review and capacity acceptance remain in progress. See the
-[platform plan](docs/PLATFORM_PLAN.md) for the current delivery checklist and the
-[prior PR audit](docs/PR_REVIEW_AUDIT.md) for the completed deposit review loop.
+once. The [experience verification](docs/evidence/experience/verification.md)
+records the exact local evidence and remaining provider/hosting limits. The
+[experience plan](docs/experience/PLAN.md) tracks private delivery; the
+[prior PR audit](docs/PR_REVIEW_AUDIT.md) records the earlier clean review loops.
 
-Clara supports local authenticated households and multiple processes sharing
+Argus supports local authenticated households and multiple processes sharing
 one SQLite database on one host. That does not qualify it for public hosting.
 The [scale design](docs/SCALE_DESIGN.md) defines the proposed 10,000-monthly-user
 workload; [scale evidence](docs/SCALE_EVIDENCE.md) separates local measurements
@@ -180,7 +197,16 @@ from remaining qualification. Full retention volume, sustained heavy-household
 traffic and the target hosting hardware still require acceptance evidence.
 Monthly active users are not simultaneous connections.
 
-All delivery remains in the isolated Clara lane. The only authorized PR target
+All delivery remains in the isolated Argus finance lane. The only authorized PR target
 and merge destination is `codex/money-placement-pilot`. There is no merge to
 `main` or `codex/private-alpha-next`, deployment, production change, Supabase
 connection or migration in this work.
+
+## Experience implementation
+
+The [experience plan](docs/experience/PLAN.md), [architecture](docs/experience/ARCHITECTURE.md),
+[presentation reuse](docs/experience/REUSE.md) and [calculation provenance](docs/experience/CORE_REUSE.md)
+record the local integration choices. Guest workspaces expire after 24 hours unless
+claimed locally. Drafts are scoped to the user, household and data generation.
+Only CSV/TSV statements are supported; PDF, spreadsheets and images are rejected
+explicitly. File contents never become model instructions.

@@ -12,7 +12,7 @@ from itertools import islice
 from typing import Annotated, Callable
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from ..store import Store
 from .common import (
@@ -26,8 +26,11 @@ from .common import (
     now,
     require_owner,
 )
+from .currency_context import resolve_currency_context
 from .identity_contracts import (
     COUNTRY_CURRENCY,
+    GuestClaim,
+    GuestStart,
     HouseholdPatch,
     HouseholdSwitch,
     LocalMember,
@@ -37,6 +40,8 @@ from .identity_contracts import (
     Preferences,
     SessionRevoke,
 )
+from .identity_guest import GUEST_AGE, MAX_GUEST_WORKSPACES, guest_status
+from .identity_guest import SCHEMA as GUEST_SCHEMA
 from .identity_lifecycle import SCHEMA as LIFECYCLE_SCHEMA
 
 COOKIE = "clara_session"
@@ -134,8 +139,9 @@ def household(row) -> dict:
     result["effective_currency"] = (
         row["currency_override"]
         if row["currency_override"] is not None
-        else COUNTRY_CURRENCY[row["country"]]
+        else COUNTRY_CURRENCY.get(row["country"])
     )
+    result["country"] = row["country"] or None
     if "role" in row.keys():
         result["role"] = row["role"]
     return result
@@ -215,10 +221,16 @@ class Identity:
     def __init__(self, store: Store):
         self.store = store
         self.data_domains: dict[str, DataDomain] = {}
+        self.guest_seed: Callable | None = None
+
+    def register_guest_seed(self, callback: Callable) -> None:
+        if self.guest_seed is not None:
+            raise ValueError("duplicate_guest_seed")
+        self.guest_seed = callback
 
     def initialize(self) -> None:
         with self.store.connection(write=True) as db:
-            db.executescript(SCHEMA + LIFECYCLE_SCHEMA)
+            db.executescript(SCHEMA + LIFECYCLE_SCHEMA + GUEST_SCHEMA)
         with self.store.connection(write=True) as db:
             if db.execute(
                 "SELECT 1 FROM p_identity_meta WHERE id='fixtures-v1'"
@@ -252,7 +264,13 @@ class Identity:
     def _create_user(db, user_id, name, password, timestamp, *, fixture=False):
         db.execute(
             "INSERT INTO p_users VALUES (?,?,NULL,'forest',?,?,NULL,?)",
-            (user_id, name, password_hash(password), timestamp, int(fixture)),
+            (
+                user_id,
+                name,
+                password_hash(password) if password else "",
+                timestamp,
+                int(fixture),
+            ),
         )
         db.execute(
             "INSERT INTO p_preferences VALUES (?,?)",
@@ -301,8 +319,14 @@ class Identity:
                 )
         return context
 
-    def snapshot(self, context: Context) -> dict:
+    def snapshot(self, context: Context, *, account_id: str | None = None) -> dict:
         with self.store.connection() as db:
+            current = active_context(
+                db,
+                user_id=context.user_id,
+                household_id=context.household_id,
+                session_id=context.session_id,
+            )
             user = db.execute(
                 "SELECT * FROM p_users WHERE id=?", (context.user_id,)
             ).fetchone()
@@ -317,14 +341,148 @@ class Identity:
                 "SELECT id,created_at,expires_at FROM p_sessions WHERE id=? AND user_id=?",
                 (context.session_id, context.user_id),
             ).fetchone()
+            home_document = household(home)
+            currency = resolve_currency_context(
+                db, context, home_document, account_id=account_id
+            )
+            guest = guest_status(db, context.user_id)
         return {
             "user": profile(user),
-            "household": household(home),
+            "household": home_document,
             "preferences": json.loads(prefs[0]),
             "session": dict(session),
             "local_only": True,
             "supported_currencies": list(CURRENCY_DIGITS),
+            "guest": guest,
+            "currency_context": currency,
+            "data_generation": current.data_generation,
         }
+
+    @staticmethod
+    def _session(db, request, response, user_id, household_id, timestamp, expires):
+        token = secrets.token_urlsafe(32)
+        session_id = identifier("session")
+        old_cookie = request.cookies.get(COOKIE)
+        if old_cookie:
+            db.execute(
+                "UPDATE p_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL",
+                (timestamp.isoformat(), token_hash(old_cookie)),
+            )
+        db.execute(
+            "INSERT INTO p_sessions VALUES (?,?,?,?,?,?,?,NULL)",
+            (
+                session_id,
+                token_hash(token),
+                user_id,
+                household_id,
+                timestamp.isoformat(),
+                expires.isoformat(),
+                timestamp.isoformat(),
+            ),
+        )
+        response.set_cookie(
+            COOKIE,
+            token,
+            max_age=int((expires - timestamp).total_seconds()),
+            httponly=True,
+            samesite="strict",
+            secure=request.url.scheme == "https",
+            path="/",
+        )
+        return active_context(
+            db, user_id=user_id, household_id=household_id, session_id=session_id
+        )
+
+    def start_guest(
+        self, request: Request, response: Response, command: GuestStart
+    ) -> dict:
+        same_origin(request)
+        try:
+            existing = self.context(request)
+        except PlatformError as exc:
+            if exc.status != 401:
+                raise
+            existing = None
+        if existing is not None:
+            with self.store.connection(write=True) as db:
+                assert_active_context(db, existing, minimum_role="viewer")
+                if not guest_status(db, existing.user_id)["is_guest"]:
+                    raise PlatformError("already_signed_in", 409)
+            return self.snapshot(existing)
+        if command.mode == "demo" and self.guest_seed is None:
+            raise PlatformError("guest_demo_unavailable", 503)
+        timestamp = now()
+        with self.store.connection(write=True) as db:
+            if (
+                db.execute("SELECT COUNT(*) FROM p_guest_workspaces").fetchone()[0]
+                >= MAX_GUEST_WORKSPACES
+            ):
+                raise PlatformError("guest_capacity_reached", 429)
+            user_id, household_id = identifier("guest"), identifier("household")
+            db.execute(
+                "INSERT INTO p_households VALUES (?,?,'',NULL,?)",
+                (household_id, "Local guest workspace", timestamp.isoformat()),
+            )
+            self._create_user(db, user_id, "Local guest", None, timestamp.isoformat())
+            db.execute(
+                "UPDATE p_preferences SET document=? WHERE user_id=?",
+                (
+                    Preferences(locale=command.locale, timezone="UTC").model_dump_json(),
+                    user_id,
+                ),
+            )
+            db.execute(
+                "INSERT INTO p_memberships VALUES (?,?,'owner')", (household_id, user_id)
+            )
+            expires = timestamp + GUEST_AGE
+            db.execute(
+                "INSERT INTO p_guest_workspaces VALUES (?,?,?,?,?,NULL)",
+                (
+                    user_id,
+                    household_id,
+                    command.mode,
+                    timestamp.isoformat(),
+                    expires.isoformat(),
+                ),
+            )
+            context = self._session(
+                db, request, response, user_id, household_id, timestamp, expires
+            )
+            if command.mode == "demo":
+                self.guest_seed(db, context)
+        return self.snapshot(context)
+
+    def claim_guest(
+        self, request: Request, response: Response, context: Context, command: GuestClaim
+    ) -> dict:
+        timestamp = now()
+        with self.store.connection(write=True) as db:
+            assert_active_context(db, context, minimum_role="owner")
+            guest = guest_status(db, context.user_id)
+            if not guest["is_guest"]:
+                raise PlatformError("guest_required", 409)
+            db.execute(
+                "UPDATE p_users SET display_name=?,password_hash=? WHERE id=?",
+                (command.display_name, password_hash(command.password), context.user_id),
+            )
+            db.execute(
+                "UPDATE p_guest_workspaces SET claimed_at=? WHERE user_id=?",
+                (timestamp.isoformat(), context.user_id),
+            )
+            db.execute(
+                "UPDATE p_sessions SET revoked_at=? WHERE user_id=? AND revoked_at IS NULL",
+                (timestamp.isoformat(), context.user_id),
+            )
+            saved_context = self._session(
+                db,
+                request,
+                response,
+                context.user_id,
+                context.household_id,
+                timestamp,
+                timestamp + SESSION_AGE,
+            )
+        return self.snapshot(saved_context)
 
     def login(self, request: Request, response: Response, command: Login) -> dict:
         same_origin(request)
@@ -353,39 +511,16 @@ class Identity:
             )
             if selected is None:
                 raise PlatformError("household_access_denied", 403)
-            token = secrets.token_urlsafe(32)
-            session_id = identifier("session")
-            expires = timestamp + SESSION_AGE
-            old_cookie = request.cookies.get(COOKIE)
-            if old_cookie:
-                db.execute(
-                    "UPDATE p_sessions SET revoked_at=? WHERE token_hash=? AND revoked_at IS NULL",
-                    (timestamp.isoformat(), token_hash(old_cookie)),
-                )
-            db.execute(
-                "INSERT INTO p_sessions VALUES (?,?,?,?,?,?,?,NULL)",
-                (
-                    session_id,
-                    token_hash(token),
-                    user["id"],
-                    selected["household_id"],
-                    timestamp.isoformat(),
-                    expires.isoformat(),
-                    timestamp.isoformat(),
-                ),
+            context = self._session(
+                db,
+                request,
+                response,
+                user["id"],
+                selected["household_id"],
+                timestamp,
+                timestamp + SESSION_AGE,
             )
-        response.set_cookie(
-            COOKIE,
-            token,
-            max_age=int(SESSION_AGE.total_seconds()),
-            httponly=True,
-            samesite="strict",
-            secure=request.url.scheme == "https",
-            path="/",
-        )
-        return self.snapshot(
-            Context(user["id"], selected["household_id"], selected["role"], session_id)
-        )
+        return self.snapshot(context)
 
     def active_memories(self, context: Context) -> list[dict]:
         with self.store.connection() as connection:
@@ -458,8 +593,30 @@ def login(
 def session(
     context: Annotated[Context, Depends(get_context)],
     identity: Annotated[Identity, Depends(get_identity)],
+    account_id: str | None = Query(default=None, min_length=1, max_length=100),
 ):
-    return identity.snapshot(context)
+    return identity.snapshot(context, account_id=account_id)
+
+
+@router.post("/session/guest")
+def start_guest(
+    command: GuestStart,
+    request: Request,
+    response: Response,
+    identity: Annotated[Identity, Depends(get_identity)],
+):
+    return identity.start_guest(request, response, command)
+
+
+@router.post("/session/claim")
+def claim_guest(
+    command: GuestClaim,
+    request: Request,
+    response: Response,
+    context: Annotated[Context, Depends(get_context)],
+    identity: Annotated[Identity, Depends(get_identity)],
+):
+    return identity.claim_guest(request, response, context, command)
 
 
 @router.post("/session/logout")
@@ -527,8 +684,14 @@ def patch_household(
 ):
     require_owner(context)
     changes = command.model_dump(exclude_unset=True)
-    if any(value is None for key, value in changes.items() if key != "currency_override"):
+    if any(
+        value is None
+        for key, value in changes.items()
+        if key not in {"currency_override", "country"}
+    ):
         raise PlatformError("invalid_household")
+    if "country" in changes and changes["country"] is None:
+        changes["country"] = ""
     with identity.store.connection(write=True) as db:
         assert_active_context(db, context, minimum_role="owner")
         for key, value in changes.items():

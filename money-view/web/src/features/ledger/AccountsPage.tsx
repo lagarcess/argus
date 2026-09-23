@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { request } from "../../platform/client";
+import { useRecordFocus } from "../../argus/useRecordFocus";
 import { useResource } from "../../platform/hooks";
 import {
   PageHeader,
@@ -33,19 +34,22 @@ const accountKinds = [
   "cash",
 ];
 export function AccountsPage(props: PlatformPageProps) {
-  const { locale, currency, revision, onChanged, onNavigate } = props,
+  const { locale, currency, revision, onChanged, onNavigate, query } = props,
     t = copy(locale);
   const [showDeleted, setShowDeleted] = useState(false),
     [editing, setEditing] = useState<Account | "new" | null>(null),
     [deleting, setDeleting] = useState<Account | null>(null);
+  const targetId = query.get("record_id") ?? query.get("account_id");
   const accounts = useResource(
-    () =>
-      request(
+    () => targetId
+      ? request(`/accounts/${encodeURIComponent(targetId)}`, accountSchema).then(account => ({ items: [account], total: 1, limit: 1, offset: 0 }))
+      : request(
         `/accounts?currency=${encodeURIComponent(currency)}&include_deleted=${showDeleted}&limit=100`,
         accountsSchema,
       ),
-    [currency, showDeleted, revision],
+    [currency, showDeleted, revision, targetId],
   );
+  const recordRef = useRecordFocus(targetId, [accounts.data]);
   const connections = useResource(
     () => request("/connections", connectionsSchema),
     [revision],
@@ -61,7 +65,7 @@ export function AccountsPage(props: PlatformPageProps) {
     onChanged();
   };
   return (
-    <div className="ledger-page p-stack">
+    <div className="ledger-page p-stack" ref={recordRef}>
       <PageHeader
         title={t.accounts}
         description={t.accountsIntro}
@@ -72,7 +76,8 @@ export function AccountsPage(props: PlatformPageProps) {
         }
       />
       <div className="p-toolbar">
-        <span className="p-badge">{currency}</span>
+        <span className="p-badge">{targetId ? accounts.data?.items[0]?.currency : currency}</span>
+        {targetId && <button className="p-button-secondary" onClick={() => onNavigate("accounts")}>{locale === "en" ? "Show all accounts" : "Ver todas las cuentas"}</button>}
         <p className="p-muted">{t.noConversion}</p>
         <label className="ledger-checkbox">
           <input
@@ -112,7 +117,7 @@ export function AccountsPage(props: PlatformPageProps) {
             <h2>{categoryLabel(kind, locale)}</h2>
             <div className="p-ledger">
               {items.map((account) => (
-                <article className="p-ledger-row" key={account.id}>
+                <article className="p-ledger-row" key={account.id} data-record-id={account.id} tabIndex={-1}>
                   <div className="p-row-main">
                     <h3>
                       {account.name}{" "}
