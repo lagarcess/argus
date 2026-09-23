@@ -109,6 +109,7 @@ export async function read(page: Page, path: string) {
   return response.json();
 }
 export async function screenshot(page: Page, name: string) {
+  await expect(page.locator('.argus-recents').filter({ hasNot: page.getByTestId('recent-conversations') })).toHaveCount(0);
   await expect(page.getByTestId('recent-conversations').getByRole('status')).toHaveCount(0);
   await page.evaluate(async () => {
     await document.fonts.ready;

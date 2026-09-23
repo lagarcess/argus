@@ -1,0 +1,180 @@
+{
+  "setup": "Public local API only; 21 rows per source to cross the 20-row page boundary",
+  "current_writer": "POST /api/platform/chat/conversations",
+  "older_writer": "POST /api/platform/assistant/ask with typed net_worth action",
+  "provider_keys": "empty",
+  "records": {
+    "chat": [
+      {
+        "id": "chat-0b7f3810dacd40eb88377c92fc11f4a8",
+        "title": "Browser current history 1"
+      },
+      {
+        "id": "chat-f7770273950648048080597f71b8b2ff",
+        "title": "Browser current history 2"
+      },
+      {
+        "id": "chat-97dd285d2a8c40a4a308e9dbd7bd09e1",
+        "title": "Browser current history 3"
+      },
+      {
+        "id": "chat-c33943bcef9840c3a968361db0727c8f",
+        "title": "Browser current history 4"
+      },
+      {
+        "id": "chat-521c6a5f25794ef3945cf3e40f4044a7",
+        "title": "Browser current history 5"
+      },
+      {
+        "id": "chat-64e996a286cb42c28cc1d337409b5a75",
+        "title": "Browser current history 6"
+      },
+      {
+        "id": "chat-91dfa469e1f44ecaaf55b7a7dd6d8a8f",
+        "title": "Browser current history 7"
+      },
+      {
+        "id": "chat-ec203bccb40c45ffbd3c0eebaa8cca41",
+        "title": "Browser current history 8"
+      },
+      {
+        "id": "chat-9a62543896364cd5b6c3eda286f4e0ac",
+        "title": "Browser current history 9"
+      },
+      {
+        "id": "chat-40e429c3ceb14618a0368858d4a82145",
+        "title": "Browser current history 10"
+      },
+      {
+        "id": "chat-39dfa00141a44a1388c51d03b69bbb7f",
+        "title": "Browser current history 11"
+      },
+      {
+        "id": "chat-921507255a684f8ea8c379e11733ca38",
+        "title": "Browser current history 12"
+      },
+      {
+        "id": "chat-ae81dbf3f495427b8d3ce599ec096eab",
+        "title": "Browser current history 13"
+      },
+      {
+        "id": "chat-9aa6c88e24fd4e7fbd9088683dd4724c",
+        "title": "Browser current history 14"
+      },
+      {
+        "id": "chat-de485b1d2e2540dcaab23833582d8924",
+        "title": "Browser current history 15"
+      },
+      {
+        "id": "chat-f6510c66ff3b4c4e8419b8070164d539",
+        "title": "Browser current history 16"
+      },
+      {
+        "id": "chat-800e2ab28eaa49719557095808707c6b",
+        "title": "Browser current history 17"
+      },
+      {
+        "id": "chat-41d85ebcf600461fb1447e687fa7860a",
+        "title": "Browser current history 18"
+      },
+      {
+        "id": "chat-f4d25e21904f4ee5ae5fb915acc3b1b0",
+        "title": "Browser current history 19"
+      },
+      {
+        "id": "chat-a537f63eadbf49c886b39fd2f8c3fa86",
+        "title": "Browser current history 20"
+      },
+      {
+        "id": "chat-1fb5a9a19fdf43d59f361481ee40964f",
+        "title": "Browser current history 21"
+      }
+    ],
+    "assistant": [
+      {
+        "id": "conversation-4cbfc08b13e64dc48a532abfed150ec4",
+        "title": "Browser older history 1"
+      },
+      {
+        "id": "conversation-fa23392a10044ad9ba554c6a95a7ace1",
+        "title": "Browser older history 2"
+      },
+      {
+        "id": "conversation-1b437af1b9334fd5a5b0131288b711b3",
+        "title": "Browser older history 3"
+      },
+      {
+        "id": "conversation-f2735e8b71fe4a01b48bbb2bc1ceb2dc",
+        "title": "Browser older history 4"
+      },
+      {
+        "id": "conversation-032d338755664735b459c1bbda610686",
+        "title": "Browser older history 5"
+      },
+      {
+        "id": "conversation-905f5ebe64064d2e9a397b061ca26edf",
+        "title": "Browser older history 6"
+      },
+      {
+        "id": "conversation-a3d05ea4662b4796af556aee6e206726",
+        "title": "Browser older history 7"
+      },
+      {
+        "id": "conversation-7eb8f69b3a364eedaa7d0136f2013ebc",
+        "title": "Browser older history 8"
+      },
+      {
+        "id": "conversation-cb36cca1b428430dad9d6e899a4d7d53",
+        "title": "Browser older history 9"
+      },
+      {
+        "id": "conversation-fbc671d6e9ad4b58bb14fec341afc1d2",
+        "title": "Browser older history 10"
+      },
+      {
+        "id": "conversation-f45efffaf6924fcc8fb8d4cddd0c80cd",
+        "title": "Browser older history 11"
+      },
+      {
+        "id": "conversation-27fb7cb4cc1e404596c62c94059c7d56",
+        "title": "Browser older history 12"
+      },
+      {
+        "id": "conversation-285cdb9175a74a2582e762ef207cd17a",
+        "title": "Browser older history 13"
+      },
+      {
+        "id": "conversation-a6eb5c4353e4490083d504694c6f0f80",
+        "title": "Browser older history 14"
+      },
+      {
+        "id": "conversation-084167019bd04ddf830b75311b12848f",
+        "title": "Browser older history 15"
+      },
+      {
+        "id": "conversation-c467ba1228744ade8840eed9d16fb0e6",
+        "title": "Browser older history 16"
+      },
+      {
+        "id": "conversation-452b1f55e585490bab0aacfc0e4b9f05",
+        "title": "Browser older history 17"
+      },
+      {
+        "id": "conversation-d43b3598a7b24197a3bd08690096071d",
+        "title": "Browser older history 18"
+      },
+      {
+        "id": "conversation-cdf0a3084baf48cca10be1b64c0fc891",
+        "title": "Browser older history 19"
+      },
+      {
+        "id": "conversation-e641c06060f74d709c873033909614f6",
+        "title": "Browser older history 20"
+      },
+      {
+        "id": "conversation-a9af2c3ee5714dca8fbeaad7a3e1df16",
+        "title": "Browser older history 21"
+      }
+    ]
+  }
+}

@@ -23,7 +23,7 @@ remain the offline delivery path. Financial execution remains simulated.
 - [x] Sketch: compare two integration shapes and record the chosen interfaces.
 - [x] Implement: reuse Argus interaction primitives; integrate chat, recall,
   guest entry, verified currency and statement import with current domains.
-- [ ] Inspect: compare actual desktop, tablet and mobile screens to Argus;
+- [x] Inspect: compare actual desktop, tablet and mobile screens to Argus;
   exercise keyboard, focus, hover, loading and recovery states.
 - [ ] Verify: focused behavior tests, full local regression, browser journeys,
   scoped independent reviews and GitHub review to clean acknowledgment.

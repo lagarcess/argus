@@ -184,9 +184,10 @@ bun run test:e2e
 
 Browser checks use isolated loopback processes, the actual API and temporary
 SQLite data. Browser installation may require `bunx playwright install chromium`
-once. Final CI, final review and capacity acceptance remain in progress. See the
-[platform plan](docs/PLATFORM_PLAN.md) for the current delivery checklist and the
-[prior PR audit](docs/PR_REVIEW_AUDIT.md) for the completed deposit review loop.
+once. The [experience verification](docs/evidence/experience/verification.md)
+records the exact local evidence and remaining provider/hosting limits. The
+[experience plan](docs/experience/PLAN.md) tracks private delivery; the
+[prior PR audit](docs/PR_REVIEW_AUDIT.md) records the earlier clean review loops.
 
 Argus supports local authenticated households and multiple processes sharing
 one SQLite database on one host. That does not qualify it for public hosting.

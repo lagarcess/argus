@@ -1,0 +1,28 @@
+{
+  "source_checkpoint": "06980d1961f166500ffd6d362a084a27802e27bb",
+  "full_run": {
+    "passed": 59,
+    "failed": 1,
+    "duration": "5.1m",
+    "failure": "test reloaded during deferred modal history traversal"
+  },
+  "followup": {
+    "passed": 14,
+    "failed": 0,
+    "duration": "1.2m",
+    "scope": "EN/ES imports, empty guest, five-width money/chat/settings/import/search matrix"
+  },
+  "source_files": 242,
+  "full_run_source_drift": [],
+  "followup_changes": [
+    "web/e2e/experience-import.spec.ts",
+    "web/e2e/fixtures.ts"
+  ],
+  "application_source_changed": false,
+  "png_count": 120,
+  "test_ports": {
+    "8022": "closed",
+    "5192": "closed"
+  },
+  "live_provider_calls": 0
+}

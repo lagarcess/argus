@@ -1,0 +1,115 @@
+$ playwright test --trace off
+(node:85202) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[WebServer] (node:85203) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 60 tests using 1 worker
+
+(node:85208) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:85208) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:85208) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 e2e/assistant-export.spec.ts:3:1 › expired assistant export clears loaded household answers (3.5s)
+  ✓   2 e2e/experience-chat-review.spec.ts:4:1 › editing a proposal blocks confirmation until the revised target amount is saved (4.3s)
+  ✓   3 e2e/experience-chat-review.spec.ts:30:1 › changing conversations cancels older-message loading without disabling the new history (6.5s)
+  ✓   4 e2e/experience-chat.spec.ts:5:3 › en: guest proposal confirms once, opens its goal, and survives claim and recall (5.9s)
+  ✓   5 e2e/experience-chat.spec.ts:72:3 › en: keyless composer preserves draft, input semantics, navigation and attachment (2.3s)
+  ✓   6 e2e/experience-chat.spec.ts:5:3 › es: guest proposal confirms once, opens its goal, and survives claim and recall (5.9s)
+  ✓   7 e2e/experience-chat.spec.ts:72:3 › es: keyless composer preserves draft, input semantics, navigation and attachment (3.3s)
+  ✓   8 e2e/experience-chat.spec.ts:111:1 › a disconnected prepared turn retries its persisted proposal and confirms only once (4.4s)
+  ✓   9 e2e/experience-chat.spec.ts:142:1 › staged chat text stays out of URLs and cannot cross user or reset generations (6.2s)
+  ✓  10 e2e/experience-chat.spec.ts:182:1 › navigating away from a detached turn cannot redirect or replace the new page (4.7s)
+  ✓  11 e2e/experience-composer-delivery.spec.ts:27:3 › accepted inline retry clears whitespace draft and storage (3.3s)
+  ✓  12 e2e/experience-composer-delivery.spec.ts:27:3 › accepted inline retry clears multiline draft and storage (3.5s)
+  ✓  13 e2e/experience-composer-delivery.spec.ts:27:3 › accepted inline retry clears mention draft and storage (3.7s)
+  ✓  14 e2e/experience-composer-delivery.spec.ts:67:1 › accepted ordinary send clears reload draft; typed action and newer edits preserve it (4.0s)
+  ✓  15 e2e/experience-composer-delivery.spec.ts:102:1 › accepted staged handoff removes its saved draft record (3.7s)
+  ✓  16 e2e/experience-composer-geometry.spec.ts:7:3 › en: chat draft keeps send and attachment inside all five viewport widths (3.4s)
+  ✓  17 e2e/experience-composer-geometry.spec.ts:7:3 › es: chat draft keeps send and attachment inside all five viewport widths (3.3s)
+  ✓  18 e2e/experience-history.spec.ts:5:1 › mixed conversation history paginates, exports, restores and moves both sources to recently deleted (5.7s)
+  ✘  19 e2e/experience-import.spec.ts:5:3 › en: empty guest maps a statement in owned currency and reviews duplicate intake (4.9s)
+(node:85661) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:85661) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:85661) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  20 e2e/experience-import.spec.ts:5:3 › es: empty guest maps a statement in owned currency and reviews duplicate intake (4.7s)
+  ✓  21 e2e/experience-targets.spec.ts:3:1 › exact transaction recall cancels stale targets and close removes the target (4.8s)
+  ✓  22 e2e/experience-targets.spec.ts:40:1 › historical budget recall owns its month and ignores a superseded target (4.9s)
+  ✓  23 e2e/experience-targets.spec.ts:86:1 › mobile settings Back and Forward restore the route and one focused overlay (3.3s)
+  ✓  24 e2e/experience.spec.ts:7:3 › en: empty guest begins with unknown currency and no manufactured money (2.6s)
+  ✓  25 e2e/experience.spec.ts:27:5 › en 1440: guest money and Omnisearch keyboard selection preserve record identity (5.6s)
+  ✓  26 e2e/experience.spec.ts:27:5 › en 1024: guest money and Omnisearch keyboard selection preserve record identity (5.4s)
+  ✓  27 e2e/experience.spec.ts:27:5 › en 768: guest money and Omnisearch keyboard selection preserve record identity (5.3s)
+  ✓  28 e2e/experience.spec.ts:27:5 › en 390: guest money and Omnisearch keyboard selection preserve record identity (5.9s)
+  ✓  29 e2e/experience.spec.ts:27:5 › en 320: guest money and Omnisearch keyboard selection preserve record identity (5.5s)
+  ✓  30 e2e/experience.spec.ts:7:3 › es: empty guest begins with unknown currency and no manufactured money (2.5s)
+  ✓  31 e2e/experience.spec.ts:27:5 › es 1440: guest money and Omnisearch keyboard selection preserve record identity (5.3s)
+  ✓  32 e2e/experience.spec.ts:27:5 › es 1024: guest money and Omnisearch keyboard selection preserve record identity (5.5s)
+  ✓  33 e2e/experience.spec.ts:27:5 › es 768: guest money and Omnisearch keyboard selection preserve record identity (5.3s)
+  ✓  34 e2e/experience.spec.ts:27:5 › es 390: guest money and Omnisearch keyboard selection preserve record identity (5.6s)
+  ✓  35 e2e/experience.spec.ts:27:5 › es 320: guest money and Omnisearch keyboard selection preserve record identity (5.7s)
+  ✓  36 e2e/frontend-review.spec.ts:27:3 › new editor signs in using the copied local ID and retains role boundaries (5.0s)
+  ✓  37 e2e/frontend-review.spec.ts:27:3 › new viewer signs in using the copied local ID and retains role boundaries (5.0s)
+  ✓  38 e2e/frontend-review.spec.ts:89:1 › real session revocation through another client makes CSV export remove private UI (3.5s)
+  ✓  39 e2e/frontend-review.spec.ts:106:1 › notice selected while compute is pending hydrates its before and after record (5.0s)
+  ✓  40 e2e/frontend-review.spec.ts:132:1 › an invalid deposit target requests once and remains recoverable (3.4s)
+  ✓  41 e2e/frontend-review.spec.ts:148:1 › a saved deposit refresh settles when another tab publishes a newer source load (6.2s)
+  ✓  42 e2e/pilot.spec.ts:24:3 › es 1440: confirm, save, unchanged check, changed notice and receipts (6.2s)
+  ✓  43 e2e/pilot.spec.ts:24:3 › en 1440: confirm, save, unchanged check, changed notice and receipts (7.0s)
+  ✓  44 e2e/pilot.spec.ts:24:3 › es 390: confirm, save, unchanged check, changed notice and receipts (5.8s)
+  ✓  45 e2e/pilot.spec.ts:66:1 › edited replay stays honest and the second country uses the same flow (4.1s)
+  ✓  46 e2e/pilot.spec.ts:104:1 › mobile money view fits the maximum supported amount (3.0s)
+  ✓  47 e2e/platform.spec.ts:6:3 › en: real ledger import, edit and bounded full-volume pagination (4.9s)
+  ✓  48 e2e/platform.spec.ts:6:3 › es: real ledger import, edit and bounded full-volume pagination (4.9s)
+  ✓  49 e2e/platform.spec.ts:60:1 › budget, recurring payment, allocated goal and immutable scenario (6.2s)
+  ✓  50 e2e/platform.spec.ts:114:1 › paper investment preview confirms once and preserves linked net worth (4.7s)
+  ✓  51 e2e/platform.spec.ts:145:1 › mobile settings, confirmed memory, privacy and keyless saved assistant (5.0s)
+  ✓  52 e2e/platform.spec.ts:201:3 › Spanish 1440: route coverage, dated sources, no overflow and keyboard escape (8.6s)
+  ✓  53 e2e/platform.spec.ts:201:3 › Spanish 1024: route coverage, dated sources, no overflow and keyboard escape (8.5s)
+  ✓  54 e2e/platform.spec.ts:201:3 › Spanish 768: route coverage, dated sources, no overflow and keyboard escape (8.5s)
+  ✓  55 e2e/platform.spec.ts:201:3 › Spanish 390: route coverage, dated sources, no overflow and keyboard escape (9.1s)
+  ✓  56 e2e/platform.spec.ts:201:3 › Spanish 320: route coverage, dated sources, no overflow and keyboard escape (8.9s)
+  ✓  57 e2e/platform.spec.ts:228:1 › credit, tax, estate and membership produce local receipts (8.8s)
+  ✓  58 e2e/platform.spec.ts:317:1 › viewer permissions and other-household isolation are visible (4.7s)
+  ✓  59 e2e/platform.spec.ts:344:1 › household export and deliberate local reset survive reload (4.2s)
+  ✓  60 e2e/platform.spec.ts:368:1 › 320px initial overview derives household currency before any user change (3.0s)
+
+
+  1) e2e/experience-import.spec.ts:5:3 › en: empty guest maps a statement in owned currency and reviews duplicate intake
+
+    Error: page.reload: net::ERR_ABORTED; maybe frame was detached?
+    Call log:
+      - waiting for navigation until "load"
+
+
+      58 |     await expect(dialog.getByRole('status')).toContainText('0');
+      59 |     await dialog.getByRole('button', { name: en ? 'Done' : 'Listo', exact: true }).click();
+    > 60 |     await page.reload();
+         |                ^
+      61 |     expect((await read(page, '/transactions')).total).toBe(2);
+      62 |     expect((await read(page, `/accounts/${account.id}`)).balance).toBe(en ? '909.00' : '909.750');
+      63 |   });
+        at /Users/garces/.codex/worktrees/3535/private-alpha-next/money-view/web/e2e/experience-import.spec.ts:60:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/experience-import-en-empty-f2136-nd-reviews-duplicate-intake/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: backend-log (text/plain) ────────────────────────────────────────────────────────
+    INFO:     Started server process [85632]
+    INFO:     Waiting for application startup.
+    INFO:     Application startup complete.
+    INFO:     Uvicorn running on http://127.0.0.1:8022 (Press CTRL+C to quit)
+    INFO:     127.0.0.1:55223 - "GET /api/platform/demo/personas HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:5523...
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/experience-import-en-empty-f2136-nd-reviews-duplicate-intake/error-context.md
+
+  1 failed
+    e2e/experience-import.spec.ts:5:3 › en: empty guest maps a statement in owned currency and reviews duplicate intake
+  59 passed (5.1m)
+error: script "test:e2e" exited with code 1

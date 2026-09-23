@@ -1,5 +1,6 @@
 import { test, expect, navigate, read, screenshot } from './fixtures';
 import { enterGuest } from './experience-helpers';
+import { OVERLAY_HISTORY_KEY } from '../src/argus/overlay-history';
 
 for (const language of ['en', 'es'] as const) {
   test(`${language}: empty guest maps a statement in owned currency and reviews duplicate intake`, async ({ page }) => {
@@ -41,12 +42,17 @@ for (const language of ['en', 'es'] as const) {
       await expect(dialog.locator('tbody tr')).toHaveCount(2);
       await expect(dialog).toContainText(currency);
     }
+    async function finishImport() {
+      await dialog.getByRole('button', { name: en ? 'Done' : 'Listo', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await page.waitForFunction(key => !window.history.state?.[key], OVERLAY_HISTORY_KEY);
+    }
     await reviewFile();
     expect((await read(page, '/transactions')).total).toBe(0);
     const commit = dialog.getByRole('button', { name: en ? 'Save reviewed transactions' : 'Guardar movimientos revisados', exact: true });
     await commit.click();
     await expect(dialog.getByRole('status')).toContainText('2');
-    await dialog.getByRole('button', { name: en ? 'Done' : 'Listo', exact: true }).click();
+    await finishImport();
     expect((await read(page, '/transactions')).total).toBe(2);
     expect((await read(page, `/accounts/${account.id}`)).balance).toBe(en ? '909.00' : '909.750');
     await reviewFile();
@@ -56,7 +62,7 @@ for (const language of ['en', 'es'] as const) {
     await screenshot(page, `${language}-statement-duplicates`);
     await commit.click();
     await expect(dialog.getByRole('status')).toContainText('0');
-    await dialog.getByRole('button', { name: en ? 'Done' : 'Listo', exact: true }).click();
+    await finishImport();
     await page.reload();
     expect((await read(page, '/transactions')).total).toBe(2);
     expect((await read(page, `/accounts/${account.id}`)).balance).toBe(en ? '909.00' : '909.750');
