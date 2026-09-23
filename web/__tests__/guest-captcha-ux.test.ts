@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import * as guestCaptcha from "../lib/guest-captcha";
+import { applyGuestBootstrapError } from "../lib/guest-entry-error";
 
 const root = join(import.meta.dir, "..");
 
@@ -203,6 +204,23 @@ describe("shared CAPTCHA acquisition UX", () => {
     );
   });
 
+  test("captcha_unavailable clears the guest entry retry; other errors keep it", () => {
+    const coded = Object.assign(new Error("Browser CAPTCHA could not be verified."), {
+      code: "captcha_unavailable",
+    });
+    const captchaRetry = { current: { text: "retry me" } };
+    expect(applyGuestBootstrapError(coded, captchaRetry)).toBe(
+      "captcha_unavailable",
+    );
+    expect(captchaRetry.current).toBeNull();
+
+    const genericRetry = { current: { text: "keep me" } };
+    expect(applyGuestBootstrapError(new Error("network"), genericRetry)).toBe(
+      "generic",
+    );
+    expect(genericRetry.current).toEqual({ text: "keep me" });
+  });
+
   test("empty-chat guest entry localizes captcha_unavailable and omits a same-path retry", () => {
     const emptyChat = readFileSync(
       join(root, "components/chat/EmptyChatSurface.tsx"),
@@ -242,9 +260,10 @@ describe("shared CAPTCHA acquisition UX", () => {
     expect(genericBranch).toContain("onRetryGuestSubmission");
 
     expect(experience).toContain("onGuestBootstrapError(error)");
-    expect(chat).toContain("guestEntryErrorKind(error)");
-    expect(chat).toContain("guestSubmissionRetryRef.current = null");
+    expect(chat).toContain("useGuestEntryError(guestSubmissionRetryRef)");
+    expect(chat).toContain("onGuestBootstrapError: guestEntry.onGuestBootstrapError");
     expect(chat).toContain("onSignIn={requestGuestSignIn}");
+    expect(chat).not.toContain("guestEntryErrorKind(");
 
     expect(en.auth.errors.captcha_unavailable).toBe(
       "This browser didn’t pass the security check. Open Argus in a regular browser, or reload the page.",

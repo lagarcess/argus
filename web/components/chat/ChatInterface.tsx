@@ -207,11 +207,7 @@ import { messageElementRegistrar } from "./transcript-element-refs";
 import { usePendingBreakdownRecovery } from "./usePendingBreakdownRecovery";
 import { retirePendingBreakdown } from "@/lib/pending-result-breakdown";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
-import {
-  CAPTCHA_UNAVAILABLE_CODE,
-  guestEntryErrorKind,
-  type GuestEntryErrorKind,
-} from "@/lib/guest-captcha";
+import { useGuestEntryError } from "@/lib/guest-entry-error";
 import SidebarShell from "@/components/sidebar/SidebarShell";
 import ChatShellMenuTrigger from "@/components/chat/ChatShellMenuTrigger";
 import GuestSettingsMenu from "@/components/guest/GuestSettingsMenu";
@@ -304,8 +300,6 @@ export default function ChatInterface() {
     activityCausalClock,
   });
   const [guestSubmissionPending, setGuestSubmissionPending] = useState(false);
-  const [guestSubmissionError, setGuestSubmissionError] =
-    useState<GuestEntryErrorKind | null>(null);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
@@ -326,6 +320,7 @@ export default function ChatInterface() {
   const guestSendRef = useRef<GuestResumeSend | null>(null);
   const sendAdmissionInFlightRef = useRef(false);
   const guestSubmissionRetryRef = useRef<GuestPendingSubmission | null>(null);
+  const guestEntry = useGuestEntryError(guestSubmissionRetryRef);
   const currentViewRef = useRef<View>("chat");
   const [transcriptSessionCache] = useState(
     () => new TranscriptSessionCache<SavedConversationTranscript>(),
@@ -934,18 +929,11 @@ export default function ChatInterface() {
     onRequestPendingGuestSignIn: () => router.push("/?auth=login"),
     onAdoptConversation: adoptGuestConversation,
     onGuestBootstrapExpired: (publicAccountAccessEnabled) => {
-      guestSubmissionRetryRef.current = null;
-      setGuestSubmissionError(null);
+      guestEntry.resetGuestSubmissionError();
       setExpiredPublicAccountAccessEnabled(publicAccountAccessEnabled);
       setProfileState("expired");
     },
-    onGuestBootstrapError: (error) => {
-      const kind = guestEntryErrorKind(error);
-      if (kind === CAPTCHA_UNAVAILABLE_CODE) {
-        guestSubmissionRetryRef.current = null;
-      }
-      setGuestSubmissionError(kind);
-    },
+    onGuestBootstrapError: guestEntry.onGuestBootstrapError,
     onGateError: () => showToast(t("chat.error_generic"), "error"),
     onStartOverError: () =>
       showToast(
@@ -1068,7 +1056,7 @@ export default function ChatInterface() {
         actionArg,
         options,
       };
-      setGuestSubmissionError(null);
+      guestEntry.clearGuestSubmissionError();
       setGuestSubmissionPending(true);
       setStreamStatus(t("guest.entry.sending", "Sending..."));
     }
@@ -2429,7 +2417,7 @@ export default function ChatInterface() {
                 isGuest={isGuest}
                 expiresAt={account?.guest?.expires_at}
                 guestSubmissionPending={guestSubmissionPending || Boolean(readReceiptFollowup())}
-                guestSubmissionError={guestSubmissionError}
+                guestSubmissionError={guestEntry.guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
                 preferredName={greetingName}
