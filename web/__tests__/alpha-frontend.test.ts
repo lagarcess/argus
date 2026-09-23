@@ -1107,7 +1107,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(`${chat}\n${emptyChat}`).toContain("<ChatInput");
     expect(chat).toContain("onSend={handleSend}");
     expect(emptyChat).toMatch(
-      /const disabled =\s*isStreamingResponse \|\| isHydratingConversation \|\| guestSubmissionPending/,
+      /const disabled =\s*isStreamingResponse \|\|\s*isHydratingConversation \|\|\s*guestSubmissionPending \|\|\s*guestSubmissionError === CAPTCHA_UNAVAILABLE_CODE/,
     );
     expect(emptyChat).toContain("disabled={disabled}");
     expect(chat).toContain("disabled={conversationComposerUnavailable}");

@@ -50,7 +50,10 @@ export default function EmptyChatSurface({
   const { t } = useTranslation();
   const { isBelowTablet } = useResponsiveLayout();
   const disabled =
-    isStreamingResponse || isHydratingConversation || guestSubmissionPending;
+    isStreamingResponse ||
+    isHydratingConversation ||
+    guestSubmissionPending ||
+    guestSubmissionError === CAPTCHA_UNAVAILABLE_CODE;
 
   const showGreeting = researchRailEnabled;
   const showRegisteredDisclaimer = researchRailEnabled && !isGuest;

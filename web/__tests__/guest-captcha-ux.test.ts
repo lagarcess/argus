@@ -381,6 +381,12 @@ describe("shared CAPTCHA acquisition UX", () => {
       readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
     );
 
+    expect(emptyChat).toMatch(
+      /const disabled =\s*isStreamingResponse \|\|\s*isHydratingConversation \|\|\s*guestSubmissionPending \|\|\s*guestSubmissionError === CAPTCHA_UNAVAILABLE_CODE/,
+    );
+    expect(emptyChat).toContain("<ChatInput");
+    expect(emptyChat).toContain("<StarterActions");
+    expect(emptyChat.match(/disabled=\{disabled\}/g)?.length).toBe(2);
     expect(emptyChat).toContain("auth.errors.captcha_unavailable");
     expect(emptyChat).toContain("guest.entry.reload");
     expect(emptyChat).toContain("window.location.reload()");
@@ -390,7 +396,7 @@ describe("shared CAPTCHA acquisition UX", () => {
     expect(emptyChat).not.toContain("{guestSubmissionError}");
 
     const captchaRender = emptyChat.slice(
-      emptyChat.indexOf("guestSubmissionError === CAPTCHA_UNAVAILABLE_CODE"),
+      emptyChat.indexOf("guestSubmissionError === CAPTCHA_UNAVAILABLE_CODE ? ("),
     );
     const genericBranch = captchaRender.slice(captchaRender.indexOf(") : ("));
     const captchaActions = captchaRender.slice(
@@ -398,6 +404,7 @@ describe("shared CAPTCHA acquisition UX", () => {
       captchaRender.indexOf(") : ("),
     );
     expect(captchaActions).toContain("guest.entry.reload");
+    expect(captchaActions).not.toContain("disabled={disabled}");
     expect(captchaActions).not.toContain("guest.shell.sign_in");
     expect(captchaActions).not.toContain("common.try_again");
     expect(captchaActions).not.toContain("onRetryGuestSubmission");
