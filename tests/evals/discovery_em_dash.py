@@ -1,7 +1,13 @@
 """Issue #644 discovery em-dash evidence and the free punctuation gate.
 
-The two captured replies stay as raw evidence. Runtime owns the writer
-fix. This module detects U+2014. It does not rewrite prose.
+The two captured replies stay as raw evidence. This module detects U+2014
+only. U+2013 en dash is outside the founder-locked copy rule
+(`.agent/rules/coding-standards.md`, 2026-08-04). The check is
+language-independent, so English and es-419 use the same helper.
+
+Runtime owns the writer fix. `src/argus/domain/visible_reply.py` already
+rewrites em dashes at the visibility boundary. This module does not
+rewrite prose and does not add a second sanitizer.
 """
 
 from __future__ import annotations
@@ -13,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 EM_DASH = "\u2014"
+# U+2013 en dash is not this rule. Do not add it to the detector.
 DEFAULT_FIXTURE_PATH = Path(__file__).with_name("discovery_em_dash_regression.json")
 ISSUE_644_CASE_IDS = (
     "asset_discovery_trending_crypto_exact_issue_344",
@@ -31,15 +38,19 @@ class DiscoveryEmDashEvidence:
 
 
 def prose_contains_em_dash(prose: str) -> bool:
-    """Return True when user-facing prose contains U+2014."""
+    """Return True when user-facing prose contains U+2014.
+
+    Hyphens and U+2013 en dashes do not count.
+    """
     return EM_DASH in prose
 
 
 def assert_no_em_dash(prose: str) -> None:
     """Fail when user-facing prose contains U+2014.
 
-    Runtime satisfies this later by fixing generation. Do not rewrite
-    preserved #644 evidence to make this pass.
+    Runtime satisfies this later by fixing generation, in English and
+    es-419, through the existing `rewrite_visible_reply` owner. Do not
+    rewrite preserved #644 evidence to make this pass.
     """
     if not prose_contains_em_dash(prose):
         return

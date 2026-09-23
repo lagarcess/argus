@@ -47,6 +47,15 @@ at `4c4e7a001150740dddef4e97fc13b99f2b0c823b` are preserved as raw evidence
 in `discovery_em_dash_regression.json`. They still contain U+2014. That is
 the known defect. Do not rewrite the fixture to make a check pass.
 
+The gate is U+2014 only, in English and es-419. U+2013 en dash is not this
+rule. See `.agent/rules/coding-standards.md` (founder-locked 2026-08-04).
+
+`src/argus/domain/visible_reply.py` already rewrites em dashes at the
+visibility boundary through `rewrite_visible_reply`. This eval lane does
+not change that owner or edit `src/`. Runtime's likely follow-up after
+#656 is discovery composition bypassing that door, or a streaming/persist
+mismatch, not a second sanitizer and not a model-facing instruction change.
+
 ```bash
 poetry run pytest tests/evals/test_discovery_em_dash_regression.py -q --no-cov
 ```

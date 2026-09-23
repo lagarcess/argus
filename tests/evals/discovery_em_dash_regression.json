@@ -4,7 +4,7 @@
   "verified_sha": "4c4e7a001150740dddef4e97fc13b99f2b0c823b",
   "environment": "local-live-eval",
   "captured_at": "2026-09-15",
-  "rule": "User-facing Argus prose must not contain U+2014 EM DASH.",
+  "rule": "User-facing Argus prose must not contain U+2014 EM DASH. U+2013 en dash is outside this rule.",
   "cases": [
     {
       "id": "asset_discovery_trending_crypto_exact_issue_344",

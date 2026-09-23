@@ -1,7 +1,8 @@
 """Free #644 gate: preserve the captured discovery replies and the em-dash rule.
 
-These tests do not call a model. The fixture is raw evidence. Runtime owns
-the writer fix and should call assert_no_em_dash on newly generated prose.
+These tests do not call a model. The fixture is raw evidence. The helper
+fails on U+2014 only. U+2013 is allowed. Runtime owns the writer fix
+through the existing visible_reply door, in English and es-419.
 """
 
 from __future__ import annotations
@@ -35,6 +36,10 @@ def test_issue_644_fixture_keeps_both_captured_replies() -> None:
     assert payload["issue"] == 644
     assert payload["verified_sha"] == "4c4e7a001150740dddef4e97fc13b99f2b0c823b"
     assert payload["environment"] == "local-live-eval"
+    assert payload["rule"] == (
+        "User-facing Argus prose must not contain U+2014 EM DASH. "
+        "U+2013 en dash is outside this rule."
+    )
     assert tuple(case.id for case in cases) == ISSUE_644_CASE_IDS
 
 
@@ -69,14 +74,42 @@ def test_assert_no_em_dash_rejects_the_preserved_issue_644_replies(
         "Here are the confirmed options you can explore.",
         "It's built for ideas you already have, like testing a strategy.",
         "No dash here, only a hyphen-joined word.",
-        f"An en dash range 2020{EN_DASH}2024 is not an em dash.",
+        "Argus no predice el futuro. Puedo probar la idea sobre historia.",
         "",
     ],
-    ids=["clean", "comma", "hyphen", "en-dash", "empty"],
+    ids=["en-clean", "en-comma", "hyphen", "es-419-clean", "empty"],
 )
 def test_assert_no_em_dash_accepts_prose_without_u2014(prose: str) -> None:
     assert prose_contains_em_dash(prose) is False
     assert_no_em_dash(prose)
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        f"Range 2020{EN_DASH}2024 with an en dash.",
+        f"Rango 2020{EN_DASH}2024 con raya corta.",
+    ],
+    ids=["en-en-dash", "es-419-en-dash"],
+)
+def test_assert_no_em_dash_allows_u2013_en_dash(prose: str) -> None:
+    assert EM_DASH not in prose
+    assert EN_DASH in prose
+    assert prose_contains_em_dash(prose) is False
+    assert_no_em_dash(prose)
+
+
+@pytest.mark.parametrize(
+    "prose",
+    [
+        f"It already has an idea{EM_DASH}like a test on one stock.",
+        f"Argus no predice el futuro{EM_DASH}eso queda fuera de lo que hace.",
+    ],
+    ids=["en-em-dash", "es-419-em-dash"],
+)
+def test_assert_no_em_dash_rejects_u2014_in_english_and_es_419(prose: str) -> None:
+    with pytest.raises(AssertionError, match="U\\+2014"):
+        assert_no_em_dash(prose)
 
 
 def test_loader_rejects_a_broken_fixture(tmp_path: Path) -> None:
