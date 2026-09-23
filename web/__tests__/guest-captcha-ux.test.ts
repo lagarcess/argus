@@ -1,8 +1,40 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import * as guestCaptcha from "../lib/guest-captcha";
+import { applyGuestBootstrapError } from "../lib/guest-entry-error";
+
+const globalRestores: Array<() => void> = [];
+
+function stubGlobal(name: "window" | "document", value: unknown) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, name);
+  Object.defineProperty(globalThis, name, {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value,
+  });
+  const restore = () => {
+    if (previous) {
+      Object.defineProperty(globalThis, name, previous);
+      return;
+    }
+    Reflect.deleteProperty(globalThis, name);
+  };
+  globalRestores.push(restore);
+  return restore;
+}
+
+function restoreStubbedGlobals() {
+  while (globalRestores.length > 0) {
+    globalRestores.pop()?.();
+  }
+}
+
+afterEach(() => {
+  restoreStubbedGlobals();
+});
 
 const root = join(import.meta.dir, "..");
 
@@ -186,5 +218,265 @@ describe("shared CAPTCHA acquisition UX", () => {
     expect(es.auth.captcha?.verifying).toBe(
       "Verificando que no eres un bot…",
     );
+  });
+
+  test("an unavailable acquisition plan throws captcha_unavailable", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalLocalToken =
+      process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN;
+    const originalTurnstileSiteKey =
+      process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY;
+    const originalApiUrl = process.env.NEXT_PUBLIC_ARGUS_API_URL;
+    process.env.NODE_ENV = "production";
+    delete process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN;
+    delete process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY;
+    process.env.NEXT_PUBLIC_ARGUS_API_URL =
+      "https://api.argus.example/api/v1";
+    try {
+      const error = await guestCaptcha
+        .acquireGuestCaptchaToken()
+        .catch((caught: unknown) => caught);
+      expect(guestCaptcha.isCaptchaUnavailableError(error)).toBe(true);
+      expect(guestCaptcha.guestEntryErrorKind(error)).toBe(
+        "captcha_unavailable",
+      );
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      if (originalLocalToken === undefined) {
+        delete process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN;
+      } else {
+        process.env.NEXT_PUBLIC_ARGUS_LOCAL_QA_CAPTCHA_TOKEN =
+          originalLocalToken;
+      }
+      if (originalTurnstileSiteKey === undefined) {
+        delete process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY;
+      } else {
+        process.env.NEXT_PUBLIC_ARGUS_TURNSTILE_SITE_KEY =
+          originalTurnstileSiteKey;
+      }
+      if (originalApiUrl === undefined) {
+        delete process.env.NEXT_PUBLIC_ARGUS_API_URL;
+      } else {
+        process.env.NEXT_PUBLIC_ARGUS_API_URL = originalApiUrl;
+      }
+    }
+
+    const captcha = readFileSync(join(root, "lib/guest-captcha.ts"), "utf-8");
+    const unavailableBranch = captcha.slice(
+      captcha.indexOf('if (plan.kind === "unavailable")'),
+      captcha.indexOf("const deadline"),
+    );
+    expect(unavailableBranch).toContain("throw captchaUnavailableError()");
+    expect(captcha).not.toContain(
+      "Guest access requires a configured browser CAPTCHA before production exposure.",
+    );
+  });
+
+  test("script-load and missing-turnstile failures classify as captcha_unavailable", async () => {
+    const loadTurnstile = (
+      guestCaptcha as typeof guestCaptcha & {
+        loadTurnstile?: (timeoutMs: number) => Promise<unknown>;
+      }
+    ).loadTurnstile;
+    expect(typeof loadTurnstile).toBe("function");
+    const load = loadTurnstile as (timeoutMs: number) => Promise<unknown>;
+
+    const classifyLoadFailure = async (trigger: "error" | "load") => {
+      const listeners = new Map<string, () => void>();
+      const script = {
+        addEventListener(type: string, handler: () => void) {
+          listeners.set(type, handler);
+        },
+        removeEventListener(type: string) {
+          listeners.delete(type);
+        },
+        remove() {},
+        id: "",
+        src: "",
+        async: false,
+        defer: false,
+      };
+      stubGlobal("window", {
+        turnstile: undefined,
+        setTimeout: globalThis.setTimeout.bind(globalThis),
+        clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      });
+      stubGlobal("document", {
+        getElementById: () => null,
+        createElement: () => script,
+        head: { appendChild() {} },
+      });
+      try {
+        const pending = load(50);
+        listeners.get(trigger)?.();
+        const error = await pending.catch((caught: unknown) => caught);
+        expect(guestCaptcha.isCaptchaUnavailableError(error), trigger).toBe(
+          true,
+        );
+        expect(guestCaptcha.guestEntryErrorKind(error), trigger).toBe(
+          "captcha_unavailable",
+        );
+      } finally {
+        restoreStubbedGlobals();
+      }
+    };
+
+    await classifyLoadFailure("error");
+    await classifyLoadFailure("load");
+
+    const captcha = readFileSync(join(root, "lib/guest-captcha.ts"), "utf-8");
+    expect(captcha).not.toContain("Browser CAPTCHA could not start.");
+    expect(captcha).not.toContain("Browser CAPTCHA could not load.");
+  });
+
+  test("maps coded Turnstile failures to captcha_unavailable and other errors to generic", () => {
+    const coded = Object.assign(new Error("Browser CAPTCHA could not be verified."), {
+      code: "captcha_unavailable",
+    });
+    expect(guestCaptcha.isCaptchaUnavailableError(coded)).toBe(true);
+    expect(guestCaptcha.guestEntryErrorKind(coded)).toBe("captcha_unavailable");
+    expect(guestCaptcha.guestEntryErrorKind(new Error("network"))).toBe(
+      "generic",
+    );
+    expect(guestCaptcha.guestEntryErrorKind()).toBe("generic");
+    expect(guestCaptcha.guestEntryErrorKind("captcha_unavailable")).toBe(
+      "generic",
+    );
+  });
+
+  test("captcha_unavailable clears the guest entry retry; other errors keep it", () => {
+    const coded = Object.assign(new Error("Browser CAPTCHA could not be verified."), {
+      code: "captcha_unavailable",
+    });
+    const captchaRetry = { current: { text: "retry me" } };
+    expect(applyGuestBootstrapError(coded, captchaRetry)).toBe(
+      "captcha_unavailable",
+    );
+    expect(captchaRetry.current).toBeNull();
+
+    const genericRetry = { current: { text: "keep me" } };
+    expect(applyGuestBootstrapError(new Error("network"), genericRetry)).toBe(
+      "generic",
+    );
+    expect(genericRetry.current).toEqual({ text: "keep me" });
+  });
+
+  test("empty-chat guest entry localizes captcha_unavailable and omits a same-path retry", () => {
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(emptyChat).toMatch(
+      /const disabled =\s*isStreamingResponse \|\|\s*isHydratingConversation \|\|\s*guestSubmissionPending \|\|\s*guestSubmissionError === CAPTCHA_UNAVAILABLE_CODE/,
+    );
+    expect(emptyChat).toContain("<ChatInput");
+    expect(emptyChat).toContain("<StarterActions");
+    expect(emptyChat.match(/disabled=\{disabled\}/g)?.length).toBe(2);
+    expect(emptyChat).toContain("auth.errors.captcha_unavailable");
+    expect(emptyChat).toContain("guest.entry.reload");
+    expect(emptyChat).toContain("window.location.reload()");
+    expect(emptyChat).not.toContain("guest.shell.sign_in");
+    expect(emptyChat).not.toContain("onSignIn");
+    expect(emptyChat).not.toContain("t(guestSubmissionError");
+    expect(emptyChat).not.toContain("{guestSubmissionError}");
+
+    const captchaRender = emptyChat.slice(
+      emptyChat.indexOf("guestSubmissionError === CAPTCHA_UNAVAILABLE_CODE ? ("),
+    );
+    const genericBranch = captchaRender.slice(captchaRender.indexOf(") : ("));
+    const captchaActions = captchaRender.slice(
+      0,
+      captchaRender.indexOf(") : ("),
+    );
+    expect(captchaActions).toContain("guest.entry.reload");
+    expect(captchaActions).not.toContain("disabled={disabled}");
+    expect(captchaActions).not.toContain("guest.shell.sign_in");
+    expect(captchaActions).not.toContain("common.try_again");
+    expect(captchaActions).not.toContain("onRetryGuestSubmission");
+    expect(genericBranch).toContain("common.try_again");
+    expect(genericBranch).toContain("onRetryGuestSubmission");
+
+    expect(experience).toContain("onGuestBootstrapError(error)");
+    expect(chat).toContain("useGuestEntryError(guestSubmissionRetryRef)");
+    expect(chat).toContain("onGuestBootstrapError: guestEntry.onGuestBootstrapError");
+    expect(chat).toContain("onSignIn={requestGuestSignIn}");
+    const emptyStart = chat.indexOf("<EmptyChatSurface");
+    const emptyUsage = chat.slice(
+      emptyStart,
+      chat.indexOf("/>", emptyStart),
+    );
+    expect(emptyUsage).not.toContain("onSignIn");
+    expect(chat).not.toContain("guestEntryErrorKind(");
+
+    expect(en.auth.errors.captcha_unavailable).toBe(
+      "This browser didn’t pass the security check. Open Argus in a regular browser, or reload the page.",
+    );
+    expect(es.auth.errors.captcha_unavailable).toBe(
+      "Este navegador no pasó la verificación de seguridad. Abre Argus en un navegador normal, o actualiza la página.",
+    );
+    expect(en.guest.entry.reload).toBe("Reload");
+    expect(es.guest.entry.reload).toBe("Actualizar");
+    expect(en.auth.errors.captcha_unavailable).not.toBe("captcha_unavailable");
+    expect(es.auth.errors.captcha_unavailable).not.toBe("captcha_unavailable");
+    expect(en.auth.errors.captcha_unavailable.toLowerCase()).not.toContain(
+      "try again",
+    );
+
+    const captchaE2e = readFileSync(
+      join(root, "e2e/guest-auth-captcha-ux.spec.ts"),
+      "utf-8",
+    );
+    expect(captchaE2e).toContain("en.auth.errors.captcha_unavailable");
+    expect(captchaE2e).not.toContain(
+      "We couldn’t complete the security check. Please try again.",
+    );
+  });
+
+  test("expired guest restart localizes captcha_unavailable as Reload-only", () => {
+    const expired = readFileSync(
+      join(root, "components/guest/ExpiredGuestSession.tsx"),
+      "utf-8",
+    );
+
+    expect(expired).toContain("useState<GuestEntryErrorKind | null>");
+    expect(expired).toContain("guestEntryErrorKind(error)");
+    expect(expired).toContain("restartErrorKind === CAPTCHA_UNAVAILABLE_CODE");
+    expect(expired).toContain("auth.errors.captcha_unavailable");
+    expect(expired).toContain("guest.entry.reload");
+    expect(expired).toContain("window.location.reload()");
+    expect(expired).not.toContain("setRestartError(");
+    expect(expired).not.toContain("isCaptchaUnavailableError");
+
+    const captchaBranch = expired.slice(
+      expired.indexOf("captchaBlocked ? ("),
+      expired.indexOf(") : authMode ? ("),
+    );
+    expect(captchaBranch).toContain("guest.entry.reload");
+    expect(captchaBranch).not.toContain("guest.expired.start_new");
+    expect(captchaBranch).not.toContain("guest.expired.sign_in");
+    expect(captchaBranch).not.toContain("guest.expired.create_account");
+    expect(captchaBranch).not.toContain("<AuthForm");
+    expect(captchaBranch).not.toContain("retryGuestSession");
+
+    const genericBranch = expired.slice(expired.indexOf(") : authMode ? ("));
+    expect(expired).toContain("retryGuestSession");
+    expect(genericBranch).toContain("guest.expired.start_new");
+    expect(genericBranch).toContain("guest.expired.restart_error");
+    expect(genericBranch).toContain('restartErrorKind === "generic"');
   });
 });

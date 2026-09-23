@@ -70,7 +70,7 @@ type UseGuestExperienceInput = {
   onRequestPendingGuestSignIn: () => void;
   onAdoptConversation: (conversationId: string) => void;
   onGuestBootstrapExpired: (publicAccountAccessEnabled: boolean) => void;
-  onGuestBootstrapError: () => void;
+  onGuestBootstrapError: (error?: unknown) => void;
   onGateError: () => void;
   onStartOverError: () => void;
   omnisearchShortcutEnabled: boolean;
@@ -219,8 +219,8 @@ export function useGuestExperience({
               return false;
             }
             effectiveAccount = refreshedAccount;
-          } catch {
-            if (!admissionCancelled()) onGuestBootstrapError();
+          } catch (error) {
+            if (!admissionCancelled()) onGuestBootstrapError(error);
             return false;
           }
         }

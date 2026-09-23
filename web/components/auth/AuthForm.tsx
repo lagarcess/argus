@@ -45,7 +45,8 @@ const AUTH_ERROR_MESSAGE_BY_CODE: Readonly<
 > = {
   captcha_unavailable: {
     key: "auth.errors.captcha_unavailable",
-    fallback: "We couldn’t complete the security check. Please try again.",
+    fallback:
+      "This browser didn’t pass the security check. Open Argus in a regular browser, or reload the page.",
   },
   unauthorized: {
     key: "auth.errors.unauthorized",

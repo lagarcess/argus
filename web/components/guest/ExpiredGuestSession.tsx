@@ -10,6 +10,11 @@ import {
   normalizeApiLanguage,
   signupWithEmail,
 } from "@/lib/argus-api";
+import {
+  CAPTCHA_UNAVAILABLE_CODE,
+  guestEntryErrorKind,
+  type GuestEntryErrorKind,
+} from "@/lib/guest-captcha";
 import { retryGuestSession } from "@/lib/guest-session";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
@@ -23,21 +28,22 @@ export default function ExpiredGuestSession({
   const { t, i18n } = useTranslation();
   const [authMode, setAuthMode] = useState<AuthFormMode | null>(null);
   const [isRestarting, setIsRestarting] = useState(false);
-  const [restartError, setRestartError] = useState<string | null>(null);
+  const [restartErrorKind, setRestartErrorKind] =
+    useState<GuestEntryErrorKind | null>(null);
+  const captchaBlocked = restartErrorKind === CAPTCHA_UNAVAILABLE_CODE;
 
   const startNewTemporaryChat = async () => {
     setIsRestarting(true);
-    setRestartError(null);
+    setRestartErrorKind(null);
     try {
       await retryGuestSession(i18n.resolvedLanguage ?? i18n.language);
       window.location.assign("/chat");
-    } catch {
-      setRestartError(
-        t(
-          "guest.expired.restart_error",
-          "Argus could not start a new temporary chat. Try again.",
-        ),
-      );
+    } catch (error) {
+      const kind = guestEntryErrorKind(error);
+      setRestartErrorKind(kind);
+      if (kind === CAPTCHA_UNAVAILABLE_CODE) {
+        setAuthMode(null);
+      }
       setIsRestarting(false);
     }
   };
@@ -61,7 +67,26 @@ export default function ExpiredGuestSession({
           )}
         </p>
 
-        {authMode ? (
+        {captchaBlocked ? (
+          <div
+            className="mt-7 flex flex-col items-center gap-3 text-center"
+            role="alert"
+          >
+            <p className={`text-sm ${inlineFailureTextClass}`}>
+              {t(
+                "auth.errors.captcha_unavailable",
+                "This browser didn’t pass the security check. Open Argus in a regular browser, or reload the page.",
+              )}
+            </p>
+            <button
+              type="button"
+              className="min-h-11 rounded-full border border-current px-6 py-3 text-base font-medium"
+              onClick={() => window.location.reload()}
+            >
+              {t("guest.entry.reload", "Reload")}
+            </button>
+          </div>
+        ) : authMode ? (
           <div
             aria-label={
               authMode === "signup"
@@ -137,9 +162,12 @@ export default function ExpiredGuestSession({
           </div>
         )}
 
-        {restartError && (
+        {restartErrorKind === "generic" && (
           <p className={`mt-4 text-center text-sm ${inlineFailureTextClass}`} role="alert">
-            {restartError}
+            {t(
+              "guest.expired.restart_error",
+              "Argus could not start a new temporary chat. Try again.",
+            )}
           </p>
         )}
       </section>
