@@ -31,7 +31,6 @@ type EmptyChatSurfaceProps = {
     selection?: ChatMention[] | StarterSelectionMetadata,
   ) => void | boolean | Promise<void | boolean>;
   onRetryGuestSubmission: () => void;
-  onSignIn: () => void;
   onToast: (message: string) => void;
 };
 
@@ -46,7 +45,6 @@ export default function EmptyChatSurface({
   placeholder,
   onSend,
   onRetryGuestSubmission,
-  onSignIn,
   onToast,
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
@@ -124,13 +122,6 @@ export default function EmptyChatSurface({
                     onClick={() => window.location.reload()}
                   >
                     {t("guest.entry.reload", "Reload")}
-                  </button>
-                  <button
-                    type="button"
-                    className="min-h-11 rounded-full border border-current px-4 py-2 font-medium"
-                    onClick={onSignIn}
-                  >
-                    {t("guest.shell.sign_in", "Sign in")}
                   </button>
                 </div>
               </>

@@ -2424,7 +2424,6 @@ export default function ChatInterface() {
                 placeholder={chatInputPlaceholder}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}
-                onSignIn={requestGuestSignIn}
                 onToast={showToast}
               />
             ) : (

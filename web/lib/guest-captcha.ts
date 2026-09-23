@@ -396,9 +396,7 @@ export async function acquireGuestCaptchaToken(
   const plan = guestCaptchaPlan(browserCaptchaToken);
   if (plan.kind === "token") return plan.token;
   if (plan.kind === "unavailable") {
-    throw new Error(
-      "Guest access requires a configured browser CAPTCHA before production exposure.",
-    );
+    throw captchaUnavailableError();
   }
 
   const deadline = Date.now() + CAPTCHA_ACQUISITION_TIMEOUT_MS;
