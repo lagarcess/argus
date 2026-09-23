@@ -1,0 +1,20 @@
+{
+  "schema_version": "discovery_em_dash_regression/v1",
+  "issue": 644,
+  "verified_sha": "4c4e7a001150740dddef4e97fc13b99f2b0c823b",
+  "environment": "local-live-eval",
+  "captured_at": "2026-09-15",
+  "rule": "User-facing Argus prose must not contain U+2014 EM DASH.",
+  "cases": [
+    {
+      "id": "asset_discovery_trending_crypto_exact_issue_344",
+      "sha256": "9f0e90616ca2ae5efc28c16420199a298233e395a4855ba3cf892ad603532f95",
+      "text": "Here are the trending cryptos I can confirm for you right now. \n\nThe search also returned some names that couldn't be fully verified in the current data, so those aren't testable here—but the two below are the confirmed options you can explore."
+    },
+    {
+      "id": "asset_discovery_not_capability_question_issue_244",
+      "sha256": "f4703bba518f1a479406d5d7344630220bbf6b8368c34e1181328e8347066a51",
+      "text": "No, Argus doesn't help you find new stocks to invest in. It's built for experimenting with ideas you already have—like testing a strategy on a specific stock, crypto, or currency pair you're curious about.\n\nThink of it this way: you bring the stock (or other asset) to the table, and Argus runs a backtest to see how your idea would have performed. If you're looking for stock discovery or screening, that's outside what Argus does.\n\nIf you have a stock in mind and want to test a strategy on it, I can help set that up."
+    }
+  ]
+}

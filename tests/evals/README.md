@@ -33,11 +33,29 @@ poetry run pytest tests/evals/test_measurement_eval_harness.py \
   tests/evals/test_measurement_delivery.py \
   tests/evals/test_measurement_outcome.py \
   tests/evals/test_prose_evidence.py \
+  tests/evals/test_discovery_em_dash_regression.py \
   -q
 ```
 
 This run is free. It does not call the LLM, does not spend provider tokens, and
 is safe to run anywhere.
+
+## Discovery Em-Dash Regression (Issue #644)
+
+The two captured discovery replies from the 2026-09-15 local live measurement
+at `4c4e7a001150740dddef4e97fc13b99f2b0c823b` are preserved as raw evidence
+in `discovery_em_dash_regression.json`. They still contain U+2014. That is
+the known defect. Do not rewrite the fixture to make a check pass.
+
+```bash
+poetry run pytest tests/evals/test_discovery_em_dash_regression.py -q --no-cov
+```
+
+This check is free. It does not call a model. `assert_no_em_dash` is the
+gate Runtime must satisfy on newly generated user-facing prose. The
+historical fixture stays. Wiring `no_em_dash` into the live prose judge is
+left for the writer-fix lane. A deterministic character check does not
+belong in the LLM rubric.
 
 ## Search Provider Evaluation (Issue #244)
 
