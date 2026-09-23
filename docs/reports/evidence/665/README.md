@@ -9,8 +9,8 @@ Turnstile is not bypassed.
 - `before.png` — parent-tip behavior: generic temporary-chat copy + **Try again**;
   AuthForm still said “try again.”
 - `after.png` — this tip: `auth.errors.captcha_unavailable` + **Reload**
-  only on empty chat (Sign in is a same-browser dead path); AuthForm uses
-  the same honest copy and keeps submit.
+  only; composer and starter chips look disabled so they cannot send.
+  AuthForm uses the same honest copy and keeps submit.
 - `before-after-collage.png` — both columns together.
 
 Source HTML (gitignored): `temp/issue-665-ux-fixtures.html`.
