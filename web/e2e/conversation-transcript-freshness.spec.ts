@@ -103,6 +103,51 @@ for (const language of ["en", "es-419"] as const) {
   });
 }
 
+for (const language of ["en", "es-419"] as const) {
+  test(`pre-admission focus still surfaces the later saved reply (${language})`, async ({ context, page: tabA }) => {
+    const fixture = await installActivityFixture(context, { language });
+    const tabB = await context.newPage();
+    fixture.hideWorkingFrom.add(tabB);
+    for (const tab of [tabA, tabB]) {
+      await tab.goto("/chat?conversation=activity-a");
+      await expect(tab.getByTestId("chat-input")).toBeVisible();
+      await expect(tab.getByText("Transcript activity-a message 0", { exact: true })).toHaveCount(1);
+    }
+    const beforeURL = tabB.url();
+    const transcript = tabB.getByTestId("conversation-transcript-region");
+    const scrollTop = await transcript.evaluate((element) => {
+      if (element.scrollHeight > element.clientHeight) element.scrollTop = 240;
+      element.dispatchEvent(new Event("scroll"));
+      return element.scrollTop;
+    });
+    const prompt = language === "en" ? "What is compound interest?" : "¿Qué es el interés compuesto?";
+    await tabA.getByTestId("chat-input").fill(prompt);
+    await tabA.getByTestId("chat-send").click();
+    await expect.poll(() => fixture.pendingStreams.has("activity-a")).toBe(true);
+    // B focuses while the stream exists but before any saved user message.
+    expect(fixture.messages["activity-a"].at(-1)?.role).toBe("assistant");
+    await refreshActivity(tabB, fixture);
+    await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(0);
+    await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(0);
+    const readsAfterFocus = fixture.messageRequests.filter((request) => request.page === tabB).length;
+    // Persist the user and reply. No later focus/visibility event is sent to B.
+    fixture.settleOrdinary("activity-a", "none");
+    try {
+      await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+      await expect(tabA.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1);
+      await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+      expect(tabB.url()).toBe(beforeURL);
+      await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeCloseTo(scrollTop, 0);
+      expect(fixture.messageRequests.filter((request) => request.page === tabB).length).toBeGreaterThan(readsAfterFocus);
+      const settledReads = fixture.messageRequests.length;
+      await tabB.waitForTimeout(2_500);
+      expect(fixture.messageRequests.length).toBe(settledReads);
+    } finally {
+      await captureEvidence(tabB, `640-pre-admission-${language}.png`);
+    }
+  });
+}
+
 
 for (const language of ["en", "es-419"] as const) {
   test(`long conversation reads only its saved tail while awaiting a reply (${language})`, async ({ context, page: tabA }) => {

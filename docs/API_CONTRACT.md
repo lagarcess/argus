@@ -3268,7 +3268,13 @@ and conversation-list activity projections. It changes for an ordinary saved
 reply even without a job or lifecycle row, and marking read does not clear it.
 Clients compare this opaque identity with the last raw API message they loaded
 and reload saved messages when it differs, including on focus/visibility
-refreshes. Neither operation timestamps nor attention cursors represent
+refreshes. A focused observer that receives an idle snapshot whose
+`latest_message_id` still matches its loaded transcript also keeps reading the
+saved tail until a newer saved message appears or the runtime event timeout
+elapses. That covers a focus that lands before the API admits the next user
+message. Once an unanswered saved user message is loaded, the reply window
+starts from that message's creation time and these admission checks do not
+extend it. Neither operation timestamps nor attention cursors represent
 transcript freshness. A refresh preserves the current message anchor and scroll.
 
 Operation precedence is `running > queued > checking > idle`; equal states use

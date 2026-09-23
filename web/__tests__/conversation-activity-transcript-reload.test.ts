@@ -19,10 +19,11 @@ function harness(clock?: { now: () => number; schedule: (callback: () => void, d
     accountId: "account", conversationId: "conversation", latestMessageId: "old",
     activityRevision: 1, requestId: null, ready: true, visibleMessages: [],
   };
-  runtime.recordLoaded("account", "conversation", snapshot("old"));
+  const initial = snapshot("old");
+  runtime.recordLoaded("account", "conversation", initial);
   runtime.update(inputs);
   const update = (patch: Partial<TranscriptFreshnessInputs>) => { Object.assign(inputs, patch); runtime.update({ ...inputs }); };
-  return { runtime, inputs, requests, applied, update };
+  return { runtime, inputs, requests, applied, update, initial };
 }
 
 describe("saved transcript freshness", () => {
@@ -214,4 +215,100 @@ test("the deadline aborts an in-flight reply check and rejects its late result",
   h.requests[0].result.resolve(snapshot("late-reply"));
   await drainMicrotasks();
   expect(h.applied).toEqual([]);
+});
+
+describe("bounded pre-admission focus checks", () => {
+  test("an idle matching-id focus keeps reading until the later saved reply lands", async () => {
+    const clock = controlledClock();
+    const h = harness(clock);
+    h.update({ activityRevision: 2 });
+    expect(h.requests).toHaveLength(0);
+    expect(clock.hasTimer()).toBe(false);
+    h.runtime.retry();
+    expect(clock.hasTimer()).toBe(true);
+    expect(h.requests).toHaveLength(0);
+    clock.advance(2_000);
+    expect(h.requests).toHaveLength(1);
+    h.requests[0].result.resolve(h.initial);
+    await drainMicrotasks(); await drainMicrotasks();
+    expect(h.applied).toEqual([]);
+    clock.advance(2_000);
+    expect(h.requests).toHaveLength(2);
+    h.requests[1].result.resolve(snapshot("reply"));
+    await drainMicrotasks(); await drainMicrotasks();
+    expect(h.applied).toEqual(["reply"]);
+    expect(clock.hasTimer()).toBe(false);
+    clock.advance(180_000);
+    expect(h.requests).toHaveLength(2);
+  });
+
+  test("a matching-id activity revision does not start admission checks", () => {
+    const clock = controlledClock();
+    const h = harness(clock);
+    h.update({ activityRevision: 2 });
+    expect(clock.hasTimer()).toBe(false);
+    expect(h.requests).toHaveLength(0);
+  });
+
+  test("pre-admission checks stop at the original 180-second focus deadline", async () => {
+    const clock = controlledClock();
+    const h = harness(clock);
+    h.runtime.retry();
+    for (let second = 2; second < 180; second += 2) {
+      clock.advance(2_000);
+      expect(h.requests).toHaveLength(second / 2);
+      h.requests.at(-1)!.result.resolve(h.initial);
+      await drainMicrotasks(); await drainMicrotasks();
+    }
+    clock.advance(2_000);
+    expect(clock.hasTimer()).toBe(false);
+    const reads = h.requests.length;
+    h.update({ activityRevision: 3 });
+    clock.advance(180_000);
+    expect(h.requests).toHaveLength(reads);
+    h.runtime.retry();
+    expect(clock.hasTimer()).toBe(true);
+    clock.advance(2_000);
+    expect(h.requests).toHaveLength(reads + 1);
+    h.requests.at(-1)!.result.resolve(h.initial);
+    await drainMicrotasks(); await drainMicrotasks();
+    expect(h.applied).toEqual([]);
+  });
+
+  test("a loaded unanswered user replaces admission checks and keeps its own deadline", async () => {
+    const clock = controlledClock();
+    const h = harness(clock);
+    h.runtime.retry();
+    clock.advance(2_000);
+    const savedAt = clock.now();
+    const saved = unanswered("user", savedAt);
+    h.requests[0].result.resolve(saved);
+    await drainMicrotasks(); await drainMicrotasks();
+    expect(h.applied).toEqual(["user"]);
+    h.update({ latestMessageId: "user", visibleMessages: [{ id: "user", role: "user" }] });
+    for (let second = 2; second < 180; second += 2) {
+      clock.advance(2_000);
+      h.requests.at(-1)!.result.resolve(saved);
+      await drainMicrotasks(); await drainMicrotasks();
+    }
+    clock.advance(2_000);
+    expect(clock.hasTimer()).toBe(false);
+    const reads = h.requests.length;
+    h.runtime.retry();
+    h.update({ activityRevision: 3 });
+    clock.advance(180_000);
+    expect(h.requests).toHaveLength(reads);
+  });
+
+  for (const change of [{ conversationId: "other" }, { accountId: "other" }, { requestId: "local" }, { ready: false }]) {
+    test(`stops pre-admission polling when ${Object.keys(change)[0]} changes`, () => {
+      const clock = controlledClock();
+      const h = harness(clock);
+      h.runtime.retry();
+      expect(clock.hasTimer()).toBe(true);
+      h.update(change);
+      expect(clock.hasTimer()).toBe(false);
+      h.runtime.dispose();
+    });
+  }
 });
