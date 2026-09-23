@@ -15,7 +15,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from argus.agent_runtime.research_grounded import DECLINED_REASON_CODE
+# Same token `research_grounded.DECLINED_REASON_CODE` writes onto an
+# in-memory interpretation. This exporter does not import that module: the
+# research runtime is not an attribution dependency. The lock is
+# `test_declined_reason_code_matches_runtime_owner`.
+STORED_RESEARCH_DECLINED_CODE = "research_declined_not_a_money_request"
 
 # Lifecycle columns the historical exporters already allowlisted. Identifiers
 # such as turn_id and request_id stay out.
@@ -221,9 +225,9 @@ def _research_declined(
     if isinstance(declined, bool):
         return declined
     declined_code = _finite_code(declined)
-    if declined_code == DECLINED_REASON_CODE:
+    if declined_code == STORED_RESEARCH_DECLINED_CODE:
         return True
-    if reason_codes is not None and DECLINED_REASON_CODE in reason_codes:
+    if reason_codes is not None and STORED_RESEARCH_DECLINED_CODE in reason_codes:
         return True
     return None
 
@@ -237,9 +241,7 @@ def _unsupported_categories(
     found = False
     for path in _UNSUPPORTED_LIST_PATHS:
         container = (
-            {"clarification": clarification}
-            if path[0] == "clarification"
-            else stored
+            {"clarification": clarification} if path[0] == "clarification" else stored
         )
         raw = _walk(container, path)
         codes = _category_codes(raw)

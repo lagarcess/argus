@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import ast
 import json
-from pathlib import Path
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from faker import Faker
 
-from argus.agent_runtime.research_grounded import DECLINED_REASON_CODE
 from tests.evals.acceptance_attribution import (
     FAILURE_METADATA_KEYS,
     FORBIDDEN_EXPORT_KEYS,
+    STORED_RESEARCH_DECLINED_CODE,
     allowlisted_cost_row,
     allowlisted_failure_metadata,
     allowlisted_route_row,
@@ -21,14 +21,28 @@ from tests.evals.acceptance_attribution import (
 
 REPO = Path(__file__).resolve().parents[2]
 EXPORTERS = (
-    REPO
-    / "docs/reports/evidence/2026-09-14-acceptance/drivers/export_replay.py",
+    REPO / "docs/reports/evidence/2026-09-14-acceptance/drivers/export_replay.py",
     REPO
     / "docs/reports/evidence/2026-09-17-final-acceptance-e8a4ccee"
     / "drivers/export_replay.py",
 )
 
 fake = Faker()
+
+
+def test_declined_reason_code_matches_runtime_owner() -> None:
+    tree = ast.parse((REPO / "src/argus/agent_runtime/research_grounded.py").read_text())
+    assigned = next(
+        node.value.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "DECLINED_REASON_CODE"
+            for target in node.targets
+        )
+        and isinstance(node.value, ast.Constant)
+    )
+    assert assigned == STORED_RESEARCH_DECLINED_CODE
 
 
 def test_top_level_clarification_reason_is_exported() -> None:
@@ -109,11 +123,16 @@ def test_recovery_code_reads_contract_owner_not_reason_code() -> None:
 
 def test_interpreter_reason_codes_are_exported_when_stored() -> None:
     exported = allowlisted_failure_metadata(
-        {"reason_codes": [DECLINED_REASON_CODE, "scenario_contract_from_horizon"]}
+        {
+            "reason_codes": [
+                STORED_RESEARCH_DECLINED_CODE,
+                "scenario_contract_from_horizon",
+            ]
+        }
     )
 
     assert exported["interpreter_reason_codes"] == [
-        DECLINED_REASON_CODE,
+        STORED_RESEARCH_DECLINED_CODE,
         "scenario_contract_from_horizon",
     ]
     assert exported["research_declined"] is True
@@ -241,7 +260,7 @@ def test_export_shape_does_not_leak_customer_text() -> None:
                 "answer": customer_text,
             },
             "recovery": {"code": "runtime_failure"},
-            "reason_codes": [DECLINED_REASON_CODE],
+            "reason_codes": [STORED_RESEARCH_DECLINED_CODE],
             "agent_runtime_stage_outcome": "ready_to_respond",
             "agent_runtime_turn": {
                 "status": "completed",
