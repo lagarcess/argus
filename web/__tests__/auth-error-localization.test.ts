@@ -101,6 +101,17 @@ describe("auth error localization", () => {
     ).toBe(
       "No pudimos verificar esta solicitud. Actualiza la página e inténtalo de nuevo.",
     );
+    expect(resolve(codedError("captcha_unavailable"), translator(en))).toBe(
+      "This browser didn’t pass the security check. Open Argus in a regular browser, or reload the page.",
+    );
+    expect(
+      resolve(codedError("captcha_unavailable"), translator(es419)),
+    ).toBe(
+      "Este navegador no pasó la verificación de seguridad. Abre Argus en un navegador normal, o actualiza la página.",
+    );
+    expect(resolve(codedError("captcha_unavailable"), translator(en))).not.toBe(
+      "captcha_unavailable",
+    );
   });
 
   test("falls back to the localized generic message for unknown errors", async () => {

@@ -10,13 +10,17 @@ import StarterActions, {
   type StarterSelectionMetadata,
 } from "./StarterActions";
 import type { ChatMention } from "./types";
+import {
+  CAPTCHA_UNAVAILABLE_CODE,
+  type GuestEntryErrorKind,
+} from "@/lib/guest-captcha";
 import { researchRailEnabled } from "@/lib/private-alpha-flags";
 
 type EmptyChatSurfaceProps = {
   isGuest: boolean;
   expiresAt?: string | null;
   guestSubmissionPending: boolean;
-  guestSubmissionError: boolean;
+  guestSubmissionError: GuestEntryErrorKind | null;
   isStreamingResponse: boolean;
   isHydratingConversation: boolean;
   /** A setting the user stated, never something Argus inferred. */
@@ -27,6 +31,7 @@ type EmptyChatSurfaceProps = {
     selection?: ChatMention[] | StarterSelectionMetadata,
   ) => void | boolean | Promise<void | boolean>;
   onRetryGuestSubmission: () => void;
+  onSignIn: () => void;
   onToast: (message: string) => void;
 };
 
@@ -41,6 +46,7 @@ export default function EmptyChatSurface({
   placeholder,
   onSend,
   onRetryGuestSubmission,
+  onSignIn,
   onToast,
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
@@ -100,17 +106,51 @@ export default function EmptyChatSurface({
         )}
         {guestSubmissionError && !guestSubmissionPending && (
           <div
-            className="mt-3 flex flex-wrap items-center justify-center gap-2 text-center text-sm text-red-600 dark:text-red-300"
+            className="mt-3 flex flex-col items-center justify-center gap-2 text-center text-sm text-red-600 dark:text-red-300"
             role="alert"
           >
-            <span>{t("guest.entry.error")}</span>
-            <button
-              type="button"
-              className="min-h-11 rounded-full border border-current px-4 py-2 font-medium"
-              onClick={onRetryGuestSubmission}
-            >
-              {t("common.try_again", "Try again")}
-            </button>
+            {guestSubmissionError === CAPTCHA_UNAVAILABLE_CODE ? (
+              <>
+                <span>
+                  {t(
+                    "auth.errors.captcha_unavailable",
+                    "This browser didn’t pass the security check. Open Argus in a regular browser, or reload the page.",
+                  )}
+                </span>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    className="min-h-11 rounded-full border border-current px-4 py-2 font-medium"
+                    onClick={() => window.location.reload()}
+                  >
+                    {t("guest.entry.reload", "Reload")}
+                  </button>
+                  <button
+                    type="button"
+                    className="min-h-11 rounded-full border border-current px-4 py-2 font-medium"
+                    onClick={onSignIn}
+                  >
+                    {t("guest.shell.sign_in", "Sign in")}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <span>
+                  {t(
+                    "guest.entry.error",
+                    "Argus couldn't open a temporary chat. Try again.",
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className="min-h-11 rounded-full border border-current px-4 py-2 font-medium"
+                  onClick={onRetryGuestSubmission}
+                >
+                  {t("common.try_again", "Try again")}
+                </button>
+              </div>
+            )}
           </div>
         )}
         <ChatLegalNotice

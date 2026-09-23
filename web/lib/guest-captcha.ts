@@ -34,7 +34,13 @@ export const CAPTCHA_INTERACTIVE_TIMEOUT_MS = 300_000;
 let turnstileScriptPromise: Promise<TurnstileApi> | null = null;
 let captchaShellSequence = 0;
 
-type CaptchaUnavailableError = Error & { code: "captcha_unavailable" };
+export const CAPTCHA_UNAVAILABLE_CODE = "captcha_unavailable" as const;
+
+export type GuestEntryErrorKind = "generic" | typeof CAPTCHA_UNAVAILABLE_CODE;
+
+type CaptchaUnavailableError = Error & {
+  code: typeof CAPTCHA_UNAVAILABLE_CODE;
+};
 
 type TurnstileShell = {
   container: HTMLElement;
@@ -46,8 +52,20 @@ function captchaUnavailableError(): CaptchaUnavailableError {
   const error = new Error(
     "Browser CAPTCHA could not be verified.",
   ) as CaptchaUnavailableError;
-  error.code = "captcha_unavailable";
+  error.code = CAPTCHA_UNAVAILABLE_CODE;
   return error;
+}
+
+export function isCaptchaUnavailableError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if (!("code" in error)) return false;
+  return error.code === CAPTCHA_UNAVAILABLE_CODE;
+}
+
+export function guestEntryErrorKind(error?: unknown): GuestEntryErrorKind {
+  return isCaptchaUnavailableError(error)
+    ? CAPTCHA_UNAVAILABLE_CODE
+    : "generic";
 }
 
 export function guestCaptchaTokenForEnvironment(input: {
@@ -412,7 +430,7 @@ export async function acquirePasswordAuthCaptchaToken(): Promise<string> {
     const error = new Error(
       "The browser security check could not be completed.",
     ) as Error & { code: string };
-    error.code = "captcha_unavailable";
+    error.code = CAPTCHA_UNAVAILABLE_CODE;
     throw error;
   }
 }

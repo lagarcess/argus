@@ -187,4 +187,77 @@ describe("shared CAPTCHA acquisition UX", () => {
       "Verificando que no eres un bot…",
     );
   });
+
+  test("maps coded Turnstile failures to captcha_unavailable and other errors to generic", () => {
+    const coded = Object.assign(new Error("Browser CAPTCHA could not be verified."), {
+      code: "captcha_unavailable",
+    });
+    expect(guestCaptcha.isCaptchaUnavailableError(coded)).toBe(true);
+    expect(guestCaptcha.guestEntryErrorKind(coded)).toBe("captcha_unavailable");
+    expect(guestCaptcha.guestEntryErrorKind(new Error("network"))).toBe(
+      "generic",
+    );
+    expect(guestCaptcha.guestEntryErrorKind()).toBe("generic");
+    expect(guestCaptcha.guestEntryErrorKind("captcha_unavailable")).toBe(
+      "generic",
+    );
+  });
+
+  test("empty-chat guest entry localizes captcha_unavailable and omits a same-path retry", () => {
+    const emptyChat = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
+    const experience = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+
+    expect(emptyChat).toContain("auth.errors.captcha_unavailable");
+    expect(emptyChat).toContain("guest.entry.reload");
+    expect(emptyChat).toContain("guest.shell.sign_in");
+    expect(emptyChat).toContain("window.location.reload()");
+    expect(emptyChat).toContain("onSignIn");
+    expect(emptyChat).not.toContain("t(guestSubmissionError");
+    expect(emptyChat).not.toContain("{guestSubmissionError}");
+
+    const captchaBranch = emptyChat.slice(
+      emptyChat.indexOf("CAPTCHA_UNAVAILABLE_CODE"),
+    );
+    const genericBranch = captchaBranch.slice(captchaBranch.indexOf(") : ("));
+    expect(captchaBranch.indexOf("common.try_again")).toBeGreaterThan(
+      captchaBranch.indexOf(") : ("),
+    );
+    expect(genericBranch).toContain("common.try_again");
+    expect(genericBranch).toContain("onRetryGuestSubmission");
+
+    expect(experience).toContain("onGuestBootstrapError(error)");
+    expect(chat).toContain("guestEntryErrorKind(error)");
+    expect(chat).toContain("guestSubmissionRetryRef.current = null");
+    expect(chat).toContain("onSignIn={requestGuestSignIn}");
+
+    expect(en.auth.errors.captcha_unavailable).toBe(
+      "This browser didn’t pass the security check. Open Argus in a regular browser, or reload the page.",
+    );
+    expect(es.auth.errors.captcha_unavailable).toBe(
+      "Este navegador no pasó la verificación de seguridad. Abre Argus en un navegador normal, o actualiza la página.",
+    );
+    expect(en.guest.entry.reload).toBe("Reload");
+    expect(es.guest.entry.reload).toBe("Actualizar");
+    expect(en.auth.errors.captcha_unavailable).not.toBe("captcha_unavailable");
+    expect(es.auth.errors.captcha_unavailable).not.toBe("captcha_unavailable");
+    expect(en.auth.errors.captcha_unavailable.toLowerCase()).not.toContain(
+      "try again",
+    );
+  });
 });

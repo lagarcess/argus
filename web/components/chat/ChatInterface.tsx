@@ -207,6 +207,11 @@ import { messageElementRegistrar } from "./transcript-element-refs";
 import { usePendingBreakdownRecovery } from "./usePendingBreakdownRecovery";
 import { retirePendingBreakdown } from "@/lib/pending-result-breakdown";
 import { isGuestSimulationConversionRejection } from "@/lib/guest-conversion-recovery";
+import {
+  CAPTCHA_UNAVAILABLE_CODE,
+  guestEntryErrorKind,
+  type GuestEntryErrorKind,
+} from "@/lib/guest-captcha";
 import SidebarShell from "@/components/sidebar/SidebarShell";
 import ChatShellMenuTrigger from "@/components/chat/ChatShellMenuTrigger";
 import GuestSettingsMenu from "@/components/guest/GuestSettingsMenu";
@@ -299,7 +304,8 @@ export default function ChatInterface() {
     activityCausalClock,
   });
   const [guestSubmissionPending, setGuestSubmissionPending] = useState(false);
-  const [guestSubmissionError, setGuestSubmissionError] = useState(false);
+  const [guestSubmissionError, setGuestSubmissionError] =
+    useState<GuestEntryErrorKind | null>(null);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
@@ -929,11 +935,17 @@ export default function ChatInterface() {
     onAdoptConversation: adoptGuestConversation,
     onGuestBootstrapExpired: (publicAccountAccessEnabled) => {
       guestSubmissionRetryRef.current = null;
-      setGuestSubmissionError(false);
+      setGuestSubmissionError(null);
       setExpiredPublicAccountAccessEnabled(publicAccountAccessEnabled);
       setProfileState("expired");
     },
-    onGuestBootstrapError: () => setGuestSubmissionError(true),
+    onGuestBootstrapError: (error) => {
+      const kind = guestEntryErrorKind(error);
+      if (kind === CAPTCHA_UNAVAILABLE_CODE) {
+        guestSubmissionRetryRef.current = null;
+      }
+      setGuestSubmissionError(kind);
+    },
     onGateError: () => showToast(t("chat.error_generic"), "error"),
     onStartOverError: () =>
       showToast(
@@ -1056,7 +1068,7 @@ export default function ChatInterface() {
         actionArg,
         options,
       };
-      setGuestSubmissionError(false);
+      setGuestSubmissionError(null);
       setGuestSubmissionPending(true);
       setStreamStatus(t("guest.entry.sending", "Sending..."));
     }
@@ -2424,6 +2436,7 @@ export default function ChatInterface() {
                 placeholder={chatInputPlaceholder}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}
+                onSignIn={requestGuestSignIn}
                 onToast={showToast}
               />
             ) : (

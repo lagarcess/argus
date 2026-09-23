@@ -10,6 +10,7 @@ import {
   normalizeApiLanguage,
   signupWithEmail,
 } from "@/lib/argus-api";
+import { isCaptchaUnavailableError } from "@/lib/guest-captcha";
 import { retryGuestSession } from "@/lib/guest-session";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 
@@ -31,12 +32,17 @@ export default function ExpiredGuestSession({
     try {
       await retryGuestSession(i18n.resolvedLanguage ?? i18n.language);
       window.location.assign("/chat");
-    } catch {
+    } catch (error) {
       setRestartError(
-        t(
-          "guest.expired.restart_error",
-          "Argus could not start a new temporary chat. Try again.",
-        ),
+        isCaptchaUnavailableError(error)
+          ? t(
+              "auth.errors.captcha_unavailable",
+              "This browser didn’t pass the security check. Open Argus in a regular browser, or reload the page.",
+            )
+          : t(
+              "guest.expired.restart_error",
+              "Argus could not start a new temporary chat. Try again.",
+            ),
       );
       setIsRestarting(false);
     }
