@@ -124,7 +124,7 @@ function guestCaptchaPlan(
 export const guestCaptchaConfigured =
   guestCaptchaPlan().kind !== "unavailable";
 
-function loadTurnstile(timeoutMs: number): Promise<TurnstileApi> {
+export function loadTurnstile(timeoutMs: number): Promise<TurnstileApi> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     return Promise.reject(new Error("Browser CAPTCHA is unavailable."));
   }
@@ -154,12 +154,12 @@ function loadTurnstile(timeoutMs: number): Promise<TurnstileApi> {
         settle(() => resolve(window.turnstile as TurnstileApi));
       } else {
         script?.remove();
-        settle(() => reject(new Error("Browser CAPTCHA could not start.")));
+        settle(() => reject(captchaUnavailableError()));
       }
     };
     const fail = () => {
       script?.remove();
-      settle(() => reject(new Error("Browser CAPTCHA could not load.")));
+      settle(() => reject(captchaUnavailableError()));
     };
     if (script) {
       script.addEventListener("load", finish, { once: true });

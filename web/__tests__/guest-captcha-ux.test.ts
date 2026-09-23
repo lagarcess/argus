@@ -189,6 +189,78 @@ describe("shared CAPTCHA acquisition UX", () => {
     );
   });
 
+  test("script-load and missing-turnstile failures classify as captcha_unavailable", async () => {
+    const loadTurnstile = (
+      guestCaptcha as typeof guestCaptcha & {
+        loadTurnstile?: (timeoutMs: number) => Promise<unknown>;
+      }
+    ).loadTurnstile;
+    expect(typeof loadTurnstile).toBe("function");
+    const load = loadTurnstile as (timeoutMs: number) => Promise<unknown>;
+
+    const classifyLoadFailure = async (trigger: "error" | "load") => {
+      const listeners = new Map<string, () => void>();
+      const script = {
+        addEventListener(type: string, handler: () => void) {
+          listeners.set(type, handler);
+        },
+        removeEventListener(type: string) {
+          listeners.delete(type);
+        },
+        remove() {},
+        id: "",
+        src: "",
+        async: false,
+        defer: false,
+      };
+      const previousWindow = globalThis.window;
+      const previousDocument = globalThis.document;
+      Object.defineProperty(globalThis, "window", {
+        configurable: true,
+        value: {
+          turnstile: undefined,
+          setTimeout: globalThis.setTimeout.bind(globalThis),
+          clearTimeout: globalThis.clearTimeout.bind(globalThis),
+        },
+      });
+      Object.defineProperty(globalThis, "document", {
+        configurable: true,
+        value: {
+          getElementById: () => null,
+          createElement: () => script,
+          head: { appendChild() {} },
+        },
+      });
+      try {
+        const pending = load(50);
+        listeners.get(trigger)?.();
+        const error = await pending.catch((caught: unknown) => caught);
+        expect(guestCaptcha.isCaptchaUnavailableError(error), trigger).toBe(
+          true,
+        );
+        expect(guestCaptcha.guestEntryErrorKind(error), trigger).toBe(
+          "captcha_unavailable",
+        );
+      } finally {
+        Object.defineProperty(globalThis, "window", {
+          configurable: true,
+          value: previousWindow,
+        });
+        Object.defineProperty(globalThis, "document", {
+          configurable: true,
+          value: previousDocument,
+        });
+      }
+    };
+
+    await classifyLoadFailure("error");
+    await classifyLoadFailure("load");
+
+    const captcha = readFileSync(join(root, "lib/guest-captcha.ts"), "utf-8");
+    expect(captcha).not.toContain("Browser CAPTCHA could not start.");
+    expect(captcha).not.toContain("Browser CAPTCHA could not load.");
+  });
+
   test("maps coded Turnstile failures to captcha_unavailable and other errors to generic", () => {
     const coded = Object.assign(new Error("Browser CAPTCHA could not be verified."), {
       code: "captcha_unavailable",
