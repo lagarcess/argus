@@ -12,5 +12,10 @@ Turnstile is not bypassed.
   only; composer and starter chips look disabled so they cannot send.
   AuthForm uses the same honest copy and keeps submit.
 - `before-after-collage.png` — both columns together.
+- `expired-after.png` — ExpiredGuestSession after `captcha_unavailable`:
+  honest copy + **Reload** only (no Start new / Sign in / Create account).
+- `expired-before.png` — parent tip on that surface: all three actions stayed
+  live after the same failure.
+- `expired-before-after.png` — those two expired cards together.
 
 Source HTML (gitignored): `temp/issue-665-ux-fixtures.html`.
