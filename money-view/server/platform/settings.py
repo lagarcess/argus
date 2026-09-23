@@ -36,8 +36,10 @@ from .identity_contracts import (
     ProfilePatch,
 )
 from .identity_lifecycle import advance_household_generation
+from .settings_history import router as history_router
 
 router = APIRouter()
+router.include_router(history_router)
 
 
 def memory_data(db, context: Context) -> dict:
@@ -93,12 +95,14 @@ def settings(
         "preferences": snapshot["preferences"],
         "household": snapshot["household"],
         "supported_currencies": snapshot["supported_currencies"],
+        "guest": snapshot["guest"],
+        "currency_context": snapshot["currency_context"],
         "memory": {"enabled": memories["enabled"], "count": len(memories["items"])},
         "capabilities": {
             "local_passwords": True,
             "confirmed_memories": True,
             "data_domains": list(identity.data_domains),
-            "archive_conversations": "assistant" in identity.data_domains,
+            "archive_conversations": any(name in identity.data_domains for name in ("assistant", "chat")),
             "public_sharing": False,
             "outbound_support": False,
             "notification_delivery": "in_app_only",
@@ -379,8 +383,10 @@ def reset_data(
         clear_identity_household(db, context.household_id)
         advance_household_generation(db, context.household_id)
         db.execute(
-            "UPDATE p_households SET country='DO',currency_override=NULL WHERE id=?",
-            (context.household_id,),
+            """UPDATE p_households SET country=CASE WHEN EXISTS (
+                SELECT 1 FROM p_guest_workspaces WHERE household_id=?
+            ) THEN '' ELSE 'DO' END,currency_override=NULL WHERE id=?""",
+            (context.household_id, context.household_id),
         )
         db.execute(
             "UPDATE p_preferences SET document=? WHERE user_id=?",

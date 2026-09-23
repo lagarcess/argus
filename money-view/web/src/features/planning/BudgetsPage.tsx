@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { Check, Pause, Pencil, Play, Plus, SkipForward } from 'lucide-react';
 import { z } from 'zod';
-import { request } from '../../platform/client';
+import { APIError, request } from '../../platform/client';
+import { useRecordFocus } from '../../argus/useRecordFocus';
 import { useResource } from '../../platform/hooks';
 import type { PlatformPageProps } from '../../platform/types';
 import {
@@ -18,6 +19,7 @@ import {
   accountsResponseSchema,
   billSchema,
   billsResponseSchema,
+  budgetSchema,
   budgetsResponseSchema,
   categoriesResponseSchema,
   decimalSchema,
@@ -55,6 +57,7 @@ const billDraftSchema = z.object({
 });
 
 type PlanningData = {
+  month: string;
   budgets: Budget[];
   bills: Bill[];
   accounts: Account[];
@@ -333,45 +336,39 @@ export function BudgetsPage({
   onChanged,
 }: PlatformPageProps): ReactNode {
   const copy = planningCopy(locale);
-  const [month, setMonth] = useState(query.get('month') ?? currentMonth());
   const [budgetModal, setBudgetModal] = useState<Budget | 'new' | null>(null);
   const [billModal, setBillModal] = useState<Bill | 'new' | null>(null);
   const [mutation, setMutation] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const selectedRecord = query.get('record_id');
   const requestedMonth = query.get('month');
+  const monthFilter = requestedMonth && /^\d{4}-\d{2}$/.test(requestedMonth) ? requestedMonth : currentMonth();
   const resource = useResource<PlanningData>(async () => {
-    const [budgets, bills, accounts, categories] = await Promise.all([
-      request(`${planningPaths.budgets}?month=${encodeURIComponent(month)}`, budgetsResponseSchema),
+    const [bills, accounts, categories] = await Promise.all([
       request(planningPaths.bills, billsResponseSchema),
       request(`${planningPaths.accounts}?limit=100&offset=0`, accountsResponseSchema),
       request(planningPaths.categories, categoriesResponseSchema),
     ]);
+    const selectedBudget = selectedRecord && !bills.items.some((bill) => bill.id === selectedRecord)
+      ? await request(`${planningPaths.budgets}/${encodeURIComponent(selectedRecord)}`, budgetSchema)
+      : null;
+    const month = selectedBudget?.month ?? monthFilter;
+    const budgets = await request(`${planningPaths.budgets}?month=${encodeURIComponent(month)}`, budgetsResponseSchema);
     return {
-      budgets: budgets.items,
+      month,
+      budgets: selectedBudget
+        ? [selectedBudget, ...budgets.items.filter((budget) => budget.id !== selectedBudget.id)]
+        : budgets.items,
       bills: bills.items,
       accounts: accounts.items,
       categories: categories.items
         .filter((item) => item.kind === 'expense')
         .map((item) => item.id),
     };
-  }, [month, revision]);
-
-  useEffect(() => {
-    if (requestedMonth && /^\d{4}-\d{2}$/.test(requestedMonth) && requestedMonth !== month) {
-      setMonth(requestedMonth);
-    }
-  }, [requestedMonth, month]);
-
-  useEffect(() => {
-    if (!resource.data || !selectedRecord) return;
-    const row = document.getElementById(`budget-${selectedRecord}`);
-    row?.scrollIntoView({ block: 'center' });
-    row?.focus();
-  }, [resource.data, selectedRecord]);
+  }, [monthFilter, selectedRecord, revision]);
+  const recordRef = useRecordFocus(selectedRecord, [resource.data]);
 
   function changeMonth(nextMonth: string): void {
-    setMonth(nextMonth);
     onNavigate('budgets', { month: nextMonth });
   }
 
@@ -409,19 +406,28 @@ export function BudgetsPage({
 
   if (!resource.data && resource.loading) return <LoadingState label={copy.common.loading} />;
   if (!resource.data && resource.error) {
+    const missingRecord = selectedRecord && resource.error instanceof APIError && resource.error.status === 404;
     return (
-      <ErrorState
-        message={errorMessage(resource.error, locale)}
-        retryLabel={copy.common.retry}
-        onRetry={resource.reload}
-      />
+      <div className="p-stack">
+        <ErrorState
+          message={missingRecord
+            ? locale === 'en' ? 'This record is no longer available in this household.' : 'Este registro ya no está disponible en este hogar.'
+            : errorMessage(resource.error, locale)}
+          retryLabel={copy.common.retry}
+          onRetry={resource.reload}
+        />
+        {selectedRecord && <button className="p-button-secondary" type="button" onClick={() => onNavigate('budgets')}>
+          {locale === 'en' ? 'View current budgets' : 'Ver presupuestos actuales'}
+        </button>}
+      </div>
     );
   }
   if (!resource.data) return null;
 
   const data = resource.data;
+  const month = data.month;
   return (
-    <div className="planning-page planning-budgets-page">
+    <div className="planning-page planning-budgets-page" ref={recordRef}>
       <PageHeader
         title={copy.budgets.title}
         description={copy.budgets.description}
@@ -473,7 +479,7 @@ export function BudgetsPage({
                 {data.budgets.map((budget) => (
                   <tr
                     key={budget.id}
-                    id={`budget-${budget.id}`}
+                    data-record-id={budget.id}
                     tabIndex={selectedRecord === budget.id ? -1 : undefined}
                     className={selectedRecord === budget.id ? 'planning-highlight' : undefined}
                   >
@@ -556,7 +562,7 @@ export function BudgetsPage({
                 {data.bills.map((bill) => {
                   const paused = bill.status === 'paused';
                   return (
-                    <tr key={bill.id}>
+                    <tr key={bill.id} data-record-id={bill.id}>
                       <td data-label={copy.bills.name}>
                         <strong>{bill.name}</strong>
                         <span className="p-muted">{categoryLabel(bill.category, locale)}</span>

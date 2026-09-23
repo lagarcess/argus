@@ -10,6 +10,7 @@ name: CI
       - "!codex/money-placement-pilot"
       - "!codex/money-placement-pilot-impl"
       - "!codex/clara-platform"
+      - "!codex/argus-finance-experience"
   pull_request:
     branches: [main, "codex/private-alpha-next", "codex/private-alpha-next-jules-intake"]
     types: [opened, synchronize, reopened, ready_for_review]

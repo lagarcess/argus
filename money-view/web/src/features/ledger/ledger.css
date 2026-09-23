@@ -44,7 +44,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
-  text-align: left;
+  text-align: start;
 }
 .ledger-table th {
   font-weight: 500;
@@ -61,15 +61,15 @@
 }
 .ledger-table th:first-child,
 .ledger-table td:first-child {
-  padding-left: 0;
+  padding-inline-start: 0;
 }
 .ledger-table th:last-child,
 .ledger-table td:last-child {
-  padding-right: 0;
+  padding-inline-end: 0;
 }
 .ledger-table th button {
   padding: 0 !important;
-  min-height: 32px !important;
+  min-height: 44px !important;
 }
 .ledger-table td:nth-child(2) {
   max-width: 250px;
@@ -79,8 +79,8 @@
 }
 .ledger-amount {
   font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
+  text-align: end;
+  white-space: normal;
 }
 .ledger-subline {
   display: block;
@@ -107,7 +107,7 @@
 }
 .ledger-split {
   display: grid;
-  grid-template-columns: 1fr 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 0.6rem;
   align-items: end;
   margin-bottom: 0.8rem;
@@ -139,7 +139,7 @@
   appearance: none;
   border: 0;
   background: none;
-  text-align: left;
+  text-align: start;
   width: 100%;
   padding: 0.8rem 0;
   cursor: pointer;
@@ -167,14 +167,14 @@
 .ledger-bar-track > span {
   display: block;
   height: 100%;
-  background: var(--accent, #285640);
+  background: var(--p-teal, #428c86);
   border-radius: 10px;
 }
 .ledger-bar-link:hover .ledger-bar-track > span {
-  background: #4b795f;
+  background: var(--p-blue, #638fa5);
 }
 .ledger-bar-link:focus-visible {
-  outline: 2px solid #285640;
+  outline: 2px solid var(--p-focus);
   outline-offset: 5px;
 }
 .ledger-page .p-row-main,
@@ -210,7 +210,7 @@
     border: 0 !important;
     max-width: none !important;
     white-space: normal;
-    text-align: left;
+    text-align: start;
   }
   .ledger-table td:before {
     content: attr(data-label);
@@ -266,4 +266,30 @@
   .ledger-bar-heading strong {
     max-width: 50%;
   }
+}
+
+/* Argus ledger rows keep identity, amount and evidence together at every width. */
+.platform-shell .ledger-page :is(.p-page-header, .p-toolbar, .p-actions, .p-row-actions, .p-row-main, .p-row-value, .p-field) { min-width: 0; }
+.platform-shell .ledger-page :is(.p-actions, .p-row-actions, .ledger-search) { flex-wrap: wrap; }
+.platform-shell .ledger-page :is(button, input, select, textarea) { min-height: 44px; font-size: 16px; }
+.platform-shell .ledger-page :is(input, select, textarea) { width: 100%; }
+.platform-shell .ledger-page :is(input[type=checkbox], input[type=radio]) { width: 20px; min-height: 20px; }
+.platform-shell .ledger-page .p-actions > button { white-space: normal; max-width: 100%; }
+.platform-shell .ledger-page .p-money, .ledger-amount { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; word-break: normal; }
+.platform-shell .ledger-page .p-evidence-detail { max-width: 100%; }
+.platform-shell .ledger-page .p-pagination { flex-wrap: wrap; gap: 12px; }
+.platform-shell .ledger-bar-heading > * { min-width: 0; }
+.platform-shell .ledger-subline { font-size: 12px; }
+@media (max-width: 1023px) {
+  .platform-shell .ledger-page .p-page-header > .p-actions { width: 100%; justify-content: start; }
+  .platform-shell .ledger-table { font-size: 15px; }
+}
+@media (max-width: 599px) {
+  .platform-shell .ledger-table td:last-child { flex-wrap: wrap; }
+  .platform-shell .ledger-table td::before { font-size: 12px; }
+  .platform-shell .ledger-table td:last-child .p-evidence { flex: 1 1 100%; }
+  .platform-shell .ledger-page .p-pagination > span { flex-basis: 100%; }
+  .platform-shell .ledger-bar-heading { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .platform-shell .ledger-bar-heading strong { max-width: none; }
+  .platform-shell .ledger-detail-amount { font-family: inherit; font-weight: 500; font-size: clamp(24px, 7vw, 32px); line-height: 1.3; }
 }

@@ -172,6 +172,7 @@ TABLES = (
     "p_credit_reports",
     "p_tax_organizers",
     "p_tax_items",
+    "p_tax_scenarios",
     "p_estate_assets",
     "p_estate_contacts",
     "p_estate_beneficiaries",

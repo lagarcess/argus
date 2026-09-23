@@ -97,6 +97,21 @@ export const connectionSchema = z.object({
 });
 export const connectorsSchema = z.object({ items: z.array(connectorSchema) });
 export const connectionsSchema = z.object({ items: z.array(connectionSchema) });
+export const importInspectionSchema = z.object({
+  stage: z.literal("mapping"),
+  headers: z.array(z.string()),
+  sample_rows: z.array(z.array(z.string())),
+  row_count: z.number(),
+  currency: z.string(),
+  file_digest: z.string(),
+  limits: z.object({
+    max_bytes: z.number(),
+    max_rows: z.number(),
+    max_columns: z.number(),
+    max_cell_chars: z.number(),
+    max_header_row: z.number(),
+  }),
+});
 export const previewSchema = z.object({
   id: z.string(),
   account_id: z.string(),
@@ -111,6 +126,8 @@ export const previewSchema = z.object({
       category: z.string(),
       kind: z.string(),
       duplicate: z.boolean(),
+      duplicate_status: z.enum(["new", "exact", "possible"]).optional(),
+      source_id: z.string().nullable().optional(),
     }),
   ),
   errors: z.array(z.object({ line: z.number(), code: z.string() })),
@@ -118,6 +135,12 @@ export const previewSchema = z.object({
   duplicate_count: z.number(),
   can_commit: z.boolean(),
   source: evidenceSchema,
+  stage: z.literal("review").optional(),
+  review_count: z.number().optional(),
+  preview_digest: z.string().optional(),
+  expires_at: z.string().optional(),
+  file_digest: z.string().optional(),
+  parser_version: z.string().optional(),
 });
 export const importSchema = z.object({
   id: z.string(),

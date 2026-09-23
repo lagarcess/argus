@@ -6,7 +6,8 @@ import hashlib
 import io
 import json
 import sqlite3
-from datetime import date
+from dataclasses import asdict
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Literal
 
@@ -33,6 +34,7 @@ from .ledger_contracts import (
     AccountPatch,
     Connect,
     Idempotent,
+    ImportCommit,
     ImportPreview,
     Split,
     Sync,
@@ -40,6 +42,14 @@ from .ledger_contracts import (
     TransactionPatch,
 )
 from .seed import ANCHOR, seed
+from .statement_identity import IDENTITY_VERSION, Identity, Resolution, resolve_sequence
+from .statement_parser import (
+    DEFAULT_LIMITS,
+    PARSER_VERSION,
+    parse_delimited,
+    statement_amount,
+    statement_date,
+)
 
 router = APIRouter(prefix='/api/platform')
 DB = Annotated[Store, Depends(get_store)]
@@ -73,6 +83,10 @@ CREATE TABLE IF NOT EXISTS p_ledger_commands(
 CREATE TABLE IF NOT EXISTS p_imports(
  id TEXT PRIMARY KEY,household_id TEXT NOT NULL,account_id TEXT NOT NULL REFERENCES p_accounts(id),
  document TEXT NOT NULL,created_at TEXT NOT NULL,receipt TEXT);
+CREATE TABLE IF NOT EXISTS p_import_rows(
+ transaction_id TEXT PRIMARY KEY REFERENCES p_transactions(id),import_id TEXT NOT NULL REFERENCES p_imports(id),
+ household_id TEXT NOT NULL,account_id TEXT NOT NULL,line INTEGER NOT NULL,source_id TEXT,fingerprint TEXT NOT NULL,
+ UNIQUE(household_id,account_id,source_id));
 CREATE VIEW IF NOT EXISTS p_ledger_lines AS
  SELECT t.*,COALESCE(s.category,t.category) line_category,
  COALESCE(s.amount_minor,t.amount_minor) line_minor FROM p_transactions t
@@ -233,9 +247,18 @@ def restore_account(account_id: str, store: DB, ctx: CTX):
     return set_account_deleted(store, ctx, account_id, False)
 
 
+def active_transaction_predicate(alias: str = 't') -> str:
+    """Shared visibility for internal SQL aliases; callers scope the household."""
+    return f'''{alias}.deleted_at IS NULL AND EXISTS (
+        SELECT 1 FROM p_accounts AS transaction_account
+        WHERE transaction_account.id={alias}.account_id
+          AND transaction_account.household_id={alias}.household_id
+          AND transaction_account.deleted_at IS NULL)'''
+
+
 def _filters(ctx, *, account_id=None, currency=None, category=None, q=None, date_from=None, date_to=None, status=None, merchant=None, spending_only=False, lines=False):
     _currency(currency)
-    conditions = ['t.household_id=?', 't.deleted_at IS NULL', 'a.deleted_at IS NULL']
+    conditions = ['t.household_id=?', active_transaction_predicate()]
     params = [ctx.household_id]
     if date_from and date_to and str(date_from) > str(date_to):
         raise PlatformError('invalid_date_range')
@@ -270,7 +293,7 @@ def _transaction_document(row, splits):
 
 
 def _transaction(connection, ctx, transaction_id, active=True):
-    row = connection.execute('SELECT t.*,a.name account_name FROM p_transactions t JOIN p_accounts a ON a.id=t.account_id WHERE t.id=? AND t.household_id=?' + (' AND t.deleted_at IS NULL AND a.deleted_at IS NULL' if active else ''), (transaction_id, ctx.household_id)).fetchone()
+    row = connection.execute('SELECT t.*,a.name account_name FROM p_transactions t JOIN p_accounts a ON a.id=t.account_id WHERE t.id=? AND t.household_id=?' + (' AND ' + active_transaction_predicate() if active else ''), (transaction_id, ctx.household_id)).fetchone()
     if row is None:
         raise PlatformError('transaction_not_found', 404)
     return row
@@ -314,7 +337,7 @@ def list_transactions(store, ctx, *, limit=50, offset=0, sort='date_desc', **fil
 # Static CSV routes precede the transaction-id routes.
 @router.get('/transactions/sample.csv')
 def sample_csv():
-    return Response('date,merchant,description,amount,currency,category,kind\n2026-09-20,Local Market,Groceries,-45.50,USD,groceries,expense\n', media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="clara-transactions-sample.csv"'})
+    return Response('date,merchant,description,amount,currency,category,kind\n2026-09-20,Local Market,Groceries,-45.50,USD,groceries,expense\n', media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="argus-transactions-sample.csv"'})
 
 
 def _csv_cell(value):
@@ -399,6 +422,12 @@ def record_transaction(store: Store, ctx: Context, payload: TransactionCreate) -
 @router.post('/transactions')
 def create_transaction(payload: TransactionCreate, store: DB, ctx: CTX):
     return record_transaction(store, ctx, payload)
+
+
+@router.get('/transactions/{transaction_id}')
+def transaction_detail(transaction_id: str, store: DB, ctx: CTX):
+    with store.connection() as connection:
+        return _transaction_response(connection, ctx, transaction_id)
 
 
 @router.patch('/transactions/{transaction_id}')
@@ -583,93 +612,198 @@ def sync(connection_id: str, payload: Sync, store: DB, ctx: CTX):
 
 
 CSV_FIELDS = ['date', 'merchant', 'description', 'amount', 'currency', 'category', 'kind']
+IMPORT_EXPIRY = timedelta(minutes=30)
 
 
 def _fingerprint(row, amount):
     return (row['date'], row['merchant'], row['description'], amount, row['currency'])
 
 
-def _existing_fingerprints(connection, ctx, account_id):
-    return {(r['date'], r['merchant'], r['description'], r['amount_minor'], r['currency']) for r in connection.execute('SELECT date,merchant,description,amount_minor,currency FROM p_transactions WHERE household_id=? AND account_id=?', (ctx.household_id, account_id))}
+def _import_identities(connection, ctx, account_id):
+    return [Identity(
+        key='record:' + row['id'], fingerprint=_fingerprint(row, row['amount_minor']),
+        source_id=row['source_id'],
+        source_fingerprint=tuple(json.loads(row['fingerprint'])) if row['fingerprint'] else None,
+    ) for row in connection.execute('''SELECT t.id,t.date,t.merchant,t.description,t.amount_minor,t.currency,p.source_id,p.fingerprint
+        FROM p_transactions t LEFT JOIN p_import_rows p ON p.transaction_id=t.id
+        WHERE t.household_id=? AND t.account_id=? ORDER BY t.id''', (ctx.household_id, account_id))]
+
+
+def _import_candidates(rows):
+    return [Identity('line:' + str(item['line']),
+                     _fingerprint(item, minor_units(Decimal(item['amount']), item['currency'])),
+                     item.get('source_id')) for item in rows]
+
+
+def _normalize_statement_row(raw, payload, currency):
+    mapping = payload.mapping
+    def cell(field):
+        column = getattr(mapping, field)
+        return raw[column].strip() if column else ''
+    if cell('currency') and cell('currency') != currency:
+        raise PlatformError('import_currency_mismatch')
+    if mapping.amount:
+        amount = statement_amount(cell('amount'), payload.decimal_separator)
+    else:
+        debit = statement_amount(cell('debit'), payload.decimal_separator) if cell('debit') else Decimal(0)
+        credit = statement_amount(cell('credit'), payload.decimal_separator) if cell('credit') else Decimal(0)
+        if debit < 0 or credit < 0 or (debit and credit):
+            raise PlatformError('invalid_debit_credit')
+        amount = credit - debit
+    kind = cell('kind') or ('expense' if amount < 0 else payload.positive_kind)
+    if not kind:
+        raise PlatformError('statement_positive_kind_required')
+    source_id = cell('source_id') or None
+    if source_id and len(source_id) > 160:
+        raise PlatformError('invalid_source_id')
+    return {
+        'date': statement_date(cell('date'), payload.date_format),
+        'merchant': cell('merchant'), 'description': cell('description'),
+        'amount': amount, 'currency': currency, 'source_id': source_id,
+        'kind': kind, 'category': cell('category') or ('income' if kind == 'income' else 'other'),
+    }
+
+
+def _parse_import_rows(table, payload, currency):
+    if payload.mode == 'legacy' and list(table.headers) != CSV_FIELDS:
+        raise PlatformError('invalid_csv_headers')
+    if payload.mapping and any(column not in table.headers for column in payload.mapping.model_dump().values() if column):
+        raise PlatformError('invalid_column_mapping')
+    rows, errors = [], []
+    for record in table.rows:
+        try:
+            if len(record.cells) != len(table.headers):
+                raise PlatformError('invalid_csv_row')
+            raw = dict(zip(table.headers, record.cells, strict=True))
+            normalized = _normalize_statement_row(raw, payload, currency) if payload.mode == 'statement' else {**raw, 'source_id': None}
+            if normalized['currency'] != currency:
+                raise PlatformError('import_currency_mismatch')
+            parsed = TransactionCreate(account_id=payload.account_id, date=normalized['date'], merchant=normalized['merchant'], description=normalized['description'], amount=normalized['amount'], category=normalized['category'], kind=normalized['kind'], idempotency_key=f'preview-{record.line}')
+            amount = minor_units(parsed.amount, currency)
+            _validate_categories(parsed.category, parsed.kind, [], amount, currency)
+            if parsed.kind == 'transfer':
+                raise PlatformError('csv_transfer_unsupported')
+            rows.append({'line': record.line, 'date': str(parsed.date), 'merchant': parsed.merchant, 'description': parsed.description,
+                         'amount': decimal_amount(amount, currency), 'currency': currency, 'category': parsed.category, 'kind': parsed.kind, 'source_id': normalized['source_id']})
+        except (ValueError, InvalidOperation, PlatformError) as exc:
+            errors.append({'line': record.line, 'code': exc.code if isinstance(exc, PlatformError) else 'invalid_csv_row'})
+    return rows, errors
+
+
+def _preview_digest(document):
+    return hashlib.sha256(json.dumps(document, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
 
 
 @router.post('/imports/preview')
 def preview_import(payload: ImportPreview, store: DB, ctx: CTX):
     require_editor(ctx)
+    # Resolve the owned destination before parsing. No parser holds the writer lock.
+    with store.connection() as connection:
+        assert_active_context(connection, ctx)
+        account = dict(_account(connection, ctx.household_id, payload.account_id))
+    if payload.file_name and not payload.file_name.lower().endswith(('.csv', '.tsv')):
+        raise PlatformError('unsupported_statement_file')
+    table = parse_delimited(payload.csv, delimiter=payload.delimiter, header_row=payload.header_row)
+    if payload.mode == 'statement' and payload.mapping is None:
+        return {'stage': 'mapping', 'headers': list(table.headers), 'sample_rows': [list(row.cells) for row in table.rows[:5]],
+                'row_count': len(table.rows), 'currency': account['currency'], 'file_digest': table.file_digest,
+                'limits': asdict(DEFAULT_LIMITS)}
+    rows, errors = _parse_import_rows(table, payload, account['currency'])
     with store.connection(write=True) as connection:
         assert_active_context(connection, ctx)
-        account = _account(connection, ctx.household_id, payload.account_id)
-        reader = csv.DictReader(io.StringIO(payload.csv.lstrip('\ufeff')))
-        if reader.fieldnames != CSV_FIELDS:
-            raise PlatformError('invalid_csv_headers')
-        seen = _existing_fingerprints(connection, ctx, account['id'])
-        rows, errors = [], []
-        try:
-            for line, raw in enumerate(reader, 2):
-                if line > 2001:
-                    raise PlatformError('import_too_large')
-                try:
-                    if None in raw or any(value is None for value in raw.values()):
-                        raise ValueError('invalid_csv_row')
-                    if raw['currency'] != account['currency']:
-                        raise PlatformError('import_currency_mismatch')
-                    # Only generated numeric literals are accepted, never expressions.
-                    amount = minor_units(Decimal(raw['amount']), raw['currency'])
-                    parsed = TransactionCreate(account_id=account['id'], date=raw['date'], merchant=raw['merchant'], description=raw['description'], amount=Decimal(raw['amount']), category=raw['category'], kind=raw['kind'], idempotency_key=f'preview-{line}')
-                    _validate_categories(parsed.category, parsed.kind, [], amount, account['currency'])
-                    if parsed.kind == 'transfer':
-                        raise PlatformError('csv_transfer_unsupported')
-                    normalized = {**raw, 'date': str(parsed.date), 'amount': decimal_amount(amount, account['currency'])}
-                    fingerprint = _fingerprint(normalized, amount)
-                    duplicate = fingerprint in seen
-                    seen.add(fingerprint)
-                    rows.append({'line': line, **normalized, 'duplicate': duplicate})
-                except (ValueError, InvalidOperation, PlatformError) as exc:
-                    errors.append({'line': line, 'code': exc.code if isinstance(exc, PlatformError) else 'invalid_csv_row'})
-        except csv.Error:
-            raise PlatformError('invalid_csv') from None
-        record_id, stamp = identifier('import'), now().isoformat()
-        duplicates = sum(row['duplicate'] for row in rows)
-        document = {'id': record_id, 'account_id': account['id'], 'rows': rows, 'errors': errors, 'valid_count': len(rows)-duplicates, 'duplicate_count': duplicates, 'can_commit': bool(rows) and not errors and len(rows)>duplicates, 'source': evidence(record_id, 'user', stamp[:10], stamp, method='Validated local CSV preview; no account changes yet.')}
-        connection.execute('INSERT INTO p_imports VALUES(?,?,?,?,?,NULL)', (record_id, ctx.household_id, account['id'], json.dumps(document), stamp))
+        _account(connection, ctx.household_id, payload.account_id)
+        resolutions = resolve_sequence(_import_candidates(rows), _import_identities(connection, ctx, account['id']), legacy=payload.mode == 'legacy')
+        for item, resolution in zip(rows, resolutions, strict=True):
+            if resolution.error:
+                errors.append({'line': item['line'], 'code': resolution.error})
+            item.update(duplicate=resolution.duplicate_status == 'exact',
+                        duplicate_status=resolution.duplicate_status,
+                        duplicate_of=resolution.duplicate_of, match_snapshot=resolution.match_snapshot)
+        record_id, stamp = identifier('import'), now()
+        duplicates = sum(item['duplicate'] for item in rows)
+        document = {'id': record_id, 'stage': 'review', 'mode': payload.mode, 'account_id': account['id'], 'rows': rows, 'errors': errors,
+                    'valid_count': len(rows)-duplicates, 'duplicate_count': duplicates,
+                    'review_count': sum(item['duplicate_status'] == 'possible' for item in rows),
+                    'can_commit': bool(rows) and not errors and len(rows)>duplicates,
+                    'file_digest': table.file_digest, 'parser_version': PARSER_VERSION, 'identity_version': IDENTITY_VERSION,
+                    'mapping': payload.mapping.model_dump() if payload.mapping else None,
+                    'format': {key: getattr(payload, key) for key in ('delimiter', 'header_row', 'date_format', 'decimal_separator', 'positive_kind')},
+                    'created_by': ctx.user_id, 'data_generation': ctx.data_generation,
+                    'expires_at': (stamp + IMPORT_EXPIRY).isoformat(),
+                    'source': evidence(record_id, 'user', max((item['date'] for item in rows), default=stamp.date().isoformat()), stamp.isoformat(),
+                                       method='Validated statement preview; no account changes yet.', inputs=[table.file_digest, PARSER_VERSION])}
+        document['preview_digest'] = _preview_digest(document)
+        connection.execute('INSERT INTO p_imports VALUES(?,?,?,?,?,NULL)', (record_id, ctx.household_id, account['id'], json.dumps(document), stamp.isoformat()))
         return document
 
 
 @router.post('/imports/{import_id}/commit')
-def commit_import(import_id: str, payload: Idempotent, store: DB, ctx: CTX):
+def commit_import(import_id: str, payload: ImportCommit, store: DB, ctx: CTX):
     with store.connection(write=True) as connection:
         assert_active_context(connection, ctx)
+        row = connection.execute('SELECT * FROM p_imports WHERE id=? AND household_id=?', (import_id, ctx.household_id)).fetchone()
+        if row is None:
+            raise PlatformError('import_not_found', 404)
+        preview = json.loads(row['document'])
+        statement = preview.get('mode') == 'statement'
+        decisions = {decision.line: decision.action for decision in payload.decisions}
+        if len(decisions) != len(payload.decisions):
+            raise PlatformError('invalid_import_decisions')
+        if statement and payload.preview_digest != preview.get('preview_digest'):
+            raise PlatformError('import_preview_changed', 409)
+        canonical_decisions = [{'line': line, 'action': action} for line, action in sorted(decisions.items())]
+        command_payload = {'preview_digest': payload.preview_digest, 'decisions': canonical_decisions} if statement else {}
         def action():
-            row = connection.execute('SELECT * FROM p_imports WHERE id=? AND household_id=?', (import_id, ctx.household_id)).fetchone()
-            if row is None:
-                raise PlatformError('import_not_found', 404)
             if row['receipt']:
-                return json.loads(row['receipt'])
+                receipt = json.loads(row['receipt'])
+                if statement and receipt.get('decisions') != canonical_decisions:
+                    raise PlatformError('import_decisions_changed', 409)
+                return receipt
             account = _account(connection, ctx.household_id, row['account_id'])
-            preview = json.loads(row['document'])
+            if preview.get('expires_at') and now() >= datetime.fromisoformat(preview['expires_at']):
+                raise PlatformError('import_preview_expired', 409)
+            if preview.get('data_generation', ctx.data_generation) != ctx.data_generation:
+                raise PlatformError('household_data_changed', 409)
             if not preview['can_commit']:
                 raise PlatformError('import_not_committable')
-            seen = _existing_fingerprints(connection, ctx, row['account_id'])
+            review_lines = {item['line'] for item in preview['rows'] if item.get('duplicate_status') == 'possible'}
+            if statement and not review_lines.issubset(decisions):
+                raise PlatformError('import_review_required')
+            if set(decisions) - review_lines:
+                raise PlatformError('invalid_import_decisions')
+            if statement and preview.get('identity_version') != IDENTITY_VERSION:
+                raise PlatformError('import_preview_changed', 409)
+            candidates = _import_candidates(preview['rows'])
+            existing = _import_identities(connection, ctx, row['account_id'])
+            frozen = [Resolution(item.get('duplicate_status', 'new'), item.get('duplicate_of'), item.get('match_snapshot', '')) for item in preview['rows']]
+            resolutions = resolve_sequence(candidates, existing, legacy=not statement, frozen=frozen,
+                                           decisions={'line:' + str(line): choice for line, choice in decisions.items()})
             transaction_ids, duplicates = [], 0
-            for item in preview['rows']:
-                amount = minor_units(Decimal(item['amount']), item['currency'])
-                fingerprint = _fingerprint(item, amount)
-                if fingerprint in seen:
+            for item, candidate, resolution in zip(preview['rows'], candidates, resolutions, strict=True):
+                if resolution.error:
+                    raise PlatformError(resolution.error, 409)
+                if resolution.action == 'skip':
                     duplicates += 1
                     continue
-                seen.add(fingerprint)
+                fingerprint, source_id = candidate.fingerprint, candidate.source_id
                 transaction = TransactionCreate(account_id=account['id'], date=item['date'], merchant=item['merchant'], description=item['description'], amount=Decimal(item['amount']), category=item['category'], kind=item['kind'], idempotency_key=f'{import_id}:{item["line"]}')
-                transaction_ids.append(_insert_transaction(connection, ctx, transaction, account['currency']))
+                transaction_id = _insert_transaction(connection, ctx, transaction, account['currency'])
+                transaction_ids.append(transaction_id)
+                connection.execute('INSERT INTO p_import_rows(transaction_id,import_id,household_id,account_id,line,source_id,fingerprint) VALUES(?,?,?,?,?,?,?)',
+                                   (transaction_id, import_id, ctx.household_id, account['id'], item['line'], source_id, json.dumps(fingerprint)))
             stamp = now().isoformat()
-            receipt = {'id': import_id, 'imported': len(transaction_ids), 'duplicates': duplicates, 'transaction_ids': transaction_ids, 'source': evidence(import_id, 'user', stamp[:10], stamp, method='Atomic CSV import with account-specific content deduplication.', inputs=transaction_ids)}
+            receipt = {'id': import_id, 'imported': len(transaction_ids), 'duplicates': duplicates, 'transaction_ids': transaction_ids,
+                       'decisions': canonical_decisions, 'preview_digest': preview.get('preview_digest'),
+                       'source': evidence(import_id, 'user', preview['source']['as_of'], stamp, method='Confirmed atomic statement import.',
+                                          inputs=[*transaction_ids, preview.get('file_digest', ''), preview.get('parser_version', 'legacy')])}
             connection.execute('UPDATE p_imports SET receipt=? WHERE id=? AND household_id=?', (json.dumps(receipt), import_id, ctx.household_id))
             return receipt
-        return _command(connection, ctx, payload.idempotency_key, 'import:' + import_id, {}, action)
+        return _command(connection, ctx, payload.idempotency_key, 'import:' + import_id, command_payload, action)
 
 
 def export_data(connection, ctx):
     """Natural owned records for a user-requested private data download."""
-    result = {table: [dict(row) for row in connection.execute(f'SELECT * FROM {table} WHERE household_id=?', (ctx.household_id,))] for table in ['p_accounts', 'p_transactions', 'p_connections', 'p_imports']}
+    result = {table: [dict(row) for row in connection.execute(f'SELECT * FROM {table} WHERE household_id=?', (ctx.household_id,))] for table in ['p_accounts', 'p_transactions', 'p_connections', 'p_imports', 'p_import_rows']}
     result['p_transaction_splits'] = [dict(row) for row in connection.execute('SELECT s.* FROM p_transaction_splits s JOIN p_transactions t ON t.id=s.transaction_id WHERE t.household_id=?', (ctx.household_id,))]
     return result
 
@@ -678,7 +812,7 @@ def clear_data(connection, ctx):
     """Caller owns authorization and transaction; retained manifest prevents reseeding."""
     connection.execute('DELETE FROM p_transaction_splits WHERE transaction_id IN (SELECT id FROM p_transactions WHERE household_id=?)', (ctx.household_id,))
     connection.execute('UPDATE p_transactions SET reversal_of=NULL WHERE household_id=?', (ctx.household_id,))
-    for table in ['p_imports', 'p_transactions', 'p_accounts', 'p_connections', 'p_ledger_commands']:
+    for table in ['p_import_rows', 'p_imports', 'p_transactions', 'p_accounts', 'p_connections', 'p_ledger_commands']:
         connection.execute(f'DELETE FROM {table} WHERE household_id=?', (ctx.household_id,))
 
 

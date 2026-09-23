@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { request, requestResponse } from "../../platform/client";
 import { useResource } from "../../platform/hooks";
 import {
@@ -32,6 +32,91 @@ export function TransactionsPage(props: PlatformPageProps) {
     [importing, setImporting] = useState(false),
     [deleted, setDeleted] = useState<Transaction | null>(null);
   const mutation = useLedgerMutation(locale);
+  const targetId = query.get("record_id");
+  const importRequested = query.get("import") === "1";
+  const [targetLoading, setTargetLoading] = useState(false);
+  const [targetFailed, setTargetFailed] = useState(false);
+  const [targetAttempt, setTargetAttempt] = useState(0);
+  const detailRequest = useRef<AbortController | null>(null);
+  useEffect(() => {
+    detailRequest.current?.abort();
+    setTargetFailed(false);
+    if (!targetId || importRequested) {
+      setTargetLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    detailRequest.current = controller;
+    setSelected(null);
+    setTargetLoading(true);
+    void request(
+      `/transactions/${encodeURIComponent(targetId)}`,
+      transactionSchema,
+      { signal: controller.signal },
+    )
+      .then((transaction) => {
+        if (!controller.signal.aborted) setSelected(transaction);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setTargetFailed(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTargetLoading(false);
+      });
+    return () => controller.abort();
+  }, [targetId, importRequested, revision, targetAttempt]);
+  const closeDetail = () => {
+    detailRequest.current?.abort();
+    setSelected(null);
+    setTargetLoading(false);
+    setTargetFailed(false);
+    if (query.has("record_id")) {
+      const next = new URLSearchParams(query);
+      next.delete("record_id");
+      onNavigate("transactions", Object.fromEntries(next));
+    }
+  };
+  const openDetail = (id: string) => {
+    const next = new URLSearchParams(query);
+    next.set("record_id", id);
+    onNavigate("transactions", Object.fromEntries(next));
+  };
+  const [importAccounts, setImportAccounts] = useState<Account[] | null>(null);
+  const openedImport = useRef<string | null>(null);
+  const importQuery = query.toString();
+  useEffect(() => {
+    if (query.get("import") !== "1") {
+      openedImport.current = null;
+      return;
+    }
+    if (openedImport.current === importQuery) return;
+    const controller = new AbortController();
+    void request("/accounts?limit=100", accountsSchema, {
+      signal: controller.signal,
+    })
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        openedImport.current = importQuery;
+        setImportAccounts(result.items);
+        setImporting(true);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          openedImport.current = importQuery;
+          mutation.setError(t.loadError);
+        }
+      });
+    return () => controller.abort();
+  }, [importQuery]);
+  const closeImport = () => {
+    setImporting(false);
+    setImportAccounts(null);
+    if (query.has("import")) {
+      const next = new URLSearchParams(query);
+      next.delete("import");
+      onNavigate("transactions", Object.fromEntries(next));
+    }
+  };
   const params = new URLSearchParams(query);
   params.set("currency", currency);
   if (!params.has("limit")) params.set("limit", "25");
@@ -78,11 +163,13 @@ export function TransactionsPage(props: PlatformPageProps) {
   }, [total, offset, limit, records.loading]);
   async function exportCsv() {
     await mutation.run(async () => {
-      const response = await requestResponse(`/transactions/export.csv?${queryString}`);
+      const response = await requestResponse(
+        `/transactions/export.csv?${queryString}`,
+      );
       const url = URL.createObjectURL(await response.blob());
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "clara-transactions.csv";
+      anchor.download = "argus-transactions.csv";
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 0);
     });
@@ -96,16 +183,53 @@ export function TransactionsPage(props: PlatformPageProps) {
           <div className="p-actions">
             <button
               className="p-button-secondary"
-              onClick={() => setImporting(true)}
+              onClick={() => {
+                setImportAccounts(null);
+                setImporting(true);
+              }}
             >
               {t.importCsv}
             </button>
-            <button className="p-button" onClick={() => setSelected("new")}>
+            <button
+              className="p-button"
+              onClick={() => {
+                closeDetail();
+                setSelected("new");
+              }}
+            >
               {t.addTransaction}
             </button>
           </div>
         }
       />
+      {targetLoading && (
+        <p className="p-muted" role="status">
+          {t.loading}{" "}
+          <button className="p-button-ghost" onClick={closeDetail}>
+            {t.cancel}
+          </button>
+        </p>
+      )}
+      {targetFailed && (
+        <div className="p-error" role="alert">
+          <p>
+            {locale === "en"
+              ? "This transaction is unavailable. It may have been deleted, or its account may no longer be active."
+              : "Este movimiento no está disponible. Puede haberse eliminado o su cuenta puede estar inactiva."}
+          </p>
+          <div className="p-actions">
+            <button
+              className="p-button-secondary"
+              onClick={() => setTargetAttempt((attempt) => attempt + 1)}
+            >
+              {t.retry}
+            </button>
+            <button className="p-button-ghost" onClick={closeDetail}>
+              {t.cancel}
+            </button>
+          </div>
+        </div>
+      )}
       <Panel className="ledger-filters">
         <form
           onSubmit={(e) => {
@@ -410,7 +534,7 @@ export function TransactionsPage(props: PlatformPageProps) {
                       <td>
                         <button
                           className="p-button-ghost"
-                          onClick={() => setSelected(row)}
+                          onClick={() => openDetail(row.id)}
                           aria-label={`${t.details}: ${row.merchant}, ${dateLabel(row.date, locale)}`}
                         >
                           {t.details}
@@ -465,13 +589,13 @@ export function TransactionsPage(props: PlatformPageProps) {
           accounts={accounts.data?.items ?? []}
           categories={categories.data?.items ?? []}
           {...props}
-          onClose={() => setSelected(null)}
+          onClose={closeDetail}
           onSaved={() => {
-            setSelected(null);
+            closeDetail();
             refresh();
           }}
           onDeleted={(row) => {
-            setSelected(null);
+            closeDetail();
             setDeleted(row);
             refresh();
           }}
@@ -480,10 +604,10 @@ export function TransactionsPage(props: PlatformPageProps) {
       {importing && (
         <ImportDialog
           {...props}
-          accounts={accounts.data?.items ?? []}
-          onClose={() => setImporting(false)}
+          accounts={importAccounts ?? accounts.data?.items ?? []}
+          onClose={closeImport}
           onImported={() => {
-            setImporting(false);
+            closeImport();
             refresh();
           }}
         />

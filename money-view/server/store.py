@@ -125,6 +125,13 @@ class Store:
                 _snapshots.reset(token)
 
     @contextmanager
+    def transaction(self):
+        """One explicit unit of work shared only with audited synchronous writers."""
+        with self.connection(write=True) as connection:
+            with TransactionBoundStore(connection) as bound:
+                yield bound
+
+    @contextmanager
     def connection(self, *, write: bool = False):
         existing = (_snapshots.get() or {}).get((self.path, get_ident()))
         if existing is not None:
@@ -140,3 +147,193 @@ class Store:
             except BaseException:
                 connection.rollback()
                 raise
+
+
+class TransactionBoundaryError(RuntimeError):
+    """A transaction-bound handler attempted to escape its unit of work."""
+
+
+class _BoundCursor:
+    __slots__ = ("__owner", "__cursor")
+
+    def __init__(self, owner, cursor):
+        self.__owner, self.__cursor = owner, cursor
+
+    def fetchone(self):
+        self.__owner._check()
+        return self.__owner._fetch(self.__cursor.fetchone)
+
+    def fetchall(self):
+        self.__owner._check()
+        return self.__owner._fetch(self.__cursor.fetchall)
+
+    def fetchmany(self, size=1):
+        self.__owner._check()
+        return self.__owner._fetch(lambda: self.__cursor.fetchmany(size))
+
+    @property
+    def rowcount(self):
+        self.__owner._check()
+        return self.__cursor.rowcount
+
+    @property
+    def lastrowid(self):
+        self.__owner._check()
+        return self.__cursor.lastrowid
+
+    @property
+    def description(self):
+        self.__owner._check()
+        return self.__cursor.description
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.__owner._check()
+        return self.__owner._fetch(lambda: next(self.__cursor))
+
+    def __getattr__(self, name):
+        self.__owner._reject(f"Cursor capability is not available: {name}")
+
+
+class _BoundConnection:
+    __slots__ = ("__owner",)
+
+    def __init__(self, owner):
+        self.__owner = owner
+
+    def execute(self, statement, parameters=()):
+        return self.__owner._execute(statement, parameters, many=False)
+
+    def executemany(self, statement, parameters):
+        return self.__owner._execute(statement, parameters, many=True)
+
+    @property
+    def in_transaction(self):
+        self.__owner._check()
+        return True
+
+    def __getattr__(self, name):
+        self.__owner._reject(f"Connection capability is not available: {name}")
+
+
+class TransactionBoundStore:
+    """Explicit, synchronous facade for audited existing domain writers.
+
+    Obtain through Store.transaction(). Only that outer scope commits. This is
+    an API contract for trusted registered handlers, not a Python-code sandbox.
+    """
+
+    __slots__ = (
+        "__connection",
+        "__proxy",
+        "__thread",
+        "__open",
+        "__poisoned",
+        "__yield_handle",
+    )
+
+    def __init__(self, connection):
+        self.__connection = connection
+        self.__proxy = _BoundConnection(self)
+        self.__thread = get_ident()
+        self.__open = False
+        self.__poisoned = False
+        self.__yield_handle = None
+
+    def __enter__(self):
+        import asyncio
+
+        if self.__open or not self.__connection.in_transaction:
+            raise TransactionBoundaryError(
+                "An existing exclusive transaction is required"
+            )
+        self.__open = True
+        self.__connection.set_authorizer(self._authorize)
+        try:
+            self.__yield_handle = asyncio.get_running_loop().call_soon(self._yielded)
+        except RuntimeError:
+            pass
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        # Python 3.10 does not support disabling this callback with None.
+        # The facade is closing; only Store's outer commit/rollback follows.
+        self.__connection.set_authorizer(lambda *args: sqlite3.SQLITE_OK)
+        if self.__yield_handle is not None:
+            self.__yield_handle.cancel()
+        self.__open = False
+        if exc_type is None and self.__poisoned:
+            raise TransactionBoundaryError("An inner failure poisoned the unit of work")
+        return False
+
+    def _yielded(self):
+        self.__poisoned = True
+
+    def _reject(self, message):
+        self.__poisoned = True
+        raise TransactionBoundaryError(message)
+
+    def _check(self):
+        if not self.__open:
+            self._reject("Transaction scope has closed")
+        if get_ident() != self.__thread:
+            self._reject("Transaction cannot cross threads")
+        if self.__poisoned:
+            raise TransactionBoundaryError("Unit of work is poisoned")
+
+    def _authorize(self, action, arg1, arg2, database, source):
+        # Only row operations and their query expressions belong in handlers.
+        allowed = {
+            sqlite3.SQLITE_SELECT,
+            sqlite3.SQLITE_READ,
+            sqlite3.SQLITE_INSERT,
+            sqlite3.SQLITE_UPDATE,
+            sqlite3.SQLITE_DELETE,
+            sqlite3.SQLITE_FUNCTION,
+            sqlite3.SQLITE_RECURSIVE,
+        }
+        if action not in allowed:
+            self.__poisoned = True
+            return sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_OK
+
+    def _execute(self, statement, parameters, *, many):
+        self._check()
+        try:
+            cursor = (
+                self.__connection.executemany if many else self.__connection.execute
+            )(statement, parameters)
+            return _BoundCursor(self, cursor)
+        except BaseException:
+            self.__poisoned = True
+            raise
+
+    def _fetch(self, operation):
+        self._check()
+        try:
+            return operation()
+        except StopIteration:
+            raise
+        except BaseException:
+            self.__poisoned = True
+            raise
+
+    @contextmanager
+    def connection(self, *, write=False):
+        self._check()
+        try:
+            yield self.__proxy
+        except BaseException:
+            self.__poisoned = True
+            raise
+
+    def read_snapshot(self):
+        self._reject("Nested snapshots cannot escape the command transaction")
+
+    def transaction(self):
+        self._reject("Nested units of work are not supported")
+
+    def __getattr__(self, name):
+        self._reject(f"Store capability is not available: {name}")

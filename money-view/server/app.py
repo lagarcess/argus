@@ -72,7 +72,7 @@ def create_app(database_path: str | Path | None = None, interpreter=None) -> Fas
             stop_worker.set()
             await worker
 
-    application = FastAPI(title="Clara local demo", lifespan=lifespan)
+    application = FastAPI(title="Argus local demo", lifespan=lifespan)
     application.add_middleware(RuntimeMiddleware)
     application.add_middleware(
         TrustedHostMiddleware,

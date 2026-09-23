@@ -1,6 +1,8 @@
+import { navigateAfterOverlays } from "../argus/overlay-history";
 import { useCallback, useEffect, useState } from "react";
 import {
   House,
+  MessageCircle,
   Landmark,
   ArrowLeftRight,
   ChartNoAxesCombined,
@@ -22,9 +24,16 @@ import type { Page } from "./types";
 
 export const destinations = [
   {
+    id: "chat",
+    es: "Conversación",
+    en: "Chat",
+    icon: MessageCircle,
+    group: "chat",
+  },
+  {
     id: "overview",
-    es: "Resumen",
-    en: "Overview",
+    es: "Mi dinero",
+    en: "My money",
     icon: House,
     group: "money",
   },
@@ -140,7 +149,7 @@ function currentRoute() {
   return {
     page: (destinations.some((item) => item.id === name)
       ? name
-      : "overview") as Page,
+      : "chat") as Page,
     query: new URLSearchParams(search),
   };
 }
@@ -149,14 +158,34 @@ export function useNavigation() {
   useEffect(() => {
     const change = () => setRoute(currentRoute());
     window.addEventListener("hashchange", change);
-    return () => window.removeEventListener("hashchange", change);
+    window.addEventListener("popstate", change);
+    return () => {
+      window.removeEventListener("hashchange", change);
+      window.removeEventListener("popstate", change);
+    };
   }, []);
   const navigate = useCallback(
-    (page: Page, query: Record<string, string> = {}) => {
+    (
+      page: Page,
+      query: Record<string, string> = {},
+      options?: { replace?: boolean },
+    ) => {
       const search = new URLSearchParams(query).toString();
       const hash = `#${page}${search ? `?${search}` : ""}`;
-      if (window.location.hash === hash) setRoute(currentRoute());
-      else window.location.hash = hash;
+      navigateAfterOverlays(() => {
+        const from = window.location.hash;
+        if (options?.replace && window.history.state?.argusRouteFrom === hash) {
+          // A route-owned panel spends its step; direct links have no parent.
+          window.history.back();
+        } else if (options?.replace) {
+          window.history.replaceState(null, "", hash);
+          setRoute(currentRoute());
+        } else {
+          if (from !== hash)
+            window.history.pushState({ argusRouteFrom: from }, "", hash);
+          setRoute(currentRoute());
+        }
+      });
     },
     [],
   );

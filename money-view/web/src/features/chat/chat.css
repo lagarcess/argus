@@ -1,0 +1,244 @@
+.argus-conversation {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  color: var(--p-ink);
+}
+.argus-conversation-header {
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 84px;
+  padding: 16px max(4px, env(safe-area-inset-right)) 14px max(4px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--p-line);
+  background: var(--p-canvas);
+}
+.argus-conversation-header .p-eyebrow { margin: 0 0 3px; }
+.argus-conversation-header h1 {
+  margin: 0;
+  max-width: 680px;
+  overflow: hidden;
+  font-size: clamp(20px, 3vw, 28px);
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.argus-pinned { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; color: var(--p-muted); font-size: 11px; }
+.argus-header-actions { position: relative; display: flex; align-items: center; min-width: 44px; }
+.argus-title-form { display: flex; align-items: center; gap: 6px; }
+.argus-title-form input { width: min(280px, 35vw); }
+.argus-owner-menu { position: relative; }
+.argus-owner-menu > summary {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--p-muted);
+  cursor: pointer;
+  list-style: none;
+}
+.argus-owner-menu > summary::-webkit-details-marker { display: none; }
+.argus-owner-menu > div {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  inset-inline-end: 0;
+  width: 196px;
+  padding: 6px;
+  border: 1px solid var(--p-line);
+  border-radius: 12px;
+  background: var(--p-surface);
+  box-shadow: 0 14px 40px rgb(23 42 33 / 12%);
+}
+.argus-owner-menu > div button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+}
+.argus-backlink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--p-line);
+  color: var(--p-muted);
+  font-size: 12px;
+}
+.argus-backlink p { margin: 0; }
+.argus-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 40px 0;
+  padding: 34px max(18px, calc((100% - 760px) / 2)) 28px;
+}
+.argus-chat-empty {
+  max-width: 680px;
+  margin: min(12vh, 100px) auto 0;
+  text-align: center;
+}
+.argus-chat-empty h2 { margin: 0; font: 500 clamp(27px, 5vw, 42px)/1.08 var(--p-serif); letter-spacing: -.025em; }
+.argus-chat-empty > p { margin: 12px auto 0; max-width: 520px; color: var(--p-muted); line-height: 1.6; }
+.argus-honesty { color: var(--p-muted); font-size: 12px; line-height: 1.5; }
+.argus-next-moves { max-width: 620px; margin: 28px auto 0; border-top: 1px solid var(--p-line); }
+.argus-next-move {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--p-line);
+  background: transparent;
+  color: var(--p-ink);
+  text-align: start;
+}
+.argus-next-move > span { color: var(--p-action); }
+.argus-message { max-width: 700px; margin: 0 auto 34px; overflow-wrap: anywhere; }
+.argus-message-user { display: flex; flex-direction: column; align-items: flex-end; }
+.argus-message-user .argus-message-copy {
+  max-width: min(78%, 560px);
+  padding: 12px 16px;
+  border-radius: 18px 18px 5px 18px;
+  background: var(--p-selected);
+  line-height: 1.55;
+}
+.argus-message-copy p { margin: 0 0 12px; white-space: pre-wrap; }
+.argus-message-copy p:last-child { margin-bottom: 0; }
+.argus-message-assistant > .argus-message-copy { max-width: 650px; font-size: 15px; line-height: 1.72; }
+.argus-message > footer { display: flex; align-items: center; gap: 4px; margin-top: 8px; color: var(--p-muted); font-size: 10px; }
+.argus-message-user > footer { justify-content: flex-end; }
+.argus-message > footer button { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--p-muted); }
+.argus-message-cards { display: grid; gap: 14px; margin-top: 16px; }
+.argus-inline-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--p-line);
+  border-radius: 14px;
+  background: var(--p-surface);
+}
+.argus-inline-card > header { margin-bottom: 15px; }
+.argus-inline-card > header > span { display: flex; align-items: center; gap: 5px; color: var(--p-muted); font-size: 10px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+.argus-inline-card h3 { margin: 5px 0 0; font-size: 18px; }
+.argus-inline-card header p { margin: 5px 0 0; color: var(--p-muted); font-size: 12px; line-height: 1.5; }
+.argus-fact { padding: 14px 0; border-top: 1px solid var(--p-line); }
+.argus-fact:first-child { padding-top: 0; border-top: 0; }
+.argus-fact-main { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.argus-fact-main > span { color: var(--p-muted); font-size: 12px; }
+.argus-card-note { margin: 8px 0; color: var(--p-muted); font-size: 11px; line-height: 1.5; }
+.argus-card-link { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 6px 0; border: 0; background: transparent; color: var(--p-action); font-size: 12px; }
+.argus-tool-answer { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 18px; margin: 12px 0; padding: 14px 0; border-block: 1px solid var(--p-line); }
+.argus-tool-answer > span { color: var(--p-muted); font-size: 12px; }
+.argus-tool-answer > strong { font: 500 25px/1.2 var(--p-serif); }
+.argus-tool-answer > small { flex-basis: 100%; color: var(--p-muted); }
+.argus-tool-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 16px; padding: 8px 0; }
+.argus-tool-row > span, .argus-tool-row > small { color: var(--p-muted); font-size: 12px; }
+.argus-tool-row > small { grid-column: 1 / -1; }
+.argus-tool-visual, .argus-card-details { margin-top: 12px; border-top: 1px solid var(--p-line); }
+.argus-tool-visual summary, .argus-card-details summary { display: flex; align-items: center; gap: 6px; min-height: 44px; color: var(--p-muted); cursor: pointer; font-size: 12px; }
+.argus-tool-visual svg { width: 100%; height: 110px; }
+.argus-tool-visual polyline { fill: none; stroke: var(--p-action); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.argus-tool-visual table { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 11px; }
+.argus-tool-visual caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.argus-tool-visual th, .argus-tool-visual td { padding: 5px; border-bottom: 1px solid var(--p-line); text-align: start; }
+.argus-card-form { display: grid; gap: 12px; }
+.argus-card-form label { display: grid; gap: 5px; color: var(--p-muted); font-size: 12px; }
+.argus-proposal-readonly { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; min-height: 44px; padding: 9px 0; border-top: 1px solid var(--p-line); color: var(--p-muted); font-size: 12px; }
+.argus-proposal-readonly strong { color: var(--p-ink); text-align: end; }
+.argus-card-form input, .argus-card-form textarea, .argus-card-form select, .argus-title-form input, .argus-recent-rename input { width: 100%; min-height: 44px; padding: 9px 11px; border: 1px solid var(--p-line); border-radius: 7px; background: var(--p-canvas); color: var(--p-ink); font: inherit; }
+.argus-card-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; margin-top: 14px; }
+.argus-command-fields { margin: 0; }
+.argus-command-fields > div { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(0, 1.4fr); gap: 16px; padding: 9px 0; border-top: 1px solid var(--p-line); }
+.argus-command-fields dt { color: var(--p-muted); font-size: 12px; }
+.argus-command-fields dd { margin: 0; text-align: end; overflow-wrap: anywhere; }
+.argus-command-fields ul { margin: 0; padding-inline-start: 18px; text-align: start; }
+.argus-currency-lines { margin: 12px 0; padding: 10px 12px; border-radius: 7px; background: var(--p-selected); font-size: 11px; }
+.argus-currency-lines p { margin: 3px 0; }
+.argus-simulation-notice { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--p-line); border-radius: 7px; background: var(--p-selected); color: var(--p-ink); font-size: 12px; line-height: 1.5; }
+.argus-card-error, .argus-turn-error, .argus-turn-notice { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--p-line); border-radius: 9px; font-size: 13px; }
+.argus-card-error, .argus-turn-error { border-color: color-mix(in srgb, var(--p-error) 35%, var(--p-line)); }
+.argus-turn-error, .argus-turn-notice { max-width: 700px; margin: 16px auto; }
+.argus-turn-error p, .argus-turn-notice p { margin: 0; }
+.argus-record-row { padding: 16px 0; border-top: 1px solid var(--p-line); }
+.argus-record-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.argus-record-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid var(--p-line); color: var(--p-muted); font-size: 11px; }
+.argus-turn-status { display: flex; align-items: center; gap: 9px; max-width: 700px; min-height: 44px; margin: 8px auto 18px; color: var(--p-muted); font-size: 13px; }
+.argus-turn-status button { margin-inline-start: auto; }
+.argus-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--p-action); animation: argus-status 1.2s ease-in-out infinite; }
+.argus-latest-sentinel { height: 1px; }
+.argus-jump-latest { position: absolute; z-index: 8; inset-inline-end: 16px; bottom: 112px; display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--p-line); border-radius: 22px; background: var(--p-surface); color: var(--p-ink); box-shadow: 0 6px 20px rgb(23 42 33 / 10%); }
+.argus-composer-dock { z-index: 5; padding: 12px max(4px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left)); border-top: 1px solid var(--p-line); background: var(--p-canvas); }
+.argus-composer-dock > .argus-honesty { margin: 0 16px 8px; }
+.argus-load-older { display: block; min-height: 40px; margin: 0 auto 30px; border: 0; background: transparent; color: var(--p-action); }
+.argus-legacy .argus-transcript { padding-top: 24px; }
+.argus-legacy .argus-conversation-header p:last-child { margin: 5px 0 0; color: var(--p-muted); font-size: 12px; }
+.argus-legacy-answer h2 { margin: 0; font-size: 16px; }
+.argus-legacy-answer header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.argus-legacy-answer time { color: var(--p-muted); font-size: 10px; }
+.argus-legacy-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 4px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--p-line); }
+.argus-recent-list { position: relative; min-width: 0; }
+.argus-recent-filter { position: absolute; z-index: 3; top: -42px; inset-inline-end: 2px; }
+.argus-recent-filter > summary { width: 40px; height: 40px; }
+.argus-recent-filter > div button[aria-checked="true"] { color: var(--p-action); font-weight: 650; }
+.argus-recent-list ul { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.argus-recent-list li { position: relative; display: flex; min-width: 0; align-items: center; border-radius: 8px; }
+.argus-recent-open { flex: 1; min-width: 0; min-height: 48px; padding: 7px 5px; border: 0; background: transparent; color: inherit; text-align: start; }
+.argus-recent-open span { display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.argus-recent-open small { display: block; margin-top: 2px; color: var(--p-muted); font-size: 9px; }
+.argus-recent-list .argus-owner-menu > summary { width: 44px; height: 44px; }
+.argus-recent-list .argus-owner-menu > div { inset-inline-end: 0; }
+.argus-recent-rename { display: grid; width: 100%; gap: 5px; padding: 5px; }
+.argus-recent-rename input { min-height: 38px; }
+.argus-recent-rename button { min-height: 40px; }
+@keyframes argus-status { 50% { opacity: .28; } }
+@media (hover: hover) and (pointer: fine) {
+  .argus-owner-menu > summary:hover, .argus-owner-menu > div button:hover, .argus-message > footer button:hover, .argus-recent-list li:hover { background: var(--p-selected); }
+  .argus-next-move:hover, .argus-card-link:hover { color: var(--p-action); }
+  .argus-recent-list li:not(:hover) > .argus-owner-menu:not([open]) { opacity: 0; }
+}
+@media (max-width: 719.98px) {
+  .argus-conversation-header { min-height: 68px; padding-block: 10px; }
+  .argus-conversation-header .p-eyebrow, .argus-pinned { display: none; }
+  .argus-title-form { position: absolute; z-index: 10; inset-inline: 0; top: 100%; padding: 8px; background: var(--p-surface); border: 1px solid var(--p-line); border-radius: 9px; }
+  .argus-title-form input { width: 100%; }
+  .argus-transcript { padding: 24px 4px 18px; }
+  .argus-chat-empty { margin-top: min(8vh, 60px); padding-inline: 10px; }
+  .argus-message { margin-bottom: 28px; }
+  .argus-message-user .argus-message-copy { max-width: 88%; }
+  .argus-inline-card { padding: 16px 13px; border-radius: 11px; }
+  .argus-command-fields > div { grid-template-columns: minmax(92px, 1fr) minmax(0, 1.2fr); gap: 10px; }
+  .argus-card-actions > button { flex: 1 1 auto; min-height: 44px; }
+  .argus-record-pagination > div { display: grid; width: 100%; grid-template-columns: 1fr 1fr; }
+  .argus-backlink { align-items: flex-start; flex-direction: column; }
+  .argus-jump-latest { inset-inline-end: 4px; bottom: 104px; }
+  .argus-legacy-actions { display: grid; grid-template-columns: 1fr; }
+}
+@media (max-width: 359.98px) {
+  .argus-conversation-header h1 { font-size: 18px; }
+  .argus-inline-card { padding-inline: 10px; }
+  .argus-command-fields > div { grid-template-columns: 1fr; gap: 3px; }
+  .argus-command-fields dd { text-align: start; }
+  .argus-card-actions { display: grid; grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .argus-status-dot { animation: none; }
+  .argus-transcript { scroll-behavior: auto; }
+}

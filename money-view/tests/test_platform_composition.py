@@ -1,5 +1,8 @@
 """The real composition must agree with the individually tested domain owners."""
 
+import json
+from uuid import uuid4
+
 import pytest
 from fastapi.testclient import TestClient
 from server.app import create_app
@@ -56,6 +59,9 @@ def test_all_domains_are_reachable_in_real_composition(app):
             "/assistant/actions",
             "/assistant/conversations",
             "/assistant/saved",
+            "/chat/capabilities",
+            "/chat/conversations",
+            "/search",
             "/runtime/usage",
         ]
         for endpoint in endpoints:
@@ -78,18 +84,29 @@ def test_household_reset_preserves_credentials_and_other_household(app):
         login(client)
         before_members = client.get("/api/platform/household/members").json()
         domains = set(app.state.identity.data_domains)
-        assert domains == {
-            "runtime",
-            "assistant",
-            "services",
-            "planning",
-            "investing",
-            "ledger",
-            "deposits",
-        }
+        action = next(
+            item["action"]
+            for item in client.get("/api/platform/chat/capabilities").json()["examples"]
+            if item["action"]["kind"] == "proposal"
+        )
+        response = client.post(
+            "/api/platform/chat/turn",
+            json={"turn_id": uuid4().hex, "action": action},
+        )
+        assert response.status_code == 200, response.text
+        final = next(
+            event
+            for line in response.text.splitlines()
+            if line.startswith("data: {")
+            and (event := json.loads(line[6:]))["type"] == "final"
+        )
+        assert final["status"] == "completed"
+        proposal = final["message"]["cards"][0]["proposal"]
         exported = client.get("/api/platform/settings/data/export")
         assert exported.status_code == 200
         assert set(exported.json()["domains"]) == domains
+        assert proposal["proposal_id"] in exported.text
+        assert final["conversation_id"] in exported.text
         assert "password_hash" not in exported.text
         assert "token_hash" not in exported.text
         assert "household-other" not in exported.text
@@ -102,6 +119,13 @@ def test_household_reset_preserves_credentials_and_other_household(app):
         assert client.get("/api/platform/household/members").json() == before_members
         assert client.get("/api/platform/accounts").json()["total"] == 0
         assert client.get("/api/home").json()["saved"] == []
+        assert client.get(
+            f"/api/platform/chat/conversations/{final['conversation_id']}"
+        ).status_code == 404
+        assert client.post(
+            f"/api/platform/chat/proposals/{proposal['proposal_id']}/confirm",
+            json={"expected_revision": proposal["revision"]},
+        ).status_code == 404
         login(client, "user-other")
         assert client.get("/api/platform/accounts").json() == other_before
 

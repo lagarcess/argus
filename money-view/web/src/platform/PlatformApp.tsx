@@ -11,11 +11,13 @@ import {
   ArrowDownLeft,
   ArrowRight,
   ArrowUpRight,
-  ChevronDown,
   Landmark,
-  Menu,
   Search,
-  Sparkles,
+  MessageCirclePlus,
+  PanelLeftClose,
+  ChevronRight,
+  Wallet,
+  ArrowUp,
   LogOut,
 } from "lucide-react";
 import { request, APIError } from "./client";
@@ -103,9 +105,19 @@ const DepositsPage = lazy(() =>
     default: module.DepositsPage,
   })),
 );
-const AssistantDrawer = lazy(() =>
-  import("../features/assistant/AssistantDrawer").then((module) => ({
-    default: module.AssistantDrawer,
+const ConversationPage = lazy(() =>
+  import("../features/chat/ConversationPage").then((module) => ({
+    default: module.ConversationPage,
+  })),
+);
+const RecentConversations = lazy(() =>
+  import("../features/chat/RecentConversations").then((module) => ({
+    default: module.RecentConversations,
+  })),
+);
+const Omnisearch = lazy(() =>
+  import("../features/search/Omnisearch").then((module) => ({
+    default: module.Omnisearch,
   })),
 );
 const SavedAssistantPage = lazy(() =>
@@ -133,15 +145,40 @@ import {
   copy as assistantCopy,
   label as assistantLabel,
 } from "../features/assistant/catalog";
+import { ArgusComposer } from "../argus/ArgusComposer";
+import { stageChatDraft } from "../features/chat/drafts";
+import { useResponsiveLayout } from "../argus/useResponsiveLayout";
 import "./shell.css";
 
 const sessionSchema = z.object({
+  data_generation: z.number().int().nonnegative(),
   user: profileSchema,
   household: householdSchema,
   preferences: preferencesSchema,
   local_only: z.boolean(),
   supported_currencies: z.array(z.string()).min(1),
+  guest: z.object({
+    is_guest: z.boolean(),
+    expires_at: z.string().nullable(),
+    mode: z.enum(["demo", "empty"]).nullable(),
+    can_claim: z.boolean(),
+    local_only: z.literal(true),
+  }),
+  currency_context: z.object({
+    currency: z.string().nullable(),
+    source: z.enum([
+      "explicit_override",
+      "selected_account",
+      "default_account",
+      "household_default",
+      "unknown",
+    ]),
+    account_id: z.string().nullable(),
+  }),
 });
+function sessionWorkspaceKey(session: z.infer<typeof sessionSchema>) {
+  return `${session.user.id}:${session.household.id}:${session.data_generation}`;
+}
 const personasSchema = z.object({
   items: z.array(
     z.object({
@@ -178,27 +215,43 @@ export default function PlatformApp() {
   const [expired, setExpired] = useState(false);
   const [authEpoch, setAuthEpoch] = useState(0);
   const [guestLocale, setGuestLocale] = useState<Locale>("es-419");
-  const session = useResource(
-    () => request("/session", sessionSchema),
-    [authEpoch],
-  );
+  const selectedAccount = query.get("account_id");
+  const session = useResource(async () => {
+    try {
+      return await request(
+        `/session${selectedAccount ? `?account_id=${encodeURIComponent(selectedAccount)}` : ""}`,
+        sessionSchema,
+      );
+    } catch (error) {
+      // An unavailable record must not masquerade as an expired identity.
+      if (
+        selectedAccount &&
+        error instanceof APIError &&
+        error.code === "account_not_found"
+      )
+        return request("/session", sessionSchema);
+      throw error;
+    }
+  }, [authEpoch, selectedAccount]);
   const [viewCurrencies, setViewCurrencies] = useState<Record<string, string>>(
     {},
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [householdOpen, setHouseholdOpen] = useState(false);
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
   const [sessionError, setSessionError] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const layout = useResponsiveLayout();
   const data = expired || session.error ? null : session.data;
-  const currencyOwner = data
-    ? `${data.user.id}:${data.household.id}:${data.household.effective_currency}`
-    : "";
+  const workspaceKey = data ? sessionWorkspaceKey(data) : "";
+  const canonicalCurrency = data?.currency_context.currency;
+  const currencyOwner = data ? `${workspaceKey}:${canonicalCurrency}` : "";
   const explicitCurrency = viewCurrencies[currencyOwner];
   const currency = data?.supported_currencies.includes(explicitCurrency)
     ? explicitCurrency
-    : (data?.household.effective_currency ?? "");
+    : (canonicalCurrency ?? "");
   const locale = data?.preferences.locale ?? guestLocale;
   const en = locale === "en";
   const change = useCallback(() => {
@@ -206,35 +259,60 @@ export default function PlatformApp() {
     session.reload();
   }, [session.reload]);
   const go = useCallback(
-    (destination: Page, params?: Record<string, string>) => {
-      navigate(destination, params);
+    (
+      destination: Page,
+      params?: Record<string, string>,
+      options?: { replace?: boolean },
+    ) => {
+      navigate(destination, params, options);
       setMobileOpen(false);
       setHouseholdOpen(false);
+      setSearchOpen(false);
     },
     [navigate],
   );
+  const ask = (text: string) => {
+    go("chat", { draft: stageChatDraft(workspaceKey, text) });
+    return true;
+  };
+  const newChat = () => go("chat", { new: crypto.randomUUID() });
   useEffect(() => {
     const expire = () => {
       setExpired(true);
-      setAssistantOpen(false);
       setHouseholdOpen(false);
+      setSearchOpen(false);
+      setMobileOpen(false);
+      setClaimOpen(false);
     };
     window.addEventListener("clara:session-expired", expire);
     return () => window.removeEventListener("clara:session-expired", expire);
   }, []);
   useEffect(() => {
     document.documentElement.lang = locale;
-  }, [locale]);
+    document.title = en
+      ? "Argus | Your money, in perspective"
+      : "Argus | Tu dinero, en perspectiva";
+  }, [locale, en]);
   useEffect(() => {
-    setMobileOpen(false);
-    const title = document.querySelector<HTMLElement>(".p-main h1");
-    if (title) {
-      title.tabIndex = -1;
-      title.focus({ preventScroll: true });
-    }
-  }, [page]);
-  const theme = data?.preferences.appearance ?? "light";
+    if (!layout.isBelowTablet && !searchOpen && !householdOpen && !claimOpen)
+      setMobileOpen(false);
+  }, [layout.isBelowTablet, searchOpen, householdOpen, claimOpen]);
+  useEffect(() => {
+    const handle = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k" &&
+        data
+      ) {
+        event.preventDefault();
+        setSearchOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", handle);
+    return () => window.removeEventListener("keydown", handle);
+  }, [data]);
   const props: PlatformPageProps = {
+    workspaceKey,
     locale,
     currency,
     query,
@@ -248,18 +326,23 @@ export default function PlatformApp() {
         method: "POST",
       });
       setExpired(true);
-      setAssistantOpen(false);
       setHouseholdOpen(false);
+      setSearchOpen(false);
+      setClaimOpen(false);
     } catch {
       setSessionError(true);
     }
   }
+  const loggedIn = () => {
+    setExpired(false);
+    setAuthEpoch((value) => value + 1);
+    setSessionError(false);
+    setRevision((value) => value + 1);
+  };
   if (!session.data && session.loading && !expired)
     return (
       <div className="platform-shell p-entry" data-theme="light">
-        <span className="p-wordmark">
-          Clara<span>·</span>
-        </span>
+        <span className="p-wordmark">Argus</span>
         <p role="status">
           {en ? "Opening your workspace…" : "Abriendo tu espacio…"}
         </p>
@@ -268,19 +351,19 @@ export default function PlatformApp() {
   if (!data)
     return (
       <div className="platform-shell" data-theme="light">
-        <Login
+        <GuestLanding
           locale={guestLocale}
           onLocale={setGuestLocale}
-          onLogin={() => {
-            setAuthEpoch((value) => value + 1);
-            setExpired(false);
-            setSessionError(false);
-            setRevision((value) => value + 1);
-          }}
+          onLogin={loggedIn}
+          onNavigate={go}
         />
       </div>
     );
-  function navItem(item: (typeof destinations)[number], compact = false) {
+  const owner = workspaceKey;
+  const compact =
+    !layout.isBelowTablet && (collapsed || data.preferences.sidebar_compact);
+  const current = destinations.find((item) => item.id === page);
+  const navItem = (item: (typeof destinations)[number]) => {
     const Icon = item.icon;
     return (
       <a
@@ -289,21 +372,158 @@ export default function PlatformApp() {
         className="p-nav-item"
         aria-current={page === item.id ? "page" : undefined}
         title={compact ? (en ? item.en : item.es) : undefined}
-        onClick={() => {
-          setMobileOpen(false);
-          setHouseholdOpen(false);
+        onClick={(event) => {
+          event.preventDefault();
+          go(item.id);
         }}
       >
         <Icon size={18} />
         <span>{en ? item.en : item.es}</span>
       </a>
     );
-  }
+  };
+  const sidebar = (
+    <>
+      <div className="argus-sidebar-heading">
+        <a
+          className="p-wordmark"
+          href="#chat"
+          onClick={(event) => {
+            event.preventDefault();
+            newChat();
+          }}
+        >
+          Argus
+        </a>
+        <button
+          className="p-icon-button"
+          aria-label={
+            compact
+              ? en
+                ? "Expand navigation"
+                : "Expandir navegación"
+              : en
+                ? "Collapse navigation"
+                : "Contraer navegación"
+          }
+          onClick={() =>
+            layout.isBelowTablet
+              ? setMobileOpen(false)
+              : setCollapsed((value) => !value)
+          }
+        >
+          <PanelLeftClose size={18} />
+        </button>
+      </div>
+      <nav
+        className="argus-primary-nav"
+        aria-label={en ? "Workspace" : "Espacio"}
+      >
+        <button
+          className="p-nav-item"
+          onClick={newChat}
+          title={en ? "New chat" : "Nueva conversación"}
+        >
+          <MessageCirclePlus size={19} />
+          <span>{en ? "New chat" : "Nueva conversación"}</span>
+        </button>
+        <button
+          className="p-nav-item"
+          onClick={() => {
+            setSearchOpen(true);
+          }}
+          title={en ? "Search" : "Buscar"}
+        >
+          <Search size={19} />
+          <span>{en ? "Search" : "Buscar"}</span>
+          <kbd>⌘ K</kbd>
+        </button>
+        {navItem(destinations.find((item) => item.id === "overview")!)}
+      </nav>
+      <div className="argus-sidebar-scroll">
+        <details
+          className="argus-nav-section"
+          open={
+            page !== "overview" &&
+            (current?.group === "money" || current?.group === "plan")
+          }
+        >
+          <summary
+            aria-label={en ? "Finance destinations" : "Vistas de finanzas"}
+          >
+            <ChevronRight size={14} />
+            <span>{en ? "Your finances" : "Tus finanzas"}</span>
+          </summary>
+          <nav>
+            {destinations
+              .filter(
+                (item) =>
+                  ["money", "plan"].includes(item.group) &&
+                  item.id !== "overview",
+              )
+              .map(navItem)}
+          </nav>
+        </details>
+        <details className="argus-nav-section">
+          <summary
+            aria-label={en ? "Household destinations" : "Vistas del hogar"}
+          >
+            <ChevronRight size={14} />
+            <span>{en ? "Household & more" : "Hogar y más"}</span>
+          </summary>
+          <nav>
+            {destinations
+              .filter(
+                (item) => item.group === "household" || item.id === "help",
+              )
+              .map(navItem)}
+          </nav>
+        </details>
+        {!compact && (
+          <section className="argus-recents">
+            <h2>{en ? "Recent conversations" : "Conversaciones recientes"}</h2>
+            <Suspense
+              fallback={
+                <p className="p-muted">{en ? "Loading…" : "Cargando…"}</p>
+              }
+            >
+              <RecentConversations
+                key={owner}
+                locale={locale}
+                revision={revision}
+                onNavigate={go}
+              />
+            </Suspense>
+          </section>
+        )}
+      </div>
+      <div className="argus-sidebar-profile">
+        <button
+          className="p-nav-item"
+          onClick={() => setHouseholdOpen(true)}
+          title={en ? "Profile and settings" : "Perfil y ajustes"}
+        >
+          <span className="p-avatar">
+            {data.guest.is_guest ? "A" : data.user.display_name.slice(0, 1)}
+          </span>
+          <span>
+            {data.guest.is_guest
+              ? en
+                ? "Guest workspace"
+                : "Espacio de invitado"
+              : (data.user.preferred_name ?? data.user.display_name)}
+            <small>{en ? "Profile & settings" : "Perfil y ajustes"}</small>
+          </span>
+        </button>
+      </div>
+    </>
+  );
   return (
     <div
-      className="platform-shell"
-      data-theme={theme}
-      data-compact={data.preferences.sidebar_compact}
+      className="platform-shell argus-workspace"
+      data-theme={data.preferences.appearance}
+      data-compact={compact}
+      data-page={page}
     >
       <a
         className="p-skip"
@@ -315,78 +535,65 @@ export default function PlatformApp() {
       >
         {en ? "Skip to content" : "Ir al contenido"}
       </a>
-      <aside
-        className="p-sidebar"
-        aria-label={en ? "Main navigation" : "Navegación principal"}
-      >
-        <a className="p-wordmark" href="#overview">
-          Clara<span>·</span>
-        </a>
-        <p className="p-nav-label">{en ? "MY MONEY" : "MI DINERO"}</p>
-        <nav>
-          {destinations
-            .filter((item) => item.group === "money")
-            .map((item) => navItem(item, data.preferences.sidebar_compact))}
-        </nav>
-        <p className="p-nav-label">{en ? "PLAN AHEAD" : "PLANIFICAR"}</p>
-        <nav>
-          {destinations
-            .filter((item) => item.group === "plan")
-            .map((item) => navItem(item, data.preferences.sidebar_compact))}
-        </nav>
-        <div className="p-sidebar-bottom">
-          <nav>
-            {destinations
-              .filter((item) => item.group === "utility")
-              .map((item) => navItem(item, data.preferences.sidebar_compact))}
-          </nav>
-          <div className="p-sidebar-note">
-            <span className="p-status-dot" />
-            {en ? "Local demonstration" : "Demostración local"}
-          </div>
-        </div>
-      </aside>
+      {!layout.isBelowTablet && (
+        <aside
+          className="p-sidebar"
+          aria-label={en ? "Main navigation" : "Navegación principal"}
+        >
+          {sidebar}
+        </aside>
+      )}
       <div className="p-workspace">
         <header className="p-topbar">
-          <button
-            className="p-icon-button p-mobile-menu"
-            aria-label={en ? "Open navigation" : "Abrir navegación"}
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu size={22} />
-          </button>
-          <button
-            className="p-household-button"
-            aria-label={`${data.household.name} · ${data.user.preferred_name ?? data.user.display_name}`}
-            onClick={() => setHouseholdOpen(true)}
-          >
-            <span className="p-avatar">
-              {data.user.display_name.slice(0, 1)}
+          {layout.isBelowTablet && (
+            <button
+              className="p-icon-button p-mobile-menu"
+              aria-label={en ? "Open navigation" : "Abrir navegación"}
+              onClick={() => setMobileOpen(true)}
+            >
+              <PanelLeftClose size={20} />
+            </button>
+          )}
+          <div className="argus-location">
+            <span>
+              {page === "chat" ? "Argus" : en ? current?.en : current?.es}
             </span>
-            <span className="p-household-name">
-              {data.household.name}
-              <small>{en ? "Demo mode" : "Modo demo"}</small>
-            </span>
-            <ChevronDown size={14} />
-          </button>
+            <small>
+              {data.guest.is_guest
+                ? en
+                  ? "Local guest"
+                  : "Invitado local"
+                : en
+                  ? "Local workspace"
+                  : "Espacio local"}
+              {data.guest.mode === "demo"
+                ? ` · ${en ? "Demo data" : "Datos demo"}`
+                : ""}
+            </small>
+          </div>
           <span className="p-topbar-spacer" />
-          <form
-            className="p-global-search"
-            role="search"
-            onSubmit={(event) => {
-              event.preventDefault();
-              go("transactions", { q: search });
-            }}
+          <label
+            className="p-currency"
+            title={
+              en
+                ? "This view does not convert balances"
+                : "Esta vista no convierte saldos"
+            }
           >
-            <Search size={17} />
-            <input
-              aria-label={en ? "Search transactions" : "Buscar movimientos"}
-              placeholder={en ? "Search transactions" : "Buscar movimientos"}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </form>
-          <label className="p-currency">
+            <small>
+              {explicitCurrency ||
+              data.currency_context.source === "explicit_override"
+                ? en
+                  ? "View"
+                  : "Vista"
+                : data.currency_context.account_id
+                  ? en
+                    ? "Account"
+                    : "Cuenta"
+                  : en
+                    ? "Currency"
+                    : "Moneda"}
+            </small>
             <span className="sr-only">
               {en
                 ? "Display currency, no conversion"
@@ -401,27 +608,46 @@ export default function PlatformApp() {
                 }))
               }
             >
+              {!currency && (
+                <option value="">{en ? "Currency" : "Moneda"}</option>
+              )}
               {data.supported_currencies.map((item) => (
                 <option key={item}>{item}</option>
               ))}
             </select>
           </label>
-          <NoticeCenter
-            key={`${data.user.id}:${data.household.id}`}
-            locale={locale}
-            currency={currency}
-            revision={revision}
-            routeKey={`${page}?${query.toString()}`}
-            onNavigate={go}
-          />
           <button
-            className="p-assistant-trigger"
-            aria-label={en ? "Ask Clara" : "Preguntar a Clara"}
-            onClick={() => setAssistantOpen(true)}
+            className="p-icon-button argus-search-trigger"
+            aria-label={en ? "Search workspace" : "Buscar en el espacio"}
+            onClick={() => setSearchOpen(true)}
           >
-            <Sparkles size={17} />
-            <span>{en ? "Ask Clara" : "Preguntar a Clara"}</span>
+            <Search size={19} />
           </button>
+          {currency && (
+            <NoticeCenter
+              key={owner}
+              locale={locale}
+              currency={currency}
+              revision={revision}
+              routeKey={`${page}?${query.toString()}`}
+              onNavigate={go}
+            />
+          )}
+          {data.guest.can_claim && (
+            <button
+              className="p-button-secondary argus-save-workspace"
+              aria-label={en ? "Keep workspace" : "Conservar espacio"}
+              onClick={() => setClaimOpen(true)}
+            >
+              {layout.isBelowTablet
+                ? en
+                  ? "Keep"
+                  : "Conservar"
+                : en
+                  ? "Keep workspace"
+                  : "Conservar espacio"}
+            </button>
+          )}
         </header>
         <main id="platform-content" className="p-main" tabIndex={-1}>
           <Suspense
@@ -431,63 +657,106 @@ export default function PlatformApp() {
               </p>
             }
           >
-            <ActivePage
-              key={`${data.user.id}:${data.household.id}:${page}`}
-              page={page}
-              {...props}
-            />
+            {!currency && page === "overview" ? (
+              <EmptyMoney {...props} />
+            ) : (
+              <ActivePage key={`${owner}:${page}`} page={page} {...props} />
+            )}
           </Suspense>
-          <footer className="p-page-footer">
-            <span className="p-status-dot" />
-            {en
-              ? "A local demonstration. Simulated data and workflows."
-              : "Una demostración local. Datos y procesos simulados."}
-          </footer>
+          {page === "overview" && !currency && (
+            <section className="argus-money-composer">
+              <ArgusComposer
+                locale={locale}
+                onSend={ask}
+                onAttach={() => go("transactions", { import: "1" })}
+              />
+              <p>
+                {en
+                  ? "Ask about these records, or explore a plan."
+                  : "Pregunta sobre estos registros o explora un plan."}
+              </p>
+            </section>
+          )}
+          {page !== "chat" && (
+            <footer className="p-page-footer">
+              {data.guest.mode === "demo"
+                ? en
+                  ? "Local demo · Simulated records"
+                  : "Demo local · Registros simulados"
+                : en
+                  ? "Local workspace · No bank connection"
+                  : "Espacio local · Sin conexión bancaria"}
+            </footer>
+          )}
         </main>
       </div>
-      <nav
-        className="p-mobile-tabs"
-        aria-label={en ? "Quick navigation" : "Navegación rápida"}
-      >
-        {destinations
-          .filter((item) =>
-            ["overview", "accounts", "transactions"].includes(item.id),
-          )
-          .map((item) => navItem(item))}
-        <button onClick={() => setMobileOpen(true)} className="p-nav-item">
-          <Menu size={20} />
-          <span>{en ? "More" : "Más"}</span>
-        </button>
-      </nav>
       {mobileOpen && (
         <Modal
-          title={en ? "Your workspace" : "Tu espacio"}
+          title="Argus"
+          variant="drawer"
           onClose={() => setMobileOpen(false)}
         >
-          <nav className="p-mobile-full-nav">
-            {destinations.map((item) => navItem(item))}
-          </nav>
+          <div className="argus-mobile-sidebar">{sidebar}</div>
         </Modal>
+      )}
+      {searchOpen && (
+        <Suspense
+          fallback={
+            <p className="argus-overlay-loading" role="status">
+              {en ? "Loading search…" : "Cargando búsqueda…"}
+            </p>
+          }
+        >
+          <Omnisearch
+            key={owner}
+            locale={locale}
+            onClose={() => setSearchOpen(false)}
+            onNavigate={go}
+            onAsk={ask}
+            revision={revision}
+          />
+        </Suspense>
+      )}
+      {claimOpen && (
+        <ClaimWorkspace
+          locale={locale}
+          onClose={() => setClaimOpen(false)}
+          onClaimed={() => {
+            setClaimOpen(false);
+            change();
+          }}
+        />
       )}
       {householdOpen && (
         <Modal
-          title={en ? "Your household" : "Tu hogar"}
+          title={en ? "Your workspace" : "Tu espacio"}
           onClose={() => setHouseholdOpen(false)}
         >
           <div className="p-profile-summary">
             <span className="p-avatar">
-              {(data.user.preferred_name ?? data.user.display_name).slice(0, 1)}
+              {data.user.display_name.slice(0, 1)}
             </span>
             <div>
               <strong>
-                {data.user.preferred_name ?? data.user.display_name}
+                {data.guest.is_guest
+                  ? en
+                    ? "Guest workspace"
+                    : "Espacio de invitado"
+                  : (data.user.preferred_name ?? data.user.display_name)}
               </strong>
-              <p className="p-muted">{en ? "Local profile" : "Perfil local"}</p>
+              <p className="p-muted">{data.household.name}</p>
             </div>
           </div>
+          {data.guest.expires_at && (
+            <p className="p-muted">
+              {en ? "Available until" : "Disponible hasta"}{" "}
+              {new Date(data.guest.expires_at).toLocaleString(locale)}
+            </p>
+          )}
           <HouseholdMenu
             locale={locale}
             currentId={data.household.id}
+            busy={switching}
             onSelect={async (id) => {
               setSwitching(true);
               setSessionError(false);
@@ -497,7 +766,7 @@ export default function PlatformApp() {
                   body: JSON.stringify({ household_id: id }),
                 });
                 setHouseholdOpen(false);
-                setAssistantOpen(false);
+                setSearchOpen(false);
                 setAuthEpoch((value) => value + 1);
                 setRevision((value) => value + 1);
                 go("overview");
@@ -507,14 +776,17 @@ export default function PlatformApp() {
                 setSwitching(false);
               }
             }}
-            busy={switching}
           />
           <div className="p-stack p-menu-links">
             {destinations
               .filter((item) =>
-                ["household", "membership", "employer", "settings"].includes(
-                  item.id,
-                ),
+                [
+                  "household",
+                  "membership",
+                  "employer",
+                  "settings",
+                  "help",
+                ].includes(item.id),
               )
               .map((item) => (
                 <button
@@ -526,6 +798,16 @@ export default function PlatformApp() {
                   <ArrowRight size={16} />
                 </button>
               ))}
+            {data.guest.can_claim && (
+              <button
+                className="p-button-secondary"
+                onClick={() => {
+                  setClaimOpen(true);
+                }}
+              >
+                {en ? "Keep this workspace" : "Conservar este espacio"}
+              </button>
+            )}
             <button className="p-button-ghost" onClick={() => void logout()}>
               <LogOut size={16} />
               {en ? "Sign out" : "Cerrar sesión"}
@@ -540,35 +822,355 @@ export default function PlatformApp() {
           </div>
         </Modal>
       )}
-      {assistantOpen && (
-        <Suspense
-          fallback={
-            <Modal title="Clara" onClose={() => setAssistantOpen(false)}>
-              <p role="status">{en ? "Loading…" : "Cargando…"}</p>
-            </Modal>
-          }
-        >
-          <AssistantDrawer
-            key={`${data.user.id}:${data.household.id}`}
-            {...props}
-            page={page}
-            onClose={() => setAssistantOpen(false)}
-          />
-        </Suspense>
-      )}
     </div>
   );
 }
 
-function Login({
+function GuestLanding({
   locale,
   onLocale,
   onLogin,
+  onNavigate,
 }: {
   locale: Locale;
-  onLocale: (value: Locale) => void;
+  onLocale: (locale: Locale) => void;
   onLogin: () => void;
+  onNavigate: PlatformPageProps["onNavigate"];
 }) {
+  const en = locale === "en";
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const enter = async (mode: "demo" | "empty", text?: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const guest = await request("/session/guest", sessionSchema, {
+        method: "POST",
+        body: JSON.stringify({ mode, locale }),
+      });
+      onLogin();
+      onNavigate(
+        text ? "chat" : "overview",
+        text
+          ? { draft: stageChatDraft(sessionWorkspaceKey(guest), text) }
+          : undefined,
+      );
+      return true;
+    } catch {
+      setError(
+        en
+          ? "Your workspace could not be opened. Try again."
+          : "No se pudo abrir tu espacio. Inténtalo de nuevo.",
+      );
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="argus-guest">
+      <header>
+        <a className="p-wordmark" href="#chat">
+          Argus
+        </a>
+        <div className="p-actions">
+          <button
+            className="p-button-ghost"
+            onClick={() => onLocale(en ? "es-419" : "en")}
+          >
+            {en ? "Español" : "English"}
+          </button>
+          <button
+            className="p-button-secondary"
+            onClick={() => setLoginOpen(true)}
+          >
+            {en ? "Sign in" : "Iniciar sesión"}
+          </button>
+        </div>
+      </header>
+      <main className="argus-guest-main">
+        <section className="argus-guest-question">
+          <span className="argus-overline">
+            {en ? "A little more perspective" : "Un poco más de perspectiva"}
+          </span>
+          <h1>
+            {en
+              ? "Your money. Your next question."
+              : "Tu dinero. Tu próxima pregunta."}
+          </h1>
+          <p>
+            {en
+              ? "Make sense of your accounts, explore a plan, or start with what is on your mind."
+              : "Entiende tus cuentas, explora un plan o empieza con lo que tienes en mente."}
+          </p>
+          <ArgusComposer
+            locale={locale}
+            disabled={busy}
+            onSend={(text) => enter("empty", text)}
+          />
+          <div className="argus-starters">
+            <button
+              disabled={busy}
+              onClick={() =>
+                void enter(
+                  "demo",
+                  en
+                    ? "What does my money look like today?"
+                    : "¿Cómo está mi dinero hoy?",
+                )
+              }
+            >
+              {en ? "Understand my money" : "Entender mi dinero"}
+            </button>
+            <button
+              disabled={busy}
+              onClick={() =>
+                void enter(
+                  "demo",
+                  en
+                    ? "How much room is there in my budget?"
+                    : "¿Cuánto espacio hay en mi presupuesto?",
+                )
+              }
+            >
+              {en ? "Review my budget" : "Revisar mi presupuesto"}
+            </button>
+            <button disabled={busy} onClick={() => void enter("empty")}>
+              {en ? "Start with my own records" : "Empezar con mis registros"}
+            </button>
+          </div>
+          {error && (
+            <p role="alert" className="p-error">
+              {error}
+            </p>
+          )}
+          <p className="argus-guest-note">
+            {en
+              ? "A private local workspace. No bank connection or real transactions."
+              : "Un espacio local privado. Sin conexión bancaria ni transacciones reales."}
+          </p>
+        </section>
+        <section className="argus-demo-preview">
+          <div className="argus-demo-copy">
+            <span className="argus-overline">
+              {en
+                ? "A place for the whole picture"
+                : "Un lugar para ver el panorama"}
+            </span>
+            <h2>{en ? "Meet your money view" : "Conoce tu vista de dinero"}</h2>
+            <p>
+              {en
+                ? "Accounts, spending and plans stay connected to your questions. Explore the prepared household to see how it works."
+                : "Tus cuentas, gastos y planes acompañan tus preguntas. Explora el hogar preparado para ver cómo funciona."}
+            </p>
+            <button
+              className="p-button-ghost"
+              disabled={busy}
+              onClick={() => void enter("demo")}
+            >
+              {en ? "Explore the demo" : "Explorar la demo"}
+              <ArrowRight size={17} />
+            </button>
+          </div>
+          <div
+            className="argus-demo-ledger"
+            aria-label={en ? "Money view preview" : "Vista previa de dinero"}
+          >
+            <div>
+              <Wallet size={20} />
+              <strong>
+                {en ? "Your money, together" : "Tu dinero, en un lugar"}
+              </strong>
+              <small>{en ? "Demo preview" : "Vista previa demo"}</small>
+            </div>
+            {[
+              {
+                icon: Landmark,
+                en: "Accounts & balances",
+                es: "Cuentas y saldos",
+                detail: en ? "One clear view" : "Una vista clara",
+              },
+              {
+                icon: ArrowUp,
+                en: "Spending & cash flow",
+                es: "Gastos y flujo de caja",
+                detail: en ? "Follow the details" : "Sigue los detalles",
+              },
+              {
+                icon: ChevronRight,
+                en: "Plans & goals",
+                es: "Planes y metas",
+                detail: en ? "Explore what comes next" : "Explora lo que sigue",
+              },
+            ].map((item) => (
+              <div key={item.en}>
+                <item.icon size={18} />
+                <span>{en ? item.en : item.es}</span>
+                <small>{item.detail}</small>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+      {loginOpen && (
+        <Modal
+          title={en ? "Sign in to Argus" : "Entrar a Argus"}
+          onClose={() => setLoginOpen(false)}
+        >
+          <Login locale={locale} onLogin={onLogin} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+function ClaimWorkspace({
+  locale,
+  onClose,
+  onClaimed,
+}: {
+  locale: Locale;
+  onClose: () => void;
+  onClaimed: () => void;
+}) {
+  const en = locale === "en";
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const [loginId, setLoginId] = useState("");
+  return (
+    <Modal
+      title={en ? "Keep your workspace" : "Conservar tu espacio"}
+      onClose={loginId ? onClaimed : onClose}
+      dismissible={!busy}
+    >
+      {loginId ? (
+        <div className="p-stack">
+          <p>
+            {en
+              ? "Your records are saved. Use this local account ID and your password to return."
+              : "Tus registros están guardados. Usa este identificador local y tu contraseña para volver."}
+          </p>
+          <Field label={en ? "Local account ID" : "Identificador local"}>
+            <input readOnly value={loginId} />
+          </Field>
+          <button
+            className="p-button-secondary"
+            onClick={() =>
+              navigator.clipboard.writeText(loginId).catch(() => setError(true))
+            }
+          >
+            {en ? "Copy login ID" : "Copiar identificador"}
+          </button>
+          {error && (
+            <p className="p-error" role="alert">
+              {en
+                ? "Select the ID above and copy it."
+                : "Selecciona el identificador de arriba y cópialo."}
+            </p>
+          )}
+          <button className="p-button" onClick={onClaimed}>
+            {en ? "Continue" : "Continuar"}
+          </button>
+        </div>
+      ) : (
+        <form
+          className="p-stack"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setBusy(true);
+            setError(false);
+            try {
+              const data = await request("/session/claim", sessionSchema, {
+                method: "POST",
+                body: JSON.stringify({ display_name: name.trim(), password }),
+              });
+              setLoginId(data.user.id);
+            } catch {
+              setError(true);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <p className="p-muted">
+            {en
+              ? "Save your conversations and records in this local app."
+              : "Conserva tus conversaciones y registros en esta aplicación local."}
+          </p>
+          <Field label={en ? "Your name" : "Tu nombre"}>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              maxLength={80}
+              disabled={busy}
+            />
+          </Field>
+          <Field
+            label={en ? "Password" : "Contraseña"}
+            help={
+              en
+                ? "At least 10 characters. This password is only for this local app."
+                : "Al menos 10 caracteres. Esta contraseña es solo para esta aplicación local."
+            }
+          >
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              minLength={10}
+              maxLength={128}
+              autoComplete="new-password"
+              disabled={busy}
+            />
+          </Field>
+          {error && (
+            <p role="alert" className="p-error">
+              {en
+                ? "Your workspace could not be saved. Try again."
+                : "No se pudo guardar tu espacio. Inténtalo de nuevo."}
+            </p>
+          )}
+          <button className="p-button" disabled={busy || !name.trim()}>
+            {busy
+              ? en
+                ? "Saving…"
+                : "Guardando…"
+              : en
+                ? "Keep workspace"
+                : "Conservar espacio"}
+          </button>
+        </form>
+      )}
+    </Modal>
+  );
+}
+function EmptyMoney(props: PlatformPageProps) {
+  const en = props.locale === "en";
+  return (
+    <div className="argus-empty-money">
+      <span className="argus-overline">{en ? "Your money" : "Tu dinero"}</span>
+      <h1>{en ? "A clear place to begin" : "Un lugar claro para empezar"}</h1>
+      <p>
+        {en
+          ? "Add an account to see your balances and give your next question some context."
+          : "Agrega una cuenta para ver tus saldos y darle contexto a tu próxima pregunta."}
+      </p>
+      <button
+        className="p-button-secondary"
+        onClick={() => props.onNavigate("accounts")}
+      >
+        {en ? "Add an account" : "Agregar una cuenta"}
+        <ArrowRight size={16} />
+      </button>
+    </div>
+  );
+}
+
+function Login({ locale, onLogin }: { locale: Locale; onLogin: () => void }) {
   const en = locale === "en";
   const personas = useResource(
     () => request("/demo/personas", personasSchema),
@@ -607,211 +1209,161 @@ function Login({
     }
   }
   return (
-    <div className="p-login">
-      <header>
-        <a href="#overview" className="p-wordmark">
-          Clara<span>·</span>
-        </a>
-        <div className="p-actions">
-          <button
-            className="p-button-ghost"
-            aria-pressed={!en}
-            onClick={() => onLocale("es-419")}
-          >
-            ES
-          </button>
-          <button
-            className="p-button-ghost"
-            aria-pressed={en}
-            onClick={() => onLocale("en")}
-          >
-            EN
-          </button>
-        </div>
-      </header>
-      <div className="p-login-body">
-        <div className="p-login-intro">
-          <span className="p-eyebrow">
-            {en ? "A CLEARER VIEW" : "TODO, MÁS CLARO"}
-          </span>
-          <h1>
-            {en
-              ? "Your money.\nIn perspective."
-              : "Tu dinero.\nEn perspectiva."}
-          </h1>
-          <p>
-            {en
-              ? "Accounts, plans, and the details that connect them. Explore a household with realistic, simulated records."
-              : "Cuentas, planes y los detalles que los conectan. Explora un hogar con registros realistas y simulados."}
-          </p>
-          <div className="p-login-rule" />
-          <p className="p-muted">
-            {en
-              ? "Local demo · No bank connection · No real transactions"
-              : "Demo local · Sin conexión bancaria · Sin transacciones reales"}
-          </p>
-        </div>
-        <Panel className="p-login-form">
-          <h2>{en ? "Enter the demo" : "Entrar a la demo"}</h2>
-          <p className="p-muted">
-            {en
-              ? "Choose a prepared profile or use the ID of a local account created in your household."
-              : "Elige un perfil preparado o usa el identificador de una cuenta local creada en tu hogar."}
-          </p>
-          <div
-            className="p-login-methods"
-            role="group"
-            aria-label={en ? "Sign-in method" : "Forma de acceso"}
-          >
-            <button
-              type="button"
-              className="p-button-secondary"
-              aria-pressed={mode === "demo"}
-              disabled={pending}
-              onClick={() => setMode("demo")}
-            >
-              {en ? "Demo profiles" : "Perfiles demo"}
-            </button>
-            <button
-              type="button"
-              className="p-button-secondary"
-              aria-pressed={mode === "local"}
-              disabled={pending}
-              onClick={() => setMode("local")}
-            >
-              {en ? "Use a local account ID" : "Usar un identificador local"}
-            </button>
-          </div>
-          <form onSubmit={submit} className="p-stack">
-            {mode === "local" ? (
-              <Field
-                label={
-                  en ? "Local account ID" : "Identificador de cuenta local"
-                }
-                help={
-                  en
-                    ? "Use the exact ID shown when the household member was created. It is not an email address."
-                    : "Usa el identificador que se mostró al crear la persona en el hogar. No es un correo electrónico."
-                }
-              >
-                <input
-                  value={localUser}
-                  onChange={(event) => setLocalUser(event.target.value)}
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  maxLength={100}
-                  disabled={pending}
-                  required
-                />
-              </Field>
-            ) : personas.error ? (
-              <EmptyState
-                title={
-                  en
-                    ? "Demo profiles are unavailable"
-                    : "Los perfiles demo no están disponibles"
-                }
-                action={
-                  <button
-                    type="button"
-                    className="p-button-secondary"
-                    onClick={personas.reload}
-                  >
-                    {en ? "Try again" : "Reintentar"}
-                  </button>
-                }
-              />
-            ) : personas.loading ? (
-              <p role="status">
-                {en ? "Loading profiles…" : "Cargando perfiles…"}
-              </p>
-            ) : (
-              <Field label={en ? "Local profile" : "Perfil local"}>
-                <select
-                  value={user}
-                  onChange={(event) => setDemoUser(event.target.value)}
-                  disabled={pending}
-                  required
-                >
-                  {personas.data?.items.map((item) => (
-                    <option key={item.user_id} value={item.user_id}>
-                      {item.display_name} ·{" "}
-                      {roleLabel(item.households[0]?.role ?? "", locale)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            )}
-            <Field
-              label={
-                mode === "local"
-                  ? en
-                    ? "Local password"
-                    : "Contraseña local"
-                  : en
-                    ? "Demo password"
-                    : "Contraseña de demo"
-              }
-              help={
-                mode === "local"
-                  ? en
-                    ? "Enter the local password chosen when this member was created. No invitation or password email is sent."
-                    : "Escribe la contraseña local elegida al crear esta persona. No se envían invitaciones ni contraseñas por correo."
-                  : en
-                    ? "This password belongs only to the local fixture."
-                    : "Esta contraseña pertenece solo al perfil local."
-              }
-            >
-              <input
-                type="password"
-                value={password}
-                onChange={(event) =>
-                  mode === "local"
-                    ? setLocalPassword(event.target.value)
-                    : setDemoPassword(event.target.value)
-                }
-                autoComplete="current-password"
-                disabled={pending}
-                required
-              />
-            </Field>
-            {error && (
-              <p className="p-error" role="alert">
-                {error === "invalid_credentials"
-                  ? en
-                    ? "The account ID or password is incorrect."
-                    : "El identificador o la contraseña no coincide."
-                  : en
-                    ? "Could not sign in. Try again."
-                    : "No se pudo entrar. Inténtalo de nuevo."}
-              </p>
-            )}
-            <button
-              className="p-button"
-              disabled={
-                pending ||
-                !user ||
-                (mode === "demo" &&
-                  (personas.loading || Boolean(personas.error)))
-              }
-              type="submit"
-            >
-              {pending
-                ? en
-                  ? "Opening…"
-                  : "Abriendo…"
-                : en
-                  ? "Open workspace"
-                  : "Abrir espacio"}
-              <ArrowRight size={18} />
-            </button>
-          </form>
-        </Panel>
+    <Panel className="p-login-form">
+      <h2>{en ? "Enter the demo" : "Entrar a la demo"}</h2>
+      <p className="p-muted">
+        {en
+          ? "Choose a prepared profile or use the ID of a local account created in your household."
+          : "Elige un perfil preparado o usa el identificador de una cuenta local creada en tu hogar."}
+      </p>
+      <div
+        className="p-login-methods"
+        role="group"
+        aria-label={en ? "Sign-in method" : "Forma de acceso"}
+      >
+        <button
+          type="button"
+          className="p-button-secondary"
+          aria-pressed={mode === "demo"}
+          disabled={pending}
+          onClick={() => setMode("demo")}
+        >
+          {en ? "Demo profiles" : "Perfiles demo"}
+        </button>
+        <button
+          type="button"
+          className="p-button-secondary"
+          aria-pressed={mode === "local"}
+          disabled={pending}
+          onClick={() => setMode("local")}
+        >
+          {en ? "Use a local account ID" : "Usar un identificador local"}
+        </button>
       </div>
-    </div>
+      <form onSubmit={submit} className="p-stack">
+        {mode === "local" ? (
+          <Field
+            label={en ? "Local account ID" : "Identificador de cuenta local"}
+            help={
+              en
+                ? "Use the exact ID shown when the household member was created. It is not an email address."
+                : "Usa el identificador que se mostró al crear la persona en el hogar. No es un correo electrónico."
+            }
+          >
+            <input
+              value={localUser}
+              onChange={(event) => setLocalUser(event.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              maxLength={100}
+              disabled={pending}
+              required
+            />
+          </Field>
+        ) : personas.error ? (
+          <EmptyState
+            title={
+              en
+                ? "Demo profiles are unavailable"
+                : "Los perfiles demo no están disponibles"
+            }
+            action={
+              <button
+                type="button"
+                className="p-button-secondary"
+                onClick={personas.reload}
+              >
+                {en ? "Try again" : "Reintentar"}
+              </button>
+            }
+          />
+        ) : personas.loading ? (
+          <p role="status">{en ? "Loading profiles…" : "Cargando perfiles…"}</p>
+        ) : (
+          <Field label={en ? "Local profile" : "Perfil local"}>
+            <select
+              value={user}
+              onChange={(event) => setDemoUser(event.target.value)}
+              disabled={pending}
+              required
+            >
+              {personas.data?.items.map((item) => (
+                <option key={item.user_id} value={item.user_id}>
+                  {item.display_name} ·{" "}
+                  {roleLabel(item.households[0]?.role ?? "", locale)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <Field
+          label={
+            mode === "local"
+              ? en
+                ? "Local password"
+                : "Contraseña local"
+              : en
+                ? "Demo password"
+                : "Contraseña de demo"
+          }
+          help={
+            mode === "local"
+              ? en
+                ? "Enter the local password chosen when this member was created. No invitation or password email is sent."
+                : "Escribe la contraseña local elegida al crear esta persona. No se envían invitaciones ni contraseñas por correo."
+              : en
+                ? "This password belongs only to the local fixture."
+                : "Esta contraseña pertenece solo al perfil local."
+          }
+        >
+          <input
+            type="password"
+            value={password}
+            onChange={(event) =>
+              mode === "local"
+                ? setLocalPassword(event.target.value)
+                : setDemoPassword(event.target.value)
+            }
+            autoComplete="current-password"
+            disabled={pending}
+            required
+          />
+        </Field>
+        {error && (
+          <p className="p-error" role="alert">
+            {error === "invalid_credentials"
+              ? en
+                ? "The account ID or password is incorrect."
+                : "El identificador o la contraseña no coincide."
+              : en
+                ? "Could not sign in. Try again."
+                : "No se pudo entrar. Inténtalo de nuevo."}
+          </p>
+        )}
+        <button
+          className="p-button"
+          disabled={
+            pending ||
+            !user ||
+            (mode === "demo" && (personas.loading || Boolean(personas.error)))
+          }
+          type="submit"
+        >
+          {pending
+            ? en
+              ? "Opening…"
+              : "Abriendo…"
+            : en
+              ? "Open workspace"
+              : "Abrir espacio"}
+          <ArrowRight size={18} />
+        </button>
+      </form>
+    </Panel>
   );
 }
+
 function roleLabel(role: string, locale: Locale) {
   return locale === "en"
     ? ({ owner: "Owner", editor: "Editor", viewer: "Viewer" }[role] ?? role)
@@ -895,7 +1447,7 @@ function OverviewPage(props: PlatformPageProps) {
     <>
       <PageHeader
         eyebrow={en ? "YOUR HOUSEHOLD" : "TU HOGAR"}
-        title={en ? "Overview" : "Resumen"}
+        title={en ? "My money" : "Mi dinero"}
         description={
           en
             ? "The whole picture, down to the details."
@@ -997,6 +1549,24 @@ function OverviewPage(props: PlatformPageProps) {
                   </span>
                 )}
               </div>
+            </section>
+            <section className="argus-money-composer">
+              <ArgusComposer
+                locale={locale}
+                placeholder={en ? "Ask Argus" : "Pregunta a Argus"}
+                onSend={(text) => {
+                  onNavigate("chat", {
+                    draft: stageChatDraft(props.workspaceKey, text),
+                  });
+                  return true;
+                }}
+                onAttach={() => onNavigate("transactions", { import: "1" })}
+              />
+              <p>
+                {en
+                  ? "Ask about these records, or explore a plan."
+                  : "Pregunta sobre estos registros o explora un plan."}
+              </p>
             </section>
             <section className="p-overview-accounts">
               <div className="p-section-heading">
@@ -1172,6 +1742,8 @@ function OverviewPage(props: PlatformPageProps) {
 
 function ActivePage({ page, ...props }: PlatformPageProps & { page: Page }) {
   switch (page) {
+    case "chat":
+      return <ConversationPage {...props} />;
     case "accounts":
       return <AccountsPage {...props} />;
     case "budgets":

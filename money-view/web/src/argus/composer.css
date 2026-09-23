@@ -1,0 +1,159 @@
+.argus-composer-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  text-align: start;
+}
+.argus-composer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 68px;
+  padding: 10px;
+  border: 1px solid var(--p-line);
+  border-radius: 34px;
+  background: var(--p-surface);
+  cursor: text;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.argus-composer:focus-within {
+  border-color: var(--p-control);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--p-focus) 13%, transparent);
+}
+.argus-composer-editor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  outline: none;
+  padding: 8px 8px 8px 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.argus-composer-editor[data-empty="true"]:not(:focus):before {
+  content: attr(data-placeholder);
+  position: absolute;
+  inset-inline: 14px 0;
+  pointer-events: none;
+  color: var(--p-muted);
+  white-space: normal;
+}
+.platform-shell .argus-composer-send,
+.platform-shell .argus-composer-attach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  align-self: flex-end;
+  background: transparent;
+}
+.platform-shell .argus-composer-send {
+  background: var(--p-forest);
+  color: var(--p-canvas);
+}
+.platform-shell .argus-composer-send:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.argus-composer-context {
+  padding: 0 16px 8px;
+  color: var(--p-muted);
+  font-size: 12px;
+}
+.argus-composer-error {
+  padding: 8px 16px;
+  color: var(--p-error);
+  font-size: 13px;
+}
+.argus-mention-token {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: baseline;
+  border-radius: 5px;
+  padding: 0 4px;
+  background: var(--p-selected);
+  color: var(--p-action);
+  white-space: nowrap;
+  max-width: 100%;
+}
+.argus-mention-token[data-entity-token-focused="true"] {
+  outline: 2px solid var(--p-focus);
+}
+.argus-discovery {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  inset-inline: 0;
+  z-index: 20;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--p-surface);
+  border: 1px solid var(--p-line);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px #172a2112;
+}
+.argus-discovery-heading,
+.argus-discovery > p {
+  padding: 12px 18px;
+  color: var(--p-muted);
+  font-size: 13px;
+}
+.argus-discovery > button {
+  border: 0;
+  background: transparent;
+  text-align: start;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 18px;
+}
+.argus-discovery > button[aria-selected="true"] {
+  background: var(--p-selected);
+}
+.argus-discovery small {
+  display: block;
+  color: var(--p-muted);
+}
+@media (hover: hover) and (pointer: fine) {
+  .argus-composer-attach:hover {
+    background: var(--p-selected);
+  }
+  .argus-composer-send:hover:not(:disabled) {
+    opacity: 0.86;
+  }
+}
+@media (max-width: 719.98px) {
+  .argus-composer {
+    min-height: 64px;
+    padding: 8px;
+    border-radius: 28px;
+  }
+  .argus-composer-editor {
+    padding-inline: 8px;
+    max-height: 136px;
+  }
+  .argus-composer-editor[data-empty="true"]:not(:focus):before {
+    inset-inline-start: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .argus-composer {
+    transition: none;
+  }
+}
+.argus-composer-editor[data-empty="true"]:not(:focus)::before {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

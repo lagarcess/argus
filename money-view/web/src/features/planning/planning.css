@@ -52,7 +52,7 @@
 
 .platform-shell .planning-action-column {
   width: 1%;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .platform-shell .planning-row-actions {
@@ -65,12 +65,12 @@
 .platform-shell .planning-status-text {
   display: block;
   margin-top: 4px;
-  color: var(--p-error, #984e4d);
+  color: var(--p-error);
 }
 
 .platform-shell .planning-negative,
 .platform-shell .planning-warning-text {
-  color: var(--p-error, #984e4d);
+  color: var(--p-error);
 }
 
 .platform-shell .planning-allocation-details {
@@ -83,7 +83,7 @@
   align-items: center;
   width: fit-content;
   cursor: pointer;
-  color: var(--p-action, #205840);
+  color: var(--p-teal, #428c86);
   font-size: 13px;
   font-weight: 600;
 }
@@ -98,7 +98,7 @@
 
 .platform-shell .planning-allocation-details li {
   padding-inline-start: 12px;
-  border-inline-start: 2px solid var(--p-rule, #d8dfd2);
+  border-inline-start: 2px solid var(--p-line);
 }
 
 .platform-shell .planning-allocation-details li > div:first-child,
@@ -142,7 +142,7 @@
 
 .platform-shell .planning-goal-row {
   display: grid;
-  grid-template-columns: minmax(240px, 1.4fr) minmax(230px, 0.9fr) auto;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) auto;
   gap: 28px;
   align-items: center;
 }
@@ -173,20 +173,20 @@
   overflow: hidden;
   border: 0;
   border-radius: 999px;
-  color: var(--p-action, #205840);
-  background: var(--p-rule, #d8dfd2);
+  color: var(--p-teal, #428c86);
+  background: var(--p-line);
 }
 
 .platform-shell .planning-progress-group progress::-webkit-progress-bar {
-  background: var(--p-rule, #d8dfd2);
+  background: var(--p-line);
 }
 
 .platform-shell .planning-progress-group progress::-webkit-progress-value {
-  background: var(--p-action, #205840);
+  background: var(--p-teal, #428c86);
 }
 
 .platform-shell .planning-progress-group progress::-moz-progress-bar {
-  background: var(--p-action, #205840);
+  background: var(--p-teal, #428c86);
 }
 
 .platform-shell .planning-goal-values dl {
@@ -209,7 +209,7 @@
 .platform-shell .planning-template-tabs {
   display: flex;
   gap: 4px;
-  overflow-x: auto;
+  flex-wrap: wrap;
   padding-bottom: 2px;
 }
 
@@ -230,7 +230,7 @@
   display: grid;
   gap: 20px;
   padding-top: 28px;
-  border-top: 1px solid var(--p-rule, #d8dfd2);
+  border-top: 1px solid var(--p-line);
 }
 
 .platform-shell .planning-scenario-metrics {
@@ -251,7 +251,7 @@
   align-items: center;
   width: fit-content;
   cursor: pointer;
-  color: var(--p-action, #205840);
+  color: var(--p-teal, #428c86);
   font-weight: 600;
 }
 
@@ -276,15 +276,15 @@
   gap: 18px;
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid var(--p-rule, #d8dfd2);
+  border-top: 1px solid var(--p-line);
 }
 
 .platform-shell .planning-comparison-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
-  background: var(--p-rule, #d8dfd2);
-  border: 1px solid var(--p-rule, #d8dfd2);
+  background: var(--p-line);
+  border: 1px solid var(--p-line);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -324,7 +324,7 @@
 
 @media (max-width: 980px) {
   .platform-shell .planning-goal-row {
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.8fr);
   }
 
   .platform-shell .planning-goal-row > .p-row-actions {
@@ -375,7 +375,7 @@
 
   .platform-shell .planning-table tr {
     padding: 16px 0;
-    border-bottom: 1px solid var(--p-rule, #d8dfd2);
+    border-bottom: 1px solid var(--p-line);
   }
 
   .platform-shell .planning-table td {
@@ -426,7 +426,7 @@
   }
 
   .platform-shell .planning-comparison-columns section + section {
-    border-top: 1px solid var(--p-rule, #d8dfd2);
+    border-top: 1px solid var(--p-line);
   }
 }
 
@@ -438,4 +438,32 @@
   .platform-shell .planning-table td {
     grid-template-columns: minmax(84px, 0.65fr) minmax(0, 1.35fr);
   }
+}
+
+.platform-shell .planning-page :is(.p-page-header, .p-actions, .p-row-actions, .p-field, .planning-goal-values, .planning-scenario-result, .planning-period-toolbar) { min-width: 0; }
+.platform-shell .planning-page :is(h2, h3, p, .p-money, .planning-progress-labels, .planning-goal-values dd) { overflow-wrap: anywhere; }
+.platform-shell .planning-page :is(button, input, select, textarea) { min-height: 44px; font-size: 16px; }
+.platform-shell .planning-page :is(input, select, textarea) { width: 100%; min-width: 0; }
+.platform-shell .planning-page :is(input[type=checkbox], input[type=radio]) { width: 20px; min-height: 20px; }
+.platform-shell .planning-page .p-actions { flex-wrap: wrap; gap: 10px; }
+.platform-shell .planning-page .p-actions > button { white-space: normal; max-width: 100%; }
+.platform-shell .planning-page .p-evidence-detail { max-width: 100%; }
+.platform-shell .planning-page .planning-scenario-metrics .p-metric { min-width: 0; }
+.platform-shell .planning-warning-text { color: var(--p-body); border-inline-start: 3px solid var(--p-gold, #b28d49); padding-inline-start: 12px; }
+.platform-shell .planning-progress-labels { flex-wrap: wrap; }
+.platform-shell .planning-page .planning-template-tabs button { white-space: normal; max-width: 100%; }
+@media (max-width: 1023px) {
+  .platform-shell .planning-section-heading { flex-wrap: wrap; }
+  .platform-shell .planning-page .p-page-header > .p-actions { width: 100%; justify-content: start; }
+  .platform-shell .planning-goal-row { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+}
+@media (max-width: 599px) {
+  .platform-shell .planning-page .planning-period-toolbar { align-items: stretch; }
+  .platform-shell .planning-page .planning-period-toolbar .p-field { max-width: none; width: 100%; }
+  .platform-shell .planning-table td { grid-template-columns: minmax(0, 1fr); gap: 4px; padding-block: 8px; border: 0; }
+  .platform-shell .planning-table td .p-evidence { grid-column: 1; }
+  .platform-shell .planning-table td::before { font-size: 12px; }
+  .platform-shell .planning-comparison-columns section { padding: 16px; }
+  .platform-shell .planning-page .planning-template-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; overflow: visible; }
+  .platform-shell .planning-page .planning-template-tabs button { width: 100%; text-align: start; }
 }

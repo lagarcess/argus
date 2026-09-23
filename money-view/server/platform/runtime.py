@@ -487,7 +487,10 @@ class RuntimeMiddleware:
                 return {"type": "http.request", "body": bytes(body), "more_body": False}
 
             if (
-                scope["path"] == "/api/platform/session/login"
+                scope["path"] in {
+                    "/api/platform/session/login",
+                    "/api/platform/session/guest",
+                }
                 and scope["method"] == "POST"
             ):
                 address = (scope.get("client") or ("unknown",))[0]

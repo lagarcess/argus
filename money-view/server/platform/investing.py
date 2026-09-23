@@ -5,8 +5,6 @@ from __future__ import annotations
 import base64
 import binascii
 import calendar
-import csv
-import io
 import json
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
@@ -43,6 +41,7 @@ from .market_data import (
 from .market_data import (
     initialize as initialize_market_data,
 )
+from .statement_parser import DEFAULT_LIMITS, parse_delimited
 
 router = APIRouter(prefix="/api/platform")
 
@@ -54,8 +53,6 @@ Symbol = Annotated[str, Field(pattern=r"^[A-Z0-9.-]{1,24}$")]
 
 FIXTURE_RECORDED_AT = datetime(2026, 9, 20, 12, tzinfo=timezone.utc)
 QUOTE_LIFETIME = timedelta(minutes=5)
-MAX_CSV_BYTES = 1_000_000
-MAX_CSV_ROWS = 2_000
 MAX_RECURRING_BATCH = 100
 RECURRING_RUN_LEASE = timedelta(seconds=30)
 RECURRING_ANCHOR_MIGRATION_BATCH = 100
@@ -95,7 +92,7 @@ class HoldingUpdate(Model):
 
 
 class HoldingCsvRequest(Model):
-    csv: str = Field(min_length=1, max_length=MAX_CSV_BYTES)
+    csv: str = Field(min_length=1, max_length=DEFAULT_LIMITS.max_bytes)
 
 
 class IdempotencyRequest(Model):
@@ -983,14 +980,8 @@ def preview_holding_csv(
     store: Store, context: Context, content: str
 ) -> dict[str, object]:
     require_editor(context)
-    if len(content.encode("utf-8")) > MAX_CSV_BYTES:
-        raise PlatformError("csv_too_large")
-    try:
-        reader = csv.DictReader(io.StringIO(content))
-    except csv.Error as exc:
-        raise PlatformError("invalid_csv") from exc
-    required = {"symbol", "name", "quantity", "total_cost", "currency", "as_of"}
-    if reader.fieldnames is None or set(reader.fieldnames) != required:
+    table = parse_delimited(content)
+    if set(table.headers) != set(HoldingCreate.model_fields):
         raise PlatformError("invalid_csv_header")
     with store.connection() as connection:
         existing = {
@@ -1006,24 +997,24 @@ def preview_holding_csv(
     rows: list[dict[str, object]] = []
     errors: list[dict[str, object]] = []
     seen: set[tuple[str, str]] = set()
-    for line, raw in enumerate(reader, start=2):
-        if len(rows) >= MAX_CSV_ROWS:
-            errors.append({"line": line, "code": "csv_too_many_rows"})
-            break
+    for row in table.rows:
+        if not row.cells:
+            continue
         try:
+            raw = dict(zip(table.headers, row.cells, strict=True))
             parsed = HoldingCreate.model_validate(raw)
             key = (parsed.symbol, parsed.currency)
             duplicate = key in existing or key in seen
             seen.add(key)
             rows.append(
                 {
-                    "line": line,
+                    "line": row.line,
                     **parsed.model_dump(mode="json"),
                     "duplicate": duplicate,
                 }
             )
         except (ValueError, TypeError):
-            errors.append({"line": line, "code": "invalid_holding_row"})
+            errors.append({"line": row.line, "code": "invalid_holding_row"})
     preview_id = identifier("holding-import")
     preview_as_of = max(
         (date.fromisoformat(str(row["as_of"])) for row in rows),

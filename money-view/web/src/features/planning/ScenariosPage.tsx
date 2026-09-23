@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { CopyPlus, Save } from 'lucide-react';
 import { request } from '../../platform/client';
+import { useRecordFocus } from '../../argus/useRecordFocus';
 import { useResource } from '../../platform/hooks';
 import type { Evidence, PlatformPageProps } from '../../platform/types';
 import {
@@ -345,6 +346,8 @@ export function ScenariosPage({
   const [afterId, setAfterId] = useState('');
   const [comparison, setComparison] = useState<ScenarioComparison | null>(null);
   const [scenarioOffset, setScenarioOffset] = useState(0);
+  const targetId = query.get('record_id');
+  const recalled = useResource(() => targetId ? request(`${planningPaths.scenarios}/${encodeURIComponent(targetId)}`, scenarioReceiptSchema) : Promise.resolve(null), [targetId, revision]);
   const resource = useResource<ScenarioData>(async () => {
     const [templates, scenarios] = await Promise.all([
       request(
@@ -364,6 +367,7 @@ export function ScenariosPage({
       scenarioOffset: scenarios.offset,
     };
   }, [currency, revision, scenarioOffset]);
+  const recordRef = useRecordFocus(targetId, [recalled.data, resource.data]);
 
   useEffect(() => {
     if (!resource.data || form) return;
@@ -514,8 +518,16 @@ export function ScenariosPage({
   if (!resource.data) return null;
 
   return (
-    <div className="planning-page planning-scenarios-page">
+    <div className="planning-page planning-scenarios-page" ref={recordRef}>
       <PageHeader title={copy.scenarios.title} description={copy.scenarios.description} />
+      {targetId && recalled.loading && <p className="p-muted" role="status">{copy.common.loading}</p>}
+      {recalled.error && <p className="p-error" role="alert">{errorMessage(recalled.error, locale)}</p>}
+      {recalled.data && <Panel data-record-id={recalled.data.id} tabIndex={-1} className="planning-recalled-record">
+        <div className="planning-section-heading"><div><h2>{recalled.data.name}</h2><p className="p-muted">{copy.scenarios.immutable}</p></div><button className="p-button-secondary" onClick={() => applyReceipt(recalled.data!)}>{copy.scenarios.newVersion}</button></div>
+        <p className="planning-compare-value"><Money amount={recalled.data.result.ending_balance} currency={recalled.data.result.currency} locale={locale}/></p>
+        <p>{copy.scenarios.endingBalance}</p>
+        <EvidenceLine evidence={recalled.data.evidence} locale={locale}/>
+      </Panel>}
       {resource.loading && <p className="p-muted" role="status">{copy.common.loading}</p>}
       <nav className="p-tabs planning-template-tabs" aria-label={copy.scenarios.template}>
         {resource.data.templates.map((template) => (

@@ -1,4 +1,24 @@
-# Clara prior PR review audit
+# Argus finance prior PR review audit
+
+## Platform PR follow-up, September 23, 2026
+
+PR [#658](https://github.com/lagarcess/argus/pull/658) also reached an explicit
+[clean latest-delta acknowledgment](https://github.com/lagarcess/argus/pull/658#issuecomment-5755955367)
+before its private merge. A fresh read on September 23 confirmed the base was
+`codex/money-placement-pilot`, the reviewed head was
+`7c7f55c84647b3a28f8d703f0e5c053d10537898`, and the merge was
+`5430d98d61d815e6c4a2bed60213b411a2bb875e`. All review threads are resolved,
+with zero unresolved and no additional page.
+
+The [terminal audit](https://github.com/lagarcess/argus/pull/658#issuecomment-5755985844)
+records the shared fixes: currency-scoped portfolio evidence dates, independent
+recurring schedule anchors, serialized legacy initialization, and household
+generation/current-role checks at private writes. Those fixes remain in the
+current experience branch. Live providers, hosted operations and target-host
+capacity qualification remain explicit limits, not unresolved review findings.
+No fresh review of unchanged PR #658 was requested.
+
+## Deposit PR audit, September 21, 2026
 
 Audited 2026-09-21 04:23 UTC. Read-only GitHub queries and local inspection; only this report was written. This audit concerns PRs merged during the Clara task and the relevance of their deferred scope to the current platform expansion. It is not acceptance of the uncommitted platform implementation.
 
