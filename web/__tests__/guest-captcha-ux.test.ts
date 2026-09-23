@@ -446,4 +446,37 @@ describe("shared CAPTCHA acquisition UX", () => {
       "We couldn’t complete the security check. Please try again.",
     );
   });
+
+  test("expired guest restart localizes captcha_unavailable as Reload-only", () => {
+    const expired = readFileSync(
+      join(root, "components/guest/ExpiredGuestSession.tsx"),
+      "utf-8",
+    );
+
+    expect(expired).toContain("useState<GuestEntryErrorKind | null>");
+    expect(expired).toContain("guestEntryErrorKind(error)");
+    expect(expired).toContain("restartErrorKind === CAPTCHA_UNAVAILABLE_CODE");
+    expect(expired).toContain("auth.errors.captcha_unavailable");
+    expect(expired).toContain("guest.entry.reload");
+    expect(expired).toContain("window.location.reload()");
+    expect(expired).not.toContain("setRestartError(");
+    expect(expired).not.toContain("isCaptchaUnavailableError");
+
+    const captchaBranch = expired.slice(
+      expired.indexOf("captchaBlocked ? ("),
+      expired.indexOf(") : authMode ? ("),
+    );
+    expect(captchaBranch).toContain("guest.entry.reload");
+    expect(captchaBranch).not.toContain("guest.expired.start_new");
+    expect(captchaBranch).not.toContain("guest.expired.sign_in");
+    expect(captchaBranch).not.toContain("guest.expired.create_account");
+    expect(captchaBranch).not.toContain("<AuthForm");
+    expect(captchaBranch).not.toContain("retryGuestSession");
+
+    const genericBranch = expired.slice(expired.indexOf(") : authMode ? ("));
+    expect(expired).toContain("retryGuestSession");
+    expect(genericBranch).toContain("guest.expired.start_new");
+    expect(genericBranch).toContain("guest.expired.restart_error");
+    expect(genericBranch).toContain('restartErrorKind === "generic"');
+  });
 });
