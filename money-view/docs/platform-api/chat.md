@@ -7,7 +7,9 @@ user confirmation. Free text requires an explicitly configured semantic model;
 prepared actions work without one.
 
 All routes below are relative to `/api/platform/chat` and require the current
-local household session.
+local household session. Viewers may read and export; all conversation and turn
+mutations require current editor or owner authority, including turn replay,
+checkpointing and settlement.
 
 | Method and route | Contract |
 | --- | --- |

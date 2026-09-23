@@ -96,6 +96,7 @@ const HouseholdPage = lazy(() =>
   })),
 );
 import {
+  guestSchema,
   profileSchema,
   preferencesSchema,
   householdSchema,
@@ -157,13 +158,7 @@ const sessionSchema = z.object({
   preferences: preferencesSchema,
   local_only: z.boolean(),
   supported_currencies: z.array(z.string()).min(1),
-  guest: z.object({
-    is_guest: z.boolean(),
-    expires_at: z.string().nullable(),
-    mode: z.enum(["demo", "empty"]).nullable(),
-    can_claim: z.boolean(),
-    local_only: z.literal(true),
-  }),
+  guest: guestSchema,
   currency_context: z.object({
     currency: z.string().nullable(),
     source: z.enum([

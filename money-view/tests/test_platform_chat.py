@@ -1183,3 +1183,67 @@ def test_concurrent_duplicate_turn_is_observable_without_second_plan(client):
         ).json()["total"]
         == 2
     )
+
+
+@pytest.mark.parametrize("user", ["user-viewer", "user-partner"])
+def test_shared_chat_mutations_require_editor_but_reads_remain_available(client, user):
+    existing, original, _ = turn(client, action={"kind": "read", "action": "spending"})
+    conversation_id = existing["conversation_id"]
+    path = f"/api/platform/chat/conversations/{conversation_id}"
+    before = client.get(path).json()
+    store = client.app.state.store
+    with store.connection() as db:
+        counts = {
+            table: db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            for table in ("p_chat_conversations", "p_chat_turns", "p_chat_messages")
+        }
+    login(client, user)
+    viewer = user == "user-viewer"
+    assert client.get(path).json() == before
+    assert client.get(path + "/export").status_code == 200
+    assert client.get("/api/platform/chat/conversations").status_code == 200
+    response = client.post(
+        "/api/platform/chat/conversations", json={"title": "Shared notes"}
+    )
+    assert response.status_code == (403 if viewer else 201)
+    for patch in (
+        {"title": "Changed"},
+        {"pinned": True},
+        {"state": "archived"},
+        {"state": "trashed"},
+        {"state": "active"},
+    ):
+        response = client.patch(path, json=patch)
+        assert response.status_code == (403 if viewer else 200), response.text
+    for body in (
+        original,
+        {"turn_id": uuid4().hex, "text": "Review these records"},
+        {"turn_id": uuid4().hex, "action": {"kind": "read", "action": "spending"}},
+    ):
+        response = client.post("/api/platform/chat/turn", json=body)
+        assert response.status_code == (403 if viewer else 200), response.text
+    if viewer:
+        assert client.get(path).json() == before
+        with store.connection() as db:
+            assert counts == {
+                table: db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in counts
+            }
+
+
+def test_chat_checkpoint_and_settlement_reject_viewer_authority(client):
+    store = client.app.state.store
+    owner = Context("user-demo", "household-demo", "owner", "test")
+    viewer = Context("user-viewer", "household-demo", "viewer", "test")
+    request = TurnRequest(turn_id=uuid4().hex, text="Review my spending")
+    reservation = chat.begin_turn(store, owner, request)
+    with pytest.raises(PlatformError, match="read_only_household"):
+        chat.checkpoint_plan(
+            store,
+            viewer,
+            request.turn_id,
+            reservation["token"],
+            {"kind": "clarify", "question": "Which records?"},
+        )
+    with pytest.raises(PlatformError, match="read_only_household"):
+        chat.settle_turn(store, viewer, request.turn_id, reservation["token"])

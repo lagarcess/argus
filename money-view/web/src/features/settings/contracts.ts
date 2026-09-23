@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
+export const guestSchema = z.object({ is_guest: z.boolean(), expires_at: z.string().nullable(), mode: z.enum(['demo', 'empty']).nullable(), can_claim: z.boolean(), local_only: z.literal(true) });
 export const profileSchema = z.object({ id: z.string(), display_name: z.string(), preferred_name: z.string().nullable(), avatar_color: z.string() });
 export const preferencesSchema = z.object({ locale: z.enum(['es-419', 'en']), timezone: z.string(), appearance: z.enum(['light', 'dark', 'system']), sidebar_compact: z.boolean(), notifications: z.object({ bills: z.boolean(), account_changes: z.boolean(), product_updates: z.boolean() }) });
 export const householdSchema = z.object({ id: z.string(), name: z.string(), country: z.string().nullable(), currency_override: z.string().nullable(), effective_currency: z.string().nullable(), role: z.enum(['owner', 'editor', 'viewer']) });
-export const settingsSchema = z.object({ profile: profileSchema, preferences: preferencesSchema, household: householdSchema, supported_currencies: z.array(z.string()), memory: z.object({ enabled: z.boolean(), count: z.number() }), capabilities: z.object({ data_domains: z.array(z.string()) }).passthrough() });
+export const settingsSchema = z.object({ guest: guestSchema, profile: profileSchema, preferences: preferencesSchema, household: householdSchema, supported_currencies: z.array(z.string()), memory: z.object({ enabled: z.boolean(), count: z.number() }), capabilities: z.object({ local_passwords: z.boolean(), data_domains: z.array(z.string()) }).passthrough() });
 export type Settings = z.infer<typeof settingsSchema>;
 export const memorySchema = z.object({ id: z.string(), content: z.string(), created_at: z.string(), updated_at: z.string() });
 export const memoriesSchema = z.object({ enabled: z.boolean(), items: z.array(memorySchema), local_only: z.boolean() });

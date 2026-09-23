@@ -99,7 +99,7 @@ def settings(
         "currency_context": snapshot["currency_context"],
         "memory": {"enabled": memories["enabled"], "count": len(memories["items"])},
         "capabilities": {
-            "local_passwords": True,
+            "local_passwords": not snapshot["guest"]["is_guest"],
             "confirmed_memories": True,
             "data_domains": list(identity.data_domains),
             "archive_conversations": any(name in identity.data_domains for name in ("assistant", "chat")),

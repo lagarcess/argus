@@ -69,7 +69,7 @@ export function SettingsPage({ locale, revision, query, onChanged, onNavigate }:
   const appearance = settings && { light: t('Clara', 'Light'), dark: t('Oscura', 'Dark'), system: t('Según el dispositivo', 'Device setting') }[settings.preferences.appearance];
   const values: Partial<Record<PanelName, string>> = settings ? {
     profile: settings.profile.display_name,
-    security: t('Contraseña y accesos', 'Password and access'),
+    security: settings.guest.is_guest ? t('Acceso de invitado', 'Guest access') : t('Contraseña y accesos', 'Password and access'),
     language: settings.preferences.locale === 'en' ? 'English' : 'Español',
     regional: [settings.household.country, settings.household.effective_currency].filter(Boolean).join(' · ') || t('Sin seleccionar', 'Not selected'),
     appearance: appearance ?? '', notifications: t('Dentro de Argus', 'Inside Argus'),
@@ -96,7 +96,7 @@ export function SettingsPage({ locale, revision, query, onChanged, onNavigate }:
       {active && <Modal key={active} historyMode="route" title={titles[active]} onClose={() => setActive(null)}>
         <button className="p-button-ghost settings-back" onClick={() => setActive(null)}>‹ {section.title}</button>
         {(['profile', 'language', 'regional', 'appearance', 'notifications'] as string[]).includes(active) && <Preferences key={active} panel={active as PreferencePanel} settings={settings} t={t} onChanged={onChanged} onClose={() => setActive(null)}/>}
-        {active === 'security' && <Security t={t} locale={locale} onChanged={onChanged}/>}
+        {active === 'security' && <Security settings={settings} t={t} locale={locale} onChanged={onChanged}/>}
         {active === 'memories' && <Memories t={t} locale={locale} onChanged={onChanged}/>}
         {active === 'usage' && <Usage t={t} locale={locale}/>}
         {active === 'data' && <DataControls t={t} settings={settings} onChanged={onChanged}/>}

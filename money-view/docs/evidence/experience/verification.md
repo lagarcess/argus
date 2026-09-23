@@ -69,7 +69,10 @@ latest section of each record; early findings are retained as history.
 - [Prior PR audit](../../PR_REVIEW_AUDIT.md) confirms clean latest-delta
   acknowledgment and zero unresolved threads for the previous private merges.
 
-GitHub CI/review and the private merge remain required delivery steps. Their
+The initial GitHub review found two P2 gaps despite green CI (700 backend,
+61 browser). Their [scoped corrections and evidence](review-followup/README.md)
+cover conversation authority and guest settings. GitHub CI/re-review and the
+private merge remain required delivery steps. Their
 terminal state will be recorded in the PR after the final reviewer response,
 including current head, base, unresolved threads and merged-tree equivalence.
 

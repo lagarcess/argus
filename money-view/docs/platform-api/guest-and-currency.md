@@ -98,3 +98,12 @@ second write transaction. The seed is invoked only for a fresh demo entry; reset
 claim, re-entry, initialization and restart never invoke it.
 Reset also restores unknown country/currency for a guest-origin household while
 preserving its original guest expiry, including after that local account is saved.
+
+## Guest settings
+
+The settings response preserves the canonical guest status. `local_passwords`
+is false until claim creates local credentials. Guest settings show access and
+sessions, export and household reset; password change and password-confirmed
+account deletion are unavailable. Session closure warns that an unsaved guest
+may lose access. The same session/guest schema is used by the shell and settings,
+and claimed sessions regain the password controls.

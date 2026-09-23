@@ -158,7 +158,7 @@ def _new_conversation(db, context, title):
 @router.post("/conversations", status_code=201)
 def create_conversation(payload: ConversationCreate, store: DB, context: CTX):
     with store.connection(write=True) as db:
-        assert_active_context(db, context, minimum_role="viewer")
+        assert_active_context(db, context)
         return _new_conversation(db, context, payload.title)
 
 
@@ -192,7 +192,7 @@ def update_conversation(
     conversation_id: str, payload: ConversationPatch, store: DB, context: CTX
 ):
     with store.connection(write=True) as db:
-        assert_active_context(db, context, minimum_role="viewer")
+        assert_active_context(db, context)
         previous = _conversation(db, context, conversation_id)
         changes = payload.model_dump(exclude_unset=True)
         db.execute(
@@ -422,7 +422,7 @@ def begin_turn(store, context, request):
     encoded = _dump(request)
     digest = hashlib.sha256(encoded.encode()).hexdigest()
     with store.connection(write=True) as db:
-        assert_active_context(db, context, minimum_role="viewer")
+        assert_active_context(db, context)
         prior = db.execute(
             "SELECT * FROM p_chat_turns WHERE id=?", (request.turn_id,)
         ).fetchone()
@@ -504,7 +504,7 @@ def begin_turn(store, context, request):
 
 
 def _running(db, context, turn_id, token):
-    assert_active_context(db, context, minimum_role="viewer")
+    assert_active_context(db, context)
     row = db.execute(
         "SELECT * FROM p_chat_turns WHERE id=? AND household_id=? AND run_token=? AND status='running'",
         (turn_id, context.household_id, token),

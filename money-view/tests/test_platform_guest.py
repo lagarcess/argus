@@ -115,6 +115,9 @@ def test_expired_guest_cannot_read_claim_or_reuse_and_new_entry_is_isolated(
 def test_claim_preserves_records_and_rotates_into_real_local_credentials(guest_app):
     with TestClient(guest_app) as browser:
         before = start(browser).json()
+        guest_settings = browser.get(f"{BASE}/settings").json()
+        assert guest_settings["guest"] == before["guest"]
+        assert guest_settings["capabilities"]["local_passwords"] is False
         account = add_account(browser, "KWD", opening="12.345")
         token = browser.cookies.get(COOKIE)
         response = browser.post(
@@ -132,6 +135,9 @@ def test_claim_preserves_records_and_rotates_into_real_local_credentials(guest_a
             "can_claim": False,
             "local_only": True,
         }
+        claimed_settings = browser.get(f"{BASE}/settings").json()
+        assert claimed_settings["guest"] == saved["guest"]
+        assert claimed_settings["capabilities"]["local_passwords"] is True
         assert browser.cookies.get(COOKIE) != token
         assert browser.get(f"{BASE}/accounts/{account['id']}").status_code == 200
         browser.post(f"{BASE}/session/logout")
