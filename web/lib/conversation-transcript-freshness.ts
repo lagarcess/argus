@@ -83,12 +83,16 @@ export function createTranscriptFreshnessRuntime(options: {
     latestMessageId: string | null;
     unansweredUserId: string | null;
     replyDeadline: number | null;
+    admissionDeadline: number | null;
   } | null = null;
   let pending: { identity: string; controller: AbortController; replyCheck: boolean } | null = null;
   let attempted: string | null = null;
   const cancel = () => { pending?.controller.abort(); pending = null; };
   let replyTimer: { key: string; cancel: () => void } | null = null;
   const stopReplyTimer = () => { replyTimer?.cancel(); replyTimer = null; };
+  const clearAdmissionDeadline = () => {
+    if (loaded) loaded.admissionDeadline = null;
+  };
   const awaitingReply = () => {
     if (!inputs || !inputs.ready || inputs.requestId || !loaded ||
       loaded.identity !== identity(inputs) || loaded.replyDeadline === null ||
@@ -99,8 +103,15 @@ export function createTranscriptFreshnessRuntime(options: {
     if (userIndex >= 0 && replyIndex > userIndex) return null;
     return { key: JSON.stringify([loaded.identity, loaded.unansweredUserId]), deadline: loaded.replyDeadline };
   };
+  const awaitingAdmission = () => {
+    if (!inputs || !inputs.ready || inputs.requestId || !loaded ||
+      loaded.identity !== identity(inputs) || loaded.admissionDeadline === null ||
+      loaded.replyDeadline !== null || clock.now() >= loaded.admissionDeadline) return null;
+    return { key: JSON.stringify([loaded.identity, "admission"]), deadline: loaded.admissionDeadline };
+  };
+  const waitingCheck = () => awaitingReply() ?? awaitingAdmission();
   const synchronizeReplyTimer = () => {
-    const waiting = awaitingReply();
+    const waiting = waitingCheck();
     if (replyTimer?.key === waiting?.key) return;
     stopReplyTimer();
     if (!waiting) return;
@@ -108,7 +119,7 @@ export function createTranscriptFreshnessRuntime(options: {
       key: waiting.key,
       cancel: clock.schedule(() => {
         replyTimer = null;
-        if (!awaitingReply()) {
+        if (!waitingCheck()) {
           if (pending?.replyCheck) cancel();
           return;
         }
@@ -130,6 +141,9 @@ export function createTranscriptFreshnessRuntime(options: {
       // Re-reading the same unanswered message never extends its turn window.
       replyDeadline: sameUser ? loaded!.replyDeadline : Number.isFinite(savedAt)
         ? Math.min(savedAt, clock.now()) + CHAT_RUNTIME_EVENT_TIMEOUT_MS : null,
+      // A newly applied snapshot either starts the unanswered window or ends
+      // the turn. Focus is the only event that opens an admission window.
+      admissionDeadline: null,
     };
     synchronizeReplyTimer();
   };
@@ -140,6 +154,7 @@ export function createTranscriptFreshnessRuntime(options: {
     if (key !== previousIdentity || next.requestId || !next.ready) {
       cancel();
       attempted = null;
+      clearAdmissionDeadline();
     }
     synchronizeReplyTimer();
     if (!key || !next.ready || next.requestId || !next.conversationId) return;
@@ -156,8 +171,8 @@ export function createTranscriptFreshnessRuntime(options: {
     const request = { identity: key, controller, replyCheck };
     pending = request;
     const conversationId = next.conversationId;
-    // Only the bounded unanswered-turn checks use the saved tail. Ordinary
-    // activity refreshes retain their full-history reconciliation behavior.
+    // Bounded observer checks use the saved tail. Ordinary activity refreshes
+    // retain their full-history reconciliation behavior.
     const previous = replyCheck && loaded?.identity === key ? loaded.snapshot : undefined;
     void options.load(conversationId, controller.signal, previous).then((snapshot) => {
       if (pending !== request || !inputs || identity(inputs) !== key || inputs.requestId || !inputs.ready) return;
@@ -173,6 +188,23 @@ export function createTranscriptFreshnessRuntime(options: {
       }
     });
   };
-  const retry = () => { attempted = null; if (inputs) update(inputs); };
+  const retry = () => {
+    attempted = null;
+    if (
+      loaded &&
+      inputs &&
+      identity(inputs) === loaded.identity &&
+      !inputs.requestId &&
+      inputs.ready &&
+      loaded.unansweredUserId === null
+    ) {
+      // A focus/visibility retry that still sees the loaded latest id may have
+      // raced admission. Do not extend an already running window.
+      if (loaded.admissionDeadline === null || clock.now() >= loaded.admissionDeadline) {
+        loaded.admissionDeadline = clock.now() + CHAT_RUNTIME_EVENT_TIMEOUT_MS;
+      }
+    }
+    if (inputs) update(inputs);
+  };
   return { update, recordLoaded, retry, setApply: (next: typeof apply) => { apply = next; }, dispose: () => { stopReplyTimer(); cancel(); } };
 }
