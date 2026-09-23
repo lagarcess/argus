@@ -1,9 +1,40 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import * as guestCaptcha from "../lib/guest-captcha";
 import { applyGuestBootstrapError } from "../lib/guest-entry-error";
+
+const globalRestores: Array<() => void> = [];
+
+function stubGlobal(name: "window" | "document", value: unknown) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, name);
+  Object.defineProperty(globalThis, name, {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value,
+  });
+  const restore = () => {
+    if (previous) {
+      Object.defineProperty(globalThis, name, previous);
+      return;
+    }
+    Reflect.deleteProperty(globalThis, name);
+  };
+  globalRestores.push(restore);
+  return restore;
+}
+
+function restoreStubbedGlobals() {
+  while (globalRestores.length > 0) {
+    globalRestores.pop()?.();
+  }
+}
+
+afterEach(() => {
+  restoreStubbedGlobals();
+});
 
 const root = join(import.meta.dir, "..");
 
@@ -213,23 +244,15 @@ describe("shared CAPTCHA acquisition UX", () => {
         async: false,
         defer: false,
       };
-      const previousWindow = globalThis.window;
-      const previousDocument = globalThis.document;
-      Object.defineProperty(globalThis, "window", {
-        configurable: true,
-        value: {
-          turnstile: undefined,
-          setTimeout: globalThis.setTimeout.bind(globalThis),
-          clearTimeout: globalThis.clearTimeout.bind(globalThis),
-        },
+      stubGlobal("window", {
+        turnstile: undefined,
+        setTimeout: globalThis.setTimeout.bind(globalThis),
+        clearTimeout: globalThis.clearTimeout.bind(globalThis),
       });
-      Object.defineProperty(globalThis, "document", {
-        configurable: true,
-        value: {
-          getElementById: () => null,
-          createElement: () => script,
-          head: { appendChild() {} },
-        },
+      stubGlobal("document", {
+        getElementById: () => null,
+        createElement: () => script,
+        head: { appendChild() {} },
       });
       try {
         const pending = load(50);
@@ -242,14 +265,7 @@ describe("shared CAPTCHA acquisition UX", () => {
           "captcha_unavailable",
         );
       } finally {
-        Object.defineProperty(globalThis, "window", {
-          configurable: true,
-          value: previousWindow,
-        });
-        Object.defineProperty(globalThis, "document", {
-          configurable: true,
-          value: previousDocument,
-        });
+        restoreStubbedGlobals();
       }
     };
 
