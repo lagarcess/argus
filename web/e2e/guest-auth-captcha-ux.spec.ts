@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import en from "../public/locales/en/common.json";
+
 const SCREENSHOT_DIR =
   "../docs/release-evidence/screenshots/issue-321";
 
@@ -146,7 +148,7 @@ for (const fixture of [
   });
 }
 
-test("a stuck shared CAPTCHA times out and leaves login ready to retry", async ({
+test("a stuck shared CAPTCHA times out and leaves login ready", async ({
   page,
 }) => {
   test.setTimeout(25_000);
@@ -155,7 +157,7 @@ test("a stuck shared CAPTCHA times out and leaves login ready to retry", async (
 
   await expect(page.getByTestId("auth-submit-spinner")).toBeVisible();
   await expect(
-    page.getByText("We couldn’t complete the security check. Please try again."),
+    page.getByText(en.auth.errors.captcha_unavailable),
   ).toBeVisible({ timeout: 18_000 });
   await expect(page.getByPlaceholder("Email address")).toHaveValue(
     "captcha-probe@example.com",
