@@ -1,6 +1,8 @@
 """Free regressions for answer repairs that leave the model contract unchanged."""
 
 import asyncio
+import json
+from pathlib import Path
 
 import pytest
 from argus.agent_runtime import answer_calculation as ac
@@ -8,10 +10,12 @@ from argus.agent_runtime import knowledge_answer as ka
 from argus.agent_runtime import research_answer as ra
 from argus.agent_runtime.llm_interpreter_types import LLMInterpretationResponse
 from argus.agent_runtime.state.models import RunState, UserState
+from argus.domain.calculations.answer_request import AnswerCalculation
 
 from tests.agent_runtime.test_answer_calculation import (
     LOAN,
     _published,
+    _published_many,
     _request,
     _resolve,
 )
@@ -218,6 +222,73 @@ def test_completed_card_attaches_its_primary_result_without_discarding_prose(tem
     assert failure == "missing_computed_reference"
     assert rendered in published.answer_text
     assert ac.FIGURE_CHECK_REASON_CODE in notes
+
+
+@pytest.mark.parametrize("language", ["en", "es-419"])
+def test_omitted_savings_goal_result_uses_localized_card_label(language):
+    # Production walk after a9286b21: prose omitted the computed periods, so
+    # recovery printed the model's identifier name as the label.
+    request = AnswerCalculation.model_validate(
+        {
+            "name": "months_to_goal",
+            "kind": "time_value",
+            "solve_for": "periods",
+            "inputs": [
+                {"name": "direction", "value": "save", "source": "user"},
+                {
+                    "name": "present_value",
+                    "value": 1200,
+                    "source": "user",
+                    "currency": "USD",
+                },
+                {
+                    "name": "payment",
+                    "value": 300,
+                    "source": "user",
+                    "currency": "USD",
+                },
+                {
+                    "name": "future_value",
+                    "value": 3000,
+                    "source": "user",
+                    "currency": "USD",
+                },
+                {"name": "annual_rate_pct", "value": 0, "source": "assumption"},
+            ],
+        }
+    )
+    published = _published_many(
+        "Saving another 300 each month reaches the goal.",
+        [request],
+        language=language,
+    )
+    card = ac.card_in(published.patch)
+    answer = card.presentation.answer
+    assert answer is not None
+    assert answer.name == "periods"
+    assert answer.label.locale_key == "tools.calc.fields.periods"
+    figure = ac.figure_text(answer)
+    assert published.answer_text is not None
+    assert published.template is not None
+    expected = _locale_copy(language, answer.label.locale_key)
+    assert expected
+    assert expected != "months_to_goal"
+    assert "months_to_goal" not in published.answer_text
+    assert f"{expected}: {figure}" in published.answer_text
+    owner = ac.calculation_names([request])[0]
+    assert (
+        f"{expected}: {{{{{owner}.{answer.name}}}}}" in published.template["text"]
+    )
+
+
+def _locale_copy(language: str, locale_key: str) -> str:
+    locale = "es-419" if language.startswith("es") else "en"
+    node = json.loads(
+        (Path("web/public/locales") / locale / "common.json").read_text(encoding="utf-8")
+    )
+    for part in locale_key.split("."):
+        node = node[part]
+    return str(node)
 
 
 def test_each_completed_card_needs_its_own_primary_reference():

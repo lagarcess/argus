@@ -27,6 +27,7 @@ from uuid import uuid4
 from loguru import logger
 from pydantic import ValidationError
 
+from argus.agent_runtime.presentation_i18n import localized_copy
 from argus.agent_runtime.stages.tool_execution import local_tool_call_patch
 from argus.domain.calculations import is_free_calculation
 from argus.domain.calculations._shared import (
@@ -201,7 +202,7 @@ def publish_calculations(
             if answer is not None and (owner, answer.name) not in referenced:
                 # Only the model's display name is prose. Internal reference
                 # keys are not localized labels; the attached card owns those.
-                name = request.name.strip() if unsafe_comparison else request.name
+                name = _recovery_result_label(request.name, card, language)
                 label = f"{name}: " if name else ""
                 if unsafe_comparison:
                     label = f"{index}. {label}"
@@ -445,6 +446,24 @@ def unresolved_references(template: str, cards: AnswerCards) -> list[str]:
             for reference in _REFERENCE.findall(template)
             if _resolved(reference, cards) is None
         }
+    )
+
+
+_IDENTIFIER_NAME = re.compile(r"[a-z][a-z0-9_]*")
+
+
+def _recovery_result_label(name: str, card: ToolResultCard, language: str) -> str:
+    """A recovery line's label: display text the model wrote, else the card's."""
+    display = name.strip()
+    if display and not _IDENTIFIER_NAME.fullmatch(display):
+        return display
+    answer = card.presentation.answer
+    if answer is None:
+        return ""
+    return localized_copy(
+        answer.label.locale_key,
+        language=language,
+        interpolation=answer.label.interpolation_args,
     )
 
 

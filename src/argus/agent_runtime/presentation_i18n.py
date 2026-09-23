@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Literal
 
 from argus.agent_runtime.rule_specs import (
@@ -86,6 +90,60 @@ _CATALOGS: dict[RuntimeLocale, LocaleCatalog] = {
 def runtime_locale(language: str | None) -> RuntimeLocale:
     normalized = str(language or "").strip().lower()
     return "es-419" if normalized.startswith("es") else "en"
+
+
+def localized_copy(
+    locale_key: str,
+    *,
+    language: str | None,
+    interpolation: Mapping[str, Any] | None = None,
+) -> str:
+    """Words for a card locale key in the reader's language.
+
+    The web locale files own these strings; this lookup derives from that one
+    catalog so recovery prose cannot invent a second label.
+    """
+    raw = _common_catalog(runtime_locale(language)).get(str(locale_key or ""), "")
+    if not raw:
+        return ""
+    for key, value in (interpolation or {}).items():
+        if value is None:
+            continue
+        token = str(key)
+        raw = raw.replace("{{" + token + "}}", str(value))
+        raw = raw.replace("{{ " + token + " }}", str(value))
+    return raw
+
+
+@lru_cache(maxsize=2)
+def _common_catalog(locale: RuntimeLocale) -> dict[str, str]:
+    root = _locales_root()
+    if root is None:
+        return {}
+    path = root / locale / "common.json"
+    if not path.is_file():
+        return {}
+    return _flatten_locale(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _locales_root() -> Path | None:
+    for start in (Path(__file__).resolve(), Path.cwd().resolve()):
+        for parent in (start, *start.parents):
+            candidate = parent / "web" / "public" / "locales"
+            if candidate.is_dir():
+                return candidate
+    return None
+
+
+def _flatten_locale(value: Any, prefix: str = "") -> dict[str, str]:
+    items: dict[str, str] = {}
+    if isinstance(value, dict):
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            items.update(_flatten_locale(child, path))
+    elif prefix and isinstance(value, str):
+        items[prefix] = value
+    return items
 
 
 def optional_parameter_display_label(

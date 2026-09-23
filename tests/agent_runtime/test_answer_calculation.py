@@ -484,10 +484,13 @@ def test_a_reference_two_options_both_hold_is_never_guessed() -> None:
         notes=notes,
     )
     assert published.template is not None
-    for name, card in zip(("a", "b"), ac.cards_in(published.patch), strict=True):
+    for card in ac.cards_in(published.patch):
         assert (
-            f"{name}: {ac.figure_text(card.presentation.answer)}" in published.answer_text
+            f"Payment per period: {ac.figure_text(card.presentation.answer)}"
+            in published.answer_text
         )
+    assert "a:" not in published.answer_text
+    assert "b:" not in published.answer_text
     assert ac.FIGURE_CHECK_REASON_CODE in notes
 
 
@@ -537,9 +540,11 @@ def test_comparison_fallback_distinguishes_unnamed_or_duplicate_options(names):
     for index, (name, card) in enumerate(
         zip(names, ac.cards_in(published.patch), strict=True), start=1
     ):
-        label = f"{name.strip()}: " if name.strip() else ""
+        display = name.strip()
+        if not display or (display.isidentifier() and display.islower()):
+            display = "Payment per period"
         assert (
-            f"{index}. {label}{ac.figure_text(card.presentation.answer)}"
+            f"{index}. {display}: {ac.figure_text(card.presentation.answer)}"
             in published.answer_text
         )
     assert "cheaper" not in published.template["text"]
