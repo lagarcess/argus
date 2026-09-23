@@ -1,0 +1,39 @@
+$ playwright test conversation-activity-ui.spec.ts conversation-transcript-freshness.spec.ts --grep-invert "durable backtest stays|coarse pointer|resolved clarification"
+
+Running 23 tests using 2 workers
+
+(node:5225) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5226) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5226) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5225) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   2 [chromium] › e2e/conversation-activity-ui.spec.ts:4:5 › ordinary work remains owned by A after switching to B and clears only at visible latest (2.1s)
+  ✓   1 [chromium] › e2e/conversation-activity-ui.spec.ts:58:7 › simultaneous A and B requests stay isolated when activity-a settles first (2.2s)
+  ✓   3 [chromium] › e2e/conversation-activity-ui.spec.ts:58:7 › simultaneous A and B requests stay isolated when activity-b settles first (1.6s)
+  ✓   4 [chromium] › e2e/conversation-activity-ui.spec.ts:157:5 › completion while scrolled up keeps position and evolves the single Jump to latest control (3.9s)
+  ✓   5 [chromium] › e2e/conversation-activity-ui.spec.ts:205:5 › restored older scroll and an older message anchor retain unread until latest (2.6s)
+  ✓   6 [chromium] › e2e/conversation-activity-ui.spec.ts:260:5 › row and header menus toggle durable unread without reordering or same-view self-clear (1.9s)
+  ✓   7 [chromium] › e2e/conversation-activity-ui.spec.ts:339:5 › expanded, collapsed, Quick Peek, selected, dark, and reduced-motion projections share one precedence (2.2s)
+  ✓   9 [chromium] › e2e/conversation-activity-ui.spec.ts:570:5 › Spanish desktop exposes the complete typed activity vocabulary (760ms)
+  ✓   8 [chromium] › e2e/conversation-activity-ui.spec.ts:471:5 › typed needs-input, attention, canceled, expired, and checking states do not alter the activity rail (1.4s)
+  ✓  10 [chromium] › e2e/conversation-activity-ui.spec.ts:611:7 › second tab loads the saved reply on completion without duplicating the sender (en) (4.1s)
+  ✓  11 [chromium] › e2e/conversation-activity-ui.spec.ts:611:7 › second tab loads the saved reply on completion without duplicating the sender (es-419) (4.2s)
+  ✓  12 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: hidden observer misses all working states (en) (1.9s)
+  ✓  13 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: visible observer misses all working states (en) (3.7s)
+  ✓  15 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: hidden observer misses all working states (es-419) (1.8s)
+  ✓  14 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: anchor observer misses all working states (en) (4.7s)
+  ✓  16 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: visible observer misses all working states (es-419) (3.5s)
+  ✓  17 [chromium] › e2e/conversation-transcript-freshness.spec.ts:6:9 › saved-message freshness: anchor observer misses all working states (es-419) (4.6s)
+  ✓  18 [chromium] › e2e/conversation-transcript-freshness.spec.ts:72:7 › unanswered user keeps the idle observer checking until the reply lands (en) (6.8s)
+  ✓  19 [chromium] › e2e/conversation-transcript-freshness.spec.ts:72:7 › unanswered user keeps the idle observer checking until the reply lands (es-419) (6.7s)
+  ✓  20 [chromium] › e2e/conversation-transcript-freshness.spec.ts:107:7 › pre-admission focus still surfaces the later saved reply (en) (6.8s)
+  ✓  21 [chromium] › e2e/conversation-transcript-freshness.spec.ts:107:7 › pre-admission focus still surfaces the later saved reply (es-419) (6.7s)
+{"language":"en","historyLength":1000,"unchangedChecks":[{"anchorMessageId":"activity-a-user-1000","cursor":null,"returnedCount":1},{"anchorMessageId":"activity-a-user-1000","cursor":null,"returnedCount":1}],"replyChecks":[{"anchorMessageId":"activity-a-user-1000","cursor":null,"returnedCount":2}]}
+  ✓  22 [chromium] › e2e/conversation-transcript-freshness.spec.ts:153:7 › long conversation reads only its saved tail while awaiting a reply (en) (21.7s)
+{"language":"es-419","historyLength":1000,"unchangedChecks":[{"anchorMessageId":"activity-a-user-1000","cursor":null,"returnedCount":1},{"anchorMessageId":"activity-a-user-1000","cursor":null,"returnedCount":1}],"replyChecks":[{"anchorMessageId":"activity-a-user-1000","cursor":null,"returnedCount":2}]}
+  ✓  23 [chromium] › e2e/conversation-transcript-freshness.spec.ts:153:7 › long conversation reads only its saved tail while awaiting a reply (es-419) (23.8s)
+
+  23 passed (1.1m)

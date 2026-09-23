@@ -1,0 +1,74 @@
+$ playwright test conversation-transcript-freshness.spec.ts --grep pre-admission
+
+Running 2 tests using 2 workers
+
+(node:4928) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4927) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4927) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4928) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [chromium] › e2e/conversation-transcript-freshness.spec.ts:107:7 › pre-admission focus still surfaces the later saved reply (en) (17.3s)
+  ✘  2 [chromium] › e2e/conversation-transcript-freshness.spec.ts:107:7 › pre-admission focus still surfaces the later saved reply (es-419) (17.3s)
+
+
+  1) [chromium] › e2e/conversation-transcript-freshness.spec.ts:107:7 › pre-admission focus still surfaces the later saved reply (en) 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: [32m1[39m
+    Received: [31m0[39m
+    Timeout:  10000ms
+
+    Call log:
+    [2m  - Expect "toHaveCount" with timeout 10000ms[22m
+    [2m  - waiting for getByText('Terminal response for activity-a', { exact: true })[22m
+    [2m    14 × locator resolved to 0 elements[22m
+    [2m       - unexpected value "0"[22m
+
+
+      134 |     fixture.settleOrdinary("activity-a", "none");
+      135 |     try {
+    > 136 |       await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+          |                                                                                         ^
+      137 |       await expect(tabA.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1);
+      138 |       await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+      139 |       expect(tabB.url()).toBe(beforeURL);
+        at /workspace/web/e2e/conversation-transcript-freshness.spec.ts:136:89
+
+    Error Context: temp/playwright-results/1790136288669-4927/conversation-transcript-fr-48a61-s-the-later-saved-reply-en--chromium/error-context.md
+
+  2) [chromium] › e2e/conversation-transcript-freshness.spec.ts:107:7 › pre-admission focus still surfaces the later saved reply (es-419) 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCount[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  getByText('Terminal response for activity-a', { exact: true })
+    Expected: [32m1[39m
+    Received: [31m0[39m
+    Timeout:  10000ms
+
+    Call log:
+    [2m  - Expect "toHaveCount" with timeout 10000ms[22m
+    [2m  - waiting for getByText('Terminal response for activity-a', { exact: true })[22m
+    [2m    14 × locator resolved to 0 elements[22m
+    [2m       - unexpected value "0"[22m
+
+
+      134 |     fixture.settleOrdinary("activity-a", "none");
+      135 |     try {
+    > 136 |       await expect(tabB.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1, { timeout: 10_000 });
+          |                                                                                         ^
+      137 |       await expect(tabA.getByText("Terminal response for activity-a", { exact: true })).toHaveCount(1);
+      138 |       await expect(tabB.getByText(prompt, { exact: true })).toHaveCount(1);
+      139 |       expect(tabB.url()).toBe(beforeURL);
+        at /workspace/web/e2e/conversation-transcript-freshness.spec.ts:136:89
+
+    Error Context: temp/playwright-results/1790136288685-4928/conversation-transcript-fr-455da-e-later-saved-reply-es-419--chromium/error-context.md
+
+  2 failed
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:107:7 › pre-admission focus still surfaces the later saved reply (en) 
+    [chromium] › e2e/conversation-transcript-freshness.spec.ts:107:7 › pre-admission focus still surfaces the later saved reply (es-419) 
+error: script "test:e2e" exited with code 1

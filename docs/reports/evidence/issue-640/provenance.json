@@ -1,0 +1,9 @@
+{
+  "issue": 640,
+  "integration_base": "708864ef76961df2767d7e09c2fbf5f9812179c7",
+  "current_integration": "708864ef76961df2767d7e09c2fbf5f9812179c7",
+  "red_test_head": "8fdcec3ac5f74d63ecc8a9208c204314313b6fd1",
+  "green_implementation_head": "d36bba76c34b8a26c17c87dbf33d60ae736aaff0",
+  "environment": "provider-free Playwright fixture and bun unit tests",
+  "paid_runs": false
+}
