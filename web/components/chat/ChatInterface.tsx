@@ -189,7 +189,7 @@ import {
 } from "./types";
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
-  chatActionRequestFromAction, chatHttpErrorDisplay, guestComputeClaimTransportPatch,
+  chatActionRequestFromAction, chatHttpErrorDisplay, guestClaimErrorKeepsLocalTranscript, guestClaimErrorRetryAction, guestClaimErrorTerminalPayload, guestComputeClaimTransportPatch,
   applyEmptyFinalFallback,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
@@ -1134,7 +1134,9 @@ export default function ChatInterface() {
         : isFailedActionRetry(action)
           ? "recovery"
           : "message_send";
-    invalidateTranscriptForMutation(targetConversationId, transcriptMutation);
+    if (!options?.keepLocalTranscript) {
+      invalidateTranscriptForMutation(targetConversationId, transcriptMutation);
+    }
 
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
@@ -1753,7 +1755,16 @@ export default function ChatInterface() {
                           : isRateLimit
                             ? m.recoveryDisplay
                             : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
-                        ...guestComputeClaimTransportPatch({ code: rejectionCode, retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null, retryAction: retryLastTurnAction }),
+                        ...guestComputeClaimTransportPatch({
+                          code: rejectionCode,
+                          retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null,
+                          retryAction: guestClaimErrorRetryAction({
+                            code: rejectionCode,
+                            retryAction: retryLastTurnAction,
+                            message: trimmed,
+                            assistantMessageId: assistantId,
+                          }),
+                        }),
                       }
                     : m,
                 ),
@@ -1763,7 +1774,14 @@ export default function ChatInterface() {
             ),
           );
         }
-        terminalReadiness.finish(requestSessions.authorize(requestSession, "catch"));
+        const catchAuthorized = requestSessions.authorize(requestSession, "catch");
+        if (guestClaimErrorKeepsLocalTranscript(rejectionCode)) {
+          terminalReadiness.accept(
+            guestClaimErrorTerminalPayload(assistantId),
+            catchAuthorized,
+          );
+        }
+        terminalReadiness.finish(catchAuthorized);
         finishRequestTransport(requestSession);
       }
     })();
@@ -1935,6 +1953,7 @@ export default function ChatInterface() {
         ? discoveryCandidateMention(retryChatAction)
         : null;
       if (retryText) {
+        const keepLocalTranscript = !requestMessageId;
         void handleSend(
           retryText,
           retryMention ? [retryMention] : (retryChatAction ?? []),
@@ -1943,10 +1962,11 @@ export default function ChatInterface() {
             ? {
                 renderUserMessage: false,
                 replacementAssistantId: failedAssistantId,
+                keepLocalTranscript,
               }
             : requestMessageId
               ? { renderUserMessage: true }
-              : { renderUserMessage: false },
+              : { renderUserMessage: false, keepLocalTranscript },
         );
       }
       return;

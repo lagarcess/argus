@@ -38,6 +38,10 @@ type ClaimEvidence = {
   streamStatuses: number[];
 };
 
+type ClaimJourneyOptions = {
+  claimFailures?: number;
+};
+
 async function fulfillJson(route: Route, body: unknown, status = 200) {
   await route.fulfill({
     status,
@@ -87,7 +91,9 @@ async function mockGuestClaimJourney(
   page: Page,
   language: "en" | "es-419",
   successText: string,
+  options: ClaimJourneyOptions = {},
 ): Promise<ClaimEvidence> {
+  const claimFailures = options.claimFailures ?? 1;
   let authenticated = false;
   const evidence: ClaimEvidence = {
     sentMessages: [],
@@ -171,7 +177,7 @@ async function mockGuestClaimJourney(
     evidence.streamCalls += 1;
     const body = route.request().postDataJSON() as { message?: string };
     evidence.sentMessages.push(body.message ?? "");
-    if (evidence.streamCalls === 1) {
+    if (evidence.streamCalls <= claimFailures) {
       evidence.streamStatuses.push(503);
       await route.fulfill({
         status: 503,
@@ -180,6 +186,9 @@ async function mockGuestClaimJourney(
           "Retry-After": "3",
           "Access-Control-Allow-Origin": new URL(page.url()).origin,
           "Access-Control-Allow-Credentials": "true",
+          // Stands in for the backend CORS expose_headers fix in #678.
+          // Without it, a cross-origin browser hides Retry-After and the
+          // client falls back to 15s. Same-origin reads the header either way.
           "Access-Control-Expose-Headers": "Retry-After, X-Request-Id",
         },
         body: JSON.stringify({
@@ -260,3 +269,56 @@ for (const locale of ["en", "es-419"] as const) {
     expect(evidence.sentMessages).toEqual([copy.prompt, copy.prompt]);
   });
 }
+
+test("guest 503 then retry 503 keeps the local transcript and Retry countdown", async ({
+  page,
+}) => {
+  const copy = COPY.en;
+  await page.addInitScript((language) => {
+    window.localStorage.setItem("i18nextLng", language);
+  }, copy.language);
+  const evidence = await mockGuestClaimJourney(page, copy.language, copy.success, {
+    claimFailures: 2,
+  });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const composer = page.getByTestId("chat-input");
+  await expect(composer).toBeVisible({ timeout: 15_000 });
+  await composer.fill(copy.prompt);
+  await composer.press("Enter");
+
+  const notice = page.getByRole("status").filter({ hasText: copy.error });
+  await expect(notice).toBeVisible();
+  await expect(page.getByText(copy.prompt, { exact: true })).toBeVisible();
+
+  const retry = notice.getByRole("button");
+  await expect(retry).toBeDisabled();
+  await expect(retry).toHaveText(copy.retrySoon);
+  await expect(retry).toBeEnabled({ timeout: 8_000 });
+  await expect(retry).toHaveText(copy.retry);
+  await retry.click();
+
+  await expect(notice).toBeVisible();
+  await expect(page.getByText(copy.prompt, { exact: true })).toBeVisible();
+  await expect(page.getByText(RAW_SERVER_DETAIL)).toHaveCount(0);
+  await expect(retry).toBeDisabled();
+  await expect(retry).toHaveText(copy.retrySoon);
+  await expect(page.getByRole("heading", { name: "argus" })).toHaveCount(0);
+
+  await mkdir(EVIDENCE_DIR, { recursive: true });
+  await page.screenshot({
+    path: path.join(EVIDENCE_DIR, "en-claim-503-retry-again.png"),
+    animations: "disabled",
+  });
+
+  await expect(retry).toBeEnabled({ timeout: 8_000 });
+  await expect(retry).toHaveText(copy.retry);
+  await retry.click();
+
+  await expect(page.getByText(copy.success)).toBeVisible();
+  await expect(page.getByText(copy.prompt, { exact: true })).toHaveCount(1);
+  await expect(notice).toHaveCount(0);
+  expect(evidence.streamCalls).toBe(3);
+  expect(evidence.streamStatuses).toEqual([503, 503, 200]);
+  expect(evidence.sentMessages).toEqual([copy.prompt, copy.prompt, copy.prompt]);
+});

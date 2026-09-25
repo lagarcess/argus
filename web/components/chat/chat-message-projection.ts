@@ -62,11 +62,20 @@ import {
 } from "@/lib/chat-recovery-display";
 import {
   GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+  guestClaimErrorKeepsLocalTranscript,
+  guestClaimErrorRetryAction,
+  guestClaimErrorTerminalPayload,
   guestComputeClaimTransportPatch,
   isGuestComputeClaimUnavailable,
 } from "@/lib/guest-compute-claim-error";
 
-export { guestComputeClaimTransportPatch };
+export {
+  guestClaimErrorKeepsLocalTranscript,
+  guestClaimErrorRetryAction,
+  guestClaimErrorTerminalPayload,
+  guestComputeClaimTransportPatch,
+  isGuestComputeClaimUnavailable,
+};
 import {
   applyConsumedResultActions,
   applyConfirmationActionEffects,

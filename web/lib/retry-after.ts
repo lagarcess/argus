@@ -14,6 +14,17 @@ function clampRetryAfterSeconds(seconds: number): number {
   );
 }
 
+const IMF_FIXDATE =
+  /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/;
+const RFC_850_DATE =
+  /^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), \d{2}-(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{2} \d{2}:\d{2}:\d{2} GMT$/;
+const ASCTIME_DATE =
+  /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (?: \d|\d{2}) \d{2}:\d{2}:\d{2} \d{4}$/;
+
+export function isHttpRetryAfterDate(value: string): boolean {
+  return IMF_FIXDATE.test(value) || RFC_850_DATE.test(value) || ASCTIME_DATE.test(value);
+}
+
 export function parseRetryAfterSeconds(
   value: string | null | undefined,
   nowMs: number = Date.now(),
@@ -22,8 +33,11 @@ export function parseRetryAfterSeconds(
   if (!text) {
     return RETRY_AFTER_FALLBACK_SECONDS;
   }
-  if (/^[0-9]+$/.test(text)) {
+  if (/^\d+$/.test(text)) {
     return clampRetryAfterSeconds(Number(text));
+  }
+  if (!isHttpRetryAfterDate(text)) {
+    return RETRY_AFTER_FALLBACK_SECONDS;
   }
   const parsed = Date.parse(text);
   if (!Number.isFinite(parsed)) {

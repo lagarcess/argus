@@ -1,4 +1,5 @@
 import type { ChatActionOption } from "@/components/chat/types";
+import { retryLastTurnActionFromMessage } from "./chat-retry-actions";
 import { parseRetryAfterSeconds } from "./retry-after";
 
 export const GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE =
@@ -51,5 +52,38 @@ export function guestComputeClaimTransportPatch(input: {
           },
         ]
       : undefined,
+  };
+}
+
+export function guestClaimErrorRetryAction(input: {
+  code: string | null | undefined;
+  retryAction: ChatActionOption | null;
+  message: string;
+  assistantMessageId: string;
+}): ChatActionOption | null {
+  if (!isGuestComputeClaimUnavailable(input.code)) {
+    return input.retryAction;
+  }
+  return (
+    input.retryAction ??
+    retryLastTurnActionFromMessage(input.message, {
+      assistantMessageId: input.assistantMessageId,
+    })
+  );
+}
+
+export function guestClaimErrorKeepsLocalTranscript(
+  code: string | null | undefined,
+): boolean {
+  return isGuestComputeClaimUnavailable(code);
+}
+
+export function guestClaimErrorTerminalPayload(assistantMessageId: string): {
+  message_id: string;
+  recovery: { code: typeof GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE };
+} {
+  return {
+    message_id: assistantMessageId,
+    recovery: { code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE },
   };
 }

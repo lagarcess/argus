@@ -8,11 +8,15 @@ import {
   GUEST_COMPUTE_CLAIM_MESSAGE_KEY,
   GUEST_COMPUTE_CLAIM_RETRY_IN_KEY,
   GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+  guestClaimErrorKeepsLocalTranscript,
+  guestClaimErrorRetryAction,
+  guestClaimErrorTerminalPayload,
   guestComputeClaimTransportPatch,
   localizedGuestComputeClaimMessage,
 } from "../lib/guest-compute-claim-error";
 import { recoveryDisplayText } from "../lib/chat-recovery-display";
 import {
+  isHttpRetryAfterDate,
   parseRetryAfterSeconds,
   remainingRetryAfterSeconds,
   shouldKeepRetryAfterTicker,
@@ -103,6 +107,34 @@ describe("Retry-After parsing", () => {
     expect(parseRetryAfterSeconds("not-a-http-date")).toBe(
       RETRY_AFTER_FALLBACK_SECONDS,
     );
+    expect(parseRetryAfterSeconds("-5")).toBe(RETRY_AFTER_FALLBACK_SECONDS);
+    expect(parseRetryAfterSeconds("1.5")).toBe(RETRY_AFTER_FALLBACK_SECONDS);
+    expect(parseRetryAfterSeconds("abc")).toBe(RETRY_AFTER_FALLBACK_SECONDS);
+    expect(parseRetryAfterSeconds("2026")).toBe(RETRY_AFTER_FALLBACK_SECONDS);
+    expect(parseRetryAfterSeconds("Sep 25 2026")).toBe(
+      RETRY_AFTER_FALLBACK_SECONDS,
+    );
+  });
+
+  test("accepts only IMF-fixdate, RFC 850, or asctime HTTP-dates", () => {
+    expect(isHttpRetryAfterDate("Fri, 25 Sep 2026 12:00:08 GMT")).toBe(true);
+    expect(isHttpRetryAfterDate("Friday, 25-Sep-26 12:00:08 GMT")).toBe(true);
+    expect(isHttpRetryAfterDate("Fri Sep 25 12:00:08 2026")).toBe(true);
+    expect(isHttpRetryAfterDate("Fri Sep  5 12:00:08 2026")).toBe(true);
+    expect(isHttpRetryAfterDate("Fri, 25 Sep 2026")).toBe(false);
+    expect(isHttpRetryAfterDate("2026-09-25T12:00:08.000Z")).toBe(false);
+    expect(isHttpRetryAfterDate("-5")).toBe(false);
+    expect(isHttpRetryAfterDate("1.5")).toBe(false);
+    expect(isHttpRetryAfterDate("")).toBe(false);
+    expect(isHttpRetryAfterDate("abc")).toBe(false);
+    const nowMs = Date.parse("Fri, 25 Sep 2026 12:00:00 GMT");
+    expect(
+      parseRetryAfterSeconds("Friday, 25-Sep-26 12:00:08 GMT", nowMs),
+    ).toBe(8);
+    const asctime = "Fri Sep 25 12:00:08 2026";
+    expect(
+      parseRetryAfterSeconds(asctime, Date.parse(asctime) - 8_000),
+    ).toBe(8);
   });
 
   test("clamps huge, zero, and past values into 1..120", () => {
@@ -287,6 +319,59 @@ describe("guest compute claim error copy", () => {
     expect(error.code).toBe(GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE);
     expect(error.retryAfter).toBe("8");
     expect(error.message).toBe(RAW_SERVER_DETAIL);
+  });
+
+  test("a later claim 503 keeps the local turn and rebuilds Retry", () => {
+    const nowMs = Date.parse("Fri, 25 Sep 2026 12:00:00 GMT");
+    expect(
+      guestClaimErrorKeepsLocalTranscript(GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE),
+    ).toBe(true);
+    expect(guestClaimErrorKeepsLocalTranscript("too_many_requests")).toBe(false);
+    expect(guestClaimErrorTerminalPayload("assistant-claim-1")).toEqual({
+      message_id: "assistant-claim-1",
+      recovery: { code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE },
+    });
+
+    const rebuilt = guestClaimErrorRetryAction({
+      code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      retryAction: null,
+      message: "Compare Apple with SPY",
+      assistantMessageId: "assistant-claim-1",
+    });
+    expect(rebuilt?.type).toBe("retry_last_turn");
+    expect(rebuilt?.payload).toEqual({
+      message: "Compare Apple with SPY",
+      failed_assistant_id: "assistant-claim-1",
+    });
+
+    const later = guestComputeClaimTransportPatch({
+      code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      retryAfterHeader: "4",
+      retryAction: rebuilt,
+      nowMs,
+    });
+    expect(later.actions?.[0]?.availableAtMs).toBe(nowMs + 4_000);
+    expect(
+      guestClaimErrorRetryAction({
+        code: "too_many_requests",
+        retryAction: null,
+        message: "Compare Apple with SPY",
+        assistantMessageId: "assistant-claim-1",
+      }),
+    ).toBeNull();
+  });
+
+  test("the claim 503 catch keeps local messages and the retry path does not reload empty", () => {
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf8",
+    );
+    expect(chat).toContain("keepLocalTranscript");
+    expect(chat).toContain("if (!options?.keepLocalTranscript)");
+    expect(chat).toContain("guestClaimErrorKeepsLocalTranscript(rejectionCode)");
+    expect(chat).toContain("guestClaimErrorTerminalPayload(assistantId)");
+    expect(chat).toContain("guestClaimErrorRetryAction({");
+    expect(chat).toContain("const keepLocalTranscript = !requestMessageId");
   });
 
   test("countdown labels localize without raw server text", () => {

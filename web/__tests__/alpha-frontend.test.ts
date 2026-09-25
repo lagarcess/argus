@@ -410,6 +410,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("failedAssistantId");
     expect(chat).toContain("renderUserMessage: false");
     expect(chat).toContain("replacementAssistantId: failedAssistantId");
+    expect(chat).toContain("keepLocalTranscript");
     expect(chat).toContain("requestMessageId");
     expect(chat).toContain("renderUserMessage: true");
     expect(chat).toContain(
