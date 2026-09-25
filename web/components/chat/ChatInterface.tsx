@@ -302,7 +302,6 @@ export default function ChatInterface() {
   });
   const [guestSubmissionPending, setGuestSubmissionPending] = useState(false);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
-  const [initialRoutingSettled, setInitialRoutingSettled] = useState(false);
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
@@ -779,7 +778,7 @@ export default function ChatInterface() {
   function beginConversationActivityTerminalReadiness(getRequest: () => ChatRequestSession) { const terminalReadiness = createConversationActivityTerminalReadinessSession({ getRequest: () => ({ conversationId: getRequest().identity.conversationId, kind: getRequest().kind }), activeConversationIdRef, currentViewRef, readyTranscriptConversationIdRef, transcriptReadiness: activityTranscriptReadiness, reconcileCanonical: (id) => void navigateConversationTranscript(id) }); terminalReadiness.stage(); return terminalReadiness; }
   // ── Init conversation ──────────────────────────────────────────────────────
 
-  useInitialChatSession({
+  const initialRoutingSettled = useInitialChatSession({
     hasAcceptedUserInputRef,
     setAccount,
     setProfileState,
@@ -788,7 +787,6 @@ export default function ChatInterface() {
     resetToEmptyChatSurface,
     navigateConversationTranscript,
     cancelActiveNavigation: () => transcriptSessionCache.cancelActiveNavigation(),
-    onInitialRoutingSettled: () => setInitialRoutingSettled(true),
   });
 
   const { scrollToLatest, updateScrollPositionState } = useChatScrollControls({

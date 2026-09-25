@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { getMe, listConversations } from "@/lib/argus-api";
@@ -31,7 +31,6 @@ type InitialChatSessionOptions = {
     options: Readonly<{ bootstrap: boolean; messageId?: string }>,
   ) => Promise<void>;
   cancelActiveNavigation: () => void;
-  onInitialRoutingSettled: () => void;
 };
 
 export function useInitialChatSession({
@@ -43,8 +42,8 @@ export function useInitialChatSession({
   resetToEmptyChatSurface,
   navigateConversationTranscript,
   cancelActiveNavigation,
-  onInitialRoutingSettled,
-}: InitialChatSessionOptions): void {
+}: InitialChatSessionOptions): boolean {
+  const [initialRoutingSettled, setInitialRoutingSettled] = useState(false);
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
@@ -87,20 +86,20 @@ export function useInitialChatSession({
           const userId = meResponse?.user.id;
           if (!userId) {
             resetToEmptyChatSurface();
-            onInitialRoutingSettled();
+            setInitialRoutingSettled(true);
             return;
           }
           await navigateConversationTranscript(activeConversationId, userId, {
             bootstrap: true,
             messageId: activeRoute.messageId ?? undefined,
           });
-          if (!cancelled) onInitialRoutingSettled();
+          if (!cancelled) setInitialRoutingSettled(true);
           return;
         }
 
         if (cancelled || hasAcceptedUserInputRef.current) return;
         resetToEmptyChatSurface();
-        onInitialRoutingSettled();
+        setInitialRoutingSettled(true);
       } catch {
         if (cancelled) return;
         setProfileState("unavailable");
@@ -123,4 +122,6 @@ export function useInitialChatSession({
     // Bootstraps the active conversation once; re-running on callback or i18n updates would create noisy chat reloads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  return initialRoutingSettled;
 }

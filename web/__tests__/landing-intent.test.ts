@@ -307,7 +307,8 @@ describe("landing starter prefill wiring", () => {
       join(root, "components/guest/useGuestExperience.ts"),
       "utf-8",
     );
-    expect(init).toContain("onInitialRoutingSettled");
+    expect(init).toContain("setInitialRoutingSettled(true)");
+    expect(init).toContain("return initialRoutingSettled");
     expect(chat).toContain("canConsumeLandingStarter={initialRoutingSettled}");
     expect(guest).toContain("if (isGuestBootstrapAbortError(error)) return;");
     expect(guest).not.toContain("if (!isGuestBootstrapAbortError(error)) throw error");
