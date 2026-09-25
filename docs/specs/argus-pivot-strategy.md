@@ -7,6 +7,7 @@ apart first, and only then does it turn into a roadmap.
 
 This document argues what Argus becomes and why. The board of work lives in
 [`argus-answers-that-stay-true-roadmap.md`](argus-answers-that-stay-true-roadmap.md).
+Locked product decisions live in [`argus-decision-log.md`](argus-decision-log.md).
 
 ---
 
