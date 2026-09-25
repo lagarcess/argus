@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   attributionPayload,
   authLoginPathFromSearch,
+  CAMPAIGN_VALUE_FIELDS,
   captureLandingIntent,
   currentChatPath,
   hasCampaignAttribution,
@@ -74,13 +75,14 @@ describe("landing intent parsing", () => {
   test("keeps campaign fields and the starter whitelist", () => {
     expect(
       parseLandingIntent(
-        "utm_source=ig&utm_medium=paid&utm_campaign=x&utm_content=card-a&fbclid=abc.1&ref=stories&starter=backtest",
+        "utm_source=ig&utm_medium=paid&utm_campaign=x&utm_term=meta-kw&utm_content=card-a&fbclid=abc.1&ref=stories&starter=backtest",
         "/",
       ),
     ).toEqual({
       utm_source: "ig",
       utm_medium: "paid",
       utm_campaign: "x",
+      utm_term: "meta-kw",
       utm_content: "card-a",
       fbclid: "abc.1",
       ref: "stories",
@@ -122,6 +124,33 @@ describe("landing intent parsing", () => {
     const tooLong = `ig-${"a".repeat(400)}`;
     expect(parseLandingIntent(`utm_source=${tooLong}`).utm_source).toHaveLength(
       256,
+    );
+    expect(parseLandingIntent(`utm_term=${tooLong}`).utm_term).toHaveLength(256);
+  });
+
+  test("captures utm_term, carries it through the login bounce, and treats it as campaign", () => {
+    installStorage();
+    expect(parseLandingIntent("utm_term=meta-kw", "/")).toEqual({
+      utm_term: "meta-kw",
+      landing_path: "/",
+    });
+    expect(captureLandingIntent("utm_term=meta-kw", "/")).toEqual({
+      utm_term: "meta-kw",
+      landing_path: "/",
+    });
+    expect(attributionPayload()).toEqual({
+      utm_term: "meta-kw",
+      landing_path: "/",
+    });
+    expect(hasCampaignAttribution({ utm_term: "meta-kw" })).toBe(true);
+    expect(authLoginPathFromSearch("utm_term=meta-kw&next=/admin")).toBe(
+      "/?utm_term=meta-kw&auth=login",
+    );
+    const tooLong = `kw-${"a".repeat(400)}`;
+    const bounced = authLoginPathFromSearch(`utm_term=${tooLong}&next=/admin`);
+    expect(new URLSearchParams(bounced.slice(2)).get("utm_term")).toHaveLength(256);
+    expect(authLoginPathFromSearch("utm_term=%00%07meta-kw")).toBe(
+      "/?utm_term=meta-kw&auth=login",
     );
   });
 
@@ -203,6 +232,13 @@ describe("landing intent storage", () => {
     expect(hasCampaignAttribution({ starter: "backtest" })).toBe(false);
     expect(hasCampaignAttribution({ ref: "stories" })).toBe(true);
     expect(hasCampaignAttribution({ utm_campaign: "x" })).toBe(true);
+    expect(hasCampaignAttribution({ utm_term: "meta-kw" })).toBe(true);
+    for (const field of CAMPAIGN_VALUE_FIELDS) {
+      expect(hasCampaignAttribution({ [field]: "x" })).toBe(true);
+      expect(authLoginPathFromSearch(`${field}=x&next=/admin`)).toBe(
+        `/?${field}=x&auth=login`,
+      );
+    }
   });
 
   test("starter prefill is consume-once session state, like receipt follow-up", () => {
@@ -534,8 +570,8 @@ describe("landing intent merge and redirects", () => {
     expect(pathWithSearch("/chat", "?utm_campaign=x&starter=backtest&auth=signup")).toBe(
       "/chat?utm_campaign=x&starter=backtest",
     );
-    expect(authLoginPathFromSearch("utm_campaign=x&starter=backtest")).toBe(
-      "/?utm_campaign=x&starter=backtest&auth=login",
+    expect(authLoginPathFromSearch("utm_campaign=x&utm_term=meta-kw&starter=backtest")).toBe(
+      "/?utm_campaign=x&utm_term=meta-kw&starter=backtest&auth=login",
     );
     expect(authLoginPathFromSearch("utm_campaign=x", "/chat")).toBe(
       "/?utm_campaign=x&from_path=%2Fchat&auth=login",
@@ -563,9 +599,9 @@ describe("landing intent merge and redirects", () => {
   test("login bounce drops next, redirect, unknown params, and invalid starters", () => {
     expect(
       authLoginPathFromSearch(
-        "utm_campaign=x&starter=backtest&next=/admin&redirect=https://evil.example&foo=1&auth=signup",
+        "utm_campaign=x&utm_term=meta-kw&starter=backtest&next=/admin&redirect=https://evil.example&foo=1&auth=signup",
       ),
-    ).toBe("/?utm_campaign=x&starter=backtest&auth=login");
+    ).toBe("/?utm_campaign=x&utm_term=meta-kw&starter=backtest&auth=login");
     expect(
       authLoginPathFromSearch("utm_campaign=x&starter=BACKTEST&next=/admin"),
     ).toBe("/?utm_campaign=x&auth=login");

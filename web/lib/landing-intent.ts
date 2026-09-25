@@ -32,52 +32,38 @@ export const LANDING_STARTER_STORAGE_KEY = "argus:landing-starter:v1";
 export const LANDING_STARTERS = ["backtest", "savings"] as const;
 export type LandingStarter = (typeof LANDING_STARTERS)[number];
 
-export const ATTRIBUTION_FIELDS = [
+export const CAMPAIGN_VALUE_FIELDS = [
   "utm_source",
   "utm_medium",
   "utm_campaign",
+  "utm_term",
   "utm_content",
   "fbclid",
   "ref",
+] as const;
+
+export const ATTRIBUTION_FIELDS = [
+  ...CAMPAIGN_VALUE_FIELDS,
   "starter",
   "landing_path",
 ] as const;
 
+export type CampaignValueField = (typeof CAMPAIGN_VALUE_FIELDS)[number];
 export type AttributionField = (typeof ATTRIBUTION_FIELDS)[number];
 
 export type LandingIntent = {
-  utm_source?: string;
-  utm_medium?: string;
-  utm_campaign?: string;
-  utm_content?: string;
-  fbclid?: string;
-  ref?: string;
+  [K in CampaignValueField]?: string;
+} & {
   starter?: LandingStarter;
   landing_path?: string;
 };
 
 export type AttributionPayload = {
-  utm_source?: string;
-  utm_medium?: string;
-  utm_campaign?: string;
-  utm_content?: string;
-  fbclid?: string;
-  ref?: string;
-  starter?: string;
-  landing_path?: string;
+  [K in AttributionField]?: string;
 };
 
 const VALUE_MAX_LENGTH = 256;
 const PATH_MAX_LENGTH = 200;
-
-const BOUNCE_CAMPAIGN_KEYS = [
-  "utm_source",
-  "utm_medium",
-  "utm_campaign",
-  "utm_content",
-  "fbclid",
-  "ref",
-] as const;
 
 const LANDING_STARTER_COPY_KEYS = {
   backtest: "chat.landing_starters.backtest",
@@ -155,14 +141,23 @@ function toSearchParams(
   return params;
 }
 
+function campaignValuesFrom(
+  read: (field: CampaignValueField) => string | null | undefined,
+): Pick<LandingIntent, CampaignValueField> {
+  const next: Pick<LandingIntent, CampaignValueField> = {};
+  for (const field of CAMPAIGN_VALUE_FIELDS) {
+    const value = sanitizeCampaignValue(read(field));
+    if (value) next[field] = value;
+  }
+  return next;
+}
+
 function withDefinedFields(intent: LandingIntent): LandingIntent {
   const next: LandingIntent = {};
-  if (intent.utm_source) next.utm_source = intent.utm_source;
-  if (intent.utm_medium) next.utm_medium = intent.utm_medium;
-  if (intent.utm_campaign) next.utm_campaign = intent.utm_campaign;
-  if (intent.utm_content) next.utm_content = intent.utm_content;
-  if (intent.fbclid) next.fbclid = intent.fbclid;
-  if (intent.ref) next.ref = intent.ref;
+  for (const field of CAMPAIGN_VALUE_FIELDS) {
+    const value = intent[field];
+    if (value) next[field] = value;
+  }
   if (intent.starter) next.starter = intent.starter;
   if (intent.landing_path) next.landing_path = intent.landing_path;
   return next;
@@ -179,12 +174,7 @@ export function parseLandingIntent(
     (!requestedPath || requestedPath === "/");
   const starter = parseLandingStarter(params);
   const intent = withDefinedFields({
-    utm_source: sanitizeCampaignValue(params.get("utm_source")),
-    utm_medium: sanitizeCampaignValue(params.get("utm_medium")),
-    utm_campaign: sanitizeCampaignValue(params.get("utm_campaign")),
-    utm_content: sanitizeCampaignValue(params.get("utm_content")),
-    fbclid: sanitizeCampaignValue(params.get("fbclid")),
-    ref: sanitizeCampaignValue(params.get("ref")),
+    ...campaignValuesFrom((field) => params.get(field)),
     starter,
     landing_path: bouncedFromChat ? "/chat" : requestedPath,
   });
@@ -211,12 +201,9 @@ export function mergeFirstTouchLandingIntent(
 
 function sanitizeStoredIntent(raw: Record<string, unknown>): LandingIntent | null {
   const intent = withDefinedFields({
-    utm_source: sanitizeCampaignValue(typeof raw.utm_source === "string" ? raw.utm_source : undefined),
-    utm_medium: sanitizeCampaignValue(typeof raw.utm_medium === "string" ? raw.utm_medium : undefined),
-    utm_campaign: sanitizeCampaignValue(typeof raw.utm_campaign === "string" ? raw.utm_campaign : undefined),
-    utm_content: sanitizeCampaignValue(typeof raw.utm_content === "string" ? raw.utm_content : undefined),
-    fbclid: sanitizeCampaignValue(typeof raw.fbclid === "string" ? raw.fbclid : undefined),
-    ref: sanitizeCampaignValue(typeof raw.ref === "string" ? raw.ref : undefined),
+    ...campaignValuesFrom((field) =>
+      typeof raw[field] === "string" ? raw[field] : undefined,
+    ),
     starter: sanitizeLandingStarter(typeof raw.starter === "string" ? raw.starter : undefined),
     landing_path: sanitizeLandingPath(typeof raw.landing_path === "string" ? raw.landing_path : undefined),
   });
@@ -312,14 +299,7 @@ export function hasCampaignAttribution(
   intent: LandingIntent | null = readLandingIntent(),
 ): boolean {
   if (!intent) return false;
-  return Boolean(
-    intent.utm_source ||
-      intent.utm_medium ||
-      intent.utm_campaign ||
-      intent.utm_content ||
-      intent.fbclid ||
-      intent.ref,
-  );
+  return CAMPAIGN_VALUE_FIELDS.some((field) => Boolean(intent[field]));
 }
 
 export function takeLandingStarterPrefill(): LandingStarter | null {
@@ -430,8 +410,9 @@ export function authLoginPathFromSearch(
 ): string {
   const source = toSearchParams(search);
   const params = new URLSearchParams();
-  for (const key of BOUNCE_CAMPAIGN_KEYS) {
-    const value = source.get(key);
+  const campaign = campaignValuesFrom((field) => source.get(field));
+  for (const key of CAMPAIGN_VALUE_FIELDS) {
+    const value = campaign[key];
     if (value) params.set(key, value);
   }
   const starter = parseLandingStarter(source);
