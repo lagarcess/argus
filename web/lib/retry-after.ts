@@ -43,13 +43,10 @@ export function remainingRetryAfterSeconds(
 }
 
 export function useRetryAfterCountdown(availableAtMs?: number): number {
-  const [remaining, setRemaining] = useState(() =>
-    remainingRetryAfterSeconds(availableAtMs, Date.now()),
-  );
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
-    const tick = () =>
-      setRemaining(remainingRetryAfterSeconds(availableAtMs, Date.now()));
+    const tick = () => setNowMs(Date.now());
     tick();
     if (remainingRetryAfterSeconds(availableAtMs, Date.now()) <= 0) {
       return;
@@ -58,5 +55,5 @@ export function useRetryAfterCountdown(availableAtMs?: number): number {
     return () => window.clearInterval(id);
   }, [availableAtMs]);
 
-  return remaining;
+  return remainingRetryAfterSeconds(availableAtMs, nowMs);
 }

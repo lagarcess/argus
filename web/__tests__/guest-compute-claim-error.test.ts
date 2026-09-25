@@ -121,6 +121,17 @@ describe("Retry-After parsing", () => {
     expect(remainingRetryAfterSeconds(1_500, 1_000)).toBe(1);
     expect(remainingRetryAfterSeconds(500, 1_000)).toBe(0);
   });
+
+  test("a newly assigned deadline is unreadied on the same clock read", () => {
+    const mountedAtMs = 1_000;
+    expect(remainingRetryAfterSeconds(undefined, mountedAtMs)).toBe(0);
+    const availableAtMs = mountedAtMs + 15_000;
+    expect(remainingRetryAfterSeconds(availableAtMs, mountedAtMs)).toBe(15);
+    expect(remainingRetryAfterSeconds(availableAtMs, availableAtMs - 1)).toBe(1);
+    expect(remainingRetryAfterSeconds(availableAtMs, availableAtMs)).toBe(0);
+    const laterDeadlineMs = availableAtMs + 8_000;
+    expect(remainingRetryAfterSeconds(laterDeadlineMs, availableAtMs)).toBe(8);
+  });
 });
 
 describe("guest compute claim error copy", () => {
