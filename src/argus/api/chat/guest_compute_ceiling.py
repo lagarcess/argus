@@ -2,14 +2,25 @@
 
 Conversation is compute: free, unlimited in the product surface, never an
 allowance. An anonymous endpoint still cannot be unbounded, so a guest's
-ordinary turns count against a visitor-keyed daily ceiling sized so no real
-person reaches it. Nothing here is rendered or promised, a registered account
-carries no ceiling, and run actions are execution charged at admission.
+ordinary turns count against two daily ceilings, and the guest hits
+whichever is lower:
+
+- visitor-keyed (trusted client IP)
+- session-keyed (authenticated guest workspace / anonymous user id)
+
+Both units are claimed atomically at turn start, the same way research
+claims before spend. A claim that is admitted stands even if the turn
+errors before any LLM spend: releasing it is possible, but keeping it is
+the simpler fail-closed anti-abuse choice. Registered accounts and run
+actions carry no ceiling. Nothing here is rendered or promised.
 """
 
 from __future__ import annotations
 
+import threading
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import Request
 from loguru import logger
@@ -19,57 +30,99 @@ from argus.api.dependencies import dev_memory_fallback_enabled, problem
 from argus.api.guest_access import AccountContext, account_context, client_identity
 from argus.api.schemas import User
 from argus.domain.usage_limits import (
-    GUEST_COMPUTE_CEILING_LIMITS,
     GUEST_COMPUTE_CEILING_RESOURCE,
     align_usage_period,
+    guest_compute_ceiling_limits,
+    guest_session_ceiling_limits,
 )
 from argus.domain.visitor_usage import (
+    guest_session_compute_key,
     memory_visitor_within_limits,
+    settle_memory_visitor_usage,
     visitor_key_for,
-    visitor_within_limits,
 )
+
+_MEMORY_CLAIM_LOCK = threading.Lock()
+
+
+@dataclass(frozen=True)
+class GuestComputeAdmission:
+    available: bool
+    visitor_exhausted: bool = False
+    session_exhausted: bool = False
+
+
+def claim_guest_compute_turn(
+    *,
+    visitor_key: str,
+    session_key: str,
+) -> GuestComputeAdmission:
+    """Atomically claim one visitor unit and one session unit, or neither."""
+    now = datetime.now(timezone.utc)
+    visitor_limits = guest_compute_ceiling_limits()
+    session_limits = guest_session_ceiling_limits()
+    try:
+        if api_state.supabase_gateway is not None:
+            return _claim_supabase_guest_compute(
+                visitor_key=visitor_key,
+                session_key=session_key,
+                visitor_limits=visitor_limits,
+                session_limits=session_limits,
+            )
+        return _claim_memory_guest_compute(
+            visitor_key=visitor_key,
+            session_key=session_key,
+            visitor_limits=visitor_limits,
+            session_limits=session_limits,
+            now=now,
+        )
+    except Exception as exc:
+        if dev_memory_fallback_enabled() and api_state.supabase_gateway is not None:
+            logger.warning(
+                "Guest compute claim failed; using dev memory fallback",
+                error=str(exc),
+            )
+            try:
+                return _claim_memory_guest_compute(
+                    visitor_key=visitor_key,
+                    session_key=session_key,
+                    visitor_limits=visitor_limits,
+                    session_limits=session_limits,
+                    now=now,
+                )
+            except Exception as memory_exc:
+                logger.warning(
+                    "Guest compute memory claim failed; "
+                    "treating capacity as exhausted",
+                    error=str(memory_exc),
+                )
+                return GuestComputeAdmission(available=False)
+        logger.warning(
+            "Guest compute claim failed; treating capacity as exhausted",
+            error=str(exc),
+        )
+        return GuestComputeAdmission(available=False)
 
 
 def check_guest_compute_ceiling(request: Request, user: User) -> None:
-    """Non-consuming read at entry; 429 once the visitor's day is at the ceiling."""
+    """Claim one turn at entry; 429 once either daily ceiling is reached."""
     context = account_context(request)
     if context.kind != "guest":
         return
     now = datetime.now(timezone.utc)
-    visitor_key = visitor_key_for(client_identity(request))
-    try:
-        if api_state.supabase_gateway is not None:
-            within = visitor_within_limits(
-                api_state.supabase_gateway.client,
-                visitor_key=visitor_key,
-                resource=GUEST_COMPUTE_CEILING_RESOURCE,
-                limits=list(GUEST_COMPUTE_CEILING_LIMITS),
-                now=now,
-            )
-        else:
-            within = memory_visitor_within_limits(
-                api_state.store.visitor_usage_counters,
-                visitor_key=visitor_key,
-                resource=GUEST_COMPUTE_CEILING_RESOURCE,
-                limits=list(GUEST_COMPUTE_CEILING_LIMITS),
-                now=now,
-            )
-    except Exception as exc:
-        if not dev_memory_fallback_enabled():
-            raise
-        logger.warning(
-            "Guest compute ceiling read failed; using dev memory fallback",
-            error=str(exc),
-            user_id=user.id,
-        )
-        return
-    if within:
+    admission = claim_guest_compute_turn(
+        visitor_key=visitor_key_for(client_identity(request)),
+        session_key=guest_session_compute_key(context.user_id),
+    )
+    if admission.available:
         return
     _, day_end = align_usage_period(now, "day")
     logger.warning(
         "Guest compute ceiling reached",
         user_id=user.id,
         failure_classification="abuse_ceiling",
+        visitor_exhausted=admission.visitor_exhausted,
+        session_exhausted=admission.session_exhausted,
     )
     raise problem(
         request,
@@ -87,12 +140,88 @@ def guest_compute_settlement(
     is_run_backtest_turn: bool,
     visitor_key: str,
 ) -> dict[str, object] | None:
-    """One turn unit against the visitor ceiling, settled with the durable
-    terminal. Registered accounts and run actions settle nothing."""
-    if account.kind != "guest" or is_run_backtest_turn:
-        return None
-    return {
-        "resource": GUEST_COMPUTE_CEILING_RESOURCE,
-        "limits": list(GUEST_COMPUTE_CEILING_LIMITS),
-        "visitor_key": visitor_key,
-    }
+    """The unit is claimed at turn start. Terminal settlement is a no-op so
+    a completed turn cannot double-count, and a failed turn keeps the claim."""
+    del account, is_run_backtest_turn, visitor_key
+    return None
+
+
+def _claim_supabase_guest_compute(
+    *,
+    visitor_key: str,
+    session_key: str,
+    visitor_limits: list[tuple[str, int]],
+    session_limits: list[tuple[str, int]],
+) -> GuestComputeAdmission:
+    gateway = api_state.supabase_gateway
+    if gateway is None:
+        raise RuntimeError("Supabase gateway is required for the durable claim.")
+    client = gateway.client
+    result = client.rpc(
+        "claim_guest_compute_usage",
+        {
+            "p_visitor_key": visitor_key,
+            "p_session_key": session_key,
+            "p_resource": GUEST_COMPUTE_CEILING_RESOURCE,
+            "p_visitor_limit": dict(visitor_limits)["day"],
+            "p_session_limit": dict(session_limits)["day"],
+        },
+    ).execute()
+    payload = getattr(result, "data", None)
+    if not isinstance(payload, dict):
+        raise TypeError("Guest compute claim returned no object")
+    return GuestComputeAdmission(
+        available=payload.get("available") is True,
+        visitor_exhausted=payload.get("visitor_exhausted") is True,
+        session_exhausted=payload.get("session_exhausted") is True,
+    )
+
+
+def _claim_memory_guest_compute(
+    *,
+    visitor_key: str,
+    session_key: str,
+    visitor_limits: list[tuple[str, int]],
+    session_limits: list[tuple[str, int]],
+    now: datetime,
+) -> GuestComputeAdmission:
+    """Process-local twin of claim_guest_compute_usage."""
+    counters: dict[tuple[str, str, str], dict[str, Any]] = (
+        api_state.store.visitor_usage_counters
+    )
+    with _MEMORY_CLAIM_LOCK:
+        visitor_within = memory_visitor_within_limits(
+            counters,
+            visitor_key=visitor_key,
+            resource=GUEST_COMPUTE_CEILING_RESOURCE,
+            limits=list(visitor_limits),
+            now=now,
+        )
+        session_within = memory_visitor_within_limits(
+            counters,
+            visitor_key=session_key,
+            resource=GUEST_COMPUTE_CEILING_RESOURCE,
+            limits=list(session_limits),
+            now=now,
+        )
+        if not visitor_within or not session_within:
+            return GuestComputeAdmission(
+                available=False,
+                visitor_exhausted=not visitor_within,
+                session_exhausted=not session_within,
+            )
+        settle_memory_visitor_usage(
+            counters,
+            visitor_key=visitor_key,
+            resource=GUEST_COMPUTE_CEILING_RESOURCE,
+            limits=list(visitor_limits),
+            now=now,
+        )
+        settle_memory_visitor_usage(
+            counters,
+            visitor_key=session_key,
+            resource=GUEST_COMPUTE_CEILING_RESOURCE,
+            limits=list(session_limits),
+            now=now,
+        )
+        return GuestComputeAdmission(available=True)

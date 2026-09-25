@@ -1,15 +1,16 @@
 """The silent anti-abuse ceiling on guest compute turns.
 
-Conversation is free and reports no limit; a guest's turns still count against
-a visitor-keyed daily ceiling that is never rendered. These tests prove the
-entry read, the terminal settlement, the silence in ``GET /me/usage``, and
-that the refusal-log observer and the ceiling settlement fire on the same
-terminal now that both lanes hook it.
+Conversation is free and reports no limit; a guest's turns still count
+against daily ceilings that are never rendered. These tests prove the
+atomic entry claim, the silence in ``GET /me/usage``, and that the
+refusal-log observer still fires on the terminal after the claim.
 """
 
 from __future__ import annotations
 
 from datetime import timedelta
+from threading import Lock
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -23,13 +24,12 @@ from argus.api.guest_access import (
 from argus.domain.store import utcnow
 from argus.domain.usage_limits import (
     GUEST_COMPUTE_CEILING_RESOURCE,
-    GUEST_COMPUTE_DAILY_CEILING,
+    guest_session_daily_turn_ceiling,
 )
 
 from tests.test_allowance_accounting import (
     _assistant_settlements,
     _configure_guest_account,
-    _FakeVisitorClient,
     client,
     mock_gateway,
 )
@@ -40,16 +40,84 @@ GUEST_HEADERS = {"Authorization": "Bearer guest-token"}
 TURN = {"conversation_id": "conv-1", "message": "Test TSLA dip idea"}
 
 
-def _guest(mock_gateway, monkeypatch: pytest.MonkeyPatch, *, turns_today: int):
+class _FakeComputeClaimClient:
+    """Thread-safe stub for claim_guest_compute_usage plus leftover reads."""
+
+    def __init__(
+        self,
+        *,
+        visitor_used: int = 0,
+        session_used: int = 0,
+    ) -> None:
+        self.visitor_used = visitor_used
+        self.session_used = session_used
+        self.claims = 0
+        self._lock = Lock()
+        self._resource: str | None = None
+
+    def table(self, name: str) -> "_FakeComputeClaimClient":
+        assert name == "visitor_usage_counters"
+        return self
+
+    def select(self, *_args: Any) -> "_FakeComputeClaimClient":
+        return self
+
+    def eq(self, column: str, value: Any) -> "_FakeComputeClaimClient":
+        if column == "resource":
+            self._resource = str(value)
+        return self
+
+    def limit(self, *_args: Any) -> "_FakeComputeClaimClient":
+        return self
+
+    def rpc(self, name: str, params: dict[str, Any]) -> SimpleNamespace:
+        assert name == "claim_guest_compute_usage"
+        with self._lock:
+            visitor_limit = int(params["p_visitor_limit"])
+            session_limit = int(params["p_session_limit"])
+            visitor_exhausted = self.visitor_used >= visitor_limit
+            session_exhausted = self.session_used >= session_limit
+            if visitor_exhausted or session_exhausted:
+                data = {
+                    "available": False,
+                    "visitor_exhausted": visitor_exhausted,
+                    "session_exhausted": session_exhausted,
+                }
+            else:
+                self.visitor_used += 1
+                self.session_used += 1
+                self.claims += 1
+                data = {
+                    "available": True,
+                    "visitor_exhausted": False,
+                    "session_exhausted": False,
+                }
+        return SimpleNamespace(execute=lambda: SimpleNamespace(data=data))
+
+    def execute(self) -> Any:
+        used = self.visitor_used if self._resource else 0
+        rows = [{"used_count": used}] if used else []
+        return SimpleNamespace(data=rows)
+
+
+def _guest(
+    mock_gateway,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    turns_today: int,
+    session_used: int | None = None,
+) -> _FakeComputeClaimClient:
     monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_GUEST_ACCESS_ENABLED", "true")
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
-    workspace = _configure_guest_account(mock_gateway)
-    mock_gateway.client = _FakeVisitorClient(
-        {GUEST_COMPUTE_CEILING_RESOURCE: turns_today}
+    _configure_guest_account(mock_gateway)
+    fake = _FakeComputeClaimClient(
+        visitor_used=turns_today,
+        session_used=turns_today if session_used is None else session_used,
     )
-    return workspace
+    mock_gateway.client = fake
+    return fake
 
 
 def _terminal_message_ids(mock_gateway) -> set[str]:
@@ -62,38 +130,56 @@ def _terminal_message_ids(mock_gateway) -> set[str]:
     return ids
 
 
-def test_guest_turn_settles_one_ceiling_unit_on_the_visitor(
+def test_session_ceiling_reads_env_or_the_code_owned_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARGUS_GUEST_SESSION_DAILY_TURN_CEILING", raising=False)
+    assert guest_session_daily_turn_ceiling() == 100
+    monkeypatch.setenv("ARGUS_GUEST_SESSION_DAILY_TURN_CEILING", "25")
+    assert guest_session_daily_turn_ceiling() == 25
+    monkeypatch.setenv("ARGUS_GUEST_SESSION_DAILY_TURN_CEILING", "0")
+    assert guest_session_daily_turn_ceiling() == 100
+    monkeypatch.setenv("ARGUS_GUEST_SESSION_DAILY_TURN_CEILING", "nope")
+    assert guest_session_daily_turn_ceiling() == 100
+
+
+def test_guest_turn_claims_one_ceiling_unit_at_entry(
     mock_gateway, monkeypatch: pytest.MonkeyPatch
 ):
-    _guest(mock_gateway, monkeypatch, turns_today=5)
+    fake = _guest(mock_gateway, monkeypatch, turns_today=5)
 
     response = client.post("/api/v1/chat/stream", json=TURN, headers=GUEST_HEADERS)
 
     assert response.status_code == 200, response.text
-    settlements = _assistant_settlements(mock_gateway)
-    assert len(settlements) == 1
-    assert settlements[0]["resource"] == GUEST_COMPUTE_CEILING_RESOURCE
-    assert settlements[0]["limits"] == [("day", GUEST_COMPUTE_DAILY_CEILING)]
-    assert settlements[0]["visitor_key"].startswith("visitor:")
-    # No allowance meter is consulted: the ceiling is the only counter.
+    assert fake.claims == 1
+    assert fake.visitor_used == 6
+    assert _assistant_settlements(mock_gateway) == []
     mock_gateway.check_usage_limits.assert_not_called()
 
 
 def test_guest_at_the_ceiling_is_refused_at_entry_without_charging(
     mock_gateway, monkeypatch: pytest.MonkeyPatch
 ):
-    _guest(mock_gateway, monkeypatch, turns_today=GUEST_COMPUTE_DAILY_CEILING)
+    from argus.domain.usage_limits import GUEST_COMPUTE_DAILY_CEILING
+
+    fake = _guest(
+        mock_gateway, monkeypatch, turns_today=GUEST_COMPUTE_DAILY_CEILING
+    )
 
     response = client.post("/api/v1/chat/stream", json=TURN, headers=GUEST_HEADERS)
 
     assert response.status_code == 429
     assert response.json()["code"] == "too_many_requests"
+    assert response.json()["detail"] == "Too many conversation turns today."
     assert int(response.headers["Retry-After"]) >= 1
+    assert fake.claims == 0
     mock_gateway.create_message.assert_not_called()
     assert _assistant_settlements(mock_gateway) == []
 
 
 def test_ceiling_never_appears_in_usage(mock_gateway, monkeypatch: pytest.MonkeyPatch):
+    from argus.domain.usage_limits import GUEST_COMPUTE_DAILY_CEILING
+
     _guest(mock_gateway, monkeypatch, turns_today=GUEST_COMPUTE_DAILY_CEILING - 1)
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
 
@@ -127,34 +213,30 @@ def test_registered_accounts_and_run_actions_settle_nothing_against_the_ceiling(
         )
         is None
     )
-    assert guest_compute_settlement(
-        guest, is_run_backtest_turn=False, visitor_key="visitor:x"
-    ) == {
-        "resource": GUEST_COMPUTE_CEILING_RESOURCE,
-        "limits": [("day", GUEST_COMPUTE_DAILY_CEILING)],
-        "visitor_key": "visitor:x",
-    }
+    assert (
+        guest_compute_settlement(
+            guest, is_run_backtest_turn=False, visitor_key="visitor:x"
+        )
+        is None
+    )
 
 
-def test_refusal_observer_and_ceiling_settlement_fire_on_one_guest_terminal(
+def test_refusal_observer_fires_after_the_entry_claim(
     mock_gateway, monkeypatch: pytest.MonkeyPatch
 ):
-    # Two lanes hook the same terminal: the refusal log observes the pair
-    # after complete() returns, and the ceiling unit rides the finalize call
-    # inside it. One turn must show both, naming the same assistant message.
     observed: list[Any] = []
     monkeypatch.setattr(
         refusal_evidence,
         "persist_refusal_observation",
         lambda *, gateway, observation: observed.append(observation),
     )
-    _guest(mock_gateway, monkeypatch, turns_today=0)
+    fake = _guest(mock_gateway, monkeypatch, turns_today=0)
 
     response = client.post("/api/v1/chat/stream", json=TURN, headers=GUEST_HEADERS)
 
     assert response.status_code == 200, response.text
-    settlements = _assistant_settlements(mock_gateway)
-    assert [item["resource"] for item in settlements] == [GUEST_COMPUTE_CEILING_RESOURCE]
+    assert fake.claims == 1
+    assert _assistant_settlements(mock_gateway) == []
     assert len(observed) == 1
     assert observed[0].response_message_id in _terminal_message_ids(mock_gateway)
     assert observed[0].request_message_id != observed[0].response_message_id

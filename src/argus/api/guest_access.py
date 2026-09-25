@@ -8,6 +8,7 @@ from typing import Literal, Protocol
 
 from fastapi import Request
 
+from argus.api.client_ip import resolve_client_ip
 from argus.api.schemas import AccountCapabilities
 from argus.domain.guest_workspaces import GuestWorkspace
 from argus.domain.visitor_usage import visitor_key_for
@@ -75,18 +76,11 @@ _current_account_context: ContextVar[AccountContext | None] = ContextVar(
 def client_identity(request: Request) -> str:
     """Best available identifier for the visitor behind a request.
 
-    Prefers the first `x-forwarded-for` hop so a proxied deployment sees the
-    caller rather than the proxy. Guest allowances are charged against this
-    instead of a user id, because a guest user id renews on a timer.
+    Delegates to the single trusted-header helper. Guest allowances are
+    charged against this instead of a user id, because a guest user id
+    renews on a timer.
     """
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        first_hop = forwarded_for.split(",", 1)[0].strip()
-        if first_hop:
-            return first_hop
-    if request.client and request.client.host:
-        return request.client.host
-    return "unknown"
+    return resolve_client_ip(request)
 
 
 def visitor_key_for_request(request: Request) -> str:

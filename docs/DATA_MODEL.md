@@ -2010,9 +2010,9 @@ Tracks resource consumption for quotas and limits.
 Tracks visitor-scoped and shared provider allowances without inventing a
 profile owner. This is intentionally separate from `usage_counters`, whose
 `user_id` is a foreign key to `profiles.id`. It also holds the guest compute
-anti-abuse ceiling (`guest_compute_turns`, one unit per completed guest turn,
-settled in the terminal transaction), which is not an allowance and is never
-projected by `GET /me/usage`.
+anti-abuse ceiling (`guest_compute_turns`, one visitor-keyed row and one
+`session:<guest user id>` row, claimed atomically at turn start), which is
+not an allowance and is never projected by `GET /me/usage`.
 
 ### Fields
 - `visitor_key`: `text` (opaque keyed digest; never a raw address)
@@ -2032,8 +2032,8 @@ projected by `GET /me/usage`.
 - **Window lookup index**:
   `(visitor_key, resource, period_end)`
 - RLS is enabled with no policies. Only `service_role` has table access and may
-  execute `settle_visitor_usage`, `claim_research_usage`, or
-  `purge_expired_visitor_usage`.
+  execute `settle_visitor_usage`, `claim_research_usage`,
+  `claim_guest_compute_usage`, or `purge_expired_visitor_usage`.
 - Expired rows are disposable operational data, but `period_end` is not a timer
   and nothing in the database acts on it. The row has no owner to cascade from,
   so it is deleted only when a successful non-dry-run of the guest cleanup job
@@ -2080,6 +2080,18 @@ projected by `GET /me/usage`.
 - Cache hits, ordinary chat turns, unconfigured-provider paths, and persisted
   thorough-job replays never call the claim. Claim failures degrade to the honest
   research-capacity response and do not enter the provider path.
+
+### Guest compute policy
+- A guest's ordinary chat turns claim one `guest_compute_turns` unit against
+  the visitor digest and one unit against `session:<guest user id>` in the
+  same transaction, at turn start. The guest hits whichever daily ceiling
+  is lower. The visitor ceiling is 300. The session ceiling defaults to 100
+  (`ARGUS_GUEST_SESSION_DAILY_TURN_CEILING`) so one workspace cannot reset
+  the cap by changing IP. A claim that is admitted stands if the turn later
+  errors; there is no release. Migration
+  `20260925120000_claim_guest_compute_usage.sql` adds the claim. The visitor
+  identity is the trusted client IP header (`CF-Connecting-IP` by default,
+  `ARGUS_TRUSTED_CLIENT_IP_HEADER`), never the first `X-Forwarded-For` hop.
 
 ---
 

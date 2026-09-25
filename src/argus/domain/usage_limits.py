@@ -59,6 +59,30 @@ GUEST_COMPUTE_DAILY_CEILING = 300
 GUEST_COMPUTE_CEILING_LIMITS: list[tuple[str, int]] = [
     ("day", GUEST_COMPUTE_DAILY_CEILING)
 ]
+# One authenticated guest workspace is one person. The visitor (IP) ceiling
+# stays 300 so a shared NAT still has headroom. A single session hopping
+# IPs must not inherit that headroom. 100 is still far above any honest
+# guest conversation day and is env-overridable without a deploy.
+_GUEST_SESSION_DAILY_TURN_CEILING_DEFAULT = 100
+
+
+def guest_session_daily_turn_ceiling() -> int:
+    raw = os.getenv("ARGUS_GUEST_SESSION_DAILY_TURN_CEILING", "").strip()
+    if not raw:
+        return _GUEST_SESSION_DAILY_TURN_CEILING_DEFAULT
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return _GUEST_SESSION_DAILY_TURN_CEILING_DEFAULT
+    return parsed if parsed > 0 else _GUEST_SESSION_DAILY_TURN_CEILING_DEFAULT
+
+
+def guest_session_ceiling_limits() -> list[tuple[str, int]]:
+    return [("day", guest_session_daily_turn_ceiling())]
+
+
+def guest_compute_ceiling_limits() -> list[tuple[str, int]]:
+    return list(GUEST_COMPUTE_CEILING_LIMITS)
 
 # One ceiling for every research shape, not one per tier. A stranger cannot
 # tell a fast lookup from a thorough comparison, and a meter they cannot
