@@ -424,7 +424,7 @@ def test_guest_ip_limit_runs_before_anonymous_auth_creation(
                 client.post(
                     "/api/v1/auth/guest",
                     json={"captcha_token": "captcha-proof", "language": "en"},
-                    headers={"x-forwarded-for": "203.0.113.41"},
+                    headers={"CF-Connecting-IP": "203.0.113.41"},
                 )
             )
             client.cookies.clear()
