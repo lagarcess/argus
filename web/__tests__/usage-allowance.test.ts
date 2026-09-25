@@ -484,7 +484,6 @@ describe("private-alpha usage allowance", () => {
 
     const es = readLocale("es-419");
     expect(es.command_palette.decision_note_count).toBe("{{count}} / {{max}}");
-    expect(es.feedback.attachments_with_count).toBe("Adjuntos ({{count}}/5)");
     expect(es.chat.confirmation.asset_count).toBe("{{count}} activos");
   });
 

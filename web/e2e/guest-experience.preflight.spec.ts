@@ -638,8 +638,6 @@ test("feedback evidence helper distinguishes consent without private content", a
     const baseContext = {
       surface: "guest_header",
       tags: [],
-      hasAttachments: false,
-      attachmentCount: 0,
     };
     const unchecked = await apiJson<{ success: boolean }>(
       page.context().request,

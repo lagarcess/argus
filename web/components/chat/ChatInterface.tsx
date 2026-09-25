@@ -1000,7 +1000,6 @@ export default function ChatInterface() {
               includeConversationContext: true,
               rating,
               tags: [],
-              attachmentCount: 0,
             }),
           });
         } catch {

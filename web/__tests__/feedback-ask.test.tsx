@@ -140,8 +140,6 @@ describe("feedback ask", () => {
         evidence_artifact_id: "result-1-evidence",
         rating,
         tags: [],
-        hasAttachments: false,
-        attachmentCount: 0,
       });
       const serialized = JSON.stringify(context);
       expect(serialized).not.toContain(READOUT);
@@ -156,7 +154,7 @@ describe("feedback ask", () => {
       ...feedbackAskPointers(backtestResult("result-2"), "conversation-2"),
       conversation_id: "conversation-2",
     };
-    const detail = { tags: [], attachmentCount: 0 };
+    const detail = { tags: [] };
 
     expect(
       feedbackContextForSubmission(handed, { ...detail, includeConversationContext: false }),
@@ -164,8 +162,6 @@ describe("feedback ask", () => {
       source: "feedback_ask",
       surface: "chat",
       tags: [],
-      hasAttachments: false,
-      attachmentCount: 0,
     });
     expect(
       feedbackContextForSubmission(handed, { ...detail, includeConversationContext: true }),
