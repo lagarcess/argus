@@ -23,6 +23,7 @@ ProductEventKind = Literal[
     "continuity_mismatch",
     "compare_started",
     "next_experiments_offered",
+    "next_experiment_selected",
     "eval_readiness",
     "receipt_created",
     "receipt_revoked",
@@ -40,6 +41,7 @@ _PRODUCT_EVENT_MAP: dict[ProductEventKind, tuple[EventType, EventAction, Feature
     "continuity_mismatch": ("recovery", "failed", "continuity"),
     "compare_started": ("compare_started", "started", "result_explanation"),
     "next_experiments_offered": ("system", "completed", "result_explanation"),
+    "next_experiment_selected": ("system", "completed", "result_explanation"),
     "eval_readiness": ("eval_suite_run", "completed", "chat_interpretation"),
     # The receipt funnel. Viewer-side stages carry no actor and no source id, so
     # a public view can never be attributed back to the owner who shared it.

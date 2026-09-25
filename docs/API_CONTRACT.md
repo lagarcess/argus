@@ -6225,6 +6225,7 @@ Approved product events:
 - `continuity_mismatch`
 - `compare_started`
 - `next_experiments_offered`
+- `next_experiment_selected`
 - `eval_readiness`
 
 Each approved product event sets `attributes.product_event` to the registered

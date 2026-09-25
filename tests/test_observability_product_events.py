@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from argus.observability import EventCaptureResult
 from argus.observability.product_events import (
+    _PRODUCT_EVENT_MAP,
     build_product_event,
     capture_product_event,
 )
@@ -15,6 +16,7 @@ def test_product_event_mapping_covers_measurement_lane_set() -> None:
         "continuity_mismatch": ("recovery", "failed", "continuity"),
         "compare_started": ("compare_started", "started", "result_explanation"),
         "next_experiments_offered": ("system", "completed", "result_explanation"),
+        "next_experiment_selected": ("system", "completed", "result_explanation"),
         "eval_readiness": ("eval_suite_run", "completed", "chat_interpretation"),
         "account_registration_completed": ("storage", "completed", "guest_acquisition"),
     }
@@ -94,3 +96,45 @@ def test_capture_product_event_unknown_kind_fails_open(monkeypatch) -> None:
     assert result.status == "failed"
     assert result.reason == "unknown_product_event_kind"
     assert captured == []
+
+
+def test_runtime_emitted_product_event_kinds_are_registered() -> None:
+    for kind in (
+        "next_experiments_offered",
+        "next_experiment_selected",
+        "compare_started",
+    ):
+        assert kind in _PRODUCT_EVENT_MAP
+
+
+def test_capture_product_event_maps_next_experiment_selected(monkeypatch) -> None:
+    captured = []
+
+    def fake_capture(envelope):  # noqa: ANN001
+        captured.append(envelope)
+        return EventCaptureResult(
+            status="captured",
+            reason=None,
+            event_id=envelope.event_id,
+            destination="posthog",
+        )
+
+    monkeypatch.setattr("argus.observability.product_events.capture_event", fake_capture)
+
+    result = capture_product_event(
+        "next_experiment_selected",
+        user_id="user-1",
+        conversation_id="conversation-1",
+        attributes={"kind": "change_date_range", "position": 0},
+    )
+
+    assert result.status == "captured"
+    assert result.reason != "unknown_product_event_kind"
+    assert captured[0].event_type == "system"
+    assert captured[0].event_action == "completed"
+    assert captured[0].feature_area == "result_explanation"
+    assert captured[0].attributes == {
+        "kind": "change_date_range",
+        "position": 0,
+        "product_event": "next_experiment_selected",
+    }
