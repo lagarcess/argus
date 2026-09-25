@@ -82,7 +82,7 @@ def emit_runtime_measurement_events(
         )
     failure_code = _continuity_failure_code(metadata)
     if failure_code is not None:
-        capture_product_event(
+        _capture_runtime_product_event(
             "continuity_mismatch",
             user_id=user_id,
             conversation_id=conversation_id,
@@ -108,7 +108,7 @@ def emit_runtime_measurement_events(
         if kinds:
             # Stage-1 ordering consumes these impressions; acceptance rides
             # the persisted select_response_option turns.
-            capture_product_event(
+            _capture_runtime_product_event(
                 "next_experiments_offered",
                 user_id=user_id,
                 conversation_id=conversation_id,
@@ -126,13 +126,38 @@ def emit_runtime_measurement_events(
     candidate_count = _positive_int(comparison_started.get("candidate_count"))
     if candidate_count is not None:
         attributes["candidate_count"] = candidate_count
-    capture_product_event(
+    _capture_runtime_product_event(
         "compare_started",
         user_id=user_id,
         conversation_id=conversation_id,
         status="started",
         attributes=attributes,
     )
+
+
+def _capture_runtime_product_event(
+    kind: str,
+    *,
+    user_id: str,
+    conversation_id: str,
+    status: str | None = None,
+    attributes: dict[str, Any] | None = None,
+) -> None:
+    try:
+        capture_product_event(
+            kind,
+            user_id=user_id,
+            conversation_id=conversation_id,
+            status=status,
+            attributes=attributes,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Runtime measurement product event capture failed",
+            error=str(exc),
+            product_event=kind,
+            conversation_id=conversation_id,
+        )
 
 
 def _continuity_failure_code(metadata: dict[str, Any]) -> str | None:
