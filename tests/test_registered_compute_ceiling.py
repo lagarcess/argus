@@ -90,6 +90,20 @@ def test_registered_compute_claim_sql_is_service_role_only() -> None:
     assert "to service_role" in lowered
 
 
+def test_guest_and_signed_in_claim_outages_share_one_retry_interval() -> None:
+    from argus.api.chat import guest_compute_ceiling, registered_compute_ceiling
+    from argus.domain.usage_limits import (
+        COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS,
+    )
+
+    assert (
+        guest_compute_ceiling.COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS
+        is registered_compute_ceiling.COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS
+        is COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS
+    )
+    assert COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS == 15
+
+
 def test_registered_caps_read_env_or_the_code_owned_defaults(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

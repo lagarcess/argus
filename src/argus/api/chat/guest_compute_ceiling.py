@@ -35,6 +35,7 @@ from argus.api.guest_access import AccountContext, account_context, client_ident
 from argus.api.schemas import User
 from argus.domain.usage_limits import (
     COMPUTE_CLAIM_UNAVAILABLE_DETAIL,
+    COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS,
     COMPUTE_TURN_CEILING_DETAIL,
     GUEST_COMPUTE_CEILING_RESOURCE,
     align_usage_period,
@@ -49,7 +50,6 @@ from argus.domain.visitor_usage import (
 )
 
 _MEMORY_CLAIM_LOCK = threading.Lock()
-CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -142,7 +142,7 @@ def check_guest_compute_ceiling(request: Request, user: User) -> None:
             title="Service Temporarily Unavailable",
             detail=COMPUTE_CLAIM_UNAVAILABLE_DETAIL,
             headers={
-                "Retry-After": str(CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS),
+                "Retry-After": str(COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS),
             },
         )
     _, day_end = align_usage_period(now, "day")

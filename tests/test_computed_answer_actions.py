@@ -406,6 +406,54 @@ def test_refresh_names_the_readers_country_and_currency_in_the_lookup(
     )
 
 
+def test_a_failed_refresh_returns_the_signed_in_research_claim(
+    client, monkeypatch
+) -> None:
+    from argus.agent_runtime import research_grounded as grounded
+    from argus.api import state as api_state
+    from argus.api.chat.research_evidence import RESEARCH_USAGE_RESOURCE
+    from argus.domain.research.contracts import ResearchUnavailableError
+    from argus.domain.visitor_usage import (
+        read_memory_visitor_used,
+        registered_account_usage_key,
+    )
+
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+
+    class _FailingClient:
+        def run_research(self, *_args: Any, **_kwargs: Any):
+            raise ResearchUnavailableError("timeout")
+
+    monkeypatch.setattr(grounded, "_client", lambda: _FailingClient())
+    owner = client.get("/api/v1/me").json()["user"]["id"]
+    key = registered_account_usage_key(owner)
+    conversation = _conversation(client)
+    message_id = _answer(
+        client,
+        conversation,
+        "valuation_scenarios",
+        CITED_VALUATION,
+        "What will NVDA be worth?",
+    )
+
+    response = client.post(
+        f"/api/v1/conversations/{conversation}/messages/{message_id}/computation/refresh"
+    )
+
+    assert response.status_code == 503
+    assert "research_unavailable" in response.text
+    assert (
+        read_memory_visitor_used(
+            api_state.store.visitor_usage_counters,
+            visitor_key=key,
+            resource=RESEARCH_USAGE_RESOURCE,
+            period="day",
+        )
+        == 0
+    )
+
+
 def test_refresh_is_refused_before_any_provider_work_when_the_allowance_is_spent(
     client, monkeypatch
 ) -> None:

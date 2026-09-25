@@ -78,6 +78,9 @@ COMPUTE_TURN_CEILING_DETAIL = "Too many conversation turns today."
 COMPUTE_CLAIM_UNAVAILABLE_DETAIL = (
     "Argus could not start this turn. Please try again."
 )
+# One Retry-After for every compute-claim outage. Guest and signed-in 503s
+# both read this so the wait cannot drift.
+COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS = 15
 
 
 def positive_int_env(name: str, default: int) -> int:
