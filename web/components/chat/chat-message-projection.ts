@@ -63,18 +63,22 @@ import {
 import {
   GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
   guestClaimErrorKeepsLocalTranscript,
+  guestClaimErrorMessagePatch,
   guestClaimErrorRetryAction,
   guestClaimErrorTerminalPayload,
   guestComputeClaimTransportPatch,
   isGuestComputeClaimUnavailable,
+  settleGuestClaimTransportReadiness,
 } from "@/lib/guest-compute-claim-error";
 
 export {
   guestClaimErrorKeepsLocalTranscript,
+  guestClaimErrorMessagePatch,
   guestClaimErrorRetryAction,
   guestClaimErrorTerminalPayload,
   guestComputeClaimTransportPatch,
   isGuestComputeClaimUnavailable,
+  settleGuestClaimTransportReadiness,
 };
 import {
   applyConsumedResultActions,

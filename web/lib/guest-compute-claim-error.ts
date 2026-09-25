@@ -87,3 +87,42 @@ export function guestClaimErrorTerminalPayload(assistantMessageId: string): {
     recovery: { code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE },
   };
 }
+
+export function guestClaimErrorMessagePatch(input: {
+  code: string | null | undefined;
+  retryAfterHeader: string | null | undefined;
+  retryAction: ChatActionOption | null;
+  message: string;
+  assistantMessageId: string;
+  nowMs?: number;
+}) {
+  return guestComputeClaimTransportPatch({
+    code: input.code,
+    retryAfterHeader: input.retryAfterHeader,
+    retryAction: guestClaimErrorRetryAction(input),
+    nowMs: input.nowMs,
+  });
+}
+
+type ClaimTransportReadiness = {
+  accept: (
+    payload: ReturnType<typeof guestClaimErrorTerminalPayload>,
+    identityAuthorized: boolean,
+  ) => boolean;
+  finish: (identityAuthorized: boolean) => boolean;
+};
+
+export function settleGuestClaimTransportReadiness(
+  terminalReadiness: ClaimTransportReadiness,
+  code: string | null | undefined,
+  assistantMessageId: string,
+  authorized: boolean,
+): void {
+  if (guestClaimErrorKeepsLocalTranscript(code)) {
+    terminalReadiness.accept(
+      guestClaimErrorTerminalPayload(assistantMessageId),
+      authorized,
+    );
+  }
+  terminalReadiness.finish(authorized);
+}

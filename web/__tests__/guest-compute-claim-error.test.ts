@@ -9,9 +9,11 @@ import {
   GUEST_COMPUTE_CLAIM_RETRY_IN_KEY,
   GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
   guestClaimErrorKeepsLocalTranscript,
+  guestClaimErrorMessagePatch,
   guestClaimErrorRetryAction,
   guestClaimErrorTerminalPayload,
   guestComputeClaimTransportPatch,
+  settleGuestClaimTransportReadiness,
   localizedGuestComputeClaimMessage,
 } from "../lib/guest-compute-claim-error";
 import { recoveryDisplayText } from "../lib/chat-recovery-display";
@@ -343,13 +345,39 @@ describe("guest compute claim error copy", () => {
       failed_assistant_id: "assistant-claim-1",
     });
 
-    const later = guestComputeClaimTransportPatch({
+    const later = guestClaimErrorMessagePatch({
       code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
       retryAfterHeader: "4",
       retryAction: rebuilt,
+      message: "Compare Apple with SPY",
+      assistantMessageId: "assistant-claim-1",
       nowMs,
     });
     expect(later.actions?.[0]?.availableAtMs).toBe(nowMs + 4_000);
+    const accepts: unknown[] = [];
+    const finishes: boolean[] = [];
+    settleGuestClaimTransportReadiness(
+      {
+        accept: (payload, authorized) => {
+          accepts.push({ payload, authorized });
+          return authorized;
+        },
+        finish: (authorized) => {
+          finishes.push(authorized);
+          return false;
+        },
+      },
+      GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      "assistant-claim-1",
+      true,
+    );
+    expect(accepts).toEqual([
+      {
+        payload: guestClaimErrorTerminalPayload("assistant-claim-1"),
+        authorized: true,
+      },
+    ]);
+    expect(finishes).toEqual([true]);
     expect(
       guestClaimErrorRetryAction({
         code: "too_many_requests",
@@ -367,10 +395,9 @@ describe("guest compute claim error copy", () => {
     );
     expect(chat).toContain("keepLocalTranscript");
     expect(chat).toContain("if (!options?.keepLocalTranscript)");
-    expect(chat).toContain("guestClaimErrorKeepsLocalTranscript(rejectionCode)");
-    expect(chat).toContain("guestClaimErrorTerminalPayload(assistantId)");
-    expect(chat).toContain("guestClaimErrorRetryAction({");
-    expect(chat).toContain("const keepLocalTranscript = !requestMessageId");
+    expect(chat).toContain("guestClaimErrorMessagePatch({");
+    expect(chat).toContain("settleGuestClaimTransportReadiness(terminalReadiness, rejectionCode, assistantId,");
+    expect(chat).toContain("retryLastTurnSendOptions({ failedAssistantId, requestMessageId })");
   });
 
   test("countdown labels localize without raw server text", () => {

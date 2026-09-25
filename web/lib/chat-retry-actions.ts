@@ -246,6 +246,28 @@ export function durableRetryLastTurnFromStreamError(
   return action ? { action, persistedMessage, requestMessageId } : null;
 }
 
+export function retryLastTurnSendOptions(input: {
+  failedAssistantId: string | null;
+  requestMessageId: string | null;
+}): {
+  renderUserMessage: boolean;
+  replacementAssistantId?: string;
+  keepLocalTranscript?: boolean;
+} {
+  const keepLocalTranscript = !input.requestMessageId;
+  if (input.failedAssistantId) {
+    return {
+      renderUserMessage: false,
+      replacementAssistantId: input.failedAssistantId,
+      keepLocalTranscript,
+    };
+  }
+  if (input.requestMessageId) {
+    return { renderUserMessage: true };
+  }
+  return { renderUserMessage: false, keepLocalTranscript };
+}
+
 export function retryLastTurnRequestMessageIdFromAction(
   action: ChatActionOption | null | undefined,
 ): string | null {
