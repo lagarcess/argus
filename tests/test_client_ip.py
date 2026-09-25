@@ -131,6 +131,26 @@ def test_hosted_fallback_warns_once_per_minute(monkeypatch) -> None:
         assert warning.call_args.kwargs["peer"] == "10.0.0.8"
 
 
+def test_hosted_invalid_trusted_header_warns_separately_and_throttles(
+    monkeypatch,
+) -> None:
+    _hosted_env(monkeypatch)
+    request = _request(
+        headers={"CF-Connecting-IP": "not-an-ip; drop table"},
+        peer="10.0.0.8",
+    )
+    with patch("argus.api.client_ip.logger.warning") as warning:
+        assert resolve_client_ip(request) == "10.0.0.8"
+        assert resolve_client_ip(request) == "10.0.0.8"
+        warning.assert_called_once()
+        assert (
+            warning.call_args.args[0]
+            == "Trusted client-IP header present but invalid; using socket peer"
+        )
+        assert warning.call_args.kwargs["header"] == "CF-Connecting-IP"
+        assert warning.call_args.kwargs["peer"] == "10.0.0.8"
+
+
 def test_local_dev_fallback_does_not_warn(monkeypatch) -> None:
     monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "memory")
     monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "true")

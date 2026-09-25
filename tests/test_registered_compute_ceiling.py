@@ -19,9 +19,11 @@ from argus.api.chat.research_evidence import (
 )
 from argus.domain.usage_limits import (
     COMPUTE_TURN_CEILING_DETAIL,
+    POSTGRES_INTEGER_MAX,
     REGISTERED_COMPUTE_CEILING_RESOURCE,
     registered_daily_research_ceiling,
     registered_daily_turn_ceiling,
+    reset_positive_int_env_warnings_for_tests,
 )
 from argus.domain.visitor_usage import (
     read_memory_visitor_used,
@@ -119,6 +121,63 @@ def test_registered_caps_read_env_or_the_code_owned_defaults(
     monkeypatch.setenv("ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", "nope")
     assert registered_daily_turn_ceiling() == 200
     assert registered_daily_research_ceiling() == 15
+
+
+def test_registered_caps_accept_postgres_integer_max_and_fall_back_past_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import patch
+
+    from argus.domain.usage_limits import guest_session_daily_turn_ceiling
+
+    reset_positive_int_env_warnings_for_tests()
+    monkeypatch.setenv(
+        "ARGUS_REGISTERED_DAILY_TURN_CEILING", str(POSTGRES_INTEGER_MAX)
+    )
+    monkeypatch.setenv(
+        "ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", str(POSTGRES_INTEGER_MAX)
+    )
+    assert registered_daily_turn_ceiling() == POSTGRES_INTEGER_MAX
+    assert registered_daily_research_ceiling() == POSTGRES_INTEGER_MAX
+
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", "3000000000")
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", "2147483648")
+    monkeypatch.setenv("ARGUS_GUEST_SESSION_DAILY_TURN_CEILING", "3000000000")
+    with patch("argus.domain.usage_limits.logger.warning") as warning:
+        assert registered_daily_turn_ceiling() == 200
+        assert registered_daily_research_ceiling() == 15
+        assert guest_session_daily_turn_ceiling() == 100
+        registered_daily_turn_ceiling()
+        registered_daily_research_ceiling()
+        guest_session_daily_turn_ceiling()
+    assert warning.call_count == 3
+    names = {call.kwargs["name"] for call in warning.call_args_list}
+    assert names == {
+        "ARGUS_REGISTERED_DAILY_TURN_CEILING",
+        "ARGUS_REGISTERED_DAILY_RESEARCH_CEILING",
+        "ARGUS_GUEST_SESSION_DAILY_TURN_CEILING",
+    }
+    assert all(call.kwargs["default"] in {200, 15, 100} for call in warning.call_args_list)
+
+
+def test_registered_caps_treat_garbage_env_as_the_code_owned_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import patch
+
+    reset_positive_int_env_warnings_for_tests()
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", "3.5")
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", "-1")
+    with patch("argus.domain.usage_limits.logger.warning") as warning:
+        assert registered_daily_turn_ceiling() == 200
+        assert registered_daily_research_ceiling() == 15
+        registered_daily_turn_ceiling()
+        registered_daily_research_ceiling()
+    assert warning.call_count == 2
+    assert {call.kwargs["value"] for call in warning.call_args_list} == {
+        "3.5",
+        "-1",
+    }
 
 
 def test_the_201st_signed_in_turn_is_refused_with_the_limit_response(

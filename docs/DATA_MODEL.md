@@ -2018,7 +2018,9 @@ signed-in compute ceiling (`account_compute_turns`, keyed on
 subject on `research_searches`.
 
 ### Fields
-- `visitor_key`: `text` (opaque keyed digest; never a raw address)
+- `visitor_key`: `text` (opaque subject; never a raw address). `visitor:`
+  keys are a keyed digest. `user:<account id>` and `session:<guest user id>`
+  store the id as-is.
 - `resource`: `text` (`discovery_searches`, `research_searches`,
   `guest_compute_turns`, `account_compute_turns`)
 - `period`: `text` (`day`)

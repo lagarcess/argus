@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Protocol
 
+from loguru import logger
+
 if TYPE_CHECKING:
     from argus.api.guest_access import AccountContext
 
@@ -83,16 +85,48 @@ COMPUTE_CLAIM_UNAVAILABLE_DETAIL = (
 COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS = 15
 
 
+# Postgres ``integer`` max. A typo like 3000000000 overflows the claim
+# RPC and turns every signed-in request into a 503.
+POSTGRES_INTEGER_MAX = 2**31 - 1
+_INVALID_POSITIVE_INT_ENV_WARNED: set[str] = set()
+
+
+def reset_positive_int_env_warnings_for_tests() -> None:
+    _INVALID_POSITIVE_INT_ENV_WARNED.clear()
+
+
 def positive_int_env(name: str, default: int) -> int:
-    """Blank, invalid, or non-positive values keep the code-owned default."""
+    """Blank, invalid, non-positive, or overflow values keep the default.
+
+    Overflow is the same class of unusable env as garbage: fall back with
+    one warning per process so a typo cannot take the API down or flood
+    logs on every claim. Guest session, registered chat, registered
+    research, and the two global ceilings share this helper.
+    """
     raw = os.getenv(name, "").strip()
     if not raw:
         return default
     try:
         parsed = int(raw)
     except ValueError:
+        _warn_invalid_positive_int_env(name, raw, default)
         return default
-    return parsed if parsed > 0 else default
+    if parsed < 1 or parsed > POSTGRES_INTEGER_MAX:
+        _warn_invalid_positive_int_env(name, raw, default)
+        return default
+    return parsed
+
+
+def _warn_invalid_positive_int_env(name: str, raw: str, default: int) -> None:
+    if name in _INVALID_POSITIVE_INT_ENV_WARNED:
+        return
+    _INVALID_POSITIVE_INT_ENV_WARNED.add(name)
+    logger.warning(
+        "Invalid usage-limit env; using the code-owned default",
+        name=name,
+        value=raw,
+        default=default,
+    )
 
 
 def guest_session_daily_turn_ceiling() -> int:

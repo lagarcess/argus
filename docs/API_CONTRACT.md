@@ -2923,7 +2923,7 @@ Three operation classes, one meter each:
 
 **Allowance semantics:**
 - Every class carries the same five keys. An unbounded class has every window
-  `null`, `available_now: true`, and `limiting_window: null`.   `compute` is
+  `null`, `available_now: true`, and `limiting_window: null`. `compute` is
   always unbounded. `grounding` is unbounded for a signed-in account while the
   research rail is on: the per-account research cap and the shared daily
   ceiling are anti-abuse circuit breakers rather than allowance windows and

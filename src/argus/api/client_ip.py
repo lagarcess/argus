@@ -45,7 +45,9 @@ def _hosted_runtime() -> bool:
     return os.getenv("ARGUS_DEV_MEMORY_FALLBACK", "").strip().lower() != "true"
 
 
-def _warn_trusted_header_fallback(*, header_name: str, peer: str) -> None:
+def _warn_trusted_header_fallback(
+    *, header_name: str, peer: str, reason: str
+) -> None:
     if not _hosted_runtime():
         return
     global _last_fallback_warn_at
@@ -54,11 +56,11 @@ def _warn_trusted_header_fallback(*, header_name: str, peer: str) -> None:
         if now - _last_fallback_warn_at < FALLBACK_WARN_INTERVAL_SECONDS:
             return
         _last_fallback_warn_at = now
-    logger.warning(
-        "Trusted client-IP header missing; using socket peer",
-        header=header_name,
-        peer=peer,
-    )
+    if reason == "invalid":
+        message = "Trusted client-IP header present but invalid; using socket peer"
+    else:
+        message = "Trusted client-IP header missing; using socket peer"
+    logger.warning(message, header=header_name, peer=peer)
 
 
 def _parse_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
@@ -94,15 +96,21 @@ def resolve_client_ip(request: Request) -> str:
     """The one client-IP read every visitor key and IP limiter must use."""
     header_name = trusted_client_ip_header_name()
     raw = request.headers.get(header_name)
+    invalid_header = False
     if raw:
         value = raw.split(",", 1)[0].strip()
         if value:
             parsed = canonical_client_ip(value)
             if parsed is not None:
                 return parsed
+            invalid_header = True
     peer = request.client.host if request.client and request.client.host else "unknown"
     parsed_peer = canonical_client_ip(peer) if peer != "unknown" else None
-    _warn_trusted_header_fallback(header_name=header_name, peer=peer)
+    _warn_trusted_header_fallback(
+        header_name=header_name,
+        peer=peer,
+        reason="invalid" if invalid_header else "missing",
+    )
     # A missing peer is unknown. A present non-IP peer (TestClient, unix
     # socket) stays that stable identity instead of collapsing every
     # unparseable caller into one shared bucket.
