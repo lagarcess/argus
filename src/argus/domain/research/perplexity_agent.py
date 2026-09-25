@@ -516,9 +516,10 @@ def _packet_from_response(
         # Argus was billed for, not a crashed turn. Checking each nested shape
         # would only name the ones seen so far; the next one is already out
         # there. The catch is wide enough to cover an Argus-side regression in
-        # the parser too, so the traceback is attached: no sink is configured,
-        # and loguru's default renders it. What leaves with the error stays
-        # generic instead, because a failed job serves its detail to a reader.
+        # the parser too, so the traceback is attached. The process sink is
+        # configured with diagnose=False, so frame locals stay out of the log.
+        # What leaves with the error stays generic instead, because a failed
+        # job serves its detail to a reader.
         logger.opt(exception=True).warning("Research response could not be parsed")
         raise ResearchUnavailableError(
             "malformed_response", "response shape not parseable", usage=usage

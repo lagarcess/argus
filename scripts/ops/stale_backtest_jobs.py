@@ -71,6 +71,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    from argus.observability.log_sink import configure_logging
+
+    configure_logging()
     parser = _build_parser()
     args = parser.parse_args(argv)
     _prepare_supabase_env()

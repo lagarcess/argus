@@ -29,7 +29,10 @@ from argus.observability.cost_ledger import (
     normalize_cost_ledger_entry,
     persist_openrouter_cost_ledger_entries,
 )
+from argus.observability.log_sink import configure_logging
 from loguru import logger
+
+configure_logging()
 
 if TYPE_CHECKING:
     from argus.agent_runtime.result_readout import ResultReadout
