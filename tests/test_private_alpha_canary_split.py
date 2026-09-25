@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -12,9 +13,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Iterator
 
+import pytest
 from faker import Faker
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _bun() -> str:
+    return shutil.which("bun") or pytest.skip("bun is not available")
 
 
 def _source(path: str) -> str:
@@ -432,7 +438,7 @@ def test_session_tool_mints_private_storage_state_and_revokes_it(
             }
         )
         minted = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -457,7 +463,7 @@ def test_session_tool_mints_private_storage_state_and_revokes_it(
         assert email not in minted.stdout + minted.stderr
 
         revoked = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "revoke"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "revoke"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -498,7 +504,7 @@ def test_session_tool_retries_a_transient_allowlist_lookup_and_reports_it(
             }
         )
         minted = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -552,7 +558,7 @@ def test_session_tool_revokes_a_minted_session_that_fails_least_privilege(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -596,7 +602,7 @@ def test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails(
             }
         )
         failed_mint = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -604,7 +610,7 @@ def test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails(
             check=False,
         )
         retry = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "revoke"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "revoke"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -655,7 +661,7 @@ def test_session_tool_rejects_a_stale_admin_profile_before_mint(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -799,7 +805,7 @@ def test_session_tool_provisions_only_a_safe_dedicated_identity(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -860,7 +866,7 @@ def test_session_tool_revokes_and_rolls_back_a_failed_profile_bootstrap(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -900,7 +906,7 @@ def test_session_tool_refuses_to_relabel_an_existing_unknown_identity(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -939,7 +945,7 @@ def test_session_tool_refuses_to_overwrite_an_elevated_allowlist_role(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -976,7 +982,7 @@ def test_session_tool_refuses_to_provision_over_a_stale_admin_profile(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,

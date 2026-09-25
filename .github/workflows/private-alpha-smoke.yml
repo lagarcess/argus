@@ -16,10 +16,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  docs-change-gate:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
+    outputs:
+      run_heavy: ${{ steps.classify.outputs.run_heavy }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify docs-only changes
+        id: classify
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: .github/docs-only-changes.sh
+
   local-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
+    needs: docs-change-gate
+    if: (github.event.pull_request.draft == false || github.event_name != 'pull_request') && needs.docs-change-gate.outputs.run_heavy == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

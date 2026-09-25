@@ -99,6 +99,7 @@
     "tests/test_guest_handoff_postgres.py": 1177,
     "tests/test_history_postgres.py": 1425,
     "tests/test_openrouter_policy.py": 4172,
+    "tests/test_private_alpha_canary_split.py": 1000,
     "tests/test_private_alpha_release_docs.py": 1301,
     "tests/test_public_alpha_render_load_hardening.py": 1071,
     "tests/test_public_excerpt_api.py": 1005,
