@@ -2088,7 +2088,9 @@ not an allowance and is never projected by `GET /me/usage`.
   is lower. The visitor ceiling is 300. The session ceiling defaults to 100
   (`ARGUS_GUEST_SESSION_DAILY_TURN_CEILING`) so one workspace cannot reset
   the cap by changing IP. A claim that is admitted stands if the turn later
-  errors; there is no release. Migration
+  errors; there is no release. A claim RPC error is not treated as
+  exhaustion; the guest sees a short retry, not the daily-cap 429.
+  Migration
   `20260925120000_claim_guest_compute_usage.sql` adds the claim. The visitor
   identity is the trusted client IP header (`CF-Connecting-IP` by default,
   `ARGUS_TRUSTED_CLIENT_IP_HEADER`), never the first `X-Forwarded-For` hop.

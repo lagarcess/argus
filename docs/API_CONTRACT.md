@@ -133,7 +133,10 @@ ceilings are not an allowance: `GET /me/usage` reports conversation as
 unbounded and never projects this counter, and no product surface names
 it. At either ceiling `POST /chat/stream` answers the same `429` shape
 with `code: "too_many_requests"` and `Retry-After` set to the seconds
-until the UTC day resets. Run actions are execution and do not count;
+until the UTC day resets. A claim that cannot run (missing RPC,
+persistence error) is not a daily cap: `POST /chat/stream` answers
+`503` with `code: "guest_compute_claim_unavailable"` and a short
+`Retry-After`. Run actions are execution and do not count;
 signed-in accounts carry no such ceiling.
 
 Supported rate-limit headers where applicable:

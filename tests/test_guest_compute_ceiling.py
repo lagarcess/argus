@@ -157,6 +157,28 @@ def test_guest_turn_claims_one_ceiling_unit_at_entry(
     mock_gateway.check_usage_limits.assert_not_called()
 
 
+def test_claim_error_is_503_not_the_daily_cap(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    fake = _guest(mock_gateway, monkeypatch, turns_today=0)
+
+    def boom(*_args: Any, **_kwargs: Any) -> None:
+        raise RuntimeError("rpc missing")
+
+    fake.rpc = boom  # type: ignore[method-assign]
+
+    response = client.post("/api/v1/chat/stream", json=TURN, headers=GUEST_HEADERS)
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["code"] == "guest_compute_claim_unavailable"
+    assert body["detail"] == "Argus could not start this turn. Please try again."
+    assert response.headers["Retry-After"] == "15"
+    assert "Too many conversation turns today." not in response.text
+    mock_gateway.create_message.assert_not_called()
+
+
 def test_guest_at_the_ceiling_is_refused_at_entry_without_charging(
     mock_gateway, monkeypatch: pytest.MonkeyPatch
 ):

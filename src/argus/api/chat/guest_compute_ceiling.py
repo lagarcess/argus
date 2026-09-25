@@ -43,6 +43,7 @@ from argus.domain.visitor_usage import (
 )
 
 _MEMORY_CLAIM_LOCK = threading.Lock()
+CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -50,6 +51,7 @@ class GuestComputeAdmission:
     available: bool
     visitor_exhausted: bool = False
     session_exhausted: bool = False
+    error: bool = False
 
 
 def claim_guest_compute_turn(
@@ -93,15 +95,15 @@ def claim_guest_compute_turn(
             except Exception as memory_exc:
                 logger.warning(
                     "Guest compute memory claim failed; "
-                    "treating capacity as exhausted",
+                    "returning claim unavailable",
                     error=str(memory_exc),
                 )
-                return GuestComputeAdmission(available=False)
+                return GuestComputeAdmission(available=False, error=True)
         logger.warning(
-            "Guest compute claim failed; treating capacity as exhausted",
+            "Guest compute claim failed; returning claim unavailable",
             error=str(exc),
         )
-        return GuestComputeAdmission(available=False)
+        return GuestComputeAdmission(available=False, error=True)
 
 
 def check_guest_compute_ceiling(request: Request, user: User) -> None:
@@ -116,6 +118,22 @@ def check_guest_compute_ceiling(request: Request, user: User) -> None:
     )
     if admission.available:
         return
+    if admission.error:
+        logger.warning(
+            "Guest compute claim unavailable",
+            user_id=user.id,
+            failure_classification="claim_unavailable",
+        )
+        raise problem(
+            request,
+            status_code=503,
+            code="guest_compute_claim_unavailable",
+            title="Service Temporarily Unavailable",
+            detail="Argus could not start this turn. Please try again.",
+            headers={
+                "Retry-After": str(CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS),
+            },
+        )
     _, day_end = align_usage_period(now, "day")
     logger.warning(
         "Guest compute ceiling reached",
