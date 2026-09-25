@@ -156,6 +156,27 @@ def test_non_latin1_ops_authorization_is_rejected_without_raising(
     assert exc_info.value.status_code == 404
 
 
+def test_argus_package_import_installs_safe_handler() -> None:
+    logger.remove()
+    logger.add(sys.stderr)
+    import argus
+
+    importlib.reload(argus)
+    _assert_handlers_are_safe()
+
+
+def test_perplexity_client_import_uses_package_logging_owner() -> None:
+    logger.remove()
+    logger.add(sys.stderr)
+    import argus
+
+    importlib.reload(argus)
+    from argus.domain.research.perplexity_agent import PerplexityAgentClient
+
+    assert PerplexityAgentClient is not None
+    _assert_handlers_are_safe()
+
+
 def test_api_app_import_installs_safe_handler() -> None:
     from argus.api import app_setup
 
