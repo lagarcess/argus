@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 from pathlib import Path
 
 import yaml
+from faker import Faker
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "ci.yml"
@@ -12,7 +15,43 @@ SMOKE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "private-alpha-smoke.yml"
 AGENT_RUNTIME_WORKFLOW_PATH = (
     ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
 )
+DOCS_ONLY_SCRIPT = ROOT / ".github" / "docs-only-changes.sh"
 RUNBOOK_PATH = ROOT / "docs" / "PRIVATE_LAUNCH_RUNBOOK.md"
+FAKE = Faker()
+
+_HEAVY_CI_JOBS = ("backend-checks", "frontend-checks", "guest-release-gates")
+_DRAFT_OR_PUSH = (
+    "github.event.pull_request.draft == false || github.event_name == 'push'"
+)
+_DRAFT_OR_NON_PR = (
+    "github.event.pull_request.draft == false || "
+    "github.event_name != 'pull_request'"
+)
+
+
+def _job_needs(job: dict) -> list[str]:
+    needs = job.get("needs")
+    if needs is None:
+        return []
+    if isinstance(needs, str):
+        return [needs]
+    return list(needs)
+
+
+def _classify_changed_files(*files: str) -> dict[str, str]:
+    result = subprocess.run(
+        ["bash", str(DOCS_ONLY_SCRIPT), "--files", *files],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {
+        key: value
+        for line in result.stdout.splitlines()
+        if "=" in line
+        for key, value in (line.split("=", 1),)
+        if key in {"docs_only", "run_heavy"}
+    }
 
 
 def _workflow() -> dict:
@@ -58,7 +97,13 @@ def test_ci_queues_integration_branch_runs_without_canceling_evidence() -> None:
 def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
     jobs = _workflow()["jobs"]
 
-    assert {"ownership-gate", "backend-checks", "frontend-checks", "ci"} <= set(jobs)
+    assert {
+        "docs-change-gate",
+        "ownership-gate",
+        "backend-checks",
+        "frontend-checks",
+        "ci",
+    } <= set(jobs)
     assert "mock-demo phase" not in WORKFLOW_PATH.read_text(encoding="utf-8")
 
     backend_steps = "\n".join(
@@ -135,11 +180,30 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
     jobs = _workflow()["jobs"]
 
     assert jobs["ci"]["needs"] == [
+        "docs-change-gate",
         "ownership-gate",
         "backend-checks",
         "frontend-checks",
         "guest-release-gates",
     ]
+    assert jobs["ci"]["if"] == f"always() && ({_DRAFT_OR_PUSH})"
+    aggregator_env = jobs["ci"]["steps"][0]["env"]
+    assert aggregator_env["DOCS_CHANGE_GATE"] == (
+        "${{ needs.docs-change-gate.result }}"
+    )
+    assert aggregator_env["OWNERSHIP_GATE"] == "${{ needs.ownership-gate.result }}"
+    assert aggregator_env["BACKEND_CHECKS"] == "${{ needs.backend-checks.result }}"
+    assert aggregator_env["FRONTEND_CHECKS"] == "${{ needs.frontend-checks.result }}"
+    assert aggregator_env["GUEST_RELEASE_GATES"] == (
+        "${{ needs.guest-release-gates.result }}"
+    )
+    aggregator_run = jobs["ci"]["steps"][0]["run"]
+    assert "CI checks passed." in aggregator_run
+    assert "require_success docs-change-gate" in aggregator_run
+    assert "require_success ownership-gate" in aggregator_run
+    assert "require_success_or_skipped backend-checks" in aggregator_run
+    assert "require_success_or_skipped frontend-checks" in aggregator_run
+    assert "require_success_or_skipped guest-release-gates" in aggregator_run
 
 
 def test_private_alpha_canary_workflow_is_manual_and_scheduled_only() -> None:
@@ -348,6 +412,11 @@ def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
 
     job = workflow["jobs"]["local-smoke"]
     assert job["timeout-minutes"] == 10
+    assert _job_needs(job) == ["docs-change-gate"]
+    assert job["if"] == (
+        f"({_DRAFT_OR_NON_PR}) && "
+        "needs.docs-change-gate.outputs.run_heavy == 'true'"
+    )
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev,workflows --no-interaction" in joined_steps
     assert "cd web && bun install --frozen-lockfile" in joined_steps
@@ -423,3 +492,97 @@ def test_agent_runtime_regression_workflow_runs_full_runtime_sweep() -> None:
     assert hidden_regression_file.exists()
     assert hidden_regression_file.is_relative_to(runtime_target)
     assert str(hidden_regression_file.relative_to(ROOT)) not in joined_steps
+    assert "docs-change-gate" not in workflow["jobs"]
+    assert "paths-ignore" not in AGENT_RUNTIME_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
+def test_docs_only_changes_script_classifies_docs_and_code_lists() -> None:
+    docs_path = f"docs/{FAKE.word()}/{FAKE.file_name(extension='md')}"
+    nested_docs = f"docs/specs/{FAKE.file_name(extension='md')}"
+    code_path = f"src/argus/{FAKE.file_name(extension='py')}"
+    root_markdown = FAKE.file_name(extension="md")
+
+    assert _classify_changed_files(docs_path, nested_docs) == {
+        "docs_only": "true",
+        "run_heavy": "false",
+    }
+    assert _classify_changed_files("docs/api/openapi.yaml") == {
+        "docs_only": "true",
+        "run_heavy": "false",
+    }
+    assert _classify_changed_files(code_path) == {
+        "docs_only": "false",
+        "run_heavy": "true",
+    }
+    assert _classify_changed_files(docs_path, code_path) == {
+        "docs_only": "false",
+        "run_heavy": "true",
+    }
+    assert _classify_changed_files("AGENTS.md") == {
+        "docs_only": "false",
+        "run_heavy": "true",
+    }
+    assert _classify_changed_files(root_markdown) == {
+        "docs_only": "false",
+        "run_heavy": "true",
+    }
+    assert _classify_changed_files() == {
+        "docs_only": "false",
+        "run_heavy": "true",
+    }
+
+
+def test_docs_only_changes_script_runs_heavy_jobs_off_pull_request() -> None:
+    result = subprocess.run(
+        ["bash", str(DOCS_ONLY_SCRIPT)],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "GITHUB_EVENT_NAME": "push"},
+    )
+    parsed = {
+        key: value
+        for line in result.stdout.splitlines()
+        if "=" in line
+        for key, value in (line.split("=", 1),)
+        if key in {"docs_only", "run_heavy"}
+    }
+    assert parsed == {"docs_only": "false", "run_heavy": "true"}
+
+
+def test_pull_request_heavy_jobs_use_the_shared_docs_change_gate() -> None:
+    jobs = _workflow()["jobs"]
+    gate = jobs["docs-change-gate"]
+    classify = next(
+        step for step in gate["steps"] if step.get("id") == "classify"
+    )
+
+    assert gate["if"] == _DRAFT_OR_PUSH
+    assert gate["outputs"]["run_heavy"] == "${{ steps.classify.outputs.run_heavy }}"
+    assert classify["run"] == ".github/docs-only-changes.sh"
+    assert classify["env"]["PR_BASE_SHA"] == (
+        "${{ github.event.pull_request.base.sha }}"
+    )
+    assert _job_needs(jobs["ownership-gate"]) == []
+    assert jobs["ownership-gate"]["if"] == _DRAFT_OR_PUSH
+
+    heavy_if = (
+        f"({_DRAFT_OR_PUSH}) && "
+        "needs.docs-change-gate.outputs.run_heavy == 'true'"
+    )
+    for job_name in _HEAVY_CI_JOBS:
+        job = jobs[job_name]
+        assert _job_needs(job) == ["docs-change-gate"]
+        assert job["if"] == heavy_if
+
+    smoke = _smoke_workflow()
+    smoke_gate = smoke["jobs"]["docs-change-gate"]
+    smoke_classify = next(
+        step for step in smoke_gate["steps"] if step.get("id") == "classify"
+    )
+    assert smoke_gate["if"] == _DRAFT_OR_NON_PR
+    assert smoke_classify["run"] == ".github/docs-only-changes.sh"
+    assert "paths-ignore" not in WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "paths-ignore" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "paths:" not in WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "paths:" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")

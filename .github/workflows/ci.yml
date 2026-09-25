@@ -18,6 +18,24 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/codex/private-alpha-next' && github.ref != 'refs/heads/codex/private-alpha-next-jules-intake' }}
 
 jobs:
+  docs-change-gate:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    outputs:
+      run_heavy: ${{ steps.classify.outputs.run_heavy }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify docs-only changes
+        id: classify
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: .github/docs-only-changes.sh
+
   ownership-gate:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false || github.event_name == 'push'
@@ -37,7 +55,8 @@ jobs:
 
   backend-checks:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    needs: docs-change-gate
+    if: (github.event.pull_request.draft == false || github.event_name == 'push') && needs.docs-change-gate.outputs.run_heavy == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -75,7 +94,8 @@ jobs:
 
   frontend-checks:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    needs: docs-change-gate
+    if: (github.event.pull_request.draft == false || github.event_name == 'push') && needs.docs-change-gate.outputs.run_heavy == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,7 +130,8 @@ jobs:
 
   guest-release-gates:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    needs: docs-change-gate
+    if: (github.event.pull_request.draft == false || github.event_name == 'push') && needs.docs-change-gate.outputs.run_heavy == 'true'
     env:
       OPENROUTER_API_KEY: ""
       ALPACA_API_KEY: ""
@@ -210,12 +231,37 @@ jobs:
   ci:
     name: ci
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    if: always() && (github.event.pull_request.draft == false || github.event_name == 'push')
     needs:
+      - docs-change-gate
       - ownership-gate
       - backend-checks
       - frontend-checks
       - guest-release-gates
     steps:
       - name: All checks passed
-        run: echo "CI checks passed."
+        env:
+          DOCS_CHANGE_GATE: ${{ needs.docs-change-gate.result }}
+          OWNERSHIP_GATE: ${{ needs.ownership-gate.result }}
+          BACKEND_CHECKS: ${{ needs.backend-checks.result }}
+          FRONTEND_CHECKS: ${{ needs.frontend-checks.result }}
+          GUEST_RELEASE_GATES: ${{ needs.guest-release-gates.result }}
+        run: |
+          require_success() {
+            if [ "$2" != success ]; then
+              echo "$1: $2"
+              exit 1
+            fi
+          }
+          require_success_or_skipped() {
+            if [ "$2" != success ] && [ "$2" != skipped ]; then
+              echo "$1: $2"
+              exit 1
+            fi
+          }
+          require_success docs-change-gate "$DOCS_CHANGE_GATE"
+          require_success ownership-gate "$OWNERSHIP_GATE"
+          require_success_or_skipped backend-checks "$BACKEND_CHECKS"
+          require_success_or_skipped frontend-checks "$FRONTEND_CHECKS"
+          require_success_or_skipped guest-release-gates "$GUEST_RELEASE_GATES"
+          echo "CI checks passed."
