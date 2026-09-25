@@ -1,11 +1,3 @@
-from __future__ import annotations
+from argus.log_sink import configure_logging
 
-import sys
-from typing import Any
-
-from loguru import logger
-
-
-def configure_logging(sink: Any = sys.stderr) -> None:
-    logger.remove()
-    logger.add(sink, diagnose=False, backtrace=False)
+__all__ = ["configure_logging"]

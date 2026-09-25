@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 import importlib
 import io
+import subprocess
 import sys
 from types import ModuleType
 from typing import Any
@@ -13,7 +14,7 @@ import anyio
 import pytest
 from argus.api.main import app
 from argus.api.routers import ops
-from argus.observability.log_sink import configure_logging
+from argus.log_sink import configure_logging
 from faker import Faker
 from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
@@ -177,6 +178,34 @@ def test_perplexity_client_import_uses_package_logging_owner() -> None:
     _assert_handlers_are_safe()
 
 
+def test_memory_import_installs_safe_handler_without_observability() -> None:
+    script = """
+import sys
+import argus.memory
+from loguru import logger
+blocked = sorted(
+    name for name in sys.modules
+    if name == "argus.observability" or name.startswith("argus.observability.")
+)
+if blocked:
+    raise SystemExit("loaded " + ",".join(blocked))
+handlers = logger._core.handlers
+if not handlers:
+    raise SystemExit("no handlers")
+for handler in handlers.values():
+    formatter = handler._exception_formatter
+    if formatter._diagnose or formatter._backtrace:
+        raise SystemExit("unsafe handler")
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
 def test_api_app_import_installs_safe_handler() -> None:
     from argus.api import app_setup
 
@@ -240,7 +269,7 @@ def test_ops_script_entrypoint_installs_safe_handler(
         real_configure(*args, **kwargs)
 
     monkeypatch.setattr(
-        "argus.observability.log_sink.configure_logging",
+        "argus.log_sink.configure_logging",
         _configure,
     )
     monkeypatch.setattr(

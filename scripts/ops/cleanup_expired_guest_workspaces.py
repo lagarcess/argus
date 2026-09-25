@@ -31,7 +31,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    from argus.observability.log_sink import configure_logging
+    from argus.log_sink import configure_logging
 
     configure_logging()
     parser = _parser()
