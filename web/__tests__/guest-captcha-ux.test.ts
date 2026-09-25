@@ -45,6 +45,7 @@ type AcquireTurnstileChallenge = (input: {
   timeoutMs: number;
   interactiveTimeoutMs: number;
   theme: "light" | "dark";
+  signal?: AbortSignal;
 }) => Promise<string>;
 
 function challengeUnderTest(): AcquireTurnstileChallenge {
@@ -186,6 +187,30 @@ describe("shared CAPTCHA acquisition UX", () => {
     await expect(pending).resolves.toBe("interactive-token");
     expect(harness.revealCalls).toBe(1);
     expect(harness.removeCalls).toBe(1);
+    expect(harness.destroyCalls).toBe(1);
+  });
+
+  test("abort destroys a pending Turnstile shell before it can reveal", async () => {
+    const harness = challengeHarness();
+    const controller = new AbortController();
+    const pending = challengeUnderTest()({
+      turnstile: harness.turnstile,
+      shell: harness.shell,
+      siteKey: "test-site-key",
+      timeoutMs: 1000,
+      interactiveTimeoutMs: 1000,
+      theme: "light",
+      signal: controller.signal,
+    });
+
+    controller.abort();
+    const error = await pending.catch((caught: unknown) => caught);
+    expect(error).toMatchObject({ name: "AbortError" });
+    expect(harness.removeCalls).toBe(1);
+    expect(harness.destroyCalls).toBe(1);
+    harness.callbacks?.["before-interactive-callback"]?.();
+    harness.callbacks?.callback("too-late");
+    expect(harness.revealCalls).toBe(0);
     expect(harness.destroyCalls).toBe(1);
   });
 
