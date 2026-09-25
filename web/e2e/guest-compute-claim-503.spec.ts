@@ -176,7 +176,12 @@ async function mockGuestClaimJourney(
       await route.fulfill({
         status: 503,
         contentType: "application/problem+json",
-        headers: { "Retry-After": "3" },
+        headers: {
+          "Retry-After": "3",
+          "Access-Control-Allow-Origin": new URL(page.url()).origin,
+          "Access-Control-Allow-Credentials": "true",
+          "Access-Control-Expose-Headers": "Retry-After, X-Request-Id",
+        },
         body: JSON.stringify({
           type: "about:blank",
           title: "Service Temporarily Unavailable",

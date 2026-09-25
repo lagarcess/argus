@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { chatHttpErrorDisplay } from "../components/chat/chat-message-projection";
+import { ChatStreamError, streamChatMessage } from "../lib/argus-api";
 import {
   GUEST_COMPUTE_CLAIM_MESSAGE_KEY,
   GUEST_COMPUTE_CLAIM_RETRY_IN_KEY,
@@ -229,6 +230,48 @@ describe("guest compute claim error copy", () => {
         },
       }),
     ).toEqual({});
+  });
+
+  test("streamChatMessage keeps Retry-After on a 503 claim error", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH;
+    process.env.NEXT_PUBLIC_MOCK_AUTH = "true";
+    globalThis.fetch = (async () =>
+      new Response(
+        JSON.stringify({
+          code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+          detail: RAW_SERVER_DETAIL,
+        }),
+        {
+          status: 503,
+          headers: {
+            "Content-Type": "application/problem+json",
+            "Retry-After": "8",
+            "X-Request-Id": "claim-503",
+          },
+        },
+      )) as typeof fetch;
+
+    let caught: unknown;
+    try {
+      await streamChatMessage("conversation-1", "Compare Apple with SPY", "en", () => {});
+    } catch (err) {
+      caught = err;
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalMockAuth === undefined) {
+        delete process.env.NEXT_PUBLIC_MOCK_AUTH;
+      } else {
+        process.env.NEXT_PUBLIC_MOCK_AUTH = originalMockAuth;
+      }
+    }
+
+    expect(caught).toBeInstanceOf(ChatStreamError);
+    const error = caught as ChatStreamError;
+    expect(error.status).toBe(503);
+    expect(error.code).toBe(GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE);
+    expect(error.retryAfter).toBe("8");
+    expect(error.message).toBe(RAW_SERVER_DETAIL);
   });
 
   test("countdown labels localize without raw server text", () => {
