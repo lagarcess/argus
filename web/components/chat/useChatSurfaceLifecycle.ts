@@ -6,6 +6,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { HistoryItem } from "@/lib/argus-api";
+import { resetLandingStarterRuntime } from "@/lib/landing-intent";
 
 type UseChatSurfaceLifecycleInput = {
   conversationId: string | null;
@@ -27,6 +28,7 @@ export function useChatSurfaceLifecycle({
   onAllConversationsDeleted,
 }: UseChatSurfaceLifecycleInput) {
   const startNewChat = useCallback(async () => {
+    resetLandingStarterRuntime();
     resetToEmptyChatSurface();
     closeTransientSidebar();
     refreshHistory();

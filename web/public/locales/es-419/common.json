@@ -132,7 +132,7 @@
             },
             "preferences": {
               "label": "Preferencias que tú eliges",
-              "body": "El almacenamiento local de tu navegador guarda tu idioma, que empieza con el de tu propio navegador hasta que lo cambies, junto con tus preferencias de apariencia y diseño, los avisos que descartaste, las conversaciones que marcaste como temporales y el anuncio o enlace que te trajo aquí. Todo eso queda en tu dispositivo y Argus nunca se lo envía a anunciantes."
+              "body": "El almacenamiento local de tu navegador guarda tu idioma, que empieza con el de tu propio navegador hasta que lo cambies, junto con tus preferencias de apariencia y diseño, los avisos que descartaste, las conversaciones que marcaste como temporales y el anuncio o enlace que te trajo aquí. El idioma, la apariencia, el diseño, los avisos y las marcas temporales quedan en tu dispositivo. La campaña también se guarda ahí, y Argus puede recibirla cuando empiezas como invitado o creas una cuenta. Argus nunca envía nada de esto a anunciantes."
             }
           },
           "body_after": "Argus no usa cookies publicitarias, píxeles de anuncios, rastreadores de marketing ni rastreo entre sitios, y no comparte datos de tu navegador con socios publicitarios. La analítica de producto, cuando está activa, corre en los servidores de Argus y no guarda nada en tu navegador. Puedes borrar o bloquear este almacenamiento desde la configuración de tu navegador, aunque el inicio de sesión dejará de funcionar si bloqueas las cookies de sesión."

@@ -10,6 +10,7 @@ import {
   hasCampaignAttribution,
   LANDING_INTENT_STORAGE_KEY,
   LANDING_STARTER_STORAGE_KEY,
+  LANDING_STARTER_RUNTIME_FALLBACK_MS,
   landingStarterAppliedThisRuntime,
   mergeFirstTouchLandingIntent,
   parseLandingIntent,
@@ -165,6 +166,33 @@ describe("landing intent storage", () => {
     expect(readLandingIntent()?.starter).toBe("backtest");
   });
 
+  test("runtime starter fallback expires so a later empty composer does not re-prefill", () => {
+    installStorage();
+    const now = { value: 1_700_000_000_000 };
+    const originalNow = Date.now;
+    Date.now = () => now.value;
+    try {
+      captureLandingIntent("starter=backtest", "/");
+      expect(takeLandingStarterPrefill()).toBe("backtest");
+      expect(landingStarterAppliedThisRuntime()).toBe("backtest");
+      now.value += LANDING_STARTER_RUNTIME_FALLBACK_MS;
+      expect(landingStarterAppliedThisRuntime()).toBe("backtest");
+      now.value += 1;
+      expect(landingStarterAppliedThisRuntime()).toBeNull();
+    } finally {
+      Date.now = originalNow;
+    }
+  });
+
+  test("resetLandingStarterRuntime drops the fallback before New chat remounts", () => {
+    installStorage();
+    captureLandingIntent("starter=savings", "/");
+    expect(takeLandingStarterPrefill()).toBe("savings");
+    expect(landingStarterAppliedThisRuntime()).toBe("savings");
+    resetLandingStarterRuntime();
+    expect(landingStarterAppliedThisRuntime()).toBeNull();
+  });
+
   test("a leftover starter query cannot recreate a consumed prefill", () => {
     const { location } = installStorage();
     location.search = "?utm_campaign=x&starter=backtest";
@@ -254,6 +282,16 @@ describe("landing starter prefill wiring", () => {
     expect(empty).toContain("draftText={draftText}");
     expect(input).toContain("draftText");
     expect(input).not.toContain("onSend(draftText");
+
+    const lifecycle = readFileSync(
+      join(root, "components/chat/useChatSurfaceLifecycle.ts"),
+      "utf-8",
+    );
+    const startBlock = lifecycle.slice(
+      lifecycle.indexOf("const startNewChat"),
+      lifecycle.indexOf("const handleConversationRemoved"),
+    );
+    expect(startBlock).toContain("resetLandingStarterRuntime()");
   });
 
   test("public receipt landings capture the live path before a follow-up forks", () => {

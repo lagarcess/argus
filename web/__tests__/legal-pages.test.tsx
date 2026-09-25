@@ -260,6 +260,19 @@ describe("legal page cookie and storage disclosure", () => {
       "They stay after you close the browser",
     );
   });
+
+  test("does not claim campaign attribution stays only on the device", async () => {
+    const enBody = en.legal.privacy.sections.cookies.items.preferences.body;
+    const esBody =
+      es419.legal.privacy.sections.cookies.items.preferences.body;
+    expect(enBody).not.toContain("This stays on your device");
+    expect(esBody).not.toContain("Todo eso queda en tu dispositivo");
+    expect(enBody).toContain("start as a guest or create an account");
+    expect(esBody).toContain("empiezas como invitado o creas una cuenta");
+    expect(await renderLegal("en", "privacy")).toContain(
+      "Argus may receive it when you start as a guest or create an account",
+    );
+  });
 });
 
 describe("legal page early-access wording", () => {

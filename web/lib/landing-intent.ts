@@ -194,7 +194,11 @@ export function readLandingIntent(): LandingIntent | null {
 
 const STARTER_CONSUMED_PREFIX = "consumed:";
 
+/** Strict Mode remounts the first composer in the same tick. New chat does not. */
+export const LANDING_STARTER_RUNTIME_FALLBACK_MS = 2000;
+
 let appliedStarterThisRuntime: LandingStarter | null = null;
+let appliedStarterAtMs = 0;
 
 function readSessionStarterState(): {
   pending: LandingStarter | null;
@@ -274,6 +278,7 @@ export function takeLandingStarterPrefill(): LandingStarter | null {
       `${STARTER_CONSUMED_PREFIX}${pending}`,
     );
     appliedStarterThisRuntime = pending;
+    appliedStarterAtMs = Date.now();
     return pending;
   }
   if (!consumed) {
@@ -283,11 +288,18 @@ export function takeLandingStarterPrefill(): LandingStarter | null {
 }
 
 export function landingStarterAppliedThisRuntime(): LandingStarter | null {
+  if (!appliedStarterThisRuntime) return null;
+  if (Date.now() - appliedStarterAtMs > LANDING_STARTER_RUNTIME_FALLBACK_MS) {
+    appliedStarterThisRuntime = null;
+    appliedStarterAtMs = 0;
+    return null;
+  }
   return appliedStarterThisRuntime;
 }
 
 export function resetLandingStarterRuntime(): void {
   appliedStarterThisRuntime = null;
+  appliedStarterAtMs = 0;
 }
 
 export function stripLandingStarterFromLocation(): void {
