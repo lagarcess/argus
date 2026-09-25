@@ -210,6 +210,31 @@ describe("failed-action retry UI contract", () => {
     );
   });
 
+  test("preserves a discovery pick so Retry does not send the chip label alone", () => {
+    const action = retryLastTurnActionFromMessage("AAPL", {
+      assistantMessageId: "assistant-claim-2",
+      chatAction: {
+        type: "select_discovery_candidate",
+        label: "AAPL",
+        payload: {
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          asset_class: "equity",
+        },
+      },
+    });
+
+    expect(retryLastTurnChatActionFromAction(action)).toEqual({
+      type: "select_discovery_candidate",
+      label: "AAPL",
+      payload: {
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        asset_class: "equity",
+      },
+    });
+  });
+
   test("preserves a typed chat action for finalization retry", () => {
     const action = retryLastTurnActionFromMetadata(
       {

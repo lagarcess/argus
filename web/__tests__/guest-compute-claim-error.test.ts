@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import { chatHttpErrorDisplay } from "../components/chat/chat-message-projection";
 import { ChatStreamError, streamChatMessage } from "../lib/argus-api";
+import { retryLastTurnChatActionFromAction } from "../lib/chat-retry-actions";
+import { discoveryCandidateMention } from "../lib/chat-discovery-sidecar";
 import {
   GUEST_COMPUTE_CLAIM_MESSAGE_KEY,
   GUEST_COMPUTE_CLAIM_RETRY_IN_KEY,
@@ -388,6 +390,41 @@ describe("guest compute claim error copy", () => {
     ).toBeNull();
   });
 
+  test("a claim 503 on a discovery pick keeps the original action on Retry", () => {
+    const discoveryAction = {
+      type: "select_discovery_candidate" as const,
+      label: "AAPL",
+      payload: {
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        asset_class: "equity",
+      },
+    };
+    const rebuilt = guestClaimErrorRetryAction({
+      code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      retryAction: null,
+      message: "AAPL",
+      assistantMessageId: "assistant-claim-2",
+      chatAction: discoveryAction,
+    });
+    expect(rebuilt?.type).toBe("retry_last_turn");
+    expect(rebuilt?.payload).toEqual({
+      message: "AAPL",
+      failed_assistant_id: "assistant-claim-2",
+      chat_action: discoveryAction,
+    });
+    const replayed = retryLastTurnChatActionFromAction(rebuilt);
+    expect(replayed).toEqual(discoveryAction);
+    expect(discoveryCandidateMention(replayed!)).toEqual({
+      id: "asset:equity:AAPL",
+      type: "asset",
+      label: "Apple Inc.",
+      symbol: "AAPL",
+      asset_class: "equity",
+      insert_text: "AAPL",
+    });
+  });
+
   test("the claim 503 catch keeps local messages and the retry path does not reload empty", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
@@ -396,6 +433,7 @@ describe("guest compute claim error copy", () => {
     expect(chat).toContain("keepLocalTranscript");
     expect(chat).toContain("if (!options?.keepLocalTranscript)");
     expect(chat).toContain("guestClaimErrorMessagePatch({");
+    expect(chat).toContain("chatAction: action");
     expect(chat).toContain("settleGuestClaimTransportReadiness(terminalReadiness, rejectionCode, assistantId,");
     expect(chat).toContain("retryLastTurnSendOptions({ failedAssistantId, requestMessageId })");
   });
