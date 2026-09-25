@@ -39,8 +39,9 @@ def _require_ops_token(authorization: str | None) -> None:
     expected = _ops_token()
     if not expected:
         raise HTTPException(status_code=404, detail="Not found")
-    expected_header = f"Bearer {expected}"
-    if authorization is None or not hmac.compare_digest(authorization, expected_header):
+    expected_header = f"Bearer {expected}".encode("utf-8")
+    provided = (authorization or "").encode("utf-8")
+    if not hmac.compare_digest(provided, expected_header):
         raise HTTPException(status_code=404, detail="Not found")
 
 
