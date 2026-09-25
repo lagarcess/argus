@@ -527,6 +527,31 @@ backtest run, a job, an evidence artifact or a strategy. The only paid read is
 a refresh of cited inputs the user starts, which goes through the research
 allowance and the cost ledger like a turn.
 
+### Registered in-process calculations
+
+`get_calculation_declarations()` in
+`src/argus/domain/calculations/__init__.py` is the only catalog of free
+calculations. Eleven are registered. Each is local, never confirmed, and
+recomputes in process through its own compute function.
+
+| Registered name | What it computes | Source |
+| --- | --- | --- |
+| `time_value` | Solves a saving or borrowing plan for the one blank among starting amount, payment per period, ending amount, annual rate, and number of periods. | `src/argus/domain/calculations/time_value.py` |
+| `growth_projection` | Projects a compounding balance with optional contributions, solves for the one blank among start, end, annual rate, and periods, and shows the ending value and rate after inflation. | `src/argus/domain/calculations/growth_projection.py` |
+| `bond_value` | Prices a bond or certificate from face value, coupon rate, term, and yield to maturity, or finds the yield a price implies. | `src/argus/domain/calculations/bond_value.py` |
+| `discounted_cash_flow` | Values a cash-flow stream that grows for a number of years and then at a terminal rate, discounted at a required rate; or, given a value or price, finds the growth it implies (reverse DCF). | `src/argus/domain/calculations/discounted_cash_flow.py` |
+| `price_multiple` | Relates a price to a per-share figure through a multiple such as price to earnings, price to cash flow, or price to book, solving the missing one of price, per-share figure, and multiple. | `src/argus/domain/calculations/price_multiple.py` |
+| `income_yield` | Relates yearly income to a price as a yield (dividends, rent, interest, or coupons), solving the missing one of yearly income, price, and yield. | `src/argus/domain/calculations/income_yield.py` |
+| `effective_rate` | Turns a nominal yearly rate into the effective yearly rate under its compounding, and when amount, fees, and payment count are given, the effective APR those fees raise it to. | `src/argus/domain/calculations/effective_rate.py` |
+| `debt_to_income` | Monthly debt payments as a share of monthly income, solving the missing one of monthly debt, monthly income, and the ratio. | `src/argus/domain/calculations/debt_to_income.py` |
+| `expense_ratio` | A yearly fee as a share of assets, or the fee a ratio charges, and what that fee costs over a number of years at a stated growth rate. | `src/argus/domain/calculations/expense_ratio.py` |
+| `ranked_comparison` | Ranks products or instruments by one stated numeric key and shows each item's gap to the best. Nothing is recommended. | `src/argus/domain/calculations/ranked_comparison.py` |
+| `valuation_scenarios` | Builds low, base, and high valuation scenarios from price, a per-share figure, growth bounds, optional multiples, and a horizon, showing implied prices, annual returns, and a stated amount's worth. | `src/argus/domain/calculations/valuation_scenarios.py` |
+
+`historical_drawdown` is not in this catalog. It exists only in open, unmerged
+PR #634 and is not shipped. That same open PR also adds `scaled_amount`, which
+is likewise unregistered here.
+
 Recovery preserves the current question's ownership. When interpreter candidates
 fail, focused strategy repair requires a typed strategy read from that same turn;
 an outage, a ticker, or a pending test cannot supply that intent. An unread turn
@@ -745,10 +770,15 @@ Semantic retrieval (Vector embeddings) is deferred from Alpha.
 
 P2 continuity comes from owner-scoped `Idea`, `IdeaVersion`,
 `EvidenceArtifact`, `DecisionNote`, conversation, and run records in Supabase.
-That structured recall is not memory. A future `MemoryRecord`
-or equivalent cross-conversation preference layer remains post-PMF and requires
-earned opt-in plus inspect/edit/delete/reset/disable/"why was this used?"
-controls before activation.
+That structured recall is not memory. Memory has shipped: the production
+Blueprint sets `ARGUS_ENABLE_PERSONALIZATION_MEMORY=true`, exposure is limited
+to `admin` and `developer` accounts (`MEMORY_EXPOSURE_ROLES` in
+`src/argus/api/personalization_memory.py`), and semantic recall stays off
+(`ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL=false`). Widening memory to every
+registered user, with earned opt-in plus
+inspect/edit/delete/reset/disable/"why was this used?" controls, remains
+future work. Memory must not be required for the idea/evidence/comparison
+loop.
 
 # 15. Deletion / Archival Model
 
