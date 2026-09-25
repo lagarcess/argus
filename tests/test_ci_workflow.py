@@ -100,6 +100,7 @@ def test_ci_has_active_backend_and_frontend_quality_jobs() -> None:
     assert {
         "docs-change-gate",
         "ownership-gate",
+        "docs-checks",
         "backend-checks",
         "frontend-checks",
         "ci",
@@ -182,6 +183,7 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
     assert jobs["ci"]["needs"] == [
         "docs-change-gate",
         "ownership-gate",
+        "docs-checks",
         "backend-checks",
         "frontend-checks",
         "guest-release-gates",
@@ -192,6 +194,7 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
         "${{ needs.docs-change-gate.result }}"
     )
     assert aggregator_env["OWNERSHIP_GATE"] == "${{ needs.ownership-gate.result }}"
+    assert aggregator_env["DOCS_CHECKS"] == "${{ needs.docs-checks.result }}"
     assert aggregator_env["BACKEND_CHECKS"] == "${{ needs.backend-checks.result }}"
     assert aggregator_env["FRONTEND_CHECKS"] == "${{ needs.frontend-checks.result }}"
     assert aggregator_env["GUEST_RELEASE_GATES"] == (
@@ -201,6 +204,7 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
     assert "CI checks passed." in aggregator_run
     assert "require_success docs-change-gate" in aggregator_run
     assert "require_success ownership-gate" in aggregator_run
+    assert "require_success_or_skipped docs-checks" in aggregator_run
     assert "require_success_or_skipped backend-checks" in aggregator_run
     assert "require_success_or_skipped frontend-checks" in aggregator_run
     assert "require_success_or_skipped guest-release-gates" in aggregator_run
@@ -528,20 +532,20 @@ def test_docs_only_changes_script_classifies_docs_and_code_lists() -> None:
     }
 
 
-def test_docs_only_changes_script_runs_heavy_jobs_for_docs_api_contract() -> None:
+def test_docs_only_changes_script_treats_docs_api_as_docs_only() -> None:
     api_path = f"docs/api/{FAKE.file_name(extension='yaml')}"
 
     assert _classify_changed_files("docs/api/openapi.yaml") == {
-        "docs_only": "false",
-        "run_heavy": "true",
+        "docs_only": "true",
+        "run_heavy": "false",
     }
     assert _classify_changed_files(api_path) == {
-        "docs_only": "false",
-        "run_heavy": "true",
+        "docs_only": "true",
+        "run_heavy": "false",
     }
     assert _classify_changed_files("docs/PRODUCT.md", "docs/api/openapi.yaml") == {
-        "docs_only": "false",
-        "run_heavy": "true",
+        "docs_only": "true",
+        "run_heavy": "false",
     }
 
 
@@ -668,3 +672,30 @@ def test_pull_request_heavy_jobs_use_the_shared_docs_change_gate() -> None:
     assert "paths-ignore" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "paths:" not in WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "paths:" not in SMOKE_WORKFLOW_PATH.read_text(encoding="utf-8")
+
+
+def test_docs_checks_job_runs_only_when_the_gate_reports_docs_only() -> None:
+    jobs = _workflow()["jobs"]
+    job = jobs["docs-checks"]
+    joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
+
+    assert _job_needs(job) == ["docs-change-gate"]
+    assert job["if"] == (
+        f"({_DRAFT_OR_PUSH}) && "
+        "needs.docs-change-gate.outputs.docs_only == 'true'"
+    )
+    assert "git diff --check" in joined_steps
+    assert "poetry install --with dev --no-interaction" in joined_steps
+    assert "tests/test_openapi_compatibility.py" in joined_steps
+    assert "tests/test_private_alpha_release_docs.py" in joined_steps
+    assert "tests/test_agent_jules_contracts.py" in joined_steps
+    assert "tests/test_alpha_artifacts.py" in joined_steps
+    assert "tests/test_legacy_surface_removal.py" in joined_steps
+    assert "tests/test_render_release_profile_contract.py" in joined_steps
+    assert "tests/test_ci_workflow.py" in joined_steps
+    assert "tests/research/test_research_contract_example.py" in joined_steps
+    assert "bun" not in joined_steps
+    assert "supabase" not in joined_steps.lower()
+    assert "local-smoke" not in joined_steps
+    assert "docs-checks" in jobs["ci"]["needs"]
+    assert "require_success_or_skipped docs-checks" in jobs["ci"]["steps"][0]["run"]

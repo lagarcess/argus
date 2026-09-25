@@ -1,8 +1,7 @@
 #!/bin/bash
 # Classify whether every changed file is under docs/.
 # Root-level *.md is not docs-only: backend tests read AGENTS.md and other
-# root markdown. docs/api/** is not docs-only: it is the OpenAPI contract.
-# Non-pull_request events always run heavy jobs.
+# root markdown. Non-pull_request events always run heavy jobs.
 
 set -euo pipefail
 
@@ -22,8 +21,6 @@ write_result() {
 is_docs_path() {
   local path="${1#./}"
   [ -n "$path" ] || return 1
-  [ "$path" = "docs/api" ] && return 1
-  [ "${path#docs/api/}" != "$path" ] && return 1
   [ "$path" = "docs" ] || [ "${path#docs/}" != "$path" ]
 }
 
