@@ -141,7 +141,7 @@ describe("guest session entry contract", () => {
 
     expect(session).toContain("export async function bootstrapGuest");
     expect(session).toContain('"/auth/guest"');
-    expect(session).toContain("attributionPayload");
+    expect(session).toContain("attributionBody");
     expect(session).toContain("persistBrowserSession(response)");
     expect(session).toContain("cancelPendingGuestBootstrap");
     expect(session).toContain("persistGuestBootstrap");

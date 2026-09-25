@@ -246,6 +246,11 @@ export function attributionPayload(
   return isEmptyLandingIntent(payload) ? undefined : payload;
 }
 
+export function attributionBody(): { attribution?: AttributionPayload } {
+  const attribution = attributionPayload();
+  return attribution ? { attribution } : {};
+}
+
 export function hasCampaignAttribution(
   intent: LandingIntent | null = readLandingIntent(),
 ): boolean {
