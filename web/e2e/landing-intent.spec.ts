@@ -166,6 +166,16 @@ const expectedAttribution = {
   landing_path: "/",
 };
 
+test("ad landing without a starter leaves the composer empty", async ({
+  page,
+}) => {
+  await mockLandingJourney(page);
+  await page.goto("/?utm_campaign=x", { waitUntil: "domcontentloaded" });
+  const composer = page.getByTestId("chat-input");
+  await expect(composer).toBeVisible({ timeout: 15_000 });
+  await expect(composer).toHaveText("");
+});
+
 test("ad landing prefills the backtest prompt without sending and keeps attribution", async ({
   page,
 }) => {
@@ -177,7 +187,7 @@ test("ad landing prefills the backtest prompt without sending and keeps attribut
   const composer = page.getByTestId("chat-input");
   await expect(composer).toBeVisible({ timeout: 15_000 });
   await expect(composer).toHaveText(BACKTEST_EN);
-  await expect(page.getByTestId("chat-send")).toBeDisabled();
+  await expect(page.getByTestId("chat-send")).toBeEnabled();
   await expect.poll(() => evidence.bootstrapBodies.length).toBe(1);
   expect(evidence.bootstrapBodies[0]?.attribution).toEqual(expectedAttribution);
   expect(evidence.streamCalls).toBe(0);
