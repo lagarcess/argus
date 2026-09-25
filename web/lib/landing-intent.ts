@@ -130,7 +130,7 @@ export function parseLandingIntent(
     typeof search === "string"
       ? new URLSearchParams(search.startsWith("?") ? search.slice(1) : search)
       : search;
-  return withDefinedFields({
+  const intent = withDefinedFields({
     utm_source: sanitizeToken(params.get("utm_source")),
     utm_medium: sanitizeToken(params.get("utm_medium")),
     utm_campaign: sanitizeToken(params.get("utm_campaign")),
@@ -140,6 +140,7 @@ export function parseLandingIntent(
     starter: sanitizeLandingStarter(params.get("starter")),
     landing_path: sanitizeLandingPath(landingPath),
   });
+  return hasCampaignAttribution(intent) ? intent : {};
 }
 
 export function isEmptyLandingIntent(

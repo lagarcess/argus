@@ -152,10 +152,14 @@ export default function ChatInput({
     if (appliedDraftRef.current) return;
     const text = draftText?.trim();
     if (!text) return;
+    if (composerHasContent || composerRawText.trim()) {
+      appliedDraftRef.current = true;
+      return;
+    }
     appliedDraftRef.current = true;
     pendingCaretOffsetRef.current = text.length;
     setSegments([{ type: "text", text }]);
-  }, [draftText]);
+  }, [composerHasContent, composerRawText, draftText]);
 
   useEffect(() => {
     if (!isDiscoveryOpen) return;

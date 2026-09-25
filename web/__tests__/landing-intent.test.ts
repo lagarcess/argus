@@ -211,6 +211,18 @@ describe("landing intent storage", () => {
     expect(takeLandingStarterPrefill()).toBeNull();
   });
 
+  test("landing path is stored only with the campaign visit that owns it", () => {
+    installStorage();
+    expect(captureLandingIntent("", "/")).toBeNull();
+    expect(readLandingIntent()).toBeNull();
+    expect(
+      captureLandingIntent("utm_campaign=x", "/r/abcdefghijklmnopqrstuvwx"),
+    ).toEqual({
+      utm_campaign: "x",
+      landing_path: "/r/abcdefghijklmnopqrstuvwx",
+    });
+  });
+
   test("first-touch keeps a shared-thread landing path", () => {
     installStorage();
     expect(
@@ -284,6 +296,7 @@ describe("landing starter prefill wiring", () => {
     expect(empty).toContain("draftText={draftText}");
     expect(input).toContain("draftText");
     expect(input).not.toContain("onSend(draftText");
+    expect(input).toContain("if (composerHasContent || composerRawText.trim())");
 
     const lifecycle = readFileSync(
       join(root, "components/chat/useChatSurfaceLifecycle.ts"),
