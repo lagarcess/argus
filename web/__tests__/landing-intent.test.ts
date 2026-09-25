@@ -14,6 +14,7 @@ import {
   landingStarterAppliedThisRuntime,
   landingStarterSurfaceEpoch,
   mergeFirstTouchLandingIntent,
+  noteLandingStarterComposerMatch,
   parseLandingIntent,
   pathWithSearch,
   prepareLandingStarterAuthHandoff,
@@ -221,6 +222,7 @@ describe("landing intent storage", () => {
     captureLandingIntent(location.search, location.pathname);
     expect(takeLandingStarterPrefill()).toBe("backtest");
     stripLandingStarterFromLocation();
+    noteLandingStarterComposerMatch(true);
     prepareLandingStarterAuthHandoff();
     location.search = "?utm_campaign=x&starter=backtest";
     captureLandingIntent(location.search, location.pathname);
@@ -239,6 +241,27 @@ describe("landing intent storage", () => {
     expect(takeLandingStarterPrefill()).toBeNull();
     expect(landingStarterAppliedThisRuntime()).toBeNull();
     expect(landingStarterSurfaceEpoch()).toBe(epoch + 1);
+  });
+
+  test("New chat keeps a pending starter that was never applied", () => {
+    installStorage();
+    captureLandingIntent("starter=savings", "/");
+    const epoch = landingStarterSurfaceEpoch();
+    resetLandingStarterRuntime();
+    expect(takeLandingStarterPrefill()).toBe("savings");
+    expect(landingStarterSurfaceEpoch()).toBe(epoch + 1);
+  });
+
+  test("auth handoff restores a consumed starter only while the composer is untouched", () => {
+    installStorage();
+    captureLandingIntent("starter=backtest", "/");
+    expect(takeLandingStarterPrefill()).toBe("backtest");
+    noteLandingStarterComposerMatch(true);
+    prepareLandingStarterAuthHandoff();
+    expect(takeLandingStarterPrefill()).toBe("backtest");
+    noteLandingStarterComposerMatch(false);
+    prepareLandingStarterAuthHandoff();
+    expect(takeLandingStarterPrefill()).toBeNull();
   });
 
   test("landing path is stored only with the campaign visit that owns it", () => {
@@ -331,6 +354,7 @@ describe("landing starter prefill wiring", () => {
     expect(input).toContain("draftText");
     expect(input).not.toContain("onSend(draftText");
     expect(input).toContain("if (composerHasContent || composerRawText.trim())");
+    expect(input).toContain("noteLandingStarterComposerMatch");
 
     const lifecycle = readFileSync(
       join(root, "components/chat/useChatSurfaceLifecycle.ts"),
@@ -425,6 +449,17 @@ describe("landing intent merge and redirects", () => {
     expect(authLoginPathFromSearch("utm_campaign=x&starter=backtest")).toBe(
       "/?utm_campaign=x&starter=backtest&auth=login",
     );
+    expect(authLoginPathFromSearch("utm_campaign=x", "/chat")).toBe(
+      "/?utm_campaign=x&from_path=%2Fchat&auth=login",
+    );
+    expect(parseLandingIntent("utm_campaign=x&from_path=/chat", "/")).toEqual({
+      utm_campaign: "x",
+      landing_path: "/chat",
+    });
+    expect(parseLandingIntent("utm_campaign=x&from_path=/settings", "/")).toEqual({
+      utm_campaign: "x",
+      landing_path: "/",
+    });
     expect(
       authLoginPathFromSearch({
         utm_campaign: "x",
