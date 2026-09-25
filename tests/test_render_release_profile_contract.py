@@ -86,6 +86,21 @@ def test_release_contract_keeps_all_three_services_on_manual_deploys() -> None:
     assert "argus-backtests" in runbook
 
 
+def test_argus_api_disables_the_default_render_subdomain() -> None:
+    render_config = yaml.safe_load(_source("render.yaml"))
+    render_by_name = {service["name"]: service for service in render_config["services"]}
+    runbook = _source("docs/PRIVATE_LAUNCH_RUNBOOK.md")
+    waitlist_floor = runbook.split("### Waitlist rollback floor", 1)[1]
+
+    assert render_by_name["argus-api"]["renderSubdomainPolicy"] == "disabled"
+    assert "renderSubdomainPolicy" not in render_by_name["argus-app"]
+    assert "https://argus-ohr5.onrender.com" in waitlist_floor
+    assert "HTTP `404`" in waitlist_floor
+    assert "Cloudflare Worker" in waitlist_floor
+    assert "CF-Connecting-IP" in waitlist_floor
+    assert "#674" in waitlist_floor
+
+
 def test_workflow_version_status_derives_proof_from_ready_version(
     tmp_path: Path,
 ) -> None:
