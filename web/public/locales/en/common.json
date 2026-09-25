@@ -132,7 +132,7 @@
             },
             "preferences": {
               "label": "Preferences you set",
-              "body": "Your browser’s local storage holds your language, which starts from your browser’s own setting until you change it, along with your appearance and layout choices, tips you dismissed, and the conversations you marked temporary. This stays on your device and Argus never sends it to advertisers."
+              "body": "Your browser’s local storage holds your language, which starts from your browser’s own setting until you change it, along with your appearance and layout choices, tips you dismissed, the conversations you marked temporary, and the ad or link that brought you here. This stays on your device and Argus never sends it to advertisers."
             }
           },
           "body_after": "Argus does not use advertising cookies, ad pixels, marketing trackers, or cross-site tracking, and it does not share browser data with advertising partners. Product analytics, when enabled, run on Argus servers and store nothing in your browser. You can clear or block this storage in your browser settings, though signing in will stop working if you block the sign-in cookies."
@@ -323,6 +323,10 @@
         "label": "Test weekly Nvidia buys",
         "value": "What if I bought $250 of Nvidia every week over the last 12 months?"
       }
+    },
+    "landing_starters": {
+      "backtest": "What if I had bought an S&P 500 fund over the last 12 months?",
+      "savings": "If I set aside $200 every month, what would that add up to in a year?"
     },
     "example_queries": {
       "q1": "How does Netflix make money?",

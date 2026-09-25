@@ -1,0 +1,242 @@
+import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import {
+  attributionPayload,
+  authLoginPathFromSearch,
+  captureLandingIntent,
+  currentChatPath,
+  hasCampaignAttribution,
+  LANDING_INTENT_STORAGE_KEY,
+  LANDING_STARTER_STORAGE_KEY,
+  mergeFirstTouchLandingIntent,
+  parseLandingIntent,
+  pathWithSearch,
+  readLandingIntent,
+  sanitizeLandingPath,
+  sanitizeLandingStarter,
+  takeLandingStarterPrefill,
+} from "../lib/landing-intent";
+
+function installStorage() {
+  const local = new Map<string, string>();
+  const session = new Map<string, string>();
+  const localStorage = {
+    getItem: (key: string) => local.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      local.set(key, value);
+    },
+    removeItem: (key: string) => {
+      local.delete(key);
+    },
+  };
+  const sessionStorage = {
+    getItem: (key: string) => session.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      session.set(key, value);
+    },
+    removeItem: (key: string) => {
+      session.delete(key);
+    },
+  };
+  (globalThis as { window?: unknown }).window = {
+    localStorage,
+    sessionStorage,
+    location: { search: "", pathname: "/" },
+  };
+  return { local, session };
+}
+
+afterEach(() => {
+  delete (globalThis as { window?: unknown }).window;
+});
+
+describe("landing intent parsing", () => {
+  test("keeps campaign fields and the starter whitelist", () => {
+    expect(
+      parseLandingIntent(
+        "utm_source=ig&utm_medium=paid&utm_campaign=x&utm_content=card-a&fbclid=abc.1&ref=stories&starter=backtest",
+        "/",
+      ),
+    ).toEqual({
+      utm_source: "ig",
+      utm_medium: "paid",
+      utm_campaign: "x",
+      utm_content: "card-a",
+      fbclid: "abc.1",
+      ref: "stories",
+      starter: "backtest",
+      landing_path: "/",
+    });
+  });
+
+  test("drops unknown starters and unsanitary values", () => {
+    expect(
+      parseLandingIntent(
+        "starter=prompt-injection&utm_campaign=<script>&ref=ok%20space&utm_source=ig",
+        "https://evil.example/chat",
+      ),
+    ).toEqual({
+      utm_source: "ig",
+    });
+    expect(sanitizeLandingStarter("savings")).toBe("savings");
+    expect(sanitizeLandingStarter("SAVINGS")).toBe("savings");
+    expect(sanitizeLandingStarter("hold")).toBeUndefined();
+    expect(sanitizeLandingPath("/chat")).toBe("/chat");
+    expect(sanitizeLandingPath("//evil")).toBeUndefined();
+    expect(sanitizeLandingPath("/chat?x=1#y")).toBe("/chat");
+  });
+
+  test("caps overlong tokens rather than storing the raw query", () => {
+    const tooLong = `ig-${"a".repeat(400)}`;
+    expect(parseLandingIntent(`utm_source=${tooLong}`).utm_source).toHaveLength(
+      256,
+    );
+  });
+});
+
+describe("landing intent storage", () => {
+  test("first-touch keeps the original campaign and fills only empty fields", () => {
+    installStorage();
+
+    expect(
+      captureLandingIntent("utm_campaign=x&starter=backtest", "/"),
+    ).toEqual({
+      utm_campaign: "x",
+      starter: "backtest",
+      landing_path: "/",
+    });
+    expect(captureLandingIntent("utm_campaign=later&utm_source=ig", "/chat")).toEqual({
+      utm_campaign: "x",
+      utm_source: "ig",
+      starter: "backtest",
+      landing_path: "/",
+    });
+    expect(captureLandingIntent("", "/settings")).toEqual({
+      utm_campaign: "x",
+      utm_source: "ig",
+      starter: "backtest",
+      landing_path: "/",
+    });
+    expect(readLandingIntent()?.utm_campaign).toBe("x");
+    expect(JSON.parse(window.localStorage.getItem(LANDING_INTENT_STORAGE_KEY) ?? "{}")).toMatchObject({
+      utm_campaign: "x",
+      landing_path: "/",
+    });
+  });
+
+  test("does not invent a capture from an empty visit", () => {
+    installStorage();
+    expect(captureLandingIntent("", "")).toBeNull();
+    expect(readLandingIntent()).toBeNull();
+    expect(window.localStorage.getItem(LANDING_INTENT_STORAGE_KEY)).toBeNull();
+  });
+
+  test("omits empty attribution and treats campaign-less paths as no campaign", () => {
+    expect(attributionPayload(null)).toBeUndefined();
+    expect(attributionPayload({ landing_path: "/" })).toEqual({
+      landing_path: "/",
+    });
+    expect(hasCampaignAttribution({ landing_path: "/" })).toBe(false);
+    expect(hasCampaignAttribution({ utm_campaign: "x" })).toBe(true);
+  });
+
+  test("starter prefill is consume-once session state, like receipt follow-up", () => {
+    const { session } = installStorage();
+    captureLandingIntent("starter=backtest&utm_campaign=x", "/");
+    expect(session.get(LANDING_STARTER_STORAGE_KEY)).toBe("backtest");
+    expect(takeLandingStarterPrefill()).toBe("backtest");
+    expect(takeLandingStarterPrefill()).toBeNull();
+    expect(readLandingIntent()?.starter).toBe("backtest");
+  });
+
+  test("this visit can prefill a new starter without rewriting first-touch attribution", () => {
+    installStorage();
+    captureLandingIntent("starter=backtest&utm_campaign=x", "/");
+    expect(takeLandingStarterPrefill()).toBe("backtest");
+    captureLandingIntent("starter=savings", "/chat");
+    expect(takeLandingStarterPrefill()).toBe("savings");
+    expect(readLandingIntent()).toEqual({
+      utm_campaign: "x",
+      starter: "backtest",
+      landing_path: "/",
+    });
+  });
+
+  test("rejects stored payloads that fail the same sanitizers as the URL", () => {
+    installStorage();
+    window.localStorage.setItem(
+      LANDING_INTENT_STORAGE_KEY,
+      JSON.stringify({
+        utm_campaign: "<bad>",
+        starter: "hold",
+        landing_path: "//evil",
+        extra: "drop-me",
+      }),
+    );
+    expect(readLandingIntent()).toBeNull();
+  });
+});
+
+describe("landing starter prefill wiring", () => {
+  const root = join(import.meta.dir, "..");
+
+  test("reuses the receipt-followup consume-once hook and never auto-sends", () => {
+    const hook = readFileSync(
+      join(root, "components/chat/useLandingStarterPrefill.ts"),
+      "utf-8",
+    );
+    const empty = readFileSync(
+      join(root, "components/chat/EmptyChatSurface.tsx"),
+      "utf-8",
+    );
+    const input = readFileSync(
+      join(root, "components/chat/ChatInput.tsx"),
+      "utf-8",
+    );
+
+    expect(hook).toContain("takeLandingStarterPrefill");
+    expect(hook).toContain("captureLandingIntentFromLocation");
+    expect(hook).not.toContain("onSend");
+    expect(hook).not.toContain("admitSend");
+    expect(empty).toContain("useLandingStarterPrefill");
+    expect(empty).toContain("draftText={draftText}");
+    expect(input).toContain("draftText");
+    expect(input).not.toContain("onSend(draftText");
+  });
+});
+
+describe("landing intent merge and redirects", () => {
+  test("merge never lets an empty field stand in for a filled one", () => {
+    expect(
+      mergeFirstTouchLandingIntent(
+        { utm_campaign: "x", starter: "backtest" },
+        { utm_campaign: "", starter: "savings", utm_source: "ig" } as never,
+      ),
+    ).toEqual({
+      utm_campaign: "x",
+      starter: "backtest",
+      utm_source: "ig",
+    });
+  });
+
+  test("preserves query params onto chat and login redirects", () => {
+    expect(pathWithSearch("/chat", "?utm_campaign=x&starter=backtest&auth=signup")).toBe(
+      "/chat?utm_campaign=x&starter=backtest",
+    );
+    expect(authLoginPathFromSearch("utm_campaign=x&starter=backtest")).toBe(
+      "/?utm_campaign=x&starter=backtest&auth=login",
+    );
+    expect(
+      authLoginPathFromSearch({
+        utm_campaign: "x",
+        starter: ["backtest", "ignored"],
+      }),
+    ).toBe("/?utm_campaign=x&starter=backtest&auth=login");
+    (globalThis as { window?: { location: { search: string } } }).window = {
+      location: { search: "?utm_campaign=x" },
+    };
+    expect(currentChatPath()).toBe("/chat?utm_campaign=x");
+  });
+});

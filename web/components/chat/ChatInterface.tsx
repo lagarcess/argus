@@ -6,6 +6,7 @@ import { useReceiptFollowup, readReceiptFollowup } from "./useReceiptFollowup";
 import { useProfileUpdates } from "@/components/chat/useProfileUpdates";
 import { useTranslation } from "react-i18next";
 import { readStored, writeStored } from "@/lib/browser-storage";
+import { currentAuthLoginPath } from "@/lib/landing-intent";
 import ChatCommandPalette from "@/components/sidebar/ChatCommandPalette";
 import { KeyboardShortcutSurfaces } from "@/components/keyboard/KeyboardShortcutSurfaces";
 import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardShortcuts";
@@ -926,7 +927,7 @@ export default function ChatInterface() {
       closeDrawer();
       setSearchOverlayOpen(true);
     },
-    onRequestPendingGuestSignIn: () => router.push("/?auth=login"),
+    onRequestPendingGuestSignIn: () => router.push(currentAuthLoginPath()),
     onAdoptConversation: adoptGuestConversation,
     onGuestBootstrapExpired: (publicAccountAccessEnabled) => {
       guestEntry.resetGuestSubmissionError();

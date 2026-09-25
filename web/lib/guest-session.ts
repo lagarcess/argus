@@ -4,6 +4,7 @@ import {
   unauthenticatedApiFetch,
 } from "./argus-api";
 import { acquireGuestCaptchaToken } from "./guest-captcha";
+import { attributionPayload } from "./landing-intent";
 
 export {
   guestCaptchaConfigured,
@@ -34,11 +35,14 @@ export async function bootstrapGuest(payload: {
   captcha_token: string;
   language: "en" | "es-419";
 }) {
+  const attribution = attributionPayload();
   const response = await unauthenticatedApiFetch<GuestBootstrapResponse>(
     "/auth/guest",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(
+        attribution ? { ...payload, attribution } : payload,
+      ),
     },
   );
   await persistBrowserSession(response);

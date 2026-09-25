@@ -3,6 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import ChatInput from "./ChatInput";
+import { useLandingStarterPrefill } from "./useLandingStarterPrefill";
 import ChatLegalNotice from "./ChatLegalNotice";
 import EmptyChatGreeting from "./EmptyChatGreeting";
 import EmptyChatHeading from "./EmptyChatHeading";
@@ -49,6 +50,7 @@ export default function EmptyChatSurface({
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
   const { isBelowTablet } = useResponsiveLayout();
+  const draftText = useLandingStarterPrefill();
   const disabled =
     isStreamingResponse ||
     isHydratingConversation ||
@@ -89,6 +91,7 @@ export default function EmptyChatSurface({
           disabled={disabled}
           placeholder={placeholder}
           onToast={onToast}
+          draftText={draftText}
         />
         {guestSubmissionPending && (
           <div

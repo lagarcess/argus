@@ -3,13 +3,18 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
+import {
+  captureLandingIntentFromLocation,
+  currentChatPath,
+} from "@/lib/landing-intent";
 
 export default function GuestEntry() {
   const { t } = useTranslation();
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/chat");
+    captureLandingIntentFromLocation();
+    router.replace(currentChatPath());
   }, [router]);
 
   return (

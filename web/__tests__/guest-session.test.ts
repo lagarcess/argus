@@ -141,6 +141,7 @@ describe("guest session entry contract", () => {
 
     expect(session).toContain("export async function bootstrapGuest");
     expect(session).toContain('"/auth/guest"');
+    expect(session).toContain("attributionPayload");
     expect(session).toContain("persistBrowserSession(response)");
     expect(api).toContain("if (error)");
   });
@@ -151,7 +152,7 @@ describe("guest session entry contract", () => {
       "utf-8",
     );
 
-    expect(entry).toContain('router.replace("/chat")');
+    expect(entry).toContain("router.replace(currentChatPath())");
     expect(entry).not.toContain("router.refresh()");
     expect(entry).not.toContain("@/lib/guest-session");
     expect(entry).not.toContain("startGuestSession");

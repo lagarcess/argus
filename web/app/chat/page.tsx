@@ -5,11 +5,16 @@ import { DevModeBadge } from "@/components/ui/DevModeBadge";
 import { guestAccessEnabled } from "@/lib/private-alpha-flags";
 import { guestCaptchaConfigured } from "@/lib/guest-session";
 import { resolveChatEntrySurface } from "@/lib/landing-entry";
+import { authLoginPathFromSearch } from "@/lib/landing-intent";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function ChatPage() {
+export default async function ChatPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
   if (!isMockAuth) {
     const supabase = await createClient();
@@ -21,7 +26,7 @@ export default async function ChatPage() {
         guestCaptchaConfigured,
       }) === "auth"
     ) {
-      redirect("/?auth=login");
+      redirect(authLoginPathFromSearch(await searchParams));
     }
   }
 

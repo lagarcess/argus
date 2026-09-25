@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { getMe, listConversations } from "@/lib/argus-api";
 import { guestProfileProbeOutcome } from "@/lib/guest-account";
 import { readActiveConversationRouteState } from "@/lib/chat-conversation-routing";
+import { currentAuthLoginPath } from "@/lib/landing-intent";
 import type { Message } from "./types";
 
 export type ProfileState =
@@ -69,7 +70,7 @@ export function useInitialChatSession({
           setProfileState("bootstrap_required");
         } else if (probeOutcome === "fail_closed") {
           setProfileState("unavailable");
-          router.replace("/?auth=login");
+          router.replace(currentAuthLoginPath());
           return;
         }
         if (hasAcceptedUserInputRef.current) return;
@@ -98,7 +99,7 @@ export function useInitialChatSession({
       } catch {
         if (cancelled) return;
         setProfileState("unavailable");
-        router.replace("/?auth=login");
+        router.replace(currentAuthLoginPath());
         setMessages([
           {
             id: "offline",

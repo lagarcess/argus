@@ -34,6 +34,7 @@ type ChatInputProps = {
   disabled?: boolean;
   placeholder?: string;
   onToast?: (message: string) => void;
+  draftText?: string | null;
 };
 
 export type DiscoverySection = {
@@ -82,6 +83,7 @@ export default function ChatInput({
   disabled = false,
   placeholder,
   onToast,
+  draftText,
 }: ChatInputProps) {
   const { t } = useTranslation();
   const [segments, setSegments] = useState<ComposerSegment[]>([{ type: "text", text: "" }]);
@@ -98,6 +100,7 @@ export default function ChatInput({
   const [isMounted, setIsMounted] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const pendingCaretOffsetRef = useRef<number | null>(null);
+  const appliedDraftRef = useRef(false);
   const activeMentionOffsetRef = useRef<number | null>(null);
   const buttonDiscoveryAnchorOffsetRef = useRef<number | null>(null);
   const buttonDiscoveryQueryEndOffsetRef = useRef<number | null>(null);
@@ -144,6 +147,15 @@ export default function ChatInput({
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (appliedDraftRef.current) return;
+    const text = draftText?.trim();
+    if (!text) return;
+    appliedDraftRef.current = true;
+    pendingCaretOffsetRef.current = text.length;
+    setSegments([{ type: "text", text }]);
+  }, [draftText]);
 
   useEffect(() => {
     if (!isDiscoveryOpen) return;

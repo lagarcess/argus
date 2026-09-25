@@ -47,6 +47,10 @@ const STORAGE_CONCEPT_PHRASES: Record<StorageConcept, Record<Locale, string>> = 
     en: "conversations you marked temporary",
     "es-419": "conversaciones que marcaste como temporales",
   },
+  campaign: {
+    en: "the ad or link that brought you here",
+    "es-419": "el anuncio o enlace que te trajo aquí",
+  },
 };
 
 /**

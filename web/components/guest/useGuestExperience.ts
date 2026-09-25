@@ -25,6 +25,7 @@ import { replaceGuestConversation } from "@/lib/guest-api";
 import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import type { UserResponse } from "@/lib/guest-account";
 import { startGuestSession } from "@/lib/guest-session";
+import { hasCampaignAttribution } from "@/lib/landing-intent";
 import { normalizeEnabledLanguage } from "@/lib/language-features";
 import {
   latestDecisionResumeMessageId,
@@ -119,6 +120,11 @@ export function useGuestExperience({
     },
     [],
   );
+
+  useEffect(() => {
+    if (!guestBootstrapRequired || !hasCampaignAttribution()) return;
+    void startGuestSession(account?.user.language ?? null);
+  }, [account?.user.language, guestBootstrapRequired]);
 
   const resumeGuestAction = useCallback(
     async (action: GuestPendingAction) => {
