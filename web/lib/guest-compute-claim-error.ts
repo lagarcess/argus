@@ -65,13 +65,16 @@ export function guestClaimErrorRetryAction(input: {
   if (!isGuestComputeClaimUnavailable(input.code)) {
     return input.retryAction;
   }
-  return (
-    input.retryAction ??
-    retryLastTurnActionFromMessage(input.message, {
-      assistantMessageId: input.assistantMessageId,
-      chatAction: input.chatAction ?? undefined,
-    })
-  );
+  if (input.retryAction) {
+    return input.retryAction;
+  }
+  if (!input.chatAction?.type) {
+    return null;
+  }
+  return retryLastTurnActionFromMessage(input.message, {
+    assistantMessageId: input.assistantMessageId,
+    chatAction: input.chatAction,
+  });
 }
 
 export function guestClaimErrorKeepsLocalTranscript(

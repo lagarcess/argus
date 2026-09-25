@@ -242,7 +242,7 @@ describe("guest compute claim error copy", () => {
       for (const key of keys) {
         const value = catalogString(catalog, key);
         expect(value, key).not.toContain(EM_DASH);
-        expect(value.includes("—"), key).toBe(false);
+        expect(value.includes("\u2014"), key).toBe(false);
       }
     }
   });
@@ -337,15 +337,27 @@ describe("guest compute claim error copy", () => {
 
     const rebuilt = guestClaimErrorRetryAction({
       code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
-      retryAction: null,
+      retryAction: {
+        id: "retry-last-turn",
+        label: "Retry",
+        type: "retry_last_turn",
+        payload: { message: "Compare Apple with SPY" },
+      },
       message: "Compare Apple with SPY",
       assistantMessageId: "assistant-claim-1",
     });
     expect(rebuilt?.type).toBe("retry_last_turn");
     expect(rebuilt?.payload).toEqual({
       message: "Compare Apple with SPY",
-      failed_assistant_id: "assistant-claim-1",
     });
+    expect(
+      guestClaimErrorRetryAction({
+        code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+        retryAction: null,
+        message: "AAPL",
+        assistantMessageId: "assistant-claim-1",
+      }),
+    ).toBeNull();
 
     const later = guestClaimErrorMessagePatch({
       code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
@@ -433,7 +445,6 @@ describe("guest compute claim error copy", () => {
     expect(chat).toContain("keepLocalTranscript");
     expect(chat).toContain("if (!options?.keepLocalTranscript)");
     expect(chat).toContain("guestClaimErrorMessagePatch({");
-    expect(chat).toContain("chatAction: action");
     expect(chat).toContain("settleGuestClaimTransportReadiness(terminalReadiness, rejectionCode, assistantId,");
     expect(chat).toContain("retryLastTurnSendOptions({ failedAssistantId, requestMessageId })");
   });
