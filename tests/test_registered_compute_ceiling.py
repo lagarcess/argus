@@ -321,3 +321,62 @@ def test_signed_in_research_exhausted_copy_is_localized_without_em_dash() -> Non
     assert "consultas de investigación de hoy" in spanish
     assert "\u2014" not in english
     assert "\u2014" not in spanish
+
+
+def test_replayed_idempotency_key_does_not_consume_a_unit(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.test_guest_compute_ceiling import (
+        REPLAY_HEADERS,
+        SPENT_CONFIRMATION_REPLAY,
+    )
+
+    fake = _registered(mock_gateway, monkeypatch, turns_today=5)
+
+    first = client.post(
+        "/api/v1/chat/stream",
+        json=SPENT_CONFIRMATION_REPLAY,
+        headers={**REGISTERED_HEADERS, **REPLAY_HEADERS},
+    )
+    replay = client.post(
+        "/api/v1/chat/stream",
+        json=SPENT_CONFIRMATION_REPLAY,
+        headers={**REGISTERED_HEADERS, **REPLAY_HEADERS},
+    )
+
+    assert first.status_code == replay.status_code == 409, replay.text
+    assert fake.claims == 0
+    assert fake.used == 5
+    mock_gateway.create_message.assert_not_called()
+
+
+def test_unknown_conversation_404_does_not_consume_a_unit(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = _registered(mock_gateway, monkeypatch, turns_today=5)
+    mock_gateway.get_conversation.return_value = None
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={**TURN, "conversation_id": "conv-unknown"},
+        headers=REGISTERED_HEADERS,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    assert fake.claims == 0
+    assert fake.used == 5
+
+
+def test_signed_in_turn_still_claims_one_unit_after_lookup(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = _registered(mock_gateway, monkeypatch, turns_today=5)
+
+    response = client.post(
+        "/api/v1/chat/stream", json=TURN, headers=REGISTERED_HEADERS
+    )
+
+    assert response.status_code == 200, response.text
+    assert fake.claims == 1
+    assert fake.used == 6
