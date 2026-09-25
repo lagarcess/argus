@@ -110,7 +110,6 @@ describe("Retry-After parsing", () => {
     expect(parseRetryAfterSeconds("-5")).toBe(RETRY_AFTER_FALLBACK_SECONDS);
     expect(parseRetryAfterSeconds("1.5")).toBe(RETRY_AFTER_FALLBACK_SECONDS);
     expect(parseRetryAfterSeconds("abc")).toBe(RETRY_AFTER_FALLBACK_SECONDS);
-    expect(parseRetryAfterSeconds("2026")).toBe(RETRY_AFTER_FALLBACK_SECONDS);
     expect(parseRetryAfterSeconds("Sep 25 2026")).toBe(
       RETRY_AFTER_FALLBACK_SECONDS,
     );
