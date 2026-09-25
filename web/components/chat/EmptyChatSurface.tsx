@@ -2,8 +2,13 @@
 
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import {
+  CAPTCHA_UNAVAILABLE_CODE,
+  type GuestEntryErrorKind,
+} from "@/lib/guest-captcha";
+import { landingStarterSurfaceEpoch } from "@/lib/landing-intent";
+import { researchRailEnabled } from "@/lib/private-alpha-flags";
 import ChatInput from "./ChatInput";
-import { useLandingStarterPrefill } from "./useLandingStarterPrefill";
 import ChatLegalNotice from "./ChatLegalNotice";
 import EmptyChatGreeting from "./EmptyChatGreeting";
 import EmptyChatHeading from "./EmptyChatHeading";
@@ -11,11 +16,7 @@ import StarterActions, {
   type StarterSelectionMetadata,
 } from "./StarterActions";
 import type { ChatMention } from "./types";
-import {
-  CAPTCHA_UNAVAILABLE_CODE,
-  type GuestEntryErrorKind,
-} from "@/lib/guest-captcha";
-import { researchRailEnabled } from "@/lib/private-alpha-flags";
+import { useLandingStarterPrefill } from "./useLandingStarterPrefill";
 
 type EmptyChatSurfaceProps = {
   isGuest: boolean;
@@ -88,7 +89,7 @@ export default function EmptyChatSurface({
         }
       >
         <ChatInput
-          key="new-conversation"
+          key={`new-conversation-${landingStarterSurfaceEpoch()}`}
           onSend={onSend}
           disabled={disabled}
           placeholder={placeholder}

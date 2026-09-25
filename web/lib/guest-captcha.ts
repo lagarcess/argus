@@ -48,6 +48,12 @@ type TurnstileShell = {
   destroy(): void;
 };
 
+function captchaAbortError(): Error {
+  const error = new Error("Guest CAPTCHA cancelled.");
+  error.name = "AbortError";
+  return error;
+}
+
 function captchaUnavailableError(): CaptchaUnavailableError {
   const error = new Error(
     "Browser CAPTCHA could not be verified.",
@@ -314,6 +320,7 @@ export function acquireTurnstileChallenge(input: {
   timeoutMs: number;
   interactiveTimeoutMs: number;
   theme: "light" | "dark";
+  signal?: AbortSignal;
 }): Promise<string> {
   const {
     turnstile,
@@ -322,12 +329,20 @@ export function acquireTurnstileChallenge(input: {
     timeoutMs,
     interactiveTimeoutMs,
     theme,
+    signal,
   } = input;
+  if (signal?.aborted) {
+    shell.destroy();
+    return Promise.reject(captchaAbortError());
+  }
   return new Promise<string>((resolve, reject) => {
     let widgetId = "";
     let widgetRemoved = false;
     let settled = false;
     let timeoutId: ReturnType<typeof globalThis.setTimeout> | null = null;
+    const onAbort = () => {
+      fail(captchaAbortError());
+    };
     const startTimeout = (durationMs: number) => {
       if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
       timeoutId = globalThis.setTimeout(() => {
@@ -344,6 +359,7 @@ export function acquireTurnstileChallenge(input: {
       }
     };
     const cleanup = () => {
+      signal?.removeEventListener("abort", onAbort);
       if (timeoutId !== null) globalThis.clearTimeout(timeoutId);
       removeWidget();
       shell.destroy();
@@ -354,15 +370,20 @@ export function acquireTurnstileChallenge(input: {
       cleanup();
       resolve(token);
     };
-    function fail() {
+    function fail(error: Error = captchaUnavailableError()) {
       if (settled) return true;
       settled = true;
       cleanup();
-      reject(captchaUnavailableError());
+      reject(error);
       return true;
     }
 
     try {
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) {
+        fail(captchaAbortError());
+        return;
+      }
       startTimeout(timeoutMs);
       widgetId = turnstile.render(shell.container, {
         sitekey: siteKey,
@@ -374,6 +395,7 @@ export function acquireTurnstileChallenge(input: {
           fail();
         },
         "before-interactive-callback": () => {
+          if (settled) return;
           shell.reveal();
           startTimeout(interactiveTimeoutMs);
         },
@@ -387,7 +409,11 @@ export function acquireTurnstileChallenge(input: {
 
 export async function acquireGuestCaptchaToken(
   browserCaptchaToken?: string | null,
+  signal?: AbortSignal,
 ): Promise<string> {
+  if (signal?.aborted) {
+    throw captchaAbortError();
+  }
   const focusBeforeChallenge =
     typeof document !== "undefined" &&
     document.activeElement instanceof HTMLElement
@@ -401,11 +427,14 @@ export async function acquireGuestCaptchaToken(
 
   const deadline = Date.now() + CAPTCHA_ACQUISITION_TIMEOUT_MS;
   const turnstile = await loadTurnstile(CAPTCHA_ACQUISITION_TIMEOUT_MS);
+  if (signal?.aborted) {
+    throw captchaAbortError();
+  }
   const shell = await createTurnstileShell(focusBeforeChallenge);
   const remainingMs = deadline - Date.now();
-  if (remainingMs <= 0) {
+  if (signal?.aborted || remainingMs <= 0) {
     shell.destroy();
-    throw captchaUnavailableError();
+    throw signal?.aborted ? captchaAbortError() : captchaUnavailableError();
   }
   return acquireTurnstileChallenge({
     turnstile,
@@ -414,6 +443,7 @@ export async function acquireGuestCaptchaToken(
     timeoutMs: remainingMs,
     interactiveTimeoutMs: CAPTCHA_INTERACTIVE_TIMEOUT_MS,
     theme: resolvedTurnstileTheme(),
+    signal,
   });
 }
 
