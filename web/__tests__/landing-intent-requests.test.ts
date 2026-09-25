@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { signupWithEmail } from "../lib/argus-api";
-import { bootstrapGuest } from "../lib/guest-session";
+import { bootstrapGuest, resetGuestBootstrapRuntime } from "../lib/guest-session";
 import { captureLandingIntent } from "../lib/landing-intent";
 
 const root = join(import.meta.dir, "..");
@@ -37,6 +37,7 @@ function installStorage() {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  resetGuestBootstrapRuntime();
   delete (globalThis as { window?: unknown }).window;
 });
 

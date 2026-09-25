@@ -1,14 +1,23 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  cancelPendingGuestBootstrap,
   createGuestSessionBootstrapper,
   guestCaptchaPlanForEnvironment,
   guestCaptchaTokenForEnvironment,
+  resetGuestBootstrapRuntime,
+  startGuestSession,
 } from "../lib/guest-session";
 import { guestAccessEnabledFromEnv } from "../lib/private-alpha-flags";
 
 const root = join(import.meta.dir, "..");
+const originalFetch = globalThis.fetch;
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  resetGuestBootstrapRuntime();
+});
 
 describe("guest session entry contract", () => {
   test("defaults Guest presentation on and keeps explicit false as a kill switch", () => {
@@ -145,6 +154,8 @@ describe("guest session entry contract", () => {
     expect(session).toContain("persistBrowserSession(response)");
     expect(session).toContain("cancelPendingGuestBootstrap");
     expect(session).toContain("persistGuestBootstrap");
+    expect(session).toContain("guestBootstrapAbort?.abort()");
+    expect(session).toContain("signal: guestBootstrapAbort?.signal");
     expect(session.indexOf("if (!persistGuestBootstrap)")).toBeLessThan(
       session.lastIndexOf("persistBrowserSession(response)"),
     );
@@ -172,5 +183,31 @@ describe("guest session entry contract", () => {
     expect(guestApi).toContain('"/auth/guest/signup"');
     expect(guestApi).toContain("persistBrowserSession(response)");
     expect(guestApi).not.toContain('"/auth/guest/link"');
+  });
+
+  test("cancel aborts the in-flight guest fetch so late cookies cannot land", async () => {
+    let seen: AbortSignal | undefined;
+    globalThis.fetch = (async (_input, init) => {
+      seen = init?.signal;
+      return new Promise((_resolve, reject) => {
+        const abort = () =>
+          reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+        if (init?.signal?.aborted) {
+          abort();
+          return;
+        }
+        init?.signal?.addEventListener("abort", abort, { once: true });
+      });
+    }) as typeof fetch;
+
+    const pending = startGuestSession("en", "token");
+    for (let i = 0; i < 20 && !seen; i += 1) {
+      await Promise.resolve();
+    }
+    expect(seen).toBeDefined();
+    expect(seen?.aborted).toBe(false);
+    cancelPendingGuestBootstrap();
+    expect(seen?.aborted).toBe(true);
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
   });
 });

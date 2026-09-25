@@ -26,6 +26,7 @@ import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import type { UserResponse } from "@/lib/guest-account";
 import {
   cancelPendingGuestBootstrap,
+  isGuestBootstrapAbortError,
   startGuestSession,
 } from "@/lib/guest-session";
 import { hasCampaignAttribution } from "@/lib/landing-intent";
@@ -126,7 +127,9 @@ export function useGuestExperience({
 
   useEffect(() => {
     if (!guestBootstrapRequired || !hasCampaignAttribution()) return;
-    void startGuestSession(account?.user.language ?? null);
+    void startGuestSession(account?.user.language ?? null).catch((error) => {
+      if (!isGuestBootstrapAbortError(error)) throw error;
+    });
     return () => {
       cancelPendingGuestBootstrap();
     };
@@ -233,7 +236,10 @@ export function useGuestExperience({
             }
             effectiveAccount = refreshedAccount;
           } catch (error) {
-            if (!admissionCancelled()) onGuestBootstrapError(error);
+            if (isGuestBootstrapAbortError(error) || admissionCancelled()) {
+              return false;
+            }
+            onGuestBootstrapError(error);
             return false;
           }
         }

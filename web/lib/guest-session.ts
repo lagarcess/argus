@@ -65,9 +65,39 @@ const browserGuestBootstrapper = createGuestSessionBootstrapper<
 });
 
 let persistGuestBootstrap = true;
+let guestBootstrapAbort: AbortController | null = null;
+
+function guestBootstrapAbortError(): Error {
+  const error = new Error("Guest bootstrap cancelled.");
+  error.name = "AbortError";
+  return error;
+}
+
+export function isGuestBootstrapAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name: string }).name === "AbortError"
+  );
+}
+
+function armGuestBootstrapAbort() {
+  if (!guestBootstrapAbort || guestBootstrapAbort.signal.aborted) {
+    guestBootstrapAbort = new AbortController();
+  }
+}
+
+export function resetGuestBootstrapRuntime() {
+  persistGuestBootstrap = true;
+  guestBootstrapAbort = null;
+  browserGuestBootstrapper.reset();
+}
 
 export function cancelPendingGuestBootstrap() {
   persistGuestBootstrap = false;
+  guestBootstrapAbort?.abort();
+  guestBootstrapAbort = null;
   browserGuestBootstrapper.reset();
 }
 
@@ -75,11 +105,15 @@ export async function bootstrapGuest(payload: {
   captcha_token: string;
   language: "en" | "es-419";
 }) {
+  if (!persistGuestBootstrap) {
+    throw guestBootstrapAbortError();
+  }
   const response = await unauthenticatedApiFetch<GuestBootstrapResponse>(
     "/auth/guest",
     {
       method: "POST",
       body: JSON.stringify({ ...payload, ...attributionBody() }),
+      signal: guestBootstrapAbort?.signal,
     },
   );
   if (!persistGuestBootstrap) {
@@ -94,6 +128,7 @@ export function startGuestSession(
   captchaToken?: string | null,
 ) {
   persistGuestBootstrap = true;
+  armGuestBootstrapAbort();
   return browserGuestBootstrapper.run({ language, captchaToken });
 }
 
