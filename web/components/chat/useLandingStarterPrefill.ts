@@ -7,6 +7,7 @@ import {
   captureLandingIntentFromLocation,
   LANDING_STARTER_COPY_FALLBACKS,
   landingStarterCopyKey,
+  stripLandingStarterFromLocation,
   takeLandingStarterPrefill,
   type LandingStarter,
 } from "@/lib/landing-intent";
@@ -17,7 +18,9 @@ export function useLandingStarterPrefill(): string | null {
 
   useEffect(() => {
     captureLandingIntentFromLocation();
-    setStarter(takeLandingStarterPrefill());
+    const next = takeLandingStarterPrefill();
+    if (next) stripLandingStarterFromLocation();
+    setStarter(next);
   }, []);
 
   if (!starter) return null;

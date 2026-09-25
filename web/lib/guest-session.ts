@@ -31,24 +31,6 @@ export type GuestBootstrapResponse = {
   user?: Record<string, unknown> | null;
 };
 
-export async function bootstrapGuest(payload: {
-  captcha_token: string;
-  language: "en" | "es-419";
-}) {
-  const attribution = attributionPayload();
-  const response = await unauthenticatedApiFetch<GuestBootstrapResponse>(
-    "/auth/guest",
-    {
-      method: "POST",
-      body: JSON.stringify(
-        attribution ? { ...payload, attribution } : payload,
-      ),
-    },
-  );
-  await persistBrowserSession(response);
-  return response;
-}
-
 export function createGuestSessionBootstrapper<
   TInput,
   TResult,
@@ -82,10 +64,39 @@ const browserGuestBootstrapper = createGuestSessionBootstrapper<
   });
 });
 
+let persistGuestBootstrap = true;
+
+export function cancelPendingGuestBootstrap() {
+  persistGuestBootstrap = false;
+  browserGuestBootstrapper.reset();
+}
+
+export async function bootstrapGuest(payload: {
+  captcha_token: string;
+  language: "en" | "es-419";
+}) {
+  const attribution = attributionPayload();
+  const response = await unauthenticatedApiFetch<GuestBootstrapResponse>(
+    "/auth/guest",
+    {
+      method: "POST",
+      body: JSON.stringify(
+        attribution ? { ...payload, attribution } : payload,
+      ),
+    },
+  );
+  if (!persistGuestBootstrap) {
+    return response;
+  }
+  await persistBrowserSession(response);
+  return response;
+}
+
 export function startGuestSession(
   language?: string | null,
   captchaToken?: string | null,
 ) {
+  persistGuestBootstrap = true;
   return browserGuestBootstrapper.run({ language, captchaToken });
 }
 

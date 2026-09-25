@@ -1,4 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { createServer, type Server } from "node:http";
+import { backtestTurn, turnDocument } from "../__tests__/fixtures/receipt-turns";
 
 const GUEST_ID = "00000000-0000-4000-8000-000000000701";
 const CONVERSATION_ID = "00000000-0000-4000-8000-000000000702";
@@ -202,6 +204,114 @@ test("ad landing prefills the backtest prompt without sending and keeps attribut
   expect(evidence.signupBodies).toHaveLength(1);
   expect(evidence.signupBodies[0]?.attribution).toEqual(expectedAttribution);
   expect(evidence.streamCalls).toBe(0);
+});
+
+const SHARED_RECEIPT_ID = "abcdefghijklmnopqrstuvwx";
+
+async function startPublicReceiptMock(): Promise<Server> {
+  const payload = turnDocument(backtestTurn);
+  const server = createServer((req, res) => {
+    const url = req.url ?? "";
+    if (
+      req.method === "GET" &&
+      url.includes(`/public/receipts/${SHARED_RECEIPT_ID}`) &&
+      !url.includes("/fork")
+    ) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          public_id: SHARED_RECEIPT_ID,
+          status: "available",
+          kind: "backtest",
+          indexing: "noindex, nofollow",
+          created_at: "2026-09-14T20:00:00Z",
+          payload,
+        }),
+      );
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(8000, "127.0.0.1", () => resolve());
+  });
+  return server;
+}
+
+test("shared-thread ad landing keeps attribution through follow-up fork and signup", async ({
+  page,
+}) => {
+  const server = await startPublicReceiptMock();
+  try {
+    const evidence = await mockLandingJourney(page);
+    const forkBodies: Record<string, unknown>[] = [];
+    await page.route("**/public/receipt-funnel", async (route) => {
+      await fulfillJson(route, { success: true });
+    });
+    await page.route(
+      `**/public/receipts/${SHARED_RECEIPT_ID}/fork`,
+      async (route) => {
+        if (route.request().method() === "POST") {
+          forkBodies.push(route.request().postDataJSON() as Record<string, unknown>);
+        }
+        await fulfillJson(route, {
+          conversation: {
+            id: CONVERSATION_ID,
+            conversation_id: CONVERSATION_ID,
+            title: "New conversation",
+            pinned: false,
+            created_at: EXPIRES_AT,
+            updated_at: EXPIRES_AT,
+          },
+          created: true,
+        });
+      },
+    );
+    await page.route(`**/public/receipts/${SHARED_RECEIPT_ID}`, async (route) => {
+      await fulfillJson(route, {
+        public_id: SHARED_RECEIPT_ID,
+        status: "available",
+        kind: "backtest",
+        indexing: "noindex, nofollow",
+        created_at: EXPIRES_AT,
+        payload: turnDocument(backtestTurn),
+      });
+    });
+
+    await page.goto(`/r/${SHARED_RECEIPT_ID}?utm_campaign=x`, {
+      waitUntil: "domcontentloaded",
+    });
+    const followup = page.getByRole("textbox", {
+      name: "Follow up in your own chat",
+    });
+    await expect(followup).toBeVisible({ timeout: 15_000 });
+    await followup.fill("Change it to $300");
+    await page.getByRole("button", { name: "Send follow-up" }).click();
+
+    await expect(page.getByTestId("chat-input")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => evidence.bootstrapBodies.length).toBeGreaterThan(0);
+    expect(evidence.bootstrapBodies[0]?.attribution).toEqual({
+      utm_campaign: "x",
+      landing_path: `/r/${SHARED_RECEIPT_ID}`,
+    });
+    await expect.poll(() => forkBodies.length).toBeGreaterThan(0);
+
+    await page.goto("/?auth=signup", { waitUntil: "domcontentloaded" });
+    await page.locator('input[type="text"]').fill("Ad Visitor");
+    await page.locator('input[type="email"]').fill("ad@example.com");
+    await page.locator('input[type="password"]').fill("correct-horse-battery");
+    await page.getByRole("button", { name: "Sign up" }).click();
+    await expect(page.getByTestId("auth-check-email")).toBeVisible();
+    expect(evidence.signupBodies).toHaveLength(1);
+    expect(evidence.signupBodies[0]?.attribution).toEqual({
+      utm_campaign: "x",
+      landing_path: `/r/${SHARED_RECEIPT_ID}`,
+    });
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });
 
 test("Spanish ad landing prefills the localized backtest prompt without sending", async ({

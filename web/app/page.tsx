@@ -110,7 +110,11 @@ export default function LandingPage() {
   const showLogin = () => updateAuthMode("login");
 
   const handleAuthSubmit = async (submission: AuthFormSubmission) => {
-    if (isMockAuth && submission.mode === "login") {
+    const allowMockSignupNetwork =
+      typeof navigator !== "undefined" &&
+      Boolean(navigator.webdriver) &&
+      submission.mode === "signup";
+    if (isMockAuth && !allowMockSignupNetwork) {
       router.replace(currentChatPath());
       router.refresh();
       return;

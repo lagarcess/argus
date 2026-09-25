@@ -143,6 +143,11 @@ describe("guest session entry contract", () => {
     expect(session).toContain('"/auth/guest"');
     expect(session).toContain("attributionPayload");
     expect(session).toContain("persistBrowserSession(response)");
+    expect(session).toContain("cancelPendingGuestBootstrap");
+    expect(session).toContain("persistGuestBootstrap");
+    expect(session.indexOf("if (!persistGuestBootstrap)")).toBeLessThan(
+      session.lastIndexOf("persistBrowserSession(response)"),
+    );
     expect(api).toContain("if (error)");
   });
 

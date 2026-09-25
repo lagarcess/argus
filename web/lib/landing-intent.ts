@@ -192,13 +192,34 @@ export function readLandingIntent(): LandingIntent | null {
   }
 }
 
+const STARTER_CONSUMED_PREFIX = "consumed:";
+
+function readSessionStarterState(): {
+  pending: LandingStarter | null;
+  consumed: LandingStarter | null;
+} {
+  const raw = readSessionStored(LANDING_STARTER_STORAGE_KEY);
+  if (!raw) return { pending: null, consumed: null };
+  if (raw.startsWith(STARTER_CONSUMED_PREFIX)) {
+    return {
+      pending: null,
+      consumed:
+        sanitizeLandingStarter(raw.slice(STARTER_CONSUMED_PREFIX.length)) ?? null,
+    };
+  }
+  return { pending: sanitizeLandingStarter(raw) ?? null, consumed: null };
+}
+
 export function captureLandingIntent(
   search: string | URLSearchParams,
   landingPath?: string,
 ): LandingIntent | null {
   const incoming = parseLandingIntent(search, landingPath);
   if (incoming.starter) {
-    writeSessionStored(LANDING_STARTER_STORAGE_KEY, incoming.starter);
+    const { consumed } = readSessionStarterState();
+    if (consumed !== incoming.starter) {
+      writeSessionStored(LANDING_STARTER_STORAGE_KEY, incoming.starter);
+    }
   }
   const merged = mergeFirstTouchLandingIntent(readLandingIntent(), incoming);
   if (isEmptyLandingIntent(merged)) return null;
@@ -239,9 +260,28 @@ export function hasCampaignAttribution(
 }
 
 export function takeLandingStarterPrefill(): LandingStarter | null {
-  const starter = sanitizeLandingStarter(readSessionStored(LANDING_STARTER_STORAGE_KEY));
-  removeSessionStored(LANDING_STARTER_STORAGE_KEY);
-  return starter ?? null;
+  const { pending, consumed } = readSessionStarterState();
+  if (pending) {
+    writeSessionStored(
+      LANDING_STARTER_STORAGE_KEY,
+      `${STARTER_CONSUMED_PREFIX}${pending}`,
+    );
+    return pending;
+  }
+  if (!consumed) {
+    removeSessionStored(LANDING_STARTER_STORAGE_KEY);
+  }
+  return null;
+}
+
+export function stripLandingStarterFromLocation(): void {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("starter")) return;
+  params.delete("starter");
+  const query = params.toString();
+  const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash ?? ""}`;
+  window.history.replaceState(null, "", next);
 }
 
 export function landingStarterCopyKey(

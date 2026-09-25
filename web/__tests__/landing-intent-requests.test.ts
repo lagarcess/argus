@@ -94,6 +94,46 @@ describe("landing attribution on auth requests", () => {
     });
   });
 
+  test("a shared-thread landing path survives into bootstrap and signup", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    globalThis.fetch = (async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response(
+        JSON.stringify({ authenticated: true, account_kind: "guest", user: { id: "g1" } }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    captureLandingIntent("utm_campaign=x", "/r/abcdefghijklmnopqrstuvwx");
+    await bootstrapGuest({ captcha_token: "token", language: "en" });
+    expect(bodies[0]).toMatchObject({
+      attribution: {
+        utm_campaign: "x",
+        landing_path: "/r/abcdefghijklmnopqrstuvwx",
+      },
+    });
+
+    globalThis.fetch = (async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return new Response(JSON.stringify({ user: { id: "u1" }, session: null }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    await signupWithEmail({
+      email: "shared@example.com",
+      password: "password123",
+      language: "en",
+    });
+    expect(bodies.at(-1)).toMatchObject({
+      attribution: {
+        utm_campaign: "x",
+        landing_path: "/r/abcdefghijklmnopqrstuvwx",
+      },
+    });
+  });
+
   test("guest account signup keeps extra=forbid by not attaching attribution", () => {
     const guestApi = readFileSync(join(root, "lib/guest-api.ts"), "utf-8");
     expect(guestApi).toContain('"/auth/guest/signup"');

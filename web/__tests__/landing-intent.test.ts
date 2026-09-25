@@ -16,6 +16,7 @@ import {
   readLandingIntent,
   sanitizeLandingPath,
   sanitizeLandingStarter,
+  stripLandingStarterFromLocation,
   takeLandingStarterPrefill,
 } from "../lib/landing-intent";
 
@@ -40,12 +41,21 @@ function installStorage() {
       session.delete(key);
     },
   };
+  const location = { search: "", pathname: "/", hash: "" };
   (globalThis as { window?: unknown }).window = {
     localStorage,
     sessionStorage,
-    location: { search: "", pathname: "/" },
+    location,
+    history: {
+      replaceState: (_state: unknown, _title: string, url: string) => {
+        const parsed = new URL(url, "https://argus.test");
+        location.pathname = parsed.pathname;
+        location.search = parsed.search;
+        location.hash = parsed.hash;
+      },
+    },
   };
-  return { local, session };
+  return { local, session, location };
 }
 
 afterEach(() => {
@@ -151,6 +161,40 @@ describe("landing intent storage", () => {
     expect(readLandingIntent()?.starter).toBe("backtest");
   });
 
+  test("a leftover starter query cannot recreate a consumed prefill", () => {
+    const { location } = installStorage();
+    location.search = "?utm_campaign=x&starter=backtest";
+    location.pathname = "/chat";
+    captureLandingIntent(location.search, location.pathname);
+    expect(takeLandingStarterPrefill()).toBe("backtest");
+    stripLandingStarterFromLocation();
+    expect(location.search).toBe("?utm_campaign=x");
+    expect(captureLandingIntent(location.search, location.pathname)).toEqual({
+      utm_campaign: "x",
+      starter: "backtest",
+      landing_path: "/chat",
+    });
+    expect(takeLandingStarterPrefill()).toBeNull();
+    captureLandingIntent("starter=backtest&utm_campaign=x", "/chat");
+    expect(takeLandingStarterPrefill()).toBeNull();
+  });
+
+  test("first-touch keeps a shared-thread landing path", () => {
+    installStorage();
+    expect(
+      captureLandingIntent("utm_campaign=x&fbclid=abc.1", "/r/abcdefghijklmnopqrstuvwx"),
+    ).toEqual({
+      utm_campaign: "x",
+      fbclid: "abc.1",
+      landing_path: "/r/abcdefghijklmnopqrstuvwx",
+    });
+    expect(captureLandingIntent("utm_campaign=later", "/chat")).toEqual({
+      utm_campaign: "x",
+      fbclid: "abc.1",
+      landing_path: "/r/abcdefghijklmnopqrstuvwx",
+    });
+  });
+
   test("this visit can prefill a new starter without rewriting first-touch attribution", () => {
     installStorage();
     captureLandingIntent("starter=backtest&utm_campaign=x", "/");
@@ -198,12 +242,30 @@ describe("landing starter prefill wiring", () => {
 
     expect(hook).toContain("takeLandingStarterPrefill");
     expect(hook).toContain("captureLandingIntentFromLocation");
+    expect(hook).toContain("stripLandingStarterFromLocation");
     expect(hook).not.toContain("onSend");
     expect(hook).not.toContain("admitSend");
     expect(empty).toContain("useLandingStarterPrefill");
     expect(empty).toContain("draftText={draftText}");
     expect(input).toContain("draftText");
     expect(input).not.toContain("onSend(draftText");
+  });
+
+  test("public receipt landings capture the live path before a follow-up forks", () => {
+    const layout = readFileSync(join(root, "app/r/layout.tsx"), "utf-8");
+    const followup = readFileSync(
+      join(root, "components/receipt/ReceiptFollowup.tsx"),
+      "utf-8",
+    );
+    const capture = readFileSync(
+      join(root, "components/receipt/LandingIntentCapture.tsx"),
+      "utf-8",
+    );
+    expect(layout).toContain("LandingIntentCapture");
+    expect(capture).toContain("captureLandingIntentFromLocation");
+    expect(followup).toContain("captureLandingIntentFromLocation");
+    expect(followup).toContain("currentChatPath()");
+    expect(followup).not.toContain('router.push("/chat")');
   });
 });
 
