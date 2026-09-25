@@ -36,6 +36,7 @@ export const ATTRIBUTION_FIELDS = [
   "utm_source",
   "utm_medium",
   "utm_campaign",
+  "utm_term",
   "utm_content",
   "fbclid",
   "ref",
@@ -49,6 +50,7 @@ export type LandingIntent = {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  utm_term?: string;
   utm_content?: string;
   fbclid?: string;
   ref?: string;
@@ -60,6 +62,7 @@ export type AttributionPayload = {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  utm_term?: string;
   utm_content?: string;
   fbclid?: string;
   ref?: string;
@@ -74,6 +77,7 @@ const BOUNCE_CAMPAIGN_KEYS = [
   "utm_source",
   "utm_medium",
   "utm_campaign",
+  "utm_term",
   "utm_content",
   "fbclid",
   "ref",
@@ -160,6 +164,7 @@ function withDefinedFields(intent: LandingIntent): LandingIntent {
   if (intent.utm_source) next.utm_source = intent.utm_source;
   if (intent.utm_medium) next.utm_medium = intent.utm_medium;
   if (intent.utm_campaign) next.utm_campaign = intent.utm_campaign;
+  if (intent.utm_term) next.utm_term = intent.utm_term;
   if (intent.utm_content) next.utm_content = intent.utm_content;
   if (intent.fbclid) next.fbclid = intent.fbclid;
   if (intent.ref) next.ref = intent.ref;
@@ -182,6 +187,7 @@ export function parseLandingIntent(
     utm_source: sanitizeCampaignValue(params.get("utm_source")),
     utm_medium: sanitizeCampaignValue(params.get("utm_medium")),
     utm_campaign: sanitizeCampaignValue(params.get("utm_campaign")),
+    utm_term: sanitizeCampaignValue(params.get("utm_term")),
     utm_content: sanitizeCampaignValue(params.get("utm_content")),
     fbclid: sanitizeCampaignValue(params.get("fbclid")),
     ref: sanitizeCampaignValue(params.get("ref")),
@@ -214,6 +220,7 @@ function sanitizeStoredIntent(raw: Record<string, unknown>): LandingIntent | nul
     utm_source: sanitizeCampaignValue(typeof raw.utm_source === "string" ? raw.utm_source : undefined),
     utm_medium: sanitizeCampaignValue(typeof raw.utm_medium === "string" ? raw.utm_medium : undefined),
     utm_campaign: sanitizeCampaignValue(typeof raw.utm_campaign === "string" ? raw.utm_campaign : undefined),
+    utm_term: sanitizeCampaignValue(typeof raw.utm_term === "string" ? raw.utm_term : undefined),
     utm_content: sanitizeCampaignValue(typeof raw.utm_content === "string" ? raw.utm_content : undefined),
     fbclid: sanitizeCampaignValue(typeof raw.fbclid === "string" ? raw.fbclid : undefined),
     ref: sanitizeCampaignValue(typeof raw.ref === "string" ? raw.ref : undefined),
@@ -316,6 +323,7 @@ export function hasCampaignAttribution(
     intent.utm_source ||
       intent.utm_medium ||
       intent.utm_campaign ||
+      intent.utm_term ||
       intent.utm_content ||
       intent.fbclid ||
       intent.ref,
