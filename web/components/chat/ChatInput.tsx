@@ -24,6 +24,7 @@ import {
   type ComposerSegment,
 } from "./composer-model";
 import { entityTokenClassName } from "./entity-token";
+import { noteLandingStarterComposerMatch } from "@/lib/landing-intent";
 import type { ChatMention } from "./types";
 
 type ChatInputProps = {
@@ -160,6 +161,13 @@ export default function ChatInput({
     pendingCaretOffsetRef.current = text.length;
     setSegments([{ type: "text", text }]);
   }, [composerHasContent, composerRawText, draftText]);
+
+  useEffect(() => {
+    if (!draftText?.trim()) return;
+    noteLandingStarterComposerMatch(
+      Boolean(appliedDraftRef.current) && composerRawText === draftText,
+    );
+  }, [composerRawText, draftText]);
 
   useEffect(() => {
     if (!isDiscoveryOpen) return;
