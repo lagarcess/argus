@@ -147,6 +147,7 @@ describe("guest session entry contract", () => {
   test("uses the existing server guest endpoint and persists the provider session", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const session = readFileSync(join(root, "lib/guest-session.ts"), "utf-8");
+    const captcha = readFileSync(join(root, "lib/guest-captcha.ts"), "utf-8");
 
     expect(session).toContain("export async function bootstrapGuest");
     expect(session).toContain('"/auth/guest"');
@@ -155,7 +156,11 @@ describe("guest session entry contract", () => {
     expect(session).toContain("cancelPendingGuestBootstrap");
     expect(session).toContain("persistGuestBootstrap");
     expect(session).toContain("guestBootstrapAbort?.abort()");
+    expect(session).toContain("const signal = guestBootstrapAbort?.signal");
+    expect(session).toContain("acquireGuestCaptchaToken");
     expect(session).toContain("signal: guestBootstrapAbort?.signal");
+    expect(captcha).toContain("signal?: AbortSignal");
+    expect(captcha).toContain("Guest CAPTCHA cancelled.");
     expect(session.indexOf("if (!persistGuestBootstrap)")).toBeLessThan(
       session.lastIndexOf("persistBrowserSession(response)"),
     );
