@@ -506,10 +506,6 @@ def test_docs_only_changes_script_classifies_docs_and_code_lists() -> None:
         "docs_only": "true",
         "run_heavy": "false",
     }
-    assert _classify_changed_files("docs/api/openapi.yaml") == {
-        "docs_only": "true",
-        "run_heavy": "false",
-    }
     assert _classify_changed_files(code_path) == {
         "docs_only": "false",
         "run_heavy": "true",
@@ -530,6 +526,92 @@ def test_docs_only_changes_script_classifies_docs_and_code_lists() -> None:
         "docs_only": "false",
         "run_heavy": "true",
     }
+
+
+def test_docs_only_changes_script_runs_heavy_jobs_for_docs_api_contract() -> None:
+    api_path = f"docs/api/{FAKE.file_name(extension='yaml')}"
+
+    assert _classify_changed_files("docs/api/openapi.yaml") == {
+        "docs_only": "false",
+        "run_heavy": "true",
+    }
+    assert _classify_changed_files(api_path) == {
+        "docs_only": "false",
+        "run_heavy": "true",
+    }
+    assert _classify_changed_files("docs/PRODUCT.md", "docs/api/openapi.yaml") == {
+        "docs_only": "false",
+        "run_heavy": "true",
+    }
+
+
+def test_docs_only_changes_script_counts_rename_from_code_into_docs(
+    tmp_path: Path,
+) -> None:
+    assert "--no-renames" in DOCS_ONLY_SCRIPT.read_text(encoding="utf-8")
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "ci@example.test"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "CI"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "commit.gpgsign", "false"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+    source_name = FAKE.file_name(extension="py")
+    dest_name = FAKE.file_name(extension="md")
+    (repo / "src").mkdir()
+    (repo / "src" / source_name).write_text("print(1)\n", encoding="utf-8")
+    subprocess.run(["git", "add", f"src/{source_name}"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "add code"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    (repo / "docs").mkdir()
+    subprocess.run(
+        ["git", "mv", f"src/{source_name}", f"docs/{dest_name}"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "rename into docs"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+
+    result = subprocess.run(
+        ["bash", str(DOCS_ONLY_SCRIPT), "--from-git", "HEAD~1"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    parsed = {
+        key: value
+        for line in result.stdout.splitlines()
+        if "=" in line
+        for key, value in (line.split("=", 1),)
+        if key in {"docs_only", "run_heavy"}
+    }
+    assert f"src/{source_name}" in result.stdout
+    assert parsed == {"docs_only": "false", "run_heavy": "true"}
 
 
 def test_docs_only_changes_script_runs_heavy_jobs_off_pull_request() -> None:
