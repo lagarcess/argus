@@ -111,8 +111,7 @@ export default function LandingPage() {
 
   const handleAuthSubmit = async (submission: AuthFormSubmission) => {
     const allowMockSignupNetwork =
-      typeof navigator !== "undefined" &&
-      Boolean(navigator.webdriver) &&
+      process.env.NEXT_PUBLIC_E2E_ALLOW_MOCK_SIGNUP === "true" &&
       submission.mode === "signup";
     if (isMockAuth && !allowMockSignupNetwork) {
       router.replace(currentChatPath());

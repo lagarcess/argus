@@ -16,6 +16,7 @@ import {
   mergeFirstTouchLandingIntent,
   noteLandingStarterComposerMatch,
   parseLandingIntent,
+  parseLandingStarter,
   pathWithSearch,
   prepareLandingStarterAuthHandoff,
   readLandingIntent,
@@ -100,7 +101,7 @@ describe("landing intent parsing", () => {
       ref: "ok space",
     });
     expect(sanitizeLandingStarter("savings")).toBe("savings");
-    expect(sanitizeLandingStarter("SAVINGS")).toBe("savings");
+    expect(sanitizeLandingStarter("SAVINGS")).toBeUndefined();
     expect(sanitizeLandingStarter("hold")).toBeUndefined();
     expect(sanitizeLandingPath("/chat")).toBe("/chat");
     expect(sanitizeLandingPath("//evil")).toBeUndefined();
@@ -121,6 +122,38 @@ describe("landing intent parsing", () => {
     const tooLong = `ig-${"a".repeat(400)}`;
     expect(parseLandingIntent(`utm_source=${tooLong}`).utm_source).toHaveLength(
       256,
+    );
+  });
+
+  test("rejects case, padding, control chars, and duplicate starters on both parsers", () => {
+    const rejected = [
+      "starter=BACKTEST",
+      "starter=SaViNgs",
+      "starter=%20backtest%20",
+      "starter=back%09test",
+      "starter=backtest%00",
+      "starter=backtest&starter=evil",
+      "starter=evil&starter=backtest",
+      "starter=backtest&starter=backtest",
+    ];
+    for (const search of rejected) {
+      expect(parseLandingStarter(search)).toBeUndefined();
+      expect(parseLandingIntent(search).starter).toBeUndefined();
+      expect(authLoginPathFromSearch(search)).toBe("/?auth=login");
+      expect(
+        authLoginPathFromSearch(`utm_campaign=x&${search}`),
+      ).toBe("/?utm_campaign=x&auth=login");
+    }
+  });
+
+  test("%62acktest decodes to backtest through URLSearchParams, so it is accepted", () => {
+    const params = new URLSearchParams("starter=%62acktest");
+    expect(params.get("starter")).toBe("backtest");
+    expect(params.getAll("starter")).toEqual(["backtest"]);
+    expect(parseLandingStarter("starter=%62acktest")).toBe("backtest");
+    expect(parseLandingIntent("starter=%62acktest").starter).toBe("backtest");
+    expect(authLoginPathFromSearch("starter=%62acktest")).toBe(
+      "/?starter=backtest&auth=login",
     );
   });
 });
@@ -167,6 +200,8 @@ describe("landing intent storage", () => {
       landing_path: "/",
     });
     expect(hasCampaignAttribution({ landing_path: "/" })).toBe(false);
+    expect(hasCampaignAttribution({ starter: "backtest" })).toBe(false);
+    expect(hasCampaignAttribution({ ref: "stories" })).toBe(true);
     expect(hasCampaignAttribution({ utm_campaign: "x" })).toBe(true);
   });
 
@@ -274,6 +309,26 @@ describe("landing intent storage", () => {
     noteLandingStarterComposerMatch(false);
     prepareLandingStarterAuthHandoff();
     expect(takeLandingStarterPrefill()).toBeNull();
+  });
+
+  test("a starter-only first visit does not lock out a later utm touch", () => {
+    installStorage();
+    expect(captureLandingIntent("starter=backtest", "/")).toBeNull();
+    expect(readLandingIntent()).toBeNull();
+    expect(window.localStorage.getItem(LANDING_INTENT_STORAGE_KEY)).toBeNull();
+    expect(takeLandingStarterPrefill()).toBe("backtest");
+    expect(
+      captureLandingIntent("utm_campaign=x&utm_source=ig", "/chat"),
+    ).toEqual({
+      utm_campaign: "x",
+      utm_source: "ig",
+      landing_path: "/chat",
+    });
+    expect(readLandingIntent()).toEqual({
+      utm_campaign: "x",
+      utm_source: "ig",
+      landing_path: "/chat",
+    });
   });
 
   test("landing path is stored only with the campaign visit that owns it", () => {
@@ -435,6 +490,14 @@ describe("landing starter prefill wiring", () => {
     expect(followup).toContain("currentChatPath()");
     expect(followup).not.toContain('router.push("/chat")');
   });
+
+  test("Playwright config owns the mock-signup network flag instead of webdriver", () => {
+    const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
+    const playwright = readFileSync(join(root, "playwright.config.ts"), "utf-8");
+    expect(page).toContain("NEXT_PUBLIC_E2E_ALLOW_MOCK_SIGNUP");
+    expect(page).not.toContain("navigator.webdriver");
+    expect(playwright).toContain('NEXT_PUBLIC_E2E_ALLOW_MOCK_SIGNUP: "true"');
+  });
 });
 
 describe("landing intent merge and redirects", () => {
@@ -490,10 +553,27 @@ describe("landing intent merge and redirects", () => {
         utm_campaign: "x",
         starter: ["backtest", "ignored"],
       }),
-    ).toBe("/?utm_campaign=x&starter=backtest&auth=login");
+    ).toBe("/?utm_campaign=x&auth=login");
     (globalThis as { window?: { location: { search: string } } }).window = {
       location: { search: "?utm_campaign=x" },
     };
     expect(currentChatPath()).toBe("/chat?utm_campaign=x");
+  });
+
+  test("login bounce drops next, redirect, unknown params, and invalid starters", () => {
+    expect(
+      authLoginPathFromSearch(
+        "utm_campaign=x&starter=backtest&next=/admin&redirect=https://evil.example&foo=1&auth=signup",
+      ),
+    ).toBe("/?utm_campaign=x&starter=backtest&auth=login");
+    expect(
+      authLoginPathFromSearch("utm_campaign=x&starter=BACKTEST&next=/admin"),
+    ).toBe("/?utm_campaign=x&auth=login");
+    expect(
+      authLoginPathFromSearch(
+        "starter=evil&starter=backtest&next=/settings&redirect=/",
+        "/chat",
+      ),
+    ).toBe("/?from_path=%2Fchat&auth=login");
   });
 });

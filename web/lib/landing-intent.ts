@@ -17,9 +17,12 @@ import {
  *   Composer prefill is a separate consume-once session intent written
  *   from this visit's URL, so a later `starter=` can still prefill without
  *   rewriting first-touch attribution.
- * - Values are trimmed, stripped of control characters, and length-capped.
- *   Campaign fields keep decoded punctuation and spaces. `starter` is a
- *   whitelist (`backtest` | `savings`); anything else is dropped so a link
+ * - Campaign fields are trimmed, stripped of control characters, and
+ *   length-capped. They keep decoded punctuation and spaces.
+ * - `starter` is an exact match on the raw decoded value (`backtest` |
+ *   `savings`). No trim, lowercasing, or control-char stripping first.
+ *   Duplicate `starter` keys drop the field entirely so /chat and the
+ *   login bounce cannot disagree. Anything else is dropped so a link
  *   can never inject free text into the composer or a model request.
  */
 
@@ -66,7 +69,15 @@ export type AttributionPayload = {
 
 const VALUE_MAX_LENGTH = 256;
 const PATH_MAX_LENGTH = 200;
-const TOKEN_PATTERN = /^[\w.%+\-]+$/;
+
+const BOUNCE_CAMPAIGN_KEYS = [
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_content",
+  "fbclid",
+  "ref",
+] as const;
 
 const LANDING_STARTER_COPY_KEYS = {
   backtest: "chat.landing_starters.backtest",
@@ -92,20 +103,19 @@ function sanitizeCampaignValue(
   return cleaned ? cleaned.slice(0, maxLength) : undefined;
 }
 
-function sanitizeToken(
-  value: string | null | undefined,
-  maxLength = VALUE_MAX_LENGTH,
-): string | undefined {
-  const cleaned = stripControls(value);
-  if (!cleaned || !TOKEN_PATTERN.test(cleaned)) return undefined;
-  return cleaned.slice(0, maxLength);
-}
-
 export function sanitizeLandingStarter(
   value: string | null | undefined,
 ): LandingStarter | undefined {
-  const cleaned = sanitizeToken(value, 32)?.toLowerCase();
-  return cleaned === "backtest" || cleaned === "savings" ? cleaned : undefined;
+  return LANDING_STARTERS.find((starter) => starter === value);
+}
+
+export function parseLandingStarter(
+  search: string | URLSearchParams,
+): LandingStarter | undefined {
+  const params = toSearchParams(search);
+  const values = params.getAll("starter");
+  if (values.length !== 1) return undefined;
+  return sanitizeLandingStarter(values[0]);
 }
 
 export function sanitizeLandingPath(
@@ -121,6 +131,28 @@ export function sanitizeLandingPath(
     return undefined;
   }
   return path;
+}
+
+type SearchRecord = Record<string, string | string[] | undefined>;
+
+function toSearchParams(
+  search: string | URLSearchParams | SearchRecord,
+): URLSearchParams {
+  if (search instanceof URLSearchParams) return search;
+  if (typeof search === "string") {
+    return new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  }
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === "string") params.append(key, item);
+      }
+    } else if (typeof value === "string") {
+      params.append(key, value);
+    }
+  }
+  return params;
 }
 
 function withDefinedFields(intent: LandingIntent): LandingIntent {
@@ -140,14 +172,12 @@ export function parseLandingIntent(
   search: string | URLSearchParams,
   landingPath?: string,
 ): LandingIntent {
-  const params =
-    typeof search === "string"
-      ? new URLSearchParams(search.startsWith("?") ? search.slice(1) : search)
-      : search;
+  const params = toSearchParams(search);
   const requestedPath = sanitizeLandingPath(landingPath);
   const bouncedFromChat =
     params.get("from_path") === "/chat" &&
     (!requestedPath || requestedPath === "/");
+  const starter = parseLandingStarter(params);
   const intent = withDefinedFields({
     utm_source: sanitizeCampaignValue(params.get("utm_source")),
     utm_medium: sanitizeCampaignValue(params.get("utm_medium")),
@@ -155,10 +185,11 @@ export function parseLandingIntent(
     utm_content: sanitizeCampaignValue(params.get("utm_content")),
     fbclid: sanitizeCampaignValue(params.get("fbclid")),
     ref: sanitizeCampaignValue(params.get("ref")),
-    starter: sanitizeLandingStarter(params.get("starter")),
+    starter,
     landing_path: bouncedFromChat ? "/chat" : requestedPath,
   });
-  return hasCampaignAttribution(intent) ? intent : {};
+  if (hasCampaignAttribution(intent)) return intent;
+  return starter ? { starter } : {};
 }
 
 export function isEmptyLandingIntent(
@@ -250,7 +281,7 @@ export function captureLandingIntent(
     }
   }
   const merged = mergeFirstTouchLandingIntent(readLandingIntent(), incoming);
-  if (isEmptyLandingIntent(merged)) return null;
+  if (!hasCampaignAttribution(merged)) return null;
   writeStored(LANDING_INTENT_STORAGE_KEY, JSON.stringify(merged));
   return merged;
 }
@@ -287,8 +318,7 @@ export function hasCampaignAttribution(
       intent.utm_campaign ||
       intent.utm_content ||
       intent.fbclid ||
-      intent.ref ||
-      intent.starter,
+      intent.ref,
   );
 }
 
@@ -394,30 +424,18 @@ export function currentAuthLoginPath(): string {
   );
 }
 
-type SearchRecord = Record<string, string | string[] | undefined>;
-
 export function authLoginPathFromSearch(
   search: URLSearchParams | SearchRecord | string,
   landingPath?: string,
 ): string {
+  const source = toSearchParams(search);
   const params = new URLSearchParams();
-  if (search instanceof URLSearchParams) {
-    search.forEach((value, key) => {
-      if (value) params.set(key, value);
-    });
-  } else if (typeof search === "string") {
-    new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).forEach(
-      (value, key) => {
-        if (value) params.set(key, value);
-      },
-    );
-  } else {
-    for (const [key, value] of Object.entries(search)) {
-      const scalar = Array.isArray(value) ? value[0] : value;
-      if (typeof scalar === "string" && scalar) params.set(key, scalar);
-    }
+  for (const key of BOUNCE_CAMPAIGN_KEYS) {
+    const value = source.get(key);
+    if (value) params.set(key, value);
   }
-  params.delete("from_path");
+  const starter = parseLandingStarter(source);
+  if (starter) params.set("starter", starter);
   if (sanitizeLandingPath(landingPath) === "/chat") {
     params.set("from_path", "/chat");
   }
