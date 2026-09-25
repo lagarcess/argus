@@ -12,6 +12,7 @@ import {
   LANDING_STARTER_STORAGE_KEY,
   LANDING_STARTER_RUNTIME_FALLBACK_MS,
   landingStarterAppliedThisRuntime,
+  landingStarterSurfaceEpoch,
   mergeFirstTouchLandingIntent,
   parseLandingIntent,
   pathWithSearch,
@@ -111,7 +112,7 @@ describe("landing intent parsing", () => {
 });
 
 describe("landing intent storage", () => {
-  test("first-touch keeps the original campaign and fills only empty fields", () => {
+  test("first-touch keeps the first attributed visit as a whole", () => {
     installStorage();
 
     expect(
@@ -123,17 +124,16 @@ describe("landing intent storage", () => {
     });
     expect(captureLandingIntent("utm_campaign=later&utm_source=ig", "/chat")).toEqual({
       utm_campaign: "x",
-      utm_source: "ig",
       starter: "backtest",
       landing_path: "/",
     });
     expect(captureLandingIntent("", "/settings")).toEqual({
       utm_campaign: "x",
-      utm_source: "ig",
       starter: "backtest",
       landing_path: "/",
     });
     expect(readLandingIntent()?.utm_campaign).toBe("x");
+    expect(readLandingIntent()?.utm_source).toBeUndefined();
     expect(JSON.parse(window.localStorage.getItem(LANDING_INTENT_STORAGE_KEY) ?? "{}")).toMatchObject({
       utm_campaign: "x",
       landing_path: "/",
@@ -189,8 +189,10 @@ describe("landing intent storage", () => {
     captureLandingIntent("starter=savings", "/");
     expect(takeLandingStarterPrefill()).toBe("savings");
     expect(landingStarterAppliedThisRuntime()).toBe("savings");
+    const epoch = landingStarterSurfaceEpoch();
     resetLandingStarterRuntime();
     expect(landingStarterAppliedThisRuntime()).toBeNull();
+    expect(landingStarterSurfaceEpoch()).toBe(epoch + 1);
   });
 
   test("a leftover starter query cannot recreate a consumed prefill", () => {
@@ -288,12 +290,16 @@ describe("landing starter prefill wiring", () => {
     expect(hook).toContain("captureLandingIntentFromLocation");
     expect(hook).toContain("stripLandingStarterFromLocation");
     expect(hook).toContain("landingStarterAppliedThisRuntime");
+    expect(hook).toContain("landingStarterSurfaceEpoch");
     expect(hook).toContain("if (!canConsume) return");
     expect(hook).not.toContain("onSend");
     expect(hook).not.toContain("admitSend");
     expect(empty).toContain("useLandingStarterPrefill(canConsumeLandingStarter)");
     expect(empty).toContain("canConsumeLandingStarter");
     expect(empty).toContain("draftText={draftText}");
+    expect(empty).toContain(
+      "key={`new-conversation-${landingStarterSurfaceEpoch()}`}",
+    );
     expect(input).toContain("draftText");
     expect(input).not.toContain("onSend(draftText");
     expect(input).toContain("if (composerHasContent || composerRawText.trim())");
@@ -346,16 +352,32 @@ describe("landing starter prefill wiring", () => {
 });
 
 describe("landing intent merge and redirects", () => {
-  test("merge never lets an empty field stand in for a filled one", () => {
+  test("merge keeps the first attributed visit instead of stitching later fields", () => {
     expect(
       mergeFirstTouchLandingIntent(
-        { utm_campaign: "x", starter: "backtest" },
-        { utm_campaign: "", starter: "savings", utm_source: "ig" } as never,
+        { utm_source: "facebook" },
+        { utm_campaign: "summer", utm_medium: "email" },
+      ),
+    ).toEqual({
+      utm_source: "facebook",
+    });
+    expect(
+      mergeFirstTouchLandingIntent(null, {
+        utm_campaign: "summer",
+        landing_path: "/r/abcdefghijklmnopqrstuvwx",
+      }),
+    ).toEqual({
+      utm_campaign: "summer",
+      landing_path: "/r/abcdefghijklmnopqrstuvwx",
+    });
+    expect(
+      mergeFirstTouchLandingIntent(
+        { landing_path: "/" },
+        { utm_campaign: "x", landing_path: "/chat" },
       ),
     ).toEqual({
       utm_campaign: "x",
-      starter: "backtest",
-      utm_source: "ig",
+      landing_path: "/chat",
     });
   });
 
