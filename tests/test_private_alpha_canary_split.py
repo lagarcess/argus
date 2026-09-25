@@ -16,12 +16,11 @@ from typing import Any, Iterator
 import pytest
 from faker import Faker
 
-requires_bun = pytest.mark.skipif(
-    shutil.which("bun") is None,
-    reason="bun is not available",
-)
-
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _bun() -> str:
+    return shutil.which("bun") or pytest.skip("bun is not available")
 
 
 def _source(path: str) -> str:
@@ -411,7 +410,6 @@ def test_session_tool_retries_only_lookup_transport_failures() -> None:
         assert "withLookupRetry" not in body
 
 
-@requires_bun
 def test_session_tool_mints_private_storage_state_and_revokes_it(
     tmp_path: Path,
     faker: Faker,
@@ -440,7 +438,7 @@ def test_session_tool_mints_private_storage_state_and_revokes_it(
             }
         )
         minted = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -465,7 +463,7 @@ def test_session_tool_mints_private_storage_state_and_revokes_it(
         assert email not in minted.stdout + minted.stderr
 
         revoked = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "revoke"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "revoke"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -481,7 +479,6 @@ def test_session_tool_mints_private_storage_state_and_revokes_it(
     assert all(service_role_key not in json.dumps(call.get("body", {})) for call in calls)
 
 
-@requires_bun
 def test_session_tool_retries_a_transient_allowlist_lookup_and_reports_it(
     tmp_path: Path,
     faker: Faker,
@@ -507,7 +504,7 @@ def test_session_tool_retries_a_transient_allowlist_lookup_and_reports_it(
             }
         )
         minted = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -532,7 +529,6 @@ def test_session_tool_retries_a_transient_allowlist_lookup_and_reports_it(
     assert len(allowlist_reads) >= 2
 
 
-@requires_bun
 def test_session_tool_revokes_a_minted_session_that_fails_least_privilege(
     tmp_path: Path,
     faker: Faker,
@@ -562,7 +558,7 @@ def test_session_tool_revokes_a_minted_session_that_fails_least_privilege(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -577,7 +573,6 @@ def test_session_tool_revokes_a_minted_session_that_fails_least_privilege(
     assert any(call["path"] == "/auth/v1/logout?scope=local" for call in calls)
 
 
-@requires_bun
 def test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails(
     tmp_path: Path,
     faker: Faker,
@@ -607,7 +602,7 @@ def test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails(
             }
         )
         failed_mint = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -615,7 +610,7 @@ def test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails(
             check=False,
         )
         retry = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "revoke"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "revoke"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -642,7 +637,6 @@ def test_session_tool_preserves_a_private_retry_handoff_when_revocation_fails(
     assert 'BROWSER_SESSION_MINTED="true"' in mint_wrapper
 
 
-@requires_bun
 def test_session_tool_rejects_a_stale_admin_profile_before_mint(
     tmp_path: Path,
     faker: Faker,
@@ -667,7 +661,7 @@ def test_session_tool_rejects_a_stale_admin_profile_before_mint(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "mint"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "mint"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -787,7 +781,6 @@ def test_manual_identity_provisioning_is_safe_and_never_runs_on_schedule() -> No
     assert "canary_identity_action=provision" in runbook
 
 
-@requires_bun
 def test_session_tool_provisions_only_a_safe_dedicated_identity(
     tmp_path: Path,
     faker: Faker,
@@ -812,7 +805,7 @@ def test_session_tool_provisions_only_a_safe_dedicated_identity(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -848,7 +841,6 @@ def test_session_tool_provisions_only_a_safe_dedicated_identity(
     assert any(call["path"].startswith("/rest/v1/profiles?") for call in calls)
 
 
-@requires_bun
 def test_session_tool_revokes_and_rolls_back_a_failed_profile_bootstrap(
     faker: Faker,
 ) -> None:
@@ -874,7 +866,7 @@ def test_session_tool_revokes_and_rolls_back_a_failed_profile_bootstrap(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -894,7 +886,6 @@ def test_session_tool_revokes_and_rolls_back_a_failed_profile_bootstrap(
     )
 
 
-@requires_bun
 def test_session_tool_refuses_to_relabel_an_existing_unknown_identity(
     faker: Faker,
 ) -> None:
@@ -915,7 +906,7 @@ def test_session_tool_refuses_to_relabel_an_existing_unknown_identity(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -933,7 +924,6 @@ def test_session_tool_refuses_to_relabel_an_existing_unknown_identity(
     )
 
 
-@requires_bun
 def test_session_tool_refuses_to_overwrite_an_elevated_allowlist_role(
     faker: Faker,
 ) -> None:
@@ -955,7 +945,7 @@ def test_session_tool_refuses_to_overwrite_an_elevated_allowlist_role(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
@@ -972,7 +962,6 @@ def test_session_tool_refuses_to_overwrite_an_elevated_allowlist_role(
     )
 
 
-@requires_bun
 def test_session_tool_refuses_to_provision_over_a_stale_admin_profile(
     faker: Faker,
 ) -> None:
@@ -993,7 +982,7 @@ def test_session_tool_refuses_to_provision_over_a_stale_admin_profile(
             }
         )
         result = subprocess.run(
-            ["bun", "e2e/support/private-alpha-canary-session.ts", "provision"],
+            [_bun(), "e2e/support/private-alpha-canary-session.ts", "provision"],
             cwd=ROOT / "web",
             env=env,
             capture_output=True,
