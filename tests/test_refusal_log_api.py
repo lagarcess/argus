@@ -10,6 +10,7 @@ from argus.api import state as api_state
 from argus.api.chat import refusal_evidence
 from argus.api.main import app
 from argus.api.routers import agent as agent_router
+from argus.domain.usage_limits import REGISTERED_COMPUTE_CEILING_RESOURCE
 from faker import Faker
 from fastapi.testclient import TestClient
 
@@ -114,7 +115,15 @@ def test_each_artifact_rejection_is_recorded_once_without_contract_changes(
     assert api_state.store.messages == messages_before
     assert api_state.store.chat_turn_lifecycles == turns_before
     assert api_state.store.usage_counters == usage_before
-    assert api_state.store.visitor_usage_counters == visitor_usage_before
+    ordinary_turn = action_type not in {"run_backtest", "cancel_confirmation"}
+    if ordinary_turn:
+        assert api_state.store.visitor_usage_counters != visitor_usage_before
+        assert all(
+            resource == REGISTERED_COMPUTE_CEILING_RESOURCE
+            for _, resource, _ in api_state.store.visitor_usage_counters
+        )
+    else:
+        assert api_state.store.visitor_usage_counters == visitor_usage_before
     assert not api_state.store.backtest_jobs
     # The observer is independent of the error's rendering and settlement.
     monkeypatch.setattr(

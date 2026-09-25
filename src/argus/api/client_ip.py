@@ -103,4 +103,7 @@ def resolve_client_ip(request: Request) -> str:
     peer = request.client.host if request.client and request.client.host else "unknown"
     parsed_peer = canonical_client_ip(peer) if peer != "unknown" else None
     _warn_trusted_header_fallback(header_name=header_name, peer=peer)
-    return parsed_peer or "unknown"
+    # A missing peer is unknown. A present non-IP peer (TestClient, unix
+    # socket) stays that stable identity instead of collapsing every
+    # unparseable caller into one shared bucket.
+    return parsed_peer or peer

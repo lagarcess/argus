@@ -149,8 +149,13 @@ def test_invalid_trusted_header_falls_back_to_peer() -> None:
     assert resolve_client_ip(request) == "192.0.2.10"
 
 
-def test_invalid_header_and_peer_fall_back_to_unknown() -> None:
+def test_invalid_header_and_unparseable_peer_keeps_the_peer() -> None:
     request = _request(headers={"CF-Connecting-IP": "garbage"}, peer="also-garbage")
+    assert resolve_client_ip(request) == "also-garbage"
+
+
+def test_invalid_header_and_missing_peer_fall_back_to_unknown() -> None:
+    request = _request(headers={"CF-Connecting-IP": "garbage"}, peer=None)
     assert resolve_client_ip(request) == "unknown"
 
 
