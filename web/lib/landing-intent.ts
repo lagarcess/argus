@@ -187,6 +187,7 @@ export function readLandingIntent(): LandingIntent | null {
 }
 
 const STARTER_CONSUMED_PREFIX = "consumed:";
+const STARTER_HANDOFF_PREFIX = "handoff:";
 
 /** Strict Mode remounts the first composer in the same tick. New chat does not. */
 export const LANDING_STARTER_RUNTIME_FALLBACK_MS = 2000;
@@ -206,6 +207,13 @@ function readSessionStarterState(): {
       pending: null,
       consumed:
         sanitizeLandingStarter(raw.slice(STARTER_CONSUMED_PREFIX.length)) ?? null,
+    };
+  }
+  if (raw.startsWith(STARTER_HANDOFF_PREFIX)) {
+    return {
+      pending:
+        sanitizeLandingStarter(raw.slice(STARTER_HANDOFF_PREFIX.length)) ?? null,
+      consumed: null,
     };
   }
   return { pending: sanitizeLandingStarter(raw) ?? null, consumed: null };
@@ -300,6 +308,24 @@ export function resetLandingStarterRuntime(): void {
   appliedStarterThisRuntime = null;
   appliedStarterAtMs = 0;
   starterSurfaceEpoch += 1;
+  const { pending, consumed } = readSessionStarterState();
+  const starter = pending ?? consumed;
+  if (starter) {
+    writeSessionStored(
+      LANDING_STARTER_STORAGE_KEY,
+      `${STARTER_CONSUMED_PREFIX}${starter}`,
+    );
+  }
+}
+
+export function prepareLandingStarterAuthHandoff(): void {
+  const { pending, consumed } = readSessionStarterState();
+  const starter = pending ?? consumed;
+  if (!starter) return;
+  writeSessionStored(
+    LANDING_STARTER_STORAGE_KEY,
+    `${STARTER_HANDOFF_PREFIX}${starter}`,
+  );
 }
 
 export function stripLandingStarterFromLocation(): void {

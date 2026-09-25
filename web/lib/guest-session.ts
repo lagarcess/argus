@@ -40,10 +40,11 @@ export function createGuestSessionBootstrapper<
   return {
     run(input: TInput) {
       if (!pending) {
-        pending = bootstrap(input).catch((error: unknown) => {
-          pending = null;
+        const started = bootstrap(input).catch((error: unknown) => {
+          if (pending === started) pending = null;
           throw error;
         });
+        pending = started;
       }
       return pending;
     },

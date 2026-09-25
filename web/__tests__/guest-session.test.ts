@@ -80,6 +80,32 @@ describe("guest session entry contract", () => {
     expect(calls).toBe(3);
   });
 
+  test("an aborted bootstrap catch does not clear its replacement", async () => {
+    let rejectFirst!: (error: Error) => void;
+    let secondCalls = 0;
+    const bootstrapper = createGuestSessionBootstrapper(
+      async (value: string) => {
+        if (value === "first") {
+          return new Promise<string>((_resolve, reject) => {
+            rejectFirst = reject;
+          });
+        }
+        secondCalls += 1;
+        return value;
+      },
+    );
+
+    const first = bootstrapper.run("first");
+    bootstrapper.reset();
+    const second = bootstrapper.run("second");
+    rejectFirst(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    expect(await second).toBe("second");
+    expect(secondCalls).toBe(1);
+    expect(await bootstrapper.run("ignored")).toBe("second");
+    expect(secondCalls).toBe(1);
+  });
+
   test("allows an explicit production-QA CAPTCHA token only for loopback", () => {
     expect(
       guestCaptchaTokenForEnvironment({
@@ -157,6 +183,7 @@ describe("guest session entry contract", () => {
     expect(session).toContain("persistGuestBootstrap");
     expect(session).toContain("guestBootstrapAbort?.abort()");
     expect(session).toContain("const signal = guestBootstrapAbort?.signal");
+    expect(session).toContain("if (pending === started) pending = null");
     expect(session).toContain("acquireGuestCaptchaToken");
     expect(session).toContain("signal: guestBootstrapAbort?.signal");
     expect(captcha).toContain("signal?: AbortSignal");

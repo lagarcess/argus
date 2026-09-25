@@ -29,7 +29,10 @@ import {
   isGuestBootstrapAbortError,
   startGuestSession,
 } from "@/lib/guest-session";
-import { hasCampaignAttribution } from "@/lib/landing-intent";
+import {
+  hasCampaignAttribution,
+  prepareLandingStarterAuthHandoff,
+} from "@/lib/landing-intent";
 import { normalizeEnabledLanguage } from "@/lib/language-features";
 import {
   latestDecisionResumeMessageId,
@@ -184,6 +187,7 @@ export function useGuestExperience({
     onOpenOmnisearch,
     onRequestSignIn: () => {
       if (guestBootstrapRequired) {
+        prepareLandingStarterAuthHandoff();
         cancelPendingGuestBootstrap();
         pendingGuestAdmissionRef.current?.abort();
         pendingGuestAdmissionRef.current = null;

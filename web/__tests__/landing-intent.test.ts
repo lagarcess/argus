@@ -16,6 +16,7 @@ import {
   mergeFirstTouchLandingIntent,
   parseLandingIntent,
   pathWithSearch,
+  prepareLandingStarterAuthHandoff,
   readLandingIntent,
   resetLandingStarterRuntime,
   sanitizeLandingPath,
@@ -213,6 +214,33 @@ describe("landing intent storage", () => {
     expect(takeLandingStarterPrefill()).toBeNull();
   });
 
+  test("auth handoff restores the unused starter once without leftover-url replay", () => {
+    const { location } = installStorage();
+    location.search = "?utm_campaign=x&starter=backtest";
+    location.pathname = "/chat";
+    captureLandingIntent(location.search, location.pathname);
+    expect(takeLandingStarterPrefill()).toBe("backtest");
+    stripLandingStarterFromLocation();
+    prepareLandingStarterAuthHandoff();
+    location.search = "?utm_campaign=x&starter=backtest";
+    captureLandingIntent(location.search, location.pathname);
+    expect(takeLandingStarterPrefill()).toBe("backtest");
+    expect(takeLandingStarterPrefill()).toBeNull();
+    captureLandingIntent("starter=backtest&utm_campaign=x", "/chat");
+    expect(takeLandingStarterPrefill()).toBeNull();
+  });
+
+  test("New chat consumes a handoff so the composer stays empty", () => {
+    installStorage();
+    captureLandingIntent("starter=savings", "/");
+    prepareLandingStarterAuthHandoff();
+    const epoch = landingStarterSurfaceEpoch();
+    resetLandingStarterRuntime();
+    expect(takeLandingStarterPrefill()).toBeNull();
+    expect(landingStarterAppliedThisRuntime()).toBeNull();
+    expect(landingStarterSurfaceEpoch()).toBe(epoch + 1);
+  });
+
   test("landing path is stored only with the campaign visit that owns it", () => {
     installStorage();
     expect(captureLandingIntent("", "/")).toBeNull();
@@ -331,6 +359,15 @@ describe("landing starter prefill wiring", () => {
     expect(chat).toContain("canConsumeLandingStarter={initialRoutingSettled}");
     expect(guest).toContain("if (isGuestBootstrapAbortError(error)) return;");
     expect(guest).not.toContain("if (!isGuestBootstrapAbortError(error)) throw error");
+    const signInStart = guest.indexOf("onRequestSignIn: () => {");
+    const signInBlock = guest.slice(
+      signInStart,
+      guest.indexOf("omnisearchShortcutEnabled,", signInStart),
+    );
+    expect(signInBlock).toContain("prepareLandingStarterAuthHandoff()");
+    expect(signInBlock.indexOf("prepareLandingStarterAuthHandoff()")).toBeLessThan(
+      signInBlock.indexOf("cancelPendingGuestBootstrap()"),
+    );
   });
 
   test("public receipt landings capture the live path before a follow-up forks", () => {
