@@ -242,7 +242,7 @@ describe("guest compute claim error copy", () => {
       for (const key of keys) {
         const value = catalogString(catalog, key);
         expect(value, key).not.toContain(EM_DASH);
-        expect(value.includes("\u2014"), key).toBe(false);
+        expect(value.includes("—"), key).toBe(false);
       }
     }
   });
