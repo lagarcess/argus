@@ -915,6 +915,9 @@ def test_public_alpha_waitlist_rollback_floor_is_durable_and_ordered() -> None:
     assert "061ba50e" in runbook_text
     assert "serviceDetails.maintenanceMode.enabled=true" in runbook_text
     assert "exact maintenance status and page fingerprint" in runbook_text
+    assert "`argus-app` onrender URL" in runbook_text
+    assert "https://argus-ohr5.onrender.com` must return HTTP `404`" in runbook_text
+    assert "Never front the API with a Cloudflare Worker" in runbook_text
     assert "same-SHA restart" in runbook_text
     assert "old-instance shutdown/drain" in runbook_text
     assert "ACCESS EXCLUSIVE" in runbook_text

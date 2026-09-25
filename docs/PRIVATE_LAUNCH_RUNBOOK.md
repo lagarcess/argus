@@ -1128,8 +1128,11 @@ fail-closed floor while the schema can contain active `requested` rows. Prefer
 a forward fix. Before any authorized rollback below that commit:
 
 1. read back `serviceDetails.maintenanceMode.enabled=true` out of band and
-   require the exact maintenance status and page fingerprint on the onrender
-   URL and every configured custom domain;
+   require the exact maintenance status and page fingerprint on every
+   configured custom domain and on the `argus-app` onrender URL. After
+   `argus-api`'s `renderSubdomainPolicy: disabled` is applied,
+   `https://argus-ohr5.onrender.com` must return HTTP `404` and is not a
+   maintenance probe surface;
 2. complete a same-SHA restart and prove Render's old-instance shutdown/drain
    finished with no pre-maintenance worker left;
 3. only then take the `ACCESS EXCLUSIVE` lock, disable active requested rows,
@@ -1140,6 +1143,15 @@ a forward fix. Before any authorized rollback below that commit:
 6. re-verify the maintenance configuration and response signature;
 7. disable maintenance last, then require the public invalid-body readback to
    return HTTP `404` on every public API surface.
+
+Never front the API with a Cloudflare Worker in the `arguschat.ai` zone.
+Worker subrequests rewrite `CF-Connecting-IP` to a single Cloudflare IPv6
+and would collapse every guest into one rate-limit bucket.
+
+The API `renderSubdomainPolicy` takes effect only when Blueprint or
+dashboard settings are applied at the next `main` promotion, together with
+#674. Autodeploy is off, so merging this field does not change live
+routing by itself.
 
 Generic error statuses are not maintenance proof. If control-plane state,
 response fingerprint, restart drain, exact SHA, or a private verification
