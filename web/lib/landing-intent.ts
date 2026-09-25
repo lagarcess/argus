@@ -18,8 +18,9 @@ import {
  *   from this visit's URL, so a later `starter=` can still prefill without
  *   rewriting first-touch attribution.
  * - Values are trimmed, stripped of control characters, and length-capped.
- *   `starter` is a whitelist (`backtest` | `savings`); anything else is dropped
- *   so a link can never inject free text into the composer or a model request.
+ *   Campaign fields keep decoded punctuation and spaces. `starter` is a
+ *   whitelist (`backtest` | `savings`); anything else is dropped so a link
+ *   can never inject free text into the composer or a model request.
  */
 
 export const LANDING_INTENT_STORAGE_KEY = "argus:landing-intent:v1";
@@ -77,12 +78,25 @@ export const LANDING_STARTER_COPY_FALLBACKS = {
   savings: "If I set aside $200 every month, what would that add up to in a year?",
 } as const;
 
+function stripControls(value: string | null | undefined): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const cleaned = value.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  return cleaned || undefined;
+}
+
+function sanitizeCampaignValue(
+  value: string | null | undefined,
+  maxLength = VALUE_MAX_LENGTH,
+): string | undefined {
+  const cleaned = stripControls(value);
+  return cleaned ? cleaned.slice(0, maxLength) : undefined;
+}
+
 function sanitizeToken(
   value: string | null | undefined,
   maxLength = VALUE_MAX_LENGTH,
 ): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const cleaned = value.replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  const cleaned = stripControls(value);
   if (!cleaned || !TOKEN_PATTERN.test(cleaned)) return undefined;
   return cleaned.slice(0, maxLength);
 }
@@ -135,12 +149,12 @@ export function parseLandingIntent(
     params.get("from_path") === "/chat" &&
     (!requestedPath || requestedPath === "/");
   const intent = withDefinedFields({
-    utm_source: sanitizeToken(params.get("utm_source")),
-    utm_medium: sanitizeToken(params.get("utm_medium")),
-    utm_campaign: sanitizeToken(params.get("utm_campaign")),
-    utm_content: sanitizeToken(params.get("utm_content")),
-    fbclid: sanitizeToken(params.get("fbclid")),
-    ref: sanitizeToken(params.get("ref")),
+    utm_source: sanitizeCampaignValue(params.get("utm_source")),
+    utm_medium: sanitizeCampaignValue(params.get("utm_medium")),
+    utm_campaign: sanitizeCampaignValue(params.get("utm_campaign")),
+    utm_content: sanitizeCampaignValue(params.get("utm_content")),
+    fbclid: sanitizeCampaignValue(params.get("fbclid")),
+    ref: sanitizeCampaignValue(params.get("ref")),
     starter: sanitizeLandingStarter(params.get("starter")),
     landing_path: bouncedFromChat ? "/chat" : requestedPath,
   });
@@ -166,12 +180,12 @@ export function mergeFirstTouchLandingIntent(
 
 function sanitizeStoredIntent(raw: Record<string, unknown>): LandingIntent | null {
   const intent = withDefinedFields({
-    utm_source: sanitizeToken(typeof raw.utm_source === "string" ? raw.utm_source : undefined),
-    utm_medium: sanitizeToken(typeof raw.utm_medium === "string" ? raw.utm_medium : undefined),
-    utm_campaign: sanitizeToken(typeof raw.utm_campaign === "string" ? raw.utm_campaign : undefined),
-    utm_content: sanitizeToken(typeof raw.utm_content === "string" ? raw.utm_content : undefined),
-    fbclid: sanitizeToken(typeof raw.fbclid === "string" ? raw.fbclid : undefined),
-    ref: sanitizeToken(typeof raw.ref === "string" ? raw.ref : undefined),
+    utm_source: sanitizeCampaignValue(typeof raw.utm_source === "string" ? raw.utm_source : undefined),
+    utm_medium: sanitizeCampaignValue(typeof raw.utm_medium === "string" ? raw.utm_medium : undefined),
+    utm_campaign: sanitizeCampaignValue(typeof raw.utm_campaign === "string" ? raw.utm_campaign : undefined),
+    utm_content: sanitizeCampaignValue(typeof raw.utm_content === "string" ? raw.utm_content : undefined),
+    fbclid: sanitizeCampaignValue(typeof raw.fbclid === "string" ? raw.fbclid : undefined),
+    ref: sanitizeCampaignValue(typeof raw.ref === "string" ? raw.ref : undefined),
     starter: sanitizeLandingStarter(typeof raw.starter === "string" ? raw.starter : undefined),
     landing_path: sanitizeLandingPath(typeof raw.landing_path === "string" ? raw.landing_path : undefined),
   });

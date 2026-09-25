@@ -69,6 +69,7 @@ const browserGuestBootstrapper = createGuestSessionBootstrapper<
   return bootstrapGuest({
     captcha_token: captchaToken,
     language: normalizeApiLanguage(language),
+    signal,
   });
 });
 
@@ -108,19 +109,21 @@ export function cancelPendingGuestBootstrap() {
 export async function bootstrapGuest(payload: {
   captcha_token: string;
   language: "en" | "es-419";
+  signal?: AbortSignal;
 }) {
-  if (!persistGuestBootstrap) {
+  const { signal, captcha_token, language } = payload;
+  if (signal?.aborted || !persistGuestBootstrap) {
     throw guestBootstrapAbortError();
   }
   const response = await unauthenticatedApiFetch<GuestBootstrapResponse>(
     "/auth/guest",
     {
       method: "POST",
-      body: JSON.stringify({ ...payload, ...attributionBody() }),
-      signal: guestBootstrapAbort?.signal,
+      body: JSON.stringify({ captcha_token, language, ...attributionBody() }),
+      signal,
     },
   );
-  if (!persistGuestBootstrap) {
+  if (signal?.aborted || !persistGuestBootstrap) {
     return response;
   }
   await persistBrowserSession(response);

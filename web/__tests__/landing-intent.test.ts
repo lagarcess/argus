@@ -88,7 +88,7 @@ describe("landing intent parsing", () => {
     });
   });
 
-  test("drops unknown starters and unsanitary values", () => {
+  test("drops unknown starters and keeps decoded campaign values", () => {
     expect(
       parseLandingIntent(
         "starter=prompt-injection&utm_campaign=<script>&ref=ok%20space&utm_source=ig",
@@ -96,6 +96,8 @@ describe("landing intent parsing", () => {
       ),
     ).toEqual({
       utm_source: "ig",
+      utm_campaign: "<script>",
+      ref: "ok space",
     });
     expect(sanitizeLandingStarter("savings")).toBe("savings");
     expect(sanitizeLandingStarter("SAVINGS")).toBe("savings");
@@ -103,6 +105,16 @@ describe("landing intent parsing", () => {
     expect(sanitizeLandingPath("/chat")).toBe("/chat");
     expect(sanitizeLandingPath("//evil")).toBeUndefined();
     expect(sanitizeLandingPath("/chat?x=1#y")).toBe("/chat");
+  });
+
+  test("keeps decoded campaign spaces without the starter token whitelist", () => {
+    expect(
+      parseLandingIntent("utm_campaign=fall+sale&utm_content=card%20a", "/chat"),
+    ).toEqual({
+      utm_campaign: "fall sale",
+      utm_content: "card a",
+      landing_path: "/chat",
+    });
   });
 
   test("caps overlong tokens rather than storing the raw query", () => {
@@ -310,13 +322,26 @@ describe("landing intent storage", () => {
     window.localStorage.setItem(
       LANDING_INTENT_STORAGE_KEY,
       JSON.stringify({
-        utm_campaign: "<bad>",
+        utm_campaign: "\u0000",
         starter: "hold",
         landing_path: "//evil",
         extra: "drop-me",
       }),
     );
     expect(readLandingIntent()).toBeNull();
+  });
+
+  test("keeps stored campaign punctuation that is not starter text", () => {
+    installStorage();
+    window.localStorage.setItem(
+      LANDING_INTENT_STORAGE_KEY,
+      JSON.stringify({
+        utm_campaign: "<script>",
+        starter: "hold",
+        landing_path: "//evil",
+      }),
+    );
+    expect(readLandingIntent()).toEqual({ utm_campaign: "<script>" });
   });
 });
 
