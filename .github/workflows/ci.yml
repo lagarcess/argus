@@ -81,16 +81,14 @@ jobs:
 
       - name: Run docs-reading backend tests
         run: |
-          poetry run pytest \
-            tests/test_openapi_compatibility.py \
-            tests/test_private_alpha_release_docs.py \
-            tests/test_agent_jules_contracts.py \
-            tests/test_alpha_artifacts.py \
-            tests/test_legacy_surface_removal.py \
-            tests/test_render_release_profile_contract.py \
-            tests/test_ci_workflow.py \
-            tests/research/test_research_contract_example.py \
-            -q --no-cov
+          mapfile -t docs_tests < <(.github/docs-reading-tests.sh)
+          if [ "${#docs_tests[@]}" -eq 0 ]; then
+            echo "docs-reading test selector returned no files."
+            exit 1
+          fi
+          printf 'Selected %s docs-reading test file(s):\n' "${#docs_tests[@]}"
+          printf '  %s\n' "${docs_tests[@]}"
+          poetry run pytest "${docs_tests[@]}" -q --no-cov
 
   backend-checks:
     runs-on: ubuntu-latest
@@ -283,6 +281,7 @@ jobs:
         env:
           DOCS_CHANGE_GATE: ${{ needs.docs-change-gate.result }}
           OWNERSHIP_GATE: ${{ needs.ownership-gate.result }}
+          DOCS_ONLY: ${{ needs.docs-change-gate.outputs.docs_only }}
           DOCS_CHECKS: ${{ needs.docs-checks.result }}
           BACKEND_CHECKS: ${{ needs.backend-checks.result }}
           FRONTEND_CHECKS: ${{ needs.frontend-checks.result }}
@@ -302,7 +301,11 @@ jobs:
           }
           require_success docs-change-gate "$DOCS_CHANGE_GATE"
           require_success ownership-gate "$OWNERSHIP_GATE"
-          require_success_or_skipped docs-checks "$DOCS_CHECKS"
+          if [ "$DOCS_ONLY" = true ]; then
+            require_success docs-checks "$DOCS_CHECKS"
+          else
+            require_success_or_skipped docs-checks "$DOCS_CHECKS"
+          fi
           require_success_or_skipped backend-checks "$BACKEND_CHECKS"
           require_success_or_skipped frontend-checks "$FRONTEND_CHECKS"
           require_success_or_skipped guest-release-gates "$GUEST_RELEASE_GATES"

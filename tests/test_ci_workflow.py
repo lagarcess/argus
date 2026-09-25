@@ -16,6 +16,7 @@ AGENT_RUNTIME_WORKFLOW_PATH = (
     ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
 )
 DOCS_ONLY_SCRIPT = ROOT / ".github" / "docs-only-changes.sh"
+DOCS_READING_TESTS_SCRIPT = ROOT / ".github" / "docs-reading-tests.sh"
 RUNBOOK_PATH = ROOT / "docs" / "PRIVATE_LAUNCH_RUNBOOK.md"
 FAKE = Faker()
 
@@ -194,6 +195,9 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
         "${{ needs.docs-change-gate.result }}"
     )
     assert aggregator_env["OWNERSHIP_GATE"] == "${{ needs.ownership-gate.result }}"
+    assert aggregator_env["DOCS_ONLY"] == (
+        "${{ needs.docs-change-gate.outputs.docs_only }}"
+    )
     assert aggregator_env["DOCS_CHECKS"] == "${{ needs.docs-checks.result }}"
     assert aggregator_env["BACKEND_CHECKS"] == "${{ needs.backend-checks.result }}"
     assert aggregator_env["FRONTEND_CHECKS"] == "${{ needs.frontend-checks.result }}"
@@ -204,7 +208,6 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
     assert "CI checks passed." in aggregator_run
     assert "require_success docs-change-gate" in aggregator_run
     assert "require_success ownership-gate" in aggregator_run
-    assert "require_success_or_skipped docs-checks" in aggregator_run
     assert "require_success_or_skipped backend-checks" in aggregator_run
     assert "require_success_or_skipped frontend-checks" in aggregator_run
     assert "require_success_or_skipped guest-release-gates" in aggregator_run
@@ -617,6 +620,45 @@ def test_docs_only_changes_script_counts_rename_from_code_into_docs(
     assert f"src/{source_name}" in result.stdout
     assert parsed == {"docs_only": "false", "run_heavy": "true"}
 
+    docs_source = FAKE.file_name(extension="md")
+    docs_dest = FAKE.file_name(extension="md")
+    (repo / "docs" / docs_source).write_text("note\n", encoding="utf-8")
+    subprocess.run(["git", "add", f"docs/{docs_source}"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "commit", "-m", "add docs"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "mv", f"docs/{docs_source}", f"docs/{docs_dest}"],
+        cwd=repo,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "commit", "-m", "rename inside docs"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    docs_rename = subprocess.run(
+        ["bash", str(DOCS_ONLY_SCRIPT), "--from-git", "HEAD~1"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    docs_parsed = {
+        key: value
+        for line in docs_rename.stdout.splitlines()
+        if "=" in line
+        for key, value in (line.split("=", 1),)
+        if key in {"docs_only", "run_heavy"}
+    }
+    assert f"docs/{docs_source}" in docs_rename.stdout
+    assert f"docs/{docs_dest}" in docs_rename.stdout
+    assert docs_parsed == {"docs_only": "true", "run_heavy": "false"}
+
 
 def test_docs_only_changes_script_runs_heavy_jobs_off_pull_request() -> None:
     result = subprocess.run(
@@ -686,16 +728,49 @@ def test_docs_checks_job_runs_only_when_the_gate_reports_docs_only() -> None:
     )
     assert "git diff --check" in joined_steps
     assert "poetry install --with dev --no-interaction" in joined_steps
-    assert "tests/test_openapi_compatibility.py" in joined_steps
-    assert "tests/test_private_alpha_release_docs.py" in joined_steps
-    assert "tests/test_agent_jules_contracts.py" in joined_steps
-    assert "tests/test_alpha_artifacts.py" in joined_steps
-    assert "tests/test_legacy_surface_removal.py" in joined_steps
-    assert "tests/test_render_release_profile_contract.py" in joined_steps
-    assert "tests/test_ci_workflow.py" in joined_steps
-    assert "tests/research/test_research_contract_example.py" in joined_steps
+    assert ".github/docs-reading-tests.sh" in joined_steps
+    assert "tests/test_openapi_compatibility.py" not in joined_steps
     assert "bun" not in joined_steps
     assert "supabase" not in joined_steps.lower()
     assert "local-smoke" not in joined_steps
     assert "docs-checks" in jobs["ci"]["needs"]
-    assert "require_success_or_skipped docs-checks" in jobs["ci"]["steps"][0]["run"]
+
+
+def test_docs_reading_tests_selector_includes_guest_observability() -> None:
+    result = subprocess.run(
+        ["bash", str(DOCS_READING_TESTS_SCRIPT)],
+        check=True,
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    selected = result.stdout.splitlines()
+    assert "tests/test_guest_observability.py" in selected
+    assert "tests/test_home_country.py" in selected
+    assert all(
+        name.startswith("test_") or name.endswith("_test.py")
+        for path in selected
+        for name in (Path(path).name,)
+    )
+
+
+def test_ci_aggregator_requires_docs_checks_success_when_docs_only() -> None:
+    run = _workflow()["jobs"]["ci"]["steps"][0]["run"]
+    env = _workflow()["jobs"]["ci"]["steps"][0]["env"]
+
+    assert env["DOCS_ONLY"] == "${{ needs.docs-change-gate.outputs.docs_only }}"
+    assert 'if [ "$DOCS_ONLY" = true ]; then' in run
+    docs_only_branch = run.split('if [ "$DOCS_ONLY" = true ]; then', 1)[1].split(
+        "else", 1
+    )[0]
+    assert "require_success docs-checks" in docs_only_branch
+    assert "require_success_or_skipped docs-checks" not in docs_only_branch
+
+
+def test_ci_aggregator_allows_skipped_docs_checks_when_not_docs_only() -> None:
+    run = _workflow()["jobs"]["ci"]["steps"][0]["run"]
+    not_docs_only_branch = run.split('if [ "$DOCS_ONLY" = true ]; then', 1)[1].split(
+        "else", 1
+    )[1]
+    assert "require_success_or_skipped docs-checks" in not_docs_only_branch
+    assert "require_success docs-checks" not in not_docs_only_branch.split("fi", 1)[0]
