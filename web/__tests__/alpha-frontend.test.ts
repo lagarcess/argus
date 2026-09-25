@@ -2338,14 +2338,12 @@ describe("Argus Alpha frontend contract", () => {
     expect(dialog).toContain("expected");
     expect(dialog).toContain("actual");
     expect(dialog).toContain("includeConversationContext");
-    expect(dialog).toContain("files");
-    expect(dialog).toContain("Paperclip");
     expect(dialog).toContain("ChevronDown");
-    expect(dialog).toContain("attachmentCount: files.length");
-    expect(dialog).toContain("Maximum 5 files");
-    expect(dialog).toContain("attachments_with_count");
-    expect(dialog).toContain("Attachments ({{count}}/5)");
-    expect(dialog).toContain("Optional: add a screenshot, sketch, or example.");
+    expect(dialog).not.toContain("attachmentCount");
+    expect(dialog).not.toContain("Paperclip");
+    expect(dialog).not.toContain("type=\"file\"");
+    expect(dialog).not.toContain("attachments_with_count");
+    expect(dialog).not.toContain("Maximum 5 files");
     expect(dialog).toContain("General Feedback");
     expect(dialog).toContain("Report a Bug");
     expect(dialog).toContain("Request a Feature");
@@ -2376,6 +2374,20 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(dialog).not.toContain("ThumbsUp");
     expect(dialog).not.toContain("ThumbsDown");
+
+    const en = JSON.parse(
+      readFileSync(join(root, "public/locales/en/common.json"), "utf-8"),
+    );
+    const es = JSON.parse(
+      readFileSync(join(root, "public/locales/es-419/common.json"), "utf-8"),
+    );
+    for (const locale of [en, es]) {
+      expect(locale.feedback).not.toHaveProperty("attachments");
+      expect(locale.feedback).not.toHaveProperty("attachments_with_count");
+      expect(locale.feedback).not.toHaveProperty("attach_files");
+      expect(locale.feedback).not.toHaveProperty("attach_files_feature");
+      expect(locale.feedback).not.toHaveProperty("max_files");
+    }
   });
 
   test("chat feedback rating is posted directly while dialog remains available for deliberate feedback", () => {
@@ -2406,7 +2418,7 @@ describe("Argus Alpha frontend contract", () => {
     );
     expect(chat).toContain("includeConversationContext: true");
     expect(chat).toContain("tags: []");
-    expect(chat).toContain("attachmentCount: 0");
+    expect(chat).not.toContain("attachmentCount");
     expect(chat).toContain('t("feedback.rating_message_fallback", { rating })');
     expect(chat).toContain("openFeedbackDialogState(type, context, rating, conversationId)");
     expect(

@@ -5,7 +5,6 @@ import {
   useId,
   useRef,
   useState,
-  type ChangeEvent,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -18,9 +17,7 @@ import {
   ChevronDown,
   Lightbulb,
   MessageCircle,
-  Paperclip,
   Send,
-  X,
 } from "lucide-react";
 import { postFeedback } from "@/lib/argus-api";
 import { feedbackContextForSubmission } from "@/lib/feedback-context";
@@ -60,13 +57,11 @@ export default function FeedbackDialog({
   const [actual, setActual] = useState("");
   const [includeConversationContext, setIncludeConversationContext] =
     useState(false);
-  const [files, setFiles] = useState<File[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   /* Only for the types that open straight into writing. A rating opens on the
      stars, where taking focus to the notes field would skip the actual ask. */
   const messageRef = useRef<HTMLTextAreaElement>(null);
@@ -81,7 +76,6 @@ export default function FeedbackDialog({
     setExpected("");
     setActual("");
     setIncludeConversationContext(false);
-    setFiles([]);
     setSelectedTags([]);
     setIsSubmitting(false);
     setIsSuccess(false);
@@ -106,7 +100,6 @@ export default function FeedbackDialog({
 
   const isRating = type === "rating";
   const isBug = type === "bug";
-  const isFeature = type === "feature";
   const hasConversationContext =
     typeof context?.conversation_id === "string" && context.conversation_id.length > 0;
 
@@ -156,25 +149,6 @@ export default function FeedbackDialog({
     return message.trim().length > 0;
   };
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = event.target.files;
-    if (!selectedFiles) return;
-
-    const nextFiles = Array.from(selectedFiles);
-    if (files.length + nextFiles.length > 5) {
-      setError(t("feedback.max_files", "Maximum 5 files allowed."));
-      return;
-    }
-
-    setFiles((current) => [...current, ...nextFiles].slice(0, 5));
-    setError(null);
-    event.target.value = "";
-  };
-
-  const removeFile = (index: number) => {
-    setFiles((current) => current.filter((_, currentIndex) => currentIndex !== index));
-  };
-
   const toggleTag = (tagKey: string) => {
     setSelectedTags((current) =>
       current.includes(tagKey)
@@ -209,7 +183,6 @@ export default function FeedbackDialog({
           includeConversationContext,
           rating,
           tags: selectedTags,
-          attachmentCount: files.length,
         }),
       });
       setIsSuccess(true);
@@ -445,61 +418,6 @@ export default function FeedbackDialog({
                       {message.length}/1000
                     </div>
                   </div>
-                </div>
-              )}
-
-              {!isRating && (
-                <div>
-                  <label className="mb-2 block text-[13px] font-medium text-black/60 dark:text-white/60">
-                    {t("feedback.attachments_with_count", "Attachments ({{count}}/5)", {
-                      count: files.length,
-                    })}
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-black/20 p-6 text-center transition-colors hover:bg-black/5 dark:border-white/20 dark:hover:bg-white/5"
-                  >
-                    <Paperclip className="mb-2 h-5 w-5 text-black/40 dark:text-white/40" />
-                    <span className="text-[13px] text-black/60 dark:text-white/60">
-                      {isFeature
-                        ? t(
-                            "feedback.attach_files_feature",
-                            "Optional: add a screenshot, sketch, or example.",
-                          )
-                        : t("feedback.attach_files", "Click to attach files (max 5)")}
-                    </span>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-
-                  {files.length > 0 && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      {files.map((file, index) => (
-                        <div
-                          key={`${file.name}-${index}`}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-black/5 bg-white px-3 py-2 dark:border-white/5 dark:bg-[#25282d]"
-                        >
-                          <span className="truncate text-[13px] text-black/80 dark:text-white/80">
-                            {file.name}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeFile(index)}
-                            className="rounded-full p-1 text-black/40 transition-colors hover:bg-black/10 hover:text-black dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white"
-                            aria-label={`Remove ${file.name}`}
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )}
 
