@@ -439,7 +439,7 @@ export function authLoginPathFromSearch(
   const source = toSearchParams(search);
   const params = new URLSearchParams();
   for (const key of BOUNCE_CAMPAIGN_KEYS) {
-    const value = source.get(key);
+    const value = sanitizeCampaignValue(source.get(key));
     if (value) params.set(key, value);
   }
   const starter = parseLandingStarter(source);

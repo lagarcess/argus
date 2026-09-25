@@ -145,6 +145,12 @@ describe("landing intent parsing", () => {
     expect(authLoginPathFromSearch("utm_term=meta-kw&next=/admin")).toBe(
       "/?utm_term=meta-kw&auth=login",
     );
+    const tooLong = `kw-${"a".repeat(400)}`;
+    const bounced = authLoginPathFromSearch(`utm_term=${tooLong}&next=/admin`);
+    expect(new URLSearchParams(bounced.slice(2)).get("utm_term")).toHaveLength(256);
+    expect(authLoginPathFromSearch("utm_term=%00%07meta-kw")).toBe(
+      "/?utm_term=meta-kw&auth=login",
+    );
   });
 
   test("rejects case, padding, control chars, and duplicate starters on both parsers", () => {
