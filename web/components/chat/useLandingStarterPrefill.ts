@@ -8,6 +8,7 @@ import {
   LANDING_STARTER_COPY_FALLBACKS,
   landingStarterAppliedThisRuntime,
   landingStarterCopyKey,
+  landingStarterSurfaceEpoch,
   stripLandingStarterFromLocation,
   takeLandingStarterPrefill,
   type LandingStarter,
@@ -15,7 +16,12 @@ import {
 
 export function useLandingStarterPrefill(canConsume: boolean): string | null {
   const { t } = useTranslation();
-  const [starter, setStarter] = useState<LandingStarter | null>(null);
+  const epoch = landingStarterSurfaceEpoch();
+  const [prefill, setPrefill] = useState<{
+    epoch: number;
+    starter: LandingStarter | null;
+  }>(() => ({ epoch, starter: null }));
+  const starter = prefill.epoch === epoch ? prefill.starter : null;
 
   useEffect(() => {
     captureLandingIntentFromLocation();
@@ -23,8 +29,8 @@ export function useLandingStarterPrefill(canConsume: boolean): string | null {
     const next =
       takeLandingStarterPrefill() ?? landingStarterAppliedThisRuntime();
     if (next) stripLandingStarterFromLocation();
-    setStarter(next);
-  }, [canConsume]);
+    setPrefill({ epoch, starter: next });
+  }, [canConsume, epoch]);
 
   if (!starter) return null;
   return t(landingStarterCopyKey(starter), LANDING_STARTER_COPY_FALLBACKS[starter]);

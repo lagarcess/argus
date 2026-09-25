@@ -53,19 +53,23 @@ export function createGuestSessionBootstrapper<
   };
 }
 
+let persistGuestBootstrap = true;
+let guestBootstrapAbort: AbortController | null = null;
+
 const browserGuestBootstrapper = createGuestSessionBootstrapper<
   GuestSessionInput,
   GuestBootstrapResponse
 >(async ({ language, captchaToken: browserCaptchaToken }) => {
-  const captchaToken = await acquireGuestCaptchaToken(browserCaptchaToken);
+  const signal = guestBootstrapAbort?.signal;
+  const captchaToken = await acquireGuestCaptchaToken(
+    browserCaptchaToken,
+    signal,
+  );
   return bootstrapGuest({
     captcha_token: captchaToken,
     language: normalizeApiLanguage(language),
   });
 });
-
-let persistGuestBootstrap = true;
-let guestBootstrapAbort: AbortController | null = null;
 
 function guestBootstrapAbortError(): Error {
   const error = new Error("Guest bootstrap cancelled.");
@@ -97,7 +101,6 @@ export function resetGuestBootstrapRuntime() {
 export function cancelPendingGuestBootstrap() {
   persistGuestBootstrap = false;
   guestBootstrapAbort?.abort();
-  guestBootstrapAbort = null;
   browserGuestBootstrapper.reset();
 }
 

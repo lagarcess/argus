@@ -10,11 +10,11 @@ import {
  * First-touch campaign capture for ad landings.
  *
  * Semantics:
- * - Persist the first non-empty value for each field. A later visit cannot
- *   overwrite a stored field, and an empty visit cannot clear one. That keeps
- *   "which ad brought this person in" stable through return trips and signup.
- * - `starter` on the stored attribution object follows the same first-touch
- *   rule. Composer prefill is a separate consume-once session intent written
+ * - Persist the first attributed visit as a whole. Later campaign visits
+ *   cannot add, replace, or backfill fields, so "which ad brought this
+ *   person in" stays one real visit instead of a stitched tuple.
+ * - `starter` on the stored attribution object is part of that first visit.
+ *   Composer prefill is a separate consume-once session intent written
  *   from this visit's URL, so a later `starter=` can still prefill without
  *   rewriting first-touch attribution.
  * - Values are trimmed, stripped of control characters, and length-capped.
@@ -154,17 +154,10 @@ export function mergeFirstTouchLandingIntent(
   existing: LandingIntent | null,
   incoming: LandingIntent,
 ): LandingIntent {
-  const current = existing ?? {};
-  return withDefinedFields({
-    utm_source: current.utm_source ?? incoming.utm_source,
-    utm_medium: current.utm_medium ?? incoming.utm_medium,
-    utm_campaign: current.utm_campaign ?? incoming.utm_campaign,
-    utm_content: current.utm_content ?? incoming.utm_content,
-    fbclid: current.fbclid ?? incoming.fbclid,
-    ref: current.ref ?? incoming.ref,
-    starter: current.starter ?? incoming.starter,
-    landing_path: current.landing_path ?? incoming.landing_path,
-  });
+  if (existing && hasCampaignAttribution(existing)) {
+    return withDefinedFields(existing);
+  }
+  return withDefinedFields(incoming);
 }
 
 function sanitizeStoredIntent(raw: Record<string, unknown>): LandingIntent | null {
@@ -200,6 +193,7 @@ export const LANDING_STARTER_RUNTIME_FALLBACK_MS = 2000;
 
 let appliedStarterThisRuntime: LandingStarter | null = null;
 let appliedStarterAtMs = 0;
+let starterSurfaceEpoch = 0;
 
 function readSessionStarterState(): {
   pending: LandingStarter | null;
@@ -298,9 +292,14 @@ export function landingStarterAppliedThisRuntime(): LandingStarter | null {
   return appliedStarterThisRuntime;
 }
 
+export function landingStarterSurfaceEpoch(): number {
+  return starterSurfaceEpoch;
+}
+
 export function resetLandingStarterRuntime(): void {
   appliedStarterThisRuntime = null;
   appliedStarterAtMs = 0;
+  starterSurfaceEpoch += 1;
 }
 
 export function stripLandingStarterFromLocation(): void {
