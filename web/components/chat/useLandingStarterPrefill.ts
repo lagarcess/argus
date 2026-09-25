@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import {
   captureLandingIntentFromLocation,
   LANDING_STARTER_COPY_FALLBACKS,
+  landingStarterAppliedThisRuntime,
   landingStarterCopyKey,
   stripLandingStarterFromLocation,
   takeLandingStarterPrefill,
@@ -18,7 +19,8 @@ export function useLandingStarterPrefill(): string | null {
 
   useEffect(() => {
     captureLandingIntentFromLocation();
-    const next = takeLandingStarterPrefill();
+    const next =
+      takeLandingStarterPrefill() ?? landingStarterAppliedThisRuntime();
     if (next) stripLandingStarterFromLocation();
     setStarter(next);
   }, []);

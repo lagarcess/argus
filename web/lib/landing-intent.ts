@@ -194,6 +194,8 @@ export function readLandingIntent(): LandingIntent | null {
 
 const STARTER_CONSUMED_PREFIX = "consumed:";
 
+let appliedStarterThisRuntime: LandingStarter | null = null;
+
 function readSessionStarterState(): {
   pending: LandingStarter | null;
   consumed: LandingStarter | null;
@@ -266,12 +268,21 @@ export function takeLandingStarterPrefill(): LandingStarter | null {
       LANDING_STARTER_STORAGE_KEY,
       `${STARTER_CONSUMED_PREFIX}${pending}`,
     );
+    appliedStarterThisRuntime = pending;
     return pending;
   }
   if (!consumed) {
     removeSessionStored(LANDING_STARTER_STORAGE_KEY);
   }
   return null;
+}
+
+export function landingStarterAppliedThisRuntime(): LandingStarter | null {
+  return appliedStarterThisRuntime;
+}
+
+export function resetLandingStarterRuntime(): void {
+  appliedStarterThisRuntime = null;
 }
 
 export function stripLandingStarterFromLocation(): void {

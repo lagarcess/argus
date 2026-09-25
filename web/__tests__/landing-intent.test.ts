@@ -10,10 +10,12 @@ import {
   hasCampaignAttribution,
   LANDING_INTENT_STORAGE_KEY,
   LANDING_STARTER_STORAGE_KEY,
+  landingStarterAppliedThisRuntime,
   mergeFirstTouchLandingIntent,
   parseLandingIntent,
   pathWithSearch,
   readLandingIntent,
+  resetLandingStarterRuntime,
   sanitizeLandingPath,
   sanitizeLandingStarter,
   stripLandingStarterFromLocation,
@@ -59,6 +61,7 @@ function installStorage() {
 }
 
 afterEach(() => {
+  resetLandingStarterRuntime();
   delete (globalThis as { window?: unknown }).window;
 });
 
@@ -158,6 +161,7 @@ describe("landing intent storage", () => {
     expect(session.get(LANDING_STARTER_STORAGE_KEY)).toBe("backtest");
     expect(takeLandingStarterPrefill()).toBe("backtest");
     expect(takeLandingStarterPrefill()).toBeNull();
+    expect(landingStarterAppliedThisRuntime()).toBe("backtest");
     expect(readLandingIntent()?.starter).toBe("backtest");
   });
 
@@ -243,6 +247,7 @@ describe("landing starter prefill wiring", () => {
     expect(hook).toContain("takeLandingStarterPrefill");
     expect(hook).toContain("captureLandingIntentFromLocation");
     expect(hook).toContain("stripLandingStarterFromLocation");
+    expect(hook).toContain("landingStarterAppliedThisRuntime");
     expect(hook).not.toContain("onSend");
     expect(hook).not.toContain("admitSend");
     expect(empty).toContain("useLandingStarterPrefill");
