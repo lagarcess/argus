@@ -42,16 +42,30 @@ export function remainingRetryAfterSeconds(
   return Math.max(0, Math.ceil((availableAtMs - nowMs) / 1000));
 }
 
+export function shouldKeepRetryAfterTicker(
+  availableAtMs: number | undefined,
+  nowMs: number,
+): boolean {
+  return remainingRetryAfterSeconds(availableAtMs, nowMs) > 0;
+}
+
 export function useRetryAfterCountdown(availableAtMs?: number): number {
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
-    const tick = () => setNowMs(Date.now());
-    tick();
-    if (remainingRetryAfterSeconds(availableAtMs, Date.now()) <= 0) {
+    const tick = () => {
+      const nextNowMs = Date.now();
+      setNowMs(nextNowMs);
+      return shouldKeepRetryAfterTicker(availableAtMs, nextNowMs);
+    };
+    if (!tick()) {
       return;
     }
-    const id = window.setInterval(tick, 250);
+    const id = window.setInterval(() => {
+      if (!tick()) {
+        window.clearInterval(id);
+      }
+    }, 250);
     return () => window.clearInterval(id);
   }, [availableAtMs]);
 

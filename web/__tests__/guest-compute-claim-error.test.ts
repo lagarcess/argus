@@ -15,6 +15,7 @@ import { recoveryDisplayText } from "../lib/chat-recovery-display";
 import {
   parseRetryAfterSeconds,
   remainingRetryAfterSeconds,
+  shouldKeepRetryAfterTicker,
   RETRY_AFTER_FALLBACK_SECONDS,
   RETRY_AFTER_MAX_SECONDS,
   RETRY_AFTER_MIN_SECONDS,
@@ -131,6 +132,9 @@ describe("Retry-After parsing", () => {
     expect(remainingRetryAfterSeconds(availableAtMs, availableAtMs)).toBe(0);
     const laterDeadlineMs = availableAtMs + 8_000;
     expect(remainingRetryAfterSeconds(laterDeadlineMs, availableAtMs)).toBe(8);
+    expect(shouldKeepRetryAfterTicker(availableAtMs, mountedAtMs)).toBe(true);
+    expect(shouldKeepRetryAfterTicker(availableAtMs, availableAtMs)).toBe(false);
+    expect(shouldKeepRetryAfterTicker(undefined, mountedAtMs)).toBe(false);
   });
 });
 
