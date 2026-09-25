@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   attributionPayload,
   authLoginPathFromSearch,
+  CAMPAIGN_VALUE_FIELDS,
   captureLandingIntent,
   currentChatPath,
   hasCampaignAttribution,
@@ -232,6 +233,12 @@ describe("landing intent storage", () => {
     expect(hasCampaignAttribution({ ref: "stories" })).toBe(true);
     expect(hasCampaignAttribution({ utm_campaign: "x" })).toBe(true);
     expect(hasCampaignAttribution({ utm_term: "meta-kw" })).toBe(true);
+    for (const field of CAMPAIGN_VALUE_FIELDS) {
+      expect(hasCampaignAttribution({ [field]: "x" })).toBe(true);
+      expect(authLoginPathFromSearch(`${field}=x&next=/admin`)).toBe(
+        `/?${field}=x&auth=login`,
+      );
+    }
   });
 
   test("starter prefill is consume-once session state, like receipt follow-up", () => {
