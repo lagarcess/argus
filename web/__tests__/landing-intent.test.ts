@@ -276,9 +276,11 @@ describe("landing starter prefill wiring", () => {
     expect(hook).toContain("captureLandingIntentFromLocation");
     expect(hook).toContain("stripLandingStarterFromLocation");
     expect(hook).toContain("landingStarterAppliedThisRuntime");
+    expect(hook).toContain("if (!canConsume) return");
     expect(hook).not.toContain("onSend");
     expect(hook).not.toContain("admitSend");
-    expect(empty).toContain("useLandingStarterPrefill");
+    expect(empty).toContain("useLandingStarterPrefill(canConsumeLandingStarter)");
+    expect(empty).toContain("canConsumeLandingStarter");
     expect(empty).toContain("draftText={draftText}");
     expect(input).toContain("draftText");
     expect(input).not.toContain("onSend(draftText");
@@ -292,6 +294,23 @@ describe("landing starter prefill wiring", () => {
       lifecycle.indexOf("const handleConversationRemoved"),
     );
     expect(startBlock).toContain("resetLandingStarterRuntime()");
+
+    const init = readFileSync(
+      join(root, "components/chat/useInitialChatSession.ts"),
+      "utf-8",
+    );
+    const chat = readFileSync(
+      join(root, "components/chat/ChatInterface.tsx"),
+      "utf-8",
+    );
+    const guest = readFileSync(
+      join(root, "components/guest/useGuestExperience.ts"),
+      "utf-8",
+    );
+    expect(init).toContain("onInitialRoutingSettled");
+    expect(chat).toContain("canConsumeLandingStarter={initialRoutingSettled}");
+    expect(guest).toContain("if (isGuestBootstrapAbortError(error)) return;");
+    expect(guest).not.toContain("if (!isGuestBootstrapAbortError(error)) throw error");
   });
 
   test("public receipt landings capture the live path before a follow-up forks", () => {

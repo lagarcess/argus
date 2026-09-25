@@ -31,6 +31,7 @@ type InitialChatSessionOptions = {
     options: Readonly<{ bootstrap: boolean; messageId?: string }>,
   ) => Promise<void>;
   cancelActiveNavigation: () => void;
+  onInitialRoutingSettled: () => void;
 };
 
 export function useInitialChatSession({
@@ -42,6 +43,7 @@ export function useInitialChatSession({
   resetToEmptyChatSurface,
   navigateConversationTranscript,
   cancelActiveNavigation,
+  onInitialRoutingSettled,
 }: InitialChatSessionOptions): void {
   const { t, i18n } = useTranslation();
   const router = useRouter();
@@ -85,17 +87,20 @@ export function useInitialChatSession({
           const userId = meResponse?.user.id;
           if (!userId) {
             resetToEmptyChatSurface();
+            onInitialRoutingSettled();
             return;
           }
           await navigateConversationTranscript(activeConversationId, userId, {
             bootstrap: true,
             messageId: activeRoute.messageId ?? undefined,
           });
+          if (!cancelled) onInitialRoutingSettled();
           return;
         }
 
         if (cancelled || hasAcceptedUserInputRef.current) return;
         resetToEmptyChatSurface();
+        onInitialRoutingSettled();
       } catch {
         if (cancelled) return;
         setProfileState("unavailable");

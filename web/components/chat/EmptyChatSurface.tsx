@@ -24,6 +24,7 @@ type EmptyChatSurfaceProps = {
   guestSubmissionError: GuestEntryErrorKind | null;
   isStreamingResponse: boolean;
   isHydratingConversation: boolean;
+  canConsumeLandingStarter: boolean;
   /** A setting the user stated, never something Argus inferred. */
   preferredName?: string | null;
   placeholder: string;
@@ -42,6 +43,7 @@ export default function EmptyChatSurface({
   guestSubmissionError,
   isStreamingResponse,
   isHydratingConversation,
+  canConsumeLandingStarter,
   preferredName,
   placeholder,
   onSend,
@@ -50,7 +52,7 @@ export default function EmptyChatSurface({
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
   const { isBelowTablet } = useResponsiveLayout();
-  const draftText = useLandingStarterPrefill();
+  const draftText = useLandingStarterPrefill(canConsumeLandingStarter);
   const disabled =
     isStreamingResponse ||
     isHydratingConversation ||

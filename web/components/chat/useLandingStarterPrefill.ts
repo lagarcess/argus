@@ -13,17 +13,18 @@ import {
   type LandingStarter,
 } from "@/lib/landing-intent";
 
-export function useLandingStarterPrefill(): string | null {
+export function useLandingStarterPrefill(canConsume: boolean): string | null {
   const { t } = useTranslation();
   const [starter, setStarter] = useState<LandingStarter | null>(null);
 
   useEffect(() => {
     captureLandingIntentFromLocation();
+    if (!canConsume) return;
     const next =
       takeLandingStarterPrefill() ?? landingStarterAppliedThisRuntime();
     if (next) stripLandingStarterFromLocation();
     setStarter(next);
-  }, []);
+  }, [canConsume]);
 
   if (!starter) return null;
   return t(landingStarterCopyKey(starter), LANDING_STARTER_COPY_FALLBACKS[starter]);

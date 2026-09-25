@@ -128,7 +128,7 @@ export function useGuestExperience({
   useEffect(() => {
     if (!guestBootstrapRequired || !hasCampaignAttribution()) return;
     void startGuestSession(account?.user.language ?? null).catch((error) => {
-      if (!isGuestBootstrapAbortError(error)) throw error;
+      if (isGuestBootstrapAbortError(error)) return;
     });
     return () => {
       cancelPendingGuestBootstrap();

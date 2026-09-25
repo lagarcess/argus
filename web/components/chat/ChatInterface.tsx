@@ -302,6 +302,7 @@ export default function ChatInterface() {
   });
   const [guestSubmissionPending, setGuestSubmissionPending] = useState(false);
   const [isHydratingConversation, setIsHydratingConversation] = useState(false);
+  const [initialRoutingSettled, setInitialRoutingSettled] = useState(false);
   const [showConversationRetrievalState, setShowConversationRetrievalState] =
     useState(false);
   const [failedConversationId, setFailedConversationId] = useState<string | null>(null);
@@ -787,6 +788,7 @@ export default function ChatInterface() {
     resetToEmptyChatSurface,
     navigateConversationTranscript,
     cancelActiveNavigation: () => transcriptSessionCache.cancelActiveNavigation(),
+    onInitialRoutingSettled: () => setInitialRoutingSettled(true),
   });
 
   const { scrollToLatest, updateScrollPositionState } = useChatScrollControls({
@@ -2421,6 +2423,7 @@ export default function ChatInterface() {
                 guestSubmissionError={guestEntry.guestSubmissionError}
                 isStreamingResponse={isStreamingResponse}
                 isHydratingConversation={isHydratingConversation}
+                canConsumeLandingStarter={initialRoutingSettled}
                 preferredName={greetingName}
                 placeholder={chatInputPlaceholder}
                 onSend={handleSend}
