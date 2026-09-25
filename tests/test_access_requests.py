@@ -294,7 +294,7 @@ def test_public_access_request_uses_bounded_auth_attempt_limiter(
 ) -> None:
     from argus.api.routers import auth
 
-    headers = {"X-Forwarded-For": "203.0.113.19"}
+    headers = {"CF-Connecting-IP": "203.0.113.19"}
     payload = {"email": "person@example.com", "language": "en"}
     for _ in range(auth.AUTH_ACCESS_REQUEST_ATTEMPT_LIMIT):
         response = client.post(

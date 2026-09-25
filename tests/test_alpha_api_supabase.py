@@ -2278,7 +2278,7 @@ def test_signup_keeps_obfuscated_duplicate_indistinguishable_without_profile(
     mock_gateway.get_or_create_profile_for_auth_user.side_effect = (
         lambda auth_user: profile_rows.add(str(auth_user["id"]))
     )
-    headers = {"X-Forwarded-For": "203.0.113.92"}
+    headers = {"CF-Connecting-IP": "203.0.113.92"}
 
     fresh = client.post(
         "/api/v1/auth/signup",
@@ -2338,7 +2338,7 @@ def test_signup_retry_does_not_reveal_profile_creation_through_username(
             },
         },
     ]
-    headers = {"X-Forwarded-For": "203.0.113.93"}
+    headers = {"CF-Connecting-IP": "203.0.113.93"}
 
     with patch(
         "argus.api.routers.auth.serialized_username_signup",
@@ -2689,7 +2689,7 @@ def test_login_rate_limit_blocks_extra_attempt_before_provider(
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = True
     mock_gateway.login.side_effect = RuntimeError("invalid provider password")
-    headers = {"X-Forwarded-For": "203.0.113.10"}
+    headers = {"CF-Connecting-IP": "203.0.113.10"}
 
     for _ in range(auth_router.AUTH_LOGIN_ATTEMPT_LIMIT):
         response = client.post(
@@ -2729,7 +2729,7 @@ def test_signup_rate_limit_blocks_extra_attempt_before_allowlist_check(
     monkeypatch.setenv("NEXT_PUBLIC_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     mock_gateway.private_alpha_email_allowed.return_value = False
-    headers = {"X-Forwarded-For": "203.0.113.11"}
+    headers = {"CF-Connecting-IP": "203.0.113.11"}
 
     for _ in range(auth_router.AUTH_SIGNUP_ATTEMPT_LIMIT):
         response = client.post(

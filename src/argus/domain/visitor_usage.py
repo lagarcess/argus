@@ -19,6 +19,7 @@ from argus.domain.usage_limits import align_usage_period
 
 VISITOR_USAGE_TABLE = "visitor_usage_counters"
 _VISITOR_SUBJECT_PREFIX = "visitor:"
+_SESSION_SUBJECT_PREFIX = "session:"
 
 
 def visitor_digest(identity: str) -> str:
@@ -33,6 +34,16 @@ def visitor_key_for(client_identity: str | None) -> str:
     an unmetered allowance is the worse failure."""
     identity = (client_identity or "").strip() or "unknown"
     return f"{_VISITOR_SUBJECT_PREFIX}{visitor_digest(identity)}"
+
+
+def guest_session_compute_key(user_id: str | None) -> str:
+    """Visitor-table subject for one authenticated guest workspace.
+
+    The session id is already an opaque UUID, so it is stored as-is rather
+    than re-hashed. Fails closed to one shared bucket when the id is missing.
+    """
+    identity = (user_id or "").strip() or "unknown"
+    return f"{_SESSION_SUBJECT_PREFIX}{identity}"
 
 
 def read_visitor_used(

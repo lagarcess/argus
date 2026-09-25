@@ -88,6 +88,10 @@ services:
         value: "true"
       - key: ARGUS_RESEARCH_GLOBAL_DAILY_CEILING
         value: "5000"
+      - key: ARGUS_TRUSTED_CLIENT_IP_HEADER
+        value: CF-Connecting-IP
+      - key: ARGUS_GUEST_SESSION_DAILY_TURN_CEILING
+        value: "100"
       - key: ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL
         value: "false"
       - key: ARGUS_MEMORY_EMBEDDING_MODEL
