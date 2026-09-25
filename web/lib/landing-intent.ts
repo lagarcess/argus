@@ -130,6 +130,10 @@ export function parseLandingIntent(
     typeof search === "string"
       ? new URLSearchParams(search.startsWith("?") ? search.slice(1) : search)
       : search;
+  const requestedPath = sanitizeLandingPath(landingPath);
+  const bouncedFromChat =
+    params.get("from_path") === "/chat" &&
+    (!requestedPath || requestedPath === "/");
   const intent = withDefinedFields({
     utm_source: sanitizeToken(params.get("utm_source")),
     utm_medium: sanitizeToken(params.get("utm_medium")),
@@ -138,7 +142,7 @@ export function parseLandingIntent(
     fbclid: sanitizeToken(params.get("fbclid")),
     ref: sanitizeToken(params.get("ref")),
     starter: sanitizeLandingStarter(params.get("starter")),
-    landing_path: sanitizeLandingPath(landingPath),
+    landing_path: bouncedFromChat ? "/chat" : requestedPath,
   });
   return hasCampaignAttribution(intent) ? intent : {};
 }
@@ -195,6 +199,7 @@ export const LANDING_STARTER_RUNTIME_FALLBACK_MS = 2000;
 let appliedStarterThisRuntime: LandingStarter | null = null;
 let appliedStarterAtMs = 0;
 let starterSurfaceEpoch = 0;
+let starterComposerUntouched = false;
 
 function readSessionStarterState(): {
   pending: LandingStarter | null;
@@ -304,12 +309,20 @@ export function landingStarterSurfaceEpoch(): number {
   return starterSurfaceEpoch;
 }
 
+export function noteLandingStarterComposerMatch(matchesApplied: boolean): void {
+  starterComposerUntouched = matchesApplied;
+}
+
 export function resetLandingStarterRuntime(): void {
   appliedStarterThisRuntime = null;
   appliedStarterAtMs = 0;
   starterSurfaceEpoch += 1;
-  const { pending, consumed } = readSessionStarterState();
-  const starter = pending ?? consumed;
+  starterComposerUntouched = false;
+  const raw = readSessionStored(LANDING_STARTER_STORAGE_KEY);
+  if (!raw?.startsWith(STARTER_HANDOFF_PREFIX)) return;
+  const starter = sanitizeLandingStarter(
+    raw.slice(STARTER_HANDOFF_PREFIX.length),
+  );
   if (starter) {
     writeSessionStored(
       LANDING_STARTER_STORAGE_KEY,
@@ -320,7 +333,7 @@ export function resetLandingStarterRuntime(): void {
 
 export function prepareLandingStarterAuthHandoff(): void {
   const { pending, consumed } = readSessionStarterState();
-  const starter = pending ?? consumed;
+  const starter = pending ?? (starterComposerUntouched ? consumed : null);
   if (!starter) return;
   writeSessionStored(
     LANDING_STARTER_STORAGE_KEY,
@@ -363,6 +376,7 @@ export function currentChatPath(): string {
 export function currentAuthLoginPath(): string {
   return authLoginPathFromSearch(
     typeof window === "undefined" ? "" : window.location.search,
+    typeof window === "undefined" ? undefined : window.location.pathname,
   );
 }
 
@@ -370,6 +384,7 @@ type SearchRecord = Record<string, string | string[] | undefined>;
 
 export function authLoginPathFromSearch(
   search: URLSearchParams | SearchRecord | string,
+  landingPath?: string,
 ): string {
   const params = new URLSearchParams();
   if (search instanceof URLSearchParams) {
@@ -387,6 +402,10 @@ export function authLoginPathFromSearch(
       const scalar = Array.isArray(value) ? value[0] : value;
       if (typeof scalar === "string" && scalar) params.set(key, scalar);
     }
+  }
+  params.delete("from_path");
+  if (sanitizeLandingPath(landingPath) === "/chat") {
+    params.set("from_path", "/chat");
   }
   params.set("auth", "login");
   return `/?${params.toString()}`;

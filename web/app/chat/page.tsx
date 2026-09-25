@@ -26,7 +26,7 @@ export default async function ChatPage({
         guestCaptchaConfigured,
       }) === "auth"
     ) {
-      redirect(authLoginPathFromSearch(await searchParams));
+      redirect(authLoginPathFromSearch(await searchParams, "/chat"));
     }
   }
 
