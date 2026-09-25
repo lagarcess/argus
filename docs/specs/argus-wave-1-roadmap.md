@@ -12,9 +12,8 @@ The goal number is the share of signed-in pilot users who return between day 8
 and day 30. The early signal is the share who save a card or create a goal in
 their first week.
 
-Head of Engineering costing: with web push the wave is 5 to 6 weeks. Email-only
-would be 4 to 5 weeks. Web push plus the home-screen install guide in step 3
-adds about a week.
+Head of Engineering costing: the wave total is 5 to 6 weeks, with web push
+included. Email-only would have been 4 to 5 weeks.
 
 ## Steps 0 to 3 (Draft, not approved by Lucas)
 
@@ -42,11 +41,13 @@ items 1 and 2.
 ### Step 3 (Draft, not approved by Lucas)
 
 Step 3 adds one daily job plus a channel-agnostic notifications table, monthly
-goal check-ins, and maturity reminders. Email is opt-in. Consent is recorded.
-The email carries no amounts, at most one message per goal per month, and a
-one-click unsubscribe. The step also adds web push plus a home-screen install
-wizard, and it covers setup checklist item 3. Rate rechecks wait until the
-eval passes.
+goal check-ins, and maturity reminders. Email reminders ship first. Email is
+opt-in. Consent is recorded. The email carries no amounts, at most one message
+per goal per month, and a one-click unsubscribe. Web push plus the home-screen
+install guide ship last, on the same notifications table. If push slips, the
+monthly check-ins and the day 8 to 30 return measurement still start on time.
+The step covers setup checklist item 3. Rate rechecks wait until the eval
+passes.
 
 ## Setup checklist (Draft, not approved by Lucas)
 
