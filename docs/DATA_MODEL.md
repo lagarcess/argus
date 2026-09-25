@@ -2011,13 +2011,16 @@ Tracks visitor-scoped and shared provider allowances without inventing a
 profile owner. This is intentionally separate from `usage_counters`, whose
 `user_id` is a foreign key to `profiles.id`. It also holds the guest compute
 anti-abuse ceiling (`guest_compute_turns`, one visitor-keyed row and one
-`session:<guest user id>` row, claimed atomically at turn start), which is
-not an allowance and is never projected by `GET /me/usage`.
+`session:<guest user id>` row, claimed atomically at turn start) and the
+signed-in compute ceiling (`account_compute_turns`, keyed on
+`user:<account id>`), which are not allowances and are never projected by
+`GET /me/usage`. Signed-in research uses the same `user:<account id>`
+subject on `research_searches`.
 
 ### Fields
 - `visitor_key`: `text` (opaque keyed digest; never a raw address)
 - `resource`: `text` (`discovery_searches`, `research_searches`,
-  `guest_compute_turns`)
+  `guest_compute_turns`, `account_compute_turns`)
 - `period`: `text` (`day`)
 - `period_start`: `timestamptz`
 - `period_end`: `timestamptz`
@@ -2033,7 +2036,8 @@ not an allowance and is never projected by `GET /me/usage`.
   `(visitor_key, resource, period_end)`
 - RLS is enabled with no policies. Only `service_role` has table access and may
   execute `settle_visitor_usage`, `claim_research_usage`,
-  `claim_guest_compute_usage`, or `purge_expired_visitor_usage`.
+  `claim_guest_compute_usage`, `claim_registered_compute_usage`, or
+  `purge_expired_visitor_usage`.
 - Expired rows are disposable operational data, but `period_end` is not a timer
   and nothing in the database acts on it. The row has no owner to cascade from,
   so it is deleted only when a successful non-dry-run of the guest cleanup job
@@ -2056,25 +2060,29 @@ not an allowance and is never projected by `GET /me/usage`.
 ### Research policy
 - A guest receives three provider-backed research questions per visitor per
   UTC day. Renewing the temporary workspace does not reset that allowance.
+- A signed-in account receives 15 provider-backed research questions per
+  UTC day (`ARGUS_REGISTERED_DAILY_RESEARCH_CEILING`), keyed on
+  `user:<account id>` in the same table. `GET /me/usage` does not project
+  that row.
 - Every signed-in or guest provider attempt also draws on the shared
   `global:research` daily row. Its ceiling is configured by
   `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` and defaults to `5000` when blank or
   invalid.
-- `claim_research_usage` locks the shared row and optional guest row in one
+- `claim_research_usage` locks the shared row and optional per-account row in one
   transaction, checks both limits, and increments both or neither before
   provider work starts. This is the concurrency boundary: simultaneous turns
-  from one visitor cannot both consume one remaining slot. An admitted claim
+  from one account cannot both consume one remaining slot. An admitted claim
   returns the `period_start` it charged.
 - When the provider work a claim admitted fails with no usable response, and
   the turn's charge does not already stand, the backend calls
   `release_research_usage` (service-role only, like the claim) with that
-  `period_start`. It decrements only the guest's own row for that day, never
+  `period_start`. It decrements only the account's own row for that day, never
   below zero, and never touches the shared row, which keeps the attempt. It
   returns `released`, and only a confirmed release lets a later provider path
   in the same turn claim again. The charge stands for the rest of the turn once
   provider work was served, was cancelled while it may still be billing, or
   could not be released (the function failed or matched no charge), so one
-  turn never costs a guest more than one question. Migration
+  turn never costs an account more than one question. Migration
   `20260913230000_release_research_guest_claim.sql` adds the release and the
   claim's `period_start`.
 - Cache hits, ordinary chat turns, unconfigured-provider paths, and persisted
@@ -2094,6 +2102,17 @@ not an allowance and is never projected by `GET /me/usage`.
   `20260925120000_claim_guest_compute_usage.sql` adds the claim. The visitor
   identity is the trusted client IP header (`CF-Connecting-IP` by default,
   `ARGUS_TRUSTED_CLIENT_IP_HEADER`), never the first `X-Forwarded-For` hop.
+  IPv6 visitor keys group by `/64`.
+
+### Signed-in compute policy
+- A signed-in account's ordinary chat turns claim one
+  `account_compute_turns` unit against `user:<account id>` at turn start.
+  The daily ceiling defaults to 200 (`ARGUS_REGISTERED_DAILY_TURN_CEILING`).
+  A claim that is admitted stands if the turn later errors; there is no
+  release. A claim RPC error is not treated as exhaustion; the user sees a
+  short retry, not the daily-cap 429. Migration
+  `20260925140000_claim_registered_compute_usage.sql` adds the claim.
+  `GET /me/usage` never projects this counter.
 
 ---
 

@@ -34,6 +34,19 @@ def reset_guest_funnel_milestones():
     api_state.store.guest_funnel_milestones.clear()
 
 
+@pytest.fixture(autouse=True)
+def reset_usage_counters():
+    """Daily claim rows are process-local in tests; leftover counts would
+    trip the signed-in ceiling in a later case."""
+    from argus.api import state as api_state
+
+    api_state.store.visitor_usage_counters.clear()
+    api_state.store.usage_counters.clear()
+    yield
+    api_state.store.visitor_usage_counters.clear()
+    api_state.store.usage_counters.clear()
+
+
 @pytest.fixture
 def freeze_new_york_clock(monkeypatch):
     """Freeze the one clock every "today" reads at an aware instant."""

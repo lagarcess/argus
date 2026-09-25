@@ -169,6 +169,7 @@ async def discovery_operation_result(
                     note = research_capacity_exhausted_note(
                         runtime_locale(language),
                         guest_allowance=admission.guest_exhausted,
+                        registered_allowance=admission.registered_exhausted,
                     )
                     answer = result.stage_patch.get("assistant_response")
                     result.stage_patch["assistant_response"] = (

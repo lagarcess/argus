@@ -20,6 +20,7 @@ from argus.domain.usage_limits import align_usage_period
 VISITOR_USAGE_TABLE = "visitor_usage_counters"
 _VISITOR_SUBJECT_PREFIX = "visitor:"
 _SESSION_SUBJECT_PREFIX = "session:"
+_REGISTERED_SUBJECT_PREFIX = "user:"
 
 
 def visitor_digest(identity: str) -> str:
@@ -44,6 +45,20 @@ def guest_session_compute_key(user_id: str | None) -> str:
     """
     identity = (user_id or "").strip() or "unknown"
     return f"{_SESSION_SUBJECT_PREFIX}{identity}"
+
+
+def registered_account_usage_key(user_id: str | None) -> str:
+    """Visitor-table subject for one signed-in account.
+
+    The account id is already an opaque UUID, so it is stored as-is rather
+    than re-hashed. Fails closed to one shared bucket when the id is missing.
+    """
+    identity = (user_id or "").strip() or "unknown"
+    return f"{_REGISTERED_SUBJECT_PREFIX}{identity}"
+
+
+def is_registered_account_usage_key(visitor_key: str | None) -> bool:
+    return bool(visitor_key) and visitor_key.startswith(_REGISTERED_SUBJECT_PREFIX)
 
 
 def read_visitor_used(

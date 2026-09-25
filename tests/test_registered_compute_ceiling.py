@@ -1,0 +1,250 @@
+"""Signed-in daily compute and research caps.
+
+Conversation stays unbounded in ``GET /me/usage``. Ordinary signed-in turns
+still claim a daily unit at entry. Research claims the same visitor-table
+row shape guests use, keyed on ``user:<account id>``.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from threading import Lock
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+from argus.api import state as api_state
+from argus.api.chat.research_evidence import (
+    claim_research_provider_attempt,
+)
+from argus.domain.usage_limits import (
+    COMPUTE_TURN_CEILING_DETAIL,
+    REGISTERED_COMPUTE_CEILING_RESOURCE,
+    registered_daily_research_ceiling,
+    registered_daily_turn_ceiling,
+)
+from argus.domain.visitor_usage import (
+    read_memory_visitor_used,
+    registered_account_usage_key,
+)
+
+from tests.test_allowance_accounting import client, mock_gateway
+from tests.test_guest_compute_ceiling import (
+    GUEST_HEADERS,
+    TURN,
+    _guest,
+)
+
+__all__ = ["mock_gateway"]
+
+REGISTERED_HEADERS = {"Authorization": "Bearer test-token"}
+ACCOUNT_ID = "00000000-0000-0000-0000-000000000001"
+ACCOUNT_KEY = registered_account_usage_key(ACCOUNT_ID)
+
+
+class _FakeRegisteredComputeClaimClient:
+    """Thread-safe stub for claim_registered_compute_usage."""
+
+    def __init__(self, *, used: int = 0) -> None:
+        self.used = used
+        self.claims = 0
+        self._lock = Lock()
+
+    def rpc(self, name: str, params: dict[str, Any]) -> SimpleNamespace:
+        assert name == "claim_registered_compute_usage"
+        with self._lock:
+            limit = int(params["p_limit"])
+            if self.used >= limit:
+                data = {"available": False}
+            else:
+                self.used += 1
+                self.claims += 1
+                data = {"available": True}
+        return SimpleNamespace(execute=lambda: SimpleNamespace(data=data))
+
+
+def _registered(mock_gateway, monkeypatch: pytest.MonkeyPatch, *, turns_today: int):
+    monkeypatch.setenv("ARGUS_GUEST_ACCESS_ENABLED", "true")
+    fake = _FakeRegisteredComputeClaimClient(used=turns_today)
+    mock_gateway.client = fake
+    return fake
+
+
+def test_registered_compute_claim_sql_is_service_role_only() -> None:
+    from pathlib import Path
+
+    sql = Path(
+        "supabase/migrations/20260925140000_claim_registered_compute_usage.sql"
+    ).read_text(encoding="utf-8")
+    lowered = " ".join(sql.lower().split())
+    assert "for update" in lowered
+    assert (
+        "revoke all on function public.claim_registered_compute_usage("
+        in lowered
+    )
+    assert "from public, anon, authenticated" in lowered
+    assert (
+        "grant execute on function public.claim_registered_compute_usage("
+        in lowered
+    )
+    assert "to service_role" in lowered
+
+
+def test_registered_caps_read_env_or_the_code_owned_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", raising=False)
+    monkeypatch.delenv("ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", raising=False)
+    assert registered_daily_turn_ceiling() == 200
+    assert registered_daily_research_ceiling() == 15
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", "7")
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", "4")
+    assert registered_daily_turn_ceiling() == 7
+    assert registered_daily_research_ceiling() == 4
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", "0")
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", "nope")
+    assert registered_daily_turn_ceiling() == 200
+    assert registered_daily_research_ceiling() == 15
+
+
+def test_the_201st_signed_in_turn_is_refused_with_the_limit_response(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", raising=False)
+    fake = _registered(mock_gateway, monkeypatch, turns_today=200)
+
+    response = client.post(
+        "/api/v1/chat/stream", json=TURN, headers=REGISTERED_HEADERS
+    )
+
+    assert response.status_code == 429
+    body = response.json()
+    assert body["code"] == "too_many_requests"
+    assert body["detail"] == COMPUTE_TURN_CEILING_DETAIL
+    assert body["title"] == "Too Many Requests"
+    assert int(response.headers["Retry-After"]) >= 1
+    assert fake.claims == 0
+    mock_gateway.create_message.assert_not_called()
+
+
+def test_env_override_changes_the_signed_in_chat_cap(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", "2")
+    fake = _registered(mock_gateway, monkeypatch, turns_today=2)
+
+    response = client.post(
+        "/api/v1/chat/stream", json=TURN, headers=REGISTERED_HEADERS
+    )
+
+    assert response.status_code == 429
+    assert response.json()["detail"] == COMPUTE_TURN_CEILING_DETAIL
+    assert fake.claims == 0
+
+
+def test_signed_in_and_guest_limit_responses_use_the_same_copy(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from argus.domain.usage_limits import GUEST_COMPUTE_DAILY_CEILING
+
+    monkeypatch.delenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", raising=False)
+    registered = _registered(mock_gateway, monkeypatch, turns_today=200)
+    signed_in = client.post(
+        "/api/v1/chat/stream", json=TURN, headers=REGISTERED_HEADERS
+    )
+    _guest(mock_gateway, monkeypatch, turns_today=GUEST_COMPUTE_DAILY_CEILING)
+    guest = client.post("/api/v1/chat/stream", json=TURN, headers=GUEST_HEADERS)
+
+    assert signed_in.status_code == guest.status_code == 429
+    assert signed_in.json()["code"] == guest.json()["code"] == "too_many_requests"
+    assert signed_in.json()["title"] == guest.json()["title"]
+    assert signed_in.json()["detail"] == guest.json()["detail"] == COMPUTE_TURN_CEILING_DETAIL
+    assert "\u2014" not in signed_in.json()["detail"]
+    assert registered.claims == 0
+
+
+def test_signed_in_counter_resets_the_next_day(monkeypatch: pytest.MonkeyPatch) -> None:
+    from argus.api.chat.registered_compute_ceiling import (
+        claim_registered_compute_turn,
+    )
+    from argus.domain.usage_limits import align_usage_period
+
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    api_state.store.visitor_usage_counters.clear()
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", "1")
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+    start, end = align_usage_period(yesterday, "day")
+    api_state.store.visitor_usage_counters[
+        (ACCOUNT_KEY, REGISTERED_COMPUTE_CEILING_RESOURCE, "day")
+    ] = {
+        "period_start": start,
+        "period_end": end,
+        "used_count": 1,
+        "limit_count": 1,
+    }
+
+    first_today = claim_registered_compute_turn(account_key=ACCOUNT_KEY)
+    second_today = claim_registered_compute_turn(account_key=ACCOUNT_KEY)
+
+    assert first_today.available is True
+    assert second_today.available is False
+    assert (
+        read_memory_visitor_used(
+            api_state.store.visitor_usage_counters,
+            visitor_key=ACCOUNT_KEY,
+            resource=REGISTERED_COMPUTE_CEILING_RESOURCE,
+            period="day",
+        )
+        == 1
+    )
+    api_state.store.visitor_usage_counters.clear()
+
+
+def test_the_16th_signed_in_research_run_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    api_state.store.usage_counters.clear()
+    api_state.store.visitor_usage_counters.clear()
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    monkeypatch.delenv("ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", raising=False)
+
+    for _ in range(15):
+        assert claim_research_provider_attempt(guest_visitor_key=ACCOUNT_KEY).available
+    sixteenth = claim_research_provider_attempt(guest_visitor_key=ACCOUNT_KEY)
+    assert sixteenth.available is False
+    assert sixteenth.registered_exhausted is True
+    assert sixteenth.guest_exhausted is False
+    api_state.store.usage_counters.clear()
+    api_state.store.visitor_usage_counters.clear()
+
+
+def test_env_override_changes_the_signed_in_research_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    api_state.store.usage_counters.clear()
+    api_state.store.visitor_usage_counters.clear()
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_REGISTERED_DAILY_RESEARCH_CEILING", "2")
+
+    assert claim_research_provider_attempt(guest_visitor_key=ACCOUNT_KEY).available
+    assert claim_research_provider_attempt(guest_visitor_key=ACCOUNT_KEY).available
+    third = claim_research_provider_attempt(guest_visitor_key=ACCOUNT_KEY)
+    assert third.available is False
+    assert third.registered_exhausted is True
+    api_state.store.usage_counters.clear()
+    api_state.store.visitor_usage_counters.clear()
+
+
+def test_signed_in_research_exhausted_copy_is_localized_without_em_dash() -> None:
+    from argus.agent_runtime.research_grounded import research_capacity_exhausted_note
+
+    english = research_capacity_exhausted_note("en", registered_allowance=True)
+    spanish = research_capacity_exhausted_note("es-419", registered_allowance=True)
+    assert "Create an account" not in english
+    assert "Crea una cuenta" not in spanish
+    assert "today's research questions" in english
+    assert "consultas de investigación de hoy" in spanish
+    assert "\u2014" not in english
+    assert "\u2014" not in spanish

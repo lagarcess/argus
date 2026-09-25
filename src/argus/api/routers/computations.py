@@ -117,6 +117,7 @@ async def refresh_computed_answer_route(
     visitor_key = guest_research_visitor_key(
         is_guest=account_context(request).kind == "guest",
         client_identity=client_identity(request),
+        user_id=user.id,
     )
     try:
         return await refresh_computed_answer(
