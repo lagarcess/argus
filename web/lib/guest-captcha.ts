@@ -390,7 +390,7 @@ export function acquireTurnstileChallenge(input: {
         appearance: "interaction-only",
         theme,
         callback: succeed,
-        "error-callback": fail,
+        "error-callback": () => fail(),
         "expired-callback": () => {
           fail();
         },

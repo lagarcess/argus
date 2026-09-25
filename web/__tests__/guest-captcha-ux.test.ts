@@ -354,6 +354,35 @@ describe("shared CAPTCHA acquisition UX", () => {
     expect(captcha).not.toContain("Browser CAPTCHA could not load.");
   });
 
+  test("a Turnstile error-callback keeps captcha_unavailable when the provider passes a code", async () => {
+    const harness = challengeHarness();
+    const pending = challengeUnderTest()({
+      turnstile: harness.turnstile,
+      shell: harness.shell,
+      siteKey: "test-site-key",
+      timeoutMs: 100,
+      interactiveTimeoutMs: 100,
+      theme: "light",
+    });
+
+    const returned = (
+      harness.callbacks?.["error-callback"] as
+        | ((code?: string) => boolean)
+        | undefined
+    )?.("600010");
+    const error = await pending.catch((caught: unknown) => caught);
+
+    expect(returned).toBe(true);
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error & { code?: string }).code).toBe(
+      "captcha_unavailable",
+    );
+    expect(guestCaptcha.guestEntryErrorKind(error)).toBe("captcha_unavailable");
+    expect(readFileSync(join(root, "lib/guest-captcha.ts"), "utf-8")).toContain(
+      '"error-callback": () => fail()',
+    );
+  });
+
   test("maps coded Turnstile failures to captcha_unavailable and other errors to generic", () => {
     const coded = Object.assign(new Error("Browser CAPTCHA could not be verified."), {
       code: "captcha_unavailable",
