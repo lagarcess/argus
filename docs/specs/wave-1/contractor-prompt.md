@@ -36,7 +36,10 @@ Argus team and are not in this list.
 | 1 | 9 | 1B-2 | `02-stage-1-layout-ai-landing-card-payoff.md` |
 
 Packages whose "Depends on" line is already satisfied may be built in parallel
-sessions. They still merge in this order, each rebased on the new tip.
+sessions. They still merge in this order. A branch that is already published
+(pushed, PR open, or has screenshots or eval evidence) is never rebased: bring
+in the new tip by merging `origin/codex/private-alpha-next` into it (AGENTS.md,
+reconciliation rules).
 
 ## Instructions for the session
 
@@ -49,7 +52,8 @@ product text it references. The spec is the source of truth. Where code and
 spec disagree, follow the spec's "Clashes resolved" table. If something is
 still unclear, stop and say so in the PR. Do not guess.
 
-1. Branch from `origin/codex/private-alpha-next` after a fresh fetch. Name the
+1. Branch from `origin/codex/private-alpha-next` after a fresh fetch, and record
+   that SHA as your integration base in the PR. Name the
    branch `<type>/<package-id>-<short-name>`, for example
    `fix/0B-2-cap-copy`. Never push to `codex/private-alpha-next`; it is
    protected and only accepts PRs.
@@ -59,7 +63,13 @@ still unclear, stop and say so in the PR. Do not guess.
    (rule E8). Their existing tests must stay green.
 4. Write the named tests from the package's "done when". Run the backend and
    web checks locally before opening the PR.
-5. Rebase on the latest `origin/codex/private-alpha-next` before opening the PR.
+5. Before opening the PR, fetch again. If integration moved, merge (or, only
+   if nothing is pushed yet, rebase) the latest `origin/codex/private-alpha-next`
+   into your branch. Once the branch is pushed, never rebase or force-push it;
+   reconcile by merging the tip. In the PR, record the original base and the
+   current integration SHA, and name any overlap with what merged in between
+   (shared runtime owner, API or data contract, UI state, migration, env var,
+   affected tests), not just Git conflicts.
 6. Open ONE PR into `codex/private-alpha-next` with these headings: TL;DR,
    Motivation (link the spec package and issue), Changes, Out of scope,
    Testing (es-419 and EN screenshots for anything visible), Risks/Rollback,
@@ -72,7 +82,10 @@ still unclear, stop and say so in the PR. Do not guess.
 
 ## Environment
 
-- Local worktree: run `.github/setup-worktree-env.sh`, then `.github/setup.sh`.
+- Local worktree: run `bash .github/setup-worktree-env.sh`, then
+  `bash .github/setup-worktree-env.sh --check "$PWD"`. Stop if it reports
+  `missing` or `conflicting-link`, and fix the link before running tests or
+  services. Then run `bash .github/setup.sh`.
 - Cloud session: setup script `bash .github/setup.sh`. Use dev-safe variables
   only: mock auth (`ARGUS_MOCK_AUTH`, `NEXT_PUBLIC_MOCK_AUTH`), in-memory
   persistence (`ARGUS_PERSISTENCE_MODE`), and a capped dev OpenRouter key if a
