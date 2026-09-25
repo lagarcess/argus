@@ -50,6 +50,13 @@ live and gating shipped code, so renaming it moves the release contract
 QA scripts) together. Do it when something else touches that surface, not as a
 standalone edit.
 
+> Correction 2026-09-25: Memory is shipped and
+> `ARGUS_ENABLE_PERSONALIZATION_MEMORY` is on in production. Exposure remains
+> limited to `admin` and `developer` accounts. Semantic recall
+> (`ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL`) is off. Widening to every registered
+> user remains future work. The "default-off flag" wording below is the
+> landing-time state, not the current production state.
+
 ## Operating rules (founder-locked 2026-08-06)
 
 1. **No phases, no incubation.** When a lane is dispatched it is built
@@ -972,6 +979,10 @@ profile and fall back to the nameless pool.
   scoped to `admin` and `developer` allowlist roles. Propose, confirm, inspect,
   explain, edit, delete, disable, reset, export, and temporary chat. Guests
   denied before any side effect.
+
+  Correction 2026-09-25: the production Blueprint now sets
+  `ARGUS_ENABLE_PERSONALIZATION_MEMORY=true`. The role gate is unchanged.
+  Semantic recall remains off.
 
   **Follow-up is specced and ready to dispatch, not pending decisions.** The
   recall loop is locked in

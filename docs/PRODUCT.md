@@ -269,8 +269,12 @@ its own groups.
 
 For P2, this durable `Idea` / `IdeaVersion` / `EvidenceArtifact` /
 `DecisionNote` recall is the product's "remembering" contract. It is distinct
-from memory. Automatic or user-confirmed cross-conversation
-memory remains post-PMF and must not be required for the P2
+from memory. Memory has shipped: production sets
+`ARGUS_ENABLE_PERSONALIZATION_MEMORY=true`, exposure is limited to `admin`
+and `developer` accounts (`MEMORY_EXPOSURE_ROLES` in
+`src/argus/api/personalization_memory.py`), and semantic recall stays off
+(`ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL=false`). Widening memory to every
+registered user remains future work. Memory must not be required for the P2
 idea/evidence/comparison loop.
 
 ## Legacy Compatibility Goals

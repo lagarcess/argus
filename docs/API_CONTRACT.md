@@ -6309,7 +6309,10 @@ Exposure model, checked in this order on every endpoint:
    process service, and a `private_alpha_allowlist` role of `admin` or
    `developer` are all required. Any missing piece returns
    `404 personalization_memory_unavailable`, so ordinary registered accounts
-   see exactly the flag-off state.
+   see exactly the flag-off state. Production sets the flag on
+   (`render.yaml`); semantic recall stays off
+   (`ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL=false`). The role gate is what
+   keeps the surface off for everyone except `admin` and `developer`.
 
 `GET /memory/availability` is a presentation probe returning
 `{"available": bool}` so clients can hide the surface entirely; it never
