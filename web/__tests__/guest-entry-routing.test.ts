@@ -95,7 +95,8 @@ describe("landing entry routing", () => {
 
     expect(chatPage).toContain("resolveChatEntrySurface");
     expect(chatPage).not.toContain('redirect("/")');
-    expect(chatPage).toContain('redirect("/?auth=login")');
+    expect(chatPage).toContain("authLoginPathFromSearch");
+    expect(chatPage).toContain('authLoginPathFromSearch(await searchParams, "/chat")');
     expect(chatPage).toContain("<ChatInterface />");
   });
 });

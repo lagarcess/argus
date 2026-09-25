@@ -20,6 +20,10 @@ import { guestAccessEnabled } from "@/lib/private-alpha-flags";
 import {
   resolveLandingEntrySurface,
 } from "@/lib/landing-entry";
+import {
+  captureLandingIntentFromLocation,
+  currentChatPath,
+} from "@/lib/landing-intent";
 import { guestCaptchaConfigured } from "@/lib/guest-session";
 import { guestProfileProbeOutcome } from "@/lib/guest-account";
 
@@ -55,6 +59,7 @@ export default function LandingPage() {
     useState(false);
 
   useEffect(() => {
+    captureLandingIntentFromLocation();
     const nextAuthMode = authModeFromLocation();
     setAuthMode(nextAuthMode);
     if (skipAuthenticatedRedirect()) {
@@ -71,7 +76,7 @@ export default function LandingPage() {
           setIsCheckingSession(false);
           return;
         }
-        router.replace("/chat");
+        router.replace(currentChatPath());
       } catch (error) {
         if (cancelled) return;
         setProfileProbeFailedClosed(
@@ -105,8 +110,11 @@ export default function LandingPage() {
   const showLogin = () => updateAuthMode("login");
 
   const handleAuthSubmit = async (submission: AuthFormSubmission) => {
-    if (isMockAuth) {
-      router.replace("/chat");
+    const allowMockSignupNetwork =
+      process.env.NEXT_PUBLIC_E2E_ALLOW_MOCK_SIGNUP === "true" &&
+      submission.mode === "signup";
+    if (isMockAuth && !allowMockSignupNetwork) {
+      router.replace(currentChatPath());
       router.refresh();
       return;
     }
@@ -128,7 +136,7 @@ export default function LandingPage() {
       });
     }
 
-    router.replace("/chat");
+    router.replace(currentChatPath());
     router.refresh();
   };
 

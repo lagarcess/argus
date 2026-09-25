@@ -24,6 +24,7 @@ import {
   type ComposerSegment,
 } from "./composer-model";
 import { entityTokenClassName } from "./entity-token";
+import { noteLandingStarterComposerMatch } from "@/lib/landing-intent";
 import type { ChatMention } from "./types";
 
 type ChatInputProps = {
@@ -34,6 +35,7 @@ type ChatInputProps = {
   disabled?: boolean;
   placeholder?: string;
   onToast?: (message: string) => void;
+  draftText?: string | null;
 };
 
 export type DiscoverySection = {
@@ -82,6 +84,7 @@ export default function ChatInput({
   disabled = false,
   placeholder,
   onToast,
+  draftText,
 }: ChatInputProps) {
   const { t } = useTranslation();
   const [segments, setSegments] = useState<ComposerSegment[]>([{ type: "text", text: "" }]);
@@ -98,6 +101,7 @@ export default function ChatInput({
   const [isMounted, setIsMounted] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const pendingCaretOffsetRef = useRef<number | null>(null);
+  const appliedDraftRef = useRef(false);
   const activeMentionOffsetRef = useRef<number | null>(null);
   const buttonDiscoveryAnchorOffsetRef = useRef<number | null>(null);
   const buttonDiscoveryQueryEndOffsetRef = useRef<number | null>(null);
@@ -144,6 +148,26 @@ export default function ChatInput({
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (appliedDraftRef.current) return;
+    const text = draftText?.trim();
+    if (!text) return;
+    if (composerHasContent || composerRawText.trim()) {
+      appliedDraftRef.current = true;
+      return;
+    }
+    appliedDraftRef.current = true;
+    pendingCaretOffsetRef.current = text.length;
+    setSegments([{ type: "text", text }]);
+  }, [composerHasContent, composerRawText, draftText]);
+
+  useEffect(() => {
+    if (!draftText?.trim()) return;
+    noteLandingStarterComposerMatch(
+      Boolean(appliedDraftRef.current) && composerRawText === draftText,
+    );
+  }, [composerRawText, draftText]);
 
   useEffect(() => {
     if (!isDiscoveryOpen) return;

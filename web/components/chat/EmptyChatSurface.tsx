@@ -2,6 +2,12 @@
 
 import { useTranslation } from "react-i18next";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import {
+  CAPTCHA_UNAVAILABLE_CODE,
+  type GuestEntryErrorKind,
+} from "@/lib/guest-captcha";
+import { landingStarterSurfaceEpoch } from "@/lib/landing-intent";
+import { researchRailEnabled } from "@/lib/private-alpha-flags";
 import ChatInput from "./ChatInput";
 import ChatLegalNotice from "./ChatLegalNotice";
 import EmptyChatGreeting from "./EmptyChatGreeting";
@@ -10,11 +16,7 @@ import StarterActions, {
   type StarterSelectionMetadata,
 } from "./StarterActions";
 import type { ChatMention } from "./types";
-import {
-  CAPTCHA_UNAVAILABLE_CODE,
-  type GuestEntryErrorKind,
-} from "@/lib/guest-captcha";
-import { researchRailEnabled } from "@/lib/private-alpha-flags";
+import { useLandingStarterPrefill } from "./useLandingStarterPrefill";
 
 type EmptyChatSurfaceProps = {
   isGuest: boolean;
@@ -23,6 +25,7 @@ type EmptyChatSurfaceProps = {
   guestSubmissionError: GuestEntryErrorKind | null;
   isStreamingResponse: boolean;
   isHydratingConversation: boolean;
+  canConsumeLandingStarter: boolean;
   /** A setting the user stated, never something Argus inferred. */
   preferredName?: string | null;
   placeholder: string;
@@ -41,6 +44,7 @@ export default function EmptyChatSurface({
   guestSubmissionError,
   isStreamingResponse,
   isHydratingConversation,
+  canConsumeLandingStarter,
   preferredName,
   placeholder,
   onSend,
@@ -49,6 +53,7 @@ export default function EmptyChatSurface({
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
   const { isBelowTablet } = useResponsiveLayout();
+  const draftText = useLandingStarterPrefill(canConsumeLandingStarter);
   const disabled =
     isStreamingResponse ||
     isHydratingConversation ||
@@ -84,11 +89,12 @@ export default function EmptyChatSurface({
         }
       >
         <ChatInput
-          key="new-conversation"
+          key={`new-conversation-${landingStarterSurfaceEpoch()}`}
           onSend={onSend}
           disabled={disabled}
           placeholder={placeholder}
           onToast={onToast}
+          draftText={draftText}
         />
         {guestSubmissionPending && (
           <div

@@ -262,8 +262,11 @@ describe("password auth CAPTCHA and confirmation contract", () => {
       page.indexOf("const isSignup"),
     );
     expect(submitHandler).toContain("needsEmailConfirmation");
+    expect(submitHandler).toContain("NEXT_PUBLIC_E2E_ALLOW_MOCK_SIGNUP");
+    expect(submitHandler).not.toContain("navigator.webdriver");
+    expect(submitHandler).toContain("allowMockSignupNetwork");
     expect(submitHandler.indexOf("needsEmailConfirmation")).toBeLessThan(
-      submitHandler.lastIndexOf('router.replace("/chat")'),
+      submitHandler.lastIndexOf("router.replace(currentChatPath())"),
     );
     expect(form).toContain('data-testid="auth-check-email"');
     expect(form).toContain("captcha_unavailable");

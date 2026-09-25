@@ -24,7 +24,15 @@ import {
 import { replaceGuestConversation } from "@/lib/guest-api";
 import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import type { UserResponse } from "@/lib/guest-account";
-import { startGuestSession } from "@/lib/guest-session";
+import {
+  cancelPendingGuestBootstrap,
+  isGuestBootstrapAbortError,
+  startGuestSession,
+} from "@/lib/guest-session";
+import {
+  hasCampaignAttribution,
+  prepareLandingStarterAuthHandoff,
+} from "@/lib/landing-intent";
 import { normalizeEnabledLanguage } from "@/lib/language-features";
 import {
   latestDecisionResumeMessageId,
@@ -120,6 +128,16 @@ export function useGuestExperience({
     [],
   );
 
+  useEffect(() => {
+    if (!guestBootstrapRequired || !hasCampaignAttribution()) return;
+    void startGuestSession(account?.user.language ?? null).catch((error) => {
+      if (isGuestBootstrapAbortError(error)) return;
+    });
+    return () => {
+      cancelPendingGuestBootstrap();
+    };
+  }, [account?.user.language, guestBootstrapRequired]);
+
   const resumeGuestAction = useCallback(
     async (action: GuestPendingAction) => {
       if (action.reason === "simulation_limit") {
@@ -169,6 +187,8 @@ export function useGuestExperience({
     onOpenOmnisearch,
     onRequestSignIn: () => {
       if (guestBootstrapRequired) {
+        prepareLandingStarterAuthHandoff();
+        cancelPendingGuestBootstrap();
         pendingGuestAdmissionRef.current?.abort();
         pendingGuestAdmissionRef.current = null;
         onRequestPendingGuestSignIn();
@@ -220,7 +240,10 @@ export function useGuestExperience({
             }
             effectiveAccount = refreshedAccount;
           } catch (error) {
-            if (!admissionCancelled()) onGuestBootstrapError(error);
+            if (isGuestBootstrapAbortError(error) || admissionCancelled()) {
+              return false;
+            }
+            onGuestBootstrapError(error);
             return false;
           }
         }

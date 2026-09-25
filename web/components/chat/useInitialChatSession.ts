@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import { getMe, listConversations } from "@/lib/argus-api";
 import { guestProfileProbeOutcome } from "@/lib/guest-account";
 import { readActiveConversationRouteState } from "@/lib/chat-conversation-routing";
+import { currentAuthLoginPath } from "@/lib/landing-intent";
 import type { Message } from "./types";
 
 export type ProfileState =
@@ -41,7 +42,8 @@ export function useInitialChatSession({
   resetToEmptyChatSurface,
   navigateConversationTranscript,
   cancelActiveNavigation,
-}: InitialChatSessionOptions): void {
+}: InitialChatSessionOptions): boolean {
+  const [initialRoutingSettled, setInitialRoutingSettled] = useState(false);
   const { t, i18n } = useTranslation();
   const router = useRouter();
 
@@ -69,7 +71,7 @@ export function useInitialChatSession({
           setProfileState("bootstrap_required");
         } else if (probeOutcome === "fail_closed") {
           setProfileState("unavailable");
-          router.replace("/?auth=login");
+          router.replace(currentAuthLoginPath());
           return;
         }
         if (hasAcceptedUserInputRef.current) return;
@@ -84,21 +86,24 @@ export function useInitialChatSession({
           const userId = meResponse?.user.id;
           if (!userId) {
             resetToEmptyChatSurface();
+            setInitialRoutingSettled(true);
             return;
           }
           await navigateConversationTranscript(activeConversationId, userId, {
             bootstrap: true,
             messageId: activeRoute.messageId ?? undefined,
           });
+          if (!cancelled) setInitialRoutingSettled(true);
           return;
         }
 
         if (cancelled || hasAcceptedUserInputRef.current) return;
         resetToEmptyChatSurface();
+        setInitialRoutingSettled(true);
       } catch {
         if (cancelled) return;
         setProfileState("unavailable");
-        router.replace("/?auth=login");
+        router.replace(currentAuthLoginPath());
         setMessages([
           {
             id: "offline",
@@ -117,4 +122,6 @@ export function useInitialChatSession({
     // Bootstraps the active conversation once; re-running on callback or i18n updates would create noisy chat reloads.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  return initialRoutingSettled;
 }

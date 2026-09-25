@@ -59,6 +59,7 @@ describe("shared starter actions", () => {
     expect(starter).toContain("metadata: { strategy_category:");
     expect(starter).not.toContain("captureGuestFunnelEvent");
     expect(guestExperience).toContain("startGuestSession");
+    expect(guestExperience).toContain("cancelPendingGuestBootstrap");
     expect(`${chat}\n${guestExperience}`).toContain("captureGuestFunnelEvent");
     const admissionOwner = guestExperience.slice(
       guestExperience.indexOf("const admitSend"),

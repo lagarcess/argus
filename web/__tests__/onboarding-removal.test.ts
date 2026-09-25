@@ -139,7 +139,7 @@ describe("onboarding strip-out: first use is ordinary chat", () => {
     expect(failClosedBranch).toBeGreaterThan(-1);
     const failClosed = init.slice(failClosedBranch, failClosedBranch + 220);
     expect(failClosed).toContain('setProfileState("unavailable")');
-    expect(failClosed).toContain('router.replace("/?auth=login")');
+    expect(failClosed).toContain("router.replace(currentAuthLoginPath())");
     expect(chat).toContain(
       'if (profileState === "probing" || profileState === "unavailable") {',
     );

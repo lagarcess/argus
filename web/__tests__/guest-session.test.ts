@@ -1,14 +1,24 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  bootstrapGuest,
+  cancelPendingGuestBootstrap,
   createGuestSessionBootstrapper,
   guestCaptchaPlanForEnvironment,
   guestCaptchaTokenForEnvironment,
+  resetGuestBootstrapRuntime,
+  startGuestSession,
 } from "../lib/guest-session";
 import { guestAccessEnabledFromEnv } from "../lib/private-alpha-flags";
 
 const root = join(import.meta.dir, "..");
+const originalFetch = globalThis.fetch;
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+  resetGuestBootstrapRuntime();
+});
 
 describe("guest session entry contract", () => {
   test("defaults Guest presentation on and keeps explicit false as a kill switch", () => {
@@ -69,6 +79,32 @@ describe("guest session entry contract", () => {
     await expect(bootstrapper.run("fail")).rejects.toThrow("failed");
     expect(await bootstrapper.run("recovered")).toBe("recovered");
     expect(calls).toBe(3);
+  });
+
+  test("an aborted bootstrap catch does not clear its replacement", async () => {
+    let rejectFirst!: (error: Error) => void;
+    let secondCalls = 0;
+    const bootstrapper = createGuestSessionBootstrapper(
+      async (value: string) => {
+        if (value === "first") {
+          return new Promise<string>((_resolve, reject) => {
+            rejectFirst = reject;
+          });
+        }
+        secondCalls += 1;
+        return value;
+      },
+    );
+
+    const first = bootstrapper.run("first");
+    bootstrapper.reset();
+    const second = bootstrapper.run("second");
+    rejectFirst(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    expect(await second).toBe("second");
+    expect(secondCalls).toBe(1);
+    expect(await bootstrapper.run("ignored")).toBe("second");
+    expect(secondCalls).toBe(1);
   });
 
   test("allows an explicit production-QA CAPTCHA token only for loopback", () => {
@@ -138,10 +174,25 @@ describe("guest session entry contract", () => {
   test("uses the existing server guest endpoint and persists the provider session", () => {
     const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
     const session = readFileSync(join(root, "lib/guest-session.ts"), "utf-8");
+    const captcha = readFileSync(join(root, "lib/guest-captcha.ts"), "utf-8");
 
     expect(session).toContain("export async function bootstrapGuest");
     expect(session).toContain('"/auth/guest"');
+    expect(session).toContain("attributionBody");
     expect(session).toContain("persistBrowserSession(response)");
+    expect(session).toContain("cancelPendingGuestBootstrap");
+    expect(session).toContain("persistGuestBootstrap");
+    expect(session).toContain("guestBootstrapAbort?.abort()");
+    expect(session).toContain("const signal = guestBootstrapAbort?.signal");
+    expect(session).toContain("if (pending === started) pending = null");
+    expect(session).toContain("acquireGuestCaptchaToken");
+    expect(session).toContain("if (signal?.aborted || !persistGuestBootstrap)");
+    expect(session).not.toContain("signal: guestBootstrapAbort?.signal");
+    expect(captcha).toContain("signal?: AbortSignal");
+    expect(captcha).toContain("Guest CAPTCHA cancelled.");
+    expect(session.indexOf("if (!persistGuestBootstrap)")).toBeLessThan(
+      session.lastIndexOf("persistBrowserSession(response)"),
+    );
     expect(api).toContain("if (error)");
   });
 
@@ -151,7 +202,7 @@ describe("guest session entry contract", () => {
       "utf-8",
     );
 
-    expect(entry).toContain('router.replace("/chat")');
+    expect(entry).toContain("router.replace(currentChatPath())");
     expect(entry).not.toContain("router.refresh()");
     expect(entry).not.toContain("@/lib/guest-session");
     expect(entry).not.toContain("startGuestSession");
@@ -166,5 +217,67 @@ describe("guest session entry contract", () => {
     expect(guestApi).toContain('"/auth/guest/signup"');
     expect(guestApi).toContain("persistBrowserSession(response)");
     expect(guestApi).not.toContain('"/auth/guest/link"');
+  });
+
+  test("cancel aborts the in-flight guest fetch so late cookies cannot land", async () => {
+    let seen: AbortSignal | undefined;
+    globalThis.fetch = (async (_input, init) => {
+      seen = init?.signal;
+      return new Promise((_resolve, reject) => {
+        const abort = () =>
+          reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+        if (init?.signal?.aborted) {
+          abort();
+          return;
+        }
+        init?.signal?.addEventListener("abort", abort, { once: true });
+      });
+    }) as typeof fetch;
+
+    const pending = startGuestSession("en", "token");
+    for (let i = 0; i < 20 && !seen; i += 1) {
+      await Promise.resolve();
+    }
+    expect(seen).toBeDefined();
+    expect(seen?.aborted).toBe(false);
+    cancelPendingGuestBootstrap();
+    expect(seen?.aborted).toBe(true);
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  test("bootstrapGuest stays bound to its request signal after a restart", async () => {
+    const fetches: AbortSignal[] = [];
+    globalThis.fetch = (async (_input, init) => {
+      if (init?.signal) fetches.push(init.signal);
+      return new Response(
+        JSON.stringify({ authenticated: true, account_kind: "guest" }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    await expect(startGuestSession("en", "live-token")).resolves.toMatchObject({
+      account_kind: "guest",
+    });
+    expect(fetches).toHaveLength(1);
+
+    const stale = new AbortController();
+    stale.abort();
+    await expect(
+      bootstrapGuest({
+        captcha_token: "stale-token",
+        language: "en",
+        signal: stale.signal,
+      }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetches).toHaveLength(1);
+
+    const owned = new AbortController();
+    await bootstrapGuest({
+      captcha_token: "owned-token",
+      language: "en",
+      signal: owned.signal,
+    });
+    expect(fetches).toHaveLength(2);
+    expect(fetches[1]).toBe(owned.signal);
   });
 });

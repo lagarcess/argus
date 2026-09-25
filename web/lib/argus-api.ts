@@ -38,6 +38,7 @@ import {
   resultMetricDisplayOrder,
 } from "./result-card-display";
 import { acquirePasswordAuthCaptchaToken } from "./guest-captcha";
+import { attributionBody } from "./landing-intent";
 import { resultReadoutContentFromMetadata, type ResultReadoutContent } from "./result-readout-content";
 import { resultReadoutFacts } from "./result-readout-facts";
 import {
@@ -655,13 +656,10 @@ export async function signupWithEmail(payload: {
   username?: string | null;
 }) {
   const captchaToken = await acquirePasswordAuthCaptchaToken();
-  const response = await unauthenticatedApiFetch<AuthResponsePayload>(
-    "/auth/signup",
-    {
-      method: "POST",
-      body: JSON.stringify({ ...payload, captcha_token: captchaToken }),
-    },
-  );
+  const response = await unauthenticatedApiFetch<AuthResponsePayload>("/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ ...payload, captcha_token: captchaToken, ...attributionBody() }),
+  });
   await persistBrowserSession(response);
   return { response, needsEmailConfirmation: !response.session };
 }

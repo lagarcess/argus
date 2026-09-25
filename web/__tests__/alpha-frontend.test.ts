@@ -2820,7 +2820,7 @@ describe("Argus Alpha frontend contract", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
 
     expect(page).toContain("await getMe()");
-    expect(page).toContain('router.replace("/chat")');
+    expect(page).toContain("router.replace(currentChatPath())");
     expect(page).toContain("skipAuthenticatedRedirect");
     expect(page).toContain("font-display text-6xl");
     expect(page).toContain("font-display flex w-full max-w-sm");
@@ -2863,7 +2863,7 @@ describe("Argus Alpha frontend contract", () => {
       "utf-8",
     );
 
-    expect(chatPage).toContain('redirect("/?auth=login")');
+    expect(chatPage).toContain("authLoginPathFromSearch");
     expect(chatPage).not.toContain('redirect("/login")');
     expect(chat).toContain('window.location.href = "/"');
     expect(chat).not.toContain('window.location.href = "/?auth=login"');
