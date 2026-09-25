@@ -14,6 +14,7 @@ def test_product_event_mapping_covers_measurement_lane_set() -> None:
         "recall_usage": ("tool_result", "completed", "recall"),
         "continuity_mismatch": ("recovery", "failed", "continuity"),
         "compare_started": ("compare_started", "started", "result_explanation"),
+        "next_experiments_offered": ("system", "completed", "result_explanation"),
         "eval_readiness": ("eval_suite_run", "completed", "chat_interpretation"),
         "account_registration_completed": ("storage", "completed", "guest_acquisition"),
     }
@@ -68,3 +69,28 @@ def test_capture_product_event_uses_shared_capture_path(monkeypatch) -> None:
         "result_count": 3,
         "product_event": "recall_usage",
     }
+
+
+def test_capture_product_event_unknown_kind_fails_open(monkeypatch) -> None:
+    captured = []
+
+    def fake_capture(envelope):  # noqa: ANN001
+        captured.append(envelope)
+        return EventCaptureResult(
+            status="captured",
+            reason=None,
+            event_id=envelope.event_id,
+            destination="posthog",
+        )
+
+    monkeypatch.setattr("argus.observability.product_events.capture_event", fake_capture)
+
+    result = capture_product_event(
+        "not_a_registered_product_event",
+        user_id="user-1",
+        conversation_id="conversation-1",
+    )
+
+    assert result.status == "failed"
+    assert result.reason == "unknown_product_event_kind"
+    assert captured == []

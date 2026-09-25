@@ -1204,8 +1204,8 @@ Current behavior:
 - `argus_observability_event/v1` is the canonical event-envelope schema.
 - Default privacy mode is `metadata_only`.
 - Product-event categories emitted to PostHog are evidence capture, decision
-  capture, recall usage, continuity mismatch, compare started, and eval
-  readiness.
+  capture, recall usage, continuity mismatch, compare started, next
+  experiments offered, and eval readiness.
 - The exact registered product-event name is carried as
   `attributes.product_event`; envelope `event_type` remains in the broader memo
   15.5 event taxonomy.

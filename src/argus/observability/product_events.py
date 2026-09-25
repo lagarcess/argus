@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import hashlib
 from typing import Any, Literal, cast
+from uuid import uuid4
+
+from loguru import logger
 
 from argus.observability.envelope import (
     ArgusEventEnvelope,
@@ -19,6 +22,7 @@ ProductEventKind = Literal[
     "recall_usage",
     "continuity_mismatch",
     "compare_started",
+    "next_experiments_offered",
     "eval_readiness",
     "receipt_created",
     "receipt_revoked",
@@ -35,6 +39,7 @@ _PRODUCT_EVENT_MAP: dict[ProductEventKind, tuple[EventType, EventAction, Feature
     "recall_usage": ("tool_result", "completed", "recall"),
     "continuity_mismatch": ("recovery", "failed", "continuity"),
     "compare_started": ("compare_started", "started", "result_explanation"),
+    "next_experiments_offered": ("system", "completed", "result_explanation"),
     "eval_readiness": ("eval_suite_run", "completed", "chat_interpretation"),
     # The receipt funnel. Viewer-side stages carry no actor and no source id, so
     # a public view can never be attributed back to the owner who shared it.
@@ -96,8 +101,8 @@ def capture_product_event(
     error_category: str | None = None,
     attributes: dict[str, Any] | None = None,
 ) -> EventCaptureResult:
-    return capture_event(
-        build_product_event(
+    try:
+        envelope = build_product_event(
             kind,
             user_id=user_id,
             conversation_id=conversation_id,
@@ -110,7 +115,18 @@ def capture_product_event(
             error_category=error_category,
             attributes=attributes,
         )
-    )
+    except KeyError:
+        logger.warning(
+            "Unknown product event kind",
+            product_event=kind,
+        )
+        return EventCaptureResult(
+            status="failed",
+            reason="unknown_product_event_kind",
+            event_id=str(uuid4()),
+            destination=None,
+        )
+    return capture_event(envelope)
 
 
 def actor_hash_for_user(user_id: str | None) -> str | None:
