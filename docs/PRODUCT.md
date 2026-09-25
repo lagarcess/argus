@@ -566,8 +566,11 @@ simulations over its fixed lifetime, plus five feedback submissions.
 Conversation is not an allowance: it is free, and the usage panel says so with
 no limit. An anonymous endpoint is still not unbounded, so guest turns carry a
 silent anti-abuse ceiling per visitor per day, sized so no real person reaches
-it; it is never rendered or promised as an allowance, and a signed-in account
-carries none. A fresh session cannot mint a fresh daily allowance—the visitor
+it; it is never rendered or promised as an allowance. A signed-in account
+carries its own silent daily chat ceiling (200, `ARGUS_REGISTERED_DAILY_TURN_CEILING`)
+and a daily research ceiling (15, `ARGUS_REGISTERED_DAILY_RESEARCH_CEILING`) so
+one login cannot run unbounded LLM spend. Those caps are never projected as
+allowances. Honest heavy chat users can hit 200 in a day. A fresh session cannot mint a fresh daily allowance—the visitor
 counter keys on a keyed digest of the caller—and Start over preserves the
 workspace counters. Simulations keep a workspace-keyed reservation as replay
 identity; the visitor charge beside it is best-effort past admission, and

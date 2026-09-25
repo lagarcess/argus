@@ -6,12 +6,16 @@ from unittest.mock import patch
 
 from argus.api.client_ip import (
     DEFAULT_TRUSTED_CLIENT_IP_HEADER,
+    canonical_client_ip,
     reset_trusted_header_fallback_warning_for_tests,
     resolve_client_ip,
     trusted_client_ip_header_name,
 )
 from argus.api.guest_access import client_identity
-from argus.domain.visitor_usage import guest_session_compute_key
+from argus.domain.visitor_usage import (
+    guest_session_compute_key,
+    registered_account_usage_key,
+)
 from starlette.requests import Request
 
 
@@ -83,6 +87,14 @@ def test_session_compute_key_is_the_authenticated_guest_id() -> None:
     assert guest_session_compute_key("  ") == "session:unknown"
 
 
+def test_registered_compute_key_is_the_signed_in_account_id() -> None:
+    assert (
+        registered_account_usage_key("00000000-0000-0000-0000-000000000001")
+        == "user:00000000-0000-0000-0000-000000000001"
+    )
+    assert registered_account_usage_key("  ") == "user:unknown"
+
+
 def test_configured_header_is_the_only_trusted_read(monkeypatch) -> None:
     monkeypatch.setenv("ARGUS_TRUSTED_CLIENT_IP_HEADER", "True-Client-IP")
     request = _request(
@@ -119,6 +131,26 @@ def test_hosted_fallback_warns_once_per_minute(monkeypatch) -> None:
         assert warning.call_args.kwargs["peer"] == "10.0.0.8"
 
 
+def test_hosted_invalid_trusted_header_warns_separately_and_throttles(
+    monkeypatch,
+) -> None:
+    _hosted_env(monkeypatch)
+    request = _request(
+        headers={"CF-Connecting-IP": "not-an-ip; drop table"},
+        peer="10.0.0.8",
+    )
+    with patch("argus.api.client_ip.logger.warning") as warning:
+        assert resolve_client_ip(request) == "10.0.0.8"
+        assert resolve_client_ip(request) == "10.0.0.8"
+        warning.assert_called_once()
+        assert (
+            warning.call_args.args[0]
+            == "Trusted client-IP header present but invalid; using socket peer"
+        )
+        assert warning.call_args.kwargs["header"] == "CF-Connecting-IP"
+        assert warning.call_args.kwargs["peer"] == "10.0.0.8"
+
+
 def test_local_dev_fallback_does_not_warn(monkeypatch) -> None:
     monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "memory")
     monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "true")
@@ -127,6 +159,47 @@ def test_local_dev_fallback_does_not_warn(monkeypatch) -> None:
     with patch("argus.api.client_ip.logger.warning") as warning:
         assert resolve_client_ip(request) == "192.0.2.10"
         warning.assert_not_called()
+
+
+def test_invalid_trusted_header_falls_back_to_peer() -> None:
+    request = _request(
+        headers={"CF-Connecting-IP": "not-an-ip; drop table"},
+        peer="192.0.2.10",
+    )
+    assert resolve_client_ip(request) == "192.0.2.10"
+
+
+def test_invalid_header_and_unparseable_peer_keeps_the_peer() -> None:
+    request = _request(headers={"CF-Connecting-IP": "garbage"}, peer="also-garbage")
+    assert resolve_client_ip(request) == "also-garbage"
+
+
+def test_invalid_header_and_missing_peer_fall_back_to_unknown() -> None:
+    request = _request(headers={"CF-Connecting-IP": "garbage"}, peer=None)
+    assert resolve_client_ip(request) == "unknown"
+
+
+def test_ipv6_addresses_in_the_same_64_map_to_the_same_key() -> None:
+    first = canonical_client_ip("2001:db8:1:2:aaaa::1")
+    second = canonical_client_ip("2001:db8:1:2:bbbb::2")
+    assert first == second == "2001:db8:1:2::/64"
+    request_a = _request(headers={"CF-Connecting-IP": "2001:db8:1:2:aaaa::1"})
+    request_b = _request(headers={"CF-Connecting-IP": "2001:db8:1:2:bbbb::2"})
+    assert resolve_client_ip(request_a) == resolve_client_ip(request_b) == first
+
+
+def test_ipv6_addresses_in_different_64s_map_to_different_keys() -> None:
+    first = canonical_client_ip("2001:db8:1:2::1")
+    second = canonical_client_ip("2001:db8:1:3::1")
+    assert first == "2001:db8:1:2::/64"
+    assert second == "2001:db8:1:3::/64"
+    assert first != second
+
+
+def test_ipv4_stays_per_address() -> None:
+    assert canonical_client_ip("203.0.113.50") == "203.0.113.50"
+    assert canonical_client_ip("203.0.113.51") == "203.0.113.51"
+    assert canonical_client_ip("::ffff:192.0.2.10") == "192.0.2.10"
 
 
 def test_hosted_trusted_header_does_not_warn(monkeypatch) -> None:

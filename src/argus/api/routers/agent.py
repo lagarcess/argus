@@ -276,7 +276,7 @@ async def chat_stream(
     turn_client_identity = client_identity(request)
     turn_visitor_key = visitor_key_for(turn_client_identity)
     turn_guest_research_key = guest_research_visitor_key(
-        is_guest=turn_is_guest, client_identity=turn_client_identity
+        is_guest=turn_is_guest, client_identity=turn_client_identity, user_id=user.id
     )
     clean_idempotency_key = validated_optional_idempotency_key(
         request,

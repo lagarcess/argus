@@ -128,7 +128,9 @@ so one workspace hopping IPs cannot inherit the shared-NAT headroom. A
 guest hits whichever remaining count is lower. The unit is claimed
 atomically at turn start (`claim_guest_compute_usage`); a failed turn
 keeps the claim. The visitor IP comes from `CF-Connecting-IP` by default
-(`ARGUS_TRUSTED_CLIENT_IP_HEADER`), never from `X-Forwarded-For`. These
+(`ARGUS_TRUSTED_CLIENT_IP_HEADER`), never from `X-Forwarded-For`. IPv4
+keys stay per-address. IPv6 keys group by the address `/64` so rotating
+addresses inside one prefix cannot mint a fresh visitor row. These
 ceilings are not an allowance: `GET /me/usage` reports conversation as
 unbounded and never projects this counter, and no product surface names
 it. At either ceiling `POST /chat/stream` answers the same `429` shape
@@ -136,8 +138,15 @@ with `code: "too_many_requests"` and `Retry-After` set to the seconds
 until the UTC day resets. A claim that cannot run (missing RPC,
 persistence error) is not a daily cap: `POST /chat/stream` answers
 `503` with `code: "guest_compute_claim_unavailable"` and a short
-`Retry-After`. Run actions are execution and do not count;
-signed-in accounts carry no such ceiling.
+`Retry-After`. Run actions are execution and do not count.
+Signed-in accounts carry their own daily chat ceiling, default 200
+(`ARGUS_REGISTERED_DAILY_TURN_CEILING`), claimed atomically at turn
+start (`claim_registered_compute_usage`) against `user:<account id>`
+on `account_compute_turns`. A failed turn keeps the claim. At the
+ceiling `POST /chat/stream` answers the same `429` copy and shape
+guests get. A claim that cannot run answers `503` with
+`code: "registered_compute_claim_unavailable"` and the same short
+`Retry-After`. `GET /me/usage` still reports conversation as unbounded.
 
 Supported rate-limit headers where applicable:
 - `X-RateLimit-Limit`
@@ -2916,9 +2925,9 @@ Three operation classes, one meter each:
 - Every class carries the same five keys. An unbounded class has every window
   `null`, `available_now: true`, and `limiting_window: null`. `compute` is
   always unbounded. `grounding` is unbounded for a signed-in account while the
-  research rail is on: no per-account research window exists, only the shared
-  daily ceiling, which is a circuit breaker rather than an allowance and is
-  not projected here.
+  research rail is on: the per-account research cap and the shared daily
+  ceiling are anti-abuse circuit breakers rather than allowance windows and
+  are not projected here.
 - `grounding` reports the counter the live retrieval rail claims. Rail on, that
   is `research_searches`: guests receive the visitor-owned UTC `day` window of
   three. Rail off, it is `discovery_searches`: guests receive two per visitor
@@ -4285,9 +4294,16 @@ Contract rules:
   shared daily ceiling and the optional visitor-keyed guest allowance, then
   increments both or neither. Two concurrent turns from the same visitor can
   consume at most the slots that remained when they arrived. Guests receive
-  three provider-backed research questions per UTC day; signed-in users have
-  no separate per-user research allowance, but every provider attempt uses the
-  shared ceiling. `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` defaults to `5000`.
+  three provider-backed research questions per UTC day. Signed-in users
+  receive 15 provider-backed research questions per UTC day
+  (`ARGUS_REGISTERED_DAILY_RESEARCH_CEILING`), claimed on
+  `user:<account id>` in the same `claim_research_usage` transaction as the
+  shared ceiling. A failed provider attempt refunds that per-account row
+  through `release_research_usage`, the same way a guest question is
+  returned. Every provider attempt also uses the shared ceiling.
+  `ARGUS_RESEARCH_GLOBAL_DAILY_CEILING` defaults to `5000`.
+  `GET /me/usage` still leaves signed-in `grounding` unbounded: the
+  per-account research cap is anti-abuse, not an allowance window.
   `GET /me/usage` projects this meter as the `grounding` operation class.
   Ordinary chat turns, cache hits, unconfigured-provider paths, and idempotent
   persisted thorough-job replays do not claim capacity. An unreadable or

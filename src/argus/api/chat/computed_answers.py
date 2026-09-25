@@ -330,7 +330,10 @@ async def refresh_computed_answer(
         retrieved_pages,
     )
     from argus.agent_runtime.research_query import ResearchQueryExtraction
-    from argus.api.chat.research_evidence import claim_research_provider_attempt
+    from argus.api.chat.research_evidence import (
+        claim_research_provider_attempt,
+        release_research_provider_claim,
+    )
     from argus.domain.capability_registry import get_tool_catalog
     from argus.domain.research.admission import (
         claim_current_research_attempt,
@@ -385,7 +388,12 @@ async def refresh_computed_answer(
     )
     spend = grounded._TurnSpend()
     with research_attempt_admission_context(
-        lambda: claim_research_provider_attempt(guest_visitor_key=guest_visitor_key)
+        lambda: claim_research_provider_attempt(
+            guest_visitor_key=guest_visitor_key
+        ),
+        release=lambda admission: release_research_provider_claim(
+            admission, guest_visitor_key=guest_visitor_key
+        ),
     ):
         admission = claim_current_research_attempt()
         if not admission.available:
