@@ -60,6 +60,7 @@ export function guestClaimErrorRetryAction(input: {
   retryAction: ChatActionOption | null;
   message: string;
   assistantMessageId: string;
+  chatAction?: ChatActionOption | null;
 }): ChatActionOption | null {
   if (!isGuestComputeClaimUnavailable(input.code)) {
     return input.retryAction;
@@ -68,6 +69,7 @@ export function guestClaimErrorRetryAction(input: {
     input.retryAction ??
     retryLastTurnActionFromMessage(input.message, {
       assistantMessageId: input.assistantMessageId,
+      chatAction: input.chatAction ?? undefined,
     })
   );
 }
@@ -94,6 +96,7 @@ export function guestClaimErrorMessagePatch(input: {
   retryAction: ChatActionOption | null;
   message: string;
   assistantMessageId: string;
+  chatAction?: ChatActionOption | null;
   nowMs?: number;
 }) {
   return guestComputeClaimTransportPatch({
