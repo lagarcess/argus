@@ -189,7 +189,7 @@ import {
 } from "./types";
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
-  chatActionRequestFromAction, chatHttpErrorDisplay,
+  chatActionRequestFromAction, chatHttpErrorDisplay, guestComputeClaimTransportPatch,
   applyEmptyFinalFallback,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
@@ -1753,6 +1753,7 @@ export default function ChatInterface() {
                           : isRateLimit
                             ? m.recoveryDisplay
                             : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
+                        ...guestComputeClaimTransportPatch({ code: rejectionCode, retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null, retryAction: retryLastTurnAction }),
                       }
                     : m,
                 ),
