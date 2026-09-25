@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Lock
-from types import SimpleNamespace
-from typing import Any
 
 import pytest
 from argus.api import state as api_state
@@ -23,16 +21,23 @@ from argus.domain.visitor_usage import (
     visitor_key_for,
 )
 
-from tests.test_allowance_accounting import client, mock_gateway
+from tests.test_allowance_accounting import client
 from tests.test_client_ip import _request
-from tests.test_guest_compute_ceiling import GUEST_HEADERS, TURN, _guest
+from tests.test_guest_compute_ceiling import (
+    GUEST_HEADERS,
+    TURN,
+    _guest,
+    mock_gateway,
+)
+
+__all__ = ["mock_gateway"]
 
 
 def test_spoofed_xff_from_one_session_hits_the_same_cap(
     mock_gateway, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("ARGUS_GUEST_SESSION_DAILY_TURN_CEILING", "50")
-    fake = _guest(mock_gateway, monkeypatch, turns_today=299)
+    fake = _guest(mock_gateway, monkeypatch, turns_today=299, session_used=0)
 
     first = client.post(
         "/api/v1/chat/stream",
@@ -121,7 +126,7 @@ def test_concurrent_endpoint_claims_reject_the_overshoot(
     mock_gateway, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("ARGUS_GUEST_SESSION_DAILY_TURN_CEILING", "50")
-    fake = _guest(mock_gateway, monkeypatch, turns_today=299)
+    fake = _guest(mock_gateway, monkeypatch, turns_today=299, session_used=0)
     barrier = Barrier(6)
 
     def _turn(xff: str) -> int:

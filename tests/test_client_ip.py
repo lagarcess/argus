@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from starlette.requests import Request
-
 from argus.api.client_ip import (
     DEFAULT_TRUSTED_CLIENT_IP_HEADER,
     resolve_client_ip,
@@ -11,6 +9,7 @@ from argus.api.client_ip import (
 )
 from argus.api.guest_access import client_identity
 from argus.domain.visitor_usage import guest_session_compute_key
+from starlette.requests import Request
 
 
 def _request(
