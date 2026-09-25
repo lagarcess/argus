@@ -380,3 +380,47 @@ def test_signed_in_turn_still_claims_one_unit_after_lookup(
     assert response.status_code == 200, response.text
     assert fake.claims == 1
     assert fake.used == 6
+
+
+def test_over_cap_retest_is_refused_before_market_data_coverage(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from argus.api.chat import retest
+    from argus.domain.retest_setup import RetestDossierAvailability
+
+    fake = _registered(mock_gateway, monkeypatch, turns_today=200)
+    monkeypatch.delenv("ARGUS_REGISTERED_DAILY_TURN_CEILING", raising=False)
+    setup = SimpleNamespace(source_run_id="run-1")
+    monkeypatch.setattr(retest, "_owned_retest_setup", lambda **_: setup)
+    monkeypatch.setattr(
+        retest,
+        "retest_dossier_availability",
+        lambda _setup: RetestDossierAvailability(state="new_data_available"),
+    )
+    monkeypatch.setattr(retest, "repaired_retest_setup", lambda s, _a: s)
+    coverage_calls: list[Any] = []
+    monkeypatch.setattr(
+        retest,
+        "prepare_retest_confirmation_payload",
+        lambda *args, **kwargs: coverage_calls.append(args),
+    )
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={
+            "conversation_id": "conv-1",
+            "action": {
+                "type": "retest_run",
+                "payload": {
+                    "source_run_id": "00000000-0000-4000-8000-0000000000aa",
+                    "window_policy": "preserve_start_ending_latest_available",
+                    "contract_version": "argus_retest_run/v2",
+                },
+            },
+        },
+        headers=REGISTERED_HEADERS,
+    )
+
+    assert response.status_code == 429, response.text
+    assert coverage_calls == []
+    assert fake.claims == 0
