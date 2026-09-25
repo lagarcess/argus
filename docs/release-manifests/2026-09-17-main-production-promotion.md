@@ -46,19 +46,22 @@ Status: production promotion authorized and in progress. The local stop recorded
 
 ## Live Eval Evidence
 
-- Live eval scorecard: `docs/reports/evidence/2026-09-17-main-promotion/candidate-scorecard-3cecda69.json`
+The four live-eval and A/B JSON files for this promotion live on `main` at
+`a9286b21`. They are not copied into this branch.
+
+- Live eval scorecard on main: [candidate-scorecard-3cecda69.json](https://github.com/lagarcess/argus/blob/a9286b21/docs/reports/evidence/2026-09-17-main-promotion/candidate-scorecard-3cecda69.json)
 - Live eval measured SHA: `3cecda6933399e53f6ea00edc8004a88d7eefad4`
 - Candidate result: **70 passed, 3 failed**, zero expected failures, unexpected passes, skipped cases, or infrastructure errors. Native pytest exit 1 because of the three failures.
 - Candidate fixture identity: 73 cases; SHA-256 `ca6ff99bf46bc1ea4a7f02088e54ed27fef685b1c02eb711f935456e47dcbe22`.
 - Candidate usage: 381 route receipts; 359 with reported cost totaling **$1.575079614852**; 22 have no reported cost. This is not a complete billed-spend total.
 - Candidate duration: native pytest **2379.17 seconds**.
-- Baseline eval scorecard: `docs/reports/evidence/2026-09-17-main-promotion/baseline-scorecard-3d98057c.json`
+- Baseline eval scorecard on main: [baseline-scorecard-3d98057c.json](https://github.com/lagarcess/argus/blob/a9286b21/docs/reports/evidence/2026-09-17-main-promotion/baseline-scorecard-3d98057c.json)
 - Baseline result: **68 passed, 3 failed**, zero other statuses; native pytest exit 1, **2203.35 seconds**. 363 route receipts, 342 reported costs totaling **$1.555157101776**, 21 costs unreported. Native schema-v2 original is retained unchanged as `docs/reports/evidence/2026-09-17-main-promotion/baseline-native-original-schema2.json`.
 - Full case comparison: `docs/reports/evidence/2026-09-17-main-promotion/full-suite-comparison.json`.
 - Baseline measured SHA: `3d98057c1e722317f0243fb96fb647771ddae484`; 71 native fixtures, digest `a48b14730a14578639e41dd27a15f27e3981208298fa7e68e477da7b159bcf6b`.
 - Candidate-only additions are the English and Spanish explicit-end-date/year-qualifier cases; both passed. Existing fixture differences are only a DCA comment, not changed assertions.
-- Targeted A/B baseline: `docs/reports/evidence/2026-09-17-main-promotion/spanish-scenario-ab-baseline.json`, measured SHA `3d98057c1e722317f0243fb96fb647771ddae484`; empty-table defect **0/10 (0%)**.
-- Targeted A/B candidate: `docs/reports/evidence/2026-09-17-main-promotion/spanish-scenario-ab-candidate.json`, measured SHA `3cecda6933399e53f6ea00edc8004a88d7eefad4`; empty-table defect **0/10 (0%)**.
+- Targeted A/B baseline on main: [spanish-scenario-ab-baseline.json](https://github.com/lagarcess/argus/blob/a9286b21/docs/reports/evidence/2026-09-17-main-promotion/spanish-scenario-ab-baseline.json), measured SHA `3d98057c1e722317f0243fb96fb647771ddae484`; empty-table defect **0/10 (0%)**.
+- Targeted A/B candidate on main: [spanish-scenario-ab-candidate.json](https://github.com/lagarcess/argus/blob/a9286b21/docs/reports/evidence/2026-09-17-main-promotion/spanish-scenario-ab-candidate.json), measured SHA `3cecda6933399e53f6ea00edc8004a88d7eefad4`; empty-table defect **0/10 (0%)**.
 - A/B order: `docs/reports/evidence/2026-09-17-main-promotion/targeted-execution-order.json`; ten serial rounds, baseline then candidate, no manual retries. All 20 native attempts, original judge output, and text-based defect reviews are embedded in the side documents.
 - The baseline published research in 4/10 attempts, had 5 research-publication failures and 1 routing refusal. The candidate published in 5/10, had 3 publication failures and 2 routing refusals. Among published answers the specific defect was also 0/4 baseline and 0/5 candidate. This small sample does not prove equivalence or general reliability.
 - A/B reported receipt cost: baseline **$0.08631723848** (2 unreported), candidate **$0.18516206244** (7 unreported); sum of native case durations **2177.61 seconds**. All promotion live measurements total **$3.401716017548 reported**, 827 route receipts with 52 unreported costs. Provider billing may include costs not represented here.
