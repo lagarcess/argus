@@ -262,3 +262,82 @@ def test_refusal_observer_fires_after_the_entry_claim(
     assert len(observed) == 1
     assert observed[0].response_message_id in _terminal_message_ids(mock_gateway)
     assert observed[0].request_message_id != observed[0].response_message_id
+
+
+SPENT_CONFIRMATION_REPLAY = {
+    "conversation_id": "conv-1",
+    "action": {
+        "type": "change_dates",
+        "label": "Change dates",
+        "presentation": "confirmation",
+        "payload": {"confirmation_id": "confirmation-spent"},
+    },
+}
+REPLAY_HEADERS = {"Idempotency-Key": "replay-key-1"}
+
+
+def test_replayed_idempotency_key_does_not_consume_a_guest_unit(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+):
+    """A replay the server rejects before model work is not a question.
+
+    Ordinary turns have no stored idempotency record, so the replay the
+    route can recognize is one whose card is no longer active (409).
+    """
+    fake = _guest(mock_gateway, monkeypatch, turns_today=5)
+
+    first = client.post(
+        "/api/v1/chat/stream",
+        json=SPENT_CONFIRMATION_REPLAY,
+        headers={**GUEST_HEADERS, **REPLAY_HEADERS},
+    )
+    replay = client.post(
+        "/api/v1/chat/stream",
+        json=SPENT_CONFIRMATION_REPLAY,
+        headers={**GUEST_HEADERS, **REPLAY_HEADERS},
+    )
+
+    assert first.status_code == replay.status_code == 409, replay.text
+    assert fake.claims == 0
+    assert fake.visitor_used == 5
+    assert fake.session_used == 5
+    mock_gateway.create_message.assert_not_called()
+
+
+def test_unknown_conversation_404_does_not_consume_a_guest_unit(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+):
+    fake = _guest(mock_gateway, monkeypatch, turns_today=5)
+    mock_gateway.get_conversation.return_value = None
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={**TURN, "conversation_id": "conv-unknown"},
+        headers=GUEST_HEADERS,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "not_found"
+    assert fake.claims == 0
+    assert fake.visitor_used == 5
+    assert fake.session_used == 5
+
+
+def test_unknown_conversation_404_wins_over_the_guest_daily_cap(
+    mock_gateway, monkeypatch: pytest.MonkeyPatch
+):
+    from argus.domain.usage_limits import GUEST_COMPUTE_DAILY_CEILING
+
+    fake = _guest(
+        mock_gateway, monkeypatch, turns_today=GUEST_COMPUTE_DAILY_CEILING
+    )
+    mock_gateway.get_conversation.return_value = None
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={**TURN, "conversation_id": "conv-unknown"},
+        headers=GUEST_HEADERS,
+    )
+
+    assert response.status_code == 404
+    assert fake.claims == 0
