@@ -1,6 +1,6 @@
 # Local verification
 
-Runtime commit: `14128e8e8e810f5f2959fb477935697cba1e0c77` (account-scoped composer notice and lifecycle).
+Runtime commit: `bd889e41d8d2e429081254a2033d747232370230` (account-scoped composer notice and lifecycle).
 Original and freshly fetched integration base: `6747ff3193687c885f9647d0af265e0af906ceb0`.
 No intervening integration commits; no reconciliation merge or semantic overlap.
 
@@ -13,7 +13,7 @@ No intervening integration commits; no reconciliation merge or semantic overlap.
 | Configured chat reset contract plus guest/signed-in claim regressions | 38 passed |
 | `poetry run python scripts/check_modularity_budget.py` | Passed on current integration plus package tree |
 | `poetry run pytest tests/test_modularity_budget.py -q --no-cov` | 8 passed |
-| Playwright package acceptance | 31 passed; EN/es-419; 360px/1280px; full notice lifecycle; 3 final admission-boundary cases passed |
+| Playwright package acceptance | 31 passed; EN/es-419; 360px/1280px; full notice lifecycle; 4 final admission-boundary cases passed |
 | Baseline screenshot capture | 12 passed on integration runtime |
 
 Backend command:

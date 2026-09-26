@@ -2,21 +2,23 @@
 
 ## Final admission-boundary revalidation
 
-Runtime commit: `14128e8e8e810f5f2959fb477935697cba1e0c77`.
-A completed structured action may bypass the question allowance, so only a
-successful plain question clears the notice early. Success also checks that
-no newer rejection replaced the observation since that question began; an
-older background response cannot erase a newer cap. Unit coverage verifies
-this observation ordering. All **3 focused browser cases passed** in 5.3 seconds: structured-action
-preservation after reload, successful-question clearing, and successful-question
-clearing after navigation. Results are retained in
-[playwright-admission-boundary.txt](playwright-admission-boundary.txt).
+Runtime commit: `bd889e41d8d2e429081254a2033d747232370230`.
+Successful ordinary chat turns, including structured response choices, retries,
+and retests, clear stale notices. This derives from the existing request kind:
+backtests already use `backtest_job`, and cancellation has its separate handler.
+Neither cap-exempt path clears the notice. No second action taxonomy was added.
+
+Success also checks that no newer rejection replaced the observation since that
+request began; an older background response cannot erase a newer cap. Unit
+coverage verifies this ordering. All **4 focused browser cases passed** in 6.7 seconds: structured success,
+cancellation, plain-question success, and success after navigation. Results are
+retained in [playwright-admission-boundary.txt](playwright-admission-boundary.txt).
 
 The final change does not alter the notice's rendering, placement, wording,
 reset calculation, or dismissal/expiry behavior. The complete 31-case run and
-16 captures below remain applicable; the focused follow-up checks the changed
-success path and structured-action preservation. Full web tests (2,182), lint,
-production build and modularity pass after this delta.
+16 captures below remain applicable; focused revalidation checks the changed
+success path. Full web tests (2,182), lint, production build and modularity have
+passed; exact-head CI and Codex review are recorded in the final PR audit.
 
 ## Composer notice and lifecycle
 

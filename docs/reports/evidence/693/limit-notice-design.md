@@ -14,8 +14,10 @@ on an authorized successful question, or when the account changes/signs out.
 Focus and visibility checks handle a sleeping browser. Closing the tab ends its
 session storage. The composer remains editable and manual sending stays available:
 the server owns admission and different actions can use different allowances.
-Only a successful question clears the notice early; completing a structured
-action such as a backtest or cancellation does not prove the question cap lifted.
+A successful ordinary chat turn, including a response choice, retry, or retest,
+clears the notice early. Backtests and cancellation use separate existing request
+paths and do not prove the question cap lifted. The clearing gate derives from
+the existing request kind; it does not introduce another action allowlist.
 
 Only account ID, reset instant, and dismissal state are stored through the
 registered session-storage helper. No question, answer, or localized copy is
