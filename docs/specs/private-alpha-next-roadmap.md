@@ -8,10 +8,9 @@ board in the historical body below are dated context. The interim pivot that
 this document waited on completed with the 2026-08-05 production promotion and
 is archived at
 [`docs/archive/private-alpha-interim-roadmap.md`](../archive/private-alpha-interim-roadmap.md).
-The P2 compounding loop referenced below is now carried by the active board:
-A1b linked versions and A2 comparison are its product-memory item. Keep reading
-this document for P2 history, the execution-realism contract, and slice
-provenance. Do not take work from it.
+The P2 compounding loop, A1b linked versions, and A2 comparison below are
+historical scope. Use this document for P2 history, the execution-realism
+contract, and slice provenance. Do not take work from its dated queue.
 
 P2.0 + P2.1 remain done. The Gate A/B loop landed through
 2026-07-07: refine routing

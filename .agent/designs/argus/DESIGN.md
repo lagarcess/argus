@@ -1,28 +1,29 @@
 # Design System Inspired by Argus
 
-> **Experience authority — September 26, 2026:** Preserve the Argus visual
-> identity, typography, chat detail, accessibility, and motion conventions here.
-> The [MVEE](../../../docs/specs/argus-minimum-viable-ecosystem-experience.md)
-> owns the approved ecosystem structure, household contexts, native platform
-> intent, and mobile glass navigation direction. These are experience decisions,
-> not shipped UI or a selected native implementation. See the
-> [authority map](../../../docs/DOCUMENTATION_AUTHORITY.md).
+This guide owns Argus visual conventions and existing interaction detail. The
+[MVEE](../../../docs/specs/argus-minimum-viable-ecosystem-experience.md) owns
+surface structure, household contexts, and product behavior. New native
+implementations and exact glass materials require design/engineering work.
 
 ## 1. Visual Theme & Atmosphere
 
-Argus's design system communicates that investing ideas are handled with clarity, care, and confidence through massive typography, generous whitespace, and a disciplined neutral palette. This system is designed for risk-free idea testing, ensuring the user feels empowered rather than intimidated. The visual language is built on Space Grotesk, a geometric grotesque that creates billboard-scale headlines at 136px with weight 500 and aggressive negative tracking (-2.72px). This isn't subtle branding; it's clarity at stadium scale.
+Argus should feel elegant, modern, crisp, and trustworthy across personal and
+household finances. Preserve Space Grotesk display typography, Inter body text,
+generous whitespace, and the restrained neutral palette. Existing large
+marketing-hero sizes are surface-specific examples, not default sizes for
+mobile financial screens.
 
 The color system is built on a comprehensive `--rui-*` (Argus UI) token architecture with semantic naming for every state: danger (`#e23b4a`), warning (`#ec7e00`), teal (`#00a87e`), blue (`#494fdf`), deep-pink (`#e61e49`), and more. But the marketing surface itself is remarkably restrained — near-black (`#191c1f`) and pure white (`#ffffff`) dominate, with the colorful semantic tokens reserved for the product interface, not the marketing page.
 
 What distinguishes Argus is its pill-everything button system. Every button uses 9999px radius — primary dark (`#191c1f`), secondary light (`#f4f4f4`), outlined (`transparent + 2px solid`), and ghost on dark (`rgba(244,244,244,0.1) + 2px solid`). The padding is generous (14px 32px–34px), creating large, confident touch targets. Combined with Inter for body text at various weights and positive letter-spacing (0.16px–0.24px), the result is a design that feels both premium and accessible — banking for the modern era.
 
 **Key Characteristics:**
-- Space Grotesk display at 136px weight 500 — billboard-scale fintech headlines
+- Space Grotesk weight 500; 136px is a large marketing-hero example, not a mobile default
 - Near-black (`#191c1f`) + white binary with comprehensive `--rui-*` semantic tokens
 - Universal pill buttons (9999px radius) with generous padding (14px 32px)
 - Inter for body text with positive letter-spacing (0.16px–0.24px)
 - Rich semantic color system: blue, teal, pink, yellow, green, brown, danger, warning
-- Zero shadows detected — depth through color contrast only
+- Flat content surfaces with depth through contrast; glass mobile navigation follows the MVEE
 - Tight display line-heights (1.00) with relaxed body (1.50–1.56)
 
 ## 2. Color Palette & Roles
@@ -158,7 +159,7 @@ The MVEE owns the pivot navigation and header behavior; retain the following as 
 - Apply positive letter-spacing on Inter body text
 
 ### Don't
-- Don't use shadows — Argus is flat by design
+- Keep content surfaces flat; the approved mobile navigation may use a glass material and appropriate elevation.
 - Don't use bold (700) for Space Grotesk headings — 500 is the weight
 - Don't use small buttons — the generous padding is intentional
 - Don't apply semantic colors to marketing surfaces — they're for the product
@@ -191,8 +192,8 @@ _Design targets below are intentional for this system; if implementation keeps T
 
 ### Iteration Guide
 1. Space Grotesk 500 for headings — never bold.
-2. All buttons are pills (9999px) with visible labels.
-3. Zero shadows — flat is the Argus identity.
+2. Keep pill action styling; compact icon-only navigation is allowed with accessible names and a clear selected state.
+3. Flat content surfaces; glass mobile navigation follows the MVEE direction.
 4. Muted semantic colors — never terminal neon.
 5. Calm motion and status language for trust.
 
@@ -200,9 +201,9 @@ _Design targets below are intentional for this system; if implementation keeps T
 
 - **Preserve chat within the ecosystem**: Existing chat behavior remains valuable. The MVEE owns the roles of chat and the other surfaces; manual entry and direct controls are first-class paths.
 - **Not a Dashboard**: Argus should never feel like a dashboard-first backtesting tool.
-- **Conversational Progressive Disclosure**: Use AI to guide the user through complexity rather than presenting dense configuration screens.
+- **Progressive Disclosure**: Offer clear summaries and focused detail through conversation or direct controls. Manual entry must work without AI.
 - **Trust Through Honesty**: Result cards must be simple, trustworthy, and explanation-ready.
-- **Frictionless Revisit**: Every screen should reduce the distance between a user and their next (or prior) idea.
+- **Frictionless Revisit**: Help people resume a record, plan, question, or comparison without rebuilding context.
 - **Anti-Clutter**: Avoid dense tables, multi-tab parameter overload, and "trading terminal" noise.
 
 ## 11. Primary Chat Interface
@@ -392,7 +393,7 @@ using this locked precedence:
 ## 15. Settings and Feedback UX
 
 - **Core Settings**: Visible support for Language, Theme, Feedback, Account, Recently Deleted, and Archived Chats.
-- **Feature Guarding**: Notifications and Subscriptions are hidden/flagged for Alpha.
+- **Feature Guarding**: Show only implemented, authorized controls. The MVEE approves Updates and household settings; their availability follows the assigned implementation and rollout, not this design guide.
 - **Accessible Feedback**: Simple conversational or form-based entry accessible from the settings surface.
 
 ## 16. Language & Localization UX
@@ -407,7 +408,7 @@ using this locked precedence:
 
 - **Accidental Zoom Prevention**: All input fields (text, select, textarea) must use a **Minimum 16px Font Size** to prevent iOS auto-zoom.
 - **Generous Tap Targets**: All interactive elements (buttons, chips, nav) must meet the **44px minimum** hit area.
-- **Web/PWA Focus**: Avoid "Desktop-only" dashboard patterns. Layouts should stack gracefully for narrow screens.
+- **Phone-first Layout**: Design for native iOS/Android and responsive web. Existing web/PWA details do not decide the native architecture. Avoid desktop-only dashboard patterns.
 
 ## 18. Product Anti-Patterns
 
@@ -415,7 +416,7 @@ Argus is **NOT**:
 - **Spreadsheet Software**: No dense data grids or cell-based parameter inputs.
 - **Broker Terminal**: No aggressive red/green neon or complex multi-pane layouts.
 - **Toy Trading Game**: No "gamified" badges or misleading profit claims.
-- **Multi-form Wizard**: No rigid, step-by-step forms. Prefer conversational gathering of intent.
+- **Forced Setup**: Avoid long required wizards. Provide short manual forms and conversational entry as equally usable options; new onboarding policy remains open.
 
 ## 19. Accessibility Baseline
 
@@ -476,6 +477,6 @@ Argus is **NOT**:
 
 When designing any Argus surface, ask:
 
-> *Does this make it easier for a normal person to understand, check, or revisit a money answer?*
+> *Does this help someone understand, maintain, or improve their financial picture with less effort?*
 
 If not, it likely should wait.

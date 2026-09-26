@@ -1,9 +1,9 @@
 # Private Alpha Next Integration
 
-Status: Active integration staging/process context. Current product state,
-running lanes and landing status live in
-[`argus-answers-that-stay-true-roadmap.md`](argus-answers-that-stay-true-roadmap.md); the
-product-change ledger below stops at 2026-08-02 and is history.
+Status: Integration staging/process context with a historical product ledger.
+Use [documentation authority](../DOCUMENTATION_AUTHORITY.md) for approved
+experience and assigned-work ownership. Check current PRs and release evidence
+for landing/deployment status; the ledger below stops at August 2, 2026.
 Date: 2026-06-10
 Last reconciled: 2026-08-02 (header pointer added 2026-09-12)
 Branch: `codex/private-alpha-next`
@@ -743,10 +743,11 @@ mark them as completed execution records or superseded observations. Moving
 those files into `docs/archive/` would break evidence lineage without reducing
 active ambiguity.
 
-The active command sources are only the interim roadmap, the parent roadmap,
-the decision memo, and this integration-process document. Completed
-Always Progresses plans and dated reports are regression evidence, not active
-dispatch instructions.
+Current document ownership is defined by the authority map. The MVEE owns
+experience; explicit packages own assigned work; this document and release
+references supply applicable process safeguards. Retired strategic narratives
+have archive copies and compatibility pointers. Completed Always Progresses
+plans and dated reports remain regression evidence, not dispatch instructions.
 
 ## Known Non-Blocking Debt
 

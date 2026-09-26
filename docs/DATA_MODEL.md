@@ -1,27 +1,17 @@
 # DATA_MODEL.md
 
-> **Product-direction boundary — September 26, 2026:** The approved pivot
-> experience is in the [MVEE](specs/argus-minimum-viable-ecosystem-experience.md).
-> This document retains its existing technical contracts and technical intent;
-> it does not yet specify the ecosystem's new financial records, household
-> permissions, ingestion APIs, or native architecture. Chat-first/Alpha framing
-> below describes that technical baseline, not a veto on the approved experience.
-> Follow [documentation authority](DOCUMENTATION_AUTHORITY.md) before resolving
-> a conflict; this docs-only change does not authorize a technical migration.
-
 ## Argus Data Model Source of Truth (Alpha MVP)
 
 **Status:** Active
 **Audience:** Backend engineers, database agents, API agents, frontend agents
-**Purpose:** Define the Alpha MVP database entities, relationships, ownership rules, and persistence expectations for Argus.
+**Purpose:** Define existing entities, relationships, ownership rules, and persistence contracts. The [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) owns the approved experience; its financial records and household permissions still need explicit schema and access-control design.
 
 ---
 
 # 1. Data Model Philosophy
 
-Argus is a chat-first AI investing sandbox.
-
-The data model must support:
+The existing model supports conversational finance and historical simulations.
+It must preserve:
 
 - multi-chat conversations
 - persistent user preferences

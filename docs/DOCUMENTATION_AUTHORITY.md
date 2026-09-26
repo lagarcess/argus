@@ -16,7 +16,7 @@
 | Question | Owner | Boundary |
 | --- | --- | --- |
 | What is Argus becoming, for whom, and how should it feel and work? | [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) | Approved experience, not a shipped-feature inventory or technical implementation specification |
-| How does that relate to the existing product? | [PRODUCT.md](PRODUCT.md) | Concise overview and preserved Alpha behavior; verify actual availability against code/release evidence |
+| How does that relate to the existing product? | [PRODUCT.md](PRODUCT.md) | Current product overview and explicit existing-capability contracts; verify actual availability against code/release evidence |
 | Which founder decisions changed, and when? | [Decision log](specs/argus-decision-log.md) | Decision provenance and links; detailed requirements remain with their owner |
 | What architecture, payloads, and persistence contracts apply? | Architecture, API contract, and data model docs above | Existing system contracts/technical intent; some statements describe targets, not proof of implementation |
 | What visual and interaction conventions apply? | [DESIGN.md](../.agent/designs/argus/DESIGN.md) | Preserve current design system and chat detail; MVEE owns the pivot's surface structure and platform intent |
@@ -52,13 +52,13 @@ Before implementing a change in these areas, define its bounded technical contra
 | --- | --- | --- |
 | [Pivot strategy](specs/argus-pivot-strategy.md) | Historical strategic proposal; conflicting experience direction superseded | Preserve rationale and research; do not promote every proposal into scope |
 | [Answers that stay true](specs/argus-answers-that-stay-true-roadmap.md) | Historical product board plus carried-work/release reference | Saved-answer ideas may support the MVEE; preserve unresolved issues and operational rules without treating its brainstorm as today's assignment |
-| [Private Alpha Next decision memo](specs/private-alpha-next-decision-memo.md) | Historical strategic/technical rationale | Read relevant technical context for a named slice; its old product framing does not override the MVEE |
+| [Private Alpha Next decision memo](specs/private-alpha-next-decision-memo.md) | Historical strategic/technical rationale | Follow its compatibility pointer to archived technical context for a named slice; its old product framing does not override the MVEE |
 | [Wave 1](specs/wave-1/README.md) | Existing package specifications; experience conflicts require reconciliation | Preserve assigned work, dependencies, review gates, and safe completed work. Do not silently cancel, expand, or rewrite packages |
 | [Private Alpha Next roadmap](specs/private-alpha-next-roadmap.md) | Superseded P2 history and technical reference | No new assignments from its old queue |
 | [Old active-roadmap pointer](specs/argus-active-roadmap.md) and [grounded-finance pointer](specs/argus-grounded-finance-roadmap.md) | Historical redirects with a current authority pointer | Follow this document for current ownership instead of chaining stale active-board claims |
 | [Social/market research mapping](research/2026-09-26-dr-latam-finance-painpoints-mvee.md) | Supporting research and decision history | Approved choices live in the MVEE; raw recommendations and metrics do not become requirements automatically |
 
-Historical document bodies and issue references remain intact. Date-specific production claims are historical snapshots, not assertions about the current deployment.
+Retired strategy narratives now live in `docs/archive/`, with compatibility pointers at their former paths. Their issue references and dated reasoning are preserved. Active product and design statements are rewritten in place; current readers need not mentally override a second product identity. Technical endpoint, entity, and runtime contract sections remain unchanged. Date-specific production claims in archives are historical snapshots.
 
 ## Wave 1 reconciliation boundary
 

@@ -99,26 +99,16 @@ previous fix was at the wrong altitude. Two rounds on one theme is the trigger,
 not three. **The tell is a fix that enumerates:** adding the fourth field or the
 third known-bad string means the next unenumerated case is already waiting.
 
-# 🎯 Existing Alpha Foundation
+# 🎯 Product Direction
 
-The following describes the preserved Alpha baseline, not the pivot's complete
-experience or future priority order. Approved direction lives in the MVEE.
+The [MVEE](docs/specs/argus-minimum-viable-ecosystem-experience.md) owns the
+approved audience, ecosystem surfaces, ingestion, personal/household experience,
+and boundaries. [PRODUCT.md](docs/PRODUCT.md) connects that direction to
+capabilities already present.
 
-**Existing Alpha Priorities:**
-- Chat-first UX; activation is the first successful backtest
-- Strategy drafting through conversation
-- Simple, trustworthy backtests
-- Recents/history retrieval
-- Idea and evidence recall through Omnisearch
-- English + Spanish support
-- Fast iteration over feature breadth
-
-**Existing Alpha exclusions (not permanent pivot exclusions):**
-- Brokerage integrations & real money trading
-- Social feeds & institutional tools
-- Advanced portfolio analytics
-- Mixed-asset backtests (Equity, Crypto, and Currency Pair in one run)
-- Existing Alpha mobile delivery is PWA/mobile web. Native iOS/Android is approved experience direction in the MVEE; implementation and sequencing remain open.
+Do not use chat-primary identity, a first-backtest activation requirement, or
+PWA-only scope as requirements for the pivot. Preserve existing chat and
+simulation behavior while implementing only the explicitly assigned scope.
 
 # ⚙️ Canonical Current Constraints
 
@@ -132,18 +122,12 @@ experience or future priority order. Approved direction lives in the MVEE.
 - **Organization**: Legacy Collection rows may contain mixed themes/assets, but no
   current Collection surface creates or manages them; runs may not mix asset classes.
 
-# 🚀 Existing Alpha Implementation Priorities
+# 🚀 Implementation Decisions
 
-1. Happy-path user experience (The "Golden Path")
-2. API contract correctness
-3. Reliability / Trust (Accurate metrics & benchmarks)
-4. Mobile-friendly chat UX
-5. Performance (<3s backtests)
-6. Nice-to-have polish
-7. Future complexity
-
-> [!TIP]
-> For an assigned Alpha simulation change, optimize for: *"Does this help a normal person test an investing idea faster?"* For ecosystem scope, use the MVEE and the assigned slice.
+Start from the assigned user outcome, preserve API/data correctness and runtime
+trust, and keep the experience simple on phones. The MVEE is not an ordered
+engineering backlog. Resolve the relevant open technical contracts before
+implementing a new financial-record or household capability.
 
 ---
 
@@ -425,10 +409,10 @@ design for the new ecosystem.
 
 - **Conversation carries forward**: Preserve chat, its continuity, and progressive disclosure. The MVEE defines its role alongside Home, Accounts, Plan, Search, and Updates; direct input is a supported experience, not a competing chat brain.
 - **The backtesting engine is critical infrastructure**: Results must be reproducible, grounded in real engine outputs, and presented with clear assumptions.
-- **Simplicity beats breadth**: Prefer the smallest supported path that lets the user test an idea safely and understand the result.
+- **Simplicity within the ecosystem**: Keep each assigned journey understandable and complete across the relevant surfaces; do not force every user job into a historical test.
 - **Trust through clarity**: Never hide defaults, unsupported behavior, missing data, or asset-class constraints. Explain limitations in product language, not provider plumbing.
 - **Beginner-friendly by default**: Use plain language, small follow-up choices, and honest educational context. Avoid trading-terminal complexity unless the user explicitly asks for more depth.
-- **Chat-first continuity**: Confirmation cards, result cards, historical legacy links, and follow-up actions must remain attached to the conversation flow and hydrate correctly after reload.
+- **Conversation continuity**: Confirmation cards, result cards, historical legacy links, and follow-up actions must remain attached to the conversation flow and hydrate correctly after reload.
 
 ## Runtime Migration Principles
 
