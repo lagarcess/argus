@@ -1,11 +1,14 @@
 # Project Agents & Tools: Argus
 
-Argus is a chat-first AI investing idea validation platform.
+Argus is evolving from its grounded finance chat into the founder-approved
+minimum viable financial ecosystem. Existing chat, calculations, research,
+and historical simulations remain valuable product capabilities.
 
-Users describe investing or trading ideas in natural language and Argus helps them understand, structure, simulate, and review how those ideas would have performed historically — without risking real capital.
-
-The conversation is the primary product surface.
-The backtesting engine is critical infrastructure.
+Read [documentation authority](docs/DOCUMENTATION_AUTHORITY.md) to distinguish
+approved experience from existing technical contracts and assigned work. The
+[MVEE](docs/specs/argus-minimum-viable-ecosystem-experience.md) owns the pivot's
+experience; it is not an implementation or deployment authorization.
+The backtesting engine remains critical infrastructure.
 
 This file is the primary orientation guide for AI coding agents working in the repository.
 
@@ -15,17 +18,22 @@ Before making code changes, agents must review these source-of-truth docs in thi
 
 1. `docs/PRODUCT.md`
    - Product truth, scope boundaries, user priorities, and the "Golden Path."
-2. `docs/ARCHITECTURE.md`
+2. `docs/DOCUMENTATION_AUTHORITY.md` and `docs/specs/argus-minimum-viable-ecosystem-experience.md`
+   - Document ownership, approved experience, unresolved decisions, and package reconciliation.
+3. `docs/ARCHITECTURE.md`
    - System boundaries, stateful vs stateless responsibilities, service ownership, and deployment model.
-3. `docs/API_CONTRACT.md`
+4. `docs/API_CONTRACT.md`
    - Frontend/backend contract, endpoint shapes, request/response truth, and auth/profile behavior.
-4. `docs/DATA_MODEL.md`
+5. `docs/DATA_MODEL.md`
    - Persistence truth, entities, ownership rules, and RLS expectations.
-5. `.agent/designs/argus/DESIGN.md`
-   - Visual system, product UX rules, chat-first interaction design, and anti-patterns.
+6. `.agent/designs/argus/DESIGN.md`
+   - Visual system, preserved chat interaction details, and ecosystem design boundaries.
 
 > [!IMPORTANT]
-> If code contradicts these docs, assume the docs represent intended Alpha direction unless implementation constraints prove otherwise.
+> Read each document within its declared scope. The MVEE owns approved product
+> experience; technical docs retain existing contracts and technical intent.
+> Resolve contradictions before changing the affected contract. Do not infer
+> new APIs, migrations, permission models, or shipped capabilities from vision text.
 
 # 🧠 The Split-Brain Rule (Founder-Locked 2026-08-12)
 
@@ -91,23 +99,16 @@ previous fix was at the wrong altitude. Two rounds on one theme is the trigger,
 not three. **The tell is a fix that enumerates:** adding the fourth field or the
 third known-bad string means the next unenumerated case is already waiting.
 
-# 🎯 Alpha Product Truth
+# 🎯 Product Direction
 
-**Argus Alpha Priorities:**
-- Chat-first UX; activation is the first successful backtest
-- Strategy drafting through conversation
-- Simple, trustworthy backtests
-- Recents/history retrieval
-- Idea and evidence recall through Omnisearch
-- English + Spanish support
-- Fast iteration over feature breadth
+The [MVEE](docs/specs/argus-minimum-viable-ecosystem-experience.md) owns the
+approved audience, ecosystem surfaces, ingestion, personal/household experience,
+and boundaries. [PRODUCT.md](docs/PRODUCT.md) connects that direction to
+capabilities already present.
 
-**Out of Scope for Alpha:**
-- Brokerage integrations & real money trading
-- Social feeds & institutional tools
-- Advanced portfolio analytics
-- Mixed-asset backtests (Equity, Crypto, and Currency Pair in one run)
-- Native mobile apps (PWA/Mobile-web only)
+Do not use chat-primary identity, a first-backtest activation requirement, or
+PWA-only scope as requirements for the pivot. Preserve existing chat and
+simulation behavior while implementing only the explicitly assigned scope.
 
 # ⚙️ Canonical Current Constraints
 
@@ -121,18 +122,12 @@ third known-bad string means the next unenumerated case is already waiting.
 - **Organization**: Legacy Collection rows may contain mixed themes/assets, but no
   current Collection surface creates or manages them; runs may not mix asset classes.
 
-# 🚀 Implementation Priority Order
+# 🚀 Implementation Decisions
 
-1. Happy-path user experience (The "Golden Path")
-2. API contract correctness
-3. Reliability / Trust (Accurate metrics & benchmarks)
-4. Mobile-friendly chat UX
-5. Performance (<3s backtests)
-6. Nice-to-have polish
-7. Future complexity
-
-> [!TIP]
-> If unsure, optimize for: *"Does this help a normal person test an investing idea faster?"*
+Start from the assigned user outcome, preserve API/data correctness and runtime
+trust, and keep the experience simple on phones. The MVEE is not an ordered
+engineering backlog. Resolve the relevant open technical contracts before
+implementing a new financial-record or household capability.
 
 ---
 
@@ -161,34 +156,35 @@ under "Standing release discipline".
   correlation ids, feature flags, and append-only operational evidence over
   one-off feature plumbing. New platform machinery earns its place only when it
   protects the chat/backtest/evidence loop.
-- **User Experience**: Chat stays primary, but direct artifact controls should
-  exist where they reduce friction. UI must show assumptions, preserve
-  continuity, avoid invented backend facts, and make unsupported behavior clear
+- **User Experience**: Preserve conversational continuity and use the MVEE for
+  ecosystem surface ownership. Direct controls should exist where they reduce
+  friction. UI must show assumptions, preserve continuity, avoid invented backend facts, and make unsupported behavior clear
   without blaming the user.
 
-Tool-specific choices and sequencing live in
-`docs/specs/private-alpha-next-decision-memo.md`; the active execution board
-lives in `docs/specs/argus-answers-that-stay-true-roadmap.md`.
+Document and execution ownership lives in `docs/DOCUMENTATION_AUTHORITY.md`.
+The decision memo is historical rationale, not a competing product authority.
 
-# 🧭 Current Milestone: Private Alpha Next P1
+# 🧭 Current Direction and Assigned Work
 
-When working from `codex/private-alpha-next` or its clean reintegration lane,
-use `docs/specs/argus-answers-that-stay-true-roadmap.md` as the active execution board after
-reading the mandatory canon docs above. It owns the current priorities, their
-execution order, the serial-versus-parallel rules, and what is deliberately not
-being built. `docs/specs/private-alpha-next-roadmap.md` is superseded P2 history
-and contract reference; read it for provenance, do not take work from it.
-The grounded-finance board (2026-09-05 to 2026-09-17) and the board before it
-are archived under `docs/archive/`; their landed work remains valid history.
+When working from `codex/private-alpha-next` or a worker branch, read the MVEE
+for approved experience and the explicitly assigned package for execution.
+Wave 1's existing package/stage/review rules remain applicable to assigned
+Wave 1 work; see `docs/specs/wave-1/README.md`. Conflicting experience scope
+must be reconciled as described in `docs/DOCUMENTATION_AUTHORITY.md`.
+
+This documentation reconciliation neither creates a replacement execution
+schedule nor cancels existing packages. The answers board retains carried
+issues and operating history, but no longer owns conflicting product direction.
+`docs/specs/private-alpha-next-roadmap.md` remains superseded P2 history and
+contract reference. Archived boards retain their landed-work provenance.
 
 Lanes are built production-ready end to end. There are no phases and no
 incubation branches: work that is not ready for users ships behind a default-off
 flag, not behind a staged branch.
 
-Use `docs/specs/private-alpha-next-decision-memo.md` as the strategic north
-star and task-onboarding source for Private Alpha Next product work. Any
-subagent working on a roadmap slice must first read the decision memo details
-and addenda related to that slice before planning or changing code.
+For task onboarding, use `docs/DOCUMENTATION_AUTHORITY.md`, the MVEE, and the
+assigned slice. Read relevant decision-memo sections only for historical or
+technical rationale; do not treat them as new work assignments.
 
 Use `docs/specs/private-alpha-ci-cd-sota.md`,
 `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
@@ -198,7 +194,7 @@ Private Alpha Next product sequencing.
 
 Use `docs/specs/private-alpha-next-integration.md` as staging and branch-process
 context. It records integration-lane guardrails, closed work, and branch-process
-boundaries, but it should not override the active roadmap or decision memo.
+boundaries, but it should not override the authority map or assigned package.
 
 Integration guardrails:
 
@@ -364,9 +360,9 @@ truth for historical context. This milestone hardened the current private-alpha
 chat/backtest loop; it does not implement the Perplexity Research Lab thesis.
 
 This is a completed checkpoint, not the active command document for
-`codex/private-alpha-next`. For current P1 product sequencing, start from
-`docs/specs/private-alpha-next-roadmap.md` and the decision memo after reading
-the canon docs. For release-gate, canary, and manifest work, use
+`codex/private-alpha-next`. For current document ownership and assigned-work
+entry points, use `docs/DOCUMENTATION_AUTHORITY.md` after the canon docs.
+For release-gate, canary, and manifest work, use
 `docs/specs/private-alpha-ci-cd-sota.md` as the release-discipline reference.
 
 Milestone guardrails:
@@ -403,16 +399,20 @@ deterministic result prose must not become the normal happy-path Argus voice.
 
 # 🧭 Argus Philosophy & Runtime Principles
 
-Argus is chat-first, AI-first, and trust-first. The assistant should help a normal person move from a rough investing idea to a clear historical test with as little friction as possible, while being honest about assumptions, limitations, and supported execution.
+The MVEE owns the approved ecosystem experience. Preserve the existing
+assistant's ability to explain finance and test investing ideas while staying
+honest about assumptions, limitations, and supported execution. The runtime
+principles below remain safeguards for the existing system, not a technical
+design for the new ecosystem.
 
 ## Product Philosophy
 
-- **Conversation is the product**: The chat thread is the primary workspace. Forms, dashboards, and dense configuration screens are secondary and should not replace conversational progressive disclosure.
+- **Conversation carries forward**: Preserve chat, its continuity, and progressive disclosure. The MVEE defines its role alongside Home, Accounts, Plan, Search, and Updates; direct input is a supported experience, not a competing chat brain.
 - **The backtesting engine is critical infrastructure**: Results must be reproducible, grounded in real engine outputs, and presented with clear assumptions.
-- **Simplicity beats breadth**: Prefer the smallest supported path that lets the user test an idea safely and understand the result.
+- **Simplicity within the ecosystem**: Keep each assigned journey understandable and complete across the relevant surfaces; do not force every user job into a historical test.
 - **Trust through clarity**: Never hide defaults, unsupported behavior, missing data, or asset-class constraints. Explain limitations in product language, not provider plumbing.
 - **Beginner-friendly by default**: Use plain language, small follow-up choices, and honest educational context. Avoid trading-terminal complexity unless the user explicitly asks for more depth.
-- **Chat-first continuity**: Confirmation cards, result cards, historical legacy links, and follow-up actions must remain attached to the conversation flow and hydrate correctly after reload.
+- **Conversation continuity**: Confirmation cards, result cards, historical legacy links, and follow-up actions must remain attached to the conversation flow and hydrate correctly after reload.
 
 ## Runtime Migration Principles
 
@@ -761,20 +761,15 @@ NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false
 
 ### Documentation Classes
 
-- **Canon docs**: `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`,
-  `docs/API_CONTRACT.md`, `docs/DATA_MODEL.md`, and
-  `.agent/designs/argus/DESIGN.md`. These define intended Alpha direction.
-- **Current active roadmap**: `docs/specs/argus-answers-that-stay-true-roadmap.md` owns the
-  current priorities, execution order, serial-versus-parallel rules, operating
-  rules, the carried-over open ends, and the open founder decisions. The
-  grounded-finance board is archived at
-  `docs/archive/2026-09-17-argus-grounded-finance-roadmap.md`;
-  `docs/specs/private-alpha-next-roadmap.md` is superseded history and
-  contract reference only.
-- **Current strategic source**:
-  `docs/specs/private-alpha-next-decision-memo.md` is the north star for the
-  Private Alpha Next product direction. Read the relevant memo sections and
-  addenda before any slice-specific planning or implementation.
+- **Authority map**: `docs/DOCUMENTATION_AUTHORITY.md` owns document status,
+  reading order, and conflict resolution. The MVEE owns approved experience;
+  the canon technical docs retain their respective contract scope.
+- **Assigned execution**: use the explicitly assigned package and its gates.
+  Wave 1 packages remain scoped specifications, subject to MVEE reconciliation;
+  this docs-only change does not create a new implementation queue.
+- **Historical rationale**: the answers board, pivot draft, and decision memo
+  retain useful research, carried issues, and technical history. Their earlier
+  product framing does not supersede the MVEE.
 - **Release-discipline references**: `docs/specs/private-alpha-ci-cd-sota.md`,
   `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
   `docs/release-manifests/TEMPLATE.md` own release gates, canaries, manifests,
@@ -784,7 +779,7 @@ NEXT_PUBLIC_RESEARCH_RAIL_ENABLED=false
   context, not as the active product roadmap.
 - **Future/design-only docs**: Research Lab, voice, public excerpt, broker,
   memory-control, and evidence-aware idea-loop specs remain design/reference
-  material until the active roadmap starts a bounded slice.
+  material until an explicit assignment starts a bounded slice under the authority map.
 - **Active milestone/spec docs**: files under `docs/specs/` that explicitly
   name the current branch or milestone. Use them for scoped execution details
   after reading canon docs.
@@ -955,7 +950,7 @@ Before implementing any feature, ask:
 2. Is this compatible with `API_CONTRACT.md`?
 3. Does `DATA_MODEL.md` already define the source of truth?
 4. Does this preserve `ARCHITECTURE.md` boundaries?
-5. Does this fit `DESIGN.md` chat-first UX?
+5. Does this fit `DESIGN.md` and the applicable MVEE experience?
 6. Is this simpler than the alternative?
 
 *If the answer to any of these is "No," pause and redesign.*

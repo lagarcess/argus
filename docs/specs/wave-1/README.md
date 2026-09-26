@@ -1,5 +1,15 @@
 # Argus wave 1 specs
 
+> **September 26, 2026 reconciliation:** Read
+> [documentation authority](../../DOCUMENTATION_AUTHORITY.md) and the approved
+> [MVEE](../argus-minimum-viable-ecosystem-experience.md) before using this spec.
+> These Wave 1 package bodies and existing stage/review gates remain preserved
+> for assigned work. Conflicting experience requirements need explicit package
+> reconciliation; they are not permanent limits on the pivot. This notice does
+> not cancel work, unlock stages, change technical contracts, or authorize
+> exposing unfinished features. The original product/source text below remains
+> a dated specification, not the final definition of the whole ecosystem.
+
 Integration branch: `codex/private-alpha-next`. Every file was checked
 against integration tip `5fb0f079b92ed5391da770cb9a7b89c1c4807684`.
 

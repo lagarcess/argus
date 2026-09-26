@@ -2,9 +2,11 @@
 
 > [!NOTE]
 > Current operational gate for Private Alpha candidate validation. Use
+> `docs/DOCUMENTATION_AUTHORITY.md` for product ownership and assigned work.
 > `docs/specs/private-alpha-next-roadmap.md` and
-> `docs/specs/private-alpha-next-decision-memo.md` for product sequencing; use
-> this runbook with `docs/specs/private-alpha-ci-cd-sota.md` and
+> `docs/specs/private-alpha-next-decision-memo.md` are historical references,
+> not product-sequencing authorities. Use this runbook with
+> `docs/specs/private-alpha-ci-cd-sota.md` and
 > `docs/release-manifests/TEMPLATE.md` for release gating.
 > For CI/CD promotion decisions, the decision memo is a later-context document, not part of this release gate.
 

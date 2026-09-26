@@ -4,15 +4,14 @@
 
 **Status:** Active
 **Audience:** Backend engineers, database agents, API agents, frontend agents
-**Purpose:** Define the Alpha MVP database entities, relationships, ownership rules, and persistence expectations for Argus.
+**Purpose:** Define existing entities, relationships, ownership rules, and persistence contracts. The [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) owns the approved experience; its financial records and household permissions still need explicit schema and access-control design.
 
 ---
 
 # 1. Data Model Philosophy
 
-Argus is a chat-first AI investing sandbox.
-
-The data model must support:
+The existing model supports conversational finance and historical simulations.
+It must preserve:
 
 - multi-chat conversations
 - persistent user preferences

@@ -4,7 +4,7 @@
 
 **Status:** Active | **Alpha Contract v1 Locked**
 **Audience:** Backend engineers, frontend engineers, AI agents
-**Purpose:** Define the current Alpha MVP interfaces between client and server. All frontend/backend integration should follow this document. Code should bend to the contract unless intentionally revised.
+**Purpose:** Define the existing client/server interfaces and intended contracts. New ecosystem interfaces must be specified explicitly before implementation; the [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) does not imply routes, payloads, or permission models. Preserve these contracts unless intentionally revised in the assigned scope.
 
 > [!IMPORTANT]
 > **Locked Status**: No breaking changes (structural JSON shape changes) are allowed without explicit approval or critical implementation blockers. Additive changes and clarifications are permitted.
