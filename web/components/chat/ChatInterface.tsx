@@ -1204,6 +1204,7 @@ export default function ChatInterface() {
     if (!initialRequestSession) return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     guestSubmissionRetryRef.current = null;
     let requestSession: ChatRequestSession = initialRequestSession;
+    const clearObservedDailyCap = dailyCap.captureSuccessClear();
     const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);
     const ordinaryTransportMessageIds =
       action?.type === "run_backtest"
@@ -1313,7 +1314,8 @@ export default function ChatInterface() {
         finishRequestTransport(requestSession);
       }
       if (event.event === "final") {
-        if (requestSessions.authorize(requestSession, "done")) dailyCap.clear();
+        // A completed question proves admission; some structured actions bypass this cap.
+        if (!action?.type && requestSessions.authorize(requestSession, "done")) clearObservedDailyCap();
         const identityAuthorized = requestSessions.authorize(requestSession, "final");
         if (!identityAuthorized) return;
         options?.onTerminal?.();

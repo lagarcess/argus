@@ -62,6 +62,10 @@ export function useDailyCapNotice(accountId: string | undefined) {
   // scope here because guest bootstrap can establish it during an awaited send.
   const record = useCallback((display: RecoveryDisplay | null) => state.record(state.getAccount(), display), [state]);
   const clear = useCallback(() => state.clear(state.getAccount()), [state]);
+  const captureSuccessClear = useCallback(() => {
+    const observed = state.getSnapshot();
+    return () => state.clear(state.getAccount(), observed);
+  }, [state]);
   const notice = active && current ? (
     <div ref={setElement} className="pb-3">
       <FailureNotice testId="daily-cap-notice">
@@ -84,5 +88,5 @@ export function useDailyCapNotice(accountId: string | undefined) {
     </div>
   ) : null;
 
-  return { notice, active, height: active ? height : 0, record, clear };
+  return { notice, active, height: active ? height : 0, record, clear, captureSuccessClear };
 }

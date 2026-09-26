@@ -52,6 +52,7 @@ export async function installComputeLimitJourney(
     controlClock?: boolean;
     bootstrapGuest?: boolean;
     holdSuccess?: boolean;
+    withResponseOption?: boolean;
   },
 ) {
   let releaseSuccess = () => {};
@@ -60,10 +61,17 @@ export async function installComputeLimitJourney(
     : Promise.resolve();
   const persistedMessages = options.newConversation ? [] : [
     { id: "prior-user", role: "user", content: options.language === "en" ? "Hello" : "Hola", created_at: RECEIVED_AT.toISOString(), metadata: {} },
-    { id: "prior-answer", role: "assistant", content: options.language === "en" ? "What would you like to test?" : "¿Qué te gustaría probar?", created_at: RECEIVED_AT.toISOString(), metadata: {} },
+    { id: "prior-answer", role: "assistant", content: options.language === "en" ? "What would you like to test?" : "¿Qué te gustaría probar?", created_at: RECEIVED_AT.toISOString(), metadata: options.withResponseOption ? {
+      clarification: {
+        kind: "coverage_recovery",
+        reason_code: "no_common_data_window",
+        options: [{ id: "change_dates", replacement_values: { requested_field: "date_range" } }],
+      },
+    } : {} },
   ];
   const evidence = {
     sentMessages: [] as string[], streamStatuses: [] as number[],
+    sentActionTypes: [] as (string | null)[],
     persistedMessageCount: persistedMessages.length,
     guestBootstraps: 0,
     releaseSuccess: () => releaseSuccess(),
@@ -121,8 +129,9 @@ export async function installComputeLimitJourney(
     });
   });
   await page.route("**/api/v1/chat/stream", async (route) => {
-    const body = route.request().postDataJSON() as { message?: string };
+    const body = route.request().postDataJSON() as { message?: string; action?: { type?: string } };
     evidence.sentMessages.push(body.message ?? "");
+    evidence.sentActionTypes.push(body.action?.type ?? null);
     if (evidence.sentMessages.length <= (options.failures ?? 1)) {
       evidence.streamStatuses.push(options.status);
       await route.fulfill({

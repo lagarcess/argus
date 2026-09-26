@@ -80,8 +80,8 @@ export function createDailyCapNoticeState(storage: NoticeStorage, now = Date.now
         replace({ ...current, dismissed: true });
       }
     },
-    clear(owner: string | undefined) {
-      if (acceptingUpdates && owner === accountId) replace(null);
+    clear(owner: string | undefined, observed?: DailyCapNoticeRecord | null) {
+      if (acceptingUpdates && owner === accountId && (observed === undefined || observed === current)) replace(null);
     },
     suspend: () => { acceptingUpdates = false; },
     expire,

@@ -177,6 +177,22 @@ test("an accepted manual question clears the notice across reload", async ({ pag
   await expect(page.getByTestId("daily-cap-notice")).toHaveCount(0);
 });
 
+test("a successful structured action retains the daily question notice", async ({ page }) => {
+  const evidence = await installComputeLimitJourney(page, {
+    account: "registered", language: "en", status: 429,
+    retryAfter: MIDNIGHT_RETRY_AFTER, withResponseOption: true,
+  });
+  await sendQuestion(page, "en");
+  await expectDailyCapNotice(page, "en");
+  await page.getByRole("button", { name: en.chat.coverage_recovery.actions.change_dates, exact: true }).click();
+  await expect(page.getByText(COPY.en.success, { exact: true })).toBeVisible();
+  expect(evidence.streamStatuses).toEqual([429, 200]);
+  expect(evidence.sentActionTypes).toEqual([null, "select_response_option"]);
+  await expectDailyCapNotice(page, "en");
+  await page.reload({ waitUntil: "networkidle" });
+  await expectDailyCapNotice(page, "en");
+});
+
 test("an accepted response clears the account notice after navigating to New chat", async ({ page }) => {
   const evidence = await cappedAccount(page, { holdSuccess: true });
   await sendQuestion(page, "en");

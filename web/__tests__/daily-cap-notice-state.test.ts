@@ -26,6 +26,19 @@ function fixture(initial: unknown = null) {
 }
 
 describe("daily cap notice lifecycle", () => {
+  test("an older successful question cannot clear a newer rejection from another chat", () => {
+    const { state } = fixture();
+    state.setAccount(accountId);
+    state.record(accountId, display());
+    const observedAtSend = state.getSnapshot();
+    state.record(accountId, display());
+    const newerRejection = state.getSnapshot();
+    state.clear(accountId, observedAtSend);
+    expect(state.getSnapshot()).toBe(newerRejection);
+    state.clear(accountId, newerRejection);
+    expect(state.getSnapshot()).toBeNull();
+  });
+
   test("an authorized dispatcher created before bootstrap uses the established account", () => {
     const { state } = fixture();
     const record = (recovery: RecoveryDisplay) => state.record(state.getAccount(), recovery);
