@@ -23,3 +23,31 @@ reset time. They do not establish identical visual styling across the three
 products; no private account was deliberately exhausted to inspect a limit.
 Argus's existing notice system owns the visual treatment here. Its acceptance
 screenshots and browser assertions verify the actual implementation.
+
+## Reset truth and user settings
+
+Both compute-admission owners (`src/argus/api/chat/guest_compute_ceiling.py`
+and `registered_compute_ceiling.py`) send `Retry-After` from the remaining
+seconds in `align_usage_period(now_utc, "day")`. Both durable claim migrations
+set the database timezone to UTC and end the window at the next UTC midnight.
+The guest-session and signed-in environment overrides change the number of
+questions; they do not change this reset schedule.
+
+The web uses that response's full delay, without the 503 retry clamp, and
+rounds the resulting instant to the displayed minute. Only a missing/invalid
+header uses the documented next-UTC-midnight fallback. The profile supports
+language, locale, country, and currency, but no timezone preference. Browser
+timezone therefore owns the local display, including daylight-saving offsets;
+country is not used to infer a timezone. The Usage settings panel's execution
+and grounding windows are separate allowances and do not own this chat cap.
+
+The founder's follow-up requests consistent `AM`/`PM` in both supported
+languages. This overrides the package's Spanish day-period styling example
+(`p. m.`), while retaining the specified localized sentence. No second parser
+or quota schedule was introduced.
+
+Verification: `tests/test_compute_reset_contract.py` exercises real chat 429
+responses for guest and signed-in configured limits, at UTC midnight,
+mid-day, and just before reset. Web tests check DR, UTC-positive, and winter/
+summer daylight-saving display. Neither backend runtime nor user settings
+were changed.

@@ -344,8 +344,7 @@ function recoveryCodeValues(
 ): Record<string, string> {
   const values = display.values ?? {};
   if (display.code === DAILY_CAP_RECOVERY_CODE) {
-    // The catalog supplies the sentence period, including after Spanish p. m.
-    const time = formatDailyCapResetTime(Date.parse(values.resetAt), locale).replace(/\.$/, "");
+    const time = formatDailyCapResetTime(Date.parse(values.resetAt), locale);
     return { ...values, time };
   }
   if (display.code === "execution_data_unavailable") {

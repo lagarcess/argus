@@ -26,9 +26,9 @@ export function formatDailyCapResetTime(
     hour12: true,
     ...(timeZone ? { timeZone } : {}),
   }).formatToParts(resetAtMs).map((part) => {
-    // ICU versions differ on spacing in abbreviated day periods (p.m. / p. m.).
+    // One AM/PM convention for both supported languages, independent of ICU.
     return part.type === "dayPeriod"
-      ? part.value.replace(/\.\s*(?=\S)/g, ". ")
+      ? part.value.replace(/[.\s]/g, "").toUpperCase()
       : part.value.replace(/[\u00a0\u202f]/g, " ");
   }).join("");
 }

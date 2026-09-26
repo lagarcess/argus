@@ -33,7 +33,7 @@ export const COPY = {
   "es-419": {
     prompt: "Compara Apple con SPY",
     claimError: "Argus no pudo iniciar este turno. Inténtalo de nuevo en un momento.",
-    capError: "Llegaste al límite de preguntas de hoy. Se reinicia a las 8:00 p. m.",
+    capError: "Llegaste al límite de preguntas de hoy. Se reinicia a las 8:00 PM.",
     retrySoon: /Reintentar en \d+ segundos?/,
     retry: "Reintentar",
     success: "Probemos esa idea.",
