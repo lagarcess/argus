@@ -7,7 +7,6 @@ from argus.api import app_setup, openapi_compat, pagination, search_utils
 from argus.api import state as api_state
 from argus.api.routers import (
     agent,
-    analytics,
     auth,
     backtest,
     computations,
@@ -46,7 +45,6 @@ def health() -> dict[str, str]:
 
 for api_router in (
     auth.router,
-    analytics.router,
     profile.router,
     conversations.router,
     computations.router,

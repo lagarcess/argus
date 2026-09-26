@@ -1070,7 +1070,6 @@ export default function ChatInterface() {
         text: trimmed,
         mentions,
         action,
-        starterSelection,
         language: i18n.resolvedLanguage ?? i18n.language,
       }))
     ) {

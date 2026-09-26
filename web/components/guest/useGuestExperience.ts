@@ -12,7 +12,6 @@ import type {
   ChatMention,
   Message,
 } from "@/components/chat/types";
-import type { StarterSelectionMetadata } from "@/components/chat/StarterActions";
 import { useGuestConversion } from "@/components/guest/useGuestConversion";
 import { useGuestShellActions } from "@/components/guest/useGuestShellActions";
 import { getUsageAllowances } from "@/lib/argus-api";
@@ -22,7 +21,6 @@ import {
   isExactGuestRunReplay,
 } from "@/lib/guest-capability-gates";
 import { replaceGuestConversation } from "@/lib/guest-api";
-import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import type { UserResponse } from "@/lib/guest-account";
 import {
   cancelPendingGuestBootstrap,
@@ -33,7 +31,6 @@ import {
   hasCampaignAttribution,
   prepareLandingStarterAuthHandoff,
 } from "@/lib/landing-intent";
-import { normalizeEnabledLanguage } from "@/lib/language-features";
 import {
   latestDecisionResumeMessageId,
   newConversationConversionMode,
@@ -88,7 +85,6 @@ type GuestSendAdmissionInput = {
   text: string;
   mentions: ChatMention[];
   action?: ChatActionOption;
-  starterSelection?: StarterSelectionMetadata;
   language?: string | null;
 };
 
@@ -209,7 +205,7 @@ export function useGuestExperience({
   });
 
   const admitSend = useCallback(
-    async ({ action, starterSelection, language }: GuestSendAdmissionInput) => {
+    async ({ action, language }: GuestSendAdmissionInput) => {
       const admissionController = guestBootstrapRequired
         ? new AbortController()
         : null;
@@ -249,16 +245,6 @@ export function useGuestExperience({
         }
         if (admissionCancelled()) return false;
         if (effectiveAccount?.account_kind !== "guest") return true;
-
-        if (starterSelection) {
-          captureGuestFunnelEvent({
-            event: "starter_action_selected",
-            language: normalizeEnabledLanguage(language),
-            surface: "starter_actions",
-            strategy_category: starterSelection.strategy_category,
-            terminal_outcome: "selected",
-          });
-        }
 
         // Conversation is compute and never gated; only a run reads the
         // execution allowance before it is sent.

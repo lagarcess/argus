@@ -9,37 +9,6 @@ info:
     tool answers persist as conversation artifacts; completed backtests also own immutable
     backtest_runs.
 paths:
-  /api/v1/analytics/guest-events:
-    post:
-      tags:
-      - analytics
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GuestFunnelClientEventRequest'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '422':
-          description: Validation Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '503':
-          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
-        '500':
-          description: An unexpected server error occurred.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
   /api/v1/auth/access-requests:
     post:
       tags:
@@ -2321,25 +2290,14 @@ paths:
     post:
       tags:
       - public-receipts
-      description: 'Record one viewer-side funnel stage. Carries no id and stores nothing.
+      description: 'Accept a viewer-side funnel stage and record nothing.
 
 
-        Section 7.2 asks for the acquisition path to be observable end to end, and
+        Wave 1 does not track share-page views or a share funnel (SPEC 0, Iris''s
 
-        both viewer-side stages happen on a page nobody is signed in to. A marker on
+        round 2 answer 4), so this endpoint counts nothing. It stays a 204 so a
 
-        the guest entry url is ruled out by section 6: sharing adds no new parameter
-
-        to that surface.
-
-
-        Views are reported from the rendered page rather than counted on the read
-
-        endpoint, because that endpoint answers metadata passes and preview-image
-
-        renders too. A pasted link would otherwise log several views before any
-
-        person opened it.'
+        receipt page already open in a browser does not error when it reports.'
       requestBody:
         content:
           application/json:
@@ -2374,9 +2332,7 @@ paths:
 
         pass, the page render, and the preview image, and a crawler expanding a pasted
 
-        link hits it with nobody having opened anything. Views are reported by the
-
-        rendered page instead, through /public/receipt-funnel.'
+        link hits it with nobody having opened anything.'
       parameters:
       - name: public_id
         in: path
@@ -4072,55 +4028,6 @@ components:
       type: object
       required:
       - captcha_token
-    GuestFunnelClientEventRequest:
-      properties:
-        event:
-          type: string
-          enum:
-          - starter_action_selected
-          - conversion_prompt_shown
-        language:
-          type: string
-          enum:
-          - en
-          - es-419
-        surface:
-          type: string
-          enum:
-          - starter_actions
-          - conversion_modal
-        strategy_category:
-          anyOf:
-          - type: string
-            enum:
-            - buy_and_hold
-            - dca_accumulation
-          - type: 'null'
-        conversion_reason:
-          anyOf:
-          - type: string
-            enum:
-            - second_simulation
-            - simulation_limit
-            - message_limit
-            - save_decision
-            - new_conversation
-            - keep_history
-            - discovery_searches
-            - share_result
-          - type: 'null'
-        terminal_outcome:
-          type: string
-          enum:
-          - selected
-          - shown
-      additionalProperties: false
-      type: object
-      required:
-      - event
-      - language
-      - surface
-      - terminal_outcome
     GuestHandoffClaimResponse:
       properties:
         conversation_id:

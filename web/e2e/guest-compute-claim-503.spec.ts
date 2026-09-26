@@ -169,10 +169,6 @@ async function mockGuestClaimJourney(
     await fulfillJson(route, { items: [], next_cursor: null });
   });
 
-  await page.route("**/api/v1/analytics/guest-events", async (route) => {
-    await fulfillJson(route, { success: true });
-  });
-
   await page.route("**/api/v1/chat/stream", async (route) => {
     evidence.streamCalls += 1;
     const body = route.request().postDataJSON() as { message?: string };

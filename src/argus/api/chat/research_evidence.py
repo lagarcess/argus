@@ -13,8 +13,6 @@ to the visitor (spec section 9b). What this module owns:
   balanced_lookup, thorough_research, screening, peer_expansion), recorded on
   the cost ledger whether or not a provider call happened, because the class
   mix is what makes natural tiers visible later.
-- a bounded PostHog research event from that same sidecar, including degraded
-  outcomes; analytics delivery is independent of ledger availability.
 """
 
 from __future__ import annotations
@@ -47,7 +45,6 @@ from argus.domain.visitor_usage import (
     settle_memory_visitor_usage,
     visitor_key_for,
 )
-from argus.observability.research_events import capture_research_turn_event
 
 RESEARCH_USAGE_RESOURCE = "research_searches"
 # Charged against the visitor table when Supabase is live for the same reason
@@ -348,12 +345,6 @@ def record_research_turn_evidence(
         message_id=message_id,
         request_id=request_id,
         tool_call_id=tool_call_id,
-    )
-    capture_research_turn_event(
-        research=research,
-        user_id=user_id,
-        conversation_id=conversation_id,
-        message_id=message_id,
     )
 
 
