@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import type { ReactNode } from "react";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import {
   CAPTCHA_UNAVAILABLE_CODE,
@@ -29,6 +30,7 @@ type EmptyChatSurfaceProps = {
   /** A setting the user stated, never something Argus inferred. */
   preferredName?: string | null;
   placeholder: string;
+  composerNotice?: ReactNode;
   onSend: (
     text: string,
     selection?: ChatMention[] | StarterSelectionMetadata,
@@ -47,6 +49,7 @@ export default function EmptyChatSurface({
   canConsumeLandingStarter,
   preferredName,
   placeholder,
+  composerNotice,
   onSend,
   onRetryGuestSubmission,
   onToast,
@@ -88,6 +91,7 @@ export default function EmptyChatSurface({
             : "order-3 w-full max-w-2xl tablet:order-2"
         }
       >
+        {composerNotice}
         <ChatInput
           key={`new-conversation-${landingStarterSurfaceEpoch()}`}
           onSend={onSend}

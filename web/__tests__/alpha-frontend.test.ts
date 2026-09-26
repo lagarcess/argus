@@ -1067,7 +1067,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(projection).toContain("latestAiIndex");
     expect(projection).toContain('(message.content ?? "") === ""');
     expect(chat).toContain("isStreaming={isWorkingMessage}");
-    expect(message).toContain("{!isUser && !isStreaming && (");
+    expect(message).toContain("const shouldShowAssistantFooter = !isUser && !isStreaming;");
+    expect(message).toContain("{shouldShowAssistantFooter && (");
     expect(message).not.toContain("{copyFeedback && (");
   });
 
@@ -1304,7 +1305,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("chat.copy_failed");
     expect(message).toContain('message.kind === "strategy_confirmation"');
     expect(chat).toContain("onToast={showToast}");
-    expect(chat).toContain("pb-[190px]");
+    expect(chat).toContain("paddingBottom: 190 + dailyCap.height");
     expect(chat).toContain('className="h-28"');
     expect(toast).toContain("absolute inset-x-0 bottom-24");
     expect(toast).toContain("flex justify-center");
