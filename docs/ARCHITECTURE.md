@@ -359,7 +359,9 @@ Provider ownership:
 
 **Use for:**
 
-- Measurement-only product analytics for the approved private-alpha event set.
+- Measurement-only product analytics for the closed wave 1 event registry
+  (`src/argus/observability/analytics_events.py`, listed in `docs/DATA_MODEL.md`
+  section 12.1.1). The sink refuses any other event.
 - Aggregate funnels, retention, and loop-health questions.
 
 **Do not use for:**

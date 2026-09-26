@@ -717,12 +717,12 @@ Public endpoints, unauthenticated:
 | Method | Path                           | Purpose |
 | :----- | :----------------------------- | :------ |
 | `GET`  | `/public/receipts/{public_id}` | Read one frozen receipt |
-| `POST` | `/public/receipt-funnel`       | Record one viewer-side funnel stage |
+| `POST` | `/public/receipt-funnel`       | Accept a viewer-side funnel stage; records nothing |
 
 A result whose conversation has been deleted is no longer shareable: creation answers
 `404` with the ordinary not-available detail, and the database refuses the insert even
-if the deletion lands mid-request. Revoking is idempotent, and only the state
-transition emits `receipt_revoked`.
+if the deletion lands mid-request. Revoking is idempotent and emits no analytics
+event.
 
 Candidate reads return `{items}`, where each item is
 `{message_id, question, kind, eligible, reason, field}`; the client counts the
@@ -753,9 +753,10 @@ no receipt is created for any part of the selection.
 `{"owner_note": string | null}`, bounded at 280 characters, and returns
 `{"receipt": PublicExcerptListItem}`. Creating a receipt for a result that already
 has a live one returns that receipt rather than minting a second link, including
-when two concurrent requests race on the insert. Only a real insert emits the
-`receipt_created` funnel event, so a retry or a reload cannot inflate the
-acquisition funnel's creation stage.
+when two concurrent requests race on the insert. Only a real insert counts as a
+share, so a retry or a reload cannot inflate it. The share event is
+`receipt_shared` (section 17.1), emitted from this insert by SPEC 0 package
+0C-8; until then creation emits nothing.
 
 `PublicExcerptListItem` is `{id, public_id, path, title, symbols, date_range, kind,
 created_at, revoked_at, revocation_reason}`, where `date_range` is `{start, end}`
@@ -797,15 +798,12 @@ timestamps cannot drop or repeat a row across pages.
 `POST /public/receipt-funnel` takes
 `{"stage": "viewed" | "try_argus" | "followed_up" | "signed_up", "kind": "backtest" | "research_answer" | "calculation" | "answer" | "mixed"}`
 (kind defaults to `backtest` for compatible callers) and returns
-`204`. It stores nothing and carries no identifier. `viewed` is reported by the
-rendered page rather than counted when the receipt is read, because that read also
-answers the metadata pass and the preview image; a link pasted into a chat would
-otherwise log views nobody caused. It exists because the Try Argus tap
-happens on a public page. Follow-up intent stays in the receiver tab for the
-bridge to normal chat; it adds no viewer identifier or tracking URL parameter.
-An owner preview reports no view, and a multi-turn public page reports one view.
-Tombstones and unavailable pages with no known kind do not emit kind-attributed
-events; they never guess that the missing document was a backtest.
+`204`. It stores nothing, carries no identifier, and emits no analytics event:
+wave 1 does not track share-page views or a share funnel (SPEC 0, section 0.5).
+It stays a validated `204` so a receipt page already open in a browser does not
+error when it reports a stage. It is not rate limited, because it does no work.
+Follow-up intent stays in the receiver tab for the bridge to normal chat; it adds
+no viewer identifier or tracking URL parameter.
 
 #### Receiver-owned fork
 
@@ -6143,14 +6141,15 @@ outside frontend reads, PostHog, model context, and the live-eval fingerprint.
 ### Product event envelope
 
 P1 defines a stable measurement envelope for product analytics, future cost
-accounting, and eval readiness. B3 slice 2 emits the approved product-event set
-to PostHog when `POSTHOG_PROJECT_TOKEN` and an explicit PostHog region or host
-are configured. If the token is missing, capture is suppressed with
+accounting, and eval readiness. PostHog capture happens only when
+`POSTHOG_PROJECT_TOKEN` and an explicit PostHog region or host are configured.
+If the token is missing, capture is suppressed with
 `reason = "posthog_not_configured"`. If the region/host is missing or
 unsupported, capture is suppressed with
 `reason = "posthog_region_not_configured"`.
 
-Event envelope schema version: `argus_observability_event/v1`.
+Event envelope schema version: `argus_observability_event/v1`. Analytics
+events (below) carry `argus_analytics_event/v1`.
 
 Core fields:
 - `schema_version`
@@ -6181,48 +6180,36 @@ Core fields:
 - `sampling_rate`
 - `retention_class`
 - `attributes`
+- `analytics_event` and `internal_account`, set only on analytics events
 
-### Native analytics dimensions
+### Product analytics events (wave 1, SPEC 0)
 
-The PostHog projection promotes a closed set of scalar attributes to event
-properties: `product_event`, `language`, `surface`, `terminal_outcome`,
-`conversion_reason`, `strategy_category`, `product_capability`, and
-`capability_class`. The sanitized `attributes` bag remains intact.
+One closed registry, `src/argus/observability/analytics_events.py`, owns every
+event PostHog receives. Each event is one Pydantic model (`extra="forbid"`,
+strict) whose fields are the event's exact properties, typed only as literal
+values, booleans, a bounded integer, or the pattern-checked invite `cohort`. An
+amount, a name, an email, question or answer text, or any other free text
+cannot be represented. Events are sent only through
+`capture_analytics_event()`; the sink refuses every other envelope with
+`reason = "not_an_analytics_event"`, so nothing else reaches PostHog.
 
-These two capability dimensions deliberately describe different facts:
+PostHog receives each event under its own name as the PostHog `event`. The
+event names and properties are documented in `docs/DATA_MODEL.md` section
+12.1.1: `first_answer_shown`, `signed_in`, `card_saved`, `goal_created`,
+`checklist_step_completed`, `reminders_opted_in`, `reminders_opted_out`,
+`session_started`, `installed_app_opened`, `landing_viewed`, and
+`receipt_shared`. The emitters land package by package (SPEC 0, 0C-3 to 0C-8);
+`goal_created`, `checklist_step_completed`, and the two reminder events are
+registered now and fire in later stages.
 
-| Dimension | Meaning | Owner / values |
-| --- | --- | --- |
-| `product_capability` | The product activity involved in a guest funnel event | `GuestFunnelProductCapability`: `chat`, `simulation`, `decision`, `history`, `account`, `feedback` |
-| `capability_class` | The kind of research work performed | Research `CapabilityClass`: `fast_quote`, `balanced_lookup`, `thorough_research`, `screening`, `peer_expansion` |
-
-They are not interchangeable and must not be merged. `surface` identifies the
-UI location; research `shape` identifies the execution configuration. A
-`screening` task stays `screening` on either balanced or thorough execution.
-The research sidecar owns its work kind; the ledger and analytics read it.
-
-`product_capability` replaces the ambiguous `capability_category` name at all
-guest event producers. New captures emit only the new name, without an alias.
-Existing PostHog events retain `capability_category`; historical queries
-spanning the change must OR the old and new property filters, or coalesce them
-in historical SQL. Do not reinterpret the old value as a research class.
-Research sidecar and cost-ledger keys remain `capability_class`, so persisted
-research messages and ledger readers need no migration.
-
-Research settlement emits `event_type = "research"` from the same sidecar
-used for metering, even without a cost-ledger gateway. `capability_class` is a
-native event property; unknown values become `unknown` rather than leaking
-arbitrary text. A sidecar carrying `degraded.code` emits
-`event_action = "failed"`, `status = "degraded"`; otherwise it emits
-`completed` for both. This describes the research outcome, not billing
-reconciliation or provider health. Cache hits and bypasses are included;
-`cache_status` remains a bounded nested attribute. No sidecar content, error
-detail, provider data, or spend is copied to PostHog. Capture is best effort,
-and network I/O is scheduled off the streaming event loop.
-
-This event covers inline research (including find) and settled background
-answers. Background failures that never produce a research sidecar retain the
-job lifecycle's failure record; they are not research settlement events.
+Each PostHog capture carries only the event's own properties plus these
+technical properties: `$process_person_profile` (always `false`),
+`schema_version`, `event_id`, `environment`, and `internal_account` (`true`
+unless the caller states the account is external). `signed_in` alone may also
+carry `guest_id_hash`. `distinct_id` is `actor_hash_for_user(<user id>)`: the
+account id for signed-in users and the guest user id for guests. Hashed
+conversation, message, or run ids, `status`, `latency_ms`, and nested
+`attributes` are never sent.
 
 Privacy posture:
 - Default mode is `metadata_only`.
@@ -6230,55 +6217,33 @@ Privacy posture:
   receipts, provider/model metadata, auth tokens, API keys, broker credentials,
   account balances, exact holdings, exact dates/capital, email, display name,
   private titles/previews, URLs, cookies, headers, IP addresses, payment
-  identifiers, and similar sensitive payloads before capture.
-- PostHog receives only the sanitized projection. Raw identifiers are hashed
-  before emission.
-- PostHog capture remains server-side only. Two browser-owned facts
-  (`starter_action_selected` and `conversion_prompt_shown`) cross the
-  authenticated `POST /analytics/guest-events` contract; the browser never
-  receives a PostHog key or sends prompts, prose, Auth material, provider/model
-  data, or other arbitrary properties. The remaining guest funnel facts emit
-  from their authoritative server settlement, admission, Auth, feedback, and
-  cleanup owners.
+  identifiers, and similar sensitive payloads from envelope attributes.
+- Raw identifiers never reach PostHog; `distinct_id` and `guest_id_hash` are
+  one-way hashes.
+- PostHog capture is server-side only. The browser has no PostHog key and no
+  analytics endpoint of its own: `POST /analytics/guest-events` and its two
+  browser events (`starter_action_selected`, `conversion_prompt_shown`) were
+  removed in SPEC 0 package 0C-1.
 - Frontend PostHog, autocapture, session replay, and product behavior reads
   from analytics remain out of scope.
 - Person profiles are disabled per event with `$process_person_profile = false`.
 - Current PostHog region is US Cloud, selected deliberately for the private
   alpha compliance posture via `POSTHOG_REGION=us` / `https://us.i.posthog.com`.
 
-Approved product events:
-- `evidence_capture`
-- `decision_capture`
-- `recall_usage`
-- `continuity_mismatch`
-- `compare_started`
-- `next_experiments_offered`
-- `next_experiment_selected`
-- `eval_readiness`
-
-Each approved product event sets `attributes.product_event` to the registered
-name above while preserving the envelope `event_type` taxonomy and
-`event_action` state model from memo 15.5.
-
-Approved guest funnel events use `feature_area = "guest_acquisition"`:
-- `guest_session_started`
-- `starter_action_selected`
-- `first_useful_assistant_response_completed`
-- `confirmation_reached`
-- `first_simulation_admitted`
-- `first_result_completed`
-- `conversion_prompt_shown`
-- `account_creation_completed`
-- `existing_account_sign_in_completed`
-- `temporary_workspace_claimed`
-- `guest_limit_reached`
-- `guest_feedback_submitted`
-- `guest_session_expired`
-
-Their optional properties are limited to hashed/correlated identity, language,
-surface, approved typed strategy/capability category, conversion reason, and
-terminal outcome. Provider cost and latency stay in the existing server-owned
-evidence ledger and correlate through privacy-safe identifiers.
+Retired events (clean break, SPEC 0 package 0C-1). None of these reaches
+PostHog any more: the earlier product events (`evidence_capture`,
+`decision_capture`, `recall_usage`, `continuity_mismatch`, `compare_started`,
+`next_experiments_offered`, `next_experiment_selected`, `eval_readiness`, the
+`receipt_*` funnel, and `account_registration_completed`), every guest funnel
+event, and the research settlement event. Their emit calls are removed, except
+`decision_capture`, `receipt_created`, `account_registration_completed`,
+`first_useful_assistant_response_completed`, `account_creation_completed`, and
+`existing_account_sign_in_completed`, whose call sites SPEC 0 packages 0C-3,
+0C-4, and 0C-8 replace with `first_answer_shown`, `signed_in`, `card_saved`,
+and `receipt_shared`. Until then those calls stop at the sink. The guest funnel
+milestone claim stays; `first_answer_shown` reuses it. Research work kind and
+outcome stay on the cost ledger and the research sidecar
+(`capability_class`), which are not analytics.
 
 Implemented operational surface:
 - The append-only first-party `cost_ledger_entries` table is the server-owned
