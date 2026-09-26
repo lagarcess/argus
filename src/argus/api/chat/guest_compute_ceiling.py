@@ -8,10 +8,12 @@ whichever is lower:
 - visitor-keyed (trusted client IP)
 - session-keyed (authenticated guest workspace / anonymous user id)
 
-Both units are claimed atomically at turn start, the same way research
-claims before spend. A claim that is admitted stands even if the turn
-errors before any LLM spend: releasing it is possible, but keeping it is
-the simpler fail-closed anti-abuse choice. Signed-in accounts claim a
+Both units are claimed atomically before any model work, the same way
+research claims before spend. The claim runs after the conversation is
+resolved and after every stale or replayed action is rejected, so a 404 or
+a rejected replay never costs a unit (#692). A claim that is admitted
+stands even if the turn errors before any LLM spend: releasing it is
+possible, but keeping it is the simpler fail-closed anti-abuse choice. Signed-in accounts claim a
 separate per-user daily ceiling in ``registered_compute_ceiling``.
 Nothing here is rendered or promised.
 """
@@ -113,7 +115,7 @@ def claim_guest_compute_turn(
 
 
 def check_guest_compute_ceiling(request: Request, user: User) -> None:
-    """Claim one turn at entry; 429 once either daily ceiling is reached.
+    """Claim one turn before model work; 429 once either daily ceiling is reached.
 
     Guests claim the visitor and session ceilings. Signed-in accounts claim
     the per-user daily ceiling. Both refusals raise the same 429 copy.
@@ -169,7 +171,7 @@ def guest_compute_settlement(
     is_run_backtest_turn: bool,
     visitor_key: str,
 ) -> dict[str, object] | None:
-    """The unit is claimed at turn start. Terminal settlement is a no-op so
+    """The unit is claimed before model work. Terminal settlement is a no-op so
     a completed turn cannot double-count, and a failed turn keeps the claim."""
     del account, is_run_backtest_turn, visitor_key
     return None

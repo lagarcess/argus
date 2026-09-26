@@ -115,8 +115,10 @@ def test_each_artifact_rejection_is_recorded_once_without_contract_changes(
     assert api_state.store.messages == messages_before
     assert api_state.store.chat_turn_lifecycles == turns_before
     assert api_state.store.usage_counters == usage_before
-    ordinary_turn = action_type not in {"run_backtest", "cancel_confirmation"}
-    if ordinary_turn:
+    # Only the response-option rejection still claims a unit: its check
+    # persists the request message, so the claim must run before it. The
+    # stale-card and retest rejections run before the claim (#692).
+    if site == "response_option":
         assert api_state.store.visitor_usage_counters != visitor_usage_before
         assert all(
             resource == REGISTERED_COMPUTE_CEILING_RESOURCE

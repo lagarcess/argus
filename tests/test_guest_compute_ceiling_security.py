@@ -8,11 +8,15 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Lock
+from unittest.mock import patch
 
 import pytest
 from argus.api import state as api_state
 from argus.api.chat.guest_compute_ceiling import claim_guest_compute_turn
-from argus.api.client_ip import resolve_client_ip
+from argus.api.client_ip import (
+    reset_trusted_header_fallback_warning_for_tests,
+    resolve_client_ip,
+)
 from argus.api.guest_access import client_identity, visitor_key_for_request
 from argus.domain.usage_limits import GUEST_COMPUTE_CEILING_RESOURCE
 from argus.domain.visitor_usage import (
@@ -161,3 +165,72 @@ def test_client_identity_is_stable_across_spoofed_xff() -> None:
     assert client_identity(first) == client_identity(second) == "192.0.2.10"
     assert visitor_key_for_request(first) == visitor_key_for_request(second)
     assert resolve_client_ip(first) == "192.0.2.10"
+
+
+def _hosted_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARGUS_PERSISTENCE_MODE", "supabase")
+    monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
+    reset_trusted_header_fallback_warning_for_tests()
+
+
+def test_trusted_header_ip_with_port_strips_port() -> None:
+    with_port = _request(
+        headers={"CF-Connecting-IP": "203.0.113.50:4711"}, peer="10.0.0.8"
+    )
+    without_port = _request(
+        headers={"CF-Connecting-IP": "203.0.113.50"}, peer="10.0.0.9"
+    )
+    bracketed_v6 = _request(
+        headers={"CF-Connecting-IP": "[2001:db8:1:2::1]:443"}, peer="10.0.0.8"
+    )
+
+    assert resolve_client_ip(with_port) == "203.0.113.50"
+    assert visitor_key_for_request(with_port) == visitor_key_for_request(
+        without_port
+    )
+    assert resolve_client_ip(bracketed_v6) == "2001:db8:1:2::/64"
+    # A bare IPv6 address is never mistaken for host:port.
+    bare_v6 = _request(headers={"CF-Connecting-IP": "2001:db8:1:2::1"})
+    assert resolve_client_ip(bare_v6) == "2001:db8:1:2::/64"
+    # A port that is not a port number keeps the value invalid.
+    bad_port = _request(
+        headers={"CF-Connecting-IP": "203.0.113.50:http"}, peer="10.0.0.8"
+    )
+    assert resolve_client_ip(bad_port) == "10.0.0.8"
+
+
+def test_non_canonical_ipv4_falls_back_and_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _hosted_env(monkeypatch)
+    request = _request(
+        headers={"CF-Connecting-IP": "203.000.113.050"}, peer="10.0.0.8"
+    )
+    with patch("argus.api.client_ip.logger.warning") as warning:
+        assert resolve_client_ip(request) == "10.0.0.8"
+        assert resolve_client_ip(request) == "10.0.0.8"
+    warning.assert_called_once()
+    assert warning.call_args.args[0] == "client_ip_rejected_non_canonical"
+    assert warning.call_args.kwargs["header"] == "CF-Connecting-IP"
+    assert warning.call_args.kwargs["peer"] == "10.0.0.8"
+    # The raw header value never reaches the log.
+    assert "203.000.113.050" not in str(warning.call_args)
+
+
+def test_each_client_ip_warning_has_its_own_throttle_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _hosted_env(monkeypatch)
+    missing = _request(headers={}, peer="10.0.0.8")
+    invalid = _request(headers={"CF-Connecting-IP": "garbage"}, peer="10.0.0.8")
+    non_canonical = _request(
+        headers={"CF-Connecting-IP": "010.0.0.1"}, peer="10.0.0.8"
+    )
+    with patch("argus.api.client_ip.logger.warning") as warning:
+        for request in (missing, invalid, non_canonical) * 2:
+            assert resolve_client_ip(request) == "10.0.0.8"
+    assert [call.args[0] for call in warning.call_args_list] == [
+        "Trusted client-IP header missing; using socket peer",
+        "Trusted client-IP header present but invalid; using socket peer",
+        "client_ip_rejected_non_canonical",
+    ]

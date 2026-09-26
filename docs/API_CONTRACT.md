@@ -126,10 +126,17 @@ on `session:<guest user id>`. The visitor ceiling defaults to 300. The
 session ceiling defaults to 100 (`ARGUS_GUEST_SESSION_DAILY_TURN_CEILING`)
 so one workspace hopping IPs cannot inherit the shared-NAT headroom. A
 guest hits whichever remaining count is lower. The unit is claimed
-atomically at turn start (`claim_guest_compute_usage`); a failed turn
-keeps the claim. The visitor IP comes from `CF-Connecting-IP` by default
-(`ARGUS_TRUSTED_CLIENT_IP_HEADER`), never from `X-Forwarded-For`. IPv4
-keys stay per-address. IPv6 keys group by the address `/64` so rotating
+atomically before model work (`claim_guest_compute_usage`); a failed turn
+keeps the claim. The claim runs after the conversation is resolved and
+after stale or replayed actions and retest state are validated, so those
+rejections come first and cost nothing: an unknown conversation answers
+`404` `not_found` even at the ceiling, and a rejected replay answers its
+`409` without using a unit. The visitor IP comes from `CF-Connecting-IP`
+by default (`ARGUS_TRUSTED_CLIENT_IP_HEADER`), never from
+`X-Forwarded-For`. A trusted value of `ip:port` has its port stripped. A
+dotted IPv4 value with leading zeros is rejected, and the socket peer is
+used with the `client_ip_rejected_non_canonical` log line. IPv4 keys stay
+per-address. IPv6 keys group by the address `/64` so rotating
 addresses inside one prefix cannot mint a fresh visitor row. These
 ceilings are not an allowance: `GET /me/usage` reports conversation as
 unbounded and never projects this counter, and no product surface names
@@ -140,9 +147,11 @@ persistence error) is not a daily cap: `POST /chat/stream` answers
 `503` with `code: "guest_compute_claim_unavailable"` and a short
 `Retry-After`. Run actions are execution and do not count.
 Signed-in accounts carry their own daily chat ceiling, default 200
-(`ARGUS_REGISTERED_DAILY_TURN_CEILING`), claimed atomically at turn
-start (`claim_registered_compute_usage`) against `user:<account id>`
-on `account_compute_turns`. A failed turn keeps the claim. At the
+(`ARGUS_REGISTERED_DAILY_TURN_CEILING`), claimed atomically before
+model work (`claim_registered_compute_usage`) against `user:<account id>`
+on `account_compute_turns`, at the same point in the turn as the guest
+claim, so a `404` or a rejected replay costs nothing. A failed turn
+keeps the claim. At the
 ceiling `POST /chat/stream` answers the same `429` copy and shape
 guests get. A claim that cannot run answers `503` with
 `code: "registered_compute_claim_unavailable"` and the same short

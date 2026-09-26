@@ -293,8 +293,6 @@ async def chat_stream(
             request=request,
             idempotency_key=clean_idempotency_key,
         )
-    if not is_run_backtest_turn and not cancel_confirmation_action:
-        check_guest_compute_ceiling(request, user)
 
     current_user_profile = None
     if api_state.supabase_gateway is not None:
@@ -411,12 +409,14 @@ async def chat_stream(
     if is_retest_action(payload):
         retest_turn = await asyncio.to_thread(
             prepare_retest_turn,
-            payload=payload,
-            request=request,
+            payload=payload, request=request,
             user_id=user.id,
             conversation_id=conversation.id,
             language=language,
+            before_provider_work=lambda: check_guest_compute_ceiling(request, user),
         )
+    elif not is_run_backtest_turn and not cancel_confirmation_action:
+        check_guest_compute_ceiling(request, user)
     request_admission = prepare_chat_request_admission(
         payload=payload,
         request=request,
