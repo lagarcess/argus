@@ -299,7 +299,7 @@ A relevant recorded or external fact changes → Argus creates an explainable up
 | Localization, guest access, mobile experience | Reduce friction when starting and returning |
 | Saved-answer and change-awareness direction | Relevant updates tied to a person's context |
 
-This is a reuse map, not a claim that components need no adaptation. The primary addition is a persistent, user-correctable personal financial picture. Preserve the existing conversational intelligence and trust boundaries while connecting it to those records.
+This is a reuse map, not a claim that components need no adaptation or an exhaustive inventory of production features. Existing capabilities, interactions, records, and gates carry forward unless explicitly changed; omission from this document is not retirement. The primary addition is a persistent, user-correctable personal financial picture. Preserve the existing conversational intelligence and trust boundaries while connecting it to those records. [PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes) owns current availability and approved transitions; the planned experience does not itself enable a hidden feature.
 
 ## 8. Differentiation and boundaries
 

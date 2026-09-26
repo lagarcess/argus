@@ -393,7 +393,7 @@ using this locked precedence:
 ## 15. Settings and Feedback UX
 
 - **Core Settings**: Visible support for Language, Theme, Feedback, Account, Recently Deleted, and Archived Chats.
-- **Feature Guarding**: Show only implemented, authorized controls. The MVEE approves Updates and household settings; their availability follows the assigned implementation and rollout, not this design guide.
+- **Feature Guarding**: Preserve existing hidden/flagged settings according to [current production availability](../../../docs/PRODUCT.md#current-production-availability-and-planned-changes). A planned experience does not enable its controls; change visibility only with its approved implementation and rollout.
 - **Accessible Feedback**: Simple conversational or form-based entry accessible from the settings surface.
 
 ## 16. Language & Localization UX

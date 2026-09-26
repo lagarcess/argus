@@ -61,6 +61,11 @@ when scoping implementation.
 
 ## 5. Existing capabilities and behavior to preserve
 
+Argus is one evolving product. Existing production capabilities, interactions,
+data, and access controls carry forward unless an approved change explicitly
+replaces them. The lists in this overview and the MVEE are not exhaustive:
+omission is not a decision to remove, rebuild, hide, or enable a feature.
+
 The current foundation is grounded finance chat, calculations, research,
 historical simulations, conversations/history, Omnisearch, and account/settings.
 These are capabilities within the ecosystem, not a separate investing product.
@@ -82,6 +87,21 @@ an auth-first journey or invent the pivot's account-onboarding policy.
 
 The remaining sections specify capabilities and behavior to preserve. They do
 not form a new feature queue or establish a backtest-only activation requirement.
+
+### Current production availability and planned changes
+
+This section owns the availability statements below. The founder confirmed this
+production posture on September 26, 2026; this documentation update changes no
+flags or rollout configuration.
+
+| Capability | Current production state | Approved change |
+| --- | --- | --- |
+| Notifications | Hidden/flagged for Alpha | Enable as part of the next product push; behavior follows the MVEE Updates experience. Implementation and rollout still need their assigned work. |
+| Subscriptions | Hidden/flagged for Alpha | No enablement change approved; preserve the existing gate. |
+
+An approved future experience does not contradict a currently hidden feature.
+Update this table when the corresponding release changes availability. Design
+and experience documents link here rather than maintain separate state lists.
 
 ---
 

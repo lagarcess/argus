@@ -32,6 +32,20 @@ The product remains one connected Argus experience that carries forward existing
 
 “Locked” means founder-approved direction. It does not mean implemented, validated market demand, a final schema, a model instruction change, or permission to deploy.
 
+## Carry forward, change explicitly
+
+Argus has one evolving product and one set of technical owners. The MVEE
+defines approved experience changes; it does not reset the production feature
+inventory. Existing behavior and gates remain valid unless a specific approved
+change replaces them. A feature omitted from the MVEE is not implicitly retired.
+
+Distinguish a contradictory product mandate from a temporal difference:
+“this feature is hidden today” can coexist with “enable it in the next push.”
+Keep current availability and its approved transition together in
+[PRODUCT.md](PRODUCT.md#current-production-availability-and-planned-changes),
+and link there from other documents. Do not delete accurate production truth
+merely to make an experience specification read as if it has shipped.
+
 ## What remains technical or undecided
 
 Do not infer these from a polished demo or the MVEE:
