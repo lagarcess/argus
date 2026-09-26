@@ -51,8 +51,8 @@ import {
   retryableNoticeIconClass,
   retryableNoticeRetryPillClass,
 } from "@/lib/failure-treatment";
-import { GUEST_COMPUTE_CLAIM_RETRY_IN_KEY } from "@/lib/guest-compute-claim-error";
-import { useRetryAfterCountdown } from "@/lib/retry-after";
+import { GUEST_COMPUTE_CLAIM_RETRY_IN_KEY } from "@/lib/compute-claim-error";
+import { useRetryAfterCountdown } from "@/lib/use-retry-after-countdown";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { isSettledStrategyResult } from "@/lib/chat-result-message";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
@@ -364,7 +364,7 @@ export default function ChatMessage({
 
   return (
     <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300 group relative">
-      {!isUser && !isStreaming && (
+      {shouldShowAssistantFooter && (
         <Tooltip content={t('chat.copy_plaintext')} side="left" delay={150}>
           <button
             onClick={() => {
@@ -377,7 +377,7 @@ export default function ChatMessage({
           </button>
         </Tooltip>
       )}
-      <div className="flex flex-col max-w-[85%]">
+      <div className="flex max-w-[85%] flex-col">
         <div className="flex flex-col mt-1.5">
           {isSettledStrategyResult(message) ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">

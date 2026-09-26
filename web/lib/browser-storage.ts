@@ -40,6 +40,7 @@ export const STORAGE_REGISTRY = {
   "argus:feedback-ask:v1": "tips",
   "argus.memoryOptOutConversations.v1": "temporary",
   "argus:receipt-followup:v1": "temporary",
+  "argus:daily-cap-notice:v1": "temporary",
   "argus:landing-intent:v1": "campaign",
   "argus:landing-starter:v1": "temporary",
 } as const satisfies Record<string, StorageConcept>;

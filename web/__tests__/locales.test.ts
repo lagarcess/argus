@@ -290,3 +290,16 @@ describe("conversation activity locales", () => {
     }
   });
 });
+
+
+describe("daily question limit copy", () => {
+  test.each([
+    [en, "You've reached today's question limit. It resets at {{time}}."],
+    [es419, "Llegaste al límite de preguntas de hoy. Se reinicia a las {{time}}."],
+  ] as const)("uses Iris's exact copy with no vague wait or em dash", (catalog, expected) => {
+    expect(catalog.chat.recovery.daily_cap_reached).toBe(expected);
+    expect(catalog.chat.recovery.daily_cap_reached).not.toContain("\u2014");
+    expect(catalog.chat.recovery.registered_compute_claim_unavailable).not.toContain("\u2014");
+    expect(catalog.chat).not.toHaveProperty("rate_limit_error");
+  });
+});

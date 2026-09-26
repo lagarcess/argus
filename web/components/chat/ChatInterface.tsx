@@ -190,7 +190,7 @@ import {
 } from "./types";
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
-  chatActionRequestFromAction, chatHttpErrorDisplay, guestClaimErrorMessagePatch, settleGuestClaimTransportReadiness,
+  chatActionRequestFromAction, chatHttpErrorDisplay, applyChatHttpErrorToMessages, settleAdmissionTransportReadiness,
   applyEmptyFinalFallback,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
@@ -230,13 +230,13 @@ import {
   applyConfirmationActionEffects,
   confirmationActionEffectFromAction,
   consumeResultActionOnMessages,
-  isStaleConfirmationActionRejectionCode,
   normalizeConfirmationHistory,
   settleConfirmationAfterActionTransportError,
   settleOpenConfirmationsAfterStreamError,
 } from "./artifact-history";
 import { randomId } from "@/lib/random-id";
 import { SEND_BUSY_FALLBACK, SEND_GENERIC_FALLBACK, sendRefusal } from "@/lib/send-refusal";
+import { useDailyCapNotice } from "./useDailyCapNotice";
 type View = "chat" | "settings";
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
@@ -247,6 +247,7 @@ export default function ChatInterface() {
   const [account, setAccount] = useState<Awaited<
     ReturnType<typeof getMe>
   > | null>(null);
+  const dailyCap = useDailyCapNotice(account?.user.id);
   const [profileState, setProfileState] = useState<ProfileState>("probing");
   const [expiredPublicAccountAccessEnabled, setExpiredPublicAccountAccessEnabled] =
     useState(false);
@@ -1203,6 +1204,7 @@ export default function ChatInterface() {
     if (!initialRequestSession) return refuseSend("chat.send_busy", SEND_BUSY_FALLBACK);
     guestSubmissionRetryRef.current = null;
     let requestSession: ChatRequestSession = initialRequestSession;
+    const clearObservedDailyCap = dailyCap.captureSuccessClear();
     const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);
     const ordinaryTransportMessageIds =
       action?.type === "run_backtest"
@@ -1312,6 +1314,8 @@ export default function ChatInterface() {
         finishRequestTransport(requestSession);
       }
       if (event.event === "final") {
+        // Ordinary sends passed compute admission; cancellation has its own handler.
+        if (requestSession.kind === "chat_turn" && requestSessions.authorize(requestSession, "done")) clearObservedDailyCap();
         const identityAuthorized = requestSessions.authorize(requestSession, "final");
         if (!identityAuthorized) return;
         options?.onTerminal?.();
@@ -1726,39 +1730,25 @@ export default function ChatInterface() {
             return;
           }
         }
+        if (!requestSessions.authorize(requestSession, "catch")) return;
         const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
-        const status = (err as { status?: number }).status;
-        const isRateLimit = status === 429;
+        const status = (err as { status?: number }).status ?? 0;
         const rejectionCode = err instanceof ChatStreamError ? err.code : null;
-        const staleConfirmationRejected =
-          isStaleConfirmationActionRejectionCode(rejectionCode);
         const fallbackMessage =
           err instanceof ChatStreamError && err.message
             ? err.message
             : t("chat.error_backtest");
-        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage);
+        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage, {
+          status, retryAfter: err instanceof ChatStreamError ? err.retryAfter : null,
+        });
+        dailyCap.record(httpErrorDisplay.recoveryDisplay);
         if (canApplyVisibleUpdate) {
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
               settleConfirmationAfterActionTransportError(
-                applyRetestReceipt(prev, userMsg.id, null).map((m) =>
-                  m.id === assistantId
-                    ? {
-                        ...m,
-                        content: staleConfirmationRejected
-                          ? ""
-                          : isRateLimit ? t("chat.rate_limit_error") : httpErrorDisplay.content,
-                        recoveryDisplay: staleConfirmationRejected
-                          ? {
-                              kind: "recovery_code" as const,
-                              code: rejectionCode,
-                            }
-                          : isRateLimit
-                            ? m.recoveryDisplay
-                            : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
-                        ...guestClaimErrorMessagePatch({ code: rejectionCode, retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null, retryAction: retryLastTurnAction, message: trimmed, assistantMessageId: assistantId }),
-                      }
-                    : m,
+                applyChatHttpErrorToMessages(
+                  applyRetestReceipt(prev, userMsg.id, null), httpErrorDisplay,
+                  { code: rejectionCode, retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null, retryAction: retryLastTurnAction, message: trimmed, assistantMessageId: assistantId },
                 ),
                 action,
                 { rejectionCode },
@@ -1766,7 +1756,7 @@ export default function ChatInterface() {
             ),
           );
         }
-        settleGuestClaimTransportReadiness(terminalReadiness, rejectionCode, assistantId, requestSessions.authorize(requestSession, "catch"));
+        settleAdmissionTransportReadiness(terminalReadiness, httpErrorDisplay.recoveryDisplay, assistantId, requestSessions.authorize(requestSession, "catch"));
         finishRequestTransport(requestSession);
       }
     })();
@@ -1809,6 +1799,7 @@ export default function ChatInterface() {
         return;
       }
       requestSessions.synchronizeAccountScope(null);
+      dailyCap.clear();
       setAccount(null);
       transcriptSessionCache.clearAuthenticatedState();
       resetToEmptyChatSurface();
@@ -2420,6 +2411,7 @@ export default function ChatInterface() {
                 canConsumeLandingStarter={initialRoutingSettled}
                 preferredName={greetingName}
                 placeholder={chatInputPlaceholder}
+                composerNotice={dailyCap.notice}
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}
                 onToast={showToast}
@@ -2441,7 +2433,8 @@ export default function ChatInterface() {
                   role="region"
                   aria-label={t("common.conversation", "Conversation")}
                   aria-busy={isHydratingConversation || guestSubmissionPending}
-                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pb-[190px] pt-[86px]"
+                  className="argus-scrollbar flex-1 overflow-y-auto px-4 pt-[86px]"
+                  style={{ paddingBottom: 190 + dailyCap.height }}
                 >
                   <div className="space-y-8">
                     {showConversationRetrievalState &&
@@ -2543,6 +2536,7 @@ export default function ChatInterface() {
                         />
                       </div>
                     )}
+                    {dailyCap.notice}
                     <ReceiptSelectionComposer><ChatInput
                       key={conversationId ?? "unowned-transcript"}
                       onSend={handleSend}
