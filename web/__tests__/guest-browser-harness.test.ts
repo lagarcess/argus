@@ -455,9 +455,9 @@ describe("browser safety evidence", () => {
     ).toBe(false);
   });
 
-  test("allows only the expected sanitized analytics write at a conversion gate", () => {
+  test("allows only the expected mutation delta at a conversion gate", () => {
     const before = {
-      "POST /api/v1/analytics/guest-events": 2,
+      "POST /api/v1/auth/guest/handoffs": 2,
       "POST /api/v1/chat/stream": 4,
     };
 
@@ -466,10 +466,10 @@ describe("browser safety evidence", () => {
         before,
         {
           ...before,
-          "POST /api/v1/analytics/guest-events": 3,
+          "POST /api/v1/auth/guest/handoffs": 3,
         },
         {
-          "POST /api/v1/analytics/guest-events": 1,
+          "POST /api/v1/auth/guest/handoffs": 1,
         },
       ),
     ).toBe(true);
@@ -478,11 +478,11 @@ describe("browser safety evidence", () => {
         before,
         {
           ...before,
-          "POST /api/v1/analytics/guest-events": 3,
+          "POST /api/v1/auth/guest/handoffs": 3,
           "POST /api/v1/chat/stream": 5,
         },
         {
-          "POST /api/v1/analytics/guest-events": 1,
+          "POST /api/v1/auth/guest/handoffs": 1,
         },
       ),
     ).toBe(false);

@@ -16,10 +16,6 @@ from argus.api.chat.confirmation import public_confirmation_projection
 from argus.api.chat.research_jobs import RESEARCH_OPERATION_SCOPE
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context, client_identity
-from argus.api.guest_observability import (
-    emit_first_guest_simulation_event,
-    emit_guest_funnel_event,
-)
 from argus.api.memory_ownership import memory_object_visible
 from argus.api.message_store import owned_conversation_message
 from argus.api.schemas import (
@@ -199,16 +195,6 @@ def run_backtest(
                 if decision == "replay":
                     return _replay_direct_job(request, user=user, job=job or {})
             if account.kind == "guest":
-                emit_guest_funnel_event(
-                    account=account,
-                    kind="guest_limit_reached",
-                    user_id=user.id,
-                    conversation_id=payload.conversation_id,
-                    surface="backtest",
-                    product_capability="simulation",
-                    conversion_reason="simulation_limit",
-                    terminal_outcome="limit_reached",
-                )
                 raise problem(
                     request,
                     status_code=403,
@@ -316,15 +302,6 @@ def run_backtest(
             ),
             context={"backtest_job_id": job_id, "retryable": True},
         )
-    emit_first_guest_simulation_event(
-        account=account_context(request),
-        kind="first_result_completed",
-        user_id=user.id,
-        conversation_id=finalized.run.conversation_id,
-        job_id=job_id,
-        backtest_run_id=finalized.run.id,
-        terminal_outcome="completed",
-    )
     return BacktestRunResponse(run=finalized.run)
 
 
@@ -482,15 +459,6 @@ def _admit_direct_run(
         job = memory_outcome.job
 
     if decision in ("admitted", "replay"):
-        if decision == "admitted":
-            emit_first_guest_simulation_event(
-                account=account,
-                kind="first_simulation_admitted",
-                user_id=user.id,
-                conversation_id=conversation_id,
-                job_id=str((job or {}).get("id") or "") or None,
-                terminal_outcome="admitted",
-            )
         return decision, job
     if decision == "conflict":
         raise problem(
@@ -513,16 +481,6 @@ def _admit_direct_run(
             headers={"Retry-After": "60"},
         )
     if decision == "conversion_required":
-        emit_guest_funnel_event(
-            account=account,
-            kind="guest_limit_reached",
-            user_id=user.id,
-            conversation_id=conversation_id,
-            surface="backtest",
-            product_capability="simulation",
-            conversion_reason="simulation_limit",
-            terminal_outcome="limit_reached",
-        )
         raise problem(
             request,
             status_code=403,
