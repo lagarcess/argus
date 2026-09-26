@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import functools
 import re
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated, Any, ClassVar, Literal
@@ -34,6 +35,7 @@ from pydantic_core import core_schema
 from argus.observability.envelope import (
     ArgusEventEnvelope,
     EventCaptureResult,
+    _default_environment,
     capture_event,
 )
 from argus.observability.product_events import actor_hash_for_user
@@ -262,25 +264,79 @@ def build_analytics_envelope(
     )
 
 
+# Envelope fields ``build_analytics_envelope()`` sets. Every other envelope
+# field must still hold its default on an analytics envelope.
+_REGISTRY_SET_FIELDS = frozenset(
+    {
+        "schema_version",
+        "event_id",
+        "occurred_at",
+        "environment",
+        "event_type",
+        "event_action",
+        "feature_area",
+        "actor_hash",
+        "attributes",
+        "analytics_event",
+        "internal_account",
+    }
+)
+
+
+def _is_uuid(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        return str(uuid.UUID(value)) == value
+    except ValueError:
+        return False
+
+
+def _has_registry_shape(envelope: ArgusEventEnvelope) -> bool:
+    """Every technical field is exactly what ``build_analytics_envelope()`` sets.
+
+    Technical properties are sent next to the event's own, so a free-text
+    ``schema_version``, ``event_id`` or ``environment`` would leave the app as
+    surely as a free-text event property.
+    """
+    if (
+        envelope.schema_version != ANALYTICS_SCHEMA_VERSION
+        or envelope.event_type != "analytics"
+        or envelope.event_action != "completed"
+        or envelope.feature_area != "product_analytics"
+        or envelope.environment != _default_environment()
+        or not _is_uuid(envelope.event_id)
+        or not isinstance(envelope.internal_account, bool)
+        or not _ACTOR_HASH.fullmatch(envelope.actor_hash or "")
+    ):
+        return False
+    return all(
+        getattr(envelope, name) == field.get_default(call_default_factory=False)
+        for name, field in ArgusEventEnvelope.model_fields.items()
+        if name not in _REGISTRY_SET_FIELDS
+    )
+
+
 def registered_payload(
     envelope: ArgusEventEnvelope,
 ) -> tuple[str, dict[str, Any]] | None:
     """The PostHog name and properties, only for a registry-built event.
 
     The sink calls this for every envelope and sends nothing when it returns
-    None. The envelope must carry an instance of exactly one registered model,
-    and that instance is validated again, because ``model_construct()`` or a
-    subclass could otherwise smuggle unchecked values past the model. The only
-    attribute allowed next to it is a well-formed ``guest_id_hash`` on
-    ``signed_in``, and ``distinct_id`` must be an actor hash.
+    None. The envelope must have exactly the shape ``build_analytics_envelope()``
+    gives it, technical fields included, and carry an instance of exactly one
+    registered model. That instance is validated again, because
+    ``model_construct()`` or a subclass could otherwise smuggle unchecked values
+    past the model. The only attribute allowed next to it is a well-formed
+    ``guest_id_hash`` on ``signed_in``, and ``distinct_id`` must be an actor hash.
     """
+    if not _has_registry_shape(envelope):
+        return None
     event = envelope.analytics_event
     if not isinstance(event, AnalyticsEvent):
         return None
     model = ANALYTICS_EVENT_MODELS.get(event.event_name)
     if model is None or type(event) is not model:
-        return None
-    if not _ACTOR_HASH.fullmatch(envelope.actor_hash or ""):
         return None
     try:
         checked = model.model_validate(

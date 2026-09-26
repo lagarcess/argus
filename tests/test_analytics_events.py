@@ -404,6 +404,34 @@ def _forged_envelopes():
         user_id="account-raw-id",
         internal_account=False,
     ).model_copy(update={"attributes": {"guest_id_hash": "person@example.com"}})
+    registry_built = build_analytics_envelope(
+        CardSaved(calculator="backtest"),
+        user_id="account-raw-id",
+        internal_account=False,
+    )
+    yield "generic envelope carrying a real model", build_event_envelope(
+        event_type="system",
+        event_action="failed",
+        feature_area="storage",
+        analytics_event=CardSaved(calculator="backtest"),
+        schema_version="person@example.com",
+        event_id="secret free text",
+        environment="question text",
+        internal_account=False,
+        actor_hash=valid_actor,
+    )
+    for field, value in (
+        ("schema_version", "person@example.com"),
+        ("event_id", "secret free text"),
+        ("environment", "question text"),
+        ("event_type", "system"),
+        ("feature_area", "storage"),
+        ("internal_account", None),
+        ("conversation_id", "conversation-raw-id"),
+        ("status", "RD$5,000"),
+        ("usage", {"amount": "RD$5,000"}),
+    ):
+        yield f"free-form {field}", registry_built.model_copy(update={field: value})
     yield "free text as the distinct id", build_analytics_envelope(
         CardSaved(calculator="time_value"),
         user_id="account-raw-id",

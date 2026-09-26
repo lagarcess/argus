@@ -6216,8 +6216,9 @@ registered now and fire in later stages.
 
 Each PostHog capture carries only the event's own properties plus these
 technical properties: `$process_person_profile` (always `false`),
-`schema_version`, `event_id`, `environment`, and `internal_account` (`true`
-unless the caller states the account is external). `signed_in` alone may also
+`schema_version`, `event_id`, `environment`, and `internal_account` (a boolean
+every caller must state). The sink checks each technical value is exactly what
+the registry sets. `signed_in` alone may also
 carry `guest_id_hash`. `distinct_id` is `actor_hash_for_user(<user id>)`: the
 account id for signed-in users and the guest user id for guests. Hashed
 conversation, message, or run ids, `status`, `latency_ms`, and nested

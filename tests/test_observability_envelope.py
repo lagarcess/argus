@@ -148,12 +148,14 @@ def test_posthog_capture_is_a_personless_server_event(monkeypatch) -> None:
     assert "guest-raw-id" not in str(body)
 
 
-def test_analytics_payload_fails_closed_without_an_internal_flag() -> None:
+def test_an_analytics_envelope_without_an_internal_flag_is_not_sent() -> None:
+    """The registry always states ``internal_account``; an envelope that does not
+    was not built by it."""
     envelope = _analytics_envelope().model_copy(update={"internal_account": None})
 
-    payload = posthog_event_payload(envelope, api_key="ph_project_token")
-
-    assert payload["properties"]["internal_account"] is True
+    assert capture_event(envelope).reason == "not_an_analytics_event"
+    with pytest.raises(ValueError):
+        posthog_event_payload(envelope, api_key="ph_project_token")
 
 
 def test_signed_in_payload_carries_the_guest_hash_not_the_guest_id() -> None:

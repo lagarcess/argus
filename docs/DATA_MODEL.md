@@ -1250,8 +1250,8 @@ fails if any field could hold free text or a money-formatted value (A4).
 - Technical properties, sent with every event and nothing else besides the
   event's own properties: `$process_person_profile` (always `false`),
   `schema_version`, `event_id`, `environment`, and `internal_account`
-  (`true` unless the caller states the account is external, so an unknown
-  account never counts). `distinct_id` is `actor_hash_for_user(<user id>)`:
+  (a boolean every caller must state; the sink refuses an envelope without one,
+  and any technical value the registry did not set). `distinct_id` is `actor_hash_for_user(<user id>)`:
   the account id for signed-in users, the guest user id for guests.
   `guest_id_hash` is the same hash of the guest user id, so a guest's events
   and the account's `signed_in` join without person profiles or aliasing.

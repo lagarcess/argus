@@ -337,9 +337,7 @@ def posthog_event_payload(
             "schema_version": envelope.schema_version,
             "event_id": envelope.event_id,
             "environment": envelope.environment,
-            # Fail closed: an event that does not say it is external never
-            # counts toward the one number.
-            "internal_account": envelope.internal_account is not False,
+            "internal_account": envelope.internal_account,
         },
     }
 
