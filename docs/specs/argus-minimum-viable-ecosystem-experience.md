@@ -60,7 +60,7 @@ Approval locks the product direction, not a claim that demand or retention has a
 - Retain the current Argus visual identity and typography. The founder rejected replacing it with a new visual identity.
 - Feel elegant, modern, crisp, calm, and trustworthy: a personal financial control room with the reassurance of a citadel.
 - Optimize for a phone and natural, one-handed flows. Avoid shrinking a desktop dashboard onto mobile.
-- Native iOS and Android apps are the intended mobile products, not PWA shells. Web remains a useful product surface; platform implementation and sequencing are separate decisions.
+- Native iOS and Android apps are the intended mobile products, not PWA shells. Web remains a useful product surface. The [interface stacks are founder-locked](../ARCHITECTURE.md#approved-platform-direction); detailed client contracts and delivery sequencing remain separate decisions.
 - Use progressive disclosure: clear summaries first, details when requested. Avoid walls of charts, dense tables, decorative widgets, and unnecessary setup.
 - Preserve Spanish and English support, with the Dominican audience informing language and examples.
 - Treat DOP and USD separately. Do not silently combine currencies. Any future conversion must expose its rate, date, and source.

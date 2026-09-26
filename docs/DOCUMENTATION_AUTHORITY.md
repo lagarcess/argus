@@ -18,7 +18,7 @@
 | What is Argus becoming, for whom, and how should it feel and work? | [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) | Approved experience, not a shipped-feature inventory or technical implementation specification |
 | How does that relate to the existing product? | [PRODUCT.md](PRODUCT.md) | Current product overview and explicit existing-capability contracts; verify actual availability against code/release evidence |
 | Which founder decisions changed, and when? | [Decision log](specs/argus-decision-log.md) | Decision provenance and links; detailed requirements remain with their owner |
-| What architecture, payloads, and persistence contracts apply? | Architecture, API contract, and data model docs above | Existing system contracts/technical intent; some statements describe targets, not proof of implementation |
+| What architecture, payloads, and persistence contracts apply? | Architecture, API contract, and data model docs above | Existing system contracts/technical intent and the [locked interface stacks](ARCHITECTURE.md#approved-platform-direction); some statements describe targets, not proof of implementation |
 | What visual and interaction conventions apply? | [DESIGN.md](../.agent/designs/argus/DESIGN.md) | Preserve current design system and chat detail; MVEE owns the pivot's surface structure and platform intent |
 | What is an agent authorized to build now? | Explicit assignment and its scoped package/spec | MVEE approval does not assign every feature, unlock stages, or authorize provider integrations |
 | How is work reviewed and released? | AGENTS.md, [CI/CD discipline](specs/private-alpha-ci-cd-sota.md), [launch runbook](PRIVATE_LAUNCH_RUNBOOK.md), [manifest template](release-manifests/TEMPLATE.md) | Existing evaluation, privacy, branch, merge, and deployment gates remain in force |
@@ -28,7 +28,7 @@
 
 The MVEE is the single detailed owner of the approved ecosystem. Its section 1.1 locks the audience and near-term financial emphasis; section 12 includes partner invitations and personal/household views. Sections 3–5 define surfaces and information ingestion. Sections 8–9 distinguish boundaries and open decisions. Section 11 defines pain-point coverage and the reinforcing loop.
 
-The product remains one connected Argus experience that carries forward existing chat, calculations, research, and historical comparisons. These capabilities are not gated behind debt repayment. The design direction retains the Argus visual identity. Native iOS/Android plus web are the intended platforms; architecture and sequencing are not selected here.
+The product remains one connected Argus experience that carries forward existing chat, calculations, research, and historical comparisons. These capabilities are not gated behind debt repayment. The design direction retains the Argus visual identity. Native iOS/Android plus web and their [interface stacks](ARCHITECTURE.md#approved-platform-direction) are approved. Detailed client architecture and sequencing remain open.
 
 “Locked” means founder-approved direction. It does not mean implemented, validated market demand, a final schema, a model instruction change, or permission to deploy.
 
@@ -56,7 +56,7 @@ Do not infer these from a polished demo or the MVEE:
 - API routes, action schemas, chat-to-record integration, runtime state ownership, jobs, and event contracts for the new surfaces.
 - Voice/OCR providers, supported file formats/institutions, secure bank-access design, wallet/device capabilities, and automatic-acceptance policies.
 - Scheduling, external-fact monitoring, notification delivery channels, and associated data access.
-- Native app architecture, shared components, delivery order, rollout flags, acceptance gates, and work packages for the full ecosystem.
+- Native client architecture beyond the locked interface stacks: shared contracts/components, authentication, local storage/offline synchronization, supported OS/device ranges, delivery order, rollout flags, acceptance gates, and work packages for the full ecosystem.
 
 Before implementing a change in these areas, define its bounded technical contract and acceptance conditions using the existing system as the starting point. Continue unrelated authorized work; escalate a concrete unresolved product choice or conflicting package instead of inventing it.
 
