@@ -39,7 +39,6 @@ from argus.domain.search_text import (
     search_has_indexable_token,
     search_query_is_indexable,
 )
-from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1", tags=["search"])
 
@@ -124,21 +123,6 @@ def search(
             else _ledger_groups_from_counts(None)
             if include_ledger_groups
             else None
-        )
-        capture_product_event(
-            "recall_usage",
-            user_id=user.id,
-            status="completed",
-            attributes={
-                "query_present": True,
-                "decision_state_filter_present": decision_state is not None,
-                "result_count": 0,
-                "returned_types": [],
-                "has_more": False,
-                "source": (
-                    "supabase" if api_state.supabase_gateway is not None else "memory"
-                ),
-            },
         )
         return PaginatedSearch(
             items=[],
@@ -344,19 +328,6 @@ def search(
         query=query,
         guest_conversation_id=workspace_conversation_id,
     )
-    capture_product_event(
-        "recall_usage",
-        user_id=user.id,
-        status="completed",
-        attributes={
-            "query_present": bool(query),
-            "decision_state_filter_present": decision_state is not None,
-            "result_count": len(page_items) + (1 if asset_rollup is not None else 0),
-            "returned_types": _returned_types(page_items, asset_rollup=asset_rollup),
-            "has_more": has_more,
-            "source": "supabase" if api_state.supabase_gateway is not None else "memory",
-        },
-    )
     return PaginatedSearch(
         items=[
             *([asset_rollup] if asset_rollup is not None else []),
@@ -388,17 +359,3 @@ def _ledger_groups_from_counts(
         SearchLedgerGroup(decision_state=state, count=int(values.get(state, 0)))
         for state in LEDGER_DECISION_STATE_ORDER
     ]
-
-
-def _returned_types(
-    page_items: list[tuple[int, SearchItem]],
-    *,
-    asset_rollup: SearchAssetRollup | None,
-) -> list[str]:
-    returned: list[str] = []
-    if asset_rollup is not None:
-        returned.append(asset_rollup.type)
-    for _, item in page_items:
-        if item.type not in returned:
-            returned.append(item.type)
-    return returned

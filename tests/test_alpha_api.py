@@ -494,12 +494,6 @@ def test_memory_direct_admission_persists_guest_traffic_class(
             capabilities=guest_capabilities(),
         ),
     )
-    monkeypatch.setattr(
-        backtest_router,
-        "emit_guest_funnel_event",
-        lambda **_: None,
-    )
-
     decision, job = backtest_router._admit_direct_run(
         request,
         user=user,
@@ -2084,16 +2078,14 @@ def test_search_memory_mode_centers_fragment_on_late_message_match() -> None:
     assert repeated.json()["items"][0]["match"]["fragment"] == fragment
 
 
-def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
-    observed: list[dict[str, object]] = []
-
-    def fake_capture(kind: str, **kwargs: object) -> None:
-        observed.append({"kind": kind, **kwargs})
-
+def test_search_sends_no_recall_usage_event(monkeypatch) -> None:
+    """recall_usage was retired from PostHog by SPEC 0 package 0C-1."""
+    posts: list[object] = []
+    monkeypatch.setenv("POSTHOG_PROJECT_TOKEN", "ph_project_token")
+    monkeypatch.setenv("POSTHOG_REGION", "us")
     monkeypatch.setattr(
-        "argus.api.routers.search.capture_product_event",
-        fake_capture,
-        raising=False,
+        "argus.observability.envelope.httpx.post",
+        lambda *args, **kwargs: posts.append((args, kwargs)),
     )
     client = _client()
     user_id = api_state.store.get_or_create_dev_user().id
@@ -2107,21 +2099,7 @@ def test_search_emits_recall_usage_product_event(monkeypatch) -> None:
     response = client.get("/api/v1/search?q=tesla&limit=20")
 
     assert response.status_code == 200
-    assert observed == [
-        {
-            "kind": "recall_usage",
-            "user_id": user_id,
-            "status": "completed",
-            "attributes": {
-                "query_present": True,
-                "decision_state_filter_present": False,
-                "result_count": 1,
-                "returned_types": ["conversation"],
-                "has_more": False,
-                "source": "memory",
-            },
-        }
-    ]
+    assert posts == []
 
 
 def test_search_collapses_p1_artifacts_into_source_conversation() -> None:

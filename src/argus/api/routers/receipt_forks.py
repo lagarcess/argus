@@ -5,7 +5,7 @@ from __future__ import annotations
 from threading import RLock
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict
 
 from argus.api import state as api_state
@@ -25,7 +25,6 @@ from argus.domain.public_excerpt_forks import (
     fork_marker,
     resolve_fork_replay,
 )
-from argus.observability.product_events import capture_product_event
 
 router = APIRouter(prefix="/api/v1/public", tags=["public-receipts"])
 _MEMORY_LOCK = RLock()
@@ -97,7 +96,6 @@ def fork_receipt(
     public_id: str,
     payload: PublicExcerptForkRequest,
     request: Request,
-    background_tasks: BackgroundTasks,
     user: User = Depends(current_user),  # noqa: B008
 ) -> PublicExcerptForkResponse:
     require_evidence_receipt_sharing_enabled()
@@ -151,11 +149,4 @@ def fork_receipt(
             title="Shared conversation unavailable",
             detail=error.code,
         ) from error
-    if created:
-        background_tasks.add_task(
-            capture_product_event,
-            "receipt_followed_up",
-            user_id=None,
-            status="followed_up",
-        )
     return PublicExcerptForkResponse(conversation=conversation, created=created)

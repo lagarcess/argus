@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from argus.observability import EventCaptureResult
 from argus.observability.product_events import (
     _PRODUCT_EVENT_MAP,
@@ -8,18 +9,15 @@ from argus.observability.product_events import (
 )
 
 
-def test_product_event_mapping_covers_measurement_lane_set() -> None:
+def test_retired_product_events_keep_only_the_kinds_awaiting_rename() -> None:
+    """SPEC 0 0C-1: every other product event is gone. These three stay only at
+    the call sites 0C-4 and 0C-8 replace with analytics events."""
     cases = {
-        "evidence_capture": ("storage", "completed", "evidence_capture"),
         "decision_capture": ("decision_saved", "completed", "decision_capture"),
-        "recall_usage": ("tool_result", "completed", "recall"),
-        "continuity_mismatch": ("recovery", "failed", "continuity"),
-        "compare_started": ("compare_started", "started", "result_explanation"),
-        "next_experiments_offered": ("system", "completed", "result_explanation"),
-        "next_experiment_selected": ("system", "completed", "result_explanation"),
-        "eval_readiness": ("eval_suite_run", "completed", "chat_interpretation"),
+        "receipt_created": ("storage", "completed", "evidence_capture"),
         "account_registration_completed": ("storage", "completed", "guest_acquisition"),
     }
+    assert set(_PRODUCT_EVENT_MAP) == set(cases)
 
     for kind, expected in cases.items():
         envelope = build_product_event(
@@ -36,44 +34,42 @@ def test_product_event_mapping_covers_measurement_lane_set() -> None:
         ) == expected
         assert envelope.actor_hash is not None
         assert envelope.actor_hash != "user-1"
-        assert envelope.conversation_id == "conversation-1"
         assert envelope.attributes == {"safe_count": 1, "product_event": kind}
 
 
-def test_capture_product_event_uses_shared_capture_path(monkeypatch) -> None:
-    captured = []
+@pytest.mark.parametrize("kind", sorted(_PRODUCT_EVENT_MAP))
+def test_retired_product_events_stop_at_the_sink(monkeypatch, kind: str) -> None:
+    posts: list[object] = []
+    monkeypatch.setenv("POSTHOG_PROJECT_TOKEN", "ph_project_token")
+    monkeypatch.setenv("POSTHOG_REGION", "us")
+    monkeypatch.setattr(
+        "argus.observability.envelope.httpx.post",
+        lambda *args, **kwargs: posts.append((args, kwargs)),
+    )
 
-    def fake_capture(envelope):  # noqa: ANN001
-        captured.append(envelope)
-        return EventCaptureResult(
-            status="captured",
-            reason=None,
-            event_id=envelope.event_id,
-            destination="posthog",
-        )
+    result = capture_product_event(kind, user_id="user-1", status="completed")
 
-    monkeypatch.setattr("argus.observability.product_events.capture_event", fake_capture)
+    assert result.status == "suppressed"
+    assert result.reason == "not_an_analytics_event"
+    assert posts == []
 
-    result = capture_product_event(
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "evidence_capture",
         "recall_usage",
-        user_id="user-1",
-        conversation_id="conversation-1",
-        message_id="message-1",
-        status="completed",
-        attributes={"result_count": 3},
-    )
-
-    assert result.status == "captured"
-    assert captured
-    assert captured[0].feature_area == "recall"
-    assert captured[0].message_id == "message-1"
-    assert captured[0].attributes == {
-        "result_count": 3,
-        "product_event": "recall_usage",
-    }
-
-
-def test_capture_product_event_unknown_kind_fails_open(monkeypatch) -> None:
+        "continuity_mismatch",
+        "compare_started",
+        "next_experiments_offered",
+        "next_experiment_selected",
+        "eval_readiness",
+        "receipt_revoked",
+        "receipt_viewed",
+        "not_a_registered_product_event",
+    ],
+)
+def test_capture_product_event_unknown_kind_fails_open(monkeypatch, kind: str) -> None:
     captured = []
 
     def fake_capture(envelope):  # noqa: ANN001
@@ -87,54 +83,8 @@ def test_capture_product_event_unknown_kind_fails_open(monkeypatch) -> None:
 
     monkeypatch.setattr("argus.observability.product_events.capture_event", fake_capture)
 
-    result = capture_product_event(
-        "not_a_registered_product_event",
-        user_id="user-1",
-        conversation_id="conversation-1",
-    )
+    result = capture_product_event(kind, user_id="user-1", conversation_id="c-1")
 
     assert result.status == "failed"
     assert result.reason == "unknown_product_event_kind"
     assert captured == []
-
-
-def test_runtime_emitted_product_event_kinds_are_registered() -> None:
-    for kind in (
-        "next_experiments_offered",
-        "next_experiment_selected",
-        "compare_started",
-    ):
-        assert kind in _PRODUCT_EVENT_MAP
-
-
-def test_capture_product_event_maps_next_experiment_selected(monkeypatch) -> None:
-    captured = []
-
-    def fake_capture(envelope):  # noqa: ANN001
-        captured.append(envelope)
-        return EventCaptureResult(
-            status="captured",
-            reason=None,
-            event_id=envelope.event_id,
-            destination="posthog",
-        )
-
-    monkeypatch.setattr("argus.observability.product_events.capture_event", fake_capture)
-
-    result = capture_product_event(
-        "next_experiment_selected",
-        user_id="user-1",
-        conversation_id="conversation-1",
-        attributes={"kind": "change_date_range", "position": 0},
-    )
-
-    assert result.status == "captured"
-    assert result.reason != "unknown_product_event_kind"
-    assert captured[0].event_type == "system"
-    assert captured[0].event_action == "completed"
-    assert captured[0].feature_area == "result_explanation"
-    assert captured[0].attributes == {
-        "kind": "change_date_range",
-        "position": 0,
-        "product_event": "next_experiment_selected",
-    }
