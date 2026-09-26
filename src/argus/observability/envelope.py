@@ -201,10 +201,6 @@ class ArgusEventEnvelope(BaseModel):
     sampling_rate: float | None = None
     retention_class: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
-    # Set only by ``analytics_events.build_analytics_envelope()``: the
-    # registered event model itself, re-validated by the sink before sending.
-    analytics_event: Any = None
-    internal_account: bool | None = None
 
 
 class EventCaptureResult(BaseModel):
@@ -295,7 +291,9 @@ def capture_event(envelope: ArgusEventEnvelope) -> EventCaptureResult:
             "PostHog product event capture failed",
             error=str(exc),
             event_id=envelope.event_id,
-            analytics_event=getattr(envelope.analytics_event, "event_name", None),
+            analytics_event=getattr(
+                getattr(envelope, "analytics_event", None), "event_name", None
+            ),
         )
         return EventCaptureResult(
             status="failed",
@@ -337,7 +335,8 @@ def posthog_event_payload(
             "schema_version": envelope.schema_version,
             "event_id": envelope.event_id,
             "environment": envelope.environment,
-            "internal_account": envelope.internal_account,
+            # Present and a bool: ``_registered_payload()`` checked it.
+            "internal_account": envelope.internal_account,  # type: ignore[attr-defined]
         },
     }
 

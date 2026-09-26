@@ -6189,7 +6189,8 @@ Core fields:
 - `sampling_rate`
 - `retention_class`
 - `attributes`
-- `analytics_event` and `internal_account`, set only on analytics events
+- `analytics_event` and `internal_account`, which exist only on the frozen
+  `AnalyticsEnvelope` the registry builds; the generic envelope cannot carry them
 
 ### Product analytics events (wave 1, SPEC 0)
 
@@ -6200,8 +6201,10 @@ values, booleans, a bounded integer, a calculation name checked against the
 calculation catalog at validation time, or the pattern-checked invite
 `cohort`. An amount, a name, an email, question or answer text, or any other
 free text cannot be represented. Events are sent only through
-`capture_analytics_event()`: the envelope carries the registered model itself,
-and the sink validates it again before sending. Anything else, including an
+`capture_analytics_event()`: only the frozen `AnalyticsEnvelope` the registry
+builds can carry an event, and the sink validates it again before sending,
+including that its timestamp is the build time (aware UTC, not backdated or in
+the future). Anything else, including an
 envelope that only names an event, is suppressed with
 `reason = "not_an_analytics_event"`, so nothing else reaches PostHog.
 

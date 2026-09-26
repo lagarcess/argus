@@ -353,25 +353,85 @@ def test_an_unregistered_event_model_is_refused(
 # ── The sink trusts only what the registry built and re-validates ─────────────
 
 
+def _generic_envelope_kwargs() -> list[tuple[str, dict[str, Any]]]:
+    valid_actor = actor_hash_for_user("account-raw-id")
+    return [
+        (
+            "arbitrary name and attributes",
+            {
+                "event_type": "analytics",
+                "event_action": "completed",
+                "feature_area": "product_analytics",
+                "analytics_event": "anything_at_all",
+                "internal_account": False,
+                "actor_hash": valid_actor,
+                "attributes": {"amount": "RD$5,000", "question": "How much do I owe?"},
+            },
+        ),
+        (
+            "registered name as a string",
+            {
+                "event_type": "analytics",
+                "event_action": "completed",
+                "feature_area": "product_analytics",
+                "analytics_event": "card_saved",
+                "internal_account": False,
+                "actor_hash": valid_actor,
+                "attributes": {"calculator": "time_value"},
+            },
+        ),
+        (
+            "real model with free-text technical fields",
+            {
+                "event_type": "system",
+                "event_action": "failed",
+                "feature_area": "storage",
+                "analytics_event": CardSaved(calculator="backtest"),
+                "schema_version": "person@example.com",
+                "event_id": "secret free text",
+                "environment": "question text",
+                "internal_account": False,
+                "actor_hash": valid_actor,
+            },
+        ),
+        (
+            "real model with the registry literals and a backdated timestamp",
+            {
+                "schema_version": "argus_analytics_event/v1",
+                "event_type": "analytics",
+                "event_action": "completed",
+                "feature_area": "product_analytics",
+                "analytics_event": CardSaved(calculator="backtest"),
+                "occurred_at": datetime(2020, 1, 1, tzinfo=timezone.utc),
+                "internal_account": False,
+                "actor_hash": valid_actor,
+            },
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("case", "kwargs"),
+    _generic_envelope_kwargs(),
+    ids=[case for case, _ in _generic_envelope_kwargs()],
+)
+def test_a_generic_envelope_cannot_carry_an_analytics_event(
+    case: str,
+    kwargs: dict[str, Any],
+) -> None:
+    """Only ``AnalyticsEnvelope`` has the field, and only the registry builds it."""
+    with pytest.raises(ValidationError):
+        build_event_envelope(**kwargs)
+
+
 def _forged_envelopes():
     valid_actor = actor_hash_for_user("account-raw-id")
-    yield "arbitrary name and attributes", build_event_envelope(
+    yield "generic envelope with the registry literals", build_event_envelope(
+        schema_version="argus_analytics_event/v1",
         event_type="analytics",
         event_action="completed",
         feature_area="product_analytics",
-        analytics_event="anything_at_all",
-        internal_account=False,
         actor_hash=valid_actor,
-        attributes={"amount": "RD$5,000", "question": "How much do I owe?"},
-    )
-    yield "registered name as a string", build_event_envelope(
-        event_type="analytics",
-        event_action="completed",
-        feature_area="product_analytics",
-        analytics_event="card_saved",
-        internal_account=False,
-        actor_hash=valid_actor,
-        attributes={"calculator": "time_value"},
     )
     yield "model_construct skips validation", build_analytics_envelope(
         CardSaved(calculator="time_value"),
@@ -409,29 +469,30 @@ def _forged_envelopes():
         user_id="account-raw-id",
         internal_account=False,
     )
-    yield "generic envelope carrying a real model", build_event_envelope(
-        event_type="system",
-        event_action="failed",
-        feature_area="storage",
-        analytics_event=CardSaved(calculator="backtest"),
-        schema_version="person@example.com",
-        event_id="secret free text",
-        environment="question text",
-        internal_account=False,
-        actor_hash=valid_actor,
-    )
-    for field, value in (
-        ("schema_version", "person@example.com"),
-        ("event_id", "secret free text"),
-        ("environment", "question text"),
-        ("event_type", "system"),
-        ("feature_area", "storage"),
-        ("internal_account", None),
-        ("conversation_id", "conversation-raw-id"),
-        ("status", "RD$5,000"),
-        ("usage", {"amount": "RD$5,000"}),
+    for label, field, value in (
+        ("free-text schema_version", "schema_version", "person@example.com"),
+        ("free-text event_id", "event_id", "secret free text"),
+        ("free-text environment", "environment", "question text"),
+        ("generic event_type", "event_type", "system"),
+        ("generic feature_area", "feature_area", "storage"),
+        ("missing internal_account", "internal_account", None),
+        ("conversation id set", "conversation_id", "conversation-raw-id"),
+        ("amount as status", "status", "RD$5,000"),
+        ("amount in usage", "usage", {"amount": "RD$5,000"}),
+        ("backdated timestamp", "occurred_at", datetime(2020, 1, 1, tzinfo=timezone.utc)),
+        (
+            "future timestamp",
+            "occurred_at",
+            datetime.now(timezone.utc) + timedelta(days=1),
+        ),
+        ("naive timestamp", "occurred_at", datetime.now()),
+        (
+            "non-UTC timestamp",
+            "occurred_at",
+            datetime.now(timezone(timedelta(hours=-4))),
+        ),
     ):
-        yield f"free-form {field}", registry_built.model_copy(update={field: value})
+        yield label, registry_built.model_copy(update={field: value})
     yield "free text as the distinct id", build_analytics_envelope(
         CardSaved(calculator="time_value"),
         user_id="account-raw-id",

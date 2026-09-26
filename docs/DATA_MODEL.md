@@ -1207,9 +1207,10 @@ Current behavior:
   analytics events carry `argus_analytics_event/v1`.
 - Default privacy mode is `metadata_only`.
 - The only way an event reaches PostHog is `capture_analytics_event()` in
-  `src/argus/observability/analytics_events.py`. The envelope carries the
-  registered event model itself, and the sink validates it again before
-  sending. It suppresses everything else with
+  `src/argus/observability/analytics_events.py`. Only the frozen
+  `AnalyticsEnvelope` it builds can carry an event (the generic envelope has no
+  such field), and the sink validates it again before sending, technical
+  fields and build timestamp included. It suppresses everything else with
   `reason = "not_an_analytics_event"`, including an envelope that only names an
   event, a subclass or unvalidated copy of a model, extra attributes, or a
   `distinct_id` that is not an actor hash. The eval harness writes nothing to

@@ -19,6 +19,7 @@ import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import (
@@ -105,6 +106,11 @@ AnalyticsLanguage = Literal["en", "es-419"]
 
 # No real person has been using Argus for a century.
 MAX_DAYS_SINCE_SIGNUP = 36_500
+
+# An analytics envelope is sent right after it is built. Its timestamp is the
+# build time, so one far from now was not stamped by the registry.
+_MAX_ENVELOPE_AGE = timedelta(minutes=5)
+_MAX_CLOCK_SKEW = timedelta(seconds=5)
 
 
 class AnalyticsEvent(BaseModel):
@@ -233,6 +239,21 @@ TECHNICAL_PROPERTIES: frozenset[str] = frozenset(
 )
 
 
+class AnalyticsEnvelope(ArgusEventEnvelope):
+    """The only envelope type that can carry an analytics event.
+
+    The generic ``ArgusEventEnvelope`` forbids extra fields, so it cannot hold
+    ``analytics_event`` at all. This type is built only by
+    ``build_analytics_envelope()`` and is frozen, and the sink accepts no other
+    type.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    analytics_event: AnalyticsEvent
+    internal_account: bool
+
+
 def build_analytics_envelope(
     event: AnalyticsEvent,
     *,
@@ -252,7 +273,7 @@ def build_analytics_envelope(
         guest_id_hash = actor_hash_for_user(guest_user_id)
         if guest_id_hash is not None:
             attributes["guest_id_hash"] = guest_id_hash
-    return ArgusEventEnvelope(
+    return AnalyticsEnvelope(
         schema_version=ANALYTICS_SCHEMA_VERSION,
         event_type="analytics",
         event_action="completed",
@@ -292,7 +313,7 @@ def _is_uuid(value: object) -> bool:
         return False
 
 
-def _has_registry_shape(envelope: ArgusEventEnvelope) -> bool:
+def _has_registry_shape(envelope: AnalyticsEnvelope) -> bool:
     """Every technical field is exactly what ``build_analytics_envelope()`` sets.
 
     Technical properties are sent next to the event's own, so a free-text
@@ -310,11 +331,21 @@ def _has_registry_shape(envelope: ArgusEventEnvelope) -> bool:
         or not _ACTOR_HASH.fullmatch(envelope.actor_hash or "")
     ):
         return False
+    if not _stamped_now(envelope.occurred_at):
+        return False
     return all(
         getattr(envelope, name) == field.get_default(call_default_factory=False)
         for name, field in ArgusEventEnvelope.model_fields.items()
         if name not in _REGISTRY_SET_FIELDS
     )
+
+
+def _stamped_now(occurred_at: object) -> bool:
+    """An aware UTC build time, not backdated and not in the future."""
+    if not isinstance(occurred_at, datetime) or occurred_at.utcoffset() != timedelta(0):
+        return False
+    now = datetime.now(timezone.utc)
+    return now - _MAX_ENVELOPE_AGE <= occurred_at <= now + _MAX_CLOCK_SKEW
 
 
 def registered_payload(
@@ -323,14 +354,14 @@ def registered_payload(
     """The PostHog name and properties, only for a registry-built event.
 
     The sink calls this for every envelope and sends nothing when it returns
-    None. The envelope must have exactly the shape ``build_analytics_envelope()``
-    gives it, technical fields included, and carry an instance of exactly one
-    registered model. That instance is validated again, because
+    None. The envelope must be an ``AnalyticsEnvelope`` with exactly the shape
+    ``build_analytics_envelope()`` gives it, technical fields and timestamp
+    included, and carry an instance of exactly one registered model. That instance is validated again, because
     ``model_construct()`` or a subclass could otherwise smuggle unchecked values
     past the model. The only attribute allowed next to it is a well-formed
     ``guest_id_hash`` on ``signed_in``, and ``distinct_id`` must be an actor hash.
     """
-    if not _has_registry_shape(envelope):
+    if type(envelope) is not AnalyticsEnvelope or not _has_registry_shape(envelope):
         return None
     event = envelope.analytics_event
     if not isinstance(event, AnalyticsEvent):
