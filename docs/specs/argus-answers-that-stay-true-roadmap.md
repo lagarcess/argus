@@ -1,8 +1,15 @@
 # Argus Roadmap: Answers That Stay True
 
-Status: **ACTIVE, draft.** Opened 2026-09-18. The pillars are set; the founder
-decisions listed below are still open, and no lane starts on a pillar until its
-decision is made.
+Status: **HISTORICAL PRODUCT BOARD / CARRIED-WORK REFERENCE**, updated
+September 26, 2026. The [MVEE](argus-minimum-viable-ecosystem-experience.md)
+supersedes conflicting product direction. The original September 18 board,
+open questions, issue references, and operating rules below are preserved as
+history; check the [decision log](argus-decision-log.md) before treating an
+old question as unresolved. No new work is assigned by this board.
+
+Use [documentation authority](../DOCUMENTATION_AUTHORITY.md) for current
+ownership and [Wave 1](wave-1/README.md) for explicitly assigned packages.
+This status change does not close carried issues or cancel authorized work.
 
 Read [`docs/PRODUCT.md`](../PRODUCT.md) first. The previous board, which shipped
 in full to production `a9286b21` on 2026-09-17, is archived at

@@ -1,5 +1,13 @@
 # Design System Inspired by Argus
 
+> **Experience authority — September 26, 2026:** Preserve the Argus visual
+> identity, typography, chat detail, accessibility, and motion conventions here.
+> The [MVEE](../../../docs/specs/argus-minimum-viable-ecosystem-experience.md)
+> owns the approved ecosystem structure, household contexts, native platform
+> intent, and mobile glass navigation direction. These are experience decisions,
+> not shipped UI or a selected native implementation. See the
+> [authority map](../../../docs/DOCUMENTATION_AUTHORITY.md).
+
 ## 1. Visual Theme & Atmosphere
 
 Argus's design system communicates that investing ideas are handled with clarity, care, and confidence through massive typography, generous whitespace, and a disciplined neutral palette. This system is designed for risk-free idea testing, ensuring the user feels empowered rather than intimidated. The visual language is built on Space Grotesk, a geometric grotesque that creates billboard-scale headlines at 136px with weight 500 and aggressive negative tracking (-2.72px). This isn't subtle branding; it's clarity at stadium scale.
@@ -111,7 +119,10 @@ Argus avoids "casino-terminal" vibrancy. Semantic tones are desaturated to feel 
 - No shadows — flat surfaces with color contrast
 - Dark and light section alternation
 
-### Navigation
+### Existing Alpha Navigation
+
+The MVEE owns the pivot navigation and header behavior; retain the following as existing Alpha styling context.
+
 - Space Grotesk 20px weight 500
 - Clean header, hamburger toggle at 12px radius
 - Pill CTAs right-aligned
@@ -132,10 +143,10 @@ Argus avoids "casino-terminal" vibrancy. Semantic tones are desaturated to feel 
 
 | Level | Treatment | Use |
 |-------|-----------|-----|
-| Flat (Level 0) | No shadow | Everything — Argus uses zero shadows |
+| Flat (Level 0) | No shadow | Existing content surfaces; MVEE mobile navigation has a separate glass direction |
 | Focus | `0 0 0 0.125rem` ring | Accessibility focus |
 
-**Shadow Philosophy**: Argus uses ZERO shadows. Depth comes entirely from the dark/light section contrast and the generous whitespace between elements.
+**Existing surface treatment**: Preserve flat content surfaces. The MVEE explicitly approves a glass treatment for mobile navigation; exact material, elevation, and native implementation remain design/engineering work. That exception does not authorize decorative shadows throughout the app.
 
 ## 7. Do's and Don'ts
 
@@ -185,9 +196,9 @@ _Design targets below are intentional for this system; if implementation keeps T
 4. Muted semantic colors — never terminal neon.
 5. Calm motion and status language for trust.
 
-## 10. Alpha Product UX Principles
+## 10. Product UX Principles
 
-- **Chat is the primary surface**: The product lives in the conversation.
+- **Preserve chat within the ecosystem**: Existing chat behavior remains valuable. The MVEE owns the roles of chat and the other surfaces; manual entry and direct controls are first-class paths.
 - **Not a Dashboard**: Argus should never feel like a dashboard-first backtesting tool.
 - **Conversational Progressive Disclosure**: Use AI to guide the user through complexity rather than presenting dense configuration screens.
 - **Trust Through Honesty**: Result cards must be simple, trustworthy, and explanation-ready.

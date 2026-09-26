@@ -1,17 +1,39 @@
 # PRODUCT.md
 
-## Argus Product Source of Truth (Alpha MVP)
+## Argus Product Overview and Existing Alpha Baseline
 
-**Status:** Active | **Alpha Product v1 Locked**
+**Status:** Active overview; approved pivot experience is owned by the MVEE (September 26, 2026).
 **Audience:** Founders, engineers, AI agents, designers
-**Purpose:** Define what Argus is, who it serves, what we are building now, and what we are explicitly not building now.
+**Purpose:** Connect the approved product direction to the existing Alpha foundation without presenting future capabilities as shipped.
+
+## Approved direction
+
+Argus helps people understand where they stand, keep their money organized,
+and know what to do next. The founder-approved
+[minimum viable ecosystem experience](specs/argus-minimum-viable-ecosystem-experience.md)
+owns the audience, surfaces, ingestion, household collaboration, boundaries,
+and open decisions. Existing grounded chat, calculations, research, and
+historical simulations carry forward into that ecosystem.
+
+Use [documentation authority](DOCUMENTATION_AUTHORITY.md) for reading order,
+Wave 1 reconciliation, and document ownership. This document does not duplicate
+the detailed MVEE requirements or assign a new implementation schedule.
+
+## Existing foundation and availability boundary
+
+The numbered sections below retain Alpha behavior and scope references. Their
+chat-primary journey, activation metrics, and web/PWA delivery describe the
+existing Alpha foundation, not restrictions on the approved pivot. Dated
+release/access statements must be checked against current release evidence.
+New financial records, household permissions, native clients, and ingestion
+integrations are not claimed shipped by this documentation update.
 
 > [!IMPORTANT]
 > **Locked Status**: No major scope shifts or target audience changes are allowed without explicit approval. Polish and additive refinements are permitted.
 
 ---
 
-# 1. Product Truth
+# 1. Existing Alpha Product Foundation
 
 **Argus is the easiest place to bring a money question and get an answer you can check.**
 
@@ -44,7 +66,7 @@ they ought to do is advice, and Argus does not give it.
 The backtesting engine is critical infrastructure, and the first calculation
 Argus learned.
 
-The conversation is the product.
+Conversation is the central workspace of the existing Alpha; its ecosystem role is defined in the MVEE.
 
 ---
 
@@ -123,9 +145,9 @@ when the answer needs current facts (or the user asks), and then shows its
 sources and freshness date. A remembered answer and a researched one must
 never look alike.
 
-## Chat First
+## Existing Alpha Chat Interface
 
-Conversation is the primary interface.
+Conversation is the primary interface of the existing Alpha. The MVEE defines the broader experience.
 
 ## AI First
 
@@ -153,11 +175,11 @@ AI must clearly operate within supported system capabilities.
 
 ## Mobile Future
 
-Alpha launches on web/PWA for speed. Long-term direction is mobile + web.
+The existing Alpha uses web/PWA. Native iOS and Android plus web are approved in the MVEE; native architecture and sequencing remain undecided.
 
 ---
 
-# 5. Alpha MVP Scope (What We Are Building Now)
+# 5. Existing Alpha MVP Scope
 
 ## Core Experience
 
@@ -420,11 +442,11 @@ Feedback velocity is strategic.
 
 # 15. Explicitly Out of Scope (Alpha)
 
-Not priorities now:
+The following are existing Alpha exclusions, not a replacement for the MVEE scope:
 
 - Real brokerage trading
 - Complex portfolio optimization
-- Native mobile apps deferred until post-Alpha; mobile remains strategic long-term.
+- Native mobile apps are outside the existing Alpha implementation; their approved experience direction is in the MVEE.
 - Billing / subscriptions
 - Social network features
 - Advanced quant tooling
@@ -609,11 +631,13 @@ If no, it likely should wait.
 
 ---
 
-# 22. Current Strategic Focus
+# 22. Strategic Direction and Preserved Foundation
 
-We are moving from prototype polish to real product utility.
+The [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) owns approved
+product direction. The [authority map](DOCUMENTATION_AUTHORITY.md) distinguishes
+that direction from existing assignments and technical decisions still to come.
 
-Priorities now:
+Preserve these Alpha foundations while adding the ecosystem:
 
 1. Working AI chat loop
 2. Real backtests

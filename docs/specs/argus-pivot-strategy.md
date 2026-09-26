@@ -1,13 +1,14 @@
 # Argus Pivot Strategy
 
-Status: **DRAFT, awaiting founder review.** Written 2026-09-23 from the
-research and decisions of 2026-09-18 through 2026-09-23. Nothing here is
-committed scope. See "Work in progress" at the end: the founder pulls this
-apart first, and only then does it turn into a roadmap.
+Status: **HISTORICAL STRATEGIC PROPOSAL — conflicting experience direction
+superseded September 26, 2026.** Written September 23 from earlier research.
+The [MVEE](argus-minimum-viable-ecosystem-experience.md) now owns approved
+product experience. The body below preserves original reasoning and proposals;
+it is not a list of approved features or a current capability audit.
 
-This document argues what Argus becomes and why. The board of work lives in
-[`argus-answers-that-stay-true-roadmap.md`](argus-answers-that-stay-true-roadmap.md).
-Locked product decisions live in [`argus-decision-log.md`](argus-decision-log.md).
+Use [documentation authority](../DOCUMENTATION_AUTHORITY.md) for assigned-work
+and technical boundaries, and the [decision log](argus-decision-log.md) for
+founder decisions. Research and unresolved proposals remain useful context.
 
 ---
 

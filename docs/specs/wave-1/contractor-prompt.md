@@ -1,5 +1,15 @@
 # Wave 1 contractor prompt
 
+> **September 26, 2026 reconciliation:** Read
+> [documentation authority](../../DOCUMENTATION_AUTHORITY.md) and the approved
+> [MVEE](../argus-minimum-viable-ecosystem-experience.md) before using this spec.
+> These Wave 1 package bodies and existing stage/review gates remain preserved
+> for assigned work. Conflicting experience requirements need explicit package
+> reconciliation; they are not permanent limits on the pivot. This notice does
+> not cancel work, unlock stages, change technical contracts, or authorize
+> exposing unfinished features. The original product/source text below remains
+> a dated specification, not the final definition of the whole ecosystem.
+
 Start every contractor session with one line:
 
 > Implement package `<ID>` following `docs/specs/wave-1/contractor-prompt.md`.
@@ -46,9 +56,11 @@ reconciliation rules).
 You are implementing ONE package of Argus wave 1: the package named in your
 first line, defined in the spec file listed for it above.
 
-Read first, in this order: `docs/specs/wave-1/README.md`,
+Read `AGENTS.md` and follow its mandatory reading order first. Then read
+`docs/specs/wave-1/README.md`,
 `docs/specs/wave-1/00-shared-rules.md`, then your package section and the
-product text it references. The spec is the source of truth. Where code and
+product text it references. The assigned spec owns the bounded package;
+resolve experience conflicts through the authority map above. Where code and
 spec disagree, follow the spec's "Clashes resolved" table. If something is
 still unclear, stop and say so in the PR. Do not guess.
 

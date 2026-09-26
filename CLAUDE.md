@@ -1,5 +1,10 @@
 # Argus Claude Review Contract
 
+Use [documentation authority](docs/DOCUMENTATION_AUTHORITY.md) to distinguish
+approved MVEE experience from existing technical contracts and package scope.
+Do not flag the approved pivot as a regression solely because historical
+product prose called chat the only primary surface. Runtime safeguards remain.
+
 Read `AGENTS.md` first. It is the primary operating guide for this repo.
 
 For any code review, also use:

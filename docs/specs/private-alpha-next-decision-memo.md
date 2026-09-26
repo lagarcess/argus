@@ -2,7 +2,12 @@
 
 Date: 2026-06-14
 
-Status: Active strategic north star
+Status: Historical strategic and technical rationale. Conflicting product
+experience direction is superseded by the
+[MVEE](argus-minimum-viable-ecosystem-experience.md), September 26, 2026.
+See [documentation authority](../DOCUMENTATION_AUTHORITY.md) before taking work.
+The original scope and dated pointers below are preserved as historical context,
+not a current execution queue.
 
 Audience: Founder, Codex, future product/spec work
 

@@ -1,5 +1,14 @@
 # API_CONTRACT.md
 
+> **Product-direction boundary — September 26, 2026:** The approved pivot
+> experience is in the [MVEE](specs/argus-minimum-viable-ecosystem-experience.md).
+> This document retains its existing technical contracts and technical intent;
+> it does not yet specify the ecosystem's new financial records, household
+> permissions, ingestion APIs, or native architecture. Chat-first/Alpha framing
+> below describes that technical baseline, not a veto on the approved experience.
+> Follow [documentation authority](DOCUMENTATION_AUTHORITY.md) before resolving
+> a conflict; this docs-only change does not authorize a technical migration.
+
 ## Argus API Contract Source of Truth (Alpha MVP)
 
 **Status:** Active | **Alpha Contract v1 Locked**
