@@ -1,19 +1,19 @@
 # Local verification
 
-Runtime commit: `cb3d305de2fdad813722a6d550ad5535d5ac92c6` (account-scoped composer notice and lifecycle).
+Runtime commit: `14128e8e8e810f5f2959fb477935697cba1e0c77` (account-scoped composer notice and lifecycle).
 Original and freshly fetched integration base: `6747ff3193687c885f9647d0af265e0af906ceb0`.
 No intervening integration commits; no reconciliation merge or semantic overlap.
 
 | Check | Result |
 | --- | --- |
-| `cd web && bun test __tests__` | 2,181 passed |
+| `cd web && bun test __tests__` | 2,182 passed |
 | `cd web && bun run lint` | Passed; 8 existing warnings |
 | `cd web && NEXT_DIST_DIR=.next-693-build NEXT_TELEMETRY_DISABLED=1 bun run build` | Passed, including production TypeScript check |
 | Backend claim, calculation input, artifact continuity and complete mocked eval harness | 346 passed |
 | Configured chat reset contract plus guest/signed-in claim regressions | 38 passed |
 | `poetry run python scripts/check_modularity_budget.py` | Passed on current integration plus package tree |
 | `poetry run pytest tests/test_modularity_budget.py -q --no-cov` | 8 passed |
-| Playwright package acceptance | 31 passed; EN/es-419; 360px/1280px; full notice lifecycle |
+| Playwright package acceptance | 31 passed; EN/es-419; 360px/1280px; full notice lifecycle; 3 final admission-boundary cases passed |
 | Baseline screenshot capture | 12 passed on integration runtime |
 
 Backend command:

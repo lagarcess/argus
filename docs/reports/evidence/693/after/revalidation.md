@@ -1,6 +1,24 @@
 # Browser revalidation
 
-## Current composer notice and lifecycle
+## Final admission-boundary revalidation
+
+Runtime commit: `14128e8e8e810f5f2959fb477935697cba1e0c77`.
+A completed structured action may bypass the question allowance, so only a
+successful plain question clears the notice early. Success also checks that
+no newer rejection replaced the observation since that question began; an
+older background response cannot erase a newer cap. Unit coverage verifies
+this observation ordering. All **3 focused browser cases passed** in 5.3 seconds: structured-action
+preservation after reload, successful-question clearing, and successful-question
+clearing after navigation. Results are retained in
+[playwright-admission-boundary.txt](playwright-admission-boundary.txt).
+
+The final change does not alter the notice's rendering, placement, wording,
+reset calculation, or dismissal/expiry behavior. The complete 31-case run and
+16 captures below remain applicable; the focused follow-up checks the changed
+success path and structured-action preservation. Full web tests (2,182), lint,
+production build and modularity pass after this delta.
+
+## Composer notice and lifecycle
 
 Validated runtime commit: `cb3d305de2fdad813722a6d550ad5535d5ac92c6`.
 The [complete acceptance output](playwright-lifecycle.txt) records the final
@@ -16,7 +34,7 @@ bounding boxes at 360px. No empty assistant placeholder remains.
 
 Lifecycle acceptance covers repeated429 deduplication with no automatic retry,
 same-tab reload and New chat, dismissal retained through reload and resurfacing
-on a new rejection, timer/focus expiry, successful response/reload, success
+on a new rejection, timer/focus expiry, successful question/reload, success
 after navigation, account isolation, and the first guest send after bootstrap.
 The composer remains editable. The rejected question is local; reload restores
 the server transcript rather than promising to persist a denied turn.

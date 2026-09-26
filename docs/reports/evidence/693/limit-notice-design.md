@@ -10,16 +10,19 @@ automatic retry was added.
 The notice survives reloads and conversation navigation in the same tab until
 its reset deadline. Closing it keeps it dismissed for that observation; a fresh
 429 replaces and resurfaces the single notice. It clears automatically at reset,
-on an authorized successful response, or when the account changes/signs out.
+on an authorized successful question, or when the account changes/signs out.
 Focus and visibility checks handle a sleeping browser. Closing the tab ends its
 session storage. The composer remains editable and manual sending stays available:
 the server owns admission and different actions can use different allowances.
+Only a successful question clears the notice early; completing a structured
+action such as a backtest or cancellation does not prove the question cap lifted.
 
 Only account ID, reset instant, and dismissal state are stored through the
 registered session-storage helper. No question, answer, or localized copy is
 stored. Blocked storage retains an in-memory notice. The privacy copy describes
 this temporary state. Request authorization rejects stale responses before they
 can change it, including after guest bootstrap or conversation navigation.
+An older successful question cannot erase a rejection observed after it started.
 
 Official product references checked on 2026-09-26:
 
