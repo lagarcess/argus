@@ -20,7 +20,7 @@ No backend, provider, production account, or analytics sink was contacted.
 Runtime source: `6747ff3193687c885f9647d0af265e0af906ceb0` (integration base).
 Captured before runtime edits, using a temporary spec retained as
 [`before/capture.spec.ts.txt`](before/capture.spec.ts.txt).
-The [run log](before/playwright.log) records 12 passing baseline captures.
+The [run log](before/playwright.txt) records 12 passing baseline captures.
 The baseline clock was `2026-09-26T18:17:32Z`. The acceptance clock was
 later moved to August 13 to respect the existing guest fixture's expiry.
 The reset time and visible expiry caption are identical at both clocks;
@@ -39,7 +39,7 @@ The after screenshots use the runtime files committed alongside this evidence.
 Post-commit revalidation is recorded in the PR terminal audit.
 
 Initial implementation run: 22 tests passed, with the
-[Playwright output](after/playwright.log) retained. These are HTTP recovery
+[Playwright output](after/playwright.txt) retained. These are HTTP recovery
 surfaces; the fixture does not interpret or simulate the sample question.
 
 Acceptance specs:
