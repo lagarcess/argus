@@ -35,12 +35,22 @@ def _ops_token() -> str:
     return (os.getenv("ARGUS_OPS_TOKEN") or "").strip()
 
 
+def _latin1_bytes(value: str) -> bytes | None:
+    try:
+        return value.encode("latin-1")
+    except UnicodeEncodeError:
+        return None
+
+
 def _require_ops_token(authorization: str | None) -> None:
     expected = _ops_token()
     if not expected:
         raise HTTPException(status_code=404, detail="Not found")
-    expected_header = f"Bearer {expected}"
-    if authorization is None or not hmac.compare_digest(authorization, expected_header):
+    expected_header = _latin1_bytes(f"Bearer {expected}")
+    provided = _latin1_bytes(authorization or "")
+    if expected_header is None or provided is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    if not hmac.compare_digest(provided, expected_header):
         raise HTTPException(status_code=404, detail="Not found")
 
 

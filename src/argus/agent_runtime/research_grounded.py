@@ -349,6 +349,7 @@ async def grounded_result(
                 user=user,
                 decision=decision,
                 guest_allowance_exhausted=admission.guest_exhausted,
+                registered_allowance_exhausted=admission.registered_exhausted,
                 shape=shape,
                 survey=survey,
             )
@@ -997,6 +998,7 @@ async def exhausted_result(
     state: RunState,
     user: UserState,
     guest_allowance_exhausted: bool,
+    registered_allowance_exhausted: bool = False,
     shape: QuestionShape,
     survey: bool,
     decision: InterpretDecision | None = None,
@@ -1010,6 +1012,7 @@ async def exhausted_result(
     note = research_capacity_exhausted_note(
         language,
         guest_allowance=guest_allowance_exhausted,
+        registered_allowance=registered_allowance_exhausted,
     )
     from argus.agent_runtime import knowledge_answer as ka
 
@@ -1667,7 +1670,10 @@ def _coverage_note(language: str) -> str:
 
 
 def research_capacity_exhausted_note(
-    language: str, *, guest_allowance: bool = False
+    language: str,
+    *,
+    guest_allowance: bool = False,
+    registered_allowance: bool = False,
 ) -> str:
     """Name the bound that actually closed, never a more flattering one."""
     if guest_allowance:
@@ -1682,6 +1688,19 @@ def research_capacity_exhausted_note(
             "You've used today's free research questions, so this answer "
             "comes from Argus's own data and what I already know. Create an "
             "account to keep researching; testing ideas is still available."
+        )
+    if registered_allowance:
+        if language == "es-419":
+            return (
+                "Usaste tus consultas de investigación de hoy, así que "
+                "respondo con los datos propios de Argus y lo que ya sé. "
+                "Vuelve a preguntar mañana para una lectura en vivo; probar "
+                "ideas sigue disponible."
+            )
+        return (
+            "You've used today's research questions, so this answer comes "
+            "from Argus's own data and what I already know. Ask again "
+            "tomorrow for a live read; testing ideas is still available."
         )
     if language == "es-419":
         return (
@@ -2213,6 +2232,7 @@ def research_capacity_exhausted_for_job(
     job_request: dict[str, Any],
     *,
     guest_allowance_exhausted: bool,
+    registered_allowance_exhausted: bool = False,
 ) -> dict[str, Any]:
     """Build the honest terminal payload when a thorough claim loses."""
 
@@ -2226,6 +2246,7 @@ def research_capacity_exhausted_for_job(
         "answer": research_capacity_exhausted_note(
             language,
             guest_allowance=guest_allowance_exhausted,
+            registered_allowance=registered_allowance_exhausted,
         ),
         "research": build_research_sidecar(
             capability_class=str(

@@ -8,11 +8,14 @@ whichever is lower:
 - visitor-keyed (trusted client IP)
 - session-keyed (authenticated guest workspace / anonymous user id)
 
-Both units are claimed atomically at turn start, the same way research
-claims before spend. A claim that is admitted stands even if the turn
-errors before any LLM spend: releasing it is possible, but keeping it is
-the simpler fail-closed anti-abuse choice. Registered accounts and run
-actions carry no ceiling. Nothing here is rendered or promised.
+Both units are claimed atomically before any model work, the same way
+research claims before spend. The claim runs after the conversation is
+resolved and after every stale or replayed action is rejected, so a 404 or
+a rejected replay never costs a unit (#692). A claim that is admitted
+stands even if the turn errors before any LLM spend: releasing it is
+possible, but keeping it is the simpler fail-closed anti-abuse choice. Signed-in accounts claim a
+separate per-user daily ceiling in ``registered_compute_ceiling``.
+Nothing here is rendered or promised.
 """
 
 from __future__ import annotations
@@ -26,10 +29,16 @@ from fastapi import Request
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.chat.registered_compute_ceiling import (
+    check_registered_compute_ceiling,
+)
 from argus.api.dependencies import dev_memory_fallback_enabled, problem
 from argus.api.guest_access import AccountContext, account_context, client_identity
 from argus.api.schemas import User
 from argus.domain.usage_limits import (
+    COMPUTE_CLAIM_UNAVAILABLE_DETAIL,
+    COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS,
+    COMPUTE_TURN_CEILING_DETAIL,
     GUEST_COMPUTE_CEILING_RESOURCE,
     align_usage_period,
     guest_compute_ceiling_limits,
@@ -43,7 +52,6 @@ from argus.domain.visitor_usage import (
 )
 
 _MEMORY_CLAIM_LOCK = threading.Lock()
-CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -107,9 +115,14 @@ def claim_guest_compute_turn(
 
 
 def check_guest_compute_ceiling(request: Request, user: User) -> None:
-    """Claim one turn at entry; 429 once either daily ceiling is reached."""
+    """Claim one turn before model work; 429 once either daily ceiling is reached.
+
+    Guests claim the visitor and session ceilings. Signed-in accounts claim
+    the per-user daily ceiling. Both refusals raise the same 429 copy.
+    """
     context = account_context(request)
     if context.kind != "guest":
+        check_registered_compute_ceiling(request, user)
         return
     now = datetime.now(timezone.utc)
     admission = claim_guest_compute_turn(
@@ -129,9 +142,9 @@ def check_guest_compute_ceiling(request: Request, user: User) -> None:
             status_code=503,
             code="guest_compute_claim_unavailable",
             title="Service Temporarily Unavailable",
-            detail="Argus could not start this turn. Please try again.",
+            detail=COMPUTE_CLAIM_UNAVAILABLE_DETAIL,
             headers={
-                "Retry-After": str(CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS),
+                "Retry-After": str(COMPUTE_CLAIM_UNAVAILABLE_RETRY_AFTER_SECONDS),
             },
         )
     _, day_end = align_usage_period(now, "day")
@@ -147,7 +160,7 @@ def check_guest_compute_ceiling(request: Request, user: User) -> None:
         status_code=429,
         code="too_many_requests",
         title="Too Many Requests",
-        detail="Too many conversation turns today.",
+        detail=COMPUTE_TURN_CEILING_DETAIL,
         headers={"Retry-After": str(max(int((day_end - now).total_seconds()), 1))},
     )
 
@@ -158,7 +171,7 @@ def guest_compute_settlement(
     is_run_backtest_turn: bool,
     visitor_key: str,
 ) -> dict[str, object] | None:
-    """The unit is claimed at turn start. Terminal settlement is a no-op so
+    """The unit is claimed before model work. Terminal settlement is a no-op so
     a completed turn cannot double-count, and a failed turn keeps the claim."""
     del account, is_run_backtest_turn, visitor_key
     return None

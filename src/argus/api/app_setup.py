@@ -19,6 +19,9 @@ from argus.api.dependencies import (
 )
 from argus.api.public_excerpts import EvidenceReceiptFlagGateMiddleware
 from argus.llm.openrouter_key_policy import validate_hosted_openrouter_configuration
+from argus.log_sink import configure_logging
+
+configure_logging()
 
 DEFAULT_CORS_ALLOW_ORIGINS = (
     "http://localhost:3000",
@@ -139,6 +142,7 @@ def add_core_middleware_and_handlers(app: FastAPI) -> None:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Retry-After", "X-Request-Id"],
     )
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)

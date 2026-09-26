@@ -92,6 +92,10 @@ services:
         value: CF-Connecting-IP
       - key: ARGUS_GUEST_SESSION_DAILY_TURN_CEILING
         value: "100"
+      - key: ARGUS_REGISTERED_DAILY_TURN_CEILING
+        value: "200"
+      - key: ARGUS_REGISTERED_DAILY_RESEARCH_CEILING
+        value: "15"
       - key: ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL
         value: "false"
       - key: ARGUS_MEMORY_EMBEDDING_MODEL

@@ -2,6 +2,7 @@ import json
 from contextlib import nullcontext
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -563,6 +564,26 @@ def mock_gateway():
         "status": "succeeded",
     }
     gateway.get_backtest_job.return_value = None
+
+    def _rpc(name: str, params: dict[str, Any] | None = None, **_kwargs: Any):
+        if name in {
+            "claim_registered_compute_usage",
+            "claim_guest_compute_usage",
+            "claim_research_usage",
+        }:
+            return SimpleNamespace(
+                execute=lambda: SimpleNamespace(
+                    data={
+                        "available": True,
+                        "guest_exhausted": False,
+                        "visitor_exhausted": False,
+                        "session_exhausted": False,
+                    }
+                )
+            )
+        return MagicMock()
+
+    gateway.client = SimpleNamespace(rpc=_rpc)
     with (
         patch("argus.api.state.supabase_gateway", gateway),
         patch("argus.api.dependencies.auth_session_is_active", return_value=True),
