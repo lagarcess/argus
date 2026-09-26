@@ -387,6 +387,9 @@
       "artifact_action_retry_inactive": "Ese reintento ya no está conectado a una ejecución fallida activa. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
       "execution_data_unavailable": "La configuración sigue aquí, pero no pude obtener {{dataLabel}} para esa simulación en este momento. Inténtalo de nuevo, cambia las fechas o elige otro activo compatible.",
       "backtest_capacity_exceeded": "Argus ya está corriendo todas las pruebas que puede en este momento, así que esta no se inició. Nada falló y nada se perdió: tu configuración quedó tal como la dejaste. Vuelve a ejecutarla en unos minutos.",
+      "guest_compute_claim_unavailable": "Argus no pudo iniciar este turno. Inténtalo de nuevo en un momento.",
+      "guest_compute_claim_retry_in_one": "Reintentar en {{count}} segundo",
+      "guest_compute_claim_retry_in_other": "Reintentar en {{count}} segundos",
       "data_kind": {
         "benchmark": "datos de referencia",
         "market": "datos de mercado"
