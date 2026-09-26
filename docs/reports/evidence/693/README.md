@@ -12,7 +12,7 @@ No backend, provider, production account, or analytics sink was contacted.
   guest fixture's August 14 expiry in the future.
 - Daily-cap header: `Retry-After: 20548`, derived from the receipt's next
   UTC midnight (`2026-08-14T00:00:00Z`).
-- The local reset is `8:00 PM` / `8:00 p. m.`; missing-header cases use the
+- The local reset is `8:00 PM` in both languages; missing-header cases use the
   same fixed browser clock and next UTC midnight.
 
 ## Before
@@ -36,7 +36,7 @@ that transient loading state is not used for these images.
 ## After
 
 Current after screenshots were captured at
-`b9404df285f210587c6fb586dd6478bff7f707a9`. The complete package suite passed
+`b56ce0bd4eb0a397cfc1900727abcb75de5e8ef4`. The complete package suite passed
 22 tests, including quiet daily-cap notices with no answer controls. See the
 [current browser revalidation](after/revalidation.md) and
 [run output](after/playwright-quiet-notice.txt).
