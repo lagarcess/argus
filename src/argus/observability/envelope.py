@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import os
 from datetime import datetime, timezone
 from typing import Any, Literal
@@ -40,6 +39,7 @@ EventType = Literal[
     "eval_case_run",
     "eval_suite_run",
     "broker_handoff_prep",
+    "analytics",
 ]
 FeatureArea = Literal[
     "chat_interpretation",
@@ -56,6 +56,7 @@ FeatureArea = Literal[
     "stt",
     "storage",
     "broker_handoff_prep",
+    "product_analytics",
 ]
 
 EVENT_ACTIONS: tuple[str, ...] = (
@@ -87,6 +88,7 @@ EVENT_TYPES: tuple[str, ...] = (
     "eval_case_run",
     "eval_suite_run",
     "broker_handoff_prep",
+    "analytics",
 )
 FEATURE_AREAS: tuple[str, ...] = (
     "chat_interpretation",
@@ -103,6 +105,7 @@ FEATURE_AREAS: tuple[str, ...] = (
     "stt",
     "storage",
     "broker_handoff_prep",
+    "product_analytics",
 )
 
 _BLOCKED_KEY_PARTS = (
@@ -147,26 +150,6 @@ _POSTHOG_US_HOST = "https://us.i.posthog.com"
 _POSTHOG_EU_HOST = "https://eu.i.posthog.com"
 _POSTHOG_CAPTURE_PATH = "/i/v0/e/"
 _POSTHOG_DEFAULT_TIMEOUT_SECONDS = 0.75
-_HASHED_ID_FIELDS = (
-    "session_id",
-    "conversation_id",
-    "turn_id",
-    "message_id",
-    "job_id",
-    "backtest_run_id",
-)
-_POSTHOG_TOP_LEVEL_ATTRIBUTE_ALLOWLIST = frozenset(
-    {
-        "product_event",
-        "language",
-        "surface",
-        "terminal_outcome",
-        "conversion_reason",
-        "strategy_category",
-        "product_capability",
-        "capability_class",
-    }
-)
 
 
 def _clean_env(name: str) -> str | None:
@@ -218,6 +201,10 @@ class ArgusEventEnvelope(BaseModel):
     sampling_rate: float | None = None
     retention_class: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
+    # Set only by ``analytics_events.capture_analytics_event()``: the event's
+    # PostHog name, with ``attributes`` holding its validated properties.
+    analytics_event: str | None = None
+    internal_account: bool | None = None
 
 
 class EventCaptureResult(BaseModel):
@@ -252,6 +239,15 @@ def live_analytics_sink_enabled() -> bool:
 
 
 def capture_event(envelope: ArgusEventEnvelope) -> EventCaptureResult:
+    if envelope.analytics_event is None:
+        # The clean break (SPEC 0, 0C-1): only the closed analytics registry
+        # reaches PostHog. Any other envelope stops here.
+        return EventCaptureResult(
+            status="suppressed",
+            reason="not_an_analytics_event",
+            event_id=envelope.event_id,
+            destination=None,
+        )
     if envelope.privacy_mode == "disabled":
         return EventCaptureResult(
             status="suppressed",
@@ -288,8 +284,7 @@ def capture_event(envelope: ArgusEventEnvelope) -> EventCaptureResult:
             "PostHog product event capture failed",
             error=str(exc),
             event_id=envelope.event_id,
-            event_type=envelope.event_type,
-            feature_area=envelope.feature_area,
+            analytics_event=envelope.analytics_event,
         )
         return EventCaptureResult(
             status="failed",
@@ -310,12 +305,29 @@ def posthog_event_payload(
     *,
     api_key: str,
 ) -> dict[str, Any]:
+    """The PostHog capture body for an analytics event, under its own name.
+
+    Properties are the fixed technical set plus the event model's validated
+    fields, nothing else: no hashed conversation or message ids, status,
+    latency, or nested attributes.
+    """
+    if envelope.analytics_event is None:
+        raise ValueError("only analytics events have a PostHog payload")
     return {
         "api_key": api_key,
-        "event": envelope.event_type,
+        "event": envelope.analytics_event,
         "distinct_id": envelope.actor_hash or envelope.event_id,
         "timestamp": envelope.occurred_at.isoformat(),
-        "properties": _posthog_event_properties(envelope),
+        "properties": {
+            **envelope.attributes,
+            "$process_person_profile": False,
+            "schema_version": envelope.schema_version,
+            "event_id": envelope.event_id,
+            "environment": envelope.environment,
+            # Fail closed: an event that does not say it is external never
+            # counts toward the one number.
+            "internal_account": envelope.internal_account is not False,
+        },
     }
 
 
@@ -355,52 +367,6 @@ def _blocked_key(key: str) -> bool:
     return normalized in _BLOCKED_EXACT_KEYS or any(
         part in normalized for part in _BLOCKED_KEY_PARTS
     )
-
-
-def _posthog_event_properties(envelope: ArgusEventEnvelope) -> dict[str, Any]:
-    properties: dict[str, Any] = {
-        "$process_person_profile": False,
-        "schema_version": envelope.schema_version,
-        "event_id": envelope.event_id,
-        "occurred_at": envelope.occurred_at.isoformat(),
-        "environment": envelope.environment,
-        "privacy_mode": envelope.privacy_mode,
-        "event_type": envelope.event_type,
-        "event_action": envelope.event_action,
-        "feature_area": envelope.feature_area,
-    }
-    if envelope.actor_hash:
-        properties["actor_hash"] = envelope.actor_hash
-    for field_name in _HASHED_ID_FIELDS:
-        value = getattr(envelope, field_name)
-        if isinstance(value, str) and value.strip():
-            properties[f"{field_name}_hash"] = _hash_identifier(
-                field_name,
-                value.strip(),
-            )
-    for field_name in (
-        "status",
-        "latency_ms",
-        "error_category",
-        "sampling_rate",
-        "retention_class",
-    ):
-        value = getattr(envelope, field_name)
-        if value not in (None, "", [], {}):
-            properties[field_name] = value
-    if envelope.attributes:
-        attributes = sanitize_observability_attributes(envelope.attributes)
-        properties["attributes"] = attributes
-        for key in _POSTHOG_TOP_LEVEL_ATTRIBUTE_ALLOWLIST:
-            value = attributes.get(key)
-            if key not in properties and isinstance(value, str | int | float | bool):
-                properties[key] = value
-    return properties
-
-
-def _hash_identifier(namespace: str, value: str) -> str:
-    digest = hashlib.sha256(f"argus:{namespace}:{value}".encode("utf-8")).hexdigest()
-    return digest[:24]
 
 
 def _posthog_project_token() -> str | None:

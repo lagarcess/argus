@@ -1,0 +1,444 @@
+"""The closed analytics registry (SPEC 0, package 0C-1, acceptance check A4).
+
+PostHog receives only Iris's wave 1 events, each under its own name, each with
+exactly its listed properties. Nothing else reaches PostHog.
+"""
+
+from __future__ import annotations
+
+import json
+import types
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Annotated, Any, Literal, Union, get_args, get_origin
+
+import httpx
+import pytest
+from argus.api import state as api_state
+from argus.api.guest_access import guest_account_context
+from argus.api.guest_observability import emit_verified_guest_funnel_event
+from argus.api.main import app
+from argus.domain.calculations import get_calculation_declarations
+from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
+from argus.domain.guest_workspaces import GuestWorkspace
+from argus.observability.analytics_events import (
+    ANALYTICS_EVENT_MODELS,
+    INVITE_COHORT_PATTERN,
+    TECHNICAL_PROPERTIES,
+    AnalyticsEvent,
+    CalculationName,
+    CardSaved,
+    InviteCohort,
+    SignedIn,
+    capture_analytics_event,
+)
+from argus.observability.guest_funnel import (
+    GUEST_FUNNEL_EVENT_MAP,
+    capture_guest_funnel_event,
+)
+from argus.observability.product_events import (
+    _PRODUCT_EVENT_MAP,
+    actor_hash_for_user,
+    capture_product_event,
+)
+from fastapi.testclient import TestClient
+from pydantic import ValidationError
+from pydantic.fields import FieldInfo
+
+IRIS_EVENT_NAMES = {
+    "first_answer_shown",
+    "signed_in",
+    "card_saved",
+    "goal_created",
+    "checklist_step_completed",
+    "reminders_opted_in",
+    "reminders_opted_out",
+    "session_started",
+    "installed_app_opened",
+    "landing_viewed",
+    "receipt_shared",
+}
+
+# One valid instance of every event, with every optional property set.
+VALID_PROPERTIES: dict[str, dict[str, Any]] = {
+    "first_answer_shown": {
+        "account_kind": "guest",
+        "chip_audience": "none",
+        "language": "es-419",
+        "cohort": "piloto-7kq2",
+    },
+    "signed_in": {"signup": "new", "trigger": "save", "cohort": "piloto-7kq2"},
+    "card_saved": {"calculator": "time_value"},
+    "goal_created": {"goal_type": "savings"},
+    "checklist_step_completed": {"step": 2},
+    "reminders_opted_in": {"channel": "email"},
+    "reminders_opted_out": {"channel": "push"},
+    "session_started": {"days_since_signup": 9, "cohort": "piloto-7kq2"},
+    "installed_app_opened": {},
+    "landing_viewed": {"language": "en", "cohort": "piloto-7kq2"},
+    "receipt_shared": {"calculator": "multiple"},
+}
+
+MONEY_FORMATTED_VALUES = ("RD$5,000", "US$5,000.00", "5000.00", "$5,000", 5000.0)
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _event(name: str, **overrides: Any) -> AnalyticsEvent:
+    return ANALYTICS_EVENT_MODELS[name](**{**VALID_PROPERTIES[name], **overrides})
+
+
+@pytest.fixture
+def posthog_posts(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """A configured PostHog sink whose network call records the body instead."""
+    posts: list[dict[str, Any]] = []
+
+    def fake_post(url: str, *, json: dict[str, Any], timeout: float) -> httpx.Response:
+        posts.append(json)
+        return httpx.Response(200, request=httpx.Request("POST", url))
+
+    monkeypatch.setenv("POSTHOG_PROJECT_TOKEN", "ph_project_token")
+    monkeypatch.setenv("POSTHOG_REGION", "us")
+    monkeypatch.setenv("APP_ENV", "private-alpha")
+    monkeypatch.setattr("argus.observability.envelope.httpx.post", fake_post)
+    return posts
+
+
+def test_registry_is_exactly_irises_events() -> None:
+    assert set(ANALYTICS_EVENT_MODELS) == IRIS_EVENT_NAMES
+    assert set(VALID_PROPERTIES) == IRIS_EVENT_NAMES
+    for name, model in ANALYTICS_EVENT_MODELS.items():
+        assert model.event_name == name
+
+
+def _optional_parts(annotation: Any) -> list[Any]:
+    if get_origin(annotation) in (Union, types.UnionType):
+        return [part for part in get_args(annotation) if part is not type(None)]
+    return [annotation]
+
+
+def _literal_values(annotation: Any) -> list[Any] | None:
+    values: list[Any] = []
+    for part in _optional_parts(annotation):
+        if get_origin(part) is not Literal:
+            return None
+        values.extend(get_args(part))
+    return values
+
+
+def _has_bounds(field: FieldInfo) -> bool:
+    lower = any(hasattr(item, "ge") or hasattr(item, "gt") for item in field.metadata)
+    upper = any(hasattr(item, "le") or hasattr(item, "lt") for item in field.metadata)
+    return lower and upper
+
+
+def test_every_property_is_literal_bool_or_bounded_int() -> None:
+    """The A4 lint: nothing in any event can hold free text or an amount."""
+    cohort_parts = [InviteCohort]
+    offenders: list[str] = []
+    for name, model in ANALYTICS_EVENT_MODELS.items():
+        assert model.model_config.get("extra") == "forbid", name
+        assert model.model_config.get("strict") is True, name
+        for field_name, field in model.model_fields.items():
+            where = f"{name}.{field_name}"
+            literal_values = _literal_values(field.annotation)
+            if literal_values is not None:
+                if not all(
+                    isinstance(value, str | int) and not isinstance(value, float)
+                    for value in literal_values
+                ):
+                    offenders.append(where)
+                continue
+            parts = _optional_parts(field.annotation)
+            if parts == [bool]:
+                continue
+            if parts == [int] and _has_bounds(field):
+                continue
+            # The one constrained string: the invite cohort, pattern-anchored.
+            if field_name == "cohort" and parts == cohort_parts:
+                continue
+            offenders.append(where)
+    assert offenders == []
+    assert get_origin(InviteCohort) is Annotated
+    base, *constraints = get_args(InviteCohort)
+    assert base is str
+    assert [getattr(item, "pattern", None) for item in constraints] == [
+        INVITE_COHORT_PATTERN
+    ]
+
+
+def test_money_formatted_value_is_rejected() -> None:
+    for name, model in ANALYTICS_EVENT_MODELS.items():
+        for field_name in model.model_fields:
+            for value in MONEY_FORMATTED_VALUES:
+                with pytest.raises(ValidationError):
+                    _event(name, **{field_name: value})
+        # A property outside Iris's list cannot be added either.
+        with pytest.raises(ValidationError):
+            _event(name, amount="RD$5,000")
+        with pytest.raises(ValidationError):
+            _event(name, question="How much is RD$5,000 at 12%?")
+
+
+def test_free_text_and_personal_data_are_rejected_in_every_field() -> None:
+    for name, model in ANALYTICS_EVENT_MODELS.items():
+        for field_name in model.model_fields:
+            for value in ("person@example.com", "Iris", "hola", True, "1", 1.0):
+                if VALID_PROPERTIES[name].get(field_name) == value:
+                    continue
+                with pytest.raises(ValidationError):
+                    _event(name, **{field_name: value})
+
+
+def test_bounded_ints_reject_out_of_range_values() -> None:
+    with pytest.raises(ValidationError):
+        _event("session_started", days_since_signup=-1)
+    with pytest.raises(ValidationError):
+        _event("session_started", days_since_signup=10**9)
+    for step in (0, 4):
+        with pytest.raises(ValidationError):
+            _event("checklist_step_completed", step=step)
+
+
+def test_cohort_accepts_only_the_invite_code_format() -> None:
+    for code in ("piloto-7kq2", "qa-t7k2", "ab-abcd1234", "abcdefghijkl-0000"):
+        assert _event("landing_viewed", cohort=code).model_dump()["cohort"] == code
+    for code in (
+        "piloto-1",
+        "Piloto-7kq2",
+        "piloto_7kq2",
+        "piloto-7kq2-x",
+        "piloto 7kq2",
+        "",
+        "a-7kq2",
+        "piloto-7kq2abcde",
+        "abcdefghijklm-7kq2",
+    ):
+        with pytest.raises(ValidationError):
+            _event("landing_viewed", cohort=code)
+
+
+def test_calculator_values_match_the_calculation_catalog() -> None:
+    """One owner: the catalog. A new calculation fails here until it is listed."""
+    catalog = {declaration.name for declaration in get_calculation_declarations()}
+    assert set(get_args(CalculationName)) == catalog
+    assert set(_literal_values(CardSaved.model_fields["calculator"].annotation)) == (
+        catalog | {"backtest"}
+    )
+    receipt_shared = ANALYTICS_EVENT_MODELS["receipt_shared"]
+    assert set(_literal_values(receipt_shared.model_fields["calculator"].annotation)) == (
+        catalog | {"backtest", "multiple", "none"}
+    )
+
+
+def test_payload_has_only_technical_and_event_properties(
+    posthog_posts: list[dict[str, Any]],
+) -> None:
+    for name in sorted(IRIS_EVENT_NAMES):
+        posthog_posts.clear()
+        event = _event(name)
+
+        result = capture_analytics_event(
+            event,
+            user_id="account-raw-id",
+            internal_account=False,
+        )
+
+        assert result.status == "captured", name
+        [body] = posthog_posts
+        assert set(body) == {"api_key", "event", "distinct_id", "timestamp", "properties"}
+        assert body["event"] == name
+        assert body["distinct_id"] == actor_hash_for_user("account-raw-id")
+        properties = body["properties"]
+        assert set(properties) == TECHNICAL_PROPERTIES | set(VALID_PROPERTIES[name]), name
+        assert properties["$process_person_profile"] is False
+        assert properties["internal_account"] is False
+        assert properties["environment"] == "private-alpha"
+        assert properties["schema_version"] == "argus_analytics_event/v1"
+        for key, value in VALID_PROPERTIES[name].items():
+            assert properties[key] == value
+        assert "account-raw-id" not in json.dumps(body)
+
+
+def test_unset_optional_properties_are_not_sent(
+    posthog_posts: list[dict[str, Any]],
+) -> None:
+    capture_analytics_event(
+        ANALYTICS_EVENT_MODELS["landing_viewed"](language="en"),
+        user_id="guest-raw-id",
+        internal_account=False,
+    )
+
+    [body] = posthog_posts
+    assert set(body["properties"]) == TECHNICAL_PROPERTIES | {"language"}
+
+
+def test_only_signed_in_carries_the_guest_id_hash(
+    posthog_posts: list[dict[str, Any]],
+) -> None:
+    capture_analytics_event(
+        SignedIn(signup="new", trigger="other"),
+        user_id="account-raw-id",
+        guest_user_id="guest-raw-id",
+        internal_account=False,
+    )
+
+    [body] = posthog_posts
+    assert body["properties"]["guest_id_hash"] == actor_hash_for_user("guest-raw-id")
+    assert "guest-raw-id" not in json.dumps(body)
+    for name in sorted(IRIS_EVENT_NAMES - {"signed_in"}):
+        with pytest.raises(ValueError):
+            capture_analytics_event(
+                _event(name),
+                user_id="account-raw-id",
+                guest_user_id="guest-raw-id",
+                internal_account=False,
+            )
+
+
+def test_an_unregistered_event_model_is_refused(
+    posthog_posts: list[dict[str, Any]],
+) -> None:
+    class Unlisted(AnalyticsEvent):
+        event_name = "card_saved"
+
+    with pytest.raises(TypeError):
+        capture_analytics_event(Unlisted(), user_id="account-raw-id", internal_account=False)
+    with pytest.raises(ValueError):
+        capture_analytics_event(_event("card_saved"), user_id=" ", internal_account=False)
+    assert posthog_posts == []
+
+
+# ── Clean break: every old emit path now stops before PostHog ────────────────
+
+
+def _guest_context():
+    now = datetime.now(timezone.utc)
+    return guest_account_context(
+        GuestWorkspace(
+            user_id="00000000-0000-0000-0000-000000000091",
+            conversation_id="conversation-1",
+            status="active",
+            created_at=now,
+            expires_at=now + timedelta(days=7),
+            claimed_by=None,
+            claimed_at=None,
+            updated_at=now,
+        ),
+        visitor_key="visitor-1",
+    )
+
+
+def _drive_retired_registries() -> None:
+    for kind in _PRODUCT_EVENT_MAP:
+        capture_product_event(kind, user_id="account-raw-id", status="completed")
+    for kind in GUEST_FUNNEL_EVENT_MAP:
+        capture_guest_funnel_event(kind, user_id="guest-raw-id")
+        emit_verified_guest_funnel_event(
+            kind, user_id="guest-raw-id", visitor_key=f"visitor-{kind}"
+        )
+
+
+def _drive_runtime_measurement() -> None:
+    from argus.api.chat.measurement_events import emit_runtime_measurement_events
+
+    emit_runtime_measurement_events(
+        user_id="guest-raw-id",
+        conversation_id="conversation-1",
+        runtime_result={
+            "message_id": "message-1",
+            "run": {"id": "run-1"},
+            "backtest_job": {"id": "job-1"},
+            "comparison_started": {"source": "workflow_boundary", "candidate_count": 2},
+        },
+        metadata={
+            "confirmation_card": {},
+            "next_experiments": {"rows": [{"kind": "compare"}]},
+            "active_confirmation_reference": {
+                "metadata": {"validation": {"failure_code": "asset_mismatch"}}
+            },
+        },
+        account=_guest_context(),
+    )
+
+
+def _drive_guest_cleanup() -> None:
+    class _Gateway:
+        def claim_expired_guest_workspaces(self, *, limit: int, dry_run: bool):
+            return [
+                {
+                    "user_id": "guest-raw-id",
+                    "auth_deleted": True,
+                    "cleanup_reason": "expired_workspace",
+                }
+            ]
+
+        def purge_expired_visitor_usage(self, *, before=None) -> int:
+            return 0
+
+        def purge_expired_guest_funnel_milestones(self, *, before=None) -> int:
+            return 0
+
+    cleanup_expired_guest_workspaces(_Gateway(), limit=10, dry_run=False)
+
+
+def _drive_http_surfaces(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(api_state, "supabase_gateway", None)
+    monkeypatch.setenv("ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED", "true")
+    with TestClient(app) as client:
+        for stage in ("viewed", "try_argus"):
+            response = client.post("/api/v1/public/receipt-funnel", json={"stage": stage})
+            assert response.status_code == 204
+        retired = client.post(
+            "/api/v1/analytics/guest-events",
+            json={
+                "event": "conversion_prompt_shown",
+                "language": "en",
+                "surface": "conversion_modal",
+                "conversion_reason": "save_decision",
+                "terminal_outcome": "shown",
+            },
+        )
+        assert retired.status_code in (404, 405)
+        feedback = client.post(
+            "/api/v1/feedback",
+            json={"type": "general", "message": "Clean break check"},
+        )
+        assert feedback.status_code == 200, feedback.text
+        assert client.get("/api/v1/search", params={"q": "AAPL"}).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "drive",
+    [
+        _drive_retired_registries,
+        _drive_runtime_measurement,
+        _drive_guest_cleanup,
+        _drive_http_surfaces,
+    ],
+    ids=lambda drive: drive.__name__.removeprefix("_drive_"),
+)
+def test_removed_events_do_not_reach_posthog(
+    posthog_posts: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+    drive,
+) -> None:
+    if drive is _drive_http_surfaces:
+        drive(monkeypatch)
+    else:
+        drive()
+
+    assert posthog_posts == []
+
+
+def test_shared_cohort_fixture_matches_when_present() -> None:
+    """0C-9 adds the shared fixture; once it exists it must agree with this type."""
+    fixture = FIXTURES / "invite_cohort_codes.json"
+    if not fixture.exists():
+        pytest.skip("invite cohort fixture arrives with SPEC 0 package 0C-9")
+    codes = json.loads(fixture.read_text(encoding="utf-8"))
+    for code in codes["accepted"]:
+        _event("landing_viewed", cohort=code)
+    for code in codes["rejected"]:
+        with pytest.raises(ValidationError):
+            _event("landing_viewed", cohort=code)
