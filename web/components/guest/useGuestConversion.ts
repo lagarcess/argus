@@ -12,7 +12,6 @@ import {
   signupWithEmail,
 } from "@/lib/argus-api";
 import type { UserResponse } from "@/lib/guest-account";
-import { captureGuestFunnelEvent } from "@/lib/guest-analytics";
 import {
   pendingGuestActionSummary,
   verifiedClaimAction,
@@ -58,15 +57,6 @@ export function useGuestConversion({
       nextResetAt: string | null = null,
       nextResetKind: "daily" | "workspace" = "daily",
     ) => {
-      if (account?.account_kind === "guest") {
-        captureGuestFunnelEvent({
-          event: "conversion_prompt_shown",
-          language: account.user.language,
-          surface: "conversion_modal",
-          conversion_reason: nextReason,
-          terminal_outcome: "shown",
-        });
-      }
       setReason(nextReason);
       setInitialMode(nextInitialMode);
       setResetAt(nextResetAt);
@@ -77,7 +67,7 @@ export function useGuestConversion({
       handoffPreparedRef.current = false;
       setIsOpen(true);
     },
-    [account],
+    [],
   );
 
   const close = useCallback(() => {

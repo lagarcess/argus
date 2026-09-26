@@ -254,7 +254,6 @@ jobs:
         run: |
           cd web
           bun test \
-            __tests__/guest-analytics.test.ts \
             __tests__/guest-artifact-hints.test.tsx \
             __tests__/guest-browser-harness.test.ts \
             __tests__/guest-capability-gates.test.ts \

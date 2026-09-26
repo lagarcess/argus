@@ -1079,11 +1079,12 @@ Guest usage never merges into registered hour/day counters. Cleanup
 re-verifies anonymous source truth and must not delete a permanent account or
 the transferred graph.
 
-Guest funnel capture uses the shared metadata-only server envelope. Only the two
-typed browser-owned facts cross `POST /api/v1/analytics/guest-events`; PostHog
-keys, autocapture, session replay, prompts, assistant prose, exact
-capital/dates, email, Auth material, private titles/previews, provider/model
-names, and raw transcripts stay out.
+Product analytics reach PostHog only through the closed wave 1 event registry
+(`docs/DATA_MODEL.md` section 12.1.1); the earlier guest funnel events and the
+browser `POST /api/v1/analytics/guest-events` relay were removed in SPEC 0
+package 0C-1. PostHog keys, autocapture, session replay, prompts, assistant
+prose, amounts, exact capital/dates, email, Auth material, private
+titles/previews, provider/model names, and raw transcripts stay out.
 
 Rollback order:
 

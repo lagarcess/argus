@@ -1196,25 +1196,25 @@ service role server-side; service-role grants do not relax frontend/client RLS.
 
 ## 12.1.1 P1 Observability Envelope
 
-P1 defines the private-alpha observability envelope in code. Product events now
-flow to PostHog, and B3 measurement slice 3 adds the first durable internal cost
-ledger while keeping product analytics and eval-result persistence separate.
+P1 defines the private-alpha observability envelope in code. B3 measurement
+slice 3 adds the first durable internal cost ledger while keeping product
+analytics and eval-result persistence separate. Wave 1 (SPEC 0, package 0C-1)
+replaces the earlier product and guest funnel events with one closed analytics
+registry: PostHog receives only the events below, each under its own name.
 
 Current behavior:
-- `argus_observability_event/v1` is the canonical event-envelope schema.
+- `argus_observability_event/v1` is the canonical event-envelope schema;
+  analytics events carry `argus_analytics_event/v1`.
 - Default privacy mode is `metadata_only`.
-- Product-event categories emitted to PostHog are evidence capture, decision
-  capture, recall usage, continuity mismatch, compare started, next
-  experiments offered, next experiment selected, and eval readiness.
-- The exact registered product-event name is carried as
-  `attributes.product_event`; envelope `event_type` remains in the broader memo
-  15.5 event taxonomy.
-- The sanitizer strips raw prompts, transcripts, context packets, route
-  receipts, provider/model metadata, auth tokens, API keys, broker credentials,
-  account balances, exact holdings, payment identifiers, and similar sensitive
-  payloads.
-- Raw user, session, conversation, turn, message, job, and run identifiers are
-  hashed in the PostHog projection.
+- The only way an event reaches PostHog is `capture_analytics_event()` in
+  `src/argus/observability/analytics_events.py`. Only the frozen
+  `AnalyticsEnvelope` it builds can carry an event (the generic envelope has no
+  such field), and the sink validates it again before sending, technical
+  fields and build timestamp included. It suppresses everything else with
+  `reason = "not_an_analytics_event"`, including an envelope that only names an
+  event, a subclass or unvalidated copy of a model, extra attributes, or a
+  `distinct_id` that is not an actor hash. The eval harness writes nothing to
+  the product stream.
 - Live PostHog capture is enabled only when `POSTHOG_PROJECT_TOKEN` and an
   explicit PostHog region/host are present; missing token suppresses with
   `reason = "posthog_not_configured"`, and missing or unsupported region/host
@@ -1222,10 +1222,49 @@ Current behavior:
 - PostHog is server-side only and personless (`$process_person_profile = false`).
 - US Cloud is the current PostHog region choice for private alpha compliance
   posture.
-- Research settlement projects the sidecar's work kind and outcome into a
-  bounded `research` event. Native dimension meanings and the
-  `capability_category` to `product_capability` rename are defined in
-  `docs/API_CONTRACT.md` section 17.1; analytics is not the spend ledger.
+
+Analytics events. Each is one Pydantic model (`extra="forbid"`, strict) whose
+fields are exactly the properties listed. Every field is a literal value, a
+boolean, a bounded integer, a calculation name checked against the catalog, or
+`cohort`. `tests/test_analytics_events.py`
+fails if any field could hold free text or a money-formatted value (A4).
+
+| Event | Properties | Fires (package) |
+| --- | --- | --- |
+| `first_answer_shown` | `account_kind`: `guest` or `signed_in`; `chip_audience`: `everyday`, `practitioner`, or `none`; `language`: `en` or `es-419`; `cohort` for guests with a stored cohort only | first completed answer per subject (0C-3) |
+| `signed_in` | `signup`: `new` or `returning`; `trigger`: `save`, `goal`, `checklist`, or `other`; `guest_id_hash` only when the account came from a guest; `cohort` when the account has one | every sign-up and sign-in (0C-4) |
+| `card_saved` | `calculator`: a registered calculation name or `backtest` | saving a card (0C-4) |
+| `goal_created` | `goal_type`: `savings` | registered; fires in stage 2 |
+| `checklist_step_completed` | `step`: `1`, `2`, or `3` | registered; fires in stage 2 |
+| `reminders_opted_in`, `reminders_opted_out` | `channel`: `email` or `push` | registered; fire in stage 3 |
+| `session_started` | `days_since_signup`: integer, 0 to 36500, computed on the server; `cohort` when the account has one | once per browser session, signed-in only (0C-5) |
+| `installed_app_opened` | none | standalone launch, once per session (0C-5) |
+| `landing_viewed` | `language`: `en` or `es-419`; `cohort` for guests with a stored cohort only | once per landing view (0C-5) |
+| `receipt_shared` | `calculator`: a registered calculation name, `backtest`, `multiple`, or `none` | a real share-link insert (0C-8) |
+
+- `cohort` is the invite cohort code, `^[a-z]{2,12}-[a-z0-9]{4,8}$` (for
+  example `piloto-7kq2`). The pattern is enforced by the model.
+- `calculator` is checked when the event is validated against the names
+  `get_calculation_declarations()` returns, plus the listed fixed values. The
+  calculation catalog is the only owner of that list; a new calculation is
+  accepted without editing the analytics registry.
+- Technical properties, sent with every event and nothing else besides the
+  event's own properties: `$process_person_profile` (always `false`),
+  `schema_version`, `event_id`, `environment`, and `internal_account`
+  (a boolean every caller must state; the sink refuses an envelope without one,
+  and any technical value the registry did not set). `distinct_id` is `actor_hash_for_user(<user id>)`:
+  the account id for signed-in users, the guest user id for guests.
+  `guest_id_hash` is the same hash of the guest user id, so a guest's events
+  and the account's `signed_in` join without person profiles or aliasing.
+- Saved-query filter (SPEC 0, 0C-6): `environment = production` and
+  `internal_account = false`, broken down by `cohort`.
+- Retired: `evidence_capture`, `decision_capture`, `recall_usage`,
+  `continuity_mismatch`, `compare_started`, `next_experiments_offered`,
+  `next_experiment_selected`, `eval_readiness`, the `receipt_*` funnel,
+  `account_registration_completed`, every guest funnel event, and the research
+  settlement event no longer reach PostHog. Research work kind and outcome stay
+  on the cost ledger (`capability_class`). The guest funnel milestone claim
+  table stays and is reused by `first_answer_shown`.
 
 Deferred durable surfaces:
 - Eval run/case result persistence.
