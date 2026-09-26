@@ -414,7 +414,7 @@ The personal view contains the person's own financial picture and any joint acco
 
 **Search and Updates:** Respect the same visibility boundaries. Shared milestones and obligations can generate relevant household updates; private activity must not leak through search results, totals, notifications, exports, or suggested actions. Each person controls their notification preferences.
 
-**Capture and review:** The existing manual, chat, voice, document, and future connection paths also serve shared records. Show the destination and sharing scope before confirmation. Uploading a document to a household context must make source-document visibility clear; it must not unexpectedly share unrelated private pages or details.
+**Capture and review:** The approved capture paths in section 4 should also serve shared records. Existing chat is a foundation to extend; manual, conversational, voice, document, and connection-based financial-record capture still need their scoped technical contracts and implementation. Show the destination and sharing scope before confirmation. Uploading a document to a household context must make source-document visibility clear; it must not unexpectedly share unrelated private pages or details.
 
 ### One shared fact, no duplicate money
 

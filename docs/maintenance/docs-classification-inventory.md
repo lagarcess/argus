@@ -15,21 +15,11 @@ stubs preserve old links. The duplicate active P2.1 audit was replaced with its
 existing archive pointer. The next founder-selected pillar is **Argus always
 progresses**, ready for specification only.
 
-Current source stack after the canon docs:
-
-1. `docs/specs/argus-answers-that-stay-true-roadmap.md` is the active execution
-   board (opened 2026-09-18). It owns current priorities, the carried-over open
-   ends and the open founder decisions. The grounded-finance board shipped in
-   full on 2026-09-17 and is archived with the board before it.
-2. `docs/specs/private-alpha-next-roadmap.md` is superseded P2 history and
-   contract reference. The interim roadmap completed with the 2026-08-05
-   promotion and is archived.
-3. `docs/specs/private-alpha-next-decision-memo.md` is the active strategic
-   north star and slice-onboarding source.
-4. `docs/specs/private-alpha-ci-cd-sota.md`,
-   `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
-   `docs/release-manifests/TEMPLATE.md` are release-discipline references.
-5. `docs/specs/private-alpha-next-integration.md` is staging/process context.
+Current source ownership is defined in
+[documentation authority](../DOCUMENTATION_AUTHORITY.md). Read the MVEE for
+approved experience and the explicitly assigned package for implementation
+scope. The inventory below classifies documents; it does not assign work or
+maintain a second priority order. Earlier dated passes above are history.
 
 Quarantine branches are reference material only. Do not broad cherry-pick
 runtime work from `codex/private-alpha-next-quarantine-fc231e8`; promote only
@@ -67,17 +57,19 @@ roadmap links.
 | File | Classification | Rationale | Recommended next action | Notes / possible stale references |
 | :--- | :--- | :--- | :--- | :--- |
 | `AGENTS.md` | canon | Root level agent instructions and canon pointer. | None | Current |
+| `docs/DOCUMENTATION_AUTHORITY.md` | authority map | Owns document precedence and assignment boundaries. | Start here for source ownership. | Current |
+| `docs/specs/argus-minimum-viable-ecosystem-experience.md` | approved experience | Owns the founder-approved ecosystem experience. | Define technical scope before implementation. | Current direction, not a shipped inventory |
 | `docs/PRODUCT.md` | canon | Defined as canon product source of truth. | None | Current |
 | `docs/ARCHITECTURE.md` | canon | Defined as canon architecture source of truth. | None | Current |
 | `docs/API_CONTRACT.md` | canon | Defined as canon API contract source of truth. | None | Current |
 | `docs/DATA_MODEL.md` | canon | Defined as canon data model source of truth. | None | Current |
 | `.agent/designs/argus/DESIGN.md` | canon | Explicitly listed as canon design source of truth. | None | Current |
-| `docs/specs/argus-answers-that-stay-true-roadmap.md` | active execution board | Owns current priorities, pillars, open founder decisions, carried-over open ends and operating rules. | Use as the first non-canon execution source. | Opened 2026-09-18 |
+| `docs/specs/argus-answers-that-stay-true-roadmap.md` | historical compatibility pointer | Links the archived answers board and carried-work history. | Follow documentation authority for current ownership; do not dispatch from the archived queue. | Archived 2026-09-26 |
 | `docs/archive/2026-09-17-argus-grounded-finance-roadmap.md` | archived | Grounded-finance board; every item shipped to production `a9286b21` on 2026-09-17. Pointer stub remains in `docs/specs/`. | Historical reference only; open ends moved to the active board. | Archived 2026-09-18 |
 | `docs/archive/2026-09-05-argus-active-roadmap.md` | archived | Board before grounded finance; landed work remains valid history. Pointer stub remains in `docs/specs/`. | Historical reference only. | Archived 2026-09-18 |
 | `docs/archive/private-alpha-interim-roadmap.md` | archived | Interim pivot slate; completed with the 2026-08-05 production promotion. | Historical reference only. | Archived 2026-08-06 |
 | `docs/specs/private-alpha-next-roadmap.md` | superseded reference | P2 history, execution-realism contract, and slice provenance. | Read for provenance; do not take work from it. | Superseded 2026-08-06 |
-| `docs/specs/private-alpha-next-decision-memo.md` | active strategic source | Strategic north star for Private Alpha Next; contains the addenda and details each slice must onboard through. | Read relevant sections before planning or implementation. | Current |
+| `docs/specs/private-alpha-next-decision-memo.md` | historical compatibility pointer | Links archived strategic and technical rationale. | Read relevant historical contracts for a named assignment; approved experience belongs to the MVEE. | Archived 2026-09-26 |
 | `docs/specs/private-alpha-ci-cd-sota.md` | release-discipline reference | Completed CI/CD SOTA plan; still owns canary, manifest, Render validation, and deployment discipline. | Use for release gates, not product sequencing. | Completed/reference |
 | `docs/PRIVATE_LAUNCH_RUNBOOK.md` | release-discipline reference | Operational gate for controlled private-alpha validation and launch steps. | Keep as operator runbook. | Current release ops |
 | `docs/release-manifests/TEMPLATE.md` | release-discipline reference | Template for candidate SHA, env fingerprint, evidence, approver, and rollback target. | Use when producing a candidate manifest. | Current release ops |
@@ -92,7 +84,7 @@ roadmap links.
 | `docs/archive/private-alpha-readiness-orchestration.md` | archived branch-specific context | Coordination note for `codex/private-alpha-readiness-clean`; not the current Private Alpha Next roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-controlled-readiness-panel.md` | archived branch/lane-specific context | Controlled-alpha readiness panel for readiness decisions; useful evidence but not the active roadmap. | Keep archived for readiness-lane archaeology. | Readiness lane |
 | `docs/archive/private-alpha-performance-readiness-audit.md` | archived branch/lane-specific context | Supporting performance addendum for the controlled readiness slice. | Keep archived for readiness-lane archaeology. | Readiness lane |
-| `docs/specs/evidence-aware-idea-loop.md` | source thesis / strategic background | Source product thesis for the durable idea loop. It directly informed `docs/specs/private-alpha-next-decision-memo.md`, which now owns current strategy. | Keep in `docs/specs/` with a clear source-thesis banner; do not treat as the active sequencing doc. | Provenance for the current decision memo |
+| `docs/specs/evidence-aware-idea-loop.md` | source thesis / strategic background | Source product thesis for the durable idea loop. It directly informed `docs/specs/private-alpha-next-decision-memo.md`, now preserved as archived rationale. | Keep in `docs/specs/` with a clear source-thesis banner; do not treat as the active sequencing doc. | Provenance for the archived decision memo |
 | `docs/archive/research-lab-thesis.md` | archived historical evidence | Earlier Research Lab thesis draft. It is retained for context and refined by `docs/specs/evidence-aware-idea-loop.md`, which then informed the decision memo. | Keep archived for product archaeology. | Superseded by evidence-aware source thesis and current decision memo |
 | `docs/archive/private-alpha-backtest-execution-capacity.md` | archived historical evidence | Draft from 2026-06-05; later release/runtime docs own active deployment discipline and architecture truth. | Keep archived for runtime-capacity archaeology. | Historical capacity draft |
 | `docs/archive/agent-architecture.md` | archived historical evidence | Proposed architecture from 2026-04-29. Predates the conversation trust milestone. | Keep archived for architecture archaeology. | Stale date |
