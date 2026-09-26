@@ -1207,9 +1207,13 @@ Current behavior:
   analytics events carry `argus_analytics_event/v1`.
 - Default privacy mode is `metadata_only`.
 - The only way an event reaches PostHog is `capture_analytics_event()` in
-  `src/argus/observability/analytics_events.py`. The sink suppresses every
-  other envelope with `reason = "not_an_analytics_event"`. The eval harness
-  writes nothing to the product stream.
+  `src/argus/observability/analytics_events.py`. The envelope carries the
+  registered event model itself, and the sink validates it again before
+  sending. It suppresses everything else with
+  `reason = "not_an_analytics_event"`, including an envelope that only names an
+  event, a subclass or unvalidated copy of a model, extra attributes, or a
+  `distinct_id` that is not an actor hash. The eval harness writes nothing to
+  the product stream.
 - Live PostHog capture is enabled only when `POSTHOG_PROJECT_TOKEN` and an
   explicit PostHog region/host are present; missing token suppresses with
   `reason = "posthog_not_configured"`, and missing or unsupported region/host
@@ -1220,7 +1224,8 @@ Current behavior:
 
 Analytics events. Each is one Pydantic model (`extra="forbid"`, strict) whose
 fields are exactly the properties listed. Every field is a literal value, a
-boolean, a bounded integer, or `cohort`. `tests/test_analytics_events.py`
+boolean, a bounded integer, a calculation name checked against the catalog, or
+`cohort`. `tests/test_analytics_events.py`
 fails if any field could hold free text or a money-formatted value (A4).
 
 | Event | Properties | Fires (package) |
@@ -1237,10 +1242,11 @@ fails if any field could hold free text or a money-formatted value (A4).
 | `receipt_shared` | `calculator`: a registered calculation name, `backtest`, `multiple`, or `none` | a real share-link insert (0C-8) |
 
 - `cohort` is the invite cohort code, `^[a-z]{2,12}-[a-z0-9]{4,8}$` (for
-  example `piloto-7kq2`). It is the only property that is not a fixed literal,
-  and the pattern is enforced by the model.
-- The calculator values are held equal to `get_calculation_declarations()` by
-  test, so a new calculation must be added to the registry.
+  example `piloto-7kq2`). The pattern is enforced by the model.
+- `calculator` is checked when the event is validated against the names
+  `get_calculation_declarations()` returns, plus the listed fixed values. The
+  calculation catalog is the only owner of that list; a new calculation is
+  accepted without editing the analytics registry.
 - Technical properties, sent with every event and nothing else besides the
   event's own properties: `$process_person_profile` (always `false`),
   `schema_version`, `event_id`, `environment`, and `internal_account`

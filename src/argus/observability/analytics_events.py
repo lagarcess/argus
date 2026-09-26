@@ -1,20 +1,35 @@
 """The closed product analytics registry: Iris's wave 1 events, and nothing else.
 
 Each event is one Pydantic model whose fields are the event's exact properties.
-Fields are typed only as ``Literal[...]``, ``bool``, a bounded ``int``, or the
-one pattern-constrained ``cohort`` string, so an amount, a name, an email, or
-any other free text cannot be represented, let alone sent (SPEC 0, 0.5, A4).
+Fields are typed only as ``Literal[...]``, ``bool``, a bounded ``int``, a
+string checked against a closed vocabulary another owner lists (the calculation
+catalog), or the one pattern-constrained ``cohort`` string, so an amount, a
+name, an email, or any other free text cannot be represented, let alone sent
+(SPEC 0, 0.5, A4).
 
 PostHog receives each event under its own name. The sink in ``envelope.py``
-refuses every envelope that did not come through ``capture_analytics_event()``,
-so this module is the only way an event reaches PostHog.
+sends an envelope only when ``registered_payload()`` below re-validates it as
+one of these models, so this module is the only way an event reaches PostHog.
 """
 
 from __future__ import annotations
 
+import functools
+import re
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Annotated, Any, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    GetCoreSchemaHandler,
+    StringConstraints,
+    ValidationError,
+    model_validator,
+)
+from pydantic_core import core_schema
 
 from argus.observability.envelope import (
     ArgusEventEnvelope,
@@ -34,21 +49,55 @@ InviteCohort = Annotated[
     StringConstraints(pattern=INVITE_COHORT_PATTERN, max_length=21),
 ]
 
-# The registered calculations (``get_calculation_declarations()``). A test
-# holds this list equal to the catalog, so a new calculation fails CI here
-# until it is added.
-CalculationName = Literal[
-    "time_value",
-    "growth_projection",
-    "bond_value",
-    "discounted_cash_flow",
-    "price_multiple",
-    "income_yield",
-    "effective_rate",
-    "debt_to_income",
-    "expense_ratio",
-    "ranked_comparison",
-    "valuation_scenarios",
+# ``distinct_id`` and ``guest_id_hash`` are always ``actor_hash_for_user()``.
+_ACTOR_HASH = re.compile(r"^argus_actor_[0-9a-f]{32}$")
+
+
+@dataclass(frozen=True)
+class ClosedVocabulary:
+    """A string property whose allowed values another owner lists.
+
+    ``values()`` is read when a value is validated, so the owner stays the only
+    list; nothing here restates it.
+    """
+
+    values: Callable[[], frozenset[str]]
+
+    def __get_pydantic_core_schema__(
+        self,
+        source: Any,
+        handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        return core_schema.no_info_after_validator_function(self._check, handler(source))
+
+    def _check(self, value: str) -> str:
+        if value not in self.values():
+            raise ValueError("not a registered value")
+        return value
+
+
+@functools.cache
+def registered_calculation_names() -> frozenset[str]:
+    """The calculation catalog's names, the one owner of the calculator values.
+
+    Read from ``get_calculation_declarations()`` on first validation and kept
+    for the process: the catalog is code, and building it costs tens of
+    milliseconds.
+    """
+    from argus.domain.calculations import get_calculation_declarations
+
+    return frozenset(declaration.name for declaration in get_calculation_declarations())
+
+
+CardCalculator = Annotated[
+    str,
+    ClosedVocabulary(lambda: registered_calculation_names() | {"backtest"}),
+]
+SharedCalculator = Annotated[
+    str,
+    ClosedVocabulary(
+        lambda: registered_calculation_names() | {"backtest", "multiple", "none"}
+    ),
 ]
 AnalyticsLanguage = Literal["en", "es-419"]
 
@@ -102,7 +151,7 @@ class SignedIn(AnalyticsEvent):
 class CardSaved(AnalyticsEvent):
     event_name: ClassVar[str] = "card_saved"
 
-    calculator: CalculationName | Literal["backtest"]
+    calculator: CardCalculator
 
 
 class GoalCreated(AnalyticsEvent):
@@ -150,7 +199,7 @@ class LandingViewed(AnalyticsEvent):
 class ReceiptShared(AnalyticsEvent):
     event_name: ClassVar[str] = "receipt_shared"
 
-    calculator: CalculationName | Literal["backtest", "multiple", "none"]
+    calculator: SharedCalculator
 
 
 ANALYTICS_EVENT_MODELS: dict[str, type[AnalyticsEvent]] = {
@@ -194,23 +243,63 @@ def build_analytics_envelope(
     actor_hash = actor_hash_for_user(user_id)
     if actor_hash is None:
         raise ValueError("an analytics event needs the user id it is about")
-    properties = event.model_dump(mode="json", exclude_none=True)
+    attributes: dict[str, Any] = {}
     if guest_user_id is not None:
         if not event.carries_guest_id_hash:
             raise ValueError(f"{event.event_name} does not carry a guest id hash")
         guest_id_hash = actor_hash_for_user(guest_user_id)
         if guest_id_hash is not None:
-            properties["guest_id_hash"] = guest_id_hash
+            attributes["guest_id_hash"] = guest_id_hash
     return ArgusEventEnvelope(
         schema_version=ANALYTICS_SCHEMA_VERSION,
         event_type="analytics",
         event_action="completed",
         feature_area="product_analytics",
-        analytics_event=event.event_name,
+        analytics_event=event,
         internal_account=internal_account,
         actor_hash=actor_hash,
-        attributes=properties,
+        attributes=attributes,
     )
+
+
+def registered_payload(
+    envelope: ArgusEventEnvelope,
+) -> tuple[str, dict[str, Any]] | None:
+    """The PostHog name and properties, only for a registry-built event.
+
+    The sink calls this for every envelope and sends nothing when it returns
+    None. The envelope must carry an instance of exactly one registered model,
+    and that instance is validated again, because ``model_construct()`` or a
+    subclass could otherwise smuggle unchecked values past the model. The only
+    attribute allowed next to it is a well-formed ``guest_id_hash`` on
+    ``signed_in``, and ``distinct_id`` must be an actor hash.
+    """
+    event = envelope.analytics_event
+    if not isinstance(event, AnalyticsEvent):
+        return None
+    model = ANALYTICS_EVENT_MODELS.get(event.event_name)
+    if model is None or type(event) is not model:
+        return None
+    if not _ACTOR_HASH.fullmatch(envelope.actor_hash or ""):
+        return None
+    try:
+        checked = model.model_validate(
+            {name: getattr(event, name, None) for name in model.model_fields}
+        )
+    except ValidationError:
+        return None
+    properties = checked.model_dump(mode="json", exclude_none=True)
+    attributes = dict(envelope.attributes)
+    guest_id_hash = attributes.pop("guest_id_hash", None)
+    if attributes:
+        return None
+    if guest_id_hash is not None:
+        if not model.carries_guest_id_hash or not (
+            isinstance(guest_id_hash, str) and _ACTOR_HASH.fullmatch(guest_id_hash)
+        ):
+            return None
+        properties["guest_id_hash"] = guest_id_hash
+    return model.event_name, properties
 
 
 def capture_analytics_event(

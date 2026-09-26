@@ -26,11 +26,18 @@ from argus.observability.analytics_events import (
     INVITE_COHORT_PATTERN,
     TECHNICAL_PROPERTIES,
     AnalyticsEvent,
-    CalculationName,
     CardSaved,
+    ClosedVocabulary,
     InviteCohort,
     SignedIn,
+    build_analytics_envelope,
     capture_analytics_event,
+    registered_calculation_names,
+)
+from argus.observability.envelope import (
+    build_event_envelope,
+    capture_event,
+    posthog_event_payload,
 )
 from argus.observability.guest_funnel import (
     GUEST_FUNNEL_EVENT_MAP,
@@ -154,6 +161,12 @@ def test_every_property_is_literal_bool_or_bounded_int() -> None:
                 continue
             if parts == [int] and _has_bounds(field):
                 continue
+            # A string checked against a list another owner keeps (the
+            # calculation catalog) is as closed as a literal.
+            if parts == [str] and any(
+                isinstance(item, ClosedVocabulary) for item in field.metadata
+            ):
+                continue
             # The one constrained string: the invite cohort, pattern-anchored.
             if field_name == "cohort" and parts == cohort_parts:
                 continue
@@ -218,17 +231,45 @@ def test_cohort_accepts_only_the_invite_code_format() -> None:
             _event("landing_viewed", cohort=code)
 
 
-def test_calculator_values_match_the_calculation_catalog() -> None:
-    """One owner: the catalog. A new calculation fails here until it is listed."""
+def test_calculator_values_come_from_the_calculation_catalog() -> None:
     catalog = {declaration.name for declaration in get_calculation_declarations()}
-    assert set(get_args(CalculationName)) == catalog
-    assert set(_literal_values(CardSaved.model_fields["calculator"].annotation)) == (
-        catalog | {"backtest"}
-    )
+    assert registered_calculation_names() == catalog
+    for name in sorted(catalog | {"backtest"}):
+        assert CardSaved(calculator=name).calculator == name
     receipt_shared = ANALYTICS_EVENT_MODELS["receipt_shared"]
-    assert set(_literal_values(receipt_shared.model_fields["calculator"].annotation)) == (
-        catalog | {"backtest", "multiple", "none"}
+    for name in sorted(catalog | {"backtest", "multiple", "none"}):
+        assert receipt_shared(calculator=name).calculator == name
+    for model, name in (
+        (CardSaved, "multiple"),
+        (CardSaved, "none"),
+        (CardSaved, "loan_payoff"),
+        (receipt_shared, "loan_payoff"),
+    ):
+        with pytest.raises(ValidationError):
+            model(calculator=name)
+
+
+def test_a_new_catalog_calculation_is_accepted_without_editing_the_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One owner: adding a calculation to the catalog is the whole change."""
+    import argus.domain.calculations as calculations
+
+    original = calculations.get_calculation_declarations
+    monkeypatch.setattr(
+        calculations,
+        "get_calculation_declarations",
+        lambda: (*original(), types.SimpleNamespace(name="loan_payoff")),
     )
+    registered_calculation_names.cache_clear()
+    try:
+        assert CardSaved(calculator="loan_payoff").calculator == "loan_payoff"
+        assert ANALYTICS_EVENT_MODELS["receipt_shared"](calculator="loan_payoff")
+    finally:
+        monkeypatch.undo()
+        registered_calculation_names.cache_clear()
+    with pytest.raises(ValidationError):
+        CardSaved(calculator="loan_payoff")
 
 
 def test_payload_has_only_technical_and_event_properties(
@@ -307,6 +348,86 @@ def test_an_unregistered_event_model_is_refused(
     with pytest.raises(ValueError):
         capture_analytics_event(_event("card_saved"), user_id=" ", internal_account=False)
     assert posthog_posts == []
+
+
+# ── The sink trusts only what the registry built and re-validates ─────────────
+
+
+def _forged_envelopes():
+    valid_actor = actor_hash_for_user("account-raw-id")
+    yield "arbitrary name and attributes", build_event_envelope(
+        event_type="analytics",
+        event_action="completed",
+        feature_area="product_analytics",
+        analytics_event="anything_at_all",
+        internal_account=False,
+        actor_hash=valid_actor,
+        attributes={"amount": "RD$5,000", "question": "How much do I owe?"},
+    )
+    yield "registered name as a string", build_event_envelope(
+        event_type="analytics",
+        event_action="completed",
+        feature_area="product_analytics",
+        analytics_event="card_saved",
+        internal_account=False,
+        actor_hash=valid_actor,
+        attributes={"calculator": "time_value"},
+    )
+    yield "model_construct skips validation", build_analytics_envelope(
+        CardSaved(calculator="time_value"),
+        user_id="account-raw-id",
+        internal_account=False,
+    ).model_copy(
+        update={"analytics_event": CardSaved.model_construct(calculator="RD$5,000")}
+    )
+
+    class Sneaky(CardSaved):
+        amount: str = "RD$5,000"
+
+    yield "subclass of a registered model", build_analytics_envelope(
+        CardSaved(calculator="time_value"),
+        user_id="account-raw-id",
+        internal_account=False,
+    ).model_copy(update={"analytics_event": Sneaky(calculator="time_value")})
+    yield "extra attribute next to a registered event", build_analytics_envelope(
+        CardSaved(calculator="time_value"),
+        user_id="account-raw-id",
+        internal_account=False,
+    ).model_copy(update={"attributes": {"amount": "RD$5,000"}})
+    yield "guest hash on an event that does not carry one", build_analytics_envelope(
+        CardSaved(calculator="time_value"),
+        user_id="account-raw-id",
+        internal_account=False,
+    ).model_copy(update={"attributes": {"guest_id_hash": valid_actor}})
+    yield "free text as the guest hash", build_analytics_envelope(
+        SignedIn(signup="new", trigger="save"),
+        user_id="account-raw-id",
+        internal_account=False,
+    ).model_copy(update={"attributes": {"guest_id_hash": "person@example.com"}})
+    yield "free text as the distinct id", build_analytics_envelope(
+        CardSaved(calculator="time_value"),
+        user_id="account-raw-id",
+        internal_account=False,
+    ).model_copy(update={"actor_hash": "person@example.com"})
+
+
+@pytest.mark.parametrize(
+    ("case", "envelope"),
+    list(_forged_envelopes()),
+    ids=[case for case, _ in _forged_envelopes()],
+)
+def test_an_envelope_the_registry_did_not_build_is_suppressed(
+    posthog_posts: list[dict[str, Any]],
+    case: str,
+    envelope,
+) -> None:
+    result = capture_event(envelope)
+
+    assert result.status == "suppressed", case
+    assert result.reason == "not_an_analytics_event"
+    assert posthog_posts == []
+    with pytest.raises(ValueError):
+        posthog_event_payload(envelope, api_key="ph_project_token")
 
 
 # ── Clean break: every old emit path now stops before PostHog ────────────────

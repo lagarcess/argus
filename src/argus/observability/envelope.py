@@ -201,9 +201,9 @@ class ArgusEventEnvelope(BaseModel):
     sampling_rate: float | None = None
     retention_class: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
-    # Set only by ``analytics_events.capture_analytics_event()``: the event's
-    # PostHog name, with ``attributes`` holding its validated properties.
-    analytics_event: str | None = None
+    # Set only by ``analytics_events.build_analytics_envelope()``: the
+    # registered event model itself, re-validated by the sink before sending.
+    analytics_event: Any = None
     internal_account: bool | None = None
 
 
@@ -238,10 +238,21 @@ def live_analytics_sink_enabled() -> bool:
     )
 
 
+def _registered_payload(
+    envelope: ArgusEventEnvelope,
+) -> tuple[str, dict[str, Any]] | None:
+    # Imported here because the registry builds envelopes and imports this
+    # module; the registry, not a field on the envelope, decides what is sent.
+    from argus.observability.analytics_events import registered_payload
+
+    return registered_payload(envelope)
+
+
 def capture_event(envelope: ArgusEventEnvelope) -> EventCaptureResult:
-    if envelope.analytics_event is None:
-        # The clean break (SPEC 0, 0C-1): only the closed analytics registry
-        # reaches PostHog. Any other envelope stops here.
+    if _registered_payload(envelope) is None:
+        # The clean break (SPEC 0, 0C-1): only an event the closed analytics
+        # registry built and re-validates reaches PostHog. Anything else,
+        # including an envelope that merely names an event, stops here.
         return EventCaptureResult(
             status="suppressed",
             reason="not_an_analytics_event",
@@ -284,7 +295,7 @@ def capture_event(envelope: ArgusEventEnvelope) -> EventCaptureResult:
             "PostHog product event capture failed",
             error=str(exc),
             event_id=envelope.event_id,
-            analytics_event=envelope.analytics_event,
+            analytics_event=getattr(envelope.analytics_event, "event_name", None),
         )
         return EventCaptureResult(
             status="failed",
@@ -311,15 +322,17 @@ def posthog_event_payload(
     fields, nothing else: no hashed conversation or message ids, status,
     latency, or nested attributes.
     """
-    if envelope.analytics_event is None:
-        raise ValueError("only analytics events have a PostHog payload")
+    registered = _registered_payload(envelope)
+    if registered is None:
+        raise ValueError("only registry-built analytics events have a PostHog payload")
+    event_name, event_properties = registered
     return {
         "api_key": api_key,
-        "event": envelope.analytics_event,
-        "distinct_id": envelope.actor_hash or envelope.event_id,
+        "event": event_name,
+        "distinct_id": envelope.actor_hash,
         "timestamp": envelope.occurred_at.isoformat(),
         "properties": {
-            **envelope.attributes,
+            **event_properties,
             "$process_person_profile": False,
             "schema_version": envelope.schema_version,
             "event_id": envelope.event_id,

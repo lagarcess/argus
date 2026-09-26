@@ -6187,10 +6187,13 @@ Core fields:
 One closed registry, `src/argus/observability/analytics_events.py`, owns every
 event PostHog receives. Each event is one Pydantic model (`extra="forbid"`,
 strict) whose fields are the event's exact properties, typed only as literal
-values, booleans, a bounded integer, or the pattern-checked invite `cohort`. An
-amount, a name, an email, question or answer text, or any other free text
-cannot be represented. Events are sent only through
-`capture_analytics_event()`; the sink refuses every other envelope with
+values, booleans, a bounded integer, a calculation name checked against the
+calculation catalog at validation time, or the pattern-checked invite
+`cohort`. An amount, a name, an email, question or answer text, or any other
+free text cannot be represented. Events are sent only through
+`capture_analytics_event()`: the envelope carries the registered model itself,
+and the sink validates it again before sending. Anything else, including an
+envelope that only names an event, is suppressed with
 `reason = "not_an_analytics_event"`, so nothing else reaches PostHog.
 
 PostHog receives each event under its own name as the PostHog `event`. The
