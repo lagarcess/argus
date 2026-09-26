@@ -29,6 +29,7 @@ export function formatDailyCapResetTime(
     // One AM/PM convention for both supported languages, independent of ICU.
     return part.type === "dayPeriod"
       ? part.value.replace(/[.\s]/g, "").toUpperCase()
-      : part.value.replace(/[\u00a0\u202f]/g, " ");
+      // Keep the time and day period together on narrow screens.
+      : part.value.replace(/[ \u00a0\u202f]/g, "\u00a0");
   }).join("");
 }

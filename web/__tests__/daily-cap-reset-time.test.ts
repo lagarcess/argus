@@ -6,8 +6,8 @@ const midnight = Date.parse("2026-09-27T00:00:00Z");
 
 describe("daily cap reset time", () => {
   test.each([
-    ["en", "8:00 PM"],
-    ["es-419", "8:00 PM"],
+    ["en", "8:00\u00a0PM"],
+    ["es-419", "8:00\u00a0PM"],
   ])("shows UTC midnight locally in the DR in %s", (language, expected) => {
     const resetAt = dailyCapResetAtMs("21600", receivedAt);
     expect(resetAt).toBe(midnight);
@@ -21,13 +21,13 @@ describe("daily cap reset time", () => {
     }).format(resetAt);
     expect(date).toBe("2026-09-27");
     for (const language of ["en", "es-419"]) {
-      expect(formatDailyCapResetTime(resetAt, language, "Asia/Tokyo")).toBe("9:00 AM");
+      expect(formatDailyCapResetTime(resetAt, language, "Asia/Tokyo")).toBe("9:00\u00a0AM");
     }
   });
 
   test.each([
-    ["2026-01-15T00:00:00Z", "7:00 PM"],
-    ["2026-07-15T00:00:00Z", "8:00 PM"],
+    ["2026-01-15T00:00:00Z", "7:00\u00a0PM"],
+    ["2026-07-15T00:00:00Z", "8:00\u00a0PM"],
   ])("uses the browser zone's daylight-saving offset at %s", (resetAt, expected) => {
     for (const language of ["en", "es-419"]) {
       expect(formatDailyCapResetTime(Date.parse(resetAt), language, "America/New_York")).toBe(expected);
