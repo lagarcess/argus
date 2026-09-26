@@ -177,7 +177,7 @@ test("an accepted manual question clears the notice across reload", async ({ pag
   await expect(page.getByTestId("daily-cap-notice")).toHaveCount(0);
 });
 
-test("a successful structured action retains the daily question notice", async ({ page }) => {
+test("a successful admitted structured action clears the daily question notice", async ({ page }) => {
   const evidence = await installComputeLimitJourney(page, {
     account: "registered", language: "en", status: 429,
     retryAfter: MIDNIGHT_RETRY_AFTER, withResponseOption: true,
@@ -188,6 +188,23 @@ test("a successful structured action retains the daily question notice", async (
   await expect(page.getByText(COPY.en.success, { exact: true })).toBeVisible();
   expect(evidence.streamStatuses).toEqual([429, 200]);
   expect(evidence.sentActionTypes).toEqual([null, "select_response_option"]);
+  await expect(page.getByTestId("daily-cap-notice")).toHaveCount(0);
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByTestId("chat-input")).toBeEnabled();
+  await expect(page.getByTestId("daily-cap-notice")).toHaveCount(0);
+});
+
+test("a successful cancellation retains the daily question notice", async ({ page }) => {
+  const evidence = await installComputeLimitJourney(page, {
+    account: "registered", language: "en", status: 429,
+    retryAfter: MIDNIGHT_RETRY_AFTER, withConfirmationHistory: true,
+  });
+  await sendQuestion(page, "en");
+  await expectDailyCapNotice(page, "en");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByText(en.chat.confirmation.status.draft_canceled, { exact: true })).toBeVisible();
+  expect(evidence.streamStatuses).toEqual([429, 200]);
+  expect(evidence.sentActionTypes).toEqual([null, "cancel_confirmation"]);
   await expectDailyCapNotice(page, "en");
   await page.reload({ waitUntil: "networkidle" });
   await expectDailyCapNotice(page, "en");

@@ -53,6 +53,7 @@ export async function installComputeLimitJourney(
     bootstrapGuest?: boolean;
     holdSuccess?: boolean;
     withResponseOption?: boolean;
+    withConfirmationHistory?: boolean;
   },
 ) {
   let releaseSuccess = () => {};
@@ -81,7 +82,16 @@ export async function installComputeLimitJourney(
   } else {
     await page.clock.install({ time: RECEIVED_AT });
   }
-  await installBreakpointFixture(page, { ...options, emptyChat: true, theme: "light" });
+  await installBreakpointFixture(page, {
+    ...options, emptyChat: !options.withConfirmationHistory, theme: "light",
+  });
+  if (options.withConfirmationHistory) {
+    page.on("response", async (response) => {
+      if (/\/api\/v1\/conversations\/[^/]+\/messages$/.test(new URL(response.url()).pathname)) {
+        evidence.persistedMessageCount = (await response.json()).items.length;
+      }
+    });
+  }
   if (options.bootstrapGuest) {
     let authenticated = false;
     await page.route("**/api/v1/me", async (route) => {
@@ -103,6 +113,7 @@ export async function installComputeLimitJourney(
     });
   }
   await page.route("**/api/v1/conversations/*/messages**", async (route) => {
+    if (options.withConfirmationHistory) return route.fallback();
     await route.fulfill({
       status: 200,
       contentType: "application/json",
