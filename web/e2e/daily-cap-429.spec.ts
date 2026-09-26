@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   COPY,
   MIDNIGHT_RETRY_AFTER,
@@ -10,6 +10,19 @@ import {
 } from "./fixtures/compute-limit-journey";
 
 test.use({ timezoneId: "America/Santo_Domingo" });
+
+async function expectDailyCapNotice(page: Page, language: keyof typeof COPY) {
+  const notice = page.getByTestId("recovery-failure-notice");
+  await expect(notice).toHaveCount(1);
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveAttribute("role", "status");
+  await expect(notice).toHaveText(COPY[language].capError);
+
+  const message = page.locator("[data-message-id]").filter({ has: notice });
+  await expect(message).toHaveCount(1);
+  // Copy, ratings, and More Actions must be absent, including hover-only buttons.
+  await expect(message.getByRole("button", { includeHidden: true })).toHaveCount(0);
+}
 
 for (const language of ["en", "es-419"] as const) {
   for (const viewport of VIEWPORTS) {
@@ -23,7 +36,7 @@ for (const language of ["en", "es-419"] as const) {
           });
           await sendQuestion(page, language);
           const copy = COPY[language];
-          await expect(page.getByText(copy.capError, { exact: true })).toBeVisible();
+          await expectDailyCapNotice(page, language);
           await expect(page.getByText(copy.prompt, { exact: true })).toHaveCount(1);
           await expect(page.getByText(RAW_SERVER_DETAIL, { exact: true })).toHaveCount(0);
           await expect(page.getByText(/wait a moment|espera un momento/i)).toHaveCount(0);
@@ -44,7 +57,7 @@ test("a new chat keeps the rejected question and its daily reset notice", async 
     retryAfter: MIDNIGHT_RETRY_AFTER, newConversation: true,
   });
   await sendQuestion(page, "en", true);
-  await expect(page.getByText(COPY.en.capError, { exact: true })).toBeVisible();
+  await expectDailyCapNotice(page, "en");
   await expect(page.getByText(COPY.en.prompt, { exact: true })).toHaveCount(1);
   expect(evidence.streamStatuses).toEqual([429]);
 });

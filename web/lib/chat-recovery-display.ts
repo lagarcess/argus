@@ -141,7 +141,10 @@ export function retryableAssistantRecoveryCode(value: unknown): string | null {
  * a failure statement, so it wears the quiet notice. Every other non-retryable
  * code keeps its treatment; the amber notice stays gated on retryable alone.
  */
-const QUIET_NOTICE_RECOVERY_CODES = new Set(["research_lookup_unavailable"]);
+const QUIET_NOTICE_RECOVERY_CODES = new Set([
+  "research_lookup_unavailable",
+  DAILY_CAP_RECOVERY_CODE,
+]);
 
 /** Whether a reply renders as the quiet failure notice (failure-treatment.ts). */
 export function wearsQuietFailureNotice(

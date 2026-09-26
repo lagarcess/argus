@@ -13,6 +13,7 @@ import {
   recoveryDisplayText,
   unsupportedStrategyActionsFromMetadata,
   unsupportedTimeframeActionsFromMetadata,
+  wearsQuietFailureNotice,
 } from "../lib/chat-recovery-display";
 
 const root = join(import.meta.dir, "..");
@@ -985,6 +986,7 @@ describe("daily chat admission errors", () => {
     const text = recoveryDisplayText(display.recoveryDisplay, tFromCatalog(enCatalog), "en");
     expect(text).toContain("You've reached today's question limit. It resets at ");
     expect(text).not.toContain("Wait a moment");
+    expect(wearsQuietFailureNotice(display.recoveryDisplay)).toBe(true);
     expect(chatHttpErrorDisplay("too_many_requests", "Unrelated error").content).toBe("Unrelated error");
   });
 });
