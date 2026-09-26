@@ -35,8 +35,14 @@ that transient loading state is not used for these images.
 
 ## After
 
-The after screenshots use the runtime files committed alongside this evidence.
-Post-commit revalidation is recorded in the PR terminal audit.
+Current after screenshots were captured at
+`b9404df285f210587c6fb586dd6478bff7f707a9`. The complete package suite passed
+22 tests, including quiet daily-cap notices with no answer controls. See the
+[current browser revalidation](after/revalidation.md) and
+[run output](after/playwright-quiet-notice.txt).
+
+The [notice design rationale](limit-notice-design.md) records the official
+Codex, Grok, and Claude Code references and the reused Argus treatment.
 
 Initial implementation run: 22 tests passed, with the
 [Playwright output](after/playwright.txt) retained. These are HTTP recovery

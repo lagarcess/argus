@@ -1,5 +1,33 @@
 # Browser revalidation
 
+## Current quiet daily-cap notice
+
+Validated source commit: `b9404df285f210587c6fb586dd6478bff7f707a9`.
+The complete package acceptance run passed **22 tests**, with the
+[output retained](playwright-quiet-notice.txt). All 16 after images were
+recaptured on that exact source commit. Eight daily-cap images now show the
+quiet bordered failure notice; the eight claim-recovery images remained
+byte-for-byte unchanged.
+
+Every daily-cap case, including a new chat, now asserts:
+
+- One visible `recovery-failure-notice` with `role="status"` and exact
+  English or Spanish reset-time text.
+- No buttons in the containing message, including hidden Copy, rating,
+  and More Actions controls.
+- The question remains visible, with no raw backend error or vague wait.
+
+EN and es-419 mobile images were visually inspected. The notice fits the
+360px viewport, the reset time is readable, and there are no answer controls.
+Both account kinds and the existing 503 retry behavior passed. The run used
+only mocked API responses; no backend or provider calls were made. The owned
+mock web server was stopped after capture.
+
+## Initial implementation history
+
+The following run predates the quiet-notice change and does not validate its
+appearance. The current run above supersedes its after screenshots.
+
 Validated source commit: `d604a816f5415f0681541befb7baa09fd7d986f9`.
 The 22-case run began at `f83f4124`; the only intervening commit changed
 evidence documentation. `git diff f83f4124 d604a816 -- web` is empty.

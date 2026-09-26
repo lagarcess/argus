@@ -1067,7 +1067,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(projection).toContain("latestAiIndex");
     expect(projection).toContain('(message.content ?? "") === ""');
     expect(chat).toContain("isStreaming={isWorkingMessage}");
-    expect(message).toContain("{!isUser && !isStreaming && (");
+    expect(message).toContain("const shouldShowAssistantFooter = !isUser && !isStreaming && !isDailyCapNotice;");
+    expect(message).toContain("{shouldShowAssistantFooter && (");
     expect(message).not.toContain("{copyFeedback && (");
   });
 
