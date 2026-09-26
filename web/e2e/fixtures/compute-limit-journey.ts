@@ -49,23 +49,56 @@ export async function installComputeLimitJourney(
     failures?: number;
     retryAfter?: string;
     newConversation?: boolean;
+    controlClock?: boolean;
+    bootstrapGuest?: boolean;
+    holdSuccess?: boolean;
   },
 ) {
-  const evidence = { sentMessages: [] as string[], streamStatuses: [] as number[] };
-  if (options.status === 429) {
+  let releaseSuccess = () => {};
+  const successReady = options.holdSuccess
+    ? new Promise<void>((resolve) => { releaseSuccess = resolve; })
+    : Promise.resolve();
+  const persistedMessages = options.newConversation ? [] : [
+    { id: "prior-user", role: "user", content: options.language === "en" ? "Hello" : "Hola", created_at: RECEIVED_AT.toISOString(), metadata: {} },
+    { id: "prior-answer", role: "assistant", content: options.language === "en" ? "What would you like to test?" : "¿Qué te gustaría probar?", created_at: RECEIVED_AT.toISOString(), metadata: {} },
+  ];
+  const evidence = {
+    sentMessages: [] as string[], streamStatuses: [] as number[],
+    persistedMessageCount: persistedMessages.length,
+    guestBootstraps: 0,
+    releaseSuccess: () => releaseSuccess(),
+  };
+  if (options.status === 429 && !options.controlClock) {
     await page.clock.setFixedTime(RECEIVED_AT);
   } else {
     await page.clock.install({ time: RECEIVED_AT });
   }
   await installBreakpointFixture(page, { ...options, emptyChat: true, theme: "light" });
+  if (options.bootstrapGuest) {
+    let authenticated = false;
+    await page.route("**/api/v1/me", async (route) => {
+      if (authenticated) return route.fallback();
+      return route.fulfill({
+        status: 401,
+        json: { type: "about:blank", title: "Not authenticated", status: 401, code: "not_authenticated" },
+      });
+    });
+    await page.route("**/api/v1/auth/guest", async (route) => {
+      authenticated = true;
+      evidence.guestBootstraps += 1;
+      return route.fulfill({
+        json: {
+          authenticated: true, reused: false, renewed_after_expiry: false,
+          public_account_access_enabled: false, account_kind: "guest",
+        },
+      });
+    });
+  }
   await page.route("**/api/v1/conversations/*/messages**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ items: options.newConversation ? [] : [
-        { id: "prior-user", role: "user", content: options.language === "en" ? "Hello" : "Hola", created_at: RECEIVED_AT.toISOString(), metadata: {} },
-        { id: "prior-answer", role: "assistant", content: options.language === "en" ? "What would you like to test?" : "¿Qué te gustaría probar?", created_at: RECEIVED_AT.toISOString(), metadata: {} },
-      ], next_cursor: null }),
+      body: JSON.stringify({ items: persistedMessages, next_cursor: null }),
     });
   });
   await page.route("**/api/v1/conversations", async (route) => {
@@ -112,6 +145,7 @@ export async function installComputeLimitJourney(
       return;
     }
     evidence.streamStatuses.push(200);
+    await successReady;
     const success = COPY[options.language].success;
     await route.fulfill({
       status: 200,
@@ -138,10 +172,14 @@ export async function installComputeLimitJourney(
 
 export async function sendQuestion(page: Page, language: Language, newConversation = false) {
   await page.goto(newConversation ? "/chat" : "/chat?conversation=conversation-alpha", { waitUntil: "networkidle" });
+  await page.addStyleTag({ content: FREEZE_CSS });
+  await submitQuestion(page, language);
+}
+
+export async function submitQuestion(page: Page, language: Language) {
   const composer = page.getByTestId("chat-input");
   await expect(composer).toBeVisible({ timeout: 15_000 });
   await expect(composer).toBeEnabled();
-  await page.addStyleTag({ content: FREEZE_CSS });
   await composer.fill(COPY[language].prompt);
   await composer.press("Enter");
 }

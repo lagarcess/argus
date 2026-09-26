@@ -88,6 +88,7 @@ import {
   consumedResultActionsFromApi,
   hiddenSaveActionMessageIdsFromApi,
   isBreakdownActionMetadata,
+  isStaleConfirmationActionRejectionCode,
   normalizeConfirmationHistory,
   settleOpenConfirmationsAfterTextFinal,
 } from "./artifact-history";
@@ -104,6 +105,28 @@ export type HydratedMessages = {
   messages: Message[];
   inputActions: ChatActionOption[];
 };
+
+export function applyChatHttpErrorToMessages(
+  messages: Message[],
+  display: ReturnType<typeof chatHttpErrorDisplay>,
+  input: Parameters<typeof claimErrorMessagePatch>[0],
+): Message[] {
+  if (display.recoveryDisplay?.kind === "recovery_code" &&
+    display.recoveryDisplay.code === DAILY_CAP_RECOVERY_CODE) {
+    // Admission was refused before an assistant turn existed.
+    return messages.filter((message) => message.id !== input.assistantMessageId);
+  }
+  const staleConfirmation = isStaleConfirmationActionRejectionCode(input.code);
+  const claimPatch = claimErrorMessagePatch(input);
+  return messages.map((message) => message.id === input.assistantMessageId ? {
+    ...message,
+    content: staleConfirmation ? "" : display.content,
+    recoveryDisplay: staleConfirmation
+      ? { kind: "recovery_code", code: input.code! }
+      : (display.recoveryDisplay ?? message.recoveryDisplay),
+    ...claimPatch,
+  } : message);
+}
 
 export function chatActionRequestFromAction(
   action: ChatActionOption,

@@ -53,7 +53,6 @@ import {
 } from "@/lib/failure-treatment";
 import { GUEST_COMPUTE_CLAIM_RETRY_IN_KEY } from "@/lib/compute-claim-error";
 import { useRetryAfterCountdown } from "@/lib/use-retry-after-countdown";
-import { DAILY_CAP_RECOVERY_CODE } from "@/lib/daily-cap-reset-time";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { isSettledStrategyResult } from "@/lib/chat-result-message";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
@@ -209,8 +208,6 @@ export default function ChatMessage({
 
   // An answer with a recovery keeps its content; the notice renders under it.
   const noticeUnderAnswer = !isUser && recoveryNoticeUnderAnswer(message.recoveryDisplay);
-  const isDailyCapNotice = message.recoveryDisplay?.kind === "recovery_code" &&
-    message.recoveryDisplay.code === DAILY_CAP_RECOVERY_CODE;
   const getDisplayContent = () => {
     if (!isUser && isStreaming && message.contentPresentation === "result_breakdown") {
       return t("chat.status.working");
@@ -249,7 +246,7 @@ export default function ChatMessage({
   const footerMessageActions = (message.actions ?? []).filter(
     (action) => !isRetryAction(action) && !actionHasCardScopedOwnership(action),
   );
-  const shouldShowAssistantFooter = !isUser && !isStreaming && !isDailyCapNotice;
+  const shouldShowAssistantFooter = !isUser && !isStreaming;
   // Next moves answer the newest question only. Older groups are settled by the
   // reply that followed them, so they stop rendering rather than staying
   // tappable — the guard the floating composer strip used to provide.
@@ -380,7 +377,7 @@ export default function ChatMessage({
           </button>
         </Tooltip>
       )}
-      <div className={`flex flex-col ${isDailyCapNotice ? "w-full max-w-[660px]" : "max-w-[85%]"}`}>
+      <div className="flex max-w-[85%] flex-col">
         <div className="flex flex-col mt-1.5">
           {isSettledStrategyResult(message) ? (
             <div className="flex w-full max-w-[min(100%,660px)] flex-col gap-4">

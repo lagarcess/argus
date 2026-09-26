@@ -92,10 +92,10 @@ export function claimErrorKeepsLocalTranscript(
 
 export function admissionErrorTerminalPayload(
   assistantMessageId: string,
-  code: ComputeClaimUnavailableCode | typeof DAILY_CAP_RECOVERY_CODE,
+  code: ComputeClaimUnavailableCode,
 ): {
   message_id: string;
-  recovery: { code: ComputeClaimUnavailableCode | typeof DAILY_CAP_RECOVERY_CODE };
+  recovery: { code: ComputeClaimUnavailableCode };
 } {
   return {
     message_id: assistantMessageId,
@@ -126,6 +126,7 @@ type AdmissionTransportReadiness = {
     identityAuthorized: boolean,
   ) => boolean;
   finish: (identityAuthorized: boolean) => boolean;
+  reject: (identityAuthorized: boolean) => boolean;
 };
 
 export function settleAdmissionTransportReadiness(
@@ -135,7 +136,9 @@ export function settleAdmissionTransportReadiness(
   authorized: boolean,
 ): void {
   const code = recovery?.kind === "recovery_code" ? recovery.code : null;
-  if (isComputeClaimUnavailable(code) || code === DAILY_CAP_RECOVERY_CODE) {
+  if (code === DAILY_CAP_RECOVERY_CODE) {
+    terminalReadiness.reject(authorized);
+  } else if (isComputeClaimUnavailable(code)) {
     terminalReadiness.accept(
       admissionErrorTerminalPayload(assistantMessageId, code),
       authorized,

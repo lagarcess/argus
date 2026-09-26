@@ -364,6 +364,7 @@ describe.each([
     const finishes: boolean[] = [];
     settleAdmissionTransportReadiness(
       {
+        reject: () => false,
         accept: (payload, authorized) => {
           accepts.push({ payload, authorized });
           return authorized;
@@ -436,7 +437,7 @@ describe.each([
     );
     expect(chat).toContain("keepLocalTranscript");
     expect(chat).toContain("if (!options?.keepLocalTranscript)");
-    expect(chat).toContain("claimErrorMessagePatch({");
+    expect(chat).toContain("applyChatHttpErrorToMessages(");
     expect(chat).toContain("settleAdmissionTransportReadiness(terminalReadiness, httpErrorDisplay.recoveryDisplay, assistantId,");
     expect(chat).toContain("retryLastTurnSendOptions({ failedAssistantId, requestMessageId })");
   });

@@ -143,7 +143,6 @@ export function retryableAssistantRecoveryCode(value: unknown): string | null {
  */
 const QUIET_NOTICE_RECOVERY_CODES = new Set([
   "research_lookup_unavailable",
-  DAILY_CAP_RECOVERY_CODE,
 ]);
 
 /** Whether a reply renders as the quiet failure notice (failure-treatment.ts). */
