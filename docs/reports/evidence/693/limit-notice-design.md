@@ -64,7 +64,8 @@ and grounding windows are separate allowances and do not own this chat cap.
 
 The founder's follow-up requests consistent `AM`/`PM` in both supported
 languages. This overrides the package's Spanish day-period styling example
-(`p. m.`), while retaining the specified localized sentence. No second parser
+(`p. m.`), while retaining the specified localized sentence. A single nonbreaking space
+keeps the time and day period together on narrow screens. No second parser
 or quota schedule was introduced.
 
 Verification: `tests/test_compute_reset_contract.py` exercises real chat 429

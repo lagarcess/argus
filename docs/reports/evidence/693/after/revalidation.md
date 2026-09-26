@@ -1,6 +1,33 @@
 # Browser revalidation
 
-## Current consistent AM/PM formatting
+## Current composer notice and lifecycle
+
+Validated runtime commit: `cb3d305de2fdad813722a6d550ad5535d5ac92c6`.
+The [complete acceptance output](playwright-lifecycle.txt) records the final
+package run: **31 passed in 33.5 seconds**. All 16 after images were recaptured at that commit. The eight
+429 images supersede the earlier transcript-positioned notices; the eight
+503 images preserve the existing recovery presentation.
+
+The notice appears once above the composer, outside all message rows, with
+an accessible Close button. English and Spanish both use `AM`/`PM`; a single
+nonbreaking separator keeps the time and day period together on mobile.
+The last rejected question stays above the notice, verified by measured
+bounding boxes at 360px. No empty assistant placeholder remains.
+
+Lifecycle acceptance covers repeated429 deduplication with no automatic retry,
+same-tab reload and New chat, dismissal retained through reload and resurfacing
+on a new rejection, timer/focus expiry, successful response/reload, success
+after navigation, account isolation, and the first guest send after bootstrap.
+The composer remains editable. The rejected question is local; reload restores
+the server transcript rather than promising to persist a denied turn.
+
+The runtime build, unit and backend evidence is in [verification.md](../verification.md).
+All browser API responses were mocked; no provider or production account was
+used. The browser time zone and clock remain those in [README.md](../README.md).
+This run supersedes earlier after images. Later evidence-only commits retain
+this validation when their runtime diff is empty.
+
+## Earlier AM/PM formatting
 
 Validated source commit: `b56ce0bd4eb0a397cfc1900727abcb75de5e8ef4`.
 The complete package suite passed **22 tests**, with the

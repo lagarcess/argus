@@ -36,10 +36,11 @@ that transient loading state is not used for these images.
 ## After
 
 Current after screenshots were captured at
-`b56ce0bd4eb0a397cfc1900727abcb75de5e8ef4`. The complete package suite passed
-22 tests, including quiet daily-cap notices with no answer controls. See the
+`cb3d305de2fdad813722a6d550ad5535d5ac92c6`. The complete package suite passed
+31 cases, including one account-scoped notice above the composer and its full
+reload, dismissal, expiry, account-change, and recovery lifecycle. See the
 [current browser revalidation](after/revalidation.md) and
-[run output](after/playwright-quiet-notice.txt).
+[run output](after/playwright-lifecycle.txt).
 
 The [notice design rationale](limit-notice-design.md) records the official
 Codex, Grok, and Claude Code references and the reused Argus treatment.
@@ -55,7 +56,10 @@ Acceptance specs:
   one local question; eventual success; new-chat 15-second fallback.
 - `web/e2e/daily-cap-429.spec.ts`: both account kinds, languages, and widths;
   exact local reset copy with the header and without it; no vague wait or
-  claim countdown; new-chat notice and question remain visible.
+  claim countdown; new-chat notice and question remain visible. The notice is
+  outside message rows; same-tab persistence, dismissal, expiry, successful
+  recovery across navigation, account isolation, and first guest bootstrap
+  have dedicated cases.
 
 The tests use the existing breakpoint account fixture and #681's mocked
 Problem Details and SSE pattern. They exercise the actual web application.
