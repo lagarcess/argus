@@ -190,7 +190,7 @@ import {
 } from "./types";
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
-  chatActionRequestFromAction, chatHttpErrorDisplay, guestClaimErrorMessagePatch, settleGuestClaimTransportReadiness,
+  chatActionRequestFromAction, chatHttpErrorDisplay, claimErrorMessagePatch, settleAdmissionTransportReadiness,
   applyEmptyFinalFallback,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
@@ -1727,8 +1727,7 @@ export default function ChatInterface() {
           }
         }
         const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
-        const status = (err as { status?: number }).status;
-        const isRateLimit = status === 429;
+        const status = (err as { status?: number }).status ?? 0;
         const rejectionCode = err instanceof ChatStreamError ? err.code : null;
         const staleConfirmationRejected =
           isStaleConfirmationActionRejectionCode(rejectionCode);
@@ -1736,7 +1735,9 @@ export default function ChatInterface() {
           err instanceof ChatStreamError && err.message
             ? err.message
             : t("chat.error_backtest");
-        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage);
+        const httpErrorDisplay = chatHttpErrorDisplay(rejectionCode, fallbackMessage, {
+          status, retryAfter: err instanceof ChatStreamError ? err.retryAfter : null,
+        });
         if (canApplyVisibleUpdate) {
           setMessages((prev) =>
             normalizeDurableRetryActionHistory(
@@ -1747,16 +1748,14 @@ export default function ChatInterface() {
                         ...m,
                         content: staleConfirmationRejected
                           ? ""
-                          : isRateLimit ? t("chat.rate_limit_error") : httpErrorDisplay.content,
+                          : httpErrorDisplay.content,
                         recoveryDisplay: staleConfirmationRejected
                           ? {
                               kind: "recovery_code" as const,
                               code: rejectionCode,
                             }
-                          : isRateLimit
-                            ? m.recoveryDisplay
-                            : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
-                        ...guestClaimErrorMessagePatch({ code: rejectionCode, retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null, retryAction: retryLastTurnAction, message: trimmed, assistantMessageId: assistantId }),
+                          : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
+                        ...claimErrorMessagePatch({ code: rejectionCode, retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null, retryAction: retryLastTurnAction, message: trimmed, assistantMessageId: assistantId }),
                       }
                     : m,
                 ),
@@ -1766,7 +1765,7 @@ export default function ChatInterface() {
             ),
           );
         }
-        settleGuestClaimTransportReadiness(terminalReadiness, rejectionCode, assistantId, requestSessions.authorize(requestSession, "catch"));
+        settleAdmissionTransportReadiness(terminalReadiness, httpErrorDisplay.recoveryDisplay, assistantId, requestSessions.authorize(requestSession, "catch"));
         finishRequestTransport(requestSession);
       }
     })();

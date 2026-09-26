@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 import { chatHttpErrorDisplay } from "../components/chat/chat-message-projection";
@@ -7,17 +8,17 @@ import { ChatStreamError, streamChatMessage } from "../lib/argus-api";
 import { retryLastTurnChatActionFromAction } from "../lib/chat-retry-actions";
 import { discoveryCandidateMention } from "../lib/chat-discovery-sidecar";
 import {
-  GUEST_COMPUTE_CLAIM_MESSAGE_KEY,
+  REGISTERED_COMPUTE_CLAIM_UNAVAILABLE_CODE,
   GUEST_COMPUTE_CLAIM_RETRY_IN_KEY,
   GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
-  guestClaimErrorKeepsLocalTranscript,
-  guestClaimErrorMessagePatch,
-  guestClaimErrorRetryAction,
-  guestClaimErrorTerminalPayload,
-  guestComputeClaimTransportPatch,
-  settleGuestClaimTransportReadiness,
-  localizedGuestComputeClaimMessage,
-} from "../lib/guest-compute-claim-error";
+  claimErrorKeepsLocalTranscript,
+  claimErrorMessagePatch,
+  claimErrorRetryAction,
+  admissionErrorTerminalPayload,
+  computeClaimTransportPatch,
+  settleAdmissionTransportReadiness,
+  localizedComputeClaimMessage,
+} from "../lib/compute-claim-error";
 import { recoveryDisplayText } from "../lib/chat-recovery-display";
 import {
   isHttpRetryAfterDate,
@@ -136,9 +137,27 @@ describe("Retry-After parsing", () => {
     ).toBe(8);
     const asctime = "Fri Sep 25 12:00:08 2026";
     expect(
-      parseRetryAfterSeconds(asctime, Date.parse(asctime) - 8_000),
+      parseRetryAfterSeconds(asctime, nowMs),
     ).toBe(8);
   });
+
+  test.each(["America/Los_Angeles", "Asia/Tokyo"])(
+    "parses asctime as GMT in %s, including a space-padded day",
+    (timeZone) => {
+      const script = `
+        import { parseRetryAfterSeconds } from ${JSON.stringify(join(root, "lib/retry-after.ts"))};
+        console.log(JSON.stringify([
+          parseRetryAfterSeconds("Fri Sep 25 12:00:08 2026", Date.parse("2026-09-25T12:00:00Z")),
+          parseRetryAfterSeconds("Sat Sep  5 12:00:08 2026", Date.parse("2026-09-05T12:00:00Z")),
+        ]));
+      `;
+      const result = spawnSync(process.execPath, ["--eval", script], {
+        env: { ...process.env, TZ: timeZone }, encoding: "utf8",
+      });
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout)).toEqual([8, 8]);
+    },
+  );
 
   test("clamps huge, zero, and past values into 1..120", () => {
     expect(parseRetryAfterSeconds("0")).toBe(RETRY_AFTER_MIN_SECONDS);
@@ -173,17 +192,20 @@ describe("Retry-After parsing", () => {
   });
 });
 
-describe("guest compute claim error copy", () => {
+describe.each([
+  GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+  REGISTERED_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+] as const)("%s recovery", (claimCode) => {
   test("maps the 503 claim code to English and es-419 catalogs", () => {
     const projected = chatHttpErrorDisplay(
-      GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      claimCode,
       RAW_SERVER_DETAIL,
     );
 
     expect(projected.content).toBe("");
     expect(projected.recoveryDisplay).toEqual({
       kind: "recovery_code",
-      code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      code: claimCode,
     });
     expect(
       recoveryDisplayText(projected.recoveryDisplay, tFromCatalog(enCatalog)),
@@ -201,21 +223,21 @@ describe("guest compute claim error copy", () => {
 
   test("never renders raw server text for the claim code", () => {
     expect(
-      localizedGuestComputeClaimMessage(
-        GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      localizedComputeClaimMessage(
+        claimCode,
         tFromCatalog(enCatalog),
         RAW_SERVER_DETAIL,
       ),
     ).toBe(EN_COPY);
     expect(
-      localizedGuestComputeClaimMessage(
-        GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      localizedComputeClaimMessage(
+        claimCode,
         tFromCatalog(esCatalog),
         RAW_SERVER_DETAIL,
       ),
     ).toBe(ES_COPY);
     expect(
-      localizedGuestComputeClaimMessage(
+      localizedComputeClaimMessage(
         "stream_interrupted",
         tFromCatalog(enCatalog),
         RAW_SERVER_DETAIL,
@@ -234,7 +256,7 @@ describe("guest compute claim error copy", () => {
 
   test("new claim strings contain no em dash", () => {
     const keys = [
-      GUEST_COMPUTE_CLAIM_MESSAGE_KEY,
+      `chat.recovery.${claimCode}`,
       `${GUEST_COMPUTE_CLAIM_RETRY_IN_KEY}_one`,
       `${GUEST_COMPUTE_CLAIM_RETRY_IN_KEY}_other`,
     ];
@@ -249,8 +271,8 @@ describe("guest compute claim error copy", () => {
 
   test("attaches one retry control that waits for Retry-After", () => {
     const nowMs = Date.parse("Fri, 25 Sep 2026 12:00:00 GMT");
-    const patch = guestComputeClaimTransportPatch({
-      code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+    const patch = computeClaimTransportPatch({
+      code: claimCode,
       retryAfterHeader: "8",
       retryAction: {
         id: "retry-last-turn",
@@ -263,14 +285,14 @@ describe("guest compute claim error copy", () => {
     });
 
     expect(patch?.assistantRecoveryCode).toBe(
-      GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      claimCode,
     );
     expect(patch?.actions?.[0]?.availableAtMs).toBe(nowMs + 8_000);
     expect(patch?.actions?.[0]?.payload).toEqual({
       message: "Compare Apple with SPY",
     });
     expect(
-      guestComputeClaimTransportPatch({
+      computeClaimTransportPatch({
         code: "too_many_requests",
         retryAfterHeader: "8",
         retryAction: {
@@ -289,7 +311,7 @@ describe("guest compute claim error copy", () => {
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({
-          code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+          code: claimCode,
           detail: RAW_SERVER_DETAIL,
         }),
         {
@@ -319,7 +341,7 @@ describe("guest compute claim error copy", () => {
     expect(caught).toBeInstanceOf(ChatStreamError);
     const error = caught as ChatStreamError;
     expect(error.status).toBe(503);
-    expect(error.code).toBe(GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE);
+    expect(error.code).toBe(claimCode);
     expect(error.retryAfter).toBe("8");
     expect(error.message).toBe(RAW_SERVER_DETAIL);
   });
@@ -327,16 +349,16 @@ describe("guest compute claim error copy", () => {
   test("a later claim 503 keeps the local turn and rebuilds Retry", () => {
     const nowMs = Date.parse("Fri, 25 Sep 2026 12:00:00 GMT");
     expect(
-      guestClaimErrorKeepsLocalTranscript(GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE),
+      claimErrorKeepsLocalTranscript(claimCode),
     ).toBe(true);
-    expect(guestClaimErrorKeepsLocalTranscript("too_many_requests")).toBe(false);
-    expect(guestClaimErrorTerminalPayload("assistant-claim-1")).toEqual({
+    expect(claimErrorKeepsLocalTranscript("too_many_requests")).toBe(false);
+    expect(admissionErrorTerminalPayload("assistant-claim-1", claimCode)).toEqual({
       message_id: "assistant-claim-1",
-      recovery: { code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE },
+      recovery: { code: claimCode },
     });
 
-    const rebuilt = guestClaimErrorRetryAction({
-      code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+    const rebuilt = claimErrorRetryAction({
+      code: claimCode,
       retryAction: {
         id: "retry-last-turn",
         label: "Retry",
@@ -351,16 +373,16 @@ describe("guest compute claim error copy", () => {
       message: "Compare Apple with SPY",
     });
     expect(
-      guestClaimErrorRetryAction({
-        code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      claimErrorRetryAction({
+        code: claimCode,
         retryAction: null,
         message: "AAPL",
         assistantMessageId: "assistant-claim-1",
       }),
     ).toBeNull();
 
-    const later = guestClaimErrorMessagePatch({
-      code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+    const later = claimErrorMessagePatch({
+      code: claimCode,
       retryAfterHeader: "4",
       retryAction: rebuilt,
       message: "Compare Apple with SPY",
@@ -370,7 +392,7 @@ describe("guest compute claim error copy", () => {
     expect(later.actions?.[0]?.availableAtMs).toBe(nowMs + 4_000);
     const accepts: unknown[] = [];
     const finishes: boolean[] = [];
-    settleGuestClaimTransportReadiness(
+    settleAdmissionTransportReadiness(
       {
         accept: (payload, authorized) => {
           accepts.push({ payload, authorized });
@@ -381,19 +403,19 @@ describe("guest compute claim error copy", () => {
           return false;
         },
       },
-      GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      { kind: "recovery_code", code: claimCode },
       "assistant-claim-1",
       true,
     );
     expect(accepts).toEqual([
       {
-        payload: guestClaimErrorTerminalPayload("assistant-claim-1"),
+        payload: admissionErrorTerminalPayload("assistant-claim-1", claimCode),
         authorized: true,
       },
     ]);
     expect(finishes).toEqual([true]);
     expect(
-      guestClaimErrorRetryAction({
+      claimErrorRetryAction({
         code: "too_many_requests",
         retryAction: null,
         message: "Compare Apple with SPY",
@@ -412,8 +434,8 @@ describe("guest compute claim error copy", () => {
         asset_class: "equity",
       },
     };
-    const rebuilt = guestClaimErrorRetryAction({
-      code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+    const rebuilt = claimErrorRetryAction({
+      code: claimCode,
       retryAction: null,
       message: "AAPL",
       assistantMessageId: "assistant-claim-2",
@@ -444,8 +466,8 @@ describe("guest compute claim error copy", () => {
     );
     expect(chat).toContain("keepLocalTranscript");
     expect(chat).toContain("if (!options?.keepLocalTranscript)");
-    expect(chat).toContain("guestClaimErrorMessagePatch({");
-    expect(chat).toContain("settleGuestClaimTransportReadiness(terminalReadiness, rejectionCode, assistantId,");
+    expect(chat).toContain("claimErrorMessagePatch({");
+    expect(chat).toContain("settleAdmissionTransportReadiness(terminalReadiness, httpErrorDisplay.recoveryDisplay, assistantId,");
     expect(chat).toContain("retryLastTurnSendOptions({ failedAssistantId, requestMessageId })");
   });
 

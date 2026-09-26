@@ -982,3 +982,32 @@ describe("calculation missing inputs", () => {
     );
   });
 });
+
+
+describe("daily chat admission errors", () => {
+  test("signed-in claim 503 uses its recovery key, never the backend detail", () => {
+    const display = chatHttpErrorDisplay("registered_compute_claim_unavailable", "Internal detail");
+    expect(display).toEqual({ content: "", recoveryDisplay: {
+      kind: "recovery_code", code: "registered_compute_claim_unavailable",
+    } });
+    for (const catalog of [enCatalog, esCatalog]) {
+      const text = recoveryDisplayText(display.recoveryDisplay, tFromCatalog(catalog));
+      expect(text).not.toContain("Internal detail");
+      expect(text).not.toContain("chat.recovery.");
+    }
+  });
+
+  test("chat 429 stores the reset instant and localizes the daily-cap key", () => {
+    const display = chatHttpErrorDisplay("too_many_requests", "Wait a moment", {
+      status: 429, retryAfter: "21600", nowMs: Date.parse("2026-09-26T18:00:00Z"),
+    });
+    expect(display).toEqual({ content: "", recoveryDisplay: {
+      kind: "recovery_code", code: "daily_cap_reached",
+      values: { resetAt: "2026-09-27T00:00:00.000Z" },
+    } });
+    const text = recoveryDisplayText(display.recoveryDisplay, tFromCatalog(enCatalog), "en");
+    expect(text).toContain("You've reached today's question limit. It resets at ");
+    expect(text).not.toContain("Wait a moment");
+    expect(chatHttpErrorDisplay("too_many_requests", "Unrelated error").content).toBe("Unrelated error");
+  });
+});

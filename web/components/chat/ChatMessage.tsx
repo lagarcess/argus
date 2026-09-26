@@ -51,8 +51,8 @@ import {
   retryableNoticeIconClass,
   retryableNoticeRetryPillClass,
 } from "@/lib/failure-treatment";
-import { GUEST_COMPUTE_CLAIM_RETRY_IN_KEY } from "@/lib/guest-compute-claim-error";
-import { useRetryAfterCountdown } from "@/lib/retry-after";
+import { GUEST_COMPUTE_CLAIM_RETRY_IN_KEY } from "@/lib/compute-claim-error";
+import { useRetryAfterCountdown } from "@/lib/use-retry-after-countdown";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { isSettledStrategyResult } from "@/lib/chat-result-message";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";

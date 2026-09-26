@@ -347,7 +347,6 @@
         "body": "Argus no pudo completar esta investigación. Pregunta de nuevo, o prueba la idea directamente."
       }
     },
-    "rate_limit_error": "Has alcanzado tu límite de solicitudes. Por favor, espera un momento e inténtalo de nuevo.",
     "error_offline": "Argus no puede conectarse con su servicio en este momento. Revisa tu conexión e inténtalo de nuevo en un momento.",
     "error_load": "No se pudo abrir esta conversación. Inténtalo de nuevo.",
     "opening_conversation": "Abriendo la conversación…",
@@ -388,6 +387,8 @@
       "execution_data_unavailable": "La configuración sigue aquí, pero no pude obtener {{dataLabel}} para esa simulación en este momento. Inténtalo de nuevo, cambia las fechas o elige otro activo compatible.",
       "backtest_capacity_exceeded": "Argus ya está corriendo todas las pruebas que puede en este momento, así que esta no se inició. Nada falló y nada se perdió: tu configuración quedó tal como la dejaste. Vuelve a ejecutarla en unos minutos.",
       "guest_compute_claim_unavailable": "Argus no pudo iniciar este turno. Inténtalo de nuevo en un momento.",
+      "registered_compute_claim_unavailable": "Argus no pudo iniciar este turno. Inténtalo de nuevo en un momento.",
+      "daily_cap_reached": "Llegaste al límite de preguntas de hoy. Se reinicia a las {{time}}.",
       "guest_compute_claim_retry_in_one": "Reintentar en {{count}} segundo",
       "guest_compute_claim_retry_in_other": "Reintentar en {{count}} segundos",
       "data_kind": {

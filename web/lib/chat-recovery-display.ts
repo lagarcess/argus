@@ -5,6 +5,7 @@ import { isRetryAction } from "@/lib/chat-retry-actions";
 import { artifactAssumptionsFacts, artifactAssumptionsText, type ArtifactAssumptionsFacts } from "./artifact-assumptions-display";
 import { resultReadoutFacts, type ResultReadoutFacts } from "./result-readout-facts";
 import { resultBreakdownText } from "./result-readout-display";
+import { DAILY_CAP_RECOVERY_CODE, formatDailyCapResetTime } from "./daily-cap-reset-time";
 
 const UNSUPPORTED_STRATEGY_ACTION_ID_PREFIX = "unsupported-strategy-";
 const NO_PROGRESS_ACTION_ID_PREFIX = "no-progress-";
@@ -240,7 +241,7 @@ export function recoveryDisplayText(
     return resultBreakdownText(display.facts, t, locale);
   }
   if (display.kind === "recovery_code") {
-    return t(`chat.recovery.${display.code}`, recoveryCodeValues(display, t));
+    return t(`chat.recovery.${display.code}`, recoveryCodeValues(display, t, locale));
   }
   if (display.kind === "coverage_recovery") {
     return t(`chat.coverage_recovery.${display.code}`);
@@ -336,8 +337,14 @@ export function recoveryDisplayCopyText(
 function recoveryCodeValues(
   display: Extract<RecoveryDisplay, { kind: "recovery_code" }>,
   t: TFunction,
+  locale: string,
 ): Record<string, string> {
   const values = display.values ?? {};
+  if (display.code === DAILY_CAP_RECOVERY_CODE) {
+    // The catalog supplies the sentence period, including after Spanish p. m.
+    const time = formatDailyCapResetTime(Date.parse(values.resetAt), locale).replace(/\.$/, "");
+    return { ...values, time };
+  }
   if (display.code === "execution_data_unavailable") {
     const dataKind = values.data_kind;
     const dataLabel =

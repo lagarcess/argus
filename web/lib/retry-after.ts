@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-
 export const RETRY_AFTER_FALLBACK_SECONDS = 15;
 export const RETRY_AFTER_MIN_SECONDS = 1;
 export const RETRY_AFTER_MAX_SECONDS = 120;
@@ -25,25 +23,31 @@ export function isHttpRetryAfterDate(value: string): boolean {
   return IMF_FIXDATE.test(value) || RFC_850_DATE.test(value) || ASCTIME_DATE.test(value);
 }
 
+/** Parse once; each recovery policy owns its bounds and missing-header fallback. */
+export function parseRetryAfterDelaySeconds(
+  value: string | null | undefined,
+  nowMs: number = Date.now(),
+): number | null {
+  const text = value?.trim() ?? "";
+  if (/^\d+$/.test(text)) {
+    const seconds = Number(text);
+    return Number.isFinite(seconds) ? seconds : null;
+  }
+  if (!isHttpRetryAfterDate(text)) {
+    return null;
+  }
+  // HTTP dates are GMT, including obsolete asctime values without a zone.
+  const parsed = Date.parse(ASCTIME_DATE.test(text) ? `${text} GMT` : text);
+  return Number.isFinite(parsed) ? Math.ceil((parsed - nowMs) / 1000) : null;
+}
+
 export function parseRetryAfterSeconds(
   value: string | null | undefined,
   nowMs: number = Date.now(),
 ): number {
-  const text = value?.trim() ?? "";
-  if (!text) {
-    return RETRY_AFTER_FALLBACK_SECONDS;
-  }
-  if (/^\d+$/.test(text)) {
-    return clampRetryAfterSeconds(Number(text));
-  }
-  if (!isHttpRetryAfterDate(text)) {
-    return RETRY_AFTER_FALLBACK_SECONDS;
-  }
-  const parsed = Date.parse(text);
-  if (!Number.isFinite(parsed)) {
-    return RETRY_AFTER_FALLBACK_SECONDS;
-  }
-  return clampRetryAfterSeconds(Math.ceil((parsed - nowMs) / 1000));
+  return clampRetryAfterSeconds(
+    parseRetryAfterDelaySeconds(value, nowMs) ?? RETRY_AFTER_FALLBACK_SECONDS,
+  );
 }
 
 export function remainingRetryAfterSeconds(
@@ -61,27 +65,4 @@ export function shouldKeepRetryAfterTicker(
   nowMs: number,
 ): boolean {
   return remainingRetryAfterSeconds(availableAtMs, nowMs) > 0;
-}
-
-export function useRetryAfterCountdown(availableAtMs?: number): number {
-  const [nowMs, setNowMs] = useState(() => Date.now());
-
-  useEffect(() => {
-    const tick = () => {
-      const nextNowMs = Date.now();
-      setNowMs(nextNowMs);
-      return shouldKeepRetryAfterTicker(availableAtMs, nextNowMs);
-    };
-    if (!tick()) {
-      return;
-    }
-    const id = window.setInterval(() => {
-      if (!tick()) {
-        window.clearInterval(id);
-      }
-    }, 250);
-    return () => window.clearInterval(id);
-  }, [availableAtMs]);
-
-  return remainingRetryAfterSeconds(availableAtMs, nowMs);
 }

@@ -347,7 +347,6 @@
         "body": "Argus couldn't complete this research run. Ask again, or test the idea directly."
       }
     },
-    "rate_limit_error": "You've reached your request limit. Please wait a moment and try again.",
     "error_offline": "Argus can’t reach its service right now. Check your connection and try again in a moment.",
     "error_load": "Couldn’t load this conversation. Try again.",
     "opening_conversation": "Opening conversation…",
@@ -388,6 +387,8 @@
       "execution_data_unavailable": "The setup is still here, but I could not get {{dataLabel}} for that run right now. Try again, change the dates, or choose a different supported asset.",
       "backtest_capacity_exceeded": "Argus is already running as many backtests as it can right now, so this one did not start. Nothing broke and nothing was lost: your setup is exactly as you left it. Run it again in a few minutes.",
       "guest_compute_claim_unavailable": "Argus could not start this turn. Try again in a moment.",
+      "registered_compute_claim_unavailable": "Argus could not start this turn. Try again in a moment.",
+      "daily_cap_reached": "You've reached today's question limit. It resets at {{time}}.",
       "guest_compute_claim_retry_in_one": "Retry in {{count}} second",
       "guest_compute_claim_retry_in_other": "Retry in {{count}} seconds",
       "data_kind": {
