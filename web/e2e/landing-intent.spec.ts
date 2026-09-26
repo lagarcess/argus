@@ -155,10 +155,6 @@ async function mockLandingJourney(
     await fulfillJson(route, { allowances: {} });
   });
 
-  await page.route("**/api/v1/analytics/guest-events", async (route) => {
-    await fulfillJson(route, { success: true });
-  });
-
   return evidence;
 }
 
