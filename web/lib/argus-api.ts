@@ -409,7 +409,7 @@ export class ChatStreamError extends Error {
     message: string,
     public status: number,
     public code = "unknown",
-    public requestId: string | null = null,
+    public requestId: string | null = null, public retryAfter: string | null = null,
   ) {
     super(message);
     this.name = "ChatStreamError";
@@ -1062,6 +1062,7 @@ export async function streamChatMessage(
       message,
       response.status,
       typeof code === "string" ? code : "unknown", responseRequestId,
+      response.headers.get("Retry-After"),
     );
   }
   const reader = response.body.getReader();

@@ -79,6 +79,7 @@ import {
   retryLastTurnFailedAssistantIdFromAction,
   retryLastTurnMessageFromAction,
   retryLastTurnRequestMessageIdFromAction,
+  retryLastTurnSendOptions,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
 import { RETEST_ACTION_TYPE, applyRetestReceipt, retestReceiptFromFinalPayload, settleRetestReceiptProjection } from "@/lib/chat-retest";
@@ -189,7 +190,7 @@ import {
 } from "./types";
 import { confirmationSupersedingHandlers } from "./confirmation-superseding";
 import {
-  chatActionRequestFromAction, chatHttpErrorDisplay,
+  chatActionRequestFromAction, chatHttpErrorDisplay, guestClaimErrorMessagePatch, settleGuestClaimTransportReadiness,
   applyEmptyFinalFallback,
   chatStreamErrorText,
   consumeConfirmationActionOnMessages,
@@ -1134,7 +1135,9 @@ export default function ChatInterface() {
         : isFailedActionRetry(action)
           ? "recovery"
           : "message_send";
-    invalidateTranscriptForMutation(targetConversationId, transcriptMutation);
+    if (!options?.keepLocalTranscript) {
+      invalidateTranscriptForMutation(targetConversationId, transcriptMutation);
+    }
 
     if (targetConversationId !== conversationId) {
       rememberActiveConversationId(targetConversationId);
@@ -1753,6 +1756,7 @@ export default function ChatInterface() {
                           : isRateLimit
                             ? m.recoveryDisplay
                             : (httpErrorDisplay.recoveryDisplay ?? m.recoveryDisplay),
+                        ...guestClaimErrorMessagePatch({ code: rejectionCode, retryAfterHeader: err instanceof ChatStreamError ? err.retryAfter : null, retryAction: retryLastTurnAction, message: trimmed, assistantMessageId: assistantId }),
                       }
                     : m,
                 ),
@@ -1762,7 +1766,7 @@ export default function ChatInterface() {
             ),
           );
         }
-        terminalReadiness.finish(requestSessions.authorize(requestSession, "catch"));
+        settleGuestClaimTransportReadiness(terminalReadiness, rejectionCode, assistantId, requestSessions.authorize(requestSession, "catch"));
         finishRequestTransport(requestSession);
       }
     })();
@@ -1938,14 +1942,7 @@ export default function ChatInterface() {
           retryText,
           retryMention ? [retryMention] : (retryChatAction ?? []),
           retryMention ? (retryChatAction ?? undefined) : undefined,
-          failedAssistantId
-            ? {
-                renderUserMessage: false,
-                replacementAssistantId: failedAssistantId,
-              }
-            : requestMessageId
-              ? { renderUserMessage: true }
-              : { renderUserMessage: false },
+          retryLastTurnSendOptions({ failedAssistantId, requestMessageId }),
         );
       }
       return;

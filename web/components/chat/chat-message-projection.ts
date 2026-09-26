@@ -61,6 +61,26 @@ import {
   visibleComposerResponseActions,
 } from "@/lib/chat-recovery-display";
 import {
+  GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+  guestClaimErrorKeepsLocalTranscript,
+  guestClaimErrorMessagePatch,
+  guestClaimErrorRetryAction,
+  guestClaimErrorTerminalPayload,
+  guestComputeClaimTransportPatch,
+  isGuestComputeClaimUnavailable,
+  settleGuestClaimTransportReadiness,
+} from "@/lib/guest-compute-claim-error";
+
+export {
+  guestClaimErrorKeepsLocalTranscript,
+  guestClaimErrorMessagePatch,
+  guestClaimErrorRetryAction,
+  guestClaimErrorTerminalPayload,
+  guestComputeClaimTransportPatch,
+  isGuestComputeClaimUnavailable,
+  settleGuestClaimTransportReadiness,
+};
+import {
   applyConsumedResultActions,
   applyConfirmationActionEffects,
   confirmationActionEffectFromAction,
@@ -646,6 +666,15 @@ export function chatHttpErrorDisplay(
   problemCode: string | null,
   backendMessage: string,
 ): { content: string; recoveryDisplay: RecoveryDisplay | null } {
+  if (isGuestComputeClaimUnavailable(problemCode)) {
+    return {
+      content: "",
+      recoveryDisplay: {
+        kind: "recovery_code",
+        code: GUEST_COMPUTE_CLAIM_UNAVAILABLE_CODE,
+      },
+    };
+  }
   if (!problemCode || !RETEST_COVERAGE_PROBLEM_CODES.has(problemCode)) {
     return { content: backendMessage, recoveryDisplay: null };
   }

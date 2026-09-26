@@ -51,6 +51,8 @@ import {
   retryableNoticeIconClass,
   retryableNoticeRetryPillClass,
 } from "@/lib/failure-treatment";
+import { GUEST_COMPUTE_CLAIM_RETRY_IN_KEY } from "@/lib/guest-compute-claim-error";
+import { useRetryAfterCountdown } from "@/lib/retry-after";
 import GuestArtifactHint from "@/components/guest/GuestArtifactHint";
 import { isSettledStrategyResult } from "@/lib/chat-result-message";
 import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
@@ -230,6 +232,13 @@ export default function ChatMessage({
         })
       : action.label;
   const retryAction = message.actions?.find(isRetryAction);
+  const retryAfterRemaining = useRetryAfterCountdown(retryAction?.availableAtMs);
+  const retryReady = retryAfterRemaining <= 0;
+  const retryActionLabel = retryAction
+    ? retryReady
+      ? actionLabel(retryAction)
+      : t(GUEST_COMPUTE_CLAIM_RETRY_IN_KEY, { count: retryAfterRemaining })
+    : "";
   const userRecoveryText =
     isUser && message.recoveryDisplay
       ? recoveryDisplayText(message.recoveryDisplay, t, locale).trim()
@@ -265,10 +274,15 @@ export default function ChatMessage({
       {retryAction ? (
         <button
           type="button"
-          onClick={() => onAction?.(retryAction)}
-          className={retryableNoticeRetryPillClass}
+          disabled={!retryReady}
+          aria-disabled={!retryReady}
+          onClick={() => {
+            if (!retryReady) return;
+            onAction?.(retryAction);
+          }}
+          className={`${retryableNoticeRetryPillClass} disabled:pointer-events-none disabled:opacity-50 disabled:hover:bg-transparent`}
         >
-          {actionLabel(retryAction)}
+          {retryActionLabel}
         </button>
       ) : null}
     </div>
