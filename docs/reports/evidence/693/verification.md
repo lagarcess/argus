@@ -11,6 +11,7 @@ No intervening integration commits; no reconciliation merge or semantic overlap.
 | `cd web && NEXT_DIST_DIR=.next-693-build NEXT_TELEMETRY_DISABLED=1 bun run build` | Passed, including production TypeScript check |
 | Backend claim, calculation input, artifact continuity and complete mocked eval harness | 346 passed |
 | `poetry run python scripts/check_modularity_budget.py` | Passed on current integration plus package tree |
+| `poetry run pytest tests/test_modularity_budget.py -q --no-cov` | 8 passed |
 | Playwright package acceptance | 22 passed; EN/es-419; 360px/1280px; DR time zone |
 | Baseline screenshot capture | 12 passed on integration runtime |
 
@@ -44,3 +45,11 @@ Review flags: package 0B-1 requires Priya's written eval verdict before merge.
 That internal verdict remains pending; this report does not supply it.
 Analytics/event code is untouched for #702. The 0B-1 spec needs no new event.
 The PR terminal audit records final head, CI and Codex review outcomes.
+
+CI follow-up: the first backend run passed 9,037 tests but detected that
+`chat-recovery-display.test.ts` had crossed the 1,000-line registration
+threshold. Its duplicated catalog translator now lives in shared test support
+and both recovery suites reuse it. All 2,155 web tests and all eight modularity
+unit checks pass after extraction. No assertion was removed, no budget was
+raised, and runtime/browser fixture files are unchanged, preserving browser
+evidence. Final CI is recorded in the PR audit.

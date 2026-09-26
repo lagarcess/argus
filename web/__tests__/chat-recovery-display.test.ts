@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { tFromCatalog } from "./support/catalog-translator";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,30 +22,6 @@ const enCatalog = JSON.parse(
 const esCatalog = JSON.parse(
   readFileSync(join(root, "public/locales/es-419/common.json"), "utf8"),
 ) as Record<string, unknown>;
-
-function tFromCatalog(catalog: Record<string, unknown>) {
-  return (key: string, options?: Record<string, unknown> | string) => {
-    const template = key
-      .split(".")
-      .reduce<unknown>(
-        (value, segment) =>
-          typeof value === "object" && value !== null && !Array.isArray(value)
-            ? (value as Record<string, unknown>)[segment]
-            : undefined,
-        catalog,
-      );
-    if (typeof template !== "string") {
-      return key;
-    }
-    const values =
-      typeof options === "object" && options !== null
-        ? options
-        : ({} as Record<string, unknown>);
-    return template.replace(/\{\{(\w+)\}\}/g, (_, name: string) =>
-      String(values[name] ?? ""),
-    );
-  };
-}
 
 function flattenedKeys(value: unknown, prefix = ""): string[] {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
