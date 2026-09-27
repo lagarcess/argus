@@ -102,7 +102,7 @@ capability found at the inspected SHA.
 | Tool-result cards and recompute | `tool_result_cards` + recompute route | Backend-localized `presentation`, sources, `repair` | None | Reuse candidate | `src/argus/domain/tool_contracts.py:86`, `:173`; `src/argus/api/routers/tool_results.py:56`; `docs/API_CONTRACT.md:3496-3587` |
 | Backtest / research jobs | Backtest router | `GET /backtest-jobs/{id}`, `/by-action/{confirmation_id}`, `GET /backtests/{run_id}`; research answer as `result_message` | None (polling) | Reuse candidate | `src/argus/api/routers/backtest.py:613-719`; `docs/API_CONTRACT.md:5029-5075` |
 | Run dossiers | Conversations router | `GET /conversations/{id}/run-dossiers` | None | Reuse candidate | `conversations.py:531`; `docs/API_CONTRACT.md:3354` |
-| History / Recents | `GET /history` | Cursor pages with activity projection; `conversation_id` is nullable (legacy `strategy`/`collection` item types) | None | Reuse candidate | `src/argus/api/routers/history.py:63`; `schemas.py:523-536` |
+| History / Recents | `GET /history` | Cursor pages with activity projection. A `chat` row's `id` is its conversation id; `conversation_id` is set on the guest workspace's chat row and, when known, on `run` rows; registered users' chat rows leave it null | None | Reuse candidate | `src/argus/api/routers/history.py:63`, `:101-111`, `:165`, `:235`; `schemas.py:523-536`; `web/lib/command-palette-items.ts:83-90` |
 | Omnisearch | `GET /search` | Discriminated rows: `conversation` rows carry `conversation_id`, optional `match.message_id` and dossier anchors; `asset_rollup` rows are aggregates with no transcript anchor; ledger groups | None | Reuse candidate | `src/argus/api/routers/search.py:53`; `schemas.py:621-631`, `schemas.py:671-719`; `docs/API_CONTRACT.md:5816` |
 | Computations / decisions | `computations`, `decisions`, `evidence` routers | answers list, compare, continue, refresh, rerun, decision save/open | None | Reuse candidate | `src/argus/api/routers/computations.py:46-104`; `src/argus/api/routers/decisions.py:28-135`; `src/argus/api/routers/evidence.py:16` |
 | Composer mentions | `discovery` router | `GET /discovery/assets`, `/discovery/indicators` | None | Reuse candidate | `src/argus/api/routers/discovery.py:46-83` |
@@ -136,7 +136,8 @@ acceptance) and schema-validated payloads (WP-B). The shared properties behind t
 - Navigation targets are ids, not web URLs, where a target exists. Search `conversation` rows,
   history chat rows, activity, and jobs return conversation, message, run, or job ids that native
   deep links can use. Two exceptions are covered in §4.6: search `asset_rollup` rows are aggregates
-  with no transcript anchor, and history rows may have a null `conversation_id`.
+  with no transcript anchor, and registered users' history chat rows identify the conversation by
+  `id` while leaving `conversation_id` null.
 - Account class and capabilities come from the server (`profile.py:50-67`), so native gating can
   render them without re-deriving guest policy.
 - The `X-Argus-Client-Capabilities` handshake already lets a client opt into additive presentation;
@@ -146,7 +147,7 @@ acceptance) and schema-validated payloads (WP-B). The shared properties behind t
 
 | Dependency | Where | Native consequence |
 | --- | --- | --- |
-| Cloudflare Turnstile browser widget | `web/lib/guest-captcha.ts:1-35`; required by `schemas.py:986,1003,1058,1151` | No implemented native way to obtain the token yet; an integration gap, not an inherent barrier (§8.2 E1) |
+| Cloudflare Turnstile browser widget | `web/lib/guest-captcha.ts:1-35`; required by `schemas.py:986,1003,1058,1151` | No implemented native way to obtain the token yet; an integration gap, not an inherent barrier (§8.3 E1) |
 | HttpOnly handoff cookies | `auth.py:343, 369-389, 417, 603-604, 861-862` | Guest conversion needs a cookie jar or another secret transport |
 | Browser Supabase session storage and auto-refresh | `web/lib/supabase-client.ts`; `argus-api-transport.ts:40-48` | Native owns token storage and refresh |
 | Next.js route for password recovery | `web/app/api/auth/recovery/route.ts`; `auth-security.ts:141` | Native recovery request has no Argus API endpoint |
@@ -178,7 +179,7 @@ Web today
 - **Refresh**: implemented only in the browser Supabase client. The smallest adaptation that matches
   today's web ownership is for native clients to refresh directly against Supabase Auth with the
   public URL and anon key, as the web does. The alternative is an Argus refresh endpoint. This is an
-  engineering choice with a recommended default (§8.2 E2). Note that `supabase/config.toml:183-186` enables refresh-token
+  engineering choice with a recommended default (§8.3 E2). Note that `supabase/config.toml:183-186` enables refresh-token
   rotation with a 10-second reuse window locally; concurrent refreshes from one app must be serialized.
 - **Logout**: `POST /auth/logout` deletes cookies and does not revoke (`auth.py:940-946`). Revocation
   is a Supabase `signOut`. Because `current_user` checks `auth.sessions`, a revoked access token fails
@@ -192,7 +193,7 @@ Web today
   the same jar would also capture `sb-auth-token` cookies that `current_user` accepts when no bearer
   is sent (`dependencies.py:422-445`). The smallest safe choices are (a) a jar limited to
   `/api/v1/auth` with `sb-*` cookies discarded, or (b) an additive body/header transport of the
-  handoff secret for bearer clients. This is an engineering choice (§8.2 E3).
+  handoff secret for bearer clients. This is an engineering choice (§8.3 E3).
 - **Account switching**: the server is stateless per request. The client must drop tokens, stop
   in-flight streams, and discard account-scoped caches before issuing a new identity. The web does
   this with an account epoch (`chat-request-session.ts:209-216`) and still has a stale-tab resend gap
@@ -260,7 +261,7 @@ Most results connect through ids that resolve to a conversation transcript. Aggr
                           ──match.message_id (only when match.layer = "message")
                           ──dossier.run_id, dossier.result_message_id (optional)
                           ──answer_dossier.message_id (when a computed answer exists)──┐
-/history chat row ──conversation_id, activity.latest_message_id───────────────────────┤
+/history chat row ──id (= conversation id), activity.latest_message_id──────────────────┤
 job poll ──result_run_id (backtest) | result_message (research)──────────────────────┤
                                                                                       ▼
 GET /conversations/{id}/messages[?anchor_message_id=…] → metadata.result_card / tool_result_cards / computation
@@ -280,8 +281,15 @@ GET /backtests/{run_id}, GET /conversations/{id}/run-dossiers, GET /decisions/{i
   (`web/components/sidebar/ChatCommandPalette.tsx:522-584`,
   `web/components/sidebar/command-palette/AssetHistoryRollup.tsx`). No drill-down contract from a
   rollup to its runs exists; a native client should present it the same way unless one is defined.
-- **History rows** of legacy `strategy` or `collection` type may have `conversation_id: null`
-  (`schemas.py:523-536`); only chat rows carry the activity projection.
+- **History rows** do not use `conversation_id` uniformly. A `chat` row's `id` is the conversation
+  id. Registered users' chat rows omit `conversation_id`, so it serializes as null
+  (`history.py:165`, `history.py:235`); the guest workspace row sets it (`history.py:101-111`).
+  `run` rows carry the run's `conversation_id`, which may be null (`history.py:159`, `:218`), and
+  legacy `strategy`/`collection` rows have none. The web command palette opens only
+  `chat` history rows and resolves them with `conversation_id ?? id`
+  (`web/lib/command-palette-items.ts:83-90`). A native Recents client must use
+  the same rule; reading only `conversation_id` would make ordinary chat rows unopenable. The API contract could instead require
+  `conversation_id` on chat rows; that would be a contract change and is not proposed here.
 - Computed answers carry `metadata.computation` and are listed by `GET /computations/answers`.
 
 ### 4.7 Uploads and files today versus planned ingestion
