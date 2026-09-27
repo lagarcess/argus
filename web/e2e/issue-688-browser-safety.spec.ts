@@ -158,10 +158,17 @@ test('public receipt Markdown produces no external image request', async ({ page
   expect(requests.filter(url => url.includes('tracking.example.invalid'))).toEqual([]);
   await shot(page, 'public-receipt-images');
 });
-test('explicit guest claim adopts registered identity and retains claimed conversation', async ({ page }) => {
+for (const failRecents of [false, true]) {
+test(`explicit guest claim retains destination identity with ${failRecents ? 'failed' : 'successful'} Recents refresh`, async ({ page }) => {
   const writes = await setup(page);
   let converted = false;
   let pendingAction: unknown = null;
+  let failedRefreshes = 0;
+  if (failRecents) await page.route('**/api/v1/conversations?**', route => {
+    if (!converted || route.request().method() !== 'GET') return route.fallback();
+    failedRefreshes += 1;
+    return route.fulfill({ status: 503, json: { code: 'unavailable', detail: 'Synthetic Recents outage' } });
+  });
   await page.route('**/api/v1/me', route => route.fulfill({ json: {
     user: { id: converted ? 'account-b' : 'account-a', email: converted ? 'account-b@example.invalid' : null, display_name: converted ? 'Account B' : null, language: 'en', onboarding: { completed: true, stage: 'completed', language_confirmed: true } },
     account_kind: converted ? 'registered' : 'guest', guest: converted ? null : { expires_at: new Date(Date.now() + 3600000).toISOString(), workspace_id: 'synthetic-guest' },
@@ -182,6 +189,12 @@ test('explicit guest claim adopts registered identity and retains claimed conver
   await dialog.getByPlaceholder('Email address').fill('account-b@example.invalid');
   await dialog.getByPlaceholder('Password', { exact: true }).fill('Synthetic-fixture-password-688');
   await dialog.getByRole('button', { name: 'Sign in', exact: true }).click();
+  if (failRecents) {
+    await expect.poll(() => failedRefreshes).toBeGreaterThan(0);
+    await expect(dialog.getByRole('alert')).toBeVisible();
+    await shot(page, 'guest-claim-recents-error');
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  }
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText('Account A private conversation', { exact: true })).toBeVisible();
   await expect(page.getByTestId('chat-input')).toBeEnabled();
@@ -190,8 +203,9 @@ test('explicit guest claim adopts registered identity and retains claimed conver
   await page.getByTestId('chat-input').press('Enter');
   await expect.poll(() => writes.length).toBe(1);
   expect(JSON.parse(Buffer.from(writes[0].authorization!.split('.')[1], 'base64url').toString()).sub).toBe('account-b');
-  await shot(page, 'guest-claim');
+  await shot(page, failRecents ? 'guest-claim-recents-failure' : 'guest-claim');
 });
+}
 test('account change notice uses Spanish resources', async ({ page, context }) => {
   const writes = await setup(page, 'Conversación privada A', 'es-419');
   await page.getByTestId('chat-input').fill(draft);
