@@ -164,6 +164,8 @@ test(`explicit guest claim retains destination identity with ${failRecents ? 'fa
   let converted = false;
   let pendingAction: unknown = null;
   let failedRefreshes = 0;
+  let handoffs = 0;
+  let logins = 0;
   if (failRecents) await page.route('**/api/v1/conversations?**', route => {
     if (!converted || route.request().method() !== 'GET') return route.fallback();
     failedRefreshes += 1;
@@ -175,11 +177,15 @@ test(`explicit guest claim retains destination identity with ${failRecents ? 'fa
     capabilities: { can_create_additional_conversation: converted, can_manage_conversation: converted, can_manage_account: converted, can_use_omnisearch: true }, public_account_access_enabled: true,
   } }));
   await page.route('**/api/v1/auth/guest/handoffs', route => {
+    handoffs += 1;
+    if (handoffs > 1) return route.fulfill({ status: 409, json: { code: 'handoff_consumed' } });
     pendingAction = route.request().postDataJSON().pending_action;
     return route.fulfill({ json: { handoff_id: 'synthetic-handoff', expires_at: new Date(Date.now() + 3600000).toISOString() } });
   });
   await page.route('**/auth/v1/user', route => route.fulfill({ json: session('account-b').user }));
   await page.route('**/api/v1/auth/login', route => {
+    logins += 1;
+    if (logins > 1) return route.fulfill({ json: { user: session('account-b').user, session: session('account-b'), guest_claim: null } });
     converted = true;
     return route.fulfill({ json: { user: session('account-b').user, session: session('account-b'), guest_claim: { conversation_id: 'conversation-alpha', pending_action: pendingAction } } });
   });
@@ -191,9 +197,6 @@ test(`explicit guest claim retains destination identity with ${failRecents ? 'fa
   await dialog.getByRole('button', { name: 'Sign in', exact: true }).click();
   if (failRecents) {
     await expect.poll(() => failedRefreshes).toBeGreaterThan(0);
-    await expect(dialog.getByRole('alert')).toBeVisible();
-    await shot(page, 'guest-claim-recents-error');
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   }
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText('Account A private conversation', { exact: true })).toBeVisible();
@@ -203,6 +206,7 @@ test(`explicit guest claim retains destination identity with ${failRecents ? 'fa
   await page.getByTestId('chat-input').press('Enter');
   await expect.poll(() => writes.length).toBe(1);
   expect(JSON.parse(Buffer.from(writes[0].authorization!.split('.')[1], 'base64url').toString()).sub).toBe('account-b');
+  expect({ handoffs, logins }).toEqual({ handoffs: 1, logins: 1 });
   await shot(page, failRecents ? 'guest-claim-recents-failure' : 'guest-claim');
 });
 }
