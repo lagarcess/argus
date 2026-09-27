@@ -3,9 +3,9 @@
 ## Scope and provenance
 
 Captured with Chromium and the committed provider-free Playwright fixture at
-`91de56421505a89a51e9b5ddcc41cdfcdf9c9cf3` on 2026-09-27 UTC.
+`c4ca2a517e05339515e753d7bad0b52b03b67861` on 2026-09-27 UTC.
 Original integration baseline: `ab9143c18740c28f582646d405445c01c4c8aff4`.
-The account implementation includes the post-claim completion fix `ef1b6901`; the image implementation is `b54f8564`.
+The account implementation includes the nonblocking post-claim completion fix `d56fc9be`; the image implementation is `b54f8564`.
 The final expired-view styling is `222037e3`; canonical research hydration is
 asserted by the browser fixture at `dec393c4`.
 The evidence commit adds screenshots and this report, with no runtime changes.
@@ -54,16 +54,26 @@ so a second authentication cannot accidentally repair the fixture state.
 [Historical error-modal capture](baseline-post-claim-recents-error.png) was taken
 at `2544aaf2`; it is **obsolete baseline evidence**, not final behavior.
 
-At `ef1b6901`, both successful and failed Recents refresh cases close the modal
+At `d56fc9be`, successful, failed and held Recents refresh cases close the modal
 automatically after the canonical claim completes. The claimed conversation and
 destination identity remain available; no message sends automatically. One
 subsequent deliberate message uses the destination token. Each case performs
 exactly one handoff and one login. The fixture keeps the Recents outage active
 throughout the failure case.
 
+At `64a6a236`, a separate held-response test reproduced the remaining ordering
+problem: an exhausted guest's Run backtest action opened conversion; claim B
+completed and its modal closed, but no resumed stream started within five seconds
+while Recents remained pending. The final fixture now covers this explicit
+`simulation_limit` action. On the fixed head it emits exactly one `run_backtest`
+stream authenticated as B before releasing Recents. Releasing the response does
+not emit another stream. This verifies submission/ownership only: the fixture
+does not run a backtest engine or claim a completed simulation. The composer can
+remain disabled while the synthetic simulation has no completion artifact.
+
 ## Browser acceptance
 
-All 15 Chromium cases pass in 55.4 seconds. Screenshots contain synthetic fixture data only.
+All 16 Chromium cases pass in 47.6 seconds. Screenshots contain synthetic fixture data only.
 
 Run from `web/`:
 
@@ -93,6 +103,7 @@ isolated in `.next-688`. Both servers stop with the test runner.
 | Same-user 404 recovery | Exactly original stream, replacement create, resend; all as A. [Screenshot](same-user-404-recovery.png) |
 | Explicit guest claim | Existing login modal, verified synthetic claim, actual browser `setSession`, retained conversation; no automatic send, deliberate follow-up uses destination identity. [Screenshot](guest-claim.png) |
 | Guest claim followed by Recents failure | Modal closes automatically, one handoff/login completes, claimed conversation remains available, zero implicit sends and one deliberate destination-account send. [Retained view](guest-claim-recents-failure.png) |
+| Guest claim with held Recents | Previously requested simulation resumes once as B before the history response is released; releasing it does not duplicate the action. [Pending projection](guest-claim-held-recents.png) |
 | Cold guest first send | Bootstrap establishes guest identity; exactly one stream is sent with that identity. [Screenshot](cold-guest-first-send.png) |
 
 The pending-stream fixture holds the HTTP response; it verifies request
