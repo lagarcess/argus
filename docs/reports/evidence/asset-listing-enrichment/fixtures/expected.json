@@ -1,0 +1,288 @@
+{
+ "note": "Synthetic fixtures. Values are invented and reviewed by hand against the fixture HTML. Seller fields are placeholders that must never reach a normalized record.",
+ "seller_strings": [
+  "Vendedor Ficticio",
+  "Inmobiliaria Ficticia",
+  "000-000-0000",
+  "Sector Ficticio",
+  "Ciudad Ficticia",
+  "424242",
+  "434343"
+ ],
+ "normalized": {
+  "supercarros": {
+   "site": "supercarros",
+   "ref": "47e0fff861",
+   "title_present": true,
+   "prices": [
+    {
+     "label": null,
+     "parsed": {
+      "currency": "USD",
+      "amount": "25000",
+      "period": null
+     },
+     "raw_shape": "US$ 99,999"
+    }
+   ],
+   "site_main_currency_amount_present": true,
+   "implied_usd_to_main_rate": "60.1000",
+   "ad_key_utc": "2026-09-01T12:00+00:00",
+   "spec_labels": [
+    "anuncio",
+    "carga",
+    "combustible",
+    "condicion",
+    "exterior",
+    "interior",
+    "motor",
+    "pasajeros",
+    "precio",
+    "puertas",
+    "tipo",
+    "traccion",
+    "transmision",
+    "uso"
+   ],
+   "features": [
+    "Transmisión Automática",
+    "Tracción AWD",
+    "Gasolina",
+    "Color Gris"
+   ],
+   "amenity_count": 3,
+   "visits": 12,
+   "text": {
+    "present": true,
+    "flags": {
+     "down_payment": true,
+     "financing": true,
+     "negotiable": false,
+     "damage": false,
+     "import_history": false,
+     "pre_construction": false,
+     "reservation_or_installments": false,
+     "furnished": false,
+     "short_term_rental": false,
+     "tax_incentive": false,
+     "maintenance_fee": false
+    },
+    "room_counts": [],
+    "areas": [],
+    "mileages": [
+     "40000"
+    ],
+    "replacement_char_runs": 0
+   },
+   "meta_description_present": true,
+   "title": "2021 Marca Ejemplo Modelo X EX",
+   "year_in_title": "2021",
+   "site_taxonomy_ids": {
+    "adBrand": "27",
+    "adModel": "130",
+    "adCategory": "16",
+    "adFuel": "400"
+   },
+   "is_new_flag": "0",
+   "car_age_years": "5",
+   "mileage": {
+    "value": null,
+    "unit": "mi",
+    "missing_marker": true
+   },
+   "condition": "Usado",
+   "body_type": "Jeepeta",
+   "fuel": "Gasolina",
+   "transmission": "Automática",
+   "traction": "AWD",
+   "import_spec_accessory": true,
+   "province": "Provincia Ficticia",
+   "dealer_inventory_link": true,
+   "meta_mileage": "0.00 Mi."
+  },
+  "supercasas": {
+   "site": "supercasas",
+   "ref": "d9d32d92d7",
+   "title_present": true,
+   "prices": [
+    {
+     "label": "venta",
+     "parsed": {
+      "currency": "USD",
+      "amount": "150000",
+      "period": null
+     },
+     "raw_shape": "US$ 999,999"
+    },
+    {
+     "label": "alquiler",
+     "parsed": {
+      "currency": "USD",
+      "amount": "1200",
+      "period": "month"
+     },
+     "raw_shape": "US$ 9,999/Mes"
+    }
+   ],
+   "site_main_currency_amount_present": true,
+   "implied_usd_to_main_rate": null,
+   "ad_key_utc": "2026-09-15T09:30+00:00",
+   "spec_labels": [
+    "ano construccion",
+    "anuncio",
+    "ascensores",
+    "condicion",
+    "construccion",
+    "edificable",
+    "localizacion",
+    "nivel/piso",
+    "terreno",
+    "uso actual"
+   ],
+   "features": [
+    "3 habitaciones",
+    "2.5 baños",
+    "2 parqueos"
+   ],
+   "amenity_count": 2,
+   "visits": 3,
+   "text": {
+    "present": true,
+    "flags": {
+     "down_payment": false,
+     "financing": false,
+     "negotiable": false,
+     "damage": false,
+     "import_history": false,
+     "pre_construction": true,
+     "reservation_or_installments": false,
+     "furnished": false,
+     "short_term_rental": false,
+     "tax_incentive": false,
+     "maintenance_fee": false
+    },
+    "room_counts": [
+     2
+    ],
+    "areas": [
+     "95"
+    ],
+    "mileages": [],
+    "replacement_char_runs": 1
+   },
+   "meta_description_present": true,
+   "title_shape": "Apartamento en Venta, <sector>",
+   "condition": "Nueva",
+   "current_use": "Residencial",
+   "built_area": {
+    "value": "0",
+    "unit": "mt2",
+    "missing_marker": false
+   },
+   "land_area": {
+    "value": "0",
+    "unit": "mt2",
+    "missing_marker": false
+   },
+   "floor": "0",
+   "year_built": "N/D",
+   "location": "Region Ejemplo > Sector Ejemplo",
+   "rooms": {
+    "bedrooms": "3",
+    "bathrooms": "2.5",
+    "parking": "2"
+   },
+   "object_type": "123"
+  }
+ },
+ "resilience": {
+  "bs4": {
+   "supercarros": {
+    "m1": {
+     "class_selectors": [
+      0,
+      14
+     ],
+     "label_lookup": [
+      14,
+      14
+     ]
+    },
+    "m2": {
+     "class_selectors": [
+      0,
+      14
+     ],
+     "label_lookup": [
+      14,
+      14
+     ]
+    }
+   },
+   "supercasas": {
+    "m1": {
+     "class_selectors": [
+      0,
+      10
+     ],
+     "label_lookup": [
+      9,
+      10
+     ]
+    },
+    "m2": {
+     "class_selectors": [
+      0,
+      10
+     ],
+     "label_lookup": [
+      9,
+      10
+     ]
+    }
+   }
+  },
+  "scrapling": {
+   "supercarros": {
+    "m1": {
+     "adaptive_recovered": [
+      0,
+      14
+     ],
+     "adaptive_relocated_to": [
+      "ul.content-block component-list"
+     ]
+    },
+    "m2": {
+     "adaptive_recovered": [
+      0,
+      14
+     ],
+     "adaptive_relocated_to": [
+      "ul.content-block component-list"
+     ]
+    }
+   },
+   "supercasas": {
+    "m1": {
+     "adaptive_recovered": [
+      0,
+      10
+     ],
+     "adaptive_relocated_to": [
+      "ul.content-block component-list"
+     ]
+    },
+    "m2": {
+     "adaptive_recovered": [
+      0,
+      10
+     ],
+     "adaptive_relocated_to": [
+      "ul.content-block component-list"
+     ]
+    }
+   }
+  }
+ }
+}

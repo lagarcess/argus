@@ -1,6 +1,6 @@
 # Listing sample run record, 2026-09-27
 
-This folder is the run record for [the listing enrichment feasibility report](../../asset-listing-enrichment-feasibility.md). It holds sanitized aggregates and the scripts that produced them. It holds no listing text, listing identifier, listing URL, seller field, or photograph.
+This folder is the run record for [the listing enrichment feasibility report](../../asset-listing-enrichment-feasibility.md). It holds sanitized aggregates, the scripts that produced them, and two synthetic fixtures with offline checks. It holds no listing text, listing identifier, listing URL, seller field, or photograph.
 
 ## Run facts
 
@@ -21,6 +21,8 @@ This folder is the run record for [the listing enrichment feasibility report](..
 - It replays a cached URL instead of fetching it again.
 - It never logs in, reuses cookies, rotates proxies, imitates a browser, or runs JavaScript.
 
+A robots.txt allowance only lets the fetcher read a page. It grants no right to reuse what the page contains. The report treats reuse under the sites' terms as a separate question.
+
 ## Requests
 
 | Site | robots.txt | Sitemap | Home | Terms | Search values script | Category page | Detail pages | Total |
@@ -36,8 +38,9 @@ All 33 responses were HTTP 200. None met a stop condition. The smallest gap betw
 - `sitemap-profile.json` counts listing URLs, slug words, `lastmod` ages, and listings per model or per property type and sector.
 - `field-summary.json` counts field completeness and value shapes over the 20 detail pages, per site. It holds counts, not rows.
 - `parser-comparison.json` holds parse times, the output comparison, and the markup-change test.
-- `scripts/` holds the code that produced those files.
-- `canon-map.md` maps the canon on assets, ownership, valuation, currency, evidence, and open decisions. Its quote-check script matched all 272 quotes to their cited lines.
+- `fixtures/` holds two synthetic detail pages and `expected.json`, the hand-reviewed output that `scripts/check_fixtures.py` asserts.
+- `scripts/` holds the code that produced the files above and the fixture checks.
+- `canon-map.md` maps the canon on assets, ownership, valuation, currency, evidence, and open decisions at the audited commit. Its quote-check script matched all 272 quotes to their cited lines.
 - `code-reuse-map.md` maps reusable code with a path and line for each claim.
 - `web-research.md` records public facts about both sites, Dominican law, Scrapling, and other value sources. It lists every URL it read. None was on either site.
 
@@ -54,10 +57,41 @@ All 33 responses were HTTP 200. None met a stop condition. The smallest gap betw
 
 - The extraction reads the listing block. From the seller block it reads three things. It keeps the location line's last comma-separated part, the heading word such as "Vendedor" or "Inmobiliaria", and whether a dealer inventory link exists. The page variables that identify the seller are dropped.
 - Free text is reduced to keyword flags, numbers, and a count of lost characters. No sentence leaves the parser.
-- The committed files hold aggregates and value shapes, where every digit prints as `9`. They hold no per-listing row.
+- The committed sample files hold aggregates and value shapes, where every digit prints as `9`. They hold no per-listing row.
+- The fixtures are synthetic. Their markup follows the structure the audit observed, with class names and field labels, but every value is invented. Their seller fields are placeholders such as `Vendedor Ficticio` and `000-000-0000`.
 - During manual markup inspection, a phone-number mask missed the `+1809` format. One dealer name and two contact names appeared in the audit session's terminal output. None of it was written to this folder or to the report.
 
-## Reproduce
+## What was replayed and what a reviewer can rerun
+
+### The audit's replay, before cleanup
+
+Before deleting the raw page cache, the audit copied the committed scripts to a clean scratch directory and ran them against that cache. The run regenerated `request-ledger.json`, `sitemap-profile.json`, `field-summary.json`, and both parsers' normalized output byte for byte. Only parse timings changed. The cache was then deleted because it held seller data. Nobody can repeat that replay now.
+
+### Rerun the fixture checks
+
+These checks need no site access. The only network use is installing two pinned packages. From the repository root, run:
+
+```bash
+uv venv --python 3.10 /tmp/listing-fixtures/venv-simple
+uv pip install --python /tmp/listing-fixtures/venv-simple/bin/python beautifulsoup4==4.15.0 lxml==6.1.3
+uv venv --python 3.10 /tmp/listing-fixtures/venv-scrapling
+uv pip install --python /tmp/listing-fixtures/venv-scrapling/bin/python scrapling==0.4.15
+/tmp/listing-fixtures/venv-simple/bin/python docs/reports/evidence/asset-listing-enrichment/scripts/check_fixtures.py bs4
+/tmp/listing-fixtures/venv-scrapling/bin/python docs/reports/evidence/asset-listing-enrichment/scripts/check_fixtures.py scrapling
+```
+
+Each command prints `2 of 2 fixtures pass` and exits 0. For each fixture, the check asserts four results:
+
+- The parser's normalized record equals `fixtures/expected.json`.
+- No placeholder seller value and no seller page variable reaches that record.
+- After the class rename and after the restructure, class selectors recover no specification value. Label lookup recovers 14 of 14 on the vehicle page and 9 of 10 on the property page, where the search form repeats `Condición:`.
+- Scrapling's adaptive mode recovers no value and relocates to the accessories list.
+
+The audit broke the code three ways and the check failed each time. The three breaks were a changed expected value, a normalizer that leaked the seller location line, and a parser that returned no specifications.
+
+The fixtures do not reproduce every real-page result. On real pages, Scrapling's adaptive mode sometimes relocated to the seller contact list. On the fixtures it relocated only to the accessories list. The fixtures cannot reproduce the sample's counts, dates, or prices.
+
+### Collect a new sample
 
 `scripts/fetch_ledger.py` and `scripts/fetch_sample.py` send real requests. Run them only under an assignment that authorizes live sampling, and read each site's current `robots.txt` and terms first. Every other script replays the local cache and sends nothing. A new run samples the listings of its own day, so its numbers differ from the committed files.
 
@@ -92,4 +126,4 @@ The `?20260927053` suffix on the search values script was the build string on 20
 
 ## Cleanup
 
-The raw page cache, the per-listing extraction, the listing salt, both environments, and the `uv` cache stayed in a local scratch directory. They were deleted after the evidence in this folder was written.
+The raw page cache, the per-listing extraction, the listing salt, both environments, and the `uv` cache stayed in a local scratch directory. They were deleted after the evidence in this folder was written. The environments used for the fixture checks were recreated in scratch and deleted after the checks.
