@@ -79,6 +79,15 @@ jobs:
       - name: Install backend dependencies
         run: poetry install --with dev --no-interaction
 
+      # Helper folders can include backend tests of the shared TypeScript contract.
+      - name: Set up Bun for cross-runtime contract tests
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}
+
+      - name: Install frontend dependencies for cross-runtime contract tests
+        run: cd web && bun install --frozen-lockfile
+
       - name: Check changed documentation links
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}

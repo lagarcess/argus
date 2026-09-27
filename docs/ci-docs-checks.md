@@ -15,6 +15,9 @@ This is intentionally not import/dependency analysis or changed-file matching.
 A helper at the root of `tests/` selects the whole backend suite. Current
 promotion-evidence helpers have that shape. Folder selection can therefore cost
 more than the previous incomplete reader list; it does not enable other jobs.
+Docs-checks installs the same pinned Bun and frontend dependencies as backend-checks
+because selected backend tests execute the shared TypeScript contract and canary
+session tools. It does not run frontend lint, tests, build, or browser jobs.
 
 Search failures propagate. A successful search with no matches returns an empty
 list, which the workflow rejects before pytest. Both command captures preserve

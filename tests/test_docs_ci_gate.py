@@ -150,6 +150,8 @@ def test_workflow_stops_before_pytest_on_empty_or_failed_selection(
         step["run"], tmp_path, {"PATH": f'{poetry.parent}:{os.environ["PATH"]}'}
     )
     assert result.returncode != 0
+    if status == 0:
+        assert "selector returned no files" in result.stdout
     assert not (tmp_path / "pytest-was-run").exists()
     # A failing docs job must remain red at the final aggregate.
     assert aggregate(tmp_path, DOCS_CHECKS="failure").returncode != 0
