@@ -8,10 +8,16 @@ import json
 import httpx
 import pytest
 from argus.agent_runtime import answer_calculation as calculation
+from argus.agent_runtime import knowledge_answer
 from argus.agent_runtime import research_grounded as grounded
+from argus.agent_runtime.interpreter import discovery_focused_read
 from argus.agent_runtime.interpreter.research_routing import primary_research_query
+from argus.agent_runtime.llm_interpreter import LLMInterpretationResponse
 from argus.agent_runtime.research_query import ResearchQueryExtraction
-from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+from argus.agent_runtime.stages.interpret_types import (
+    InterpretationRequest,
+    StructuredInterpretation,
+)
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
 from argus.domain.calculations.answer_request import AnswerCalculation
 from argus.domain.capability_registry import get_tool_catalog
@@ -235,6 +241,55 @@ def test_research_provider_failure_omits_detail(monkeypatch, emitted, private_te
     assert result is not None
     assert_safe(emitted, private_text, "status=504")
     cache_clear()
+
+
+@pytest.mark.parametrize("caller", ["discovery", "knowledge"])
+@pytest.mark.parametrize("failure", ["provider", "validation"])
+def test_debug_catchers_omit_exception_text_from_serialized_sink(
+    monkeypatch, emitted, caller, failure
+):
+    secret = f"PRIVATE-{fake.hexify(text='^^^^^^^^')}"
+
+    async def fail(**_kwargs: object) -> None:
+        if failure == "provider":
+            raise RuntimeError(secret)
+        NumericResponse.model_validate({"value": secret})
+
+    if caller == "discovery":
+        monkeypatch.setattr(discovery_focused_read, "invoke_openrouter_json_schema", fail)
+        result = asyncio.run(
+            discovery_focused_read.focused_discovery_payload_response(
+                response=LLMInterpretationResponse(
+                    intent="conversation_followup",
+                    task_relation="new_task",
+                    user_goal_summary="find trending cryptos",
+                    semantic_turn_act="educational_question",
+                    research_query=ResearchQueryExtraction(question_kind="find_assets"),
+                ),
+                request=InterpretationRequest(
+                    current_user_message="find me cryptos that are trending",
+                    recent_thread_history=[],
+                    latest_task_snapshot=None,
+                    user=UserState(user_id=fake.uuid4()),
+                ),
+            )
+        )
+        label = "Focused discovery read failed"
+    else:
+        monkeypatch.setattr(knowledge_answer, "invoke_openrouter_json_schema", fail)
+        result = asyncio.run(
+            knowledge_answer._classify_question(
+                message="what is a drawdown", language="en"
+            )
+        )
+        label = "Knowledge route classification failed"
+
+    assert result is None
+    expected = "RuntimeError" if failure == "provider" else "ValidationError"
+    assert_safe(emitted, secret, expected)
+    rendered = "".join(emitted)
+    assert label in rendered
+    assert "error_origin=" in rendered
 
 
 def test_malformed_research_response_does_not_log_exception_chain(emitted, private_text):
