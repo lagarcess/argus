@@ -235,6 +235,8 @@
     "close": "Close feedback"
   },
   "chat": {
+    "account_changed": "Your account changed. This chat was closed and its unsent text was cleared. Reload to continue.",
+    "account_changed_reload": "Reload",
     "artifact_edit_disclosure": {
       "no_change_applied": "No requested changes were applied. Please restate what you want to change."
     },

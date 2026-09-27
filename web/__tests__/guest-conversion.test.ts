@@ -331,7 +331,7 @@ describe("guest conversion contract", () => {
     );
   });
 
-  test("refreshes Recents after the claim before a pending action resumes", () => {
+  test("schedules Recents after the claim without blocking the pending action", () => {
     const hookPath = join(root, "components/guest/useGuestConversion.ts");
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
@@ -361,16 +361,21 @@ describe("guest conversion contract", () => {
       authenticate.indexOf("loginWithEmail"),
     );
     expect(authenticate.indexOf("registerGuestAccount")).toBeLessThan(
-      authenticate.indexOf("await refreshAccount()"),
+      authenticate.indexOf("await refreshAccount(destinationUserId)"),
     );
     expect(authenticate).toContain('status: "email_confirmation_required"');
     expect(hook).toContain("SingleUseGuestAction");
     expect(hook).toContain("actionLatch?.take()");
-    expect(authenticate).toContain("await refreshHistory()");
-    expect(authenticate.indexOf("await refreshAccount()")).toBeLessThan(
-      authenticate.indexOf("await refreshHistory()"),
+    const scheduleHistory = "void Promise.resolve().then(refreshHistory).catch(() => undefined)";
+    expect(authenticate).toContain(scheduleHistory);
+    expect(authenticate).not.toContain("await refreshHistory()");
+    expect(authenticate.indexOf("await refreshAccount(destinationUserId)")).toBeLessThan(
+      authenticate.indexOf(scheduleHistory),
     );
-    expect(authenticate.indexOf("await refreshHistory()")).toBeLessThan(
+    expect(authenticate.indexOf("setIsOpen(false)")).toBeLessThan(
+      authenticate.indexOf(scheduleHistory),
+    );
+    expect(authenticate.indexOf(scheduleHistory)).toBeLessThan(
       authenticate.indexOf("await onResume(action)"),
     );
     expect(experience).toContain("refreshHistoryForActivity");
