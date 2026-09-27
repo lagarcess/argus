@@ -359,7 +359,6 @@ def test_peer_expansion_reuses_the_existing_cache_for_a_repeated_call(
 
     from tests.research.test_research_router_absorption import (
         _FakeSearchProvider,
-        _public_anchor_state,
         _search_packet,
         _wire_find,
     )
@@ -367,10 +366,9 @@ def test_peer_expansion_reuses_the_existing_cache_for_a_repeated_call(
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
     context = _context()
-    context.state = _public_anchor_state(context.state.current_user_message, "PANW")
     common = {
         "request": "Find candidate assets around this business",
-        "anchor_symbols": ["PANW"],
+        "anchor_symbols": ["AAPL"],
         "needs_current_facts": True,
     }
 
