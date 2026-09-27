@@ -79,13 +79,14 @@ test('private, research and shared Markdown never request remote images', async 
   const content = (name: string) => `${name} ![${name} image](https://tracking.example.invalid/${name}.png) [Safe link](https://example.org/)`;
   const items = [
     { id: 'private', metadata: {} },
-    { id: 'research', metadata: { research_sources: [{ title: 'Source', url: 'https://example.org' }] } },
+    { id: 'research', metadata: { research: { sources: [{ title: 'Source', domain: 'example.org', url: 'https://example.org/' }] } } },
     { id: 'shared', metadata: { shared_conversation: { snapshot_at: stamp } } },
   ].map(entry => ({ ...entry, role: 'assistant', content: content(entry.id), created_at: stamp }));
   await page.route('**/api/v1/conversations/*/messages**', route => route.fulfill({ json: { items, next_cursor: null } }));
   const response = await page.reload();
   expect(response?.headers()['content-security-policy']).toContain("img-src 'self' data:");
   for (const entry of items) await expect(page.getByText(`${entry.id} image`, { exact: false }).first()).toBeVisible();
+  await expect(page.getByTestId('research-sources-open')).toBeVisible();
   expect(requests).toEqual([]);
   expect(await page.locator('img[src*="tracking.example.invalid"]').count()).toBe(0);
   await expect(page.getByRole('link', { name: 'Safe link', exact: true })).toHaveCount(3);
