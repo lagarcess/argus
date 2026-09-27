@@ -108,7 +108,7 @@ adaptation needed; **Missing** = no implemented capability.
 | Public receipts | `evidence_receipts`, `public_receipts` routers | Owner create/revoke; public view at web `/r/[receiptId]` | Web page for viewing | Reuse | `src/argus/api/routers/evidence_receipts.py:145-357`; `web/app/r/` |
 | File upload / ingestion | none | none | n/a | **Missing** | No `UploadFile`, multipart route, bucket, or file input found in `src/`, `web/`, or `supabase/migrations/` |
 | Financial records, household, sharing | none | none | n/a | **Missing** | [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md#what-remains-technical-or-undecided) |
-| Notifications / device registration | none | none | n/a | **Missing** | No notification delivery or device-token code found in `src/`, `web/lib/`, `web/components/`, or `supabase/` |
+| Notifications / device registration | none | none | n/a | **Missing** | No user-facing notification or device-token code found in `src/`, `web/lib/`, `web/components/`, or `supabase/` (`src/argus/api/feedback_notification.py` only emails feedback to the team) |
 | Account deletion | Feedback type | `type: "account_deletion_request"` | None | **Adapt / decision** | `schemas.py:954` |
 
 ## 4. Answers to the eight questions
@@ -284,7 +284,7 @@ not a resource permission model, and should not be stretched into household perm
 
 | Statement | Where documented | What the source shows |
 | --- | --- | --- |
-| Notifications are "Hidden/flagged for Alpha" | [PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes) | No notification inbox, delivery, or flag code was found in `src/`, `web/lib/`, or `web/components/` at this SHA. Either it lives elsewhere or the row describes a design surface. Owner should confirm |
+| Notifications are "Hidden/flagged for Alpha" | [PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes) | No user-facing notification inbox, delivery, or flag code was found in `src/`, `web/lib/`, or `web/components/` at this SHA. Either it lives elsewhere or the row describes a design surface. Owner should confirm |
 | Supabase Realtime is the job-status target transport | `docs/API_CONTRACT.md:1879` | Polling only |
 | Auth transport "Supabase Auth session cookie or bearer token" | `docs/API_CONTRACT.md:67-75` | Accurate for requests; refresh, revoke, and recovery are outside the Argus API |
 
