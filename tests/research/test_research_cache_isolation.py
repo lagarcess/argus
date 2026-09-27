@@ -213,6 +213,32 @@ def test_verified_public_search_reuses_normalized_inputs_across_users(
     assert cache_stats()["entries"] == 1
 
 
+def test_catalog_validation_runs_off_the_event_loop(monkeypatch) -> None:
+    """Catalog proof for cache eligibility must not block the chat event loop."""
+    import threading
+
+    from argus.agent_runtime import resolution
+    from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
+
+    caller = threading.get_ident()
+    seen: list[int] = []
+    real = resolution.resolve_asset_candidate
+
+    def spy(*args, **kwargs):
+        seen.append(threading.get_ident())
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(resolution, "resolve_asset_candidate", spy)
+    request = AssetDiscoveryRequest(
+        relationship="peer", anchor_symbols=["AAPL"], needs_current_facts=True
+    )
+    provider, results = _find(monkeypatch, [request])
+    assert seen
+    assert all(thread_id != caller for thread_id in seen)
+    assert len(provider.calls) == 1
+    assert results[0].stage_patch["research"]["usage"]["cache_status"] == "miss"
+
+
 @pytest.mark.parametrize(
     "change",
     [

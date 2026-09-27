@@ -12,6 +12,7 @@ unchanged; the user-visible experience is the same or better.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 
@@ -88,12 +89,10 @@ async def find_assets_stage_result(
         interpretation, user, f"research_answer_{capability_class}"
     )
     packet_cache = None
-    if (
-        request is not None
-        and request.needs_current_facts
-        and _public_anchor_search(request)
-    ):
-        packet_cache = SearchPacketCache
+    if request is not None and request.needs_current_facts:
+        # Sync catalog lookups: off the loop, or one anchor stalls every stream.
+        if await asyncio.to_thread(_public_anchor_search, request):
+            packet_cache = SearchPacketCache
     result = await discovery_operation_result(
         decision=effective_decision,
         request=request,
