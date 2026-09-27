@@ -20,6 +20,7 @@ from argus.agent_runtime.research_query import ResearchQueryExtraction
 from argus.agent_runtime.stages.interpret import interpret_stage_async
 from argus.agent_runtime.state.models import RunState, UserState
 from argus.domain.calculations.answer_request import AnswerCalculation
+from argus.domain.research.cache import cache_stats
 from argus.domain.research.config import RESEARCH_CONFIG_SPECS
 from argus.domain.research.contracts import ResearchPacket, ResearchUnavailableError
 from argus.llm import openrouter
@@ -37,7 +38,6 @@ async def test_q2_slow_sync_lookup_answers_before_runtime_turn_deadline(
     completed = threading.Event()
     received_timeouts: list[float] = []
     fallback_remaining: list[float] = []
-    cached: list[Any] = []
     admission = _Turn()
     deadline_seconds = 4.0
     monkeypatch.setenv("ARGUS_TURN_DEADLINE_SECONDS", str(deadline_seconds))
@@ -94,9 +94,6 @@ async def test_q2_slow_sync_lookup_answers_before_runtime_turn_deadline(
         )
 
     monkeypatch.setattr(research_grounded, "_client", SlowProvider)
-    monkeypatch.setattr(
-        research_grounded, "cache_put", lambda *args, **_: cached.append(args)
-    )
     query = ResearchQueryExtraction(
         question_kind="current_external", scenario_question=True
     )
@@ -227,7 +224,7 @@ async def test_q2_slow_sync_lookup_answers_before_runtime_turn_deadline(
     finally:
         release.set()
         assert await asyncio.to_thread(completed.wait, 2)
-    assert cached == [], "an abandoned response must never populate the shared cache"
+    assert cache_stats()["entries"] == 0, "an abandoned response must never be shared"
 
     # Their reply computes the income through the real declaration, card, and prose.
     with turn_execution.turn_execution_scope(entry_state={}):

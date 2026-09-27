@@ -182,7 +182,7 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
         execution_metadata={},
     )
     monkeypatch.setattr(api_state, "supabase_gateway", gateway)
-    # A completed run always retrieved; the shared cache serves nothing that did not.
+    # A completed run must have retrieved before publishing its answer.
     packet = ResearchPacket(
         answer_markdown="Final research answer", tool_results=("finance_results",)
     )
@@ -240,14 +240,13 @@ def test_poller_finalizes_success_as_an_assistant_message(monkeypatch) -> None:
     # this research in the transcript and offer its remaining peers.
     assert sidecar["anchor_symbols"] == ["NFLX", "DIS"]
     assert recorded and recorded[0]["message_id"] == "answer-msg-1"
-    # The finalized packet enters the shared cache under the key the
-    # requesting turn computed, so the same question now answers inline.
+    # A legacy queued key must not publish a freeform answer to shared storage.
     from argus.domain.research.cache import cache_get
 
-    assert cache_get("research-job-cache-key") is packet
+    assert cache_get("research-job-cache-key") is None
 
 
-def test_sync_fallback_composes_and_caches(monkeypatch) -> None:
+def test_sync_fallback_composes_without_sharing_the_answer(monkeypatch) -> None:
     monkeypatch.setattr(api_state, "supabase_gateway", None)
     packet = ResearchPacket(
         answer_markdown="Deep synchronous answer", tool_results=("finance_results",)
@@ -271,7 +270,7 @@ def test_sync_fallback_composes_and_caches(monkeypatch) -> None:
     assert runtime_result["research"]["anchor_symbols"] == ["NFLX", "DIS"]
     from argus.domain.research.cache import cache_get
 
-    assert cache_get("research-job-cache-key") is packet
+    assert cache_get("research-job-cache-key") is None
 
 
 def test_atomic_claim_denial_stops_a_thorough_submission(monkeypatch) -> None:
