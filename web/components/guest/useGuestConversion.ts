@@ -191,14 +191,13 @@ export function useGuestConversion({
         } catch { onAuthenticationComplete(null); }
         throw error;
       }
-      // The handoff changes the durable owner in the same request path. Refresh
-      // Recents before a pending follow-up can fail or navigate away, so the
-      // account's canonical conversation projection is visible immediately.
-      await refreshHistory();
       const actionLatch = latchRef.current;
       const action = actionLatch?.take() ?? null;
       setIsOpen(false);
       handoffPreparedRef.current = false;
+      // The claim is complete. A failed Recents refresh cannot reopen its
+      // consumed handoff or prevent the verified pending action from resuming.
+      try { await refreshHistory(); } catch { /* Recents refresh is best-effort. */ }
       if (action) {
         await onResume(action);
       }
