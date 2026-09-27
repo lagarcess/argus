@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / "docs/message-and-stream-shapes.md"
 SCHEMAS = ROOT / "src/argus/api/schemas.py"
 SRC = ROOT / "src/argus"
+PARSER = ROOT / "web/lib/argus-api.ts"
 
 
 def message_fields() -> dict[str, bool]:
@@ -201,6 +202,134 @@ def tool_progress_fields() -> list[str]:
     return fields_of("ToolProgress")
 
 
+def _ts_function_body(source: str, name: str) -> str:
+    marker = f"function {name}"
+    start = source.find(marker)
+    if start < 0:
+        raise SystemExit(f"{name} missing in the stream parser")
+    brace = source.find("{", start)
+    if brace < 0:
+        raise SystemExit(f"{name} has no body")
+    depth = 0
+    for index in range(brace, len(source)):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[brace + 1 : index]
+    raise SystemExit(f"{name} body did not close")
+
+
+def _skip_ws(text: str, index: int) -> int:
+    while index < len(text) and text[index] in " \t\n\r":
+        index += 1
+    return index
+
+
+def _read_string(text: str, index: int) -> tuple[str, int] | None:
+    if index >= len(text) or text[index] not in {"'", '"'}:
+        return None
+    quote = text[index]
+    index += 1
+    chars: list[str] = []
+    while index < len(text):
+        char = text[index]
+        if char == "\\":
+            raise SystemExit("escaped string in a stream type comparison")
+        if char == quote:
+            return "".join(chars), index + 1
+        chars.append(char)
+        index += 1
+    raise SystemExit("unterminated string in the stream parser")
+
+
+def _read_ident(text: str, index: int) -> tuple[str, int] | None:
+    if index >= len(text) or not (text[index].isalpha() or text[index] == "_"):
+        return None
+    end = index + 1
+    while end < len(text) and (text[end].isalnum() or text[end] == "_"):
+        end += 1
+    return text[index:end], end
+
+
+def _ts_string_consts(body: str) -> dict[str, str]:
+    consts: dict[str, str] = {}
+    index = 0
+    while index < len(body):
+        matched = None
+        for keyword in ("const ", "let "):
+            if body.startswith(keyword, index):
+                matched = keyword
+                break
+        if matched is None:
+            index += 1
+            continue
+        ident = _read_ident(body, _skip_ws(body, index + len(matched)))
+        if ident is None:
+            index += len(matched)
+            continue
+        name, cursor = ident
+        cursor = _skip_ws(body, cursor)
+        if cursor >= len(body) or body[cursor] != "=":
+            index += len(matched)
+            continue
+        parsed = _read_string(body, _skip_ws(body, cursor + 1))
+        if parsed is None:
+            index += len(matched)
+            continue
+        consts[name] = parsed[0]
+        index = parsed[1]
+    return consts
+
+
+def _type_compared_values(body: str) -> list[str]:
+    consts = _ts_string_consts(body)
+    found: list[str] = []
+    index = 0
+    while True:
+        at = body.find("type", index)
+        if at < 0:
+            break
+        before_ok = at == 0 or not (body[at - 1].isalnum() or body[at - 1] == "_")
+        after = at + len("type")
+        after_ok = after >= len(body) or not (body[after].isalnum() or body[after] == "_")
+        if not (before_ok and after_ok):
+            index = after
+            continue
+        cursor = _skip_ws(body, after)
+        if body.startswith("===", cursor):
+            operator = 3
+        elif body.startswith("==", cursor):
+            operator = 2
+        else:
+            index = after
+            continue
+        cursor = _skip_ws(body, cursor + operator)
+        parsed = _read_string(body, cursor)
+        if parsed is not None:
+            found.append(parsed[0])
+            index = parsed[1]
+            continue
+        ident = _read_ident(body, cursor)
+        if ident is not None and ident[0] in consts:
+            found.append(consts[ident[0]])
+            index = ident[1]
+            continue
+        raise SystemExit("stream type comparison is not a string literal")
+    return found
+
+
+def client_json_event_types() -> list[str]:
+    body = _ts_function_body(PARSER.read_text(), "parseChatStreamFrame")
+    return list(dict.fromkeys(_type_compared_values(body)))
+
+
+def parser_only_types() -> list[str]:
+    return sorted(set(client_json_event_types()) - set(frame_types()))
+
+
 def frame_types() -> list[str]:
     found: set[str] = set()
     for _path, tree in _parse_src():
@@ -375,6 +504,7 @@ def published_blocks() -> dict[str, str]:
         "message-fields": _message_table(message_fields()),
         "message-roles": _bullet_block(message_roles()),
         "frame-types": _bullet_block(frame_types()),
+        "parser-only": _bullet_block(parser_only_types()),
         "stage-values": _bullet_block(stage_values()),
         "substage-detail": _bullet_block(with_detail),
         "substage-no-detail": _bullet_block(without_detail),

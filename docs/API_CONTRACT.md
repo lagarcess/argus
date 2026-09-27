@@ -4181,12 +4181,6 @@ interpretation for unrelated turns.
 data: [DONE]
 ```
 
-**Parser compatibility.** `title` is not an emitted frame. `parseChatStreamFrame` accepts `type` `title` with `conversation_id` and `title`. No `sse_data` call site emits this frame. Conversation titles are saved on the conversation and loaded from the conversation list.
-
-```json
-{ "type": "title", "conversation_id": "uuid", "title": "Tesla Dip Strategy" }
-```
-
 The stream does not write an SSE `retry` field. Clients own reconnect timing.
 
 > [!IMPORTANT]

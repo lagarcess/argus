@@ -50,8 +50,6 @@ JSON `type` strings on `sse_data` payloads:
 - `token`
 <!-- /frame-types -->
 
-The emitters do not send a frame whose `type` is `title`.
-
 ### `stage_start`
 
 `type` and `stage` are always present. `stage` is a string. The list is every `WorkflowNode` value, every `emit_substage` stage argument, and every string `stage` on a `stage_start` or tool-progress frame.
@@ -200,7 +198,11 @@ The frame is `data: [DONE]`. It has no JSON object and no `message_id`.
 | `error` | `error` | `detail` from `message`, or from `detail` when `message` is absent. `code` when it is a string. `message_id` when it is a string. `recovery` and `retry_last_turn` when each is an object. |
 | `[DONE]` | `done` | `message_id` set to null. |
 
-**Parser compatibility.** `title` is not a wire frame. `parseChatStreamFrame` accepts `type` `title` with `conversation_id` and `title`. No emitter sends this frame.
+JSON `type` comparisons in `parseChatStreamFrame` that are absent from the emitted JSON type block:
+
+<!-- parser-only -->
+- `title`
+<!-- /parser-only -->
 
 An `event:` line returns that event name and the JSON object unchanged. `sse_data` does not write `event:` lines.
 
@@ -208,7 +210,7 @@ An `event:` line returns that event name and the JSON object unchanged. `sse_dat
 
 `ChatFinalPayload` is a hand-written view of the open final object. Its `final_response_payload` field is the exception. `scripts/generate_chat_final_response_type.py` generates `ChatFinalResponsePayload` from `FinalResponsePayload` in `src/argus/agent_runtime/state/models.py`.
 
-`ChatInterface` applies a `title` event to the history list. It reads `conversation_id` and `title`. No `sse_data` call site sends that frame. After a turn, `schedulePostTurnHistoryRefresh` loads titles from the conversation list.
+`ChatInterface` applies a `title` event to the history list. It reads `conversation_id` and `title`. After a turn, `schedulePostTurnHistoryRefresh` loads titles from the conversation list.
 
 ## UI messages
 
@@ -228,5 +230,3 @@ An `event:` line returns that event name and the JSON object unchanged. `sse_dat
 ## Producer and consumer gaps
 
 Sent frames map as the parser table says. `token.content` becomes `text`. `error.message` becomes `detail`. `final.payload` becomes the event data. `[DONE]` becomes `done` with `message_id` null. `ChatInterface` reads `detail` after that mapping, and it reads `confirmation`, `run`, and `backtest_job` from the final object.
-
-One consumer waits for a frame no emitter sends. `parseChatStreamFrame` and `ChatInterface` accept `type` `title` with `conversation_id` and `title`. No file under `src/argus` writes `"type": "title"`.

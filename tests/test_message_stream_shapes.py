@@ -12,7 +12,6 @@ OPENAPI = ROOT / "docs/api/openapi.yaml"
 PARSER = ROOT / "web/lib/argus-api.ts"
 UI_MESSAGE = ROOT / "web/components/chat/types.ts"
 HYDRATION = ROOT / "web/lib/chat-message-hydration.ts"
-SRC = ROOT / "src/argus"
 
 
 def _openapi_message() -> dict:
@@ -27,13 +26,6 @@ def test_openapi_message_matches_schema() -> None:
     assert schema["required"] == [name for name, required in fields.items() if required]
     assert schema["properties"]["role"]["enum"] == message_roles()
     assert schema["properties"]["metadata"]["anyOf"][0]["additionalProperties"] is True
-
-
-def test_no_emitter_sends_a_title_frame() -> None:
-    doc = DOC.read_text()
-    assert "The emitters do not send a frame whose `type` is `title`." in doc
-    sources = "\n".join(path.read_text() for path in SRC.rglob("*.py"))
-    assert '"type": "title"' not in sources
 
 
 def test_parser_and_ui_mappings_match_clients() -> None:
