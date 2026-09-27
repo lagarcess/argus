@@ -237,6 +237,8 @@ import {
 import { randomId } from "@/lib/random-id";
 import { SEND_BUSY_FALLBACK, SEND_GENERIC_FALLBACK, sendRefusal } from "@/lib/send-refusal";
 import { useDailyCapNotice } from "./useDailyCapNotice";
+import { useChatAccountBoundary } from "./useChatAccountBoundary";
+import { authenticatedRequestHeaders, ChatAccountChangedError } from "@/lib/chat-auth-ownership";
 type View = "chat" | "settings";
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
@@ -251,9 +253,11 @@ export default function ChatInterface() {
   const [profileState, setProfileState] = useState<ProfileState>("probing");
   const [expiredPublicAccountAccessEnabled, setExpiredPublicAccountAccessEnabled] =
     useState(false);
-  const refreshAccount = useCallback(async () => {
-    const nextAccount = await getMe();
+  const authenticatedUserIdRef = useRef<string | null>(null);
+  const refreshAccount = useCallback(async (expectedUserId?: string) => {
+    const nextAccount = await getMe(expectedUserId);
     if (nextAccount === null) return null;
+    authenticatedUserIdRef.current = nextAccount.user.id;
     setAccount(nextAccount);
     const resolvedLanguage = nextAccount.user.language ?? i18n.language;
     if (resolvedLanguage && resolvedLanguage !== i18n.language) {
@@ -330,7 +334,6 @@ export default function ChatInterface() {
   );
   const coldRetrievalTimerRef = useRef<number | null>(null);
   const coldRetrievalConversationIdRef = useRef<string | null>(null);
-  const authenticatedUserIdRef = useRef<string | null>(null);
   const readyTranscriptConversationIdRef = useRef<string | null>(null);
   const pendingScrollRestoreRef = useRef<PendingScrollRestore>(null);
   const pendingMessageAnchorRef = useRef<PendingMessageAnchor>(null);
@@ -475,19 +478,16 @@ export default function ChatInterface() {
     ],
   );
 
+  const accountBoundary = useChatAccountBoundary(account?.user.id ?? null, requestSessions, () => {
+    transcriptSessionCache.clearAuthenticatedState();
+    guestSubmissionRetryRef.current = null;
+    clearHistory();
+    resetToEmptyChatSurface();
+  });
+
   useLayoutEffect(() => {
-    const nextUserId = account?.user.id ?? null;
-    const previousUserId = authenticatedUserIdRef.current;
-    if (
-      previousUserId !== null &&
-      nextUserId !== null &&
-      previousUserId !== nextUserId
-    ) {
-      transcriptSessionCache.clearAuthenticatedState();
-      resetToEmptyChatSurface();
-    }
-    authenticatedUserIdRef.current = nextUserId;
-  }, [account?.user.id, resetToEmptyChatSurface, transcriptSessionCache]);
+    authenticatedUserIdRef.current = account?.user.id ?? null;
+  }, [account?.user.id]);
 
   // ── History ────────────────────────────────────────────────────────────────
 
@@ -937,6 +937,8 @@ export default function ChatInterface() {
       setProfileState("expired");
     },
     onGuestBootstrapError: guestEntry.onGuestBootstrapError,
+    onAuthenticationStart: accountBoundary.beginConversion,
+    onAuthenticationComplete: accountBoundary.finishConversion,
     onGateError: () => showToast(t("chat.error_generic"), "error"),
     onStartOverError: () =>
       showToast(
@@ -1035,7 +1037,7 @@ export default function ChatInterface() {
     let guestSubmissionHandedToStream = false;
     // Never decline a real message in silence; see lib/send-refusal.ts.
     const refuseSend = sendRefusal(showToast, t);
-    if (!trimmed) return false;
+    if (!trimmed || accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
     if (sendAdmissionInFlightRef.current || isStreamingResponse) {
       return false;
     }
@@ -1075,6 +1077,13 @@ export default function ChatInterface() {
     ) {
       return false;
     }
+    if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
+    const expectedUserId = account?.user.id ?? authenticatedUserIdRef.current;
+    if (!expectedUserId) return false;
+    try { await authenticatedRequestHeaders(expectedUserId); }
+    catch (error) { if (error instanceof ChatAccountChangedError) accountBoundary.invalidate(); else showToast(t("chat.error_generic"), "error"); return false; }
+    if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
+    const ownedRequest = { expectedUserId, signal: accountBoundary.admission.current.signal };
     hasAcceptedUserInputRef.current = true;
     setIsHydratingConversation(false);
     const replacementAssistantId =
@@ -1093,30 +1102,17 @@ export default function ChatInterface() {
       });
     let shouldResetMessagesForNewConversation = false;
 
-    if (shouldCreateNewRouteConversation) {
+    if (shouldCreateNewRouteConversation || (!targetConversationId && !action?.type)) {
       try {
-        const { conversation } = await createConversation(i18n.language);
+        const { conversation } = await createConversation(i18n.language, ownedRequest);
+        if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
         targetConversationId = conversation.id;
-        shouldResetMessagesForNewConversation = true;
+        shouldResetMessagesForNewConversation = shouldCreateNewRouteConversation || messages.length === 0;
         rememberActiveConversationId(conversation.id);
         setConversationId(conversation.id);
         void refreshHistory();
       } catch (err) {
-        console.error("Failed to start conversation before sending:", err);
-        showToast(t("chat.error_generic"), "error");
-        return false;
-      }
-    }
-
-    if (!targetConversationId && !action?.type) {
-      try {
-        const { conversation } = await createConversation(i18n.language);
-        targetConversationId = conversation.id;
-        shouldResetMessagesForNewConversation = messages.length === 0;
-        rememberActiveConversationId(conversation.id);
-        setConversationId(conversation.id);
-        void refreshHistory();
-      } catch (err) {
+        if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return false; }
         console.error("Failed to start conversation before sending:", err);
         showToast(t("chat.error_generic"), "error");
         return false;
@@ -1596,6 +1592,7 @@ export default function ChatInterface() {
           ? []
           : mentions,
         {
+          expectedUserId,
           requestId: requestSession.identity.requestId,
           signal: requestSession.controller.signal,
           failedAssistantId: replacementAssistantId,
@@ -1612,6 +1609,7 @@ export default function ChatInterface() {
       try {
         await streamToConversation(targetConversationId);
       } catch (err: unknown) {
+        if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return; }
         if (!requestSessions.authorize(requestSession, "catch")) return;
         if (
           err instanceof ChatStreamError &&
@@ -1621,7 +1619,8 @@ export default function ChatInterface() {
           try {
             const retryWasVisible = canApplyVisibleStreamUpdate();
             if (retryWasVisible) clearActiveConversationPointer();
-            const { conversation } = await createConversation(i18n.language);
+            const { conversation } = await createConversation(i18n.language, ownedRequest);
+            if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return;
             if (!moveRequestToConversation(conversation.id)) return;
             if (retryWasVisible) {
               rememberActiveConversationId(conversation.id);
@@ -1634,6 +1633,7 @@ export default function ChatInterface() {
             err = retryErr;
           }
         }
+        if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return; }
         clearNeutralGuestSubmission();
         const isOrdinaryTransportAmbiguity =
           action?.type !== "run_backtest" &&
@@ -1816,6 +1816,7 @@ export default function ChatInterface() {
   };
 
   const handleCancelConfirmationAction = async (action: ChatActionOption) => {
+    if (!account?.user.id || accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return;
     const routeState = readActiveConversationRouteState();
     const targetConversationId = targetConversationIdForSend({
       routeConversationId: routeState.conversationId,
@@ -1883,11 +1884,13 @@ export default function ChatInterface() {
         },
         [],
         {
+          expectedUserId: account.user.id,
           requestId: request.identity.requestId,
           signal: request.controller.signal,
         },
       );
     } catch (err: unknown) {
+      if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return; }
       if (!requestSessions.authorize(request, "catch")) return;
       const message =
         err instanceof ChatStreamError && err.message
@@ -2156,6 +2159,12 @@ export default function ChatInterface() {
   });
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  if (accountBoundary.expired) {
+    return <main className="flex h-[100dvh] flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+      <p role="alert">{t("chat.account_changed")}</p>
+      <button className="rounded-lg bg-primary px-4 py-2 text-primary-foreground" onClick={() => window.location.assign("/chat")}>{t("chat.account_changed_reload")}</button>
+    </main>;
+  }
   if (profileState === "probing" || profileState === "unavailable") {
     return (
       <div className="flex h-[100dvh] w-full items-center justify-center bg-background">

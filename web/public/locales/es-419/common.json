@@ -235,6 +235,8 @@
     "close": "Cerrar comentarios"
   },
   "chat": {
+    "account_changed": "Tu cuenta cambió. Este chat se cerró y se borró el texto sin enviar. Vuelve a cargar para continuar.",
+    "account_changed_reload": "Volver a cargar",
     "artifact_edit_disclosure": {
       "no_change_applied": "No se aplicó ninguno de los cambios que pediste. Vuelve a decir qué quieres cambiar."
     },

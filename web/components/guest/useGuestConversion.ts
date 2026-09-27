@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AuthFormSubmission } from "@/components/auth/AuthForm";
 import {
   createGuestHandoff,
@@ -20,13 +21,16 @@ import {
   type GuestConversionReason,
   type GuestPendingAction,
 } from "@/lib/guest-conversion";
+import { authenticatedRequestHeaders } from "@/lib/chat-auth-ownership";
 import { randomId } from "@/lib/random-id";
 
 type UseGuestConversionInput = {
   account: UserResponse | null;
   conversationId: string | null;
-  refreshAccount: () => Promise<UserResponse | null>;
+  refreshAccount: (expectedUserId?: string) => Promise<UserResponse | null>;
   refreshHistory: () => void | Promise<unknown>;
+  onAuthenticationStart: () => void;
+  onAuthenticationComplete: (userId: string | null) => void;
   onResume: (action: GuestPendingAction) => void | Promise<void>;
 };
 
@@ -36,7 +40,10 @@ export function useGuestConversion({
   refreshAccount,
   refreshHistory,
   onResume,
+  onAuthenticationStart,
+  onAuthenticationComplete,
 }: UseGuestConversionInput) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [reason, setReason] =
     useState<GuestConversionReason>("keep_history");
@@ -77,6 +84,9 @@ export function useGuestConversion({
 
   const authenticate = useCallback(
     async (submission: AuthFormSubmission) => {
+      onAuthenticationStart();
+      try {
+      let destinationUserId: unknown;
       const latch = latchRef.current;
       if (submission.mode === "signup") {
         if (!sourceConversationId) {
@@ -86,7 +96,9 @@ export function useGuestConversion({
             language: normalizeApiLanguage(account?.user.language),
             display_name: submission.displayName || null,
           });
+          destinationUserId = registered.response.user?.id;
           if (registered.needsEmailConfirmation) {
+            onAuthenticationComplete(account?.user.id ?? null);
             return { status: "email_confirmation_required" as const };
           }
         } else {
@@ -109,7 +121,9 @@ export function useGuestConversion({
                 },
           });
           handoffPreparedRef.current = true;
+          destinationUserId = registered.response.user?.id;
           if (registered.needsEmailConfirmation) {
+            onAuthenticationComplete(account?.user.id ?? null);
             return { status: "email_confirmation_required" as const };
           }
           const claimed = registered.response.guest_claim;
@@ -149,6 +163,7 @@ export function useGuestConversion({
           email: submission.email,
           password: submission.password,
         });
+        destinationUserId = authenticated.user?.id;
         if (handoffPreparedRef.current && sourceConversationId) {
           const claimed = authenticated.guest_claim;
           if (!claimed) {
@@ -165,7 +180,9 @@ export function useGuestConversion({
         }
       }
 
-      await refreshAccount();
+      if (typeof destinationUserId !== "string") throw new Error(t("chat.error_generic"));
+      const refreshed = await refreshAccount(destinationUserId);
+      onAuthenticationComplete(refreshed?.user.id ?? null);
       // The handoff changes the durable owner in the same request path. Refresh
       // Recents before a pending follow-up can fail or navigate away, so the
       // account's canonical conversation projection is visible immediately.
@@ -177,10 +194,21 @@ export function useGuestConversion({
       if (action) {
         await onResume(action);
       }
+      } catch (error) {
+        try {
+          if (!account?.user.id) throw error;
+          await authenticatedRequestHeaders(account.user.id);
+          onAuthenticationComplete(account.user.id);
+        } catch { onAuthenticationComplete(null); }
+        throw error;
+      }
     },
     [
-      account?.user.language,
+      account,
+      t,
       onResume,
+      onAuthenticationStart,
+      onAuthenticationComplete,
       refreshAccount,
       refreshHistory,
       sourceConversationId,

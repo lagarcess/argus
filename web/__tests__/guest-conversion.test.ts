@@ -361,13 +361,13 @@ describe("guest conversion contract", () => {
       authenticate.indexOf("loginWithEmail"),
     );
     expect(authenticate.indexOf("registerGuestAccount")).toBeLessThan(
-      authenticate.indexOf("await refreshAccount()"),
+      authenticate.indexOf("await refreshAccount(destinationUserId)"),
     );
     expect(authenticate).toContain('status: "email_confirmation_required"');
     expect(hook).toContain("SingleUseGuestAction");
     expect(hook).toContain("actionLatch?.take()");
     expect(authenticate).toContain("await refreshHistory()");
-    expect(authenticate.indexOf("await refreshAccount()")).toBeLessThan(
+    expect(authenticate.indexOf("await refreshAccount(destinationUserId)")).toBeLessThan(
       authenticate.indexOf("await refreshHistory()"),
     );
     expect(authenticate.indexOf("await refreshHistory()")).toBeLessThan(
