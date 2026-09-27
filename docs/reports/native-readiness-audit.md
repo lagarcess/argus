@@ -15,6 +15,7 @@ while the existing web/PWA and its behavior are retained?
 | --- | --- |
 | Inspected base | `origin/codex/private-alpha-next` at `ab9143c18740c28f582646d405445c01c4c8aff4` ("docs(product): lock MVEE and replace conflicting product guidance (#704)", 2026-09-26) |
 | Worktree / branch | Sibling managed worktree, branch `codex/native-readiness-audit` created from the fetched base |
+| Reconciliation | Base later advanced to `2ea968156e0c664b9a9ba2fd540b51e20973ab3a` ([PR #706](https://github.com/lagarcess/argus/pull/706), private log content). It was merged in one way. It changes logging code this report does not cite and one `docs/API_CONTRACT.md` line in place, so no cited path or line number moved and findings stand as audited at `ab9143c` |
 | Environment | Cloud container; source reading only. No services started, no provider calls, no Supabase or Render access, no package installation |
 | Assignment direction | iOS: Swift + SwiftUI (UIKit where needed). Android: Kotlin + Jetpack Compose (Android Views where needed). Web/PWA retained. Shared backend, records, permissions, calculations, and conversational runtime |
 
@@ -446,7 +447,7 @@ providers are deliberately not selected here.
 | [#688](https://github.com/lagarcess/argus/issues/688) Remote Markdown images; stale tab resend under new account | Same rendering and account-switch rules apply to native |
 | [#686](https://github.com/lagarcess/argus/issues/686), [#671](https://github.com/lagarcess/argus/issues/671), [#676](https://github.com/lagarcess/argus/issues/676) | Client-IP trust and rate-limit keying affect native and mobile web equally |
 | [#640](https://github.com/lagarcess/argus/issues/640) Keep an observing conversation fresh | Same activity/freshness contract native clients will poll |
-| [#687](https://github.com/lagarcess/argus/issues/687), [PR #706](https://github.com/lagarcess/argus/pull/706) Private content in logs | MVEE privacy rules for records and documents |
+| [#687](https://github.com/lagarcess/argus/issues/687), [PR #706](https://github.com/lagarcess/argus/pull/706) Private content in logs (PR merged after the audited SHA) | MVEE privacy rules for records and documents |
 | [#701](https://github.com/lagarcess/argus/issues/701) Closed analytics event registry | Native analytics events should join the same registry |
 | [PR #672](https://github.com/lagarcess/argus/pull/672) Docs accuracy and draft Wave 1 roadmap | Open docs PR touching roadmap context; avoid overlapping edits |
 | [PR #705](https://github.com/lagarcess/argus/pull/705) Docs-only CI hardening | Affects how this report's PR is gated |
