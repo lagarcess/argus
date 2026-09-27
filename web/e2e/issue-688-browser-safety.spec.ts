@@ -158,17 +158,23 @@ test('public receipt Markdown produces no external image request', async ({ page
   expect(requests.filter(url => url.includes('tracking.example.invalid'))).toEqual([]);
   await shot(page, 'public-receipt-images');
 });
-for (const failRecents of [false, true]) {
-test(`explicit guest claim retains destination identity with ${failRecents ? 'failed' : 'successful'} Recents refresh`, async ({ page }) => {
+for (const recentsState of ['successful', 'failed', 'held'] as const) {
+test(`explicit guest claim retains destination identity with ${recentsState} Recents refresh`, async ({ page }) => {
   const writes = await setup(page);
+  const failRecents = recentsState === 'failed';
+  const holdRecents = recentsState === 'held';
+  let releaseHistory = () => {};
+  const historyReady = new Promise<void>(resolve => { releaseHistory = resolve; });
+  let historyReleased = false;
   let converted = false;
   let pendingAction: unknown = null;
-  let failedRefreshes = 0;
+  let recentsRefreshes = 0;
   let handoffs = 0;
   let logins = 0;
-  if (failRecents) await page.route('**/api/v1/conversations?**', route => {
+  if (recentsState !== 'successful') await page.route('**/api/v1/conversations?**', async route => {
     if (!converted || route.request().method() !== 'GET') return route.fallback();
-    failedRefreshes += 1;
+    recentsRefreshes += 1;
+    if (holdRecents) { await historyReady; historyReleased = true; return route.fallback(); }
     return route.fulfill({ status: 503, json: { code: 'unavailable', detail: 'Synthetic Recents outage' } });
   });
   await page.route('**/api/v1/me', route => route.fulfill({ json: {
@@ -189,25 +195,48 @@ test(`explicit guest claim retains destination identity with ${failRecents ? 'fa
     converted = true;
     return route.fulfill({ json: { user: session('account-b').user, session: session('account-b'), guest_claim: { conversation_id: 'conversation-alpha', pending_action: pendingAction } } });
   });
+  if (holdRecents) {
+    await page.route('**/api/v1/conversations/*/messages**', route => route.fulfill({ json: { items: [{ id: 'synthetic-confirmation', role: 'assistant', content: 'Ready for a synthetic simulation', created_at: stamp, metadata: { confirmation_card: { version: 'argus_confirmation/v1', status: 'awaiting_confirmation', title: 'Ready to test', strategy_label: 'Buy and hold', rows: [{ key: 'assets', label: 'Assets', value: 'AAPL' }], actions: [{ id: 'run', type: 'run_backtest', label: 'Run test' }] } } }], next_cursor: null } }));
+    await page.route('**/api/v1/me/usage', route => route.fulfill({ json: { allowances: Object.fromEntries(['compute', 'grounding', 'execution'].map(kind => [kind, { hour: null, day: null, guest_session: null, available_now: kind !== 'execution' || converted, limiting_window: null }])) } }));
+  }
   await page.reload();
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  if (holdRecents) {
+    await page.getByRole('button', { name: 'Run backtest', exact: true }).click({ timeout: 10000 });
+    await page.getByRole('dialog').getByRole('button', { name: 'Sign in', exact: true }).click({ timeout: 5000 });
+  } else await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByPlaceholder('Email address').fill('account-b@example.invalid');
   await dialog.getByPlaceholder('Password', { exact: true }).fill('Synthetic-fixture-password-688');
   await dialog.getByRole('button', { name: 'Sign in', exact: true }).click();
-  if (failRecents) {
-    await expect.poll(() => failedRefreshes).toBeGreaterThan(0);
-  }
-  await expect(dialog).toHaveCount(0);
-  await expect(page.getByText('Account A private conversation', { exact: true })).toBeVisible();
-  await expect(page.getByTestId('chat-input')).toBeEnabled();
-  expect(writes).toEqual([]);
-  await page.getByTestId('chat-input').fill('New deliberate message after guest claim');
-  await page.getByTestId('chat-input').press('Enter');
-  await expect.poll(() => writes.length).toBe(1);
-  expect(JSON.parse(Buffer.from(writes[0].authorization!.split('.')[1], 'base64url').toString()).sub).toBe('account-b');
-  expect({ handoffs, logins }).toEqual({ handoffs: 1, logins: 1 });
-  await shot(page, failRecents ? 'guest-claim-recents-failure' : 'guest-claim');
+  try {
+    if (recentsState !== 'successful') {
+      await expect.poll(() => recentsRefreshes).toBeGreaterThan(0);
+    }
+    await expect(dialog).toHaveCount(0);
+    if (holdRecents) {
+      await expect.poll(() => writes.map(write => write.path), { timeout: 5000 }).toEqual(['stream']);
+      expect(historyReleased).toBe(false);
+      expect(pendingAction).toMatchObject({ reason: 'simulation_limit' });
+    } else await expect(page.getByText('Account A private conversation', { exact: true })).toBeVisible();
+    if (!holdRecents) await expect(page.getByTestId('chat-input')).toBeEnabled();
+    if (holdRecents) {
+      expect((writes[0].body as { action: { type: string } }).action.type).toBe('run_backtest');
+      expect(JSON.parse(Buffer.from(writes[0].authorization!.split('.')[1], 'base64url').toString()).sub).toBe('account-b');
+      await shot(page, 'guest-claim-held-recents');
+      releaseHistory();
+      await expect.poll(() => historyReleased).toBe(true);
+      await expect(page.getByText('Safe fixture answer', { exact: true })).toBeVisible();
+      expect(writes.map(write => write.path)).toEqual(['stream']);
+    } else {
+      expect(writes).toEqual([]);
+      await page.getByTestId('chat-input').fill('New deliberate message after guest claim');
+      await page.getByTestId('chat-input').press('Enter');
+      await expect.poll(() => writes.map(write => write.path)).toEqual(['stream']);
+      expect(JSON.parse(Buffer.from(writes[0].authorization!.split('.')[1], 'base64url').toString()).sub).toBe('account-b');
+    }
+    expect({ handoffs, logins }).toEqual({ handoffs: 1, logins: 1 });
+    if (!holdRecents) await shot(page, failRecents ? 'guest-claim-recents-failure' : 'guest-claim');
+  } finally { releaseHistory(); }
 });
 }
 test('account change notice uses Spanish resources', async ({ page, context }) => {
