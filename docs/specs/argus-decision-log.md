@@ -20,6 +20,7 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-09-26 | Publish approved experience and reconcile older document pointers in a docs-only PR; defer new technical design and implementation sequencing. Owner: [documentation authority](../DOCUMENTATION_AUTHORITY.md). | Lucas |
 | 2026-09-26 | Carry production behavior and gates forward unless explicitly changed; distinguish current availability from approved future experience. Owner: [PRODUCT.md availability and transitions](../PRODUCT.md#current-production-availability-and-planned-changes). | Lucas |
 | 2026-09-26 | Lock platform-native mobile interfaces and retain the existing web/PWA stack, sharing one Argus backend and canonical financial truth. Accept separate interface maintenance with coordinated agents and platform-specific verification. Detailed stack owner: [ARCHITECTURE.md platform decision](../ARCHITECTURE.md#approved-platform-direction). Client contracts and rollout remain to be defined. | Lucas |
+| 2026-09-27 | Accept the mobile sketch as the current visual and interaction baseline. Desktop and tablet layout stay open. Detailed owner: [approved mobile baseline](../design/2026-09-27-approved-mobile-baseline/README.md). | Lucas |
 
 ## Open (not locked)
 

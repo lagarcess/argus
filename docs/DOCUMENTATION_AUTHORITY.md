@@ -1,6 +1,6 @@
 # Argus documentation authority
 
-**Updated:** September 26, 2026. Founder-approved documentation reconciliation.
+**Updated:** September 27, 2026. The September 26 reconciliation remains in force. This update points mobile interface work at the approved sketch.
 **Purpose:** Help an agent distinguish approved product direction, existing technical contracts, historical rationale, and authorized implementation work.
 
 ## Start here
@@ -8,7 +8,7 @@
 1. Read [AGENTS.md](../AGENTS.md) for repository, safety, review, and delivery rules.
 2. Read [PRODUCT.md](PRODUCT.md) for the product overview and the boundary between the existing Alpha and the approved pivot.
 3. Read the [minimum viable ecosystem experience (MVEE)](specs/argus-minimum-viable-ecosystem-experience.md) for the approved audience, surfaces, ingestion, loop, household collaboration, and open decisions.
-4. Read [ARCHITECTURE.md](ARCHITECTURE.md), [API_CONTRACT.md](API_CONTRACT.md), [DATA_MODEL.md](DATA_MODEL.md), and [DESIGN.md](../.agent/designs/argus/DESIGN.md) before relevant technical or UI work. Their existing contracts are not replaced by experience prose.
+4. Read [ARCHITECTURE.md](ARCHITECTURE.md), [API_CONTRACT.md](API_CONTRACT.md), [DATA_MODEL.md](DATA_MODEL.md), and [DESIGN.md](../.agent/designs/argus/DESIGN.md) before relevant technical or UI work. For mobile interface work, also read the [approved mobile baseline](design/2026-09-27-approved-mobile-baseline/README.md). Their existing contracts are not replaced by experience prose. Desktop and tablet layout stay open.
 5. Read the explicitly assigned package or slice. For a Wave 1 assignment, start with [its README](specs/wave-1/README.md) and the package's existing gates. A roadmap or brainstorm does not assign work by itself.
 
 ## One owner per kind of decision
@@ -19,7 +19,7 @@
 | How does that relate to the existing product? | [PRODUCT.md](PRODUCT.md) | Current product overview and explicit existing-capability contracts; verify actual availability against code/release evidence |
 | Which founder decisions changed, and when? | [Decision log](specs/argus-decision-log.md) | Decision provenance and links; detailed requirements remain with their owner |
 | What architecture, payloads, and persistence contracts apply? | Architecture, API contract, and data model docs above | Existing system contracts/technical intent and the [locked interface stacks](ARCHITECTURE.md#approved-platform-direction); some statements describe targets, not proof of implementation |
-| What visual and interaction conventions apply? | [DESIGN.md](../.agent/designs/argus/DESIGN.md) | Preserve current design system and chat detail; MVEE owns the pivot's surface structure and platform intent |
+| What visual and interaction conventions apply? | [DESIGN.md](../.agent/designs/argus/DESIGN.md) and the [approved mobile baseline](design/2026-09-27-approved-mobile-baseline/README.md) | DESIGN.md preserves the current design system and chat detail. The 2026-09-27 sketch is the mobile interaction baseline and does not authorize implementation. Desktop and tablet layout stay open. MVEE owns the pivot's surface structure and platform intent |
 | What is an agent authorized to build now? | Explicit assignment and its scoped package/spec | MVEE approval does not assign every feature, unlock stages, or authorize provider integrations |
 | How is work reviewed and released? | AGENTS.md, [CI/CD discipline](specs/private-alpha-ci-cd-sota.md), [launch runbook](PRIVATE_LAUNCH_RUNBOOK.md), [manifest template](release-manifests/TEMPLATE.md) | Existing evaluation, privacy, branch, merge, and deployment gates remain in force |
 | What evidence or thinking informed a direction? | Linked research and historical strategy docs | Inputs and provenance, not independent scope authority |

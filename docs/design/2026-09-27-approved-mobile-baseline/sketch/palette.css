@@ -1,0 +1,33 @@
+/* Disposable preview palette, mapped to Argus source on main a9286b218.
+   globals.css: shared semantic colors; artifact-status-tones.ts and
+   failure-treatment.ts: readable text and status treatments.
+   This file is the single color owner within this standalone sketch. */
+:root {
+  --argus-ink:#191c1f;
+  --argus-white:#ffffff;
+  --argus-surface:#f4f4f4;
+  --argus-canvas:#f9f9f9;
+  --argus-text-secondary:#505a63;
+  --argus-text-tertiary:#8d969e;
+  --argus-border:#c9c9cd;
+  --argus-line:color-mix(in srgb,var(--argus-border) 45%,var(--argus-white));
+  --rui-color-teal:#5ba897;
+  --rui-color-warning:#c2a44d;
+  --rui-color-danger:#d66d75;
+  --argus-positive-text:#3f7e70;
+  --argus-negative-text:#b94c55;
+  --argus-info:#7da0ca;
+  --argus-info-text:#4f6f95;
+  --argus-success:#70a38d;
+  --argus-success-text:#4f806d;
+  --argus-failure:#b3593f;
+  --argus-failure-text:#9c4a33;
+  --argus-failure-dark:#e08d70;
+  --argus-dark-secondary:rgb(255 255 255 / .7);
+  --argus-dark-line:rgb(255 255 255 / .1);
+  --argus-dark-soft:rgb(255 255 255 / .04);
+  --argus-focus:var(--argus-ink);
+  --argus-glass:color-mix(in srgb,var(--argus-white) 77%,transparent);
+  --argus-edge:color-mix(in srgb,var(--argus-white) 88%,transparent);
+}
+.settings-dark{--argus-focus:var(--argus-white)}

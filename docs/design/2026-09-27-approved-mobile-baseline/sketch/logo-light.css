@@ -1,0 +1,34 @@
+/* Light crosses the edges; the original mark never moves or pulses. */
+.chatwelcome .edge-light-mark .logo-edge-highlight path {
+  fill:none;
+  stroke:var(--argus-white);
+  stroke-width:10;
+  stroke-linejoin:round;
+}
+.logo-edge-highlight {opacity:.85;pointer-events:none}
+.logo-light-wave {opacity:0;animation-duration:12s;animation-timing-function:ease-in-out;animation-iteration-count:infinite}
+.wave-left {animation-name:logo-light-left}
+.wave-right {animation-name:logo-light-right;animation-delay:4s}
+.wave-bottom {animation-name:logo-light-bottom;animation-delay:8s}
+@keyframes logo-light-left {
+  0%{transform:translateX(0);opacity:0}
+  4%{opacity:1}
+  29%{transform:translateX(633px);opacity:1}
+  33%,100%{transform:translateX(633px);opacity:0}
+}
+@keyframes logo-light-right {
+  0%{transform:translateX(0);opacity:0}
+  4%{opacity:1}
+  29%{transform:translateX(-633px);opacity:1}
+  33%,100%{transform:translateX(-633px);opacity:0}
+}
+@keyframes logo-light-bottom {
+  0%{transform:translateY(0);opacity:0}
+  4%{opacity:1}
+  29%{transform:translateY(-607px);opacity:1}
+  33%,100%{transform:translateY(-607px);opacity:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .logo-light-wave{animation:none}
+  .logo-edge-highlight{display:none}
+}

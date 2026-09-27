@@ -1,0 +1,18 @@
+/* Continuous surface chrome: the tint fades out instead of ending at a header bar. */
+.scroll-edge{position:absolute;left:0;right:0;z-index:3;pointer-events:none;opacity:0;background:var(--argus-edge);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:opacity .15s ease}
+.scroll-edge.edge-visible{opacity:1}
+.scroll-edge-top{top:0;height:136px;mask-image:linear-gradient(to bottom,black 38%,transparent 100%);-webkit-mask-image:linear-gradient(to bottom,black 38%,transparent 100%)}
+.scroll-edge-bottom{bottom:0;height:112px;mask-image:linear-gradient(to top,black 28%,transparent 100%);-webkit-mask-image:linear-gradient(to top,black 28%,transparent 100%)}
+.app-header{background:transparent}
+.settings-header{z-index:4;background:transparent}
+.settings-mode:has(.settings-root) .settings-header,.settings-mode:has(.profile-summary) .settings-header{background:var(--settings-bg)}
+.settings-mode .scroll-edge-bottom{height:56px;mask-image:linear-gradient(to top,black,transparent);-webkit-mask-image:linear-gradient(to top,black,transparent)}
+.settings-dark .scroll-edge{background:color-mix(in srgb,var(--argus-ink) 88%,transparent)}
+.chatmode .scroll-edge{background:color-mix(in srgb,var(--argus-canvas) 88%,transparent)}
+.chatmode .scroll-edge-bottom{height:44px;mask-image:linear-gradient(to top,black,transparent);-webkit-mask-image:linear-gradient(to top,black,transparent)}
+.navwrap{z-index:4}
+@media(prefers-reduced-motion:reduce){.scroll-edge{transition:none}}
+@media(prefers-reduced-transparency:reduce){.scroll-edge{display:none;backdrop-filter:none;-webkit-backdrop-filter:none}.app-header{background:var(--argus-white)}.chatmode .app-header{background:var(--argus-canvas)}.settings-header{background:var(--settings-bg)}}
+/* Messages scroll behind the header fade; padding belongs inside the transcript. */
+.phone.chatmode:has(.chattranscript)>.screen{padding-top:0}
+.chatmode .chattranscript{padding-top:104px;scroll-padding-top:104px}

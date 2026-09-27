@@ -1,0 +1,24 @@
+/* Disposable UI: production font assets and a shared mobile control hierarchy. */
+@font-face{font-family:Inter;src:url("fonts/InterVariable.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url("fonts/SpaceGrotesk[wght].woff2") format("woff2");font-weight:300 700;font-style:normal;font-display:swap}
+:root{--font-body:Inter,ui-sans-serif,system-ui,sans-serif;--font-display:"Space Grotesk",Inter,Arial,sans-serif;--type-body:16px;--type-label:14px;--type-note:12px}
+body{font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--font-display);font-weight:500}
+h1{font-size:32px;line-height:1.15;letter-spacing:-.64px}
+h2{font-size:22px;line-height:1.25;letter-spacing:-.44px}
+h3{font-size:18px;line-height:1.35;letter-spacing:-.18px}
+.muted{font-size:var(--type-body);line-height:1.55;letter-spacing:.08px}
+.footnote,.demolabel,.compacthint{font-size:var(--type-note);line-height:1.5}
+.primary,.secondary{display:inline-flex;justify-content:center;align-items:center;min-height:48px;padding:14px 24px;border-radius:9999px;font-family:var(--font-display);font-size:16px;font-weight:500;line-height:1.25;letter-spacing:0;transition:opacity .15s ease,background-color .15s ease}
+.primary{background:var(--argus-ink);color:var(--argus-white)}
+.secondary{background:var(--argus-surface);color:var(--argus-ink)}
+.surface-cta{width:auto;max-width:100%;text-align:center}
+.primary:disabled,.secondary:disabled{opacity:.4;cursor:not-allowed}
+@media(hover:hover){.primary:not(:disabled):hover,.secondary:not(:disabled):hover{opacity:.85}}
+.primary:not(:disabled):active,.secondary:not(:disabled):active{opacity:.75}
+.link,.back{min-height:44px;font-size:var(--type-label);font-weight:500;color:var(--argus-ink)}
+.choice strong{font-family:var(--font-body);font-size:16px;font-weight:500;line-height:1.4}
+.choice small{font-size:var(--type-note);line-height:1.5}
+.row-chevron{width:18px;height:18px;margin-inline-start:auto;flex-shrink:0;color:var(--argus-text-secondary)}
+.glyph>svg{width:22px;height:22px}
+.total,.pair strong,.line strong,.proposal-amount{font-family:var(--font-display);font-weight:500;font-variant-numeric:tabular-nums}
