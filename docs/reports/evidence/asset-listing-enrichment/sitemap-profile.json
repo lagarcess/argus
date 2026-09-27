@@ -1,0 +1,118 @@
+{
+ "as_of": "2026-09-27",
+ "sites": {
+  "supercarros": {
+   "listing_urls": 29638,
+   "other_urls": 821,
+   "distinct_slugs": 1224,
+   "first_slug_token_top": {
+    "toyota": 3931,
+    "kia": 2828,
+    "hyundai": 2210,
+    "honda": 2011,
+    "chevrolet": 1732,
+    "mercedesbenz": 1681,
+    "nissan": 1373,
+    "ford": 1344,
+    "jeep": 952,
+    "mazda": 771,
+    "lexus": 765,
+    "isuzu": 703,
+    "bmw": 635,
+    "mitsubishimotors": 515,
+    "jetour": 507
+   },
+   "largest_slugs": {
+    "honda-crv": 1284,
+    "mercedesbenz-clase gle": 669,
+    "toyota-rav4": 669,
+    "kia-sorento": 664,
+    "hyundai-tucson": 643
+   },
+   "lastmod_missing": 0,
+   "lastmod_age_days_buckets": {
+    "0-7": 2701,
+    "8-30": 6793,
+    "31-90": 8145,
+    "91-365": 9909,
+    "over 365": 2090
+   },
+   "lastmod_age_days_median": 62.5
+  },
+  "supercasas": {
+   "listing_urls": 19774,
+   "other_urls": 720,
+   "distinct_slugs": 1346,
+   "first_slug_token_top": {
+    "apartamentos": 14269,
+    "casas": 1346,
+    "villas": 1051,
+    "solares": 831,
+    "penthouse": 733,
+    "locales": 699,
+    "naves": 330,
+    "oficinas": 200,
+    "edificios": 115,
+    "fincas": 88,
+    "terreno": 70,
+    "negocios": 29,
+    "townhouse": 8,
+    "aparta": 5
+   },
+   "largest_slugs": {
+    "apartamentos-ensanche-naco": 1942,
+    "apartamentos-piantini": 1265,
+    "apartamentos-evaristo-morales": 1225,
+    "apartamentos-bella-vista": 843,
+    "apartamentos-la-esperilla": 732
+   },
+   "lastmod_missing": 0,
+   "lastmod_age_days_buckets": {
+    "0-7": 1234,
+    "8-30": 3675,
+    "31-90": 5612,
+    "91-365": 6486,
+    "over 365": 2767
+   },
+   "lastmod_age_days_median": 80.0
+  }
+ },
+ "density": {
+  "supercarros": {
+   "cell": "make-model slug",
+   "listings": 29638,
+   "cells": 1224,
+   "cells_at_or_above": {
+    "10": 384,
+    "30": 197,
+    "100": 66,
+    "300": 18
+   },
+   "share_of_listings_in_cells_at_or_above": {
+    "10": 0.927,
+    "30": 0.817,
+    "100": 0.569,
+    "300": 0.311
+   },
+   "median_cell_size": 3
+  },
+  "supercasas": {
+   "cell": "residential type-sector slug (sale and rent mixed)",
+   "listings": 17412,
+   "cells": 733,
+   "cells_at_or_above": {
+    "10": 187,
+    "30": 83,
+    "100": 29,
+    "300": 9
+   },
+   "share_of_listings_in_cells_at_or_above": {
+    "10": 0.91,
+    "30": 0.808,
+    "100": 0.648,
+    "300": 0.448
+   },
+   "median_cell_size": 3
+  }
+ }
+}

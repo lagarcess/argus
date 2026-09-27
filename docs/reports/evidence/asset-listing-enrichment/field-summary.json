@@ -1,0 +1,158 @@
+{
+ "supercarros": {
+  "pages": 10,
+  "title_year_make_model_parsed": 10,
+  "make_resolved_from_site_brand_id": 10,
+  "trim_text_after_model": {
+   "present": 6,
+   "absent": 4
+  },
+  "price_shapes": {
+   "US$ 99,999": 8,
+   "RD$ 9,999,999": 1,
+   "RD$ 999,999": 1
+  },
+  "price_currencies": {
+   "USD": 8,
+   "DOP": 2
+  },
+  "site_main_currency_amount_present": 10,
+  "implied_usd_rate_values": {
+   "60.1000": 8
+  },
+  "mileage": {
+   "present": 5,
+   "missing_marker_N/D": 5,
+   "units_shown": {
+    "mi": 7,
+    "km": 3
+   },
+   "meta_description_shows_0.00_when_missing": 5
+  },
+  "condition": {
+   "Usado": 8,
+   "Nuevo": 2
+  },
+  "condition_matches_is_new_flag": 10,
+  "car_age_negative": 1,
+  "fuel": {
+   "Gasolina": 9,
+   "Híbrido": 1
+  },
+  "transmission": {
+   "Automática": 10
+  },
+  "traction": {
+   "AWD": 4,
+   "Delantera": 4,
+   "4WD": 1,
+   "2WD": 1
+  },
+  "import_spec_accessory_checked": 3,
+  "damage_or_title_field": 0,
+  "seller_location_present": 10,
+  "seller_location_granularity_examples": [
+   "Distrito Nacional",
+   "Duarte",
+   "La Vega",
+   "Santo Domingo Este"
+  ],
+  "dealer_inventory_link": 10,
+  "free_text_present": 7,
+  "free_text_keyword_flags": {
+   "down_payment": 0,
+   "financing": 3,
+   "negotiable": 0,
+   "damage": 0,
+   "import_history": 1,
+   "pre_construction": 1,
+   "reservation_or_installments": 0,
+   "furnished": 0,
+   "short_term_rental": 0,
+   "tax_incentive": 0,
+   "maintenance_fee": 3
+  },
+  "visible_listing_date": 0,
+  "ad_key_date_equals_sitemap_lastmod": 3,
+  "visit_counter_present": 10
+ },
+ "supercasas": {
+  "pages": 10,
+  "title_shapes": {
+   "Apartamento en Venta, <sector>": 5,
+   "Apartamento en Alquiler, <sector>": 2,
+   "Casa en Alquiler, <sector>": 1,
+   "Casa en Venta, <sector>": 1,
+   "Villa en Venta, <sector>": 1
+  },
+  "price_labels": {
+   "venta": 8,
+   "alquiler amueblado": 2,
+   "alquiler": 2,
+   "venta amueblado": 1
+  },
+  "price_shapes": {
+   "US$ 999,999": 8,
+   "US$ 9,999/Mes": 4,
+   "US$ 9,999": 1
+  },
+  "price_currencies": {
+   "USD": 13
+  },
+  "pages_with_more_than_one_price": 3,
+  "pages_with_a_price_label_contradicting_title_operation": 1,
+  "implied_usd_rate_values": {
+   "59.8000": 6
+  },
+  "built_area": {
+   "positive": 9,
+   "zero": 1,
+   "units": {
+    "mt2": 10
+   }
+  },
+  "land_area": {
+   "positive": 3,
+   "zero": 7
+  },
+  "condition": {
+   "Nueva": 6,
+   "Segundo Uso": 4
+  },
+  "current_use": {
+   "Residencial": 9,
+   "Mixto": 1
+  },
+  "year_built_missing": 7,
+  "floor_zero_or_missing": 7,
+  "rooms_present": {
+   "bedrooms": 10,
+   "bathrooms": 10,
+   "parking": 10
+  },
+  "location_shape": {
+   "<region> > <sector>": 10
+  },
+  "free_text_present": 10,
+  "free_text_bedroom_count_disagrees_with_field": 3,
+  "free_text_area_disagrees_with_positive_field": 1,
+  "free_text_lost_characters": 3,
+  "free_text_keyword_flags": {
+   "down_payment": 0,
+   "financing": 0,
+   "negotiable": 0,
+   "damage": 0,
+   "import_history": 0,
+   "pre_construction": 1,
+   "reservation_or_installments": 0,
+   "furnished": 5,
+   "short_term_rental": 2,
+   "tax_incentive": 0,
+   "maintenance_fee": 1
+  },
+  "same_price_different_units_in_one_sector": 1,
+  "visible_listing_date": 0,
+  "ad_key_date_equals_sitemap_lastmod": 8,
+  "visit_counter_present": 9
+ }
+}

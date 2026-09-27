@@ -1,0 +1,73 @@
+{
+ "environments": {
+  "bs4": {
+   "python": "3.10.20",
+   "packages": {
+    "beautifulsoup4": "4.15.0",
+    "lxml": "6.1.3",
+    "soupsieve": "2.10"
+   },
+   "repeats_per_page": 30
+  },
+  "scrapling": {
+   "python": "3.10.20",
+   "packages": {
+    "scrapling": "0.4.15",
+    "lxml": "6.1.3",
+    "cssselect": "1.5.0",
+    "orjson": "3.12.0",
+    "tld": "0.13.2",
+    "w3lib": "2.4.1"
+   },
+   "repeats_per_page": 30
+  }
+ },
+ "median_parse_ms_per_page": {
+  "bs4": {
+   "supercarros": 13.219999999999999,
+   "supercasas": 12.05
+  },
+  "scrapling": {
+   "supercarros": 1.255,
+   "supercasas": 0.95
+  }
+ },
+ "pages": 20,
+ "normalized_field_differences_between_parsers": 0,
+ "markup_change_resilience": {
+  "class_rename": {
+   "spec_values_total": 240,
+   "bs4_class_selectors": 0,
+   "bs4_label_lookup": 230,
+   "scrapling_adaptive": 0,
+   "scrapling_adaptive_relocated_to": [
+    "ul.content-block component-list",
+    "ul.content-block contact-list"
+   ],
+   "scrapling_percentages_tried": [
+    0,
+    20,
+    40,
+    60,
+    80
+   ]
+  },
+  "class_rename_and_restructure": {
+   "spec_values_total": 240,
+   "bs4_class_selectors": 0,
+   "bs4_label_lookup": 230,
+   "scrapling_adaptive": 0,
+   "scrapling_adaptive_relocated_to": [
+    "ul.content-block component-list",
+    "ul.content-block contact-list"
+   ],
+   "scrapling_percentages_tried": [
+    0,
+    20,
+    40,
+    60,
+    80
+   ]
+  }
+ }
+}
