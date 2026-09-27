@@ -1,6 +1,6 @@
 # Listing sample run record, 2026-09-27
 
-This folder is the run record for [the listing enrichment feasibility report](../../asset-listing-enrichment-feasibility.md). It holds sanitized aggregates, the scripts that produced them, and two synthetic fixtures with offline checks. It holds no listing text, listing identifier, listing URL, seller field, or photograph.
+This folder is the run record for [the listing enrichment feasibility report](../../asset-listing-enrichment-feasibility.md). It holds sanitized aggregates, the scripts that produced them, and two synthetic fixtures with offline checks. It holds no real listing text, listing identifier, listing URL, seller data, or photograph. The fixtures' seller fields are invented placeholders.
 
 ## Run facts
 
