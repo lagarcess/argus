@@ -3,11 +3,18 @@
 Status: Integration staging/process context with a historical product ledger.
 Use [documentation authority](../DOCUMENTATION_AUTHORITY.md) for approved
 experience and assigned-work ownership. Check current PRs and release evidence
-for landing/deployment status; the ledger below stops at August 2, 2026.
+for landing/deployment status. The historical ledger below stops at August 2,
+2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
 Last reconciled: 2026-08-02 (header pointer added 2026-09-12)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
+
+## Later bounded landings
+
+- September 27, 2026: [PR #711 / issue #689 integration landing](../reports/2026-09-27-issue-689-integration-landing.md), merged as `ed6d9b2b53bbb5366bfe5a452249ba2cd7e2bbb1`. Shared research-cache isolation is landed; discovery's current-turn provenance/cache-reuse follow-up remains open as [#712](https://github.com/lagarcess/argus/issues/712). No deployment or main promotion.
+
+## Historical product ledger through August 2, 2026
 
 Latest product change: PR #366 at `2b023576`, which makes grounded
 discovery's failures as honest as its successes — typed routing for current
