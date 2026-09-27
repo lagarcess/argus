@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { ThumbsUp, ThumbsDown, MoreHorizontal, Copy, MessageSquareWarning, RotateCcw } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import SafeMarkdown from "@/components/chat/SafeMarkdown";
 import { useTranslation } from "react-i18next";
 import SharedConversationMessage from "./SharedConversationMessage";
 import StrategyResultCard from "./StrategyResultCard";
@@ -269,7 +268,7 @@ export default function ChatMessage({
     >
       <MessageSquareWarning className={retryableNoticeIconClass} aria-hidden="true" />
       <div className={retryableNoticeBodyClass}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+        <SafeMarkdown>{text}</SafeMarkdown>
       </div>
       {retryAction ? (
         <button
@@ -470,15 +469,15 @@ export default function ChatMessage({
                   : "recovery-failure-notice"
               }
             >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <SafeMarkdown>
                 {displayContent}
-              </ReactMarkdown>
+              </SafeMarkdown>
             </FailureNotice>
           ) : (
             <div className="text-black dark:text-white text-[16px] leading-[1.6] tracking-[0.24px] prose dark:prose-invert max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <SafeMarkdown>
                 {displayContent}
-              </ReactMarkdown>
+              </SafeMarkdown>
             </div>
           )}
           {assumedInputsLine ? (
@@ -507,9 +506,9 @@ export default function ChatMessage({
                 retryableNotice(recoveryDisplayText(message.recoveryDisplay, t, locale))
               ) : (
                 <FailureNotice testId="recovery-failure-notice">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  <SafeMarkdown>
                     {recoveryDisplayText(message.recoveryDisplay, t, locale)}
-                  </ReactMarkdown>
+                  </SafeMarkdown>
                 </FailureNotice>
               )}
             </div>
@@ -911,9 +910,9 @@ function ResultReadout({
     <section aria-label={label}>
       <div className="argus-result-section-label">{label}</div>
       <div className="argus-result-readout prose dark:prose-invert max-w-none">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        <SafeMarkdown>
           {content}
-        </ReactMarkdown>
+        </SafeMarkdown>
       </div>
     </section>
   );
@@ -934,9 +933,9 @@ function ResultBreakdown({
     <section aria-label={ariaLabel} aria-busy={isWorking || undefined}>
       <div className="argus-result-section-label">{label}</div>
       <div className="argus-result-breakdown prose dark:prose-invert max-w-none">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+        <SafeMarkdown>
           {content}
-        </ReactMarkdown>
+        </SafeMarkdown>
       </div>
     </section>
   );
