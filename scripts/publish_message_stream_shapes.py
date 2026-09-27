@@ -216,8 +216,6 @@ def frame_types() -> list[str]:
                 text = _string_constant(items["type"]) if "type" in items else None
                 if text:
                     found.add(text)
-            if isinstance(node, ast.FunctionDef) and node.name == "sse_done":
-                found.add("done")
     return sorted(found)
 
 
@@ -400,7 +398,8 @@ def render_document(text: str) -> str:
             raise SystemExit(f"missing generated block {name} in the shape record")
         before, rest = text.split(start, 1)
         _previous, after = rest.split(end, 1)
-        text = f"{before}{start}\n{body}\n{end}\n\n{after.lstrip('\n')}"
+        suffix = after.lstrip("\n")
+        text = f"{before}{start}\n{body}\n{end}\n\n{suffix}"
     return text
 
 

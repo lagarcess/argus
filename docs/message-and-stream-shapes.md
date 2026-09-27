@@ -2,7 +2,7 @@
 
 This file records shapes that already exist in the repo. It does not add fields.
 
-`scripts/publish_message_stream_shapes.py` reads the producers named below and writes every marked block. That script is the only writer of those blocks. Run it after a producer change.
+`scripts/publish_message_stream_shapes.py` reads the producers named below and writes every marked block. Backend CI and docs CI run that script and fail when the committed blocks are not the rewrite.
 
 `Message` in `src/argus/api/schemas.py` owns the saved-message wire object. The OpenAPI component `Message` in `docs/api/openapi.yaml` is the FastAPI schema of that model, published on `PaginatedMessages`. `ApiMessage` in `web/lib/argus-api.ts` repeats the same fields for fetches.
 
@@ -40,10 +40,9 @@ Persisted writers under `src/argus/api` set `role` to `user` or `assistant`. The
 
 The OpenAPI 200 response for `POST /api/v1/chat/stream` is `type: string`. It does not list frames.
 
-Emitted `type` values:
+JSON `type` strings on `sse_data` payloads:
 
 <!-- frame-types -->
-- `done`
 - `error`
 - `final`
 - `stage_outcome`
