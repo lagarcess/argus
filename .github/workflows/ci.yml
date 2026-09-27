@@ -79,9 +79,18 @@ jobs:
       - name: Install backend dependencies
         run: poetry install --with dev --no-interaction
 
+      - name: Check changed documentation links
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: poetry run python scripts/check_docs_links.py --base "$PR_BASE_SHA"
+
       - name: Run docs-reading backend tests
         run: |
-          mapfile -t docs_tests < <(.github/docs-reading-tests.sh)
+          selection="$(.github/docs-reading-tests.sh)"
+          docs_tests=()
+          while IFS= read -r path; do
+            [ -z "$path" ] || docs_tests+=("$path")
+          done <<< "$selection"
           if [ "${#docs_tests[@]}" -eq 0 ]; then
             echo "docs-reading test selector returned no files."
             exit 1
@@ -298,6 +307,10 @@ jobs:
               exit 1
             fi
           }
+          case "${DOCS_ONLY:-}" in
+            true|false) ;;
+            *) echo "Invalid DOCS_ONLY: expected true or false."; exit 1 ;;
+          esac
           require_success docs-change-gate "$DOCS_CHANGE_GATE"
           require_success ownership-gate "$OWNERSHIP_GATE"
           if [ "$DOCS_ONLY" = true ]; then

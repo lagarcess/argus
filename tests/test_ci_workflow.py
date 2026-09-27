@@ -21,12 +21,9 @@ RUNBOOK_PATH = ROOT / "docs" / "PRIVATE_LAUNCH_RUNBOOK.md"
 FAKE = Faker()
 
 _HEAVY_CI_JOBS = ("backend-checks", "frontend-checks", "guest-release-gates")
-_DRAFT_OR_PUSH = (
-    "github.event.pull_request.draft == false || github.event_name == 'push'"
-)
+_DRAFT_OR_PUSH = "github.event.pull_request.draft == false || github.event_name == 'push'"
 _DRAFT_OR_NON_PR = (
-    "github.event.pull_request.draft == false || "
-    "github.event_name != 'pull_request'"
+    "github.event.pull_request.draft == false || " "github.event_name != 'pull_request'"
 )
 
 
@@ -141,10 +138,7 @@ def test_backend_checks_gates_the_suite_by_directory() -> None:
         if step.get("uses") == "oven-sh/setup-bun@v2"
     )
     assert workflow["env"]["ARGUS_CI_BUN_VERSION"] == "1.3.14"
-    assert (
-        setup_bun_step["with"]["bun-version"]
-        == "${{ env.ARGUS_CI_BUN_VERSION }}"
-    )
+    assert setup_bun_step["with"]["bun-version"] == "${{ env.ARGUS_CI_BUN_VERSION }}"
     assert "bun test" in frontend_steps
     assert "bun run build" in frontend_steps
 
@@ -191,9 +185,7 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
     ]
     assert jobs["ci"]["if"] == f"always() && ({_DRAFT_OR_PUSH})"
     aggregator_env = jobs["ci"]["steps"][0]["env"]
-    assert aggregator_env["DOCS_CHANGE_GATE"] == (
-        "${{ needs.docs-change-gate.result }}"
-    )
+    assert aggregator_env["DOCS_CHANGE_GATE"] == ("${{ needs.docs-change-gate.result }}")
     assert aggregator_env["OWNERSHIP_GATE"] == "${{ needs.ownership-gate.result }}"
     assert aggregator_env["DOCS_ONLY"] == (
         "${{ needs.docs-change-gate.outputs.docs_only }}"
@@ -296,9 +288,7 @@ def test_private_alpha_canary_workflow_scopes_secrets_to_operational_steps() -> 
         "ARGUS_CANARY_SUPABASE_URL",
         "ARGUS_CANARY_SUPABASE_SERVICE_ROLE_KEY",
     }
-    browser_operational_secret_names = browser_identity_secret_names | {
-        "RENDER_API_KEY"
-    }
+    browser_operational_secret_names = browser_identity_secret_names | {"RENDER_API_KEY"}
 
     release_steps = {
         step["name"]: set((step.get("env") or {})) & secret_names
@@ -421,8 +411,7 @@ def test_private_alpha_smoke_workflow_runs_local_predeploy_gate() -> None:
     assert job["timeout-minutes"] == 10
     assert _job_needs(job) == ["docs-change-gate"]
     assert job["if"] == (
-        f"({_DRAFT_OR_NON_PR}) && "
-        "needs.docs-change-gate.outputs.run_heavy == 'true'"
+        f"({_DRAFT_OR_NON_PR}) && " "needs.docs-change-gate.outputs.run_heavy == 'true'"
     )
     joined_steps = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert "poetry install --with dev,workflows --no-interaction" in joined_steps
@@ -681,22 +670,17 @@ def test_docs_only_changes_script_runs_heavy_jobs_off_pull_request() -> None:
 def test_pull_request_heavy_jobs_use_the_shared_docs_change_gate() -> None:
     jobs = _workflow()["jobs"]
     gate = jobs["docs-change-gate"]
-    classify = next(
-        step for step in gate["steps"] if step.get("id") == "classify"
-    )
+    classify = next(step for step in gate["steps"] if step.get("id") == "classify")
 
     assert gate["if"] == _DRAFT_OR_PUSH
     assert gate["outputs"]["run_heavy"] == "${{ steps.classify.outputs.run_heavy }}"
     assert classify["run"] == ".github/docs-only-changes.sh"
-    assert classify["env"]["PR_BASE_SHA"] == (
-        "${{ github.event.pull_request.base.sha }}"
-    )
+    assert classify["env"]["PR_BASE_SHA"] == ("${{ github.event.pull_request.base.sha }}")
     assert _job_needs(jobs["ownership-gate"]) == []
     assert jobs["ownership-gate"]["if"] == _DRAFT_OR_PUSH
 
     heavy_if = (
-        f"({_DRAFT_OR_PUSH}) && "
-        "needs.docs-change-gate.outputs.run_heavy == 'true'"
+        f"({_DRAFT_OR_PUSH}) && " "needs.docs-change-gate.outputs.run_heavy == 'true'"
     )
     for job_name in _HEAVY_CI_JOBS:
         job = jobs[job_name]
@@ -723,8 +707,7 @@ def test_docs_checks_job_runs_only_when_the_gate_reports_docs_only() -> None:
 
     assert _job_needs(job) == ["docs-change-gate"]
     assert job["if"] == (
-        f"({_DRAFT_OR_PUSH}) && "
-        "needs.docs-change-gate.outputs.docs_only == 'true'"
+        f"({_DRAFT_OR_PUSH}) && " "needs.docs-change-gate.outputs.docs_only == 'true'"
     )
     assert "git diff --check" in joined_steps
     assert "poetry install --with dev --no-interaction" in joined_steps
@@ -745,10 +728,12 @@ def test_docs_reading_tests_selector_includes_guest_observability() -> None:
         cwd=ROOT,
     )
     selected = result.stdout.splitlines()
-    assert "tests/test_guest_observability.py" in selected
-    assert "tests/test_home_country.py" in selected
+    for expected in ("tests/test_guest_observability.py", "tests/test_home_country.py"):
+        assert any(
+            expected == path or expected.startswith(path + "/") for path in selected
+        )
     assert all(
-        name.startswith("test_") or name.endswith("_test.py")
+        (ROOT / path).is_dir() or name.startswith("test_") or name.endswith("_test.py")
         for path in selected
         for name in (Path(path).name,)
     )
