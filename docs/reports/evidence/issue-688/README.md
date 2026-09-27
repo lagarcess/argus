@@ -3,9 +3,9 @@
 ## Scope and provenance
 
 Captured with Chromium and the committed provider-free Playwright fixture at
-`2544aaf22fd90ea8b124454f98481168b9ff5c92` on 2026-09-27 UTC.
+`91de56421505a89a51e9b5ddcc41cdfcdf9c9cf3` on 2026-09-27 UTC.
 Original integration baseline: `ab9143c18740c28f582646d405445c01c4c8aff4`.
-The account implementation includes the post-claim recovery fix `b8cb5051`; the image implementation is `b54f8564`.
+The account implementation includes the post-claim completion fix `ef1b6901`; the image implementation is `b54f8564`.
 The final expired-view styling is `222037e3`; canonical research hydration is
 asserted by the browser fixture at `dec393c4`.
 The evidence commit adds screenshots and this report, with no runtime changes.
@@ -46,15 +46,24 @@ claim succeeded, then the actual `GET /conversations?...` Recents refresh return
 conversation with the account-change/reload screen. The expected login error
 modal was absent. This was a confirmed browser failure, not a speculative case.
 
-At `b8cb5051`, successful and failed Recents refresh cases both pass. The failure
-stays visible in the existing login modal; dismissing it preserves the claimed
-conversation and destination identity. No message sends automatically. One
-subsequent deliberate message uses the destination token. The fixture keeps the
-Recents outage active throughout this check.
+The first repair retained the destination identity but left the sign-in modal
+open after consuming the handoff. At `90b0b7be`, a stronger browser regression
+confirmed that the modal failed to close automatically after Recents returned
+503. The fixture now makes the claim single-use and counts handoff/login calls,
+so a second authentication cannot accidentally repair the fixture state.
+[Historical error-modal capture](baseline-post-claim-recents-error.png) was taken
+at `2544aaf2`; it is **obsolete baseline evidence**, not final behavior.
+
+At `ef1b6901`, both successful and failed Recents refresh cases close the modal
+automatically after the canonical claim completes. The claimed conversation and
+destination identity remain available; no message sends automatically. One
+subsequent deliberate message uses the destination token. Each case performs
+exactly one handoff and one login. The fixture keeps the Recents outage active
+throughout the failure case.
 
 ## Browser acceptance
 
-All 15 Chromium cases pass in 33.0 seconds. Screenshots contain synthetic fixture data only.
+All 15 Chromium cases pass in 55.4 seconds. Screenshots contain synthetic fixture data only.
 
 Run from `web/`:
 
@@ -83,7 +92,7 @@ isolated in `.next-688`. Both servers stop with the test runner.
 | Same-user token refresh | Draft retained and one stream uses refreshed A token |
 | Same-user 404 recovery | Exactly original stream, replacement create, resend; all as A. [Screenshot](same-user-404-recovery.png) |
 | Explicit guest claim | Existing login modal, verified synthetic claim, actual browser `setSession`, retained conversation; no automatic send, deliberate follow-up uses destination identity. [Screenshot](guest-claim.png) |
-| Guest claim followed by Recents failure | Existing error remains visible, dismissal retains claimed conversation, zero implicit sends and one deliberate destination-account send. [Error dialog](guest-claim-recents-error.png), [Retained view](guest-claim-recents-failure.png) |
+| Guest claim followed by Recents failure | Modal closes automatically, one handoff/login completes, claimed conversation remains available, zero implicit sends and one deliberate destination-account send. [Retained view](guest-claim-recents-failure.png) |
 | Cold guest first send | Bootstrap establishes guest identity; exactly one stream is sent with that identity. [Screenshot](cold-guest-first-send.png) |
 
 The pending-stream fixture holds the HTTP response; it verifies request
