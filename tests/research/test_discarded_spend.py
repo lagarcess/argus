@@ -329,7 +329,7 @@ def test_a_parser_failure_tells_the_operator_and_not_the_reader() -> None:
 
 def test_the_operator_log_names_the_line_that_failed() -> None:
     """Codex round 4: the log has to be able to locate a parser regression,
-    so prove the traceback reaches a sink rather than asserting it."""
+    so prove its safe origin reaches a sink without attaching exception text."""
     from argus.domain.research.contracts import ResearchUnavailableError
     from argus.domain.research.perplexity_agent import _packet_from_response
     from loguru import logger
