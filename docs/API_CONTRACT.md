@@ -4213,10 +4213,8 @@ a comparison whose assets the user has all named becomes grounded
 cross-company research, and discovery's asset-finding runs as the rail's
 `find` operation. One Perplexity provider layer (`research.search` for the
 direct Search API, `research.perplexity_agent` for the Agent API), one
-shared cache under the section 7 per-data-class TTL table (seven classes,
-from seconds-fresh quotes and minutes-fresh movers through days-fresh
-estimates, months-stable peers and constituents, quarterly fundamentals,
-and the two effectively immutable rows), one meter: find turns record
+shared public-discovery packet cache with the existing minutes-fresh movers
+TTL, one meter: find turns record
 capability-classed ledger rows (`peer_expansion` with anchors, `screening`
 for categories) and their source-backed searches are gated by the shared
 research ceiling instead of the separate discovery allowance. The discovery
@@ -4363,11 +4361,10 @@ Contract rules:
   discarded, a claim withheld for want of a public publisher, and a response
   billed and then rejected as unreadable all reach the cost ledger at what
   they cost; only a turn that reached no provider reports zero and
-  `cache_status: "bypass"`. A cache hit is the one turn whose `usage`
-  describes something other than its own work: it serves a stored record and
-  republishes that record's invocations, latency and cost as provenance, and
-  because it spent nothing, its ledger row carries `billable_quantity: 0` with
-  no cost and no latency. The retrieval is charged once, on the miss that
+  `cache_status: "bypass"`. An eligible discovery cache hit reports zero
+  invocations, the stored packet's latency, and no new cost. Because it spent
+  nothing, its ledger row carries `billable_quantity: 0` with no cost and no
+  latency. The retrieval is charged once, on the miss that
   stored it. A completed thorough run whose answer cannot be
   read posts no sidecar to a reader, so its spend is recorded on the ledger
   directly. None of this is reader-facing: `usage` is server-side evidence,
@@ -4460,7 +4457,7 @@ Contract rules:
 - Section 2's five shapes are one rail. Market pulse ("what's moving
   today"), screening ("semiconductor stocks under a 20 P/E"), and sector
   radar ("what's happening in cybersecurity") use the balanced tier and
-  cache as `movers`. Screening
+  the `movers` retrieval recency policy, without shared answer caching. Screening
   carries every stated condition into the provider call and the answer names
   which condition each asset satisfies; a screen that silently drops the
   user's threshold is a defect, not a simplification. Sector radar answers
@@ -4542,8 +4539,8 @@ Contract rules:
   `research_unavailable_malformed_response`, is never cached, and a
   completed background run carrying one fails its job. Genuine prose under a
   typed request is delivered and recorded as prose.
-- **A withheld survey keeps its retrieval record and is cached like an
-  answer.** The withholding left is the survey's own, unchanged from before
+- **A withheld survey keeps its retrieval record on its own turn.** It is not
+  shared with later requests. The withholding is the survey's own, unchanged from before
   the typed contract, and the same no-retrieval rule for every other answer:
   `survey_synthesis_incomplete` when the survey retrieved but its prose names
   no asset the resolver verifies, `survey_not_grounded` when a survey never
@@ -4551,9 +4548,8 @@ Contract rules:
   retrieved, and `scenario_inputs_uncited` when a computed scenario
   (decision 10, `research_query.scenario_question`) retrieved but no input
   row cites a public page, on the inline and the background path alike; the
-  scenario contract is also part of the research cache identity, so a packet
-  answered under the ordinary retrieval contract never serves a scenario
-  question. Whatever withholds the
+  scenario and ordinary answers both bypass shared storage because their
+  requests contain unrestricted text. Whatever withholds the
   prose, the turn's `sources` are the pages the response actually retrieved,
   selected exactly as for a published answer (period-plausible, one page per
   publisher, retrieval order, at most five): no ranking, no content check,
@@ -4568,19 +4564,29 @@ Contract rules:
   Clients render a degraded turn's sources as where Argus looked, never as
   the sources of an answer: the same drawer, framed by the typed
   `degraded.code`, so a page that yielded no figure is never presented as
-  having informed one. A withheld packet that carries a retrieval record is
-  stored in the shared cache under the same key as a published one, for its
-  data class TTL capped at one day (`WITHHELD_TTL_SECONDS`): whether a figure
-  is published somewhere changes on the scale of days, not minutes, so an
-  identical question inside that window is answered from the record with
-  `cache_status: "hit"`, the same withheld note and sources, and no provider
-  spend or capacity claim. A packet without a retrieval record is never
-  stored, published or withheld, because a model that did not look is
-  evidence about the model and not about the world and the shared cache
-  holds provider packets about public markets, never one turn's prose for
-  every other user; a malformed or unavailable response has no packet to
-  store; and a packet withheld for want of a required public source is not
-  stored.
+  having informed one.
+- **Shared-cache eligibility precedes identity (#689).** Grounded inline and
+  thorough answers contain unrestricted request text and may echo private
+  amounts, criteria, or context. They are never read from or written to shared
+  storage, even when requests match or cite public pages. Hashing those inputs
+  would not make them public. Already-queued jobs carrying an older `cache_key`
+  cannot write shared entries when they complete.
+  Discovery retains reuse only for category-free, anchor-based searches whose
+  symbols already have successful `provider_catalog` resolution provenance in
+  runtime state, matching the search asset class. Missing or client-only
+  provenance bypasses storage without additional resolver calls. Only the
+  public search packet is shared; extraction and answer voicing remain per turn.
+  This eligibility applies to the direct Perplexity Search API. Model-backed
+  search adapters remain uncached because their model/configuration needs a
+  separate complete identity contract.
+  One adapter derives both lookup and write from the exact provider search
+  query, provider ID, result limit, and `public-discovery-packet/v2` contract.
+  The query builder owns normalization; the key does not lowercase prose, sort
+  anchors, or erase punctuation. Legacy keys are incompatible. Cache expiry
+  and bounded process-local eviction remain unchanged; no hosted purge occurs.
+  Usage retains its existing accounting vocabulary: uncached provider work is
+  `cache_status: "miss"`, cached public discovery is `"hit"`, and an unpaid
+  path may report `"bypass"`. Storage ineligibility does not erase provider cost.
 - **Retrieval parameters are configuration per question shape.** Each call
   sends a model fallback chain (`models`, the primary and the other priced
   model, served in order; the invoice names the model that served), the
@@ -4597,8 +4603,8 @@ Contract rules:
   lives; a user without a country gets no such line. A thorough job's typed
   request carries the country and currency, so the job sends the location and
   line of the user who asked, and so does a refresh of a computed answer.
-  The research cache key includes that country, so a search made for one
-  country's readers never answers another's. No domain filter is sent.
+  Each grounded request runs independently, preserving its country and
+  currency without sharing its answer. No domain filter is sent.
 - Current external facts ("why is NVDA moving this week") are claim-shaped:
   they ground through the balanced shape with publisher sources required and
   a one-week recency filter, and persist the ordinary `research` sidecar with
@@ -4663,10 +4669,9 @@ Contract rules:
   retry) returns the existing job whatever its status, with no second
   provider run. `operation_scope` rides every serialized job surface,
   including the polling payload; absent means an ordinary backtest.
-- Thorough answers join the shared research cache like every other shape:
-  the finalized packet is stored under the requesting turn's key, a withheld
-  one under the capped TTL above, and an identical question within the TTL
-  answers inline with `cache_status: "hit"`, no job, and no provider spend.
+- Thorough answers remain owner-scoped job results. A later identical question
+  creates its own request through the existing admission and job lifecycle;
+  shared-cache eligibility never replaces the job's existing idempotency rule.
 - Runnable rows name assets in one vocabulary: a short display name derived
   from the resolver's own name (listing boilerplate like "Common Stock" or
   "Inc." stripped, share classes kept) plus the resolver-verified ticker.
