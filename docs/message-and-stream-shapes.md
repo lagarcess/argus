@@ -17,7 +17,16 @@ Chat stream frames are the objects `sse_data` sends. `parseChatStreamFrame` in `
 | `created_at` | yes |
 | `metadata` | no |
 
-`role` is `user`, `assistant`, `system`, or `tool`. `created_at` is a date-time. `metadata` is an object or null. The model types it as `dict[str, Any] | None`, and the OpenAPI property allows any additional properties. The model does not name keys inside `metadata`.
+`role` is the `MessageRole` literal.
+
+<!-- message-roles -->
+- `user`
+- `assistant`
+- `system`
+- `tool`
+<!-- /message-roles -->
+
+`created_at` is a date-time. `metadata` is an object or null. The model types it as `dict[str, Any] | None`, and the OpenAPI property allows any additional properties. The model does not name keys inside `metadata`.
 
 Persisted writers under `src/argus/api` set `role` to `user` or `assistant`. The model still accepts `system` and `tool`.
 
@@ -31,15 +40,41 @@ The emitters do not send a frame whose `type` is `title`.
 
 ### `stage_start`
 
-`type` and `stage` are always present. `stage` is a string. Emitters pass these strings today.
+`type` and `stage` are always present. `stage` is a string. The list is every `WorkflowNode` value, every `emit_substage` stage argument, and every string `stage` on a `stage_start` or tool-progress frame.
 
-- Workflow nodes from `WorkflowNode` in `src/argus/agent_runtime/workflow_contract.py` are `interpret`, `clarify`, `confirm`, `execute`, `explain`, and `next_step`.
-- `emit_substage` sends `discovery_search` and `discovery_verify`.
-- `emit_tool_progress` sends `execute` with `tool_progress`.
+<!-- stage-values -->
+- `clarify`
+- `confirm`
+- `discovery_search`
+- `discovery_verify`
+- `execute`
+- `explain`
+- `interpret`
+- `next_step`
+- `research_search`
+<!-- /stage-values -->
 
-`detail` is present only when `emit_substage` is called with a non-empty detail. `discovery_search` passes one. `discovery_verify` does not.
+`detail` is sent only when `emit_substage` is called with a detail argument and that argument is non-empty. These calls pass a detail argument.
 
-`tool_progress` is a `ToolProgress` dump from `src/argus/domain/tool_contracts.py`. Its fields are `locale_key`, `interpolation_args`, `call_id`, and `tool_name`. Values in `interpolation_args` are bool, int, float, str, or null.
+<!-- substage-detail -->
+- `discovery_search`
+- `research_search`
+<!-- /substage-detail -->
+
+These calls do not.
+
+<!-- substage-no-detail -->
+- `discovery_verify`
+<!-- /substage-no-detail -->
+
+`tool_progress` is a `ToolProgress` dump from `src/argus/domain/tool_contracts.py`, including the `LocalizedText` fields. `interpolation_args` values are `ToolScalar`.
+
+<!-- tool-progress-fields -->
+- `locale_key`
+- `interpolation_args`
+- `call_id`
+- `tool_name`
+<!-- /tool-progress-fields -->
 
 The frame does not reject other `stage` strings.
 
@@ -49,7 +84,22 @@ The frame does not reject other `stage` strings.
 
 ### `stage_outcome`
 
-`type` and `outcome`. `outcome` is a string. `StageOutcome` in `src/argus/agent_runtime/stages/interpret_types.py` names the graph literals `needs_clarification`, `ready_for_confirmation`, `await_user_reply`, `await_approval`, `approved_for_execution`, `execution_succeeded`, `execution_failed_recoverably`, `execution_failed_terminally`, `ready_to_respond`, and `end_run`. The frame does not validate `outcome` against that literal.
+`type` and `outcome`. `outcome` is a string. `StageOutcome` in `src/argus/agent_runtime/stages/interpret_types.py` names these graph literals.
+
+<!-- stage-outcomes -->
+- `needs_clarification`
+- `ready_for_confirmation`
+- `await_user_reply`
+- `await_approval`
+- `approved_for_execution`
+- `execution_succeeded`
+- `execution_failed_recoverably`
+- `execution_failed_terminally`
+- `ready_to_respond`
+- `end_run`
+<!-- /stage-outcomes -->
+
+The frame does not validate `outcome` against that literal.
 
 ### `final`
 
@@ -57,13 +107,57 @@ The frame does not reject other `stage` strings.
 
 Four call sites send a closed literal.
 
-A missing confirmation checkpoint in `src/argus/api/routers/agent.py` sends `stage_outcome`, `assistant_response`, `message_id`, and `recovery` when recovery is present.
+A missing confirmation checkpoint in `src/argus/api/routers/agent.py` sends these payload keys. `recovery` comes from the spread, and only when recovery is present.
 
-`complete_retest_turn` sends `stage_outcome`, `message_id`, `confirmation`, `confirmation_payload`, `active_confirmation_reference`, `artifact_references`, and `retest_receipt`. `public_confirmation_projection` removes `canonical_launch_payload_hash` at every level.
+<!-- checkpoint-final-keys -->
+- `stage_outcome`
+- `assistant_response`
+- `message_id`
+- `recovery`
+<!-- /checkpoint-final-keys -->
 
-`failed_retest_turn` sends `stage_outcome`, `assistant_response`, `message_id`, `recovery`, and `retest_receipt`. When the saved retry is a dict, it also sends `retry_last_turn` with only the keys `message` and `action`.
+`complete_retest_turn` sends these payload keys. `public_confirmation_projection` removes `canonical_launch_payload_hash` at every level.
 
-Confirmation cancellation, both the replay frame and `complete_confirmation_cancellation`, sends `stage_outcome`, `assistant_response`, `message_id`, and `confirmation_cancelled`. `confirmation_cancelled` has `confirmation_id`.
+<!-- retest-final-keys -->
+- `stage_outcome`
+- `message_id`
+- `confirmation`
+- `confirmation_payload`
+- `active_confirmation_reference`
+- `artifact_references`
+- `retest_receipt`
+<!-- /retest-final-keys -->
+
+`failed_retest_turn` sends these payload keys. `retry_last_turn` is assigned only when the saved retry is a dict, and that object keeps these keys.
+
+<!-- retest-failure-keys -->
+- `stage_outcome`
+- `assistant_response`
+- `message_id`
+- `recovery`
+- `retest_receipt`
+- `retry_last_turn`
+<!-- /retest-failure-keys -->
+
+<!-- retest-retry-keys -->
+- `message`
+- `action`
+<!-- /retest-retry-keys -->
+
+Confirmation cancellation sends the same payload keys from the replay frame and from `complete_confirmation_cancellation`.
+
+<!-- cancel-final-keys -->
+- `stage_outcome`
+- `assistant_response`
+- `message_id`
+- `confirmation_cancelled`
+<!-- /cancel-final-keys -->
+
+`confirmation_cancelled` has these keys in both producers.
+
+<!-- cancel-id-keys -->
+- `confirmation_id`
+<!-- /cancel-id-keys -->
 
 The graph turn does not use a closed payload. `agent.py` copies the runtime final, sets `message_id`, and passes the dict through `reader_chat_result`. That function drops private prose keys and sets `artifact_presentation_kind`. Other keys are whatever the runtime result still holds. This file does not close that object.
 
