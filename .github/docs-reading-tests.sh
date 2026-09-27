@@ -1,33 +1,32 @@
 #!/bin/bash
-# Print pytest-collectable files under tests/ that reference docs/.
-# Matches both "docs/..." strings and Path("docs") / 'docs' components so a
-# new doc-reading test joins without editing the workflow.
-
+# Select documentation readers. Helpers select their folder; pytest owns its
+# recursive collection rules and never receives a helper as an explicit test.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-is_collectable() {
-  local name
-  name="$(basename "$1")"
-  case "$name" in
-    test_*.py|*_test.py) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
 list_matches() {
+  local status=0
   if command -v rg >/dev/null 2>&1; then
-    rg -l --glob 'test_*.py' --glob '*_test.py' -e 'docs/' -e "['\"]docs['\"]" tests
-    return
+    rg -l --glob '*.py' -e 'docs/' -e "['\"]docs['\"]" tests || status=$?
+  else
+    git grep -l -e 'docs/' -e '"docs"' -e "'docs'" -- 'tests/*.py' || status=$?
   fi
-  git grep -l -e 'docs/' -e '"docs"' -e "'docs'" -- tests
+  # Search tools use 1 for no matches, and >1 for an actual failure.
+  if [ "$status" -gt 1 ]; then
+    return "$status"
+  fi
 }
 
+# Command substitution preserves the exit status, unlike process substitution.
+matches="$(list_matches)"
 while IFS= read -r path; do
   [ -n "$path" ] || continue
-  if is_collectable "$path"; then
-    printf '%s\n' "$path"
-  fi
-done < <(list_matches | sort -u)
+  case "${path##*/}" in
+    test_*.py|*_test.py) printf '%s\n' "$path" ;;
+    *) dirname "$path" ;;
+  esac
+done <<< "$matches" | sort -u | awk '
+  !parent || index($0, parent "/") != 1 { print; parent = $0 }
+'

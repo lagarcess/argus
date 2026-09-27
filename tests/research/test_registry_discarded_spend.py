@@ -122,7 +122,7 @@ async def test_billed_parser_failure_is_an_unavailable_call_with_retained_spend(
 
 
 @pytest.mark.asyncio()
-async def test_registered_retry_bills_the_turn_and_caches_only_the_served_packet(
+async def test_registered_retry_bills_each_turn_for_its_own_responses(
     monkeypatch, ledger, stepping_clock
 ) -> None:
     publisher = "https://ir.netflix.net/financials/quarterly-earnings/"
@@ -132,23 +132,34 @@ async def test_registered_retry_bills_the_turn_and_caches_only_the_served_packet
         tickers=[row["symbol"]],
         sources=[publisher],
     )
-    transport = wire_grounded_client(monkeypatch, [_provider_only_document(), published])
+    transport = wire_grounded_client(
+        monkeypatch, [_provider_only_document(), published, published]
+    )
 
     paid = await _execute(_call())
-    cached = await _execute(_call())
+    repeated = await _execute(_call())
 
-    assert len(transport.requests) == 2
+    assert len(transport.requests) == 3
     cards = [
         ToolResultCard.model_validate(
             result.stage_patch["final_response_payload"]["tool_result_cards"][0]
         )
-        for result in (paid, cached)
+        for result in (paid, repeated)
     ]
     assert all(card.outcome.status == "succeeded" for card in cards)
     assert all(card.presentation.answer.value == row["value"] for card in cards)
-    assert cards[0].outcome.result == cards[1].outcome.result
+    # Fresh retrieval timestamps belong to each response; answer facts agree.
+    answer_facts = [
+        {
+            key: value
+            for key, value in card.outcome.result.items()
+            if key != "retrieved_at"
+        }
+        for card in cards
+    ]
+    assert answer_facts[0] == answer_facts[1]
     paid_usage = paid.stage_patch["tool_effects"][0]["stage_patch"]["research"]["usage"]
-    cached_usage = cached.stage_patch["tool_effects"][0]["stage_patch"]["research"][
+    repeated_usage = repeated.stage_patch["tool_effects"][0]["stage_patch"]["research"][
         "usage"
     ]
     assert paid_usage == {
@@ -157,20 +168,20 @@ async def test_registered_retry_bills_the_turn_and_caches_only_the_served_packet
         "cost_usd": pytest.approx(2 * ONE_RESPONSE_USD),
         "cache_status": "miss",
     }
-    assert cached_usage == {
+    assert repeated_usage == {
         "invocations": 1,
         "latency_ms": CALL_LATENCY_MS,
         "cost_usd": pytest.approx(ONE_RESPONSE_USD),
-        "cache_status": "hit",
+        "cache_status": "miss",
     }
     paid_entry = _settle_registered(paid, ledger)
-    _settle_registered(cached, ledger)
+    _settle_registered(repeated, ledger)
     assert len(ledger.entries) == 2
     assert paid_entry["cost_amount"] == pytest.approx(2 * ONE_RESPONSE_USD)
     assert paid_entry["billable_quantity"] == 1
-    assert ledger.entries[1]["billable_quantity"] == 0
-    assert ledger.entries[1]["cost_amount"] is None
-    assert ledger.entries[1]["cost_source"] == "unavailable"
+    assert ledger.entries[1]["billable_quantity"] == 1
+    assert ledger.entries[1]["cost_amount"] == pytest.approx(ONE_RESPONSE_USD)
+    assert ledger.entries[1]["cost_source"] == "provider_reported"
 
 
 @pytest.mark.asyncio()

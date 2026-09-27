@@ -65,7 +65,7 @@ type UseGuestExperienceInput = {
   conversationId: string | null;
   messages: Message[];
   sendRef: MutableRefObject<GuestResumeSend | null>;
-  refreshAccount: () => Promise<UserResponse | null>;
+  refreshAccount: (expectedUserId?: string) => Promise<UserResponse | null>;
   refreshHistory: () => void;
   refreshHistoryForActivity: () => Promise<unknown>;
   closeTransientSidebar: () => void;
@@ -75,6 +75,8 @@ type UseGuestExperienceInput = {
   onRequestPendingGuestSignIn: () => void;
   onAdoptConversation: (conversationId: string) => void;
   onGuestBootstrapExpired: (publicAccountAccessEnabled: boolean) => void;
+  onAuthenticationStart: () => void;
+  onAuthenticationComplete: (userId: string | null) => void;
   onGuestBootstrapError: (error?: unknown) => void;
   onGateError: () => void;
   onStartOverError: () => void;
@@ -105,6 +107,8 @@ export function useGuestExperience({
   onAdoptConversation,
   onGuestBootstrapExpired,
   onGuestBootstrapError,
+  onAuthenticationStart,
+  onAuthenticationComplete,
   onGateError,
   onStartOverError,
   omnisearchShortcutEnabled,
@@ -161,6 +165,8 @@ export function useGuestExperience({
     refreshAccount,
     refreshHistory: refreshHistoryForActivity,
     onResume: resumeGuestAction,
+    onAuthenticationStart,
+    onAuthenticationComplete,
   });
 
   const shell = useGuestShellActions({
