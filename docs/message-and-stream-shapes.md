@@ -2,12 +2,15 @@
 
 This file records shapes that already exist in the repo. It does not add fields.
 
+`scripts/publish_message_stream_shapes.py` reads the producers named below and writes every marked block. That script is the only writer of those blocks. Run it after a producer change.
+
 `Message` in `src/argus/api/schemas.py` owns the saved-message wire object. The OpenAPI component `Message` in `docs/api/openapi.yaml` is the FastAPI schema of that model, published on `PaginatedMessages`. `ApiMessage` in `web/lib/argus-api.ts` repeats the same fields for fetches.
 
 Chat stream frames are the objects `sse_data` sends. `parseChatStreamFrame` in `web/lib/argus-api.ts` turns those frames into `ChatStreamEvent`. `Message` in `web/components/chat/types.ts` is the UI row. Hydration builds it from a saved message or from a parsed final.
 
 ## Saved message fields
 
+<!-- message-fields -->
 | Field | Required |
 | --- | --- |
 | `id` | yes |
@@ -16,6 +19,7 @@ Chat stream frames are the objects `sse_data` sends. `parseChatStreamFrame` in `
 | `content` | yes |
 | `created_at` | yes |
 | `metadata` | no |
+<!-- /message-fields -->
 
 `role` is the `MessageRole` literal.
 
@@ -35,6 +39,17 @@ Persisted writers under `src/argus/api` set `role` to `user` or `assistant`. The
 `sse_data` in `src/argus/api/chat/streaming.py` writes `data: {json}\n\n`. `sse_done` writes `data: [DONE]\n\n`. `sse_keepalive` writes `: keepalive\n\n`. A keepalive has no `data:` line, so the parser ignores it.
 
 The OpenAPI 200 response for `POST /api/v1/chat/stream` is `type: string`. It does not list frames.
+
+Emitted `type` values:
+
+<!-- frame-types -->
+- `done`
+- `error`
+- `final`
+- `stage_outcome`
+- `stage_start`
+- `token`
+<!-- /frame-types -->
 
 The emitters do not send a frame whose `type` is `title`.
 
@@ -144,7 +159,7 @@ A missing confirmation checkpoint in `src/argus/api/routers/agent.py` sends thes
 - `action`
 <!-- /retest-retry-keys -->
 
-Confirmation cancellation sends the same payload keys from the replay frame and from `complete_confirmation_cancellation`.
+Confirmation cancellation sends these payload keys. The script reads the replay payload and writes the block when `complete_confirmation_cancellation` returns the same keys.
 
 <!-- cancel-final-keys -->
 - `stage_outcome`
@@ -153,7 +168,7 @@ Confirmation cancellation sends the same payload keys from the replay frame and 
 - `confirmation_cancelled`
 <!-- /cancel-final-keys -->
 
-`confirmation_cancelled` has these keys in both producers.
+`confirmation_cancelled` has these keys. The script writes the block when the replay literal and the assignment in `complete_confirmation_cancellation` use the same keys.
 
 <!-- cancel-id-keys -->
 - `confirmation_id`
