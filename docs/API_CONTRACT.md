@@ -1118,6 +1118,8 @@ produces `unavailable`, never a saved-prose fallback.
 - `system`
 - `tool`
 
+Saved-message fields and stream frame fields are recorded in [Message and stream shapes](message-and-stream-shapes.md). `Message` in `src/argus/api/schemas.py` owns the saved object. The OpenAPI component `Message` is generated from that model. The metadata keys below are not fields of the model.
+
 Message `metadata` may include structured continuity artifacts. Assistant
 messages may store `pending_strategy`, `confirmation_card`,
 `confirmation_payload`, `result_card`, `result_run_id`, `latest_run_id`,
@@ -3909,6 +3911,8 @@ If the stream disconnects, the client should reconnect by re-fetching the conver
 
 **Stream Events:**
 
+Frame fields are recorded in [Message and stream shapes](message-and-stream-shapes.md). The examples below describe turn behavior.
+
 All events follow the SSE format: `data: {json}\n\n`.
 
 Events are emitted in this order per turn:
@@ -3946,10 +3950,12 @@ Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `nex
 { "type": "stage_outcome", "outcome": "ready_to_respond" }
 ```
 
-**4. `title`** — AI-generated conversation title (fires once, after first meaningful turn)
+**4. `title`.** Parser-accepted conversation title frame.
 ```json
 { "type": "title", "conversation_id": "uuid", "title": "Tesla Dip Strategy" }
 ```
+
+No `sse_data` call site emits this frame. The parser still accepts it. Conversation titles are saved on the conversation and loaded from the conversation list.
 
 **5. `final`** — last event, carries the complete response payload
 ```json
