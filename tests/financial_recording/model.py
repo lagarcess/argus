@@ -546,6 +546,9 @@ class Store:
             ]
             changes["amount"] = parse_minor(changes["amount"], account.currency)
         body = replace(record.body, **changes)
+        currency = self.book.accounts[record.body.account_id].currency
+        if self.book.accounts[body.account_id].currency != currency:
+            raise InvalidInput("currency_mismatch", body.account_id)
         others = {
             key: value for key, value in self.book.records.items() if key != record_id
         }

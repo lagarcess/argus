@@ -31,13 +31,13 @@ def test_import_flags_malformed_rows_twins_and_reimports():
         "tx-date": {"date_invalid": BLOCKING},
         "tx-number": {"amount_invalid": BLOCKING},
         "tx-missing": {"field_missing": BLOCKING},
-        "tx-household": {},
+        "tx-household": {"field_missing": BLOCKING},
     }
-    assert result["confirmed_in_batch"] == 6
+    assert result["confirmed_in_batch"] == 5
     first = result["after_first_import"]
-    assert first["activity_records"] == 6
+    assert first["activity_records"] == 5
     assert [first["totals"]["DOP"]["spending"], first["totals"]["DOP"]["income"]] == [
-        92_550,
+        22_550,
         120_000,
     ]
     assert result["reimport"] == {
@@ -55,13 +55,13 @@ def test_import_flags_malformed_rows_twins_and_reimports():
             "tx-usd-01",
         ],
         "confirm": "ReviewRequired:already_recorded",
-        "activity_records": 6,
+        "activity_records": 5,
     }
     assert result["overlap_issues"] == {
         "tx-dop-01": {"already_recorded": BLOCKING},
         "overlap-new": {},
     }
-    assert result["after_overlap"] == {"activity_records": 7, "dop_balance": 521_450}
+    assert result["after_overlap"] == {"activity_records": 6, "dop_balance": 591_450}
     dop, usd = result["totals"]["DOP"], result["totals"]["USD"]
-    assert [dop["spending"], dop["income"]] == [98_550, 120_000]
+    assert [dop["spending"], dop["income"]] == [28_550, 120_000]
     assert [usd["spending"], usd["income"]] == [4000, 0]

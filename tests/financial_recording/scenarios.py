@@ -175,7 +175,11 @@ class Scene:
                 "document",
                 {**proposal["source_ref"], "external_id": row["source_id"]},
                 kind=row["kind"],
-                account_id=accounts.get(row["account"], row["account"]),
+                account_id=(
+                    accounts.get(row["account"], row["account"])
+                    if row["destination"] == "personal"
+                    else ""
+                ),
                 amount=row["amount"],
                 currency=row["currency"],
                 occurred_on=row["date"],
@@ -532,6 +536,10 @@ def linked_correction_and_removal() -> dict:
         lambda: scene.store.correct(transfer.id, 2, "late", amount="9.00")
     )
     steps["after_stale"] = balances()
+    dollars = scene.account("Dolares", "savings", "USD", "0.00")
+    steps["moved_to_other_currency"] = outcome(
+        lambda: scene.store.correct(transfer.id, 3, "wrong", account_id=dollars.id)
+    )
     removed = scene.store.remove(transfer.id, 3, "never happened")
     steps["removed"] = balances()
     steps["history"] = [

@@ -191,9 +191,9 @@ class Coverage:
 
 @dataclass(frozen=True)
 class Position:
-    assets: int
-    liabilities: int
-    net: int
+    assets: Optional[int]
+    liabilities: Optional[int]
+    net: Optional[int]
     coverage: Coverage
 
 
@@ -366,9 +366,9 @@ def position(
         )
     return {
         currency: Position(
-            assets=round_half_up(group["assets"]),
-            liabilities=round_half_up(group["liabilities"]),
-            net=round_half_up(group["assets"] + group["liabilities"]),
+            assets=_known_total(group, group["assets"]),
+            liabilities=_known_total(group, group["liabilities"]),
+            net=_known_total(group, group["assets"] + group["liabilities"]),
             coverage=Coverage(
                 accounts_known=tuple(group["known"]),
                 accounts_unknown=tuple(group["unknown"]),
@@ -379,6 +379,11 @@ def position(
         )
         for currency, group in sorted(groups.items())
     }
+
+
+def _known_total(group: dict, value: Fraction) -> Optional[int]:
+    # With no known balance in a currency the total is unknown, never zero.
+    return round_half_up(value) if group["known"] else None
 
 
 def _placed(activity: Activity, anchor: Anchor, tz: ZoneInfo) -> SameDayOrder:

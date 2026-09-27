@@ -8,6 +8,7 @@ def test_both_legs_of_a_transfer_change_and_vanish_together():
         "counter_corrected": [850_000, 0, 150_000],
         "stale_correction": "StaleVersion",
         "after_stale": [850_000, 0, 150_000],
+        "moved_to_other_currency": "InvalidInput:currency_mismatch",
         "removed": [1_000_000, 0, 0],
         "history": [
             [100_000, "acct-3", None, False],

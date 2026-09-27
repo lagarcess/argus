@@ -88,7 +88,7 @@
     },
     "position": {
       "DOP": {
-        "assets": 0,
+        "assets": null,
         "coverage": {
           "accounts_known": [],
           "accounts_unknown": [
@@ -98,8 +98,8 @@
           "oldest_anchor_as_of": null,
           "unexplained_gaps": []
         },
-        "liabilities": 0,
-        "net": 0
+        "liabilities": null,
+        "net": null
       }
     },
     "totals": {
@@ -182,7 +182,7 @@
   },
   "duplicate_import_vs_twins": {
     "after_first_import": {
-      "activity_records": 6,
+      "activity_records": 5,
       "totals": {
         "DOP": {
           "income": 120000,
@@ -191,9 +191,9 @@
           },
           "moved_in_from_outside_scope": 0,
           "moved_out_of_scope": 0,
-          "spending": 92550,
+          "spending": 22550,
           "spending_by_category": {
-            "uncategorized": 92550
+            "uncategorized": 22550
           }
         },
         "USD": {
@@ -209,10 +209,10 @@
       }
     },
     "after_overlap": {
-      "activity_records": 7,
-      "dop_balance": 521450
+      "activity_records": 6,
+      "dop_balance": 591450
     },
-    "confirmed_in_batch": 6,
+    "confirmed_in_batch": 5,
     "first_import_issues": {
       "tx-currency": {
         "currency_unsupported": "blocking"
@@ -229,7 +229,9 @@
       "tx-dop-05": {
         "counter_account_missing": "blocking"
       },
-      "tx-household": {},
+      "tx-household": {
+        "field_missing": "blocking"
+      },
       "tx-missing": {
         "field_missing": "blocking"
       },
@@ -245,7 +247,7 @@
       }
     },
     "reimport": {
-      "activity_records": 6,
+      "activity_records": 5,
       "confirm": "ReviewRequired:already_recorded",
       "rows_already_recorded": [
         "tx-currency",
@@ -269,9 +271,9 @@
         },
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
-        "spending": 98550,
+        "spending": 28550,
         "spending_by_category": {
-          "uncategorized": 98550
+          "uncategorized": 28550
         }
       },
       "USD": {
@@ -453,6 +455,7 @@
         true
       ]
     ],
+    "moved_to_other_currency": "InvalidInput:currency_mismatch",
     "recorded": [
       900000,
       100000,

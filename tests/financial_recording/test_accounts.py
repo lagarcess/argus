@@ -31,7 +31,7 @@ def test_blank_opening_stays_unknown_after_spending():
     assert result["totals"]["DOP"]["spending"] == 85_000
     assert result["totals"]["DOP"]["income"] == 0
     dop = result["position"]["DOP"]
-    assert (dop["assets"], dop["liabilities"], dop["net"]) == (0, 0, 0)
+    assert (dop["assets"], dop["liabilities"], dop["net"]) == (None, None, None)
     assert dop["coverage"]["accounts_known"] == []
     assert dop["coverage"]["accounts_unknown"] == ["acct-1"]
 
