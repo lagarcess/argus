@@ -45,7 +45,7 @@ The rest of this document defines each piece.
 
 **Type changes.** A type change inside the same nature is an ordinary edit. A change that flips nature (checking to credit card) is refused once the account has a record, because it would reverse the meaning of every stored sign. The person archives the account and creates the right one.
 
-**Unknown is not zero.** An account has a known balance only after it has an anchor. With no anchor its balance is `unknown`, and Argus reports the activity recorded since tracking began instead ("−RD$850 recorded since you started tracking"). An unknown balance is excluded from totals and listed in coverage (section 10).
+**Unknown is not zero.** An account has a known balance only after it has an anchor. With no anchor its balance is `unknown`, and Argus reports the activity recorded since tracking began instead ("−RD$850 recorded since you started tracking"). An unknown balance is excluded from totals and listed in coverage (section 11). When no account in a currency has a known balance, that currency's assets, liabilities, and net are themselves unknown, never RD$0.
 
 **Archive.** Archived accounts leave position totals and are listed separately in coverage. Their past activity still counts in historical income and spending, because that money really moved. Whether Argus warns before archiving an account with a non-zero or unknown balance is founder decision F5.
 
@@ -59,7 +59,7 @@ The rest of this document defines each piece.
 
 **Sign convention.** One rule, with no per-type branching: an account balance is its signed value to the owner. Assets are positive when held. Liabilities are negative when owed. A card that owes RD$3,000 has balance −300,000 minor units. An overdrawn checking account is negative. The entry form still asks for the amount owed as a positive number, as the approved sketch does, and converts at the boundary. This avoids the payment ledger's inverted debit/credit convention, which #719 warns would flip balances if copied.
 
-**Rounding.** Stored amounts are exact, so sums of them are exact. The only rounding happens when a total is weighted by ownership share. That total is computed with exact fractions and rounded once, half up, to the currency exponent, at the reader.
+**Rounding.** Stored amounts are exact, so sums of them are exact. The only rounding happens when a total is weighted by ownership share. That total is computed with exact fractions and rounded once, half up, to the currency exponent, at the reader. Assets, liabilities, and net each round once from exact values, so a displayed net can differ from displayed assets minus liabilities by one minor unit. That is the accepted cost of never rounding twice.
 
 **No combination.** Every total is keyed by currency. No function sums two currencies. Cross-currency transfers and converted totals are unresolved (founder decisions F7 and F8). Argus never invents a rate.
 
@@ -97,7 +97,7 @@ Amounts are positive. The kind supplies the sign. Card interest and fees are exp
 - **Balance at time t.** Take the latest anchor with `as_of` at or before t. If none exists, the balance is unknown. Otherwise add every activity effect placed after that anchor and at or before t.
 - **Observation gap.** For each observation, subtract the previous anchor plus the activity between the two from the observed amount. The first anchor on an account has no gap. It establishes the balance. A `value_estimate` gap is labeled `revaluation`. Every other gap is labeled `unexplained`.
 - **Income and spending** for a scope and period, per currency. Spending is expenses minus refunds. Income is income. Transfers and debt payments are excluded. A transfer or payment with exactly one leg inside the scope is reported as `moved_in_from_outside_scope` or `moved_out_of_scope`, never as income or spending. Anchors, gaps, and revaluations never enter income or spending.
-- **Position** for a scope, per currency. It reports assets, liabilities, and net over accounts with a known balance, plus coverage (section 10).
+- **Position** for a scope, per currency. It reports assets, liabilities, and net over accounts with a known balance, plus coverage (section 11).
 
 ### 5.4 Worked example: the observed balance
 
@@ -150,6 +150,8 @@ Issues carry a severity. **Blocking** issues stop confirmation: `amount_precisio
 
 A manual form save is the person's confirmation. MVEE 4.1 forbids an extra AI approval step, so a manual save runs draft, preview, and confirm in one call. A statement batch confirms the selected previews in one all-or-nothing operation. Flagged rows stay drafts and do not hold back the reliable rows (MVEE 4.4).
 
+**A record keeps its currency.** A correction may move a record to another account only in the same currency. Otherwise its integer amount would silently change meaning. The proof refuses the move with `currency_mismatch`.
+
 **Correction instead of reversal.** A correction appends a revision with a reason, and derivations read the latest revision. The payment ledger undoes a payment by posting a linked reversal at a new time. For personal records that would move a corrected September expense into October's spending. A revision keeps the corrected fact at its true date and keeps the full history.
 
 ## 8. Idempotency, stale previews, and concurrent writes
@@ -181,10 +183,12 @@ Both legs must share one currency. A peso-to-dollar movement gets the blocking i
 
 Two tests decide whether a new draft repeats an existing record.
 
-1. **Identity.** The same file digest and row, or the same institution `external_id` on the same account, means the draft is `already_recorded`. Re-importing a file or an overlapping statement creates nothing new.
+1. **Identity.** The same file digest and row, or the same institution `external_id` on the same account, means the draft is `already_recorded`. The match runs against confirmed records and against drafts still waiting for review, so re-importing a file or an overlapping statement creates nothing new, not even a second pending copy.
 2. **Signature.** The same account, currency, amount, date, and kind without shared identity means `possible_duplicate`. This blocks the draft until the person chooses. **Same as that record** links the draft's source to the existing record as extra provenance and creates nothing. **Different purchase** saves it.
 
-Equal amounts alone never match. The same amount on another account or another date raises no issue at all. Nothing is ever merged or deleted automatically (MVEE section 5, duplicates). A spoken entry later seen on a statement follows the signature path. The statement row becomes provenance on the spoken record, so the purchase counts once.
+The synthetic kit confirms two identical rows from one file without asking. This contract asks once, because a statement row with no reference cannot prove two purchases happened. Equal amounts alone never match. The same amount on another account or another date raises no issue at all. Nothing is ever merged or deleted automatically (MVEE section 5, duplicates). A spoken entry later seen on a statement follows the signature path. The statement row becomes provenance on the spoken record, so the purchase counts once.
+
+An import row whose destination the kit leaves ambiguous (`personal or household`) keeps its account unresolved. The person picks the account, and the account's sharing decides who sees the row (MVEE section 12).
 
 A statement's opening and closing balances become `statement` observations at the statement's dates, and its rows become activity. Section 5.3 then reconciles the statement against itself and against earlier anchors. Imported balances and imported rows never add together as new money (MVEE 4.4).
 
@@ -206,7 +210,7 @@ Every surface calls the same three derivations: balance, income and spending, an
 
 **Personal and household.** A joint account is one account. It can sit in a personal scope and a household scope, and it counts once in each. Argus never adds two scopes together. A transfer from a private account into a joint account is `moved_in_from_outside_scope` in the household view, never household income (MVEE section 12).
 
-**Ownership share is not permission.** `ownership_share_bps` says how much of an asset or debt belongs to the person. It never decides who may view or edit a record. The proof values a view two ways, full and owner share, and applies the same weighting to assets and debts. A 50% share of a RD$1,000,000 car and a 50% share of its RD$400,000 loan give RD$300,000 in the owner-share view and RD$600,000 in the full view. The founder picks the default view (F6). Household membership, invitations, who may edit a shared record, revocation, and RLS belong to a separate household contract (MVEE section 9) and are not designed here.
+**Ownership share is not permission.** `ownership_share_bps` says how much of an asset or debt belongs to the person. It never decides who may view or edit a record. The proof values a view two ways, full and owner share, and applies the same weighting to assets and debts. In the proof, a car revalued from RD$1,000,000 to RD$900,000 and its RD$400,000 loan, each 50% owned, give RD$250,000 in the owner-share view and RD$500,000 in the full view. The RD$100,000 drop is a revaluation, not spending. The founder picks the default view (F6). Household membership, invitations, who may edit a shared record, revocation, and RLS belong to a separate household contract (MVEE section 9) and are not designed here.
 
 ## 12. Invariants
 
