@@ -1,0 +1,445 @@
+{
+  "checks": [
+    {
+      "case": "mfa_cancelled",
+      "claim": "A cancelled MFA challenge leaves no secret, no data and no refresh path",
+      "observed": {
+        "refresh_refused": true,
+        "state": "cancelled"
+      },
+      "passed": true
+    },
+    {
+      "case": "repeated_import",
+      "claim": "Re-importing the same export adds nothing; an overlapping export adds only its new row",
+      "observed": {
+        "first": 3,
+        "overlapping_new": 1,
+        "repeat": 0
+      },
+      "passed": true
+    },
+    {
+      "case": "missing_institution_ids",
+      "claim": "Rows without institution ids get derived identities; same-day twins stay two records",
+      "observed": {
+        "twin_records": 2
+      },
+      "passed": true
+    },
+    {
+      "case": "initial_connection_and_selection",
+      "claim": "Only selected source accounts map to Argus accounts; the unselected account stores nothing",
+      "observed": {
+        "discarded": 1,
+        "mapped": 3
+      },
+      "passed": true
+    },
+    {
+      "case": "manual_cash_overlap",
+      "claim": "A bank deposit that matches a manual cash-to-account transfer links to it instead of adding income",
+      "observed": {
+        "linked_to": "rec-0003"
+      },
+      "passed": true
+    },
+    {
+      "case": "balance_check_overlap",
+      "claim": "A recorded balance check is compared with imported activity; the gap is reported, never invented",
+      "observed": {
+        "before_history": {
+          "history_from": "2026-09-01",
+          "status": "history_unavailable"
+        },
+        "compared": {
+          "check_as_of": "2026-09-05",
+          "difference": "10.00",
+          "implied_at_check": "1490.00",
+          "snapshot_as_of": "2026-09-15T06:00",
+          "status": "compared"
+        }
+      },
+      "passed": true
+    },
+    {
+      "case": "own_account_transfers",
+      "claim": "Bank-referenced sides pair into one transfer; an unreferenced look-alike pair waits for the person; DOP to USD is flagged, never converted",
+      "observed": {
+        "cross_currency_flagged": true,
+        "inferred_pair_issues": [
+          "transfer_pair_inferred"
+        ],
+        "pair_keys": 2
+      },
+      "passed": true
+    },
+    {
+      "case": "retrieval_method_migration",
+      "claim": "API observations link to records first imported from a CSV file; ambiguous twins are surfaced, and no duplicate appears",
+      "observed": {
+        "candidates_per_row": {
+          "C-0101": 2,
+          "C-0102": 1,
+          "C-0103": 1,
+          "C-0106": 1
+        },
+        "card_records": 6,
+        "records_with_both_methods": 4
+      },
+      "passed": true
+    },
+    {
+      "case": "pending_to_posted",
+      "claim": "A pending hold is never confirmable; its posted replacement supersedes it with the final amount",
+      "observed": {
+        "pending_status": "superseded"
+      },
+      "passed": true
+    },
+    {
+      "case": "source_revision",
+      "claim": "A source amount revision becomes a reviewable change that keeps the person's own edits",
+      "observed": {
+        "revision_reasons": [
+          "user renamed the purchase",
+          "source_revised"
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "reversal",
+      "claim": "A reversal links to the original purchase and nets it to zero instead of deleting it",
+      "observed": {
+        "reverses": "prop-0028"
+      },
+      "passed": true
+    },
+    {
+      "case": "source_stops_reporting",
+      "claim": "A posted row the source stops reporting stays recorded and is flagged for review",
+      "observed": {
+        "flags": [
+          "source_no_longer_reports:id:conn-0012:src-chk-dop:T-0003"
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "account_rename",
+      "claim": "A renamed source account keeps its identity, Argus account and records",
+      "observed": {
+        "source_name": "Cuenta Nomina Plus"
+      },
+      "passed": true
+    },
+    {
+      "case": "kit_contract_and_totals",
+      "claim": "Every confirmed connector record passes the kit field contract and reproduces the kit's totals",
+      "observed": {
+        "connector_totals": {
+          "DOP": {
+            "personal": {
+              "expense": "806.50",
+              "income": "2200.00",
+              "transfer": "1090.00"
+            }
+          },
+          "USD": {
+            "personal": {
+              "expense": "40.00",
+              "income": "0.00",
+              "transfer": "10.00"
+            }
+          }
+        },
+        "kit_totals": {
+          "DOP": {
+            "personal": {
+              "expense": "806.50",
+              "income": "2200.00",
+              "transfer": "1090.00"
+            }
+          },
+          "USD": {
+            "personal": {
+              "expense": "40.00",
+              "income": "0.00",
+              "transfer": "10.00"
+            }
+          }
+        }
+      },
+      "passed": true
+    },
+    {
+      "case": "currencies_stay_separate",
+      "claim": "DOP and USD totals never combine and no conversion is applied",
+      "observed": {
+        "usd": {
+          "personal": {
+            "expense": "40.00",
+            "income": "0.00",
+            "transfer": "10.00"
+          }
+        }
+      },
+      "passed": true
+    },
+    {
+      "case": "expired_session",
+      "claim": "An expired session asks for reconnection; records and last success stay as they were",
+      "observed": {
+        "state_after_cancel": "reauth_required"
+      },
+      "passed": true
+    },
+    {
+      "case": "source_failure_keeps_last_good",
+      "claim": "Failed refreshes keep records, last success time and balance freshness; a malformed batch applies nothing",
+      "observed": {
+        "balance_as_of": "2026-09-16T06:00",
+        "last_success_at": "2026-09-16T06:10"
+      },
+      "passed": true
+    },
+    {
+      "case": "partial_history_and_stale_balance",
+      "claim": "Coverage shorter than requested is recorded, and a stale balance keeps its old as-of time",
+      "observed": {
+        "balance_as_of": "2026-09-16T06:00",
+        "history_from": "2026-09-01"
+      },
+      "passed": true
+    },
+    {
+      "case": "idempotent_refresh",
+      "claim": "A recovered refresh re-sees every known row and proposes only the genuinely new one",
+      "observed": {
+        "new": 1,
+        "seen": 18
+      },
+      "passed": true
+    },
+    {
+      "case": "reissued_card",
+      "claim": "A new source account after consent becomes an owner decision, not a silent new account",
+      "observed": {
+        "link_requests": 1
+      },
+      "passed": true
+    },
+    {
+      "case": "revocation_and_deletion",
+      "claim": "Revoking destroys the secret and stops refresh; deletion removes connection-only records and keeps shared or manual ones",
+      "observed": {
+        "delete": {
+          "records_deleted": 14,
+          "records_kept_other_provenance": 5,
+          "snapshots_deleted": 9
+        },
+        "revoke": {
+          "observations_purged": 22,
+          "records_retained": 19,
+          "withdrawn": 0
+        }
+      },
+      "passed": true
+    },
+    {
+      "case": "privacy_boundaries",
+      "claim": "Events carry codes and counts only; the secret never leaves the vault; a partner cannot refresh",
+      "observed": {
+        "events": 33
+      },
+      "passed": true
+    }
+  ],
+  "failed": [],
+  "fictional": true,
+  "format": "dominican-bank-connectivity-lifecycle-v1",
+  "naive_file_identity_reuse": [
+    {
+      "export_day": 7,
+      "flagged_possible_overlap": 0,
+      "rows_in_export": 6
+    },
+    {
+      "export_day": 14,
+      "flagged_possible_overlap": 6,
+      "rows_in_export": 13
+    },
+    {
+      "export_day": 21,
+      "flagged_possible_overlap": 13,
+      "rows_in_export": 26
+    },
+    {
+      "export_day": 28,
+      "flagged_possible_overlap": 26,
+      "rows_in_export": 37
+    },
+    {
+      "export_day": 35,
+      "flagged_possible_overlap": 33,
+      "rows_in_export": 44
+    },
+    {
+      "export_day": 42,
+      "flagged_possible_overlap": 37,
+      "rows_in_export": 49
+    },
+    {
+      "export_day": 49,
+      "flagged_possible_overlap": 39,
+      "rows_in_export": 51
+    },
+    {
+      "export_day": 56,
+      "flagged_possible_overlap": 40,
+      "rows_in_export": 52
+    }
+  ],
+  "passed": 22,
+  "review_workload": [
+    {
+      "actions_if_clean_rows_were_auto_accepted": 3,
+      "actions_if_every_row_is_confirmed_alone": 88,
+      "actions_with_batch_review": 55,
+      "batch_actions": 52,
+      "exception_actions": 3,
+      "new_rows": 103,
+      "pending_superseded_without_review": 13,
+      "per_row_actions": 88,
+      "records": 88,
+      "refresh_every_days": 1,
+      "refreshes": 60,
+      "review_every_days": 1,
+      "rows_reseen": 1930
+    },
+    {
+      "actions_if_clean_rows_were_auto_accepted": 3,
+      "actions_if_every_row_is_confirmed_alone": 88,
+      "actions_with_batch_review": 12,
+      "batch_actions": 9,
+      "exception_actions": 3,
+      "new_rows": 103,
+      "pending_superseded_without_review": 13,
+      "per_row_actions": 88,
+      "records": 88,
+      "refresh_every_days": 1,
+      "refreshes": 60,
+      "review_every_days": 7,
+      "rows_reseen": 1930
+    },
+    {
+      "actions_if_clean_rows_were_auto_accepted": 3,
+      "actions_if_every_row_is_confirmed_alone": 88,
+      "actions_with_batch_review": 12,
+      "batch_actions": 9,
+      "exception_actions": 3,
+      "new_rows": 90,
+      "pending_superseded_without_review": 0,
+      "per_row_actions": 88,
+      "records": 88,
+      "refresh_every_days": 7,
+      "refreshes": 9,
+      "review_every_days": 7,
+      "rows_reseen": 240
+    }
+  ],
+  "timeline": [
+    {
+      "connection": "conn-0004",
+      "last_success_at": null,
+      "records": 3,
+      "state": "mfa_required",
+      "step": "first attempt asks for MFA"
+    },
+    {
+      "connection": "conn-0004",
+      "last_success_at": null,
+      "records": 3,
+      "state": "cancelled",
+      "step": "person cancels MFA"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": null,
+      "records": 7,
+      "state": "active",
+      "step": "second attempt passes MFA"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-15T09:06",
+      "records": 7,
+      "state": "active",
+      "step": "first refresh"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-15T09:06",
+      "records": 18,
+      "state": "active",
+      "step": "person reviews first refresh"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-16T06:10",
+      "records": 18,
+      "state": "active",
+      "step": "second refresh"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-16T06:10",
+      "records": 20,
+      "state": "reauth_required",
+      "step": "session expires"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-16T06:10",
+      "records": 20,
+      "state": "active",
+      "step": "person reconnects"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-16T06:10",
+      "records": 20,
+      "state": "degraded",
+      "step": "source unavailable"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-16T06:10",
+      "records": 20,
+      "state": "degraded",
+      "step": "malformed batch rejected"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-20T06:00",
+      "records": 20,
+      "state": "active",
+      "step": "source recovers"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-20T06:00",
+      "records": 21,
+      "state": "revoked",
+      "step": "person disconnects"
+    },
+    {
+      "connection": "conn-0012",
+      "last_success_at": "2026-09-20T06:00",
+      "records": 7,
+      "state": "revoked",
+      "step": "person deletes imported data"
+    }
+  ]
+}
