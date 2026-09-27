@@ -2956,11 +2956,9 @@ def test_openrouter_failure_log_includes_visible_diagnostics(monkeypatch) -> Non
     assert "model=test/model" in message
     assert "max_tokens=3200" in message
     assert "error_type=RuntimeError" in message
-    # The detail belongs in the rendered message: the default sink drops extra,
-    # so binding it alone left production with only the exception type.
-    assert "provider rejected request" in message
+    assert "provider rejected request" not in message
     assert kwargs["error_type"] == "RuntimeError"
-    assert kwargs["error"] == "provider rejected request"
+    assert "error" not in kwargs
 
 
 def _captured_failure_log(monkeypatch, exc: Exception) -> str:
@@ -2996,7 +2994,7 @@ def test_openrouter_failure_log_reports_raising_origin(monkeypatch) -> None:
         message = _captured_failure_log(monkeypatch, exc)
 
     assert "error_type=ValueError" in message
-    assert "OpenRouter interpretation returned an incomplete strategy draft" in message
+    assert "OpenRouter interpretation returned an incomplete strategy draft" not in message
     # Points at the raising line so a deterministic local rejection is
     # distinguishable from a provider transport failure.
     assert "error_origin=test_openrouter_policy.py:" in message
@@ -3015,13 +3013,14 @@ def test_openrouter_failure_log_survives_braces_in_detail() -> None:
         )
 
 
-def test_openrouter_failure_log_bounds_long_provider_detail(monkeypatch) -> None:
+def test_openrouter_failure_log_omits_long_provider_detail(monkeypatch) -> None:
     try:
         raise RuntimeError("x" * 5000)
     except RuntimeError as exc:
         message = _captured_failure_log(monkeypatch, exc)
 
-    assert "<truncated>" in message
+    assert "xxx" not in message
+    assert "error_detail" not in message
     assert len(message) < 1000
 
 
