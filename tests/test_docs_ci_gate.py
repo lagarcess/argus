@@ -38,7 +38,14 @@ def selector_repo(tmp_path):
         (ROOT / ".github/docs-reading-tests.sh").read_text(),
     )
     (tmp_path / "tests").mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     return tmp_path
+
+
+def select(repo: Path, env: dict[str, str] | None = None):
+    # git grep intentionally reads tracked files, as it does in an Actions checkout.
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    return bash("bash .github/docs-reading-tests.sh", repo, env)
 
 
 @pytest.mark.parametrize("reader", ["conftest.py", "helpers.py"])
@@ -48,7 +55,7 @@ def test_helper_reader_selects_folder_without_collecting_helper(selector_repo, r
     write(
         selector_repo, "tests/research/ignored.py", 'raise RuntimeError("not a test")\n'
     )
-    result = bash("bash .github/docs-reading-tests.sh", selector_repo)
+    result = select(selector_repo)
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == ["tests/research"]
     collected = subprocess.run(
@@ -72,7 +79,7 @@ def test_direct_reader_selection(selector_repo):
     write(selector_repo, "tests/test_direct.py", 'SOURCE = "docs/PRODUCT.md"\n')
     write(selector_repo, "tests/other_test.py", 'SOURCE = Path("docs")\n')
     write(selector_repo, "tests/test_unrelated.py")
-    result = bash("bash .github/docs-reading-tests.sh", selector_repo)
+    result = select(selector_repo)
     assert result.returncode == 0, result.stderr
     assert set(result.stdout.splitlines()) == {
         "tests/test_direct.py",
@@ -87,8 +94,7 @@ def test_selector_propagates_search_failure(selector_repo):
         '#!/bin/bash\nprintf "tests/test_partial.py\\n"\nexit 2\n',
     )
     executable.chmod(0o755)
-    result = bash(
-        "bash .github/docs-reading-tests.sh",
+    result = select(
         selector_repo,
         {"PATH": f'{executable.parent}:{os.environ["PATH"]}'},
     )
@@ -179,7 +185,7 @@ def test_folder_selection_obeys_pytest_exclusions(selector_repo):
         "tests/research/.hidden/test_hidden.py",
         'raise RuntimeError("hidden")\n',
     )
-    result = bash("bash .github/docs-reading-tests.sh", selector_repo)
+    result = select(selector_repo)
     assert result.returncode == 0
     collected = subprocess.run(
         [
@@ -207,19 +213,17 @@ def test_git_grep_fallback_and_empty_search(selector_repo):
     for command in ("bash", "git", "dirname", "sort", "awk"):
         (commands / command).symlink_to(shutil.which(command))
     env = {"PATH": str(commands)}
-    subprocess.run(["git", "init", "-q"], cwd=selector_repo, check=True)
-    result = bash("bash .github/docs-reading-tests.sh", selector_repo, env)
+    result = select(selector_repo, env)
     assert result.returncode == 0, result.stderr
     assert not result.stdout
     write(selector_repo, "tests/nested/helpers.py", 'SOURCE = "docs/evidence.json"\n')
     write(selector_repo, "tests/test_direct.py", 'SOURCE = "docs/PRODUCT.md"\n')
     subprocess.run(["git", "add", "."], cwd=selector_repo, check=True)
-    result = bash("bash .github/docs-reading-tests.sh", selector_repo, env)
+    result = select(selector_repo, env)
     assert result.returncode == 0, result.stderr
     assert set(result.stdout.splitlines()) == {"tests/nested", "tests/test_direct.py"}
     # Outside a repository, the fallback must fail, not yield an empty success.
-    result = bash(
-        "bash .github/docs-reading-tests.sh",
+    result = select(
         selector_repo,
         {**env, "GIT_DIR": str(selector_repo / "absent")},
     )
