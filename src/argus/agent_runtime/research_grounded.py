@@ -126,23 +126,19 @@ def scenario_contract_applies(
     query's ``scenario_question`` bit, or a ``future_window`` horizon the
     interpreter typed on the draft. None reads the message; a read that carries none is an
     ordinary lookup and takes the recorded contract."""
-    from argus.agent_runtime.interpreter.draft_shape import (
-        strategy_draft_future_horizon,
-    )
     from argus.agent_runtime.interpreter.research_routing import scenario_is_typed
 
     if not scenario_is_typed(query, interpretation):
         return False
     if bool(getattr(query, "scenario_question", False)):
         return True
-    horizon = strategy_draft_future_horizon(interpretation.candidate_strategy_draft)
     # The horizon compensated for a primary read that left the bit unset:
     # record it, once, so the decay of that read stays visible.
     if SCENARIO_FROM_HORIZON_REASON_CODE not in interpretation.reason_codes:
         interpretation.reason_codes.append(SCENARIO_FROM_HORIZON_REASON_CODE)
         logger.info(
             "Scenario contract selected by the typed horizon, not the scenario bit"
-            f" kind={query.question_kind} horizon={horizon.get('evidence')}",
+            f" kind={query.question_kind} reason={SCENARIO_FROM_HORIZON_REASON_CODE}",
             failure_classification=SCENARIO_FROM_HORIZON_REASON_CODE,
         )
     return True
@@ -358,11 +354,15 @@ async def grounded_result(
             packet = await spend.run(client, prompt, spec)
         except ResearchUnavailableError as exc:
             # The deployed log sink drops structured extras, so the reason and
-            # detail must live in the message itself to be diagnosable.
+            # safe metadata must live in the message itself to be diagnosable.
             logger.warning(
                 "Research provider unavailable"
                 f" reason={exc.reason} status={exc.status} transient={exc.transient}"
-                f" detail={exc.detail or ''} shape={shape}",
+                f" shape={shape}",
+                failure_classification=exc.reason,
+                status=exc.status,
+                transient=exc.transient,
+                shape=shape,
             )
             return lookup_failure_result(
                 failure=exc,
@@ -1313,7 +1313,11 @@ async def _latest_close(symbol: str, asset_class: str) -> dict[str, str] | None:
             fetch_price_series, symbol, asset_class, start, end, "1d"
         )
     except Exception as exc:  # noqa: BLE001
-        logger.debug("Off-coverage close fetch failed", symbol=symbol, error=str(exc))
+        logger.debug(
+            "Off-coverage close fetch failed error_type={}",
+            type(exc).__name__,
+            error_type=type(exc).__name__,
+        )
         return None
     values = series.tolist() if hasattr(series, "tolist") else list(series or [])
     closes = [float(v) for v in values if v is not None]

@@ -5585,7 +5585,7 @@ and `answer_figures_replaced` is still recorded when one of them drives the
 result. Separately, every research or no-search answer's prose is audited:
 each figure written in digits that is neither a cited row nor a value of its
 calculation is recorded with `answer_figures_unsourced` and a log line with the
-count and the figures, and nothing is replaced. Dates, years, a day number beside its year,
+count only, without the figures or question text, and nothing is replaced. Dates, years, a day number beside its year,
 numbers inside words and a number that names a cited product or a model are not
 counted. A computed answer answers `ready_to_respond`:
 `final_response_payload.tool_result_cards` holds one card per calculation, the
