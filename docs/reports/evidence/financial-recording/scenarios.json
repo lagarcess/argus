@@ -1,0 +1,695 @@
+{
+  "account_edit_rules": {
+    "archived_draft_issues": {
+      "account_archived": "blocking"
+    },
+    "archived_version": 3,
+    "blank_name": "InvalidInput:nickname_invalid",
+    "currency_on_empty": "USD",
+    "currency_on_used": "InvalidInput:currency_locked",
+    "nature_flip_on_used": "InvalidInput:nature_change_requires_empty_account",
+    "same_nature_on_used": "savings",
+    "stale_version": "StaleVersion",
+    "trimmed": "Clavito"
+  },
+  "asset_revaluation_and_share": {
+    "full": {
+      "assets": 90000000,
+      "liabilities": -40000000,
+      "net": 50000000
+    },
+    "gaps": [
+      [
+        null,
+        null
+      ],
+      [
+        -10000000,
+        "revaluation"
+      ]
+    ],
+    "owner_share": {
+      "assets": 45000000,
+      "liabilities": -20000000,
+      "net": 25000000
+    },
+    "totals": {
+      "DOP": {
+        "income": 0,
+        "income_by_category": {},
+        "moved_in_from_outside_scope": 0,
+        "moved_out_of_scope": 0,
+        "spending": 0,
+        "spending_by_category": {}
+      }
+    }
+  },
+  "backdated_correction": {
+    "balance": {
+      "amount": 750000,
+      "as_of": "2026-09-05T18:00:00-04:00",
+      "basis": "user_check",
+      "state": "known"
+    },
+    "gaps": [
+      [
+        -40000,
+        "unexplained"
+      ]
+    ],
+    "gaps_before": [
+      [
+        -50000,
+        "unexplained"
+      ]
+    ],
+    "income": 0,
+    "revisions": [
+      [
+        200000,
+        null
+      ],
+      [
+        210000,
+        "receipt shows 2,100"
+      ]
+    ],
+    "spending": 210000,
+    "stale_correction": "StaleVersion"
+  },
+  "blank_opening_unknown": {
+    "balance_after": {
+      "activity_since_tracking": -85000,
+      "state": "unknown"
+    },
+    "balance_before": {
+      "activity_since_tracking": 0,
+      "state": "unknown"
+    },
+    "position": {
+      "DOP": {
+        "assets": 0,
+        "coverage": {
+          "accounts_known": [],
+          "accounts_unknown": [
+            "acct-1"
+          ],
+          "archived_excluded": [],
+          "oldest_anchor_as_of": null,
+          "unexplained_gaps": []
+        },
+        "liabilities": 0,
+        "net": 0
+      }
+    },
+    "totals": {
+      "DOP": {
+        "income": 0,
+        "income_by_category": {},
+        "moved_in_from_outside_scope": 0,
+        "moved_out_of_scope": 0,
+        "spending": 85000,
+        "spending_by_category": {
+          "uncategorized": 85000
+        }
+      }
+    }
+  },
+  "clavito_large_opening": {
+    "balance": {
+      "amount": 25000000,
+      "as_of": "2026-09-01T09:00:00-04:00",
+      "basis": "opening",
+      "state": "known"
+    },
+    "totals": {
+      "DOP": {
+        "income": 0,
+        "income_by_category": {},
+        "moved_in_from_outside_scope": 0,
+        "moved_out_of_scope": 0,
+        "spending": 0,
+        "spending_by_category": {}
+      }
+    }
+  },
+  "credit_card_purchase_then_payment": {
+    "after_payment": {
+      "card": 0,
+      "checking": 700000,
+      "totals": {
+        "DOP": {
+          "income": 0,
+          "income_by_category": {},
+          "moved_in_from_outside_scope": 0,
+          "moved_out_of_scope": 0,
+          "spending": 300000,
+          "spending_by_category": {
+            "shopping": 300000
+          }
+        }
+      }
+    },
+    "after_purchase": {
+      "card": -300000,
+      "totals": {
+        "DOP": {
+          "income": 0,
+          "income_by_category": {},
+          "moved_in_from_outside_scope": 0,
+          "moved_out_of_scope": 0,
+          "spending": 300000,
+          "spending_by_category": {
+            "shopping": 300000
+          }
+        }
+      }
+    }
+  },
+  "cross_currency_transfer_unresolved": {
+    "balances": [
+      1000000,
+      10000,
+      -5000
+    ],
+    "confirm": "ReviewRequired:cross_currency_unresolved",
+    "payment_issues": {
+      "cross_currency_unresolved": "blocking"
+    },
+    "transfer_issues": {
+      "cross_currency_unresolved": "blocking"
+    }
+  },
+  "duplicate_import_vs_twins": {
+    "after_first_import": {
+      "activity_records": 6,
+      "totals": {
+        "DOP": {
+          "income": 120000,
+          "income_by_category": {
+            "uncategorized": 120000
+          },
+          "moved_in_from_outside_scope": 0,
+          "moved_out_of_scope": 0,
+          "spending": 92550,
+          "spending_by_category": {
+            "uncategorized": 92550
+          }
+        },
+        "USD": {
+          "income": 0,
+          "income_by_category": {},
+          "moved_in_from_outside_scope": 0,
+          "moved_out_of_scope": 0,
+          "spending": 4000,
+          "spending_by_category": {
+            "uncategorized": 4000
+          }
+        }
+      }
+    },
+    "after_overlap": {
+      "activity_records": 7,
+      "dop_balance": 521450
+    },
+    "confirmed_in_batch": 6,
+    "first_import_issues": {
+      "tx-currency": {
+        "currency_unsupported": "blocking"
+      },
+      "tx-date": {
+        "date_invalid": "blocking"
+      },
+      "tx-dop-01": {},
+      "tx-dop-02": {},
+      "tx-dop-03": {
+        "possible_duplicate": "blocking"
+      },
+      "tx-dop-04": {},
+      "tx-dop-05": {
+        "counter_account_missing": "blocking"
+      },
+      "tx-household": {},
+      "tx-missing": {
+        "field_missing": "blocking"
+      },
+      "tx-number": {
+        "amount_invalid": "blocking"
+      },
+      "tx-usd-01": {}
+    },
+    "overlap_issues": {
+      "overlap-new": {},
+      "tx-dop-01": {
+        "already_recorded": "blocking"
+      }
+    },
+    "reimport": {
+      "activity_records": 6,
+      "confirm": "ReviewRequired:already_recorded",
+      "rows_already_recorded": [
+        "tx-currency",
+        "tx-date",
+        "tx-dop-01",
+        "tx-dop-02",
+        "tx-dop-03",
+        "tx-dop-04",
+        "tx-dop-05",
+        "tx-household",
+        "tx-missing",
+        "tx-number",
+        "tx-usd-01"
+      ]
+    },
+    "totals": {
+      "DOP": {
+        "income": 120000,
+        "income_by_category": {
+          "uncategorized": 120000
+        },
+        "moved_in_from_outside_scope": 0,
+        "moved_out_of_scope": 0,
+        "spending": 98550,
+        "spending_by_category": {
+          "uncategorized": 98550
+        }
+      },
+      "USD": {
+        "income": 0,
+        "income_by_category": {},
+        "moved_in_from_outside_scope": 0,
+        "moved_out_of_scope": 0,
+        "spending": 4000,
+        "spending_by_category": {
+          "uncategorized": 4000
+        }
+      }
+    }
+  },
+  "duplicate_submission": {
+    "accounts": 1,
+    "activity_records": 1,
+    "balance": 90000,
+    "create_changed_body": "IdempotencyConflict",
+    "record_ids": [
+      "rec-4",
+      "rec-4",
+      "rec-4"
+    ],
+    "same_account_returned": true,
+    "same_key_different_body": "IdempotencyConflict"
+  },
+  "equal_amount_not_a_match": {
+    "confirm_unresolved": "ReviewRequired:possible_duplicate",
+    "different_account": {},
+    "different_day": {},
+    "resolved_distinct": {
+      "activity_records": 4,
+      "totals": 150000
+    },
+    "resolved_duplicate_of": {
+      "activity_records": 3,
+      "confirm_returns": "rec-6",
+      "linked_methods": [
+        "chat"
+      ],
+      "totals": 100000
+    },
+    "same_signature": {
+      "possible_duplicate": "blocking"
+    }
+  },
+  "expense_beyond_known_balance": {
+    "balances": {
+      "known": {
+        "amount": -5000,
+        "as_of": "2026-09-01T09:00:00-04:00",
+        "basis": "opening",
+        "state": "known"
+      },
+      "unknown": {
+        "activity_since_tracking": -4000,
+        "state": "unknown"
+      }
+    },
+    "confirm_known": "ok",
+    "confirm_unknown": "ok",
+    "issues": {
+      "known": {
+        "negative_asset_balance": "notice"
+      },
+      "unknown": {}
+    }
+  },
+  "first_slice_create_reopen_edit": {
+    "after_opening_correction": {
+      "balance": {
+        "amount": 1300000,
+        "as_of": "2026-09-01T09:00:00-04:00",
+        "basis": "opening",
+        "state": "known"
+      },
+      "totals": {
+        "DOP": {
+          "income": 0,
+          "income_by_category": {},
+          "moved_in_from_outside_scope": 0,
+          "moved_out_of_scope": 0,
+          "spending": 0,
+          "spending_by_category": {}
+        }
+      },
+      "version": 3
+    },
+    "edited": {
+      "balance": 1250000,
+      "nickname": "Nomina",
+      "type": "savings",
+      "version": 2
+    },
+    "reopened": {
+      "balance": 1250000,
+      "nickname": "Cuenta nomina",
+      "version": 1
+    }
+  },
+  "income_with_category": {
+    "activity_records": 3,
+    "mismatch_confirm": "ReviewRequired:category_kind_mismatch",
+    "mismatch_issues": {
+      "category_kind_mismatch": "blocking"
+    },
+    "totals": {
+      "DOP": {
+        "income": 1820000,
+        "income_by_category": {
+          "other": 20000,
+          "remittance": 1800000
+        },
+        "moved_in_from_outside_scope": 0,
+        "moved_out_of_scope": 0,
+        "spending": 30000,
+        "spending_by_category": {
+          "other": 30000
+        }
+      }
+    }
+  },
+  "late_explanation": {
+    "balance": {
+      "amount": 750000,
+      "as_of": "2026-09-05T18:00:00-04:00",
+      "basis": "user_check",
+      "state": "known"
+    },
+    "gaps": [
+      [
+        0,
+        "unexplained"
+      ]
+    ],
+    "income": 0,
+    "spending": 250000
+  },
+  "linked_correction_and_removal": {
+    "after_stale": [
+      850000,
+      0,
+      150000
+    ],
+    "amount_corrected": [
+      850000,
+      150000,
+      0
+    ],
+    "counter_corrected": [
+      850000,
+      0,
+      150000
+    ],
+    "history": [
+      [
+        100000,
+        "acct-3",
+        null,
+        false
+      ],
+      [
+        150000,
+        "acct-3",
+        "amount was 1,500",
+        false
+      ],
+      [
+        150000,
+        "acct-5",
+        "went to Meta",
+        false
+      ],
+      [
+        150000,
+        "acct-5",
+        "never happened",
+        true
+      ]
+    ],
+    "recorded": [
+      900000,
+      100000,
+      0
+    ],
+    "removed": [
+      1000000,
+      0,
+      0
+    ],
+    "stale_correction": "StaleVersion",
+    "versions": [
+      5,
+      4,
+      3
+    ]
+  },
+  "multiple_precisions": {
+    "dinar_balance": 1234,
+    "positions": {
+      "DOP": 1000,
+      "JPY": 1500,
+      "KWD": 1234
+    },
+    "unknown_currency": "InvalidInput:currency_unsupported",
+    "yen_balance": 1500,
+    "yen_fraction_issues": {
+      "amount_precision": "blocking"
+    },
+    "yen_fraction_opening": "InvalidInput:amount_precision"
+  },
+  "new_expense_after_observation": {
+    "balance": {
+      "amount": 700000,
+      "as_of": "2026-09-05T18:00:00-04:00",
+      "basis": "user_check",
+      "state": "known"
+    },
+    "gaps": [
+      [
+        0,
+        "unexplained"
+      ]
+    ],
+    "income": 0,
+    "spending": 300000
+  },
+  "observation_gap": {
+    "balance": {
+      "amount": 750000,
+      "as_of": "2026-09-05T18:00:00-04:00",
+      "basis": "user_check",
+      "state": "known"
+    },
+    "gaps": [
+      [
+        -50000,
+        "unexplained"
+      ]
+    ],
+    "income": 0,
+    "spending": 200000
+  },
+  "overdraft_and_debt": {
+    "balances": {
+      "card": -104500,
+      "checking": -100000,
+      "loan": -2100000
+    },
+    "overdraft_issues": {
+      "negative_asset_balance": "notice"
+    },
+    "payment_to_asset_issues": {
+      "counter_not_liability": "blocking"
+    },
+    "position": {
+      "assets": -100000,
+      "liabilities": -2204500,
+      "net": -2304500
+    },
+    "totals": {
+      "interest": 4500,
+      "uncategorized": 150000
+    }
+  },
+  "partial_reconciliation": {
+    "balance": 950000,
+    "gaps_after": [
+      [
+        -20000,
+        "unexplained"
+      ]
+    ],
+    "gaps_before": [
+      [
+        -50000,
+        "unexplained"
+      ]
+    ]
+  },
+  "same_currency_transfer": {
+    "balances": {
+      "checking": 1500000,
+      "savings": 600000
+    },
+    "net_after": 2100000,
+    "net_before": 2100000,
+    "totals_both": {
+      "DOP": {
+        "income": 0,
+        "income_by_category": {},
+        "moved_in_from_outside_scope": 0,
+        "moved_out_of_scope": 0,
+        "spending": 0,
+        "spending_by_category": {}
+      }
+    },
+    "totals_checking_only": {
+      "DOP": {
+        "income": 0,
+        "income_by_category": {},
+        "moved_in_from_outside_scope": 0,
+        "moved_out_of_scope": 500000,
+        "spending": 0,
+        "spending_by_category": {}
+      }
+    },
+    "totals_savings_only": {
+      "DOP": {
+        "income": 0,
+        "income_by_category": {},
+        "moved_in_from_outside_scope": 500000,
+        "moved_out_of_scope": 0,
+        "spending": 0,
+        "spending_by_category": {}
+      }
+    }
+  },
+  "same_day_order": {
+    "after": {
+      "balance": 800000,
+      "confirm": "ok",
+      "gaps": [
+        [
+          -100000,
+          "unexplained"
+        ]
+      ],
+      "issues": {}
+    },
+    "before": {
+      "balance": 900000,
+      "confirm": "ok",
+      "gaps": [
+        [
+          0,
+          "unexplained"
+        ]
+      ],
+      "issues": {}
+    },
+    "unresolved": {
+      "balance": 900000,
+      "confirm": "ReviewRequired:observation_order_unknown",
+      "gaps": [
+        [
+          -100000,
+          "unexplained"
+        ]
+      ],
+      "issues": {
+        "observation_order_unknown": "blocking"
+      }
+    }
+  },
+  "stale_preview_two_confirms": {
+    "activity_records": 2,
+    "activity_records_after_stale": 1,
+    "balance": 70000,
+    "fresh_confirm_record": "rec-6",
+    "stale_attempts": [
+      "StalePreview",
+      "StalePreview"
+    ]
+  },
+  "two_observations": {
+    "balance": 850000,
+    "gaps_after": [
+      [
+        -100000,
+        "unexplained"
+      ],
+      [
+        0,
+        "unexplained"
+      ]
+    ],
+    "gaps_before": [
+      [
+        -100000,
+        "unexplained"
+      ],
+      [
+        -20000,
+        "unexplained"
+      ]
+    ]
+  },
+  "unknown_coverage_disclosure": {
+    "position": {
+      "DOP": {
+        "assets": 790000,
+        "coverage": {
+          "accounts_known": [
+            "acct-1"
+          ],
+          "accounts_unknown": [
+            "acct-3"
+          ],
+          "archived_excluded": [
+            "acct-4"
+          ],
+          "oldest_anchor_as_of": "2026-09-05T18:00:00-04:00",
+          "unexplained_gaps": [
+            {
+              "account_id": "acct-1",
+              "amount": -10000,
+              "as_of": "2026-09-05T18:00:00-04:00",
+              "label": "unexplained",
+              "record_id": "rec-9"
+            }
+          ]
+        },
+        "liabilities": 0,
+        "net": 790000
+      }
+    },
+    "totals": 10000
+  }
+}
