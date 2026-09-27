@@ -3950,14 +3950,7 @@ Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `nex
 { "type": "stage_outcome", "outcome": "ready_to_respond" }
 ```
 
-**4. `title`.** Parser-accepted conversation title frame.
-```json
-{ "type": "title", "conversation_id": "uuid", "title": "Tesla Dip Strategy" }
-```
-
-No `sse_data` call site emits this frame. The parser still accepts it. Conversation titles are saved on the conversation and loaded from the conversation list.
-
-**5. `final`** — last event, carries the complete response payload
+**4. `final`** — last event, carries the complete response payload
 ```json
 {
   "type": "final",
@@ -4183,15 +4176,21 @@ specific clarification prompt. A short affirmative answer such as "yes" may
 accept that candidate only for that pending field; it does not bypass normal LLM
 interpretation for unrelated turns.
 
-**6. `done`** — signals stream end (no data payload required beyond SSE `data: [DONE]`)
+**5. `done`** — signals stream end (no data payload required beyond SSE `data: [DONE]`)
 ```
 data: [DONE]
 ```
 
+**Parser compatibility.** `title` is not an emitted frame. `parseChatStreamFrame` accepts `type` `title` with `conversation_id` and `title`. No `sse_data` call site emits this frame. Conversation titles are saved on the conversation and loaded from the conversation list.
+
+```json
+{ "type": "title", "conversation_id": "uuid", "title": "Tesla Dip Strategy" }
+```
+
+The stream does not write an SSE `retry` field. Clients own reconnect timing.
+
 > [!IMPORTANT]
 > Frontend must never use local timers to fake progress states. Progress labels must be driven by `stage_start` events from the backend. This is the binding contract between DESIGN.md Section 11 and the agent runtime pipeline.
-
-*Note: Server may include `retry: 3000` in the stream, but clients should implement their own backoff/reconnect logic.*
 
 ---
 

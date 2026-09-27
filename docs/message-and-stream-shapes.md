@@ -199,7 +199,8 @@ The frame is `data: [DONE]`. It has no JSON object and no `message_id`.
 | `final` | `final` | The `payload` object. A missing payload becomes `{}`. |
 | `error` | `error` | `detail` from `message`, or from `detail` when `message` is absent. `code` when it is a string. `message_id` when it is a string. `recovery` and `retry_last_turn` when each is an object. |
 | `[DONE]` | `done` | `message_id` set to null. |
-| `title` | `title` | `conversation_id` and `title` strings. No emitter sends this frame. |
+
+**Parser compatibility.** `title` is not a wire frame. `parseChatStreamFrame` accepts `type` `title` with `conversation_id` and `title`. No emitter sends this frame.
 
 An `event:` line returns that event name and the JSON object unchanged. `sse_data` does not write `event:` lines.
 
