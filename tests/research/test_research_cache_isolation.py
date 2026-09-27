@@ -139,7 +139,33 @@ def _find_state(
     return state
 
 
-def _find(monkeypatch, requests, states):
+def _decision_with_provenance(request, provenance):
+    from argus.agent_runtime.stages.interpret_types import InterpretDecision
+    from argus.agent_runtime.state.models import ResponseProfile
+
+    return InterpretDecision(
+        intent="conversation_followup",
+        task_relation="continue",
+        requires_clarification=False,
+        user_goal_summary="research",
+        confidence=0.9,
+        effective_response_profile=ResponseProfile(
+            effective_tone="friendly",
+            effective_verbosity="medium",
+            effective_expertise_mode="beginner",
+        ),
+        semantic_turn_act="asset_discovery",
+        asset_discovery=request,
+        resolution_provenance=list(provenance),
+    )
+
+
+def _find(monkeypatch, requests, states, *, stale_provenance=()):
+    """Run find with proof on the decision and none of it left on state.
+
+    ``stale_provenance`` is planted on the pre-interpret state. Eligibility
+    must ignore it.
+    """
     from argus.agent_runtime.research_find import find_assets_stage_result
 
     from tests.research.test_research_router_absorption import (
@@ -152,6 +178,11 @@ def _find(monkeypatch, requests, states):
     _wire_find(monkeypatch, provider=provider)
     results = []
     for request, state in zip(requests, states, strict=True):
+        blank = RunState.new(
+            current_user_message=state.current_user_message,
+            recent_thread_history=[],
+        )
+        blank.resolution_provenance = list(stale_provenance)
         results.append(
             asyncio.run(
                 find_assets_stage_result(
@@ -162,8 +193,10 @@ def _find(monkeypatch, requests, states):
                         user_goal_summary="research",
                         semantic_turn_act="asset_discovery",
                     ),
-                    decision=None,
-                    state=state,
+                    decision=_decision_with_provenance(
+                        request, state.resolution_provenance
+                    ),
+                    state=blank,
                     user=_context().user,
                 )
             )
@@ -225,9 +258,23 @@ def test_material_public_search_dimensions_do_not_collide(monkeypatch, change) -
 
 
 @pytest.mark.parametrize(
-    "kind", ["category", "unknown", "client_mention", "unresolved", "wrong_class"]
+    "kind",
+    [
+        "category",
+        "private",
+        "unknown",
+        "client_mention",
+        "unresolved",
+        "wrong_class",
+        "conflicting",
+    ],
 )
 def test_unproven_discovery_context_bypasses_shared_cache(monkeypatch, kind) -> None:
+    """Unvalidated, conflicting, category, and private context stay uncached.
+
+    Provider-catalog proof planted only on the pre-interpret state must not
+    admit any of them.
+    """
     from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
 
     request = AssetDiscoveryRequest(
@@ -235,6 +282,9 @@ def test_unproven_discovery_context_bypasses_shared_cache(monkeypatch, kind) -> 
     )
     state = _find_state()
     if kind == "category":
+        request.relationship = "category"
+        request.category_description = "cybersecurity"
+    elif kind == "private":
         request.category_description = f"My private holdings {FAKE.uuid4()}"
     elif kind == "unknown":
         state.resolution_provenance = []
@@ -242,9 +292,16 @@ def test_unproven_discovery_context_bypasses_shared_cache(monkeypatch, kind) -> 
         state.resolution_provenance[0].validated_by = "client_mention"
     elif kind == "unresolved":
         state.resolution_provenance[0].resolution_status = "ambiguous"
+    elif kind == "conflicting":
+        state.resolution_provenance = _find_state(("MSFT",)).resolution_provenance
     else:
         state.resolution_provenance[0].asset_class = "crypto"
-    provider, results = _find(monkeypatch, [request, request], [state, state])
+    provider, results = _find(
+        monkeypatch,
+        [request, request],
+        [state, state],
+        stale_provenance=_find_state().resolution_provenance,
+    )
     assert len(provider.calls) == 2
     assert all(
         r.stage_patch["research"]["usage"]["cache_status"] == "miss" for r in results
@@ -276,6 +333,134 @@ def test_model_backed_search_with_unmodeled_configuration_does_not_share(
     provider, _ = _find(monkeypatch, [request, request], [_find_state(), _find_state()])
     assert len(provider.calls) == 2
     assert cache_stats()["entries"] == 0
+
+
+def test_interpret_discovery_reuses_current_decision_provenance_before_state_updates(
+    monkeypatch,
+) -> None:
+    """Empty pre-interpret state still shares once the decision has certified the anchors."""
+    from argus.agent_runtime import research_find
+    from argus.agent_runtime.stages.interpret import interpret_stage_async
+    from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
+    from argus.agent_runtime.state.models import StrategySummary, UserState
+
+    from tests.research.test_research_router_absorption import (
+        _FakeSearchProvider,
+        _search_packet,
+        _wire_find,
+    )
+
+    provider = _FakeSearchProvider(_search_packet())
+    _wire_find(monkeypatch, provider=provider)
+    observed: list[tuple[list[str | None], list[str | None]]] = []
+    original = research_find.find_assets_stage_result
+
+    async def _observe(**kwargs):
+        observed.append(
+            (
+                [item.canonical_symbol for item in kwargs["state"].resolution_provenance],
+                [
+                    item.canonical_symbol
+                    for item in kwargs["decision"].resolution_provenance
+                ],
+            )
+        )
+        return await original(**kwargs)
+
+    monkeypatch.setattr(research_find, "find_assets_stage_result", _observe)
+    user = UserState(user_id=FAKE.uuid4(), language_preference="en")
+
+    def interpretation(anchors: list[str], *, relationship: str = "peer"):
+        draft = StrategySummary()
+        draft.resolution_provenance = _find_state(("AAPL",)).resolution_provenance
+        return StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="continue",
+            user_goal_summary="Find public peers",
+            semantic_turn_act="asset_discovery",
+            candidate_strategy_draft=draft,
+            asset_discovery=AssetDiscoveryRequest(
+                relationship=relationship,
+                anchor_symbols=anchors,
+                needs_current_facts=True,
+            ),
+        )
+
+    class _Interpreter:
+        def __init__(self, response: StructuredInterpretation) -> None:
+            self.response = response
+
+        async def ainvoke(self, _request):
+            return self.response
+
+    async def turn(anchors: list[str], *, relationship: str = "peer"):
+        return await interpret_stage_async(
+            state=RunState.new(
+                current_user_message="Which public companies sit near this one?",
+                recent_thread_history=[],
+            ),
+            user=user,
+            latest_task_snapshot=None,
+            selected_thread_metadata={},
+            structured_interpreter=_Interpreter(
+                interpretation(anchors, relationship=relationship)
+            ),
+        )
+
+    async def run():
+        first = await turn(["AAPL"])
+        second = await turn([" aapl ", " "])
+        changed = await turn(["AAPL"], relationship="comparison")
+        return first, second, changed
+
+    first, second, changed = asyncio.run(run())
+    assert observed == [([], ["AAPL"])] * 3
+    assert len(provider.calls) == 2
+    assert provider.calls[0] != provider.calls[1]
+    assert [
+        result.stage_patch["research"]["usage"]["cache_status"]
+        for result in (first, second, changed)
+    ] == ["miss", "hit", "miss"]
+    assert cache_stats()["entries"] == 2
+
+
+def test_registered_tool_without_a_decision_uses_only_its_own_state(
+    monkeypatch,
+) -> None:
+    """peer_expansion supplies no decision, so another call's proof cannot admit it."""
+    from argus.agent_runtime.research_tools import PeerExpansionArguments, peer_expansion
+
+    from tests.research.test_research_router_absorption import (
+        _FakeSearchProvider,
+        _public_anchor_state,
+        _search_packet,
+        _wire_find,
+    )
+
+    provider = _FakeSearchProvider(_search_packet())
+    _wire_find(monkeypatch, provider=provider)
+    proven = _context()
+    proven.state = _public_anchor_state(proven.state.current_user_message, "AAPL")
+    bare = _context()
+    arguments = PeerExpansionArguments(
+        request="Find candidate assets around this business",
+        relationship="peer",
+        anchor_symbols=["AAPL"],
+        needs_current_facts=True,
+    )
+
+    async def invoke():
+        first = await peer_expansion(arguments, context=proven)
+        second = await peer_expansion(arguments, context=bare)
+        return first, second
+
+    asyncio.run(invoke())
+    assert len(provider.calls) == 2
+    assert [
+        proven.stage_result.stage_patch["research"]["usage"]["cache_status"],
+        bare.stage_result.stage_patch["research"]["usage"]["cache_status"],
+    ] == ["miss", "miss"]
+    assert cache_stats()["entries"] == 1
 
 
 def test_shared_storage_rejects_freeform_packet_even_under_a_current_key() -> None:

@@ -12,6 +12,7 @@ unchanged; the user-visible experience is the same or better.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,13 +23,33 @@ from argus.agent_runtime.stages.interpret_types import (
     StageResult,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import RunState, UserState
+from argus.agent_runtime.state.models import ResolutionProvenance, RunState, UserState
 from argus.domain.research.admission import claim_current_research_attempt
 from argus.domain.research.cache import SearchPacketCache
 from argus.domain.research.contracts import CapabilityClass
 
 
-def _public_anchor_search(request: AssetDiscoveryRequest, state: RunState) -> bool:
+def _cache_provenance(
+    decision: InterpretDecision | None,
+    state: RunState,
+) -> Sequence[ResolutionProvenance]:
+    """The current decision owns proof. A missing decision is the tool path.
+
+    Interpret certifies anchors on the decision, then discovery runs before
+    that proof is copied onto ``RunState``. A present decision therefore
+    never falls back to state, including when its own list is empty. The
+    registered tool path passes no decision and certifies only the state it
+    was invoked with.
+    """
+    if decision is None:
+        return state.resolution_provenance
+    return decision.resolution_provenance
+
+
+def _public_anchor_search(
+    request: AssetDiscoveryRequest,
+    provenance: Sequence[ResolutionProvenance],
+) -> bool:
     """Certify only existing provider-owned identities, never classify prose.
 
     No resolver calls are made to qualify a cache hit. Unknown provenance costs
@@ -43,7 +64,7 @@ def _public_anchor_search(request: AssetDiscoveryRequest, state: RunState) -> bo
         return False
     public_symbols = {
         item.canonical_symbol
-        for item in state.resolution_provenance
+        for item in provenance
         if item.candidate_kind == "asset"
         and item.resolution_status == "resolved"
         and item.validated_by == "provider_catalog"
@@ -80,7 +101,7 @@ async def find_assets_stage_result(
     if (
         request is not None
         and request.needs_current_facts
-        and _public_anchor_search(request, state)
+        and _public_anchor_search(request, _cache_provenance(decision, state))
     ):
         packet_cache = SearchPacketCache
     result = await discovery_operation_result(

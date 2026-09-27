@@ -361,13 +361,19 @@ def test_find_turns_share_the_research_cache_across_users(monkeypatch) -> None:
     set_research_query(monkeypatch, globals(), question_kind="find_assets", symbols=[])
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
-    decision = _decision(relationship="comparison", anchor_symbols=["PANW"])
+    decision = _decision(relationship="comparison", anchor_symbols=["PANW"]).model_copy(
+        update={
+            "resolution_provenance": _public_anchor_state(
+                "Find peers of PANW", "PANW"
+            ).resolution_provenance
+        }
+    )
 
     first = asyncio.run(
         ra.discovery_turn_stage_result(
             interpretation=_interpretation(),
             decision=decision,
-            state=_public_anchor_state("Find peers of PANW", "PANW"),
+            state=_state("Find peers of PANW"),
             user=USER,
         )
     )
@@ -375,7 +381,7 @@ def test_find_turns_share_the_research_cache_across_users(monkeypatch) -> None:
         ra.discovery_turn_stage_result(
             interpretation=_interpretation(),
             decision=decision,
-            state=_public_anchor_state("Find peers of PANW", "PANW"),
+            state=_state("Find peers of PANW"),
             user=UserState(user_id="someone-else", language_preference="en"),
         )
     )
