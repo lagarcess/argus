@@ -183,6 +183,14 @@ export function useGuestConversion({
       if (typeof destinationUserId !== "string") throw new Error(t("chat.error_generic"));
       const refreshed = await refreshAccount(destinationUserId);
       onAuthenticationComplete(refreshed?.user.id ?? null);
+      } catch (error) {
+        try {
+          if (!account?.user.id) throw error;
+          await authenticatedRequestHeaders(account.user.id);
+          onAuthenticationComplete(account.user.id);
+        } catch { onAuthenticationComplete(null); }
+        throw error;
+      }
       // The handoff changes the durable owner in the same request path. Refresh
       // Recents before a pending follow-up can fail or navigate away, so the
       // account's canonical conversation projection is visible immediately.
@@ -193,14 +201,6 @@ export function useGuestConversion({
       handoffPreparedRef.current = false;
       if (action) {
         await onResume(action);
-      }
-      } catch (error) {
-        try {
-          if (!account?.user.id) throw error;
-          await authenticatedRequestHeaders(account.user.id);
-          onAuthenticationComplete(account.user.id);
-        } catch { onAuthenticationComplete(null); }
-        throw error;
       }
     },
     [
