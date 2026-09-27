@@ -730,7 +730,11 @@ def test_docs_checks_job_runs_only_when_the_gate_reports_docs_only() -> None:
     assert "poetry install --with dev --no-interaction" in joined_steps
     assert ".github/docs-reading-tests.sh" in joined_steps
     assert "tests/test_openapi_compatibility.py" not in joined_steps
-    assert "bun" not in joined_steps
+    assert "bun install --frozen-lockfile" in joined_steps
+    assert "bun test" not in joined_steps
+    assert "bun run build" not in joined_steps
+    setup_bun = next(step for step in job["steps"] if step.get("uses") == "oven-sh/setup-bun@v2")
+    assert setup_bun["with"]["bun-version"] == "${{ env.ARGUS_CI_BUN_VERSION }}"
     assert "supabase" not in joined_steps.lower()
     assert "local-smoke" not in joined_steps
     assert "docs-checks" in jobs["ci"]["needs"]
@@ -745,10 +749,12 @@ def test_docs_reading_tests_selector_includes_guest_observability() -> None:
         cwd=ROOT,
     )
     selected = result.stdout.splitlines()
-    assert "tests/test_guest_observability.py" in selected
-    assert "tests/test_home_country.py" in selected
+    for expected in ("tests/test_guest_observability.py", "tests/test_home_country.py"):
+        assert any(
+            expected == path or expected.startswith(path + "/") for path in selected
+        )
     assert all(
-        name.startswith("test_") or name.endswith("_test.py")
+        (ROOT / path).is_dir() or name.startswith("test_") or name.endswith("_test.py")
         for path in selected
         for name in (Path(path).name,)
     )

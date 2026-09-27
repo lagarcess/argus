@@ -39,6 +39,7 @@ from argus.llm.tool_call_receipts import current_tool_call_receipt_scope
 from argus.llm.tool_call_receipts import (
     tool_call_receipt_scope as tool_call_receipt_scope,
 )
+from argus.log_sink import exception_origin
 
 load_project_dotenv()
 
@@ -1012,38 +1013,6 @@ def _openrouter_message_content(data: dict[str, object]) -> str:
     return ""
 
 
-OPENROUTER_ERROR_DETAIL_MAX_CHARS = 300
-
-
-def _format_safe(value: str) -> str:
-    # loguru formats the message whenever bound fields are passed, so braces
-    # coming from an exception detail have to be escaped.
-    return value.replace("{", "{{").replace("}", "}}")
-
-
-def _bounded_error_detail(detail: str) -> str:
-    collapsed = " ".join(detail.split())
-    if not collapsed:
-        return "<no detail>"
-    if len(collapsed) <= OPENROUTER_ERROR_DETAIL_MAX_CHARS:
-        return collapsed
-    return f"{collapsed[:OPENROUTER_ERROR_DETAIL_MAX_CHARS]}...<truncated>"
-
-
-def _exception_origin(exc: BaseException) -> str:
-    # Deepest argus frame, so a local rejection points at the raising line
-    # rather than at the generic call site that caught it.
-    traceback = exc.__traceback__
-    origin = ""
-    while traceback is not None:
-        frame = traceback.tb_frame
-        filename = frame.f_code.co_filename
-        if f"{os.sep}argus{os.sep}" in filename:
-            origin = f"{os.path.basename(filename)}:{traceback.tb_lineno}"
-        traceback = traceback.tb_next
-    return origin
-
-
 def log_openrouter_failure(
     *,
     task: OpenRouterTask,
@@ -1056,21 +1025,18 @@ def log_openrouter_failure(
     error_type = type(exc).__name__
     # The default loguru sink renders only the message, so anything a reader
     # needs in production has to live in the formatted string, not in extra.
-    # Bounded because a provider error payload can echo the request back.
-    error_detail = _bounded_error_detail(str(exc))
-    error_origin = _exception_origin(exc)
+    # Exception text and validation locations can echo private request values.
+    error_origin = exception_origin(exc)
     logger.warning(
         (
             f"{message} "
             f"task={task} model={resolved_model} "
             f"max_tokens={profile.max_tokens} error_type={error_type} "
-            f"error_origin={error_origin or '<unknown>'} "
-            f"error_detail={_format_safe(error_detail)}"
+            f"error_origin={error_origin or '<unknown>'}"
         ),
         llm_task=task,
         model=resolved_model,
         max_tokens=profile.max_tokens,
         error_type=error_type,
         error_origin=error_origin,
-        error=error_detail,
     )
