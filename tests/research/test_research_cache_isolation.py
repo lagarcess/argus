@@ -118,28 +118,8 @@ def test_private_context_never_enters_shared_storage(monkeypatch, field) -> None
     assert cache_stats() == {"entries": 0, "hits": 0, "misses": 0}
 
 
-def _find_state(
-    anchors=("AAPL",), *, validated_by="provider_catalog", asset_class="equity"
-):
-    from argus.agent_runtime.state.models import ResolutionProvenance
-
-    state = RunState.new(current_user_message=FAKE.sentence(), recent_thread_history=[])
-    state.resolution_provenance = [
-        ResolutionProvenance(
-            field="asset_universe",
-            raw_text=symbol,
-            source="llm_extraction",
-            candidate_kind="asset",
-            canonical_symbol=symbol,
-            asset_class=asset_class,
-            validated_by=validated_by,
-        )
-        for symbol in anchors
-    ]
-    return state
-
-
-def _decision_with_provenance(request, provenance):
+def _empty_decision(request):
+    """The production discovery decision: anchors on the request, draft proof empty."""
     from argus.agent_runtime.stages.interpret_types import InterpretDecision
     from argus.agent_runtime.state.models import ResponseProfile
 
@@ -156,17 +136,17 @@ def _decision_with_provenance(request, provenance):
         ),
         semantic_turn_act="asset_discovery",
         asset_discovery=request,
-        resolution_provenance=list(provenance),
     )
 
 
-def _find(monkeypatch, requests, states, *, stale_provenance=()):
-    """Run find with proof on the decision and none of it left on state.
+def _find(monkeypatch, requests):
+    """Run find the way interpret does: empty draft provenance, anchors on the request.
 
-    ``stale_provenance`` is planted on the pre-interpret state. Eligibility
-    must ignore it.
+    State is planted with provider-catalog rows for those same anchors. That
+    planting must not decide eligibility.
     """
     from argus.agent_runtime.research_find import find_assets_stage_result
+    from argus.agent_runtime.state.models import ResolutionProvenance
 
     from tests.research.test_research_router_absorption import (
         _FakeSearchProvider,
@@ -177,12 +157,23 @@ def _find(monkeypatch, requests, states, *, stale_provenance=()):
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
     results = []
-    for request, state in zip(requests, states, strict=True):
-        blank = RunState.new(
-            current_user_message=state.current_user_message,
-            recent_thread_history=[],
+    for request in requests:
+        state = RunState.new(
+            current_user_message=FAKE.sentence(), recent_thread_history=[]
         )
-        blank.resolution_provenance = list(stale_provenance)
+        state.resolution_provenance = [
+            ResolutionProvenance(
+                field="asset_universe",
+                raw_text=symbol,
+                source="llm_extraction",
+                candidate_kind="asset",
+                canonical_symbol=symbol.strip().upper(),
+                asset_class=request.asset_class_hint or "equity",
+                validated_by="provider_catalog",
+            )
+            for symbol in request.anchor_symbols
+            if symbol.strip()
+        ]
         results.append(
             asyncio.run(
                 find_assets_stage_result(
@@ -193,10 +184,8 @@ def _find(monkeypatch, requests, states, *, stale_provenance=()):
                         user_goal_summary="research",
                         semantic_turn_act="asset_discovery",
                     ),
-                    decision=_decision_with_provenance(
-                        request, state.resolution_provenance
-                    ),
-                    state=blank,
+                    decision=_empty_decision(request),
+                    state=state,
                     user=_context().user,
                 )
             )
@@ -215,7 +204,6 @@ def test_verified_public_search_reuses_normalized_inputs_across_users(
     provider, results = _find(
         monkeypatch,
         [request, request.model_copy(update={"anchor_symbols": [" aapl ", " "]})],
-        [_find_state(), _find_state()],
     )
     assert len(provider.calls) == 1
     assert [r.stage_patch["research"]["usage"]["cache_status"] for r in results] == [
@@ -241,16 +229,7 @@ def test_material_public_search_dimensions_do_not_collide(monkeypatch, change) -
         relationship="peer", anchor_symbols=["AAPL", "MSFT"], needs_current_facts=True
     )
     second = request.model_copy(update=change)
-    provider, results = _find(
-        monkeypatch,
-        [request, second],
-        [
-            _find_state(("AAPL", "MSFT")),
-            _find_state(
-                ("AAPL", "MSFT"), asset_class=second.asset_class_hint or "equity"
-            ),
-        ],
-    )
+    provider, results = _find(monkeypatch, [request, second])
     assert len(provider.calls) == 2
     assert all(
         r.stage_patch["research"]["usage"]["cache_status"] == "miss" for r in results
@@ -259,49 +238,28 @@ def test_material_public_search_dimensions_do_not_collide(monkeypatch, change) -
 
 @pytest.mark.parametrize(
     "kind",
-    [
-        "category",
-        "private",
-        "unknown",
-        "client_mention",
-        "unresolved",
-        "wrong_class",
-        "conflicting",
-    ],
+    ["category", "private", "unvalidated", "conflicting"],
 )
 def test_unproven_discovery_context_bypasses_shared_cache(monkeypatch, kind) -> None:
     """Unvalidated, conflicting, category, and private context stay uncached.
 
-    Provider-catalog proof planted only on the pre-interpret state must not
-    admit any of them.
+    Planted provider-catalog rows must not admit an anchor the catalog rejects.
     """
     from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
 
     request = AssetDiscoveryRequest(
         relationship="peer", anchor_symbols=["AAPL"], needs_current_facts=True
     )
-    state = _find_state()
     if kind == "category":
         request.relationship = "category"
         request.category_description = "cybersecurity"
     elif kind == "private":
         request.category_description = f"My private holdings {FAKE.uuid4()}"
-    elif kind == "unknown":
-        state.resolution_provenance = []
-    elif kind == "client_mention":
-        state.resolution_provenance[0].validated_by = "client_mention"
-    elif kind == "unresolved":
-        state.resolution_provenance[0].resolution_status = "ambiguous"
-    elif kind == "conflicting":
-        state.resolution_provenance = _find_state(("MSFT",)).resolution_provenance
+    elif kind == "unvalidated":
+        request.anchor_symbols = ["PANW"]
     else:
-        state.resolution_provenance[0].asset_class = "crypto"
-    provider, results = _find(
-        monkeypatch,
-        [request, request],
-        [state, state],
-        stale_provenance=_find_state().resolution_provenance,
-    )
+        request.asset_class_hint = "crypto"
+    provider, results = _find(monkeypatch, [request, request])
     assert len(provider.calls) == 2
     assert all(
         r.stage_patch["research"]["usage"]["cache_status"] == "miss" for r in results
@@ -330,7 +288,7 @@ def test_model_backed_search_with_unmodeled_configuration_does_not_share(
     request = AssetDiscoveryRequest(
         relationship="peer", anchor_symbols=["AAPL"], needs_current_facts=True
     )
-    provider, _ = _find(monkeypatch, [request, request], [_find_state(), _find_state()])
+    provider, _ = _find(monkeypatch, [request, request])
     assert len(provider.calls) == 2
     assert cache_stats()["entries"] == 0
 
@@ -371,14 +329,12 @@ def test_interpret_discovery_reuses_current_decision_provenance_before_state_upd
     user = UserState(user_id=FAKE.uuid4(), language_preference="en")
 
     def interpretation(anchors: list[str], *, relationship: str = "peer"):
-        draft = StrategySummary()
-        draft.resolution_provenance = _find_state(("AAPL",)).resolution_provenance
         return StructuredInterpretation(
             intent="conversation_followup",
             task_relation="continue",
             user_goal_summary="Find public peers",
             semantic_turn_act="asset_discovery",
-            candidate_strategy_draft=draft,
+            candidate_strategy_draft=StrategySummary(),
             asset_discovery=AssetDiscoveryRequest(
                 relationship=relationship,
                 anchor_symbols=anchors,
@@ -414,7 +370,7 @@ def test_interpret_discovery_reuses_current_decision_provenance_before_state_upd
         return first, second, changed
 
     first, second, changed = asyncio.run(run())
-    assert observed == [([], ["AAPL"])] * 3
+    assert observed == [([], [])] * 3
     assert len(provider.calls) == 2
     assert provider.calls[0] != provider.calls[1]
     assert [
@@ -424,43 +380,48 @@ def test_interpret_discovery_reuses_current_decision_provenance_before_state_upd
     assert cache_stats()["entries"] == 2
 
 
-def test_registered_tool_without_a_decision_uses_only_its_own_state(
-    monkeypatch,
-) -> None:
-    """peer_expansion supplies no decision, so another call's proof cannot admit it."""
+def test_registered_tool_does_not_share_an_unvalidated_anchor(monkeypatch) -> None:
+    """A tool call has no decision. Catalog proof, not planted state, admits it."""
     from argus.agent_runtime.research_tools import PeerExpansionArguments, peer_expansion
+    from argus.agent_runtime.state.models import ResolutionProvenance
 
     from tests.research.test_research_router_absorption import (
         _FakeSearchProvider,
-        _public_anchor_state,
         _search_packet,
         _wire_find,
     )
 
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
-    proven = _context()
-    proven.state = _public_anchor_state(proven.state.current_user_message, "AAPL")
-    bare = _context()
-    arguments = PeerExpansionArguments(
-        request="Find candidate assets around this business",
-        relationship="peer",
-        anchor_symbols=["AAPL"],
-        needs_current_facts=True,
-    )
+    context = _context()
+    context.state.resolution_provenance = [
+        ResolutionProvenance(
+            field="asset_universe",
+            raw_text="PANW",
+            source="llm_extraction",
+            candidate_kind="asset",
+            canonical_symbol="PANW",
+            asset_class="equity",
+            validated_by="provider_catalog",
+        )
+    ]
 
     async def invoke():
-        first = await peer_expansion(arguments, context=proven)
-        second = await peer_expansion(arguments, context=bare)
-        return first, second
+        return await peer_expansion(
+            PeerExpansionArguments(
+                request="Find candidate assets around this business",
+                relationship="peer",
+                anchor_symbols=["PANW"],
+                needs_current_facts=True,
+            ),
+            context=context,
+        )
 
     asyncio.run(invoke())
+    asyncio.run(invoke())
     assert len(provider.calls) == 2
-    assert [
-        proven.stage_result.stage_patch["research"]["usage"]["cache_status"],
-        bare.stage_result.stage_patch["research"]["usage"]["cache_status"],
-    ] == ["miss", "miss"]
-    assert cache_stats()["entries"] == 1
+    assert context.stage_result.stage_patch["research"]["usage"]["cache_status"] == "miss"
+    assert cache_stats()["entries"] == 0
 
 
 def test_shared_storage_rejects_freeform_packet_even_under_a_current_key() -> None:

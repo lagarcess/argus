@@ -12,7 +12,6 @@ unchanged; the user-visible experience is the same or better.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any
 
@@ -23,54 +22,45 @@ from argus.agent_runtime.stages.interpret_types import (
     StageResult,
     StructuredInterpretation,
 )
-from argus.agent_runtime.state.models import ResolutionProvenance, RunState, UserState
+from argus.agent_runtime.state.models import RunState, UserState
 from argus.domain.research.admission import claim_current_research_attempt
 from argus.domain.research.cache import SearchPacketCache
 from argus.domain.research.contracts import CapabilityClass
 
 
-def _cache_provenance(
-    decision: InterpretDecision | None,
-    state: RunState,
-) -> Sequence[ResolutionProvenance]:
-    """The current decision owns proof. A missing decision is the tool path.
+def _public_anchor_search(request: AssetDiscoveryRequest) -> bool:
+    """Share only anchors the asset catalog has already validated.
 
-    Interpret certifies anchors on the decision, then discovery runs before
-    that proof is copied onto ``RunState``. A present decision therefore
-    never falls back to state, including when its own list is empty. The
-    registered tool path passes no decision and certifies only the state it
-    was invoked with.
+    Discovery turns leave the strategy draft empty, so decision and state
+    provenance are not proof. Each anchor is resolved through the same
+    catalog check a strategy symbol uses. A category, a private description,
+    an unresolved symbol, or a class that conflicts with the request stays
+    uncached. This does not search.
     """
-    if decision is None:
-        return state.resolution_provenance
-    return decision.resolution_provenance
-
-
-def _public_anchor_search(
-    request: AssetDiscoveryRequest,
-    provenance: Sequence[ResolutionProvenance],
-) -> bool:
-    """Certify only existing provider-owned identities, never classify prose.
-
-    No resolver calls are made to qualify a cache hit. Unknown provenance costs
-    a fresh search; a client mention or typed model string is not public proof.
-    """
-    if (request.category_description or "").strip():
+    if request.relationship == "category" or (request.category_description or "").strip():
         return False
-    anchors = [
-        symbol.strip().upper() for symbol in request.anchor_symbols if symbol.strip()
-    ]
-    if not anchors or request.relationship == "category":
+    anchors = [symbol.strip() for symbol in request.anchor_symbols if symbol.strip()]
+    if not anchors:
         return False
-    public_symbols = {
-        item.canonical_symbol
-        for item in provenance
-        if item.candidate_kind == "asset"
-        and item.resolution_status == "resolved"
-        and item.validated_by == "provider_catalog"
-        and item.asset_class == (request.asset_class_hint or "equity")
-    }
-    return all(symbol in public_symbols for symbol in anchors)
+    expected_class = request.asset_class_hint or "equity"
+    from argus.agent_runtime.resolution import resolve_asset_candidate
+
+    for index, anchor in enumerate(anchors):
+        resolution = resolve_asset_candidate(
+            anchor,
+            field=f"asset_discovery.anchor_symbols[{index}]",
+            source="llm_extraction",
+            asset_class_hint=expected_class,
+        )
+        asset = resolution.asset
+        if (
+            resolution.status != "resolved"
+            or asset is None
+            or resolution.provenance.validated_by != "provider_catalog"
+            or asset.asset_class != expected_class
+        ):
+            return False
+    return True
 
 
 async def find_assets_stage_result(
@@ -101,7 +91,7 @@ async def find_assets_stage_result(
     if (
         request is not None
         and request.needs_current_facts
-        and _public_anchor_search(request, _cache_provenance(decision, state))
+        and _public_anchor_search(request)
     ):
         packet_cache = SearchPacketCache
     result = await discovery_operation_result(

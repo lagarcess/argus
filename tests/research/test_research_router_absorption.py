@@ -29,7 +29,6 @@ from argus.agent_runtime.stages.interpret_types import (
     StructuredInterpretation,
 )
 from argus.agent_runtime.state.models import (
-    ResolutionProvenance,
     ResponseProfile,
     RunState,
     StrategySummary,
@@ -100,23 +99,6 @@ def _decision(
 
 def _state(message: str) -> RunState:
     return RunState.new(current_user_message=message, recent_thread_history=[])
-
-
-def _public_anchor_state(message: str, symbol: str) -> RunState:
-    state = _state(message)
-    state.resolution_provenance = [
-        ResolutionProvenance(
-            field="asset_universe[0]",
-            raw_text=symbol,
-            source="llm_extraction",
-            candidate_kind="asset",
-            resolution_status="resolved",
-            canonical_symbol=symbol,
-            asset_class="equity",
-            validated_by="provider_catalog",
-        )
-    ]
-    return state
 
 
 def _search_packet() -> SearchResultPacket:
@@ -361,19 +343,13 @@ def test_find_turns_share_the_research_cache_across_users(monkeypatch) -> None:
     set_research_query(monkeypatch, globals(), question_kind="find_assets", symbols=[])
     provider = _FakeSearchProvider(_search_packet())
     _wire_find(monkeypatch, provider=provider)
-    decision = _decision(relationship="comparison", anchor_symbols=["PANW"]).model_copy(
-        update={
-            "resolution_provenance": _public_anchor_state(
-                "Find peers of PANW", "PANW"
-            ).resolution_provenance
-        }
-    )
+    decision = _decision(relationship="comparison", anchor_symbols=["AAPL"])
 
     first = asyncio.run(
         ra.discovery_turn_stage_result(
             interpretation=_interpretation(),
             decision=decision,
-            state=_state("Find peers of PANW"),
+            state=_state("Find peers of AAPL"),
             user=USER,
         )
     )
@@ -381,7 +357,7 @@ def test_find_turns_share_the_research_cache_across_users(monkeypatch) -> None:
         ra.discovery_turn_stage_result(
             interpretation=_interpretation(),
             decision=decision,
-            state=_state("Find peers of PANW"),
+            state=_state("Find peers of AAPL"),
             user=UserState(user_id="someone-else", language_preference="en"),
         )
     )
