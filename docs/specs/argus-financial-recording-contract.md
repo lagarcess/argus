@@ -43,6 +43,8 @@ The rest of this document defines each piece.
 | `ownership_share_bps` | The owner's share of the account, 1 to 10,000 basis points. Default 10,000. This is ownership, not permission (section 11). |
 | `version` | Integer. Increments on every write that touches the account or its records. Used for stale-preview detection (section 8). |
 
+**Vehicles and homes.** PR #723 reports that the founder approved vehicle and residential-property records, with optional ownership shares and linked debt, on 2026-09-27. It also reports that the approval is not yet published in the MVEE or the decision log. It calls this a publication gap owned by the delivery lead. This contract treats the approval as reported, not canonical. The `property` type covers both kinds with asset arithmetic. Splitting it into `vehicle` and `home` changes labels only. A loan linked to its asset stays its own debt account, counted once. The link is display-only. It lets the asset card show the loan and the equity, and never subtracts the loan a second time. The proof does not model the link.
+
 **Type changes.** A type change inside the same nature is an ordinary edit. A change that flips nature (checking to credit card) is refused once the account has a record, because it would reverse the meaning of every stored sign. The person archives the account and creates the right one.
 
 **Unknown is not zero.** An account has a known balance only after it has an anchor. With no anchor its balance is `unknown`, and Argus reports the activity recorded since tracking began instead ("−RD$850 recorded since you started tracking"). An unknown balance is excluded from totals and listed in coverage (section 11). The same holds for totals. When every asset in a currency has an unknown balance, that currency's assets total is unknown, not RD$0, and so is its net. Liabilities follow the same rule.
@@ -260,6 +262,7 @@ The proof checks each invariant through the named scenarios in [`scenarios.py`](
 | Uncertain duplicates go to review. Legitimate similar purchases are never deleted silently. | MVEE section 5 |
 | Joint account is one account. Private-to-joint transfers are not household income. Membership is not permission. | MVEE section 12 |
 | Liabilities are entered as a positive amount owed. | Founder-locked mobile sketch, published by PR #714, which is still open |
+| Vehicle and home records with optional ownership shares and linked debt | Reported approved 2026-09-27 by PR #723. Not yet in the MVEE or the decision log. Publication belongs to the delivery lead, so it is not a founder question here. |
 
 ### Recommended engineering choices (this proposal)
 
