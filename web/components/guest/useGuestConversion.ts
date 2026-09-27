@@ -195,9 +195,9 @@ export function useGuestConversion({
       const action = actionLatch?.take() ?? null;
       setIsOpen(false);
       handoffPreparedRef.current = false;
-      // The claim is complete. A failed Recents refresh cannot reopen its
-      // consumed handoff or prevent the verified pending action from resuming.
-      try { await refreshHistory(); } catch { /* Recents refresh is best-effort. */ }
+      // Recents is a projection: its latency or failure cannot delay the
+      // verified action after the claim has completed.
+      void Promise.resolve().then(refreshHistory).catch(() => undefined);
       if (action) {
         await onResume(action);
       }

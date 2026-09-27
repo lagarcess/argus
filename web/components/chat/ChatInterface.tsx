@@ -1078,7 +1078,7 @@ export default function ChatInterface() {
       return false;
     }
     if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
-    const expectedUserId = account?.user.id ?? authenticatedUserIdRef.current;
+    const expectedUserId = authenticatedUserIdRef.current;
     if (!expectedUserId) return false;
     try { await authenticatedRequestHeaders(expectedUserId); }
     catch (error) { if (error instanceof ChatAccountChangedError) accountBoundary.invalidate(); else showToast(t("chat.error_generic"), "error"); return false; }
