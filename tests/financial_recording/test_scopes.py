@@ -32,6 +32,7 @@ def test_position_discloses_unknown_and_archived_accounts():
         }
     }
     assert result["totals"] == 10_000
+    assert result["unknown_asset_side"] == [None, -300_000, None]
 
 
 def test_revaluation_is_not_income_and_share_weights_asset_and_debt_alike():

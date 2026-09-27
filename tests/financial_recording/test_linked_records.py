@@ -11,10 +11,10 @@ def test_both_legs_of_a_transfer_change_and_vanish_together():
         "moved_to_other_currency": "InvalidInput:currency_mismatch",
         "removed": [1_000_000, 0, 0],
         "history": [
-            [100_000, "acct-3", None, False],
-            [150_000, "acct-3", "amount was 1,500", False],
-            [150_000, "acct-5", "went to Meta", False],
-            [150_000, "acct-5", "never happened", True],
+            [100_000, "acct-3", None, False, "person-1"],
+            [150_000, "acct-3", "amount was 1,500", False, "person-1"],
+            [150_000, "acct-5", "went to Meta", False, "person-2"],
+            [150_000, "acct-5", "never happened", True, "person-2"],
         ],
         "versions": [5, 4, 3],
     }

@@ -47,6 +47,7 @@ def test_account_edit_rules():
         "stale_version": "StaleVersion",
         "archived_version": 3,
         "archived_draft_issues": {"account_archived": "blocking"},
+        "correct_on_archived": "ok",
     }
 
 

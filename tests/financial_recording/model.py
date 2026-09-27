@@ -28,6 +28,7 @@ from tests.financial_recording.derive import (
     Known,
     Observation,
     Opening,
+    Placements,
     Provenance,
     Record,
     Revision,
@@ -36,7 +37,6 @@ from tests.financial_recording.derive import (
     anchors,
     balance,
     legs,
-    live_records,
     order,
 )
 from tests.financial_recording.money import InvalidInput, exponent, parse_minor
@@ -99,10 +99,11 @@ class Draft:
     id: str
     fields: Mapping[str, Optional[str]]
     provenance: Provenance
-    status: Literal["proposed", "confirmed"] = "proposed"
+    status: Literal["proposed", "confirmed", "rejected"] = "proposed"
     revision: int = 1
     distinct: bool = False
     record_id: Optional[str] = None
+    placements: Placements = ()
 
 
 @dataclass(frozen=True)
@@ -131,7 +132,9 @@ def fingerprint(value: object) -> str:
 
 
 def parse_fields(
-    fields: Mapping[str, Optional[str]], accounts: Mapping[str, Account]
+    fields: Mapping[str, Optional[str]],
+    accounts: Mapping[str, Account],
+    placements: Placements = (),
 ) -> tuple[Optional[Body], tuple[Issue, ...]]:
     kind = fields.get("kind") or ""
     if kind not in REQUIRED_FIELDS:
@@ -150,6 +153,7 @@ def parse_fields(
     values = {
         "account_id": account.id,
         "amount": _parsed(found, parse_minor, text["amount"], account.currency),
+        "placements": placements,
     }
     if kind == "balance_observation":
         values["as_of"] = _parsed(found, _instant, text["as_of"])
@@ -159,9 +163,6 @@ def parse_fields(
         kind=kind,
         occurred_on=_parsed(found, _date, text["occurred_on"]),
         occurred_at=_parsed(found, _instant, text.get("occurred_at")),
-        same_day_order=_parsed(
-            found, _choice, text.get("same_day_order"), ("before", "after")
-        ),
         category=text.get("category") or None,
         counter_account_id=text.get("counter_account_id") or None,
     )
@@ -185,7 +186,7 @@ def validate(book: Book, body: Body, tz: ZoneInfo) -> list[Issue]:
         return [
             issue("observation_order_unknown", record_id)
             for record_id, activity in activities(book, body.account_id)
-            if order(activity, body, tz) is None
+            if order(activity, body, tz, record_id, None) is None
         ]
     return []
 
@@ -193,7 +194,7 @@ def validate(book: Book, body: Body, tz: ZoneInfo) -> list[Issue]:
 def review(
     state: State, draft: Draft, tz: ZoneInfo
 ) -> tuple[Optional[Body], tuple[Issue, ...]]:
-    body, parsed = parse_fields(draft.fields, state.book.accounts)
+    body, parsed = parse_fields(draft.fields, state.book.accounts, draft.placements)
     found = [*parsed, *(validate(state.book, body, tz) if body is not None else ())]
     found.extend(_duplicates(state, draft, body))
     if body is not None and not any(item.severity == "blocking" for item in found):
@@ -211,6 +212,8 @@ def _activity_issues(book: Book, body: Activity, tz: ZoneInfo) -> list[Issue]:
     counter = book.accounts.get(body.counter_account_id or "")
     if needs_counter and counter is None:
         found.append(issue("counter_account_missing"))
+    elif needs_counter and counter.id == body.account_id:
+        found.append(issue("counter_account_same", counter.id))
     elif not needs_counter and body.counter_account_id:
         found.append(issue("counter_account_unexpected", body.counter_account_id))
     elif needs_counter:
@@ -223,7 +226,8 @@ def _activity_issues(book: Book, body: Activity, tz: ZoneInfo) -> list[Issue]:
         issue("observation_order_unknown", record_id)
         for account_id in sorted(accounts_of(body))
         for record_id, anchor in anchors(book, account_id)
-        if isinstance(anchor, Observation) and order(body, anchor, tz) is None
+        if isinstance(anchor, Observation)
+        and order(body, anchor, tz, None, record_id) is None
     )
     return found
 
@@ -238,10 +242,15 @@ def _identities(provenance: Provenance, account_id: str) -> set[tuple]:
     return keys
 
 
-def _signature(body: Optional[Body]) -> Optional[tuple]:
+def _signature(body: Optional[Body]) -> frozenset:
+    # Every leg counts, so a card statement's payment row meets the payment
+    # already recorded from the checking side.
     if not isinstance(body, Activity):
-        return None
-    return (body.account_id, body.amount, body.occurred_on, body.kind)
+        return frozenset()
+    return frozenset(
+        (account_id, abs(effect), body.occurred_on)
+        for account_id, effect in legs(body).items()
+    )
 
 
 def _duplicates(state: State, draft: Draft, body: Optional[Body]) -> list[Issue]:
@@ -251,11 +260,11 @@ def _duplicates(state: State, draft: Draft, body: Optional[Body]) -> list[Issue]
     existing = [
         (
             record.id,
-            record.body,
+            None if record.removed else record.body,
             record.body.account_id,
             (record.revisions[0].provenance, *record.linked),
         )
-        for record in live_records(state.book)
+        for record in state.book.records.values()
     ] + [
         (
             other.id,
@@ -275,12 +284,12 @@ def _duplicates(state: State, draft: Draft, body: Optional[Body]) -> list[Issue]
     if same_source:
         return [issue("already_recorded", *same_source)]
     signature = _signature(body)
-    if signature is None or draft.distinct:
+    if not signature or draft.distinct:
         return []
     matches = [
         item_id
         for item_id, item_body, _, _ in existing
-        if _signature(item_body) == signature
+        if signature & _signature(item_body)
     ]
     return [issue("possible_duplicate", *matches)] if matches else []
 
@@ -351,9 +360,11 @@ class Store:
         clock: Callable[[], datetime],
         ids: Optional[Iterator[int]] = None,
         tz: ZoneInfo = DEFAULT_TZ,
+        actor: str = "person-1",
     ) -> None:
         self.clock = clock
         self.tz = tz
+        self.actor = actor
         self._ids = itertools.count(1) if ids is None else ids
         self.state = State(Book({}, {}), {}, {})
 
@@ -451,11 +462,9 @@ class Store:
         *,
         distinct: bool = False,
         duplicate_of: Optional[str] = None,
-        same_day_order: Optional[str] = None,
+        placements: Optional[Mapping[str, str]] = None,
     ) -> Draft:
-        draft = self.state.drafts[draft_id]
-        if draft.status != "proposed":
-            raise InvalidInput("draft_not_proposed", draft_id)
+        draft = self._proposed(draft_id)
         changes: dict = {
             "revision": draft.revision + 1,
             "distinct": draft.distinct or distinct,
@@ -468,11 +477,33 @@ class Store:
                 duplicate_of: replace(target, linked=(*target.linked, draft.provenance)),
             }
             changes.update(status="confirmed", record_id=duplicate_of)
-        if same_day_order is not None:
-            changes["fields"] = {**draft.fields, "same_day_order": same_day_order}
+        if placements:
+            for answer in placements.values():
+                _choice(answer, ("before", "after"))
+            merged = {**dict(draft.placements), **placements}
+            changes["placements"] = tuple(sorted(merged.items()))
         resolved = replace(draft, **changes)
         self._swap(records=records, drafts={**self.state.drafts, draft_id: resolved})
         return resolved
+
+    def edit_draft(self, draft_id: str, **fields: Optional[str]) -> Draft:
+        draft = self._proposed(draft_id)
+        edited = replace(
+            draft, fields={**draft.fields, **fields}, revision=draft.revision + 1
+        )
+        self._swap(drafts={**self.state.drafts, draft_id: edited})
+        return edited
+
+    def reject(self, draft_id: str) -> Draft:
+        rejected = replace(self._proposed(draft_id), status="rejected")
+        self._swap(drafts={**self.state.drafts, draft_id: rejected})
+        return rejected
+
+    def _proposed(self, draft_id: str) -> Draft:
+        draft = self.state.drafts[draft_id]
+        if draft.status != "proposed":
+            raise InvalidInput("draft_not_proposed", draft_id)
+        return draft
 
     def preview(self, draft_id: str) -> Preview:
         draft = self.state.drafts[draft_id]
@@ -552,7 +583,15 @@ class Store:
         others = {
             key: value for key, value in self.book.records.items() if key != record_id
         }
-        found = validate(Book(self.book.accounts, others), body, self.tz)
+        # A record on an archived account stays correctable; it just takes no new ones.
+        found = [
+            item
+            for item in validate(Book(self.book.accounts, others), body, self.tz)
+            if not (
+                item.code == "account_archived"
+                and set(item.refs) <= accounts_of(record.body)
+            )
+        ]
         if found:
             raise ReviewRequired(found)
         return self._revise(record, body, reason, removed=False)
@@ -575,7 +614,9 @@ class Store:
         self, record: Record, body: Body, reason: str, *, removed: bool
     ) -> Record:
         now = self.clock()
-        revision = Revision(body, now, Provenance("manual", now), reason, removed)
+        revision = Revision(
+            body, now, Provenance("manual", now), reason, removed, self.actor
+        )
         revised = replace(record, revisions=(*record.revisions, revision))
         touched = accounts_of(record.body) | accounts_of(body)
         self._swap(
@@ -585,7 +626,8 @@ class Store:
         return revised
 
     def _new_record(self, body: Body, provenance: Provenance) -> Record:
-        return Record(self._id("rec"), (Revision(body, self.clock(), provenance),))
+        revision = Revision(body, self.clock(), provenance, recorded_by=self.actor)
+        return Record(self._id("rec"), (revision,))
 
     def _id(self, prefix: str) -> str:
         return f"{prefix}-{next(self._ids)}"

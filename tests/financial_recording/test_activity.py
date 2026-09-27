@@ -50,6 +50,7 @@ def test_same_currency_transfer_moves_money_without_income_or_spending():
     ]
     assert [savings["income"], savings["moved_in_from_outside_scope"]] == [0, 500_000]
     assert [checking["spending"], checking["moved_out_of_scope"]] == [0, 500_000]
+    assert result["to_same_account"] == {"counter_account_same": "blocking"}
 
 
 def test_card_purchase_is_spending_once_and_its_payment_is_not():
@@ -60,6 +61,9 @@ def test_card_purchase_is_spending_once_and_its_payment_is_not():
     assert (paid["card"], paid["checking"]) == (0, 700_000)
     assert paid["totals"]["DOP"]["spending"] == 300_000
     assert paid["totals"]["DOP"]["income"] == 0
+    row = result["card_statement_payment_row"]
+    assert row["issues"] == {"possible_duplicate": "blocking"}
+    assert row["matches"] == [row["payment_record"]]
 
 
 def test_overdraft_loan_payment_and_card_interest():

@@ -79,3 +79,25 @@ def test_same_day_order_blocks_until_placed_and_each_placement_differs():
         "gaps": [[-100_000, "unexplained"]],
         "balance": 800_000,
     }
+
+
+def test_same_day_answers_belong_to_one_anchor():
+    result = scenarios.same_day_order()
+    zero_gap_at_9000 = {"confirm": "ok", "gaps": [[0, "unexplained"]], "balance": 900_000}
+    assert result["statement_close_covers_its_day"] == {"issues": {}, **zero_gap_at_9000}
+    assert result["check_recorded_after_logging"] == {
+        "unresolved": {"observation_order_unknown": "blocking"},
+        **zero_gap_at_9000,
+    }
+    two = result["two_checks_same_day"]
+    assert len(two["unresolved"]) == 2
+    assert (two["confirm"], two["gaps"], two["balance"]) == (
+        "ok",
+        [[0, "unexplained"], [0, "unexplained"]],
+        900_000,
+    )
+    assert result["opening_same_day_stays_first"] == {
+        "confirm": "ok",
+        "gaps": [[-50_000, "unexplained"]],
+        "balance": 750_000,
+    }

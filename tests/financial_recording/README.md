@@ -29,7 +29,7 @@ calls. The clock and the id sequence are injected.
 From the repository root:
 
 ```bash
-python -m pytest tests/financial_recording -q --no-cov -p no:cacheprovider
+poetry run python -m pytest tests/financial_recording -q --no-cov -p no:cacheprovider
 ```
 
 ## Regenerate the evidence
@@ -39,6 +39,6 @@ The committed evidence file is
 differs from the model's output. After you change the model, regenerate it:
 
 ```bash
-python -m tests.financial_recording.scenarios \
+poetry run python -m tests.financial_recording.scenarios \
   --write docs/reports/evidence/financial-recording/scenarios.json
 ```

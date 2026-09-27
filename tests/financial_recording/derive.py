@@ -32,6 +32,7 @@ Kind = Literal["expense", "income", "refund", "transfer", "debt_payment"]
 Basis = Literal["user_check", "statement", "value_estimate"]
 SameDayOrder = Literal["before", "after"]
 Weighting = Literal["full", "owner_share"]
+Placements = tuple[tuple[str, SameDayOrder], ...]
 
 NATURE: Mapping[str, Nature] = {
     "cash": "asset",
@@ -89,6 +90,7 @@ class Observation:
     amount: int
     as_of: datetime
     basis: Basis
+    placements: Placements = ()
 
 
 @dataclass(frozen=True)
@@ -100,7 +102,7 @@ class Activity:
     occurred_at: Optional[datetime] = None
     category: Optional[str] = None
     counter_account_id: Optional[str] = None
-    same_day_order: Optional[SameDayOrder] = None
+    placements: Placements = ()
 
 
 Anchor = Union[Opening, Observation]
@@ -121,6 +123,7 @@ class Revision:
     provenance: Provenance
     reason: Optional[str] = None
     removed: bool = False
+    recorded_by: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -209,16 +212,30 @@ def accounts_of(body: Body) -> set[str]:
     return set(legs(body)) if isinstance(body, Activity) else {body.account_id}
 
 
-def order(activity: Activity, anchor: Anchor, tz: ZoneInfo) -> Optional[SameDayOrder]:
+def order(
+    activity: Activity,
+    anchor: Anchor,
+    tz: ZoneInfo,
+    activity_id: Optional[str] = None,
+    anchor_id: Optional[str] = None,
+) -> Optional[SameDayOrder]:
+    """Where the activity falls relative to the anchor; None means ask the person.
+
+    A same-day answer belongs to one (activity, anchor) pair and is stored on
+    whichever of the two was confirmed later.
+    """
     if activity.occurred_at is not None:
         return "before" if activity.occurred_at <= anchor.as_of else "after"
     anchor_day = anchor.as_of.astimezone(tz).date()
     if activity.occurred_on != anchor_day:
         return "before" if activity.occurred_on < anchor_day else "after"
-    if activity.same_day_order is not None:
-        return activity.same_day_order
-    # An opening starts tracking, so untimed activity on its day follows it.
-    return "after" if isinstance(anchor, Opening) else None
+    if isinstance(anchor, Opening):
+        return "after"
+    if anchor.basis == "statement":
+        return "before"
+    from_activity = dict(activity.placements).get(anchor_id) if anchor_id else None
+    from_anchor = dict(anchor.placements).get(activity_id) if activity_id else None
+    return from_activity or from_anchor
 
 
 def live_records(book: Book) -> list[Record]:
@@ -250,24 +267,24 @@ def balance(
         item for item in anchors(book, account_id) if at is None or item[1].as_of <= at
     ]
     included = [
-        activity
-        for _, activity in activities(book, account_id)
+        (activity_id, activity)
+        for activity_id, activity in activities(book, account_id)
         if at is None or _on_or_before(activity, at, tz)
     ]
     if not known:
-        return Unknown(sum(legs(activity)[account_id] for activity in included))
-    anchor = known[-1][1]
+        return Unknown(sum(legs(activity)[account_id] for _, activity in included))
+    anchor_id, anchor = known[-1]
     later = sum(
         legs(activity)[account_id]
-        for activity in included
-        if _placed(activity, anchor, tz) == "after"
+        for activity_id, activity in included
+        if _placed(activity, anchor, tz, activity_id, anchor_id) == "after"
     )
     return Known(anchor.amount + later, anchor.as_of, _basis(anchor))
 
 
 def observation_gaps(book: Book, account_id: str, tz: ZoneInfo = DEFAULT_TZ) -> list[Gap]:
     ordered = anchors(book, account_id)
-    moves = [activity for _, activity in activities(book, account_id)]
+    moves = activities(book, account_id)
     gaps = []
     for position, (record_id, anchor) in enumerate(ordered):
         if not isinstance(anchor, Observation):
@@ -275,12 +292,12 @@ def observation_gaps(book: Book, account_id: str, tz: ZoneInfo = DEFAULT_TZ) -> 
         if position == 0:
             gaps.append(Gap(record_id, account_id, anchor.as_of, None, None))
             continue
-        previous = ordered[position - 1][1]
+        previous_id, previous = ordered[position - 1]
         between = sum(
             legs(activity)[account_id]
-            for activity in moves
-            if _placed(activity, previous, tz) == "after"
-            and _placed(activity, anchor, tz) == "before"
+            for activity_id, activity in moves
+            if _placed(activity, previous, tz, activity_id, previous_id) == "after"
+            and _placed(activity, anchor, tz, activity_id, record_id) == "before"
         )
         expected = previous.amount + between
         gaps.append(
@@ -346,18 +363,20 @@ def position(
         if account.archived:
             group["archived"].append(account_id)
             continue
+        side = "assets" if NATURE[account.type] == "asset" else "liabilities"
         current = balance(book, account_id, at, tz)
         if isinstance(current, Unknown):
             group["unknown"].append(account_id)
+            group["unknown_sides"].add(side)
             continue
         share = (
             Fraction(account.ownership_share_bps, 10_000)
             if weighting == "owner_share"
             else Fraction(1)
         )
-        side = "assets" if NATURE[account.type] == "asset" else "liabilities"
         group[side] += current.amount * share
         group["known"].append(account_id)
+        group["known_sides"].add(side)
         group["as_of"].append(current.as_of)
         group["gaps"].extend(
             gap
@@ -366,9 +385,9 @@ def position(
         )
     return {
         currency: Position(
-            assets=_known_total(group, group["assets"]),
-            liabilities=_known_total(group, group["liabilities"]),
-            net=_known_total(group, group["assets"] + group["liabilities"]),
+            assets=_side_total(group, "assets"),
+            liabilities=_side_total(group, "liabilities"),
+            net=_net_total(group),
             coverage=Coverage(
                 accounts_known=tuple(group["known"]),
                 accounts_unknown=tuple(group["unknown"]),
@@ -381,13 +400,27 @@ def position(
     }
 
 
-def _known_total(group: dict, value: Fraction) -> Optional[int]:
-    # With no known balance in a currency the total is unknown, never zero.
-    return round_half_up(value) if group["known"] else None
+def _side_total(group: dict, side: str) -> Optional[int]:
+    # A side whose only accounts have unknown balances is unknown, never zero.
+    if side in group["unknown_sides"] and side not in group["known_sides"]:
+        return None
+    return round_half_up(group[side]) if group["known"] else None
 
 
-def _placed(activity: Activity, anchor: Anchor, tz: ZoneInfo) -> SameDayOrder:
-    placed = order(activity, anchor, tz)
+def _net_total(group: dict) -> Optional[int]:
+    if None in (_side_total(group, "assets"), _side_total(group, "liabilities")):
+        return None
+    return round_half_up(group["assets"] + group["liabilities"])
+
+
+def _placed(
+    activity: Activity,
+    anchor: Anchor,
+    tz: ZoneInfo,
+    activity_id: str,
+    anchor_id: str,
+) -> SameDayOrder:
+    placed = order(activity, anchor, tz, activity_id, anchor_id)
     if placed is None:
         raise ValueError("observation_order_unknown must be resolved at review")
     return placed
@@ -421,6 +454,8 @@ def _blank_group() -> dict:
         "known": [],
         "unknown": [],
         "archived": [],
+        "known_sides": set(),
+        "unknown_sides": set(),
         "as_of": [],
         "gaps": [],
     }

@@ -5,6 +5,7 @@
     },
     "archived_version": 3,
     "blank_name": "InvalidInput:nickname_invalid",
+    "correct_on_archived": "ok",
     "currency_on_empty": "USD",
     "currency_on_used": "InvalidInput:currency_locked",
     "nature_flip_on_used": "InvalidInput:nature_change_requires_empty_account",
@@ -164,6 +165,15 @@
           }
         }
       }
+    },
+    "card_statement_payment_row": {
+      "issues": {
+        "possible_duplicate": "blocking"
+      },
+      "matches": [
+        "rec-8"
+      ],
+      "payment_record": "rec-8"
     }
   },
   "cross_currency_transfer_unresolved": {
@@ -208,11 +218,11 @@
         }
       }
     },
-    "after_overlap": {
-      "activity_records": 6,
-      "dop_balance": 591450
-    },
     "confirmed_in_batch": 5,
+    "final": {
+      "activity_records": 6,
+      "dop_balance": 518900
+    },
     "first_import_issues": {
       "tx-currency": {
         "currency_unsupported": "blocking"
@@ -240,6 +250,7 @@
       },
       "tx-usd-01": {}
     },
+    "household_row_after_picking_account": "ok",
     "overlap_issues": {
       "overlap-new": {},
       "tx-dop-01": {
@@ -263,6 +274,9 @@
         "tx-usd-01"
       ]
     },
+    "removed_row_reimport": {
+      "already_recorded": "blocking"
+    },
     "totals": {
       "DOP": {
         "income": 120000,
@@ -271,9 +285,9 @@
         },
         "moved_in_from_outside_scope": 0,
         "moved_out_of_scope": 0,
-        "spending": 28550,
+        "spending": 101100,
         "spending_by_category": {
-          "uncategorized": 28550
+          "uncategorized": 101100
         }
       },
       "USD": {
@@ -434,25 +448,29 @@
         100000,
         "acct-3",
         null,
-        false
+        false,
+        "person-1"
       ],
       [
         150000,
         "acct-3",
         "amount was 1,500",
-        false
+        false,
+        "person-1"
       ],
       [
         150000,
         "acct-5",
         "went to Meta",
-        false
+        false,
+        "person-2"
       ],
       [
         150000,
         "acct-5",
         "never happened",
-        true
+        true,
+        "person-2"
       ]
     ],
     "moved_to_other_currency": "InvalidInput:currency_mismatch",
@@ -563,6 +581,9 @@
     },
     "net_after": 2100000,
     "net_before": 2100000,
+    "to_same_account": {
+      "counter_account_same": "blocking"
+    },
     "totals_both": {
       "DOP": {
         "income": 0,
@@ -616,6 +637,58 @@
         ]
       ],
       "issues": {}
+    },
+    "check_recorded_after_logging": {
+      "balance": 900000,
+      "confirm": "ok",
+      "gaps": [
+        [
+          0,
+          "unexplained"
+        ]
+      ],
+      "unresolved": {
+        "observation_order_unknown": "blocking"
+      }
+    },
+    "opening_same_day_stays_first": {
+      "balance": 750000,
+      "confirm": "ok",
+      "gaps": [
+        [
+          -50000,
+          "unexplained"
+        ]
+      ]
+    },
+    "statement_close_covers_its_day": {
+      "balance": 900000,
+      "confirm": "ok",
+      "gaps": [
+        [
+          0,
+          "unexplained"
+        ]
+      ],
+      "issues": {}
+    },
+    "two_checks_same_day": {
+      "balance": 900000,
+      "confirm": "ok",
+      "gaps": [
+        [
+          0,
+          "unexplained"
+        ],
+        [
+          0,
+          "unexplained"
+        ]
+      ],
+      "unresolved": [
+        "rec-4",
+        "rec-6"
+      ]
     },
     "unresolved": {
       "balance": 900000,
@@ -693,6 +766,11 @@
         "net": 790000
       }
     },
-    "totals": 10000
+    "totals": 10000,
+    "unknown_asset_side": [
+      null,
+      -300000,
+      null
+    ]
   }
 }

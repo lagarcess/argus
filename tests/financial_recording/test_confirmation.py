@@ -5,7 +5,7 @@ from faker import Faker
 
 from tests.financial_recording import scenarios
 from tests.financial_recording.derive import DEFAULT_TZ, Provenance, balance
-from tests.financial_recording.model import ReviewRequired, Store
+from tests.financial_recording.model import ReviewRequired, StalePreview, Store
 
 NOW = datetime(2026, 9, 2, 10, tzinfo=DEFAULT_TZ)
 
@@ -53,3 +53,25 @@ def test_batch_confirm_is_all_or_nothing():
     assert store.state.drafts[good.id].status == "proposed"
     store.confirm_batch(previews[:1], "batch-good")
     assert balance(store.book, cash.id).amount == 9000
+
+
+def test_a_rejected_draft_frees_its_source_and_an_edited_draft_needs_a_new_preview():
+    store = Store(lambda: NOW)
+    cash = store.create_account("Efectivo", "cash", "DOP", "100.00", idempotency_key="c")
+    source = Provenance("document", NOW, {"digest": "d1", "row": 1})
+    fields = {
+        "kind": "expense",
+        "account_id": cash.id,
+        "amount": "10.00",
+        "occurred_on": "2026-09-02",
+    }
+    first = store.draft(fields, source)
+    store.reject(first.id)
+    second = store.draft(fields, source)
+    assert store.preview(second.id).issues == ()
+    stale = store.preview(second.id)
+    store.edit_draft(second.id, amount="12.00")
+    with pytest.raises(StalePreview):
+        store.confirm(stale, "k")
+    store.confirm(store.preview(second.id), "k")
+    assert balance(store.book, cash.id).amount == 8_800

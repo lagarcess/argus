@@ -61,7 +61,9 @@ def test_import_flags_malformed_rows_twins_and_reimports():
         "tx-dop-01": {"already_recorded": BLOCKING},
         "overlap-new": {},
     }
-    assert result["after_overlap"] == {"activity_records": 6, "dop_balance": 591_450}
+    assert result["household_row_after_picking_account"] == "ok"
+    assert result["removed_row_reimport"] == {"already_recorded": BLOCKING}
+    assert result["final"] == {"activity_records": 6, "dop_balance": 518_900}
     dop, usd = result["totals"]["DOP"], result["totals"]["USD"]
-    assert [dop["spending"], dop["income"]] == [28_550, 120_000]
+    assert [dop["spending"], dop["income"]] == [101_100, 120_000]
     assert [usd["spending"], usd["income"]] == [4000, 0]

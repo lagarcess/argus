@@ -43,8 +43,8 @@ EVIDENCE = (
 )
 
 
-def local(day: int, hour: int = 9) -> datetime:
-    return datetime(2026, 9, day, hour, tzinfo=DEFAULT_TZ)
+def local(day: int, hour: int = 9, minute: int = 0) -> datetime:
+    return datetime(2026, 9, day, hour, minute, tzinfo=DEFAULT_TZ)
 
 
 def jsonable(value: object) -> object:
@@ -121,17 +121,25 @@ class Scene:
     def record(self, kind: str, account: Account, amount: str, day: int, **options):
         return self.confirm(self.act(kind, account, amount, day, **options))
 
-    def observe(self, account: Account, amount: str, day: int, basis: str = "user_check"):
-        as_of = local(day, 18).isoformat()
-        return self.confirm(
-            self.draft(
-                kind="balance_observation",
-                account_id=account.id,
-                amount=amount,
-                as_of=as_of,
-                basis=basis,
-            )
+    def observation(
+        self,
+        account: Account,
+        amount: str,
+        day: int,
+        basis: str = "user_check",
+        hour: int = 18,
+        as_of: Optional[datetime] = None,
+    ) -> Draft:
+        return self.draft(
+            kind="balance_observation",
+            account_id=account.id,
+            amount=amount,
+            as_of=(as_of or local(day, hour)).isoformat(),
+            basis=basis,
         )
+
+    def observe(self, account: Account, amount: str, day: int, **options):
+        return self.confirm(self.observation(account, amount, day, **options))
 
     def issues(self, draft: Draft) -> dict[str, str]:
         return {item.code: item.severity for item in self.store.preview(draft.id).issues}
@@ -252,6 +260,9 @@ def same_currency_transfer() -> dict:
         "totals_both": scene.totals(checking, savings),
         "totals_savings_only": scene.totals(savings),
         "totals_checking_only": scene.totals(checking),
+        "to_same_account": scene.issues(
+            scene.act("transfer", checking, "50.00", 3, counter=checking)
+        ),
     }
 
 
@@ -261,9 +272,15 @@ def credit_card_purchase_then_payment() -> dict:
     card = scene.account("Tarjeta", "credit_card", "DOP", "0.00")
     scene.record("expense", card, "3000.00", 2, category="shopping")
     after_purchase = {"card": scene.amount(card), "totals": scene.totals(checking, card)}
-    scene.record("debt_payment", checking, "3000.00", 5, counter=card)
+    payment = scene.record("debt_payment", checking, "3000.00", 5, counter=card)
+    statement_row = scene.act("refund", card, "3000.00", 5, method="document")
     return {
         "after_purchase": after_purchase,
+        "card_statement_payment_row": {
+            "issues": scene.issues(statement_row),
+            "matches": list(scene.store.preview(statement_row.id).issues[0].refs),
+            "payment_record": payment.id,
+        },
         "after_payment": {
             "card": scene.amount(card),
             "checking": scene.amount(checking),
@@ -404,14 +421,14 @@ def two_observations() -> dict:
 def _same_day(order: Optional[str]) -> dict:
     scene = Scene()
     checking = scene.account("Corriente", "checking", "DOP", "10000.00")
-    scene.observe(checking, "9000.00", 5)
+    observed = scene.observe(checking, "9000.00", 5)
     draft = scene.act("expense", checking, "1000.00", 5)
     seen = {
         "issues": scene.issues(draft),
         "confirm": outcome(lambda: scene.confirm(draft)),
     }
     if order is not None:
-        scene.store.resolve(draft.id, same_day_order=order)
+        scene.store.resolve(draft.id, placements={observed.id: order})
         seen = {
             "issues": scene.issues(draft),
             "confirm": outcome(lambda: scene.confirm(draft)),
@@ -419,11 +436,69 @@ def _same_day(order: Optional[str]) -> dict:
     return {**seen, "gaps": scene.gaps(checking), "balance": scene.amount(checking)}
 
 
+def _reading_after(scene: Scene, account: Account, confirm: str) -> dict:
+    return {
+        "confirm": confirm,
+        "gaps": scene.gaps(account),
+        "balance": scene.amount(account),
+    }
+
+
+def _statement_close() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
+    scene.record("expense", checking, "1000.00", 5)
+    close = scene.observation(
+        checking, "9000.00", 5, basis="statement", as_of=local(5, 23, 59)
+    )
+    issues = scene.issues(close)
+    confirm = outcome(lambda: scene.confirm(close))
+    return {"issues": issues, **_reading_after(scene, checking, confirm)}
+
+
+def _check_after_logging() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
+    expense = scene.record("expense", checking, "1000.00", 5)
+    check = scene.observation(checking, "9000.00", 5)
+    unresolved = scene.issues(check)
+    scene.store.resolve(check.id, placements={expense.id: "before"})
+    confirm = outcome(lambda: scene.confirm(check))
+    return {"unresolved": unresolved, **_reading_after(scene, checking, confirm)}
+
+
+def _two_checks_same_day() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
+    early = scene.observe(checking, "10000.00", 5, hour=18)
+    late = scene.observe(checking, "9000.00", 5, hour=20)
+    purchase = scene.act("expense", checking, "1000.00", 5)
+    unresolved = sorted(
+        ref for item in scene.store.preview(purchase.id).issues for ref in item.refs
+    )
+    scene.store.resolve(purchase.id, placements={early.id: "after", late.id: "before"})
+    confirm = outcome(lambda: scene.confirm(purchase))
+    return {"unresolved": unresolved, **_reading_after(scene, checking, confirm)}
+
+
+def _opening_same_day() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "10000.00")
+    check = scene.observe(checking, "7500.00", 1)
+    expense = scene.act("expense", checking, "2000.00", 1)
+    scene.store.resolve(expense.id, placements={check.id: "before"})
+    return _reading_after(scene, checking, outcome(lambda: scene.confirm(expense)))
+
+
 def same_day_order() -> dict:
     return {
         "unresolved": _same_day(None),
         "before": _same_day("before"),
         "after": _same_day("after"),
+        "statement_close_covers_its_day": _statement_close(),
+        "check_recorded_after_logging": _check_after_logging(),
+        "two_checks_same_day": _two_checks_same_day(),
+        "opening_same_day_stays_first": _opening_same_day(),
     }
 
 
@@ -482,13 +557,20 @@ def duplicate_import_vs_twins() -> dict:
     overlap = scene.import_file("overlapping.csv", accounts)
     overlap_issues = {row: scene.issues(draft) for row, draft in overlap.items()}
     scene.confirm(overlap["overlap-new"])
+    household = scene.store.edit_draft(first["tx-household"].id, account_id=dop.id)
+    picked = outcome(lambda: scene.confirm(household))
+    refund = scene.store.state.drafts[first["tx-dop-04"].id].record_id
+    scene.store.remove(refund, 1, "bank reversed it")
+    third = scene.import_file("transactions.csv", accounts)
     return {
         "first_import_issues": first_issues,
         "confirmed_in_batch": len(clean),
         "after_first_import": after_first,
         "reimport": reimport,
         "overlap_issues": overlap_issues,
-        "after_overlap": {
+        "household_row_after_picking_account": picked,
+        "removed_row_reimport": scene.issues(third["tx-dop-04"]),
+        "final": {
             "activity_records": scene.activity_count(),
             "dop_balance": scene.amount(dop),
         },
@@ -530,6 +612,7 @@ def linked_correction_and_removal() -> dict:
     steps = {"recorded": balances()}
     scene.store.correct(transfer.id, 1, "amount was 1,500", amount="1500.00")
     steps["amount_corrected"] = balances()
+    scene.store.actor = "person-2"
     scene.store.correct(transfer.id, 2, "went to Meta", counter_account_id=c.id)
     steps["counter_corrected"] = balances()
     steps["stale_correction"] = outcome(
@@ -543,7 +626,13 @@ def linked_correction_and_removal() -> dict:
     removed = scene.store.remove(transfer.id, 3, "never happened")
     steps["removed"] = balances()
     steps["history"] = [
-        [rev.body.amount, rev.body.counter_account_id, rev.reason, rev.removed]
+        [
+            rev.body.amount,
+            rev.body.counter_account_id,
+            rev.reason,
+            rev.removed,
+            rev.recorded_by,
+        ]
         for rev in removed.revisions
     ]
     steps["versions"] = [scene.store.book.accounts[item.id].version for item in (a, b, c)]
@@ -604,7 +693,7 @@ def cross_currency_transfer_unresolved() -> dict:
     dollars = scene.account("Dolares", "savings", "USD", "100.00")
     card = scene.account("Tarjeta USD", "credit_card", "USD", "-50.00")
     transfer = scene.act("transfer", pesos, "1000.00", 2, counter=dollars)
-    payment = scene.act("debt_payment", pesos, "1000.00", 2, counter=card)
+    payment = scene.act("debt_payment", pesos, "500.00", 2, counter=card)
     return {
         "transfer_issues": scene.issues(transfer),
         "payment_issues": scene.issues(payment),
@@ -621,9 +710,12 @@ def unknown_coverage_disclosure() -> dict:
     scene.record("expense", old, "100.00", 2)
     scene.store.edit_account(old.id, 2, archived=True)
     scene.observe(checking, "7900.00", 5)
+    card = scene.account("Tarjeta", "credit_card", "DOP", "-3000.00")
+    sides = scene.position(wallet, card)["DOP"]
     return {
         "position": scene.position(checking, wallet, old),
         "totals": scene.totals(checking, wallet, old)["DOP"]["spending"],
+        "unknown_asset_side": [sides["assets"], sides["liabilities"], sides["net"]],
     }
 
 
@@ -669,6 +761,11 @@ def account_edit_rules() -> dict:
         "stale_version": outcome(lambda: store.edit_account(used.id, 1, nickname="Otra")),
         "archived_version": store.edit_account(used.id, 2, archived=True).version,
         "archived_draft_issues": scene.issues(scene.act("expense", used, "10.00", 2)),
+        "correct_on_archived": outcome(
+            lambda: store.correct(
+                anchors(store.book, used.id)[0][0], 1, "typo", amount="150.00"
+            )
+        ),
     }
 
 
