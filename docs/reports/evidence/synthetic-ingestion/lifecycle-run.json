@@ -73,8 +73,8 @@
       "file": "conversation-es.txt",
       "mode": "stub",
       "ids": [
-        "d67b0ca4f2fbaa7cf7748ea9",
-        "6ab331d0f98bcc620a13253e"
+        "d75d3e10323706f55f893429",
+        "90dc60483bcdee886af82c47"
       ],
       "errors": []
     },
@@ -89,7 +89,7 @@
       "file": "conversation-en.txt",
       "mode": "stub",
       "ids": [
-        "b3f3a493d3f7d839ec3e862d"
+        "7f55c732d24344be0c295673"
       ],
       "errors": []
     },
@@ -104,8 +104,8 @@
       "file": "voice-transcript-es.txt",
       "mode": "stub",
       "ids": [
-        "8627bc3d8b402880d913f72e",
-        "147de9d1b383819bd8a5a582"
+        "b7684d758f0e8b1a6adab798",
+        "7fa32e2d5637e5f15be1f7ee"
       ],
       "errors": []
     },
@@ -120,7 +120,7 @@
       "file": "receipt.png",
       "mode": "stub",
       "ids": [
-        "0682a7bed5c47f4b9c9222e0"
+        "5c605e32a6173c1886be3938"
       ],
       "errors": []
     },
@@ -135,8 +135,8 @@
       "file": "scanned-statement.png",
       "mode": "stub",
       "ids": [
-        "12680157c5ce2c33f0d19f28",
-        "ebed3cebed63f3966505215a"
+        "9ad1cc2188c1e4635091cdd5",
+        "5e7c32415ba4579fc060e0a3"
       ],
       "errors": []
     }
@@ -242,10 +242,10 @@
       "file": "conversation-es.txt",
       "result": {
         "confirmed": [
-          "d67b0ca4f2fbaa7cf7748ea9"
+          "d75d3e10323706f55f893429"
         ],
         "skipped": {
-          "6ab331d0f98bcc620a13253e": [
+          "90dc60483bcdee886af82c47": [
             "currency",
             "account"
           ]
@@ -257,7 +257,7 @@
       "file": "conversation-en.txt",
       "result": {
         "confirmed": [
-          "b3f3a493d3f7d839ec3e862d"
+          "7f55c732d24344be0c295673"
         ],
         "skipped": {}
       }
@@ -267,10 +267,10 @@
       "file": "voice-transcript-es.txt",
       "result": {
         "confirmed": [
-          "8627bc3d8b402880d913f72e"
+          "b7684d758f0e8b1a6adab798"
         ],
         "skipped": {
-          "147de9d1b383819bd8a5a582": [
+          "7fa32e2d5637e5f15be1f7ee": [
             "date",
             "account",
             "destination"
@@ -284,7 +284,7 @@
       "result": {
         "confirmed": [],
         "skipped": {
-          "0682a7bed5c47f4b9c9222e0": [
+          "5c605e32a6173c1886be3938": [
             "amount"
           ]
         }
@@ -295,10 +295,10 @@
       "file": "scanned-statement.png",
       "result": {
         "confirmed": [
-          "12680157c5ce2c33f0d19f28"
+          "9ad1cc2188c1e4635091cdd5"
         ],
         "skipped": {
-          "ebed3cebed63f3966505215a": [
+          "5e7c32415ba4579fc060e0a3": [
             "amount"
           ]
         }
@@ -375,64 +375,6 @@
   "reload_matches": true,
   "confirmed_records": 20,
   "review_exceptions": [
-    {
-      "fields": {
-        "account": "cash-dop",
-        "amount": "",
-        "currency": "DOP",
-        "date": "2026-09-10",
-        "description": "Partially unreadable receipt",
-        "destination": "personal",
-        "kind": "expense",
-        "source_id": "receipt-01"
-      },
-      "id": "0682a7bed5c47f4b9c9222e0",
-      "issues": [
-        "amount"
-      ],
-      "mode": "stub",
-      "source_ref": {
-        "digest": "83c086bd67466b7769e7dd5af8963831f672f4ca9dacee2dec5ba383e4b076b8",
-        "file": "receipt.png",
-        "page": 1,
-        "region": [
-          35,
-          425,
-          1050,
-          475
-        ],
-        "row": 1
-      },
-      "status": "proposed"
-    },
-    {
-      "fields": {
-        "account": "",
-        "amount": "700.00",
-        "currency": "DOP",
-        "date": "",
-        "description": "Compra sintética",
-        "destination": "personal or household",
-        "kind": "expense",
-        "source_id": "voice-02"
-      },
-      "id": "147de9d1b383819bd8a5a582",
-      "issues": [
-        "date",
-        "account",
-        "destination"
-      ],
-      "mode": "stub",
-      "source_ref": {
-        "char_end": 252,
-        "char_start": 178,
-        "digest": "d470ec119f4b5d4159e11df62fe6c2b222a32bd77be73c3db520416e60ab0593",
-        "file": "voice-transcript-es.txt",
-        "quote": "Y setecientos de la compra de casa, no sé si ponerlo personal o del hogar.",
-        "row": 2
-      },
-      "status": "proposed"
-    },
     {
       "fields": {
         "account": "statement-dop",
@@ -552,28 +494,92 @@
     },
     {
       "fields": {
-        "account": "",
-        "amount": "20.00",
-        "currency": "$",
+        "account": "cash-dop",
+        "amount": "",
+        "currency": "DOP",
         "date": "2026-09-10",
-        "description": "Compra sintética",
+        "description": "Partially unreadable receipt",
         "destination": "personal",
         "kind": "expense",
-        "source_id": "chat-es-02"
+        "source_id": "receipt-01"
       },
-      "id": "6ab331d0f98bcc620a13253e",
+      "id": "5c605e32a6173c1886be3938",
       "issues": [
-        "currency",
-        "account"
+        "amount"
       ],
       "mode": "stub",
       "source_ref": {
-        "char_end": 138,
-        "char_start": 88,
-        "digest": "98f99ac44f7e4f34cc68ba30ad60a93a1c13d1c8e1c40ba2b172d1ef2d5a0a11",
-        "file": "conversation-es.txt",
-        "quote": "También pagué $20; no dije la moneda ni la cuenta.",
-        "row": 2
+        "digest": "83c086bd67466b7769e7dd5af8963831f672f4ca9dacee2dec5ba383e4b076b8",
+        "file": "receipt.png",
+        "page": 1,
+        "region": [
+          35,
+          425,
+          1050,
+          475
+        ],
+        "row": 1,
+        "stub_digest": "3f759ba6562fdf3b237b956f8bd9e938b28c5482bf9888bfe632a77e8a9ef3ef"
+      },
+      "status": "proposed"
+    },
+    {
+      "fields": {
+        "account": "scan-dop",
+        "amount": "",
+        "currency": "DOP",
+        "date": "2026-09-11",
+        "description": "Compra sintética",
+        "destination": "personal",
+        "kind": "expense",
+        "source_id": "scan-02"
+      },
+      "id": "5e7c32415ba4579fc060e0a3",
+      "issues": [
+        "amount"
+      ],
+      "mode": "stub",
+      "source_ref": {
+        "digest": "e5fca617d1c70b2a78c422a128312f5e4e3927db59d4c37f07f5a5ce038b9805",
+        "file": "scanned-statement.png",
+        "page": 1,
+        "region": [
+          35,
+          425,
+          1050,
+          465
+        ],
+        "row": 2,
+        "stub_digest": "c54d4de1972e49930e9c196eca108832bf1a0a1687467d83d29202c02422d0db"
+      },
+      "status": "proposed"
+    },
+    {
+      "fields": {
+        "account": "",
+        "amount": "700.00",
+        "currency": "DOP",
+        "date": "",
+        "description": "Compra sintética",
+        "destination": "personal or household",
+        "kind": "expense",
+        "source_id": "voice-02"
+      },
+      "id": "7fa32e2d5637e5f15be1f7ee",
+      "issues": [
+        "date",
+        "account",
+        "destination"
+      ],
+      "mode": "stub",
+      "source_ref": {
+        "char_end": 252,
+        "char_start": 178,
+        "digest": "d470ec119f4b5d4159e11df62fe6c2b222a32bd77be73c3db520416e60ab0593",
+        "file": "voice-transcript-es.txt",
+        "quote": "Y setecientos de la compra de casa, no sé si ponerlo personal o del hogar.",
+        "row": 2,
+        "stub_digest": "10b470b1900c07ca1b07b298bc3fae9953ddb107a8a2d3e73ff636b27674ec7f"
       },
       "status": "proposed"
     },
@@ -597,6 +603,34 @@
         "digest": "ba7c8753f79438fd5a083661de781a12e9743a3a4c00c1781d4f98b1666d9366",
         "file": "transactions.csv",
         "row": 9
+      },
+      "status": "proposed"
+    },
+    {
+      "fields": {
+        "account": "",
+        "amount": "20.00",
+        "currency": "$",
+        "date": "2026-09-10",
+        "description": "Compra sintética",
+        "destination": "personal",
+        "kind": "expense",
+        "source_id": "chat-es-02"
+      },
+      "id": "90dc60483bcdee886af82c47",
+      "issues": [
+        "currency",
+        "account"
+      ],
+      "mode": "stub",
+      "source_ref": {
+        "char_end": 138,
+        "char_start": 88,
+        "digest": "98f99ac44f7e4f34cc68ba30ad60a93a1c13d1c8e1c40ba2b172d1ef2d5a0a11",
+        "file": "conversation-es.txt",
+        "quote": "También pagué $20; no dije la moneda ni la cuenta.",
+        "row": 2,
+        "stub_digest": "d34c03ae0944774808b6d73e6f0d4db37c462ecabdcb18144f864485db18e2cf"
       },
       "status": "proposed"
     },
@@ -644,36 +678,6 @@
         "digest": "ba7c8753f79438fd5a083661de781a12e9743a3a4c00c1781d4f98b1666d9366",
         "file": "transactions.csv",
         "row": 11
-      },
-      "status": "proposed"
-    },
-    {
-      "fields": {
-        "account": "scan-dop",
-        "amount": "",
-        "currency": "DOP",
-        "date": "2026-09-11",
-        "description": "Compra sintética",
-        "destination": "personal",
-        "kind": "expense",
-        "source_id": "scan-02"
-      },
-      "id": "ebed3cebed63f3966505215a",
-      "issues": [
-        "amount"
-      ],
-      "mode": "stub",
-      "source_ref": {
-        "digest": "e5fca617d1c70b2a78c422a128312f5e4e3927db59d4c37f07f5a5ce038b9805",
-        "file": "scanned-statement.png",
-        "page": 1,
-        "region": [
-          35,
-          425,
-          1050,
-          465
-        ],
-        "row": 2
       },
       "status": "proposed"
     },

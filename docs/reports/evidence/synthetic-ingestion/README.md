@@ -63,7 +63,7 @@ replacement with memory rollback on failure; this is single-process scaffolding.
 - Focused pytest checks cover independent anchors, actual parsing, identical
   generation bytes, ambiguity, partial failure, batch confirmation, rejection,
   retries, overlap, legitimate similar purchases, reload, correction history,
-  persistence failure and production-import isolation.
+  persistence failure, changed-stub provenance and production-import isolation.
 - Generated the complete corpus twice with seed 71 and compared every byte.
   Controlled PDF metadata and metadata-free PNGs keep local runs reproducible.
 - Opened both PDF renders, the receipt and scanned page. Labels and fields were
@@ -73,6 +73,10 @@ replacement with memory rollback on failure; this is single-process scaffolding.
   [sample set](../../../../tests/synthetic_ingestion/samples/).
 - Independent review caught and corrected scan source-location/date disagreement
   by deriving the rendered rows and authored proposals from one fixture owner.
+- Hosted review caught stale proposal reuse after an authored stub edit. Stub
+  digests now version extraction identity; changed proposals return to review
+  and cannot overwrite or silently duplicate confirmed records. Regression
+  tests first reproduced amount, source-location and identity-field changes.
 - No browser/product surface was changed; no real API, paid evaluation or
   customer document was used.
 
@@ -101,7 +105,7 @@ failures caused by a missing local frontend dependency. After installing
 `bun install --frozen-lockfile` in this dedicated worktree, the affected
 `tests/test_result_card_gain.py` file passed all 20 tests. Broad-suite coverage
 was 89%. The mocked eval harness checks ran within that suite. The isolated
-ingestion suite passes all 42 checks.
+ingestion suite passes all 46 checks.
 
 The blanket `ruff check .` encountered 390 existing errors in archived evidence
 scripts. Those files were preserved. The actual CI lint scope is

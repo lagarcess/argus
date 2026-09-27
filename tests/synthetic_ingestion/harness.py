@@ -91,6 +91,9 @@ class Harness:
                 if other["id"] == proposal["id"] or other["status"] == "rejected":
                     continue
                 if other["source_ref"]["digest"] == proposal["source_ref"]["digest"]:
+                    if other["source_ref"]["row"] == proposal["source_ref"]["row"]:
+                        issues.append("possible_overlap")
+                        break
                     continue
                 other_fields = (
                     self.records[other["id"]]["fields"]
@@ -114,6 +117,8 @@ class Harness:
         for item in result["proposals"]:
             ref = item["source_ref"]
             identity = f"{ref['digest']}:{ref['row']}"
+            if "stub_digest" in ref:
+                identity += f":stub:{ref['stub_digest']}"
             proposal_id = hashlib.sha256(identity.encode()).hexdigest()[:24]
             ids.append(proposal_id)
             if proposal_id not in self.proposals:

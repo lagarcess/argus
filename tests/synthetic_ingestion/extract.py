@@ -29,7 +29,9 @@ def load_input(path: Path, stub_path: Path | None = None) -> dict:
         digest = hashlib.sha256(content).hexdigest()
         result["source_digest"] = digest
         if stub_path is not None:
-            stub = json.loads(Path(stub_path).read_text())
+            stub_bytes = Path(stub_path).read_bytes()
+            stub_digest = hashlib.sha256(stub_bytes).hexdigest()
+            stub = json.loads(stub_bytes)
             if (
                 stub.get("extraction_mode") != "stub"
                 or stub.get("source_file") != path.name
@@ -105,6 +107,7 @@ def load_input(path: Path, stub_path: Path | None = None) -> dict:
             if result["mode"] == "actual_synthetic_pdf_text":
                 ref["page"] = 1
             if result["mode"] == "stub":
+                ref["stub_digest"] = stub_digest
                 location = row.get("source_ref", {})
                 ref.update(
                     {

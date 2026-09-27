@@ -62,7 +62,10 @@ records, separated by currency and destination; they are not available balances.
 
 Two purchases can share a date, merchant and amount. Similarity alone must not
 silently delete one. Exact-source retries keep their identity; overlapping
-imports expose potential matches for a reviewer. This scaffolding does not
+imports expose potential matches for a reviewer. Authored stub bytes also have a
+digest: editing a stub produces a new review proposal, preserves the confirmed
+record, and flags the same source row as a possible overlap even when its
+financial fields changed. This scaffolding does not
 solve cross-bank identity, general reconciliation or household permissions.
 
 ## Anchors to review by hand
