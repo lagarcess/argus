@@ -321,7 +321,7 @@ Two written rules apply: wave-1 R4 keeps amounts out of emails, push, analytics 
 |---|---|---|---|
 | `src/argus/log_sink.py:10` | `configure_logging` | One sink with `diagnose=False` and `backtrace=False`. | **direct reuse**. No local variable values reach tracebacks. |
 | `src/argus/llm/openrouter.py:1016` | `log_openrouter_failure` | Logs task, model, error type and origin only. States that the default sink renders only the message. | **direct reuse**. |
-| `tests/agent_runtime/test_private_log_content.py:42` | `assert_safe` | Private sentinel text must not reach a serialized sink. | **reusable pattern**. Extend it to fetch and estimate call sites. |
+| `tests/agent_runtime/test_private_log_content.py:42` (line 48 after #721) | `assert_safe` | Private sentinel text must not reach a serialized sink. | **reusable pattern**. Extend it to fetch and estimate call sites. |
 | `src/argus/observability/analytics_events.py:116` | `AnalyticsEvent` registry (contract :1-12) | Fields are Literal, bool or a bounded int, so an amount cannot be represented. | **direct reuse**. A new event needs its own registry model. |
 | `src/argus/observability/envelope.py:247` | `capture_event` | Suppresses any envelope the registry did not build. | **direct reuse**. |
 | `src/argus/observability/envelope.py:111` | `_BLOCKED_KEY_PARTS`, `sanitize_observability_attributes` (:344), `_blocked_key` (:375) | Key-substring denylist. Strings pass through at up to 500 characters. | **reusable pattern**. Needs price, amount, value, estimate, address, plate, VIN and mileage entries. |

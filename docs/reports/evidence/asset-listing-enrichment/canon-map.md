@@ -2,6 +2,8 @@
 
 Read-only audit of `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963`, 2026-09-27. The question is whether Dominican vehicle and residential-property classified listings could help a user review and update the estimated value of a vehicle or property recorded in Accounts. This file maps canon and code. It changes no product decision.
 
+**Scope note.** This map records published canon at the commit above, and its findings stay as recorded. The founder approved vehicle and residential-property records, with optional ownership shares and linked debt, on 2026-09-27. That approval was recorded locally but was not yet published at this commit. Bottom-line item 1, topics 1.1 and 1.3 to 1.5, the second unresolved tension in section 4, and gaps 1 to 4 in section 5 therefore describe a publication gap. They do not describe an open product question. The approval settles gap 1. Gaps 2 to 4 now ask how the approved fields work, not whether they exist. The delivery lead owns publication in the MVEE and the decision log.
+
 ## Legend
 
 - (A) Approved. Founder-locked direction and rules that bind all work: MVEE, decision log, PRODUCT.md direction, DESIGN.md conventions, AGENTS.md rules.

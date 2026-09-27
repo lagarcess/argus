@@ -91,14 +91,14 @@ All repositories below were read through the GitHub API [VERIFIED]. "Pushed" is 
 - Result cards are `#bigsearch-results-inner-results li` with `.title1` (area), `.title2` (price line such as "Venta: US$ ...") and `.type`. The pager is `#bigsearch-results-inner-lowerbar-pages`.
 - The detail page has `#detail-ad-header h2` (type), `#detail-ad-header h3` (price) and `.secondary-info span` (bedrooms, baths, parking).
 - The specs block `#detail-ad-info-specs` carries labeled rows: Alquiler, Alquiler Amueblado, Localización, Condición, Construcción, Nivel/Piso, Edificable, Uso Actual, Terreno, Ascensores, Año Construcción, Comodidades and Observaciones.
-- [SNIPPET] Listing URLs look like `/apartamentos-venta-punta-cana/1277982/`. IDs seen in 2026 run from about 1.26M to 1.43M.
+- [SNIPPET] Listing URLs look like `/apartamentos-venta-punta-cana/<id>/`, with a seven-digit numeric ID. IDs seen in 2026 run from about 1.26M to 1.43M.
 
 **SuperCarros page structure.** All from the code above [VERIFIED].
 
 - Search URLs look like `/buscar/?do=1&ObjectType=1&PriceFrom=0&PriceTo=50000000&PagingPageSkip=N`. Dealer pages are `/dealers/{slug}/?PagingPageSkip=N` with cards in `.generic-results-dealer ul > li`.
 - The detail page has `#detail-ad-header h1` (title), `#detail-ad-header h3` (price starting RD$ or US$) and `#detail-ad-info-photos a[data-photo]`. Specs sit in `#detail-ad-info-specs table`. Seller data sits in `#detail-right`, labeled "Tel:", "WhatsApp:" and "Email:".
 - Images are served from `img.supercarros.com/AdsPhotos/{WxH}/{n}/{photoId}.jpg` and carry a watermark.
-- [SNIPPET] Listing URLs look like `/honda-accord/1483172/`. An ID of 1610459 appears in June 2026.
+- [SNIPPET] Listing URLs look like `/honda-accord/<id>/`, with a seven-digit numeric ID. IDs above 1.6M appear in June 2026.
 
 **Fragility and blocking signals.**
 
@@ -111,6 +111,8 @@ All repositories below were read through the GitHub API [VERIFIED]. "Pushed" is 
 - [INFERRED] Several repos publish seller phones and emails (the DryFernandez xlsx) or strip watermarks. That is exposure the audit should avoid copying.
 
 ## 3. Dominican legal context (not legal advice; counsel must review)
+
+Access, commercial reuse, and legal interpretation are separate questions. The notes below restate the statute texts that were read. INFERRED marks the researcher's reading, which is not a legal conclusion. A robots.txt allowance is evidence about access only.
 
 **Ley 172-13 on personal data.** [VERIFIED] Source: https://presidencia.gob.do/sites/default/files/statics/transparencia/marco-legal/leyes/Ley-172-13.pdf.
 

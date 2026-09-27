@@ -1,31 +1,35 @@
 # What Dominican listing sites can support for asset values
 
-This report answers one question. Can SuperCarros and SuperCasas listings help an Argus user review the estimated value of a vehicle or home they own? It covers access and permission, a bounded live sample, what the data can honestly support, a recommended journey, code reuse, and a scoped next step. It changes no product decision and no runtime code.
+This report answers one question. Can SuperCarros and SuperCasas listings help an Argus user review the estimated value of a vehicle or home they own? It covers access, reuse, and open legal questions, a bounded live sample, what the data can honestly support, a recommended journey, code reuse, and a scoped next step. It changes no product decision and no runtime code.
 
-The audit read `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963` on 2026-09-27. The run record, sanitized evidence, and scripts live in [the evidence folder](evidence/asset-listing-enrichment/README.md).
+The audit read `origin/codex/private-alpha-next` at `f0a90763b79e5625ac0a4789cdfa171cda023963` on 2026-09-27. The run record, sanitized evidence, synthetic fixtures, and scripts live in [the evidence folder](evidence/asset-listing-enrichment/README.md).
 
 ## Recommendation
 
-- **Vehicles.** Prefer partnership or licensed access first. The pages are easy to read, but the operator's terms forbid commercial reuse without authorization, and robots.txt disallows the search pages that would find same-year comparables. Until a written agreement exists, keep the manual estimate and let the user add comparable ads they found.
+- **Vehicles.** Prefer partnership or licensed access first. The pages are easy to read, and robots.txt allows the detail pages, but access is not reuse. Clause 4.1 of the operator's published terms reserves commercial reproduction, distribution, and public communication of the content to its authorization. robots.txt also disallows the search pages that would find same-year comparables. Until a written agreement exists, keep the manual estimate and let the user add comparable ads they found.
 - **Residential property.** Use the simpler manual path. Record the user's estimate with its source, such as an appraisal, an insured value, or a purchase price. Even under a license, show at most a list of similar home ads, because the sampled ads mixed sale and rent prices, recorded areas as zero, and contradicted their own room counts.
 - **Scrapling.** Do not adopt it. The pages are server-rendered HTML. Scrapling's parser produced the same output as BeautifulSoup on every sampled page. After a simulated markup change, its adaptive mode returned the accessories list or the seller contact list in place of the specifications. Its fetchers imitate a browser by default, which this work must not do.
-- **Market value.** Argus should never present a market value derived from asking prices. A list of similar ads is supportable with access. A range of asking prices is supportable only for a vehicle model and year with at least 5 ads in one currency. A value estimate is not supportable from these sources.
+- **Market value.** Argus should never present a market value derived from asking prices. A list of similar ads is supportable with access. An asking-price range is an unvalidated experimental proposal, for vehicles only, and it must meet the requirements in this report before anyone tests it. A value estimate is not supportable from these sources.
 
-Four facts drive that verdict.
+Three facts drive that verdict.
 
-1. Both sites belong to Cibermercado S.R.L. Clause 4.1 of their terms forbids reproducing, distributing, or publicly communicating all or part of the content for commercial purposes without the company's authorization. The robots.txt files allow detail pages, but robots.txt does not grant reuse rights.
-2. The robots.txt files disallow `/buscar/` and `/buscador/` on both sites. The sitemap is the permitted inventory, and its URLs name a model or a sector with no year, price, or size. Finding same-year comparables therefore means fetching every detail page of a model.
+1. Both sites belong to Cibermercado S.R.L. Their terms, read on 2026-09-27, require the company's authorization for commercial reproduction or public communication of the content. robots.txt governs crawling, not reuse.
+2. The robots.txt files disallow `/buscar/` and `/buscador/` on both sites. The sitemap is the inventory a crawler may read, and its URLs name a model or a sector with no year, price, or size. Finding same-year comparables therefore means fetching every detail page of a model.
 3. No sampled page shows a listing date, a sold status, or any damage or title field. Vehicle prices come in both US$ and RD$, even within one model.
-4. Approved canon has no vehicle or property account type. MVEE section 3 lists "cash, checking, savings, investments, credit cards, and other debts". No financial-record table, route, or screen exists at the audited commit.
+
+### A publication gap, not an open decision
+
+The founder approved vehicle and residential-property records, with optional ownership shares and linked debt, on 2026-09-27. That decision is not yet published at the audited commit. There, the MVEE minimum account list reads "cash, checking, savings, investments, credit cards, and other debts", and the decision log has no entry for the approval. The exact-commit findings in this report and in [the canon map](evidence/asset-listing-enrichment/canon-map.md) describe that commit and stay as recorded. This report does not restate the approval as canon. The delivery lead owns its publication in the MVEE and the decision log.
 
 ## What was tested and what was inferred
 
 Tested on 2026-09-27:
 
-- 33 requests, all HTTP 200. They covered robots.txt, sitemaps, home pages, terms, the search values scripts, one category page, and the detail pages.
+- 33 live requests, all HTTP 200. They covered robots.txt, sitemaps, home pages, terms, the search values scripts, one category page, and the detail pages.
 - Ten detail pages per site, drawn with a fixed seed from the sitemaps.
 - Two parsers on the same cached pages, with timing, output comparison, and a markup-change test.
 - Listing density per model and per property type and sector, computed from the sitemaps alone.
+- Offline checks of both parsers on two synthetic fixtures, which any reviewer can rerun without the sites.
 
 Inferred and labeled as such below:
 
@@ -38,24 +42,36 @@ Nothing here measures market coverage, long-term reliability, or valuation accur
 
 ## Access paths compared
 
-| Path | SuperCarros | SuperCasas | Permission | Verdict |
+| Path | SuperCarros | SuperCasas | Reuse position | Verdict |
 | --- | --- | --- | --- | --- |
-| A. Documented API, feed, or license | None published. The site footer offers dealer tools. Web searches found no feed, export, or data license. | Same operator and same finding. A Dominican real estate CRM syncs listings to other portals but not to SuperCasas. | A written agreement would settle display, attribution, caching, and retention. | First choice for any automated comparables. One conversation covers both sites. |
-| B. Plain HTTP and a parser | Works. Server-rendered pages, stable labels, 156.5 ms median per page. Search pages are disallowed, so discovery goes through a 5.0 MB sitemap of 29,638 listings. | Works. Same template family, 146 ms median. The sitemap lists 19,774 listings with no sale-or-rent marker. | Blocked by clause 4.1 for commercial use. Counsel review is also needed under the laws named below. | Only after written authorization. |
-| C. Scrapling | Same output as plain parsing. Adds a dependency tree and stealth defaults. | Same. | No better than B. Its stealth features conflict with the audit rules. | Not recommended. |
-| D. Browser automation | Not needed. The data is in the first HTML response. | Not needed. | No better than B. | Not recommended. |
-| E. User-supplied comparables | The user types an asking price, currency, year, trim, mileage, and an optional link. Argus fetches nothing. | The user records an appraisal, insured value, purchase price, or ads they found. | No third-party access. | Recommended now. |
+| A. Documented API, feed, or license | None published. The site footer offers dealer tools. Web searches found no feed, export, or data license. | Same operator and same finding. A Dominican real estate CRM syncs listings to other portals but not to SuperCasas. | An agreement would set display, attribution, caching, and retention. | First choice for any automated comparables. One conversation covers both sites. |
+| B. Plain HTTP and a parser | Technically works. Server-rendered pages, stable labels, 156.5 ms median per page. Search pages are disallowed, so discovery goes through a 5.0 MB sitemap of 29,638 listings. | Technically works. Same template family, 146 ms median. The sitemap lists 19,774 listings with no sale-or-rent marker. | Clause 4.1 reserves commercial reproduction to Cibermercado's authorization, and Argus has none. Whether a given display falls under the clause is a question for counsel. | Only after written authorization. |
+| C. Scrapling | Same output as plain parsing. Adds a dependency tree and stealth defaults. | Same. | Same as B. Its stealth features also conflict with the audit rules. | Not recommended. |
+| D. Browser automation | Not needed. The data is in the first HTML response. | Not needed. | Same as B. | Not recommended. |
+| E. User-supplied comparables | The user types an asking price, currency, year, trim, mileage, and an optional link. Argus fetches nothing. | The user records an appraisal, insured value, purchase price, or ads they found. | Argus copies no third-party content. | Recommended now. |
 
-Web research found no Dominican court decision or regulator guidance on scraping. The laws a counsel review must cover are these:
+## Access, reuse, and legal interpretation are separate questions
 
-- Ley 172-13 on personal data. Seller names and phone numbers are personal data. Whether a private classifieds site is a "fuente accesible al público" is open.
-- Ley 74-25, the Penal Code in force since 2026-08-03. Article 198 penalizes knowingly collecting, retaining, or selling another person's data by automated procedures without consent. Article 199 extends that to companies.
-- Ley 53-07 on high-technology crimes. It penalizes access that exceeds an authorization. Whether terms of use define that authorization for public pages is untested.
-- Ley 65-00 on copyright. It protects photographs and any database whose selection or arrangement is creative. It does not protect the underlying data.
+**Access.** This is what the audit observed on 2026-09-27. The robots.txt files on both brands' hosts allowed a generic crawler to read the detail pages, sitemaps, home pages, and terms pages, and disallowed search. They fully disallow GPTBot, CCBot, ia_archiver, and omgili. Every request succeeded without a challenge. robots.txt states crawl preferences. It grants no license and says nothing about reuse.
 
-Seller data is the sharpest risk. Any future fetch must drop seller fields before storage.
+**Commercial reuse.** This comes from the terms both sites published, read on 2026-09-27.
 
-Public reference values exist, but none is a market price. DGII publishes a vehicle value in RD$ per make, model, and year as the base for the transfer tax, with no API or export. The Catastro publishes land values per m² by municipality. Bank appraisals and insured values are private documents the owner holds. Each can become a manual source kind with its own date. Corotos, another large Dominican classifieds site, prohibits scraping and crawling in its legal page. [The web research record](evidence/asset-listing-enrichment/web-research.md) cites each source.
+- Clause 1.1 says that accessing or using the site makes a person a user who accepts the terms.
+- Clause 4.1 claims Cibermercado's rights over the pages and their contents. It prohibits commercial reproduction, distribution, and public communication of all or part of the contents without the company's authorization. It allows viewing, printing, copying, and storing for personal and private use only.
+- Clause 2.3 limits a user's access to information while it remains current.
+
+Argus holds no authorization.
+
+**Unresolved legal interpretation.** Web research on 2026-09-27 found no Dominican court decision or regulator guidance on scraping. It read the statutes below. Each summary restates the text, and each question is for counsel.
+
+- Ley 172-13 on personal data, from the official text on presidencia.gob.do. Article 6 defines personal data as information about identified or identifiable people. Article 6(14) defines sources open to public access, and Article 27(1) exempts data from those sources from the consent requirement. Is a private classifieds site such a source for seller names and phone numbers?
+- Ley 74-25, the Penal Code, from the official text on the judiciary's site. Article 198 penalizes knowingly collecting, retaining, or selling another person's data by automated procedures without consent. Article 199 extends liability to companies, and prosecution requires the affected person's complaint. Infobae reported the code in force from 2026-08-03. Does Article 198 reach a system that stores listing facts but no seller identity?
+- Ley 53-07 on high-technology crimes, from the text hosted by the OAS. Article 6 penalizes access that exceeds an authorization. Do terms of use or robots.txt define that authorization for public pages?
+- Ley 65-00 on copyright, from the text hosted by the customs agency. Article 2 protects photographs and databases whose selection or arrangement is creative, but not the underlying data. The research found no separate database right in the text. Does Cibermercado's compilation qualify?
+
+**This audit's risk assessment.** This is not a legal conclusion. Seller data carries the most risk, so any future fetch must drop seller fields before storage. The committed evidence holds none. [The web research record](evidence/asset-listing-enrichment/web-research.md) links each source.
+
+Public reference values exist, but none is a market price. DGII publishes a vehicle value in RD$ per make, model, and year as the base for the transfer tax, with no API or export. The Catastro publishes land values per m² by municipality. Bank appraisals and insured values are private documents the owner holds. Each can become a manual source kind with its own date. Corotos, another large Dominican classifieds site, prohibits scraping and crawling in its legal page.
 
 ## Tooling compared
 
@@ -76,7 +92,7 @@ Scrapling's plain `Fetcher` defaults to `impersonate="chrome"` and `stealthy_hea
 
 ### Vehicles
 
-Every page had the same 14 labels, including `Precio:`, `Uso:` for mileage, `Condición:`, fuel, transmission, and traction. Year, make, and model parse from the title on all ten. The site's own brand IDs resolve the make.
+Every page had the same 14 specification labels, including `Precio:`, `Uso:` for mileage, `Condición:`, fuel, transmission, and traction. Year, make, and model parse from the title on all ten. The site's own brand IDs resolve the make.
 
 - Trim is free text after the model name. It was present on 6 of 10 titles. The site's search values script has no trim list to match against.
 - Mileage was `N/D` on 5 of 10 pages. The meta description printed `0.00` for those same five, so only the visible field is safe. Units were miles on 7 pages and kilometers on 3.
@@ -91,7 +107,7 @@ For a concrete case, the three US$ CR-V ads for model years 2021 and 2022 asked 
 
 ### Residential property
 
-Every page had the same 11 labels, including `Construcción:` for built area, `Terreno:` for land, `Condición:`, `Año Construcción:`, and `Localización:`. Location reads as region and sector, with no street address in the structured fields.
+Every page had the same 10 specification labels, including `Construcción:` for built area, `Terreno:` for land, `Condición:`, `Año Construcción:`, and `Localización:`. Location reads as region and sector, with no street address in the structured fields.
 
 - The sitemap slug does not say sale or rent, but the title does. The six Naco pages split four sale and two rent.
 - Three pages carried more than one price, such as sale and furnished sale. One rental carried a "Venta" price of US$2,500 with no monthly marker.
@@ -113,11 +129,30 @@ Every page had the same 11 labels, including `Construcción:` for built area, `T
 
 | Output | Vehicles | Residential property |
 | --- | --- | --- |
-| A list of comparable ads | Yes, with licensed access. Show each ad's differences from the user's car: year, trim, mileage, currency, and date seen. | Yes, with licensed access, for the same type, sector, and size band. Label sale and rent explicitly. |
-| An indicative asking-price range | Only when at least 5 same-currency ads remain after exclusions. Label it as asking prices, not sale prices or an appraisal. | Not yet. Area and operation errors are too common to summarize a sector without a study. |
+| A list of comparable ads | Yes, with licensed access. Show each ad's differences from the user's car, such as year, trim, mileage, currency, and date seen. | Yes, with licensed access, for the same type, sector, and size band. Label sale and rent explicitly. |
+| An indicative asking-price range | An unvalidated experimental proposal. A candidate only when at least 5 ads meet every requirement below. | Not proposed. |
 | A market-value estimate | No. There are no sale prices, no damage data, and no measured gap between asking and selling prices. | No. The same gaps apply, and a home's price depends on facts no ad records reliably. |
 
-The minimum of 5 comes from the range method, not from a confidence claim. With linear interpolation, the NumPy default, the middle half of 5 sorted prices runs from the 2nd to the 4th price. At 5 or more, the lowest and highest ads never set an endpoint. Below 5, show the ads without a range. The next assignment measures whether 5 is also stable enough.
+The 5-ad floor is an experimental proposal with one mechanical basis. With linear interpolation, the NumPy default, the middle half of 5 sorted prices runs from the 2nd to the 4th price, so neither extreme ad sets an endpoint. It is not a sample size, a confidence level, or evidence of reliability. Five ads can still share one dealer's pricing, one trim, or one stale week. The next assignment measures whether any floor holds up. The floor may change, and the range may be dropped.
+
+An ad counts as a vehicle comparable only when all of these hold:
+
+- Make and model match by the site's own IDs, and the model year falls inside a window the study sets.
+- Condition matches, so a used car is compared with used cars.
+- Mileage is present, converted to kilometers, and inside a band the study sets. An ad with `N/D` mileage is listed but kept out of the range.
+- Fuel and drivetrain match, or the ad shows the difference. Trim matches when the user gave one.
+- The price is one cash asking price in the range's currency. Monthly prices, down payments, the site's payment estimate, and prices whose text calls them an "inicial" stay out.
+- Argus saw the ad within a freshness window the study sets. The site shows no listing date, so this needs licensed dates or Argus's own first-seen date.
+- Likely relists of the same car count once, and every outlier exclusion follows a written rule and keeps its reason.
+
+A range is shown only when all of these hold:
+
+- Parsing passed a manual audit with zero errors on price, currency, year, and mileage.
+- The display names the count, the currency, the dates seen, the dealer and private mix, and the exclusion counts.
+- The label says these are asking prices, not sale prices, an appraisal, or a market value, and that damage and title history are unknown.
+- The study has measured how far the range moves when one ad is removed, and the founder has accepted the display rule.
+
+For homes, the same logic would add operation, property type, sector, a positive built area inside a size band, bedrooms, and completion status. Pre-construction, trust, and swap listings would stay out. This report proposes no home range.
 
 Argus should say "not enough comparable information" in two cases:
 
@@ -135,7 +170,7 @@ The smallest inputs follow.
 
 ## Recommended journey
 
-This journey is a recommendation. The founder has not locked it, and it depends on vehicle and property accounts entering canon first.
+This journey is a recommendation that the founder has not locked. It builds on the vehicle and home records approved on 2026-09-27, whose publication is pending, and on account contracts not yet written.
 
 ```mermaid
 flowchart TD
@@ -144,9 +179,9 @@ flowchart TD
     B -- "Yes" --> C["Ask only missing match inputs"]
     C --> D["Checking similar ads, neutral loading"]
     D -- "Source failed" --> E["Could not check ads now. Estimate unchanged"]
-    D -- "No match" --> F["Not enough comparable information"]
-    D -- "1 to 4 matches" --> G["Ads with their differences, no range"]
-    D -- "5 or more matches" --> H["Ads plus middle-half asking range per currency"]
+    D -- "No qualifying ad" --> F["Not enough comparable information"]
+    D -- "1 to 4 qualifying ads" --> G["Ads with their differences, no range"]
+    D -- "5 or more qualifying ads" --> H["Ads plus an experimental middle-half range per currency"]
     E --> I{"Update the estimate?"}
     F --> I
     G --> I
@@ -157,7 +192,7 @@ flowchart TD
     K --> A
 ```
 
-"Checking similar ads" reads observations Argus already stored under its license. It never calls the site while the person waits. The archived answers board set that rule for two Dominican financial data sources. The loading state is a neutral indicator, never a timed progress bar (DESIGN.md). Argus does not fill in a number for the user. An asking-price midpoint would present an unmeasured bias as a value. The user types the value, and the range sits beside the field as context.
+"Checking similar ads" reads observations Argus already stored under its license. It never calls the site while the person waits. The archived answers board set that rule for two Dominican financial data sources. The loading state is a neutral indicator, never a timed progress bar (DESIGN.md). Argus does not fill in a number for the user. An asking-price midpoint would present an unmeasured bias as a value. The user types the value, and any range sits beside the field as context.
 
 - **Ownership share.** The estimate describes the whole asset. The personal view shows the user's share of it. The household view shows a shared asset once, labeled as shared, and never sums two personal shares.
 - **Related loan.** The loan stays a debt account with its own owners, and Home counts it once in debts. The asset card may show the linked loan and the equity for explanation, but totals never subtract the loan a second time.
@@ -176,7 +211,7 @@ This split is a recommendation for when access and the account contracts exist.
 ```mermaid
 flowchart LR
     subgraph Public["Public listing data, no user data"]
-        S["Licensed feed or permitted pages"] --> O["Listing observations"]
+        S["Licensed feed or authorized pages"] --> O["Listing observations"]
         O --> N["Normalized comparables"]
     end
     subgraph Private["Private user records, owner and household rules"]
@@ -196,7 +231,7 @@ flowchart LR
 | --- | --- | --- |
 | Listing observation | A new provider adapter for the licensed source | Source, source listing ID, date seen, and public fields only. No seller data, photos, or free text. Retention follows the license. |
 | Normalized comparable | The same adapter's normalizer | Typed year, make, model, trim, mileage in km, or type, sector, and areas in m². Currency and amount as a `Decimal`. Every exclusion keeps its reason. |
-| Matching and summary | A pure domain function | Deterministic, versioned, and free of model calls. Same-currency only. It returns ads, exclusion counts, and a range only at 5 or more. |
+| Matching and summary | A pure domain function | Deterministic, versioned, and free of model calls. Same-currency only. It returns ads and exclusion counts. A range, if the experiment keeps one, follows the tested rule. |
 | Vehicle or home account | The financial-record contract, not yet written | Private. Ownership share, visibility, and edit rights stay distinct (MVEE section 12). |
 | Valuation revision | The same contract | Append-only. The current estimate is the latest confirmed revision, so no second copy can drift. |
 
@@ -227,11 +262,12 @@ Nothing in the codebase parses `RD$` or `US$`, stores a dated DOP exchange rate,
 
 ## Decisions still open
 
-Three founder decisions block this work.
+Two founder decisions remain.
 
-1. Should vehicles and homes become account types, with ownership share and a linked debt? The assignment treats this as approved, but no canon document records it. A supporting research note also warns against "Net-worth vanity with Zillow-style home values".
-2. Should Argus ask Cibermercado for licensed access, and on what display, attribution, caching, and retention terms? Only the founder can open that conversation.
-3. Should Argus show asking-price ranges at all, given that people may read them as values?
+1. Should Argus ask Cibermercado for licensed access, and on what display, attribution, caching, and retention terms? Only the founder can open that conversation.
+2. Should Argus show asking-price ranges at all, given that people may read them as values?
+
+The approval of vehicle and home records is settled. Its publication belongs to the delivery lead, as described above.
 
 [Documentation authority](../DOCUMENTATION_AUTHORITY.md) already lists the technical contracts this work needs as open. They include the financial-record schema, household ownership and permissions, chat-to-record integration, and scheduling and notifications. Wave 1 leaves the exchange-rate source to the founder. The chat path also needs decision 8 reconciled. That archived 2026-09-08 decision treats stated personal figures as ephemeral, while MVEE section 4 makes confirmed records durable.
 
@@ -239,7 +275,7 @@ Three founder decisions block this work.
 
 This is a proposal for the founder to assign or discard. It does not assign work by itself.
 
-**Goal.** Measure whether licensed or permitted SuperCarros data can support a list of comparable ads and an asking-price range for common vehicles.
+**Goal.** Measure whether licensed or authorized SuperCarros data can support a list of comparable ads, and test the experimental asking-price range for common vehicles.
 
 **Precondition.** A written authorization from Cibermercado that covers the fetch or an export, the fields, and the rate. Without it, stop before any request.
 
@@ -249,25 +285,27 @@ This is a proposal for the founder to assign or discard. It does not assign work
 
 1. Collect each detail page once, or read the export, at the agreed rate. At 4 seconds per page, the 2,617 pages take about 2.9 hours.
 2. Parse with label lookup inside the listing block, reusing the committed scripts. Drop seller fields before storage.
-3. Group ads by model, model year, and currency. Record every exclusion with its reason: missing price, unit conflict, likely monthly or down-payment price, and duplicate candidates.
-4. Report per cell the count, mileage completeness, the dealer share, the `lastmod` age spread, and the 25th, 50th, and 75th percentile prices.
-5. For cells with at least 5 ads, remove each ad in turn and record how far the median and the middle half move.
+3. Apply the comparability requirements above. Record every exclusion with its reason: missing price, unit conflict, likely monthly or down-payment price, stale ad, and duplicate candidate.
+4. Report per model year and currency the count, mileage completeness, the dealer share, the `lastmod` age spread, and the 25th, 50th, and 75th percentile prices.
+5. For cells with at least 5 qualifying ads, remove each ad in turn and record how far the median and the middle half move.
 
 **Acceptance.**
 
 - Every model year present for the three models has a count per currency, and its exclusion counts add up to the collected total.
 - A manual check of 30 random ads, 10 per model, finds every parsed price, currency, year, and mileage equal to the page. These are structured fields, so the bar is zero errors. If the true error rate were 10 percent, 30 clean checks would happen by chance only about 4 percent of the time.
-- The report publishes, for every cell with at least 5 ads, how far each range endpoint moves when one ad is removed. Display rounding is a design choice, and these shifts are its input.
-- The report recommends a prototype only if, for each model, the model years that hold at least half of its ads each keep 5 or more same-currency ads after exclusions. Otherwise it recommends stopping. The 5 is the range rule above.
+- The report publishes, for every cell with at least 5 qualifying ads, how far each range endpoint moves when one ad is removed. Display rounding is a design choice, and these shifts are its input.
+- The report recommends a prototype only if, for each model, the model years that hold at least half of its ads each keep 5 or more qualifying same-currency ads. Otherwise it recommends stopping. The 5 is the experimental floor under test.
 
 **Stop conditions.** Stop on any 401, 403, 429, bot check, or login wall. Stop if robots.txt or the terms change against the authorization. Stop if pages fail to parse because the template changed. Stop and delete the output if any seller name, phone, or email reaches a file.
 
-**Dependencies.** The measurement is independent of the financial contracts. It needs only the authorization. A product prototype would depend on the three founder decisions above and on the account, revision, household, and notification contracts. Residential property gets no experiment until vehicles show that the range survives this test.
+**Dependencies.** The measurement is independent of the financial contracts. It needs only the authorization. A product prototype would depend on the two founder decisions above, on publication of the 2026-09-27 account decision, and on the account, revision, household, and notification contracts. Residential property gets no experiment until vehicles show that the range survives this test.
 
 ## Verification and limits
 
 - The live sample ran on 2026-09-27 within the assignment limits: 16 and 17 requests, 4-second spacing, and a robots gate. No request was blocked or rate-limited.
-- Both parsers ran on Python 3.10.20 in environments outside the repository. The committed JSON files regenerate with the commands in the evidence README.
+- Before deleting the raw page cache, the audit replayed the committed scripts on it. That replay regenerated the ledger, sitemap profile, field summary, and parser outputs byte for byte. Only parse timings varied.
+- A reviewer cannot repeat that replay. The raw pages held seller data and were deleted, and a new fetch needs a new authorization and would sample a different day. A reviewer can run `scripts/check_fixtures.py` on the two synthetic fixtures. It checks both parsers, normalization, the seller-data exclusion, and the markup-change results, and it fails on injected defects.
+- The fixtures reproduce the class-rename and label-lookup results and Scrapling's relocation to the accessories list. They do not reproduce the relocation to the seller contact list, which appeared only on real pages.
 - Twenty pages cannot show market coverage, the meaning of the hidden dates, or valuation accuracy. The density figures count listings by model or sector, not by model year.
-- The legal notes summarize statutes read on 2026-09-27. They are not legal advice.
+- The legal notes restate statutes and terms read on 2026-09-27. They are not legal advice.
 - A public GitHub scraper fetches SuperCasas search pages every day, which robots.txt disallows. Its logs show no blocking. That shows technical reach, not permission.
