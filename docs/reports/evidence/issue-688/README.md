@@ -3,9 +3,9 @@
 ## Scope and provenance
 
 Captured with Chromium and the committed provider-free Playwright fixture at
-`222037e3964ebf3e468ecbbd366a0bd1004f65bb` on 2026-09-27 UTC.
+`2544aaf22fd90ea8b124454f98481168b9ff5c92` on 2026-09-27 UTC.
 Original integration baseline: `ab9143c18740c28f582646d405445c01c4c8aff4`.
-The account implementation is `98ed9b57`; the image implementation is `b54f8564`.
+The account implementation includes the post-claim recovery fix `b8cb5051`; the image implementation is `b54f8564`.
 The final expired-view styling is `222037e3`; canonical research hydration is
 asserted by the browser fixture at `dec393c4`.
 The evidence commit adds screenshots and this report, with no runtime changes.
@@ -38,9 +38,23 @@ These baseline assertions passed by expecting the unsafe original behavior. They
 are separate from the fixed-behavior regression suite. No request reached the
 external tracking host.
 
+## Review regression: failed Recents refresh after guest claim
+
+At `c3412e54`, the new browser case reproduced the reviewed defect: login and
+claim succeeded, then the actual `GET /conversations?...` Recents refresh returned
+503. The old catch rechecked the source guest identity and replaced the claimed
+conversation with the account-change/reload screen. The expected login error
+modal was absent. This was a confirmed browser failure, not a speculative case.
+
+At `b8cb5051`, successful and failed Recents refresh cases both pass. The failure
+stays visible in the existing login modal; dismissing it preserves the claimed
+conversation and destination identity. No message sends automatically. One
+subsequent deliberate message uses the destination token. The fixture keeps the
+Recents outage active throughout this check.
+
 ## Browser acceptance
 
-All 14 Chromium cases pass in 30.3 seconds. Screenshots contain synthetic fixture data only.
+All 15 Chromium cases pass in 33.0 seconds. Screenshots contain synthetic fixture data only.
 
 Run from `web/`:
 
@@ -69,6 +83,7 @@ isolated in `.next-688`. Both servers stop with the test runner.
 | Same-user token refresh | Draft retained and one stream uses refreshed A token |
 | Same-user 404 recovery | Exactly original stream, replacement create, resend; all as A. [Screenshot](same-user-404-recovery.png) |
 | Explicit guest claim | Existing login modal, verified synthetic claim, actual browser `setSession`, retained conversation; no automatic send, deliberate follow-up uses destination identity. [Screenshot](guest-claim.png) |
+| Guest claim followed by Recents failure | Existing error remains visible, dismissal retains claimed conversation, zero implicit sends and one deliberate destination-account send. [Error dialog](guest-claim-recents-error.png), [Retained view](guest-claim-recents-failure.png) |
 | Cold guest first send | Bootstrap establishes guest identity; exactly one stream is sent with that identity. [Screenshot](cold-guest-first-send.png) |
 
 The pending-stream fixture holds the HTTP response; it verifies request
