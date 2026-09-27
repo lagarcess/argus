@@ -2395,6 +2395,22 @@ Supabase Auth handles identity/session heavy lifting. Alpha should keep auth low
   current surface and offer retry; they must not reinterpret this transient
   failure as `401` or redirect to login.
 
+**Chat browser ownership:**
+- The signed-in chat view owns one Supabase Auth user identity. Conversation
+  creation for a send, streamed turns and 404 create-and-resend recovery must
+  obtain credentials for that same identity. Missing or changed identity stops
+  the operation before dispatch; bound requests do not fall back to shared
+  browser cookies.
+- Auth identity changes and logout invalidate the existing request-session
+  scope, cancel pending work and retire the private chat view. A stale draft
+  must never be submitted or displayed in the replacement account's chat.
+  Refreshing credentials for the same user does not change ownership.
+- The existing explicit guest claim is the only supported cross-identity
+  continuation. Its verified destination and transferred action, rather than
+  an arbitrary auth event, authorize resuming the claimed work.
+- This is client-side ownership protection, not a replacement for server
+  authentication or owner-scoped authorization.
+
 **Account recovery:**
 - `POST /api/auth/recovery` is a same-origin web route, not an Argus
   `/api/v1` endpoint. When the provider accepts a valid email-shaped request,

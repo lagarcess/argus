@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { getSupabaseClient } from "@/lib/supabase-client";
 import type { ChatRequestSessionController } from "@/lib/chat-request-session";
 
@@ -11,7 +11,6 @@ export function useChatAccountBoundary(userId: string | null, requests: ChatRequ
   const conversionPending = useRef(false);
   const admission = useRef(new AbortController());
   const [expired, setExpired] = useState(false);
-  useEffect(() => { owner.current = userId; clear.current = clearView; });
   const invalidate = useCallback(() => {
     if (invalidated.current) return;
     invalidated.current = true;
@@ -20,6 +19,11 @@ export function useChatAccountBoundary(userId: string | null, requests: ChatRequ
     clear.current();
     setExpired(true);
   }, [requests]);
+  useLayoutEffect(() => {
+    clear.current = clearView;
+    if (owner.current === null) owner.current = userId;
+    else if (!conversionPending.current && owner.current !== userId) invalidate();
+  }, [userId, clearView, invalidate]);
   useEffect(() => {
     if (process.env.NEXT_PUBLIC_MOCK_AUTH === "true") return;
     const client = getSupabaseClient();
