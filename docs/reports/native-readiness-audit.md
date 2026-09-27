@@ -34,96 +34,109 @@ modules under `src/argus/api/routers/`; `schemas.py` and `dependencies.py` mean
 `src/argus/api/schemas.py` and `src/argus/api/dependencies.py`; bare `web` TypeScript names are under
 `web/lib/`.
 
-**Missing documentation pointer.** The native stack named in this assignment has not reached
-the base branch. [PRODUCT.md §4](../PRODUCT.md#4-product-principles),
+**Native stack: approved, not yet published on the base branch.** The founder has approved the
+native stacks named above. Their documentation exists on a separate local branch that has not
+reached `codex/private-alpha-next` and was not inspected for this report. At the inspected SHA,
+[PRODUCT.md §4](../PRODUCT.md#4-product-principles),
 [MVEE §2](../specs/argus-minimum-viable-ecosystem-experience.md#2-product-character-and-platforms),
 the [decision log](../specs/argus-decision-log.md) (2026-09-26 row), and
 [ARCHITECTURE.md §5](../ARCHITECTURE.md#5-frontend-architecture) ("does not yet select native
-frameworks") all record native iOS/Android intent without frameworks, and
+frameworks") record native iOS/Android intent without naming frameworks, and
 [DOCUMENTATION_AUTHORITY.md](../DOCUMENTATION_AUTHORITY.md#what-remains-technical-or-undecided)
-still lists "Native app architecture" as undecided. This report therefore treats the explicit
-assignment direction as its scope. A founder-approved decision-log entry, and a one-line pointer
-from ARCHITECTURE.md §5 to it, are the missing pieces (decision F1 below). This report does not add them.
+still lists native app architecture as open. The framework choice is therefore not an open
+question; publishing that documentation and reconciling these pointers is outstanding work (R0
+below). This report uses the assignment direction as its scope and does not edit those documents.
 
 ## 2. Summary
 
-- **The backend is already mostly client-neutral.** Every product route resolves identity through
-  one dependency that accepts `Authorization: Bearer <Supabase access token>` before any cookie
+- **The transport is largely client-neutral; end-to-end native compatibility is unverified.**
+  Every product route resolves identity through one dependency that accepts
+  `Authorization: Bearer <Supabase access token>` before any cookie
   (`src/argus/api/dependencies.py:419`), verifies the token with Supabase, and checks that the
-  session row still exists (`dependencies.py:470`). Conversations, messages, activity, chat
-  streaming, jobs, runs, history, search, computations, decisions, discovery, profile, usage, and
-  feedback can be consumed by a native HTTP client without backend change.
-- **Authentication is the blocking surface.** Guest start, sign-in, and sign-up each require a
-  Cloudflare Turnstile token that only a browser widget currently produces; guest conversion
-  carries its secret in HttpOnly cookies; token refresh, sign-out revocation, password change, and
-  password recovery run in the browser's Supabase client or a Next.js route, not in the Argus API.
+  session row still exists (`dependencies.py:470`). That establishes reuse potential for
+  conversations, messages, activity, chat streaming, jobs, runs, history, search, computations,
+  decisions, discovery, profile, usage, and feedback. No native or bearer-only client was run
+  against these routes in this audit; WP-A and WP-B define the evidence that would confirm it.
+- **Authentication is the largest integration gap.** Guest start, sign-in, and sign-up each
+  require a Cloudflare Turnstile token, and the only implemented way to obtain one is the web
+  widget. Guest conversion carries its secret in HttpOnly cookies. Token refresh, sign-out
+  revocation, password change, and password recovery run in the browser's Supabase client or a
+  Next.js route, not in the Argus API. Each has a plausible native integration path; none is built.
 - **Chat streaming is simple to consume** (data-only SSE, `[DONE]` terminator, keepalive comments,
   RFC 9457 errors), and the documented reconnect rule is "re-fetch messages". Mobile backgrounding
-  makes the disconnect path common, and its user-visible result on phones has not been measured.
+  makes the disconnect path common. What a phone user sees after an interrupted turn is inferred
+  from code in this report and has not been measured.
 - **Cards render from structured payloads, not prose**, but the wire types are not machine-published
   (message `metadata` and SSE frames are untyped in OpenAPI), and a meaningful share of display
   composition (result readout fallback, recovery copy, recovery actions, localized labels) lives in
   web TypeScript and the web i18n catalog. Porting that logic twice would create three copies of one fact.
-- **No upload or file-ingestion capability exists.** Financial accounts, transactions, plans,
-  households, sharing permissions, notifications, and device registration have no implemented
-  contract. Those remain undefined and are listed as decisions, not as native prerequisites.
+- **No upload or file-ingestion capability was found.** Financial accounts, transactions, plans,
+  households, sharing permissions, and device registration have no implemented contract at the
+  inspected SHA. Notifications keep their documented status in PRODUCT.md; §5 records what this
+  search did and did not find. These remain open and are not native prerequisites.
 
 ## 3. Capability table
 
-Status key: **Reuse** = consumable unchanged by a native client; **Adapt** = bounded
-adaptation needed; **Missing** = no implemented capability.
+Status key: **Reuse candidate** = no browser dependency found in the request path, so a native
+client should be able to call it unchanged; not yet exercised by a native or bearer-only client.
+**Adapt** = a bounded integration or contract adaptation is needed. **Missing** = no implemented
+capability found at the inspected SHA.
 
 | Capability | Current owner | Endpoint / payload | Browser dependency | Status | Source evidence |
 | --- | --- | --- | --- | --- | --- |
-| Identity resolution | `current_user` dependency | `Authorization: Bearer` or `sb-*auth-token` cookie; 401/403/503 Problem Details | Cookie fallback only | Reuse | `src/argus/api/dependencies.py:393-533` |
-| Session liveness | `auth_session_is_active` | Reads `auth.sessions` by JWT `session_id` | None | Reuse | `src/argus/api/auth_sessions.py:27-76` |
+| Identity resolution | `current_user` dependency | `Authorization: Bearer` or `sb-*auth-token` cookie; 401/403/503 Problem Details | Cookie fallback only | Reuse candidate | `src/argus/api/dependencies.py:393-533` |
+| Session liveness | `auth_session_is_active` | Reads `auth.sessions` by JWT `session_id` | None | Reuse candidate | `src/argus/api/auth_sessions.py:27-76` |
 | Guest start | `POST /auth/guest` | `{captcha_token, language}` → Supabase session JSON + cookies | Turnstile widget for token | **Adapt** | `src/argus/api/routers/auth.py:184-290`; `src/argus/api/schemas.py:1057-1059`; `web/lib/guest-captcha.ts:1-35` |
 | Sign-in / sign-up | `POST /auth/login`, `POST /auth/signup` | `{email, password, captcha_token}` → `{user, session}` | Turnstile; response also sets cookies | **Adapt** | `auth.py:746-920`; `schemas.py:983-1003` |
 | Guest conversion | `POST /auth/guest/handoffs`, `/auth/guest/signup`, `/auth/login`, `/claim` | Handoff id and secret in HttpOnly cookies, `path=/api/v1/auth` | Cookie jar | **Adapt** | `auth.py:298-392`, `auth.py:603-604`, `auth.py:861-862` |
 | Token refresh | Browser Supabase client | Supabase Auth `refresh_token` grant, anon key | `@supabase/ssr` browser storage | **Adapt** | `web/lib/argus-api-transport.ts:33-53`; `web/lib/supabase-client.ts`; `web/lib/argus-api.ts:570-590` |
 | Logout / revoke | Browser Supabase `signOut` + `POST /auth/logout` | Backend only deletes cookies | Browser client | **Adapt** | `auth.py:940-946`; `web/lib/argus-api.ts:711-719`; `web/lib/auth-security.ts:44-80` |
 | Password change / recovery | Supabase `updateUser`; Next.js `POST /api/auth/recovery` | Recovery link targets web `/auth/recovery` | Next route, web origin | **Adapt** | `web/lib/auth-security.ts:97-150`; `web/app/api/auth/recovery/route.ts`; `supabase/config.toml:165-175` |
-| Profile, usage, market session | `profile`, `market` routers | `GET/PATCH /me`, `GET /me/usage`, `GET /market/session`; returns `account_kind`, guest limits, `capabilities` | None | Reuse | `src/argus/api/routers/profile.py:50-67`; `docs/API_CONTRACT.md` §8 |
-| Conversations | `conversations` router | CRUD, `/guest/replace`, cursor pages | None | Reuse | `src/argus/api/routers/conversations.py:169-530` |
-| Messages / hydration | `GET /conversations/{id}/messages` | Cursor or `anchor_message_id`; `Message.metadata: dict[str, Any]` | None | Reuse (untyped) | `conversations.py:666`; `schemas.py:324-330`; `docs/API_CONTRACT.md:3437` |
-| Activity / attention | `conversation_activity` router | `latest_message_id`, `operation`, `attention`; `mark_read`/`mark_unread` | None | Reuse | `src/argus/api/routers/conversation_activity.py:68-110`; `docs/API_CONTRACT.md:3259-3341` |
-| Chat turn stream | `POST /chat/stream` | `data:` frames `stage_start`, `token`, `stage_outcome`, `final`, `error`, then `[DONE]`; `: keepalive` comments; `Idempotency-Key`, `X-Request-Id` | None | Reuse | `src/argus/api/routers/agent.py:265`; `src/argus/api/chat/streaming.py:7-16`; `docs/API_CONTRACT.md:3467` |
-| Structured actions | `ChatActionPayload` | `{type, label?, labelKey?, payload}` with typed ids (confirmation, run) | None | Reuse | `schemas.py:751-763`; `docs/API_CONTRACT.md:3589` |
-| Confirmation edits | Confirmation routes | `/confirmations/{id}/direct-edit`, `/peer-assets` | None | Reuse | `conversations.py:851`, `conversations.py:1092` |
-| Tool-result cards and recompute | `tool_result_cards` + recompute route | Backend-localized `presentation`, sources, `repair` | None | Reuse | `src/argus/domain/tool_contracts.py:86`, `:173`; `src/argus/api/routers/tool_results.py:56`; `docs/API_CONTRACT.md:3496-3587` |
-| Backtest / research jobs | Backtest router | `GET /backtest-jobs/{id}`, `/by-action/{confirmation_id}`, `GET /backtests/{run_id}`; research answer as `result_message` | None (polling) | Reuse | `src/argus/api/routers/backtest.py:613-719`; `docs/API_CONTRACT.md:5029-5075` |
-| Run dossiers | Conversations router | `GET /conversations/{id}/run-dossiers` | None | Reuse | `conversations.py:531`; `docs/API_CONTRACT.md:3354` |
-| History / Recents | `GET /history` | Cursor pages with activity projection | None | Reuse | `src/argus/api/routers/history.py:63` |
-| Omnisearch | `GET /search` | Typed rows with `conversation_id`, `message_id`, `run_id`, dossiers, ledger groups | None | Reuse | `src/argus/api/routers/search.py:53`; `docs/API_CONTRACT.md:5816` |
-| Computations / decisions | `computations`, `decisions`, `evidence` routers | answers list, compare, continue, refresh, rerun, decision save/open | None | Reuse | `src/argus/api/routers/computations.py:46-104`; `src/argus/api/routers/decisions.py:28-135`; `src/argus/api/routers/evidence.py:16` |
-| Composer mentions | `discovery` router | `GET /discovery/assets`, `/discovery/indicators` | None | Reuse | `src/argus/api/routers/discovery.py:46-83` |
-| Client capability handshake | `X-Argus-Client-Capabilities` | Additive presentation opt-in (`dossier_decision_conversion_v1`) | None | Reuse | `src/argus/api/client_capabilities.py:9-49`; `web/lib/argus-api-transport.ts:13-31` |
+| Profile, usage, market session | `profile`, `market` routers | `GET/PATCH /me`, `GET /me/usage`, `GET /market/session`; returns `account_kind`, guest limits, `capabilities` | None | Reuse candidate | `src/argus/api/routers/profile.py:50-67`; `docs/API_CONTRACT.md` §8 |
+| Conversations | `conversations` router | CRUD, `/guest/replace`, cursor pages | None | Reuse candidate | `src/argus/api/routers/conversations.py:169-530` |
+| Messages / hydration | `GET /conversations/{id}/messages` | Cursor or `anchor_message_id`; `Message.metadata: dict[str, Any]` | None | Reuse candidate (untyped) | `conversations.py:666`; `schemas.py:324-330`; `docs/API_CONTRACT.md:3437` |
+| Activity / attention | `conversation_activity` router | `latest_message_id`, `operation`, `attention`; `mark_read`/`mark_unread` | None | Reuse candidate | `src/argus/api/routers/conversation_activity.py:68-110`; `docs/API_CONTRACT.md:3259-3341` |
+| Chat turn stream | `POST /chat/stream` | `data:` frames `stage_start`, `token`, `stage_outcome`, `final`, `error`, then `[DONE]`; `: keepalive` comments; `Idempotency-Key`, `X-Request-Id` | None | Reuse candidate | `src/argus/api/routers/agent.py:265`; `src/argus/api/chat/streaming.py:7-16`; `docs/API_CONTRACT.md:3467` |
+| Structured actions | `ChatActionPayload` | `{type, label?, labelKey?, payload}` with typed ids (confirmation, run) | None | Reuse candidate | `schemas.py:751-763`; `docs/API_CONTRACT.md:3589` |
+| Confirmation edits | Confirmation routes | `/confirmations/{id}/direct-edit`, `/peer-assets` | None | Reuse candidate | `conversations.py:851`, `conversations.py:1092` |
+| Tool-result cards and recompute | `tool_result_cards` + recompute route | Backend-localized `presentation`, sources, `repair` | None | Reuse candidate | `src/argus/domain/tool_contracts.py:86`, `:173`; `src/argus/api/routers/tool_results.py:56`; `docs/API_CONTRACT.md:3496-3587` |
+| Backtest / research jobs | Backtest router | `GET /backtest-jobs/{id}`, `/by-action/{confirmation_id}`, `GET /backtests/{run_id}`; research answer as `result_message` | None (polling) | Reuse candidate | `src/argus/api/routers/backtest.py:613-719`; `docs/API_CONTRACT.md:5029-5075` |
+| Run dossiers | Conversations router | `GET /conversations/{id}/run-dossiers` | None | Reuse candidate | `conversations.py:531`; `docs/API_CONTRACT.md:3354` |
+| History / Recents | `GET /history` | Cursor pages with activity projection; `conversation_id` is nullable (legacy `strategy`/`collection` item types) | None | Reuse candidate | `src/argus/api/routers/history.py:63`; `schemas.py:523-536` |
+| Omnisearch | `GET /search` | Discriminated rows: `conversation` rows carry `conversation_id`, optional `match.message_id` and dossier anchors; `asset_rollup` rows are aggregates with no transcript anchor; ledger groups | None | Reuse candidate | `src/argus/api/routers/search.py:53`; `schemas.py:621-631`, `schemas.py:671-719`; `docs/API_CONTRACT.md:5816` |
+| Computations / decisions | `computations`, `decisions`, `evidence` routers | answers list, compare, continue, refresh, rerun, decision save/open | None | Reuse candidate | `src/argus/api/routers/computations.py:46-104`; `src/argus/api/routers/decisions.py:28-135`; `src/argus/api/routers/evidence.py:16` |
+| Composer mentions | `discovery` router | `GET /discovery/assets`, `/discovery/indicators` | None | Reuse candidate | `src/argus/api/routers/discovery.py:46-83` |
+| Client capability handshake | `X-Argus-Client-Capabilities` | Additive presentation opt-in (`dossier_decision_conversion_v1`) | None | Reuse candidate | `src/argus/api/client_capabilities.py:9-49`; `web/lib/argus-api-transport.ts:13-31` |
 | Result readout text | Web `result-readout-*` | Uses backend `result_readout_content` when its language matches; otherwise composes from `result_fact_bank` + web i18n | Web i18n catalog | **Adapt** | `web/lib/artifact-response-transport.ts:8-22`; `web/lib/result-readout-display.ts:16-40`; `docs/API_CONTRACT.md:5042-5051` |
 | Recovery copy and actions | Web `chat-recovery-display.ts` | Derives display text and action options from typed metadata codes | Web i18n catalog | **Adapt** | `web/lib/chat-recovery-display.ts:103-700` (1,116 lines) |
 | Localized labels | Web i18n catalog (1,723 `en` keys) | Backend emits `locale_key` / `label_key` into that namespace | Bundled with web | **Adapt** | `web/public/locales/en/common.json`; `docs/API_CONTRACT.md:3513-3517` |
-| Shared display policy | `argus_display_contract` package | JSON read by backend and web build | None | Reuse | `web/argus_display_contract/result_display_policy.json`; `src/argus/domain/result_money.py:19`; `pyproject.toml:10` |
+| Shared display policy | `argus_display_contract` package | JSON read by backend and web build | None | Reuse candidate | `web/argus_display_contract/result_display_policy.json`; `src/argus/domain/result_money.py:19`; `pyproject.toml:10` |
 | Temporary chat (memory opt-out) | Web localStorage | `memory_opt_out` flag per request | `localStorage` | **Adapt** | `web/lib/browser-storage.ts:33-46`; `web/lib/argus-api.ts:1041`; `schemas.py:840-842` |
-| Memory controls | `personalization_memory` router | role-gated settings, records, export JSON | None | Reuse | `src/argus/api/routers/personalization_memory.py:108-379` |
-| Feedback | `POST /feedback` | Text + bounded context; no attachments | None | Reuse | `src/argus/api/routers/feedback.py:19`; `schemas.py:953-968` |
-| Public receipts | `evidence_receipts`, `public_receipts` routers | Owner create/revoke; public view at web `/r/[receiptId]` | Web page for viewing | Reuse | `src/argus/api/routers/evidence_receipts.py:145-357`; `web/app/r/` |
+| Memory controls | `personalization_memory` router | role-gated settings, records, export JSON | None | Reuse candidate | `src/argus/api/routers/personalization_memory.py:108-379` |
+| Feedback | `POST /feedback` | Text + bounded context; no attachments | None | Reuse candidate | `src/argus/api/routers/feedback.py:19`; `schemas.py:953-968` |
+| Public receipts | `evidence_receipts`, `public_receipts` routers | Owner create/revoke; public view at web `/r/[receiptId]` | Web page for viewing | Reuse candidate | `src/argus/api/routers/evidence_receipts.py:145-357`; `web/app/r/` |
 | File upload / ingestion | none | none | n/a | **Missing** | No `UploadFile`, multipart route, bucket, or file input found in `src/`, `web/`, or `supabase/migrations/` |
 | Financial records, household, sharing | none | none | n/a | **Missing** | [DOCUMENTATION_AUTHORITY](../DOCUMENTATION_AUTHORITY.md#what-remains-technical-or-undecided) |
-| Notifications / device registration | none | none | n/a | **Missing** | No user-facing notification or device-token code found in `src/`, `web/lib/`, `web/components/`, or `supabase/` (`src/argus/api/feedback_notification.py` only emails feedback to the team) |
+| Notifications / device registration | Documented as hidden/flagged for Alpha ([PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes)) | Not found by this search | n/a | **Not found at SHA** | Search scope and terms in §5; `src/argus/api/feedback_notification.py` only emails feedback to the team |
 | Account deletion | Feedback type | `type: "account_deletion_request"` | None | **Adapt / decision** | `schemas.py:954` |
 
 ## 4. Answers to the eight questions
 
 ### 4.1 What native clients can consume unchanged
 
-All `/api/v1` product routes in the table marked **Reuse**. The shared properties that make this true:
+The `/api/v1` product routes marked **Reuse candidate** in the table. These are transport-level
+findings from source reading; end-to-end compatibility still needs a bearer-only client run (WP-A
+acceptance) and schema-validated payloads (WP-B). The shared properties behind the finding:
 
 - Bearer auth is first-class (`dependencies.py:419-421`); cookies are a fallback.
 - The auth-origin guard admits requests that carry no `Origin` header (`auth.py:923-937`), which is
   the normal native case. CORS is irrelevant to native HTTP clients.
 - Errors are flat RFC 9457 bodies with `code` and `request_id` (`src/argus/api/app_setup.py:94-105`),
   plus `Retry-After` on 429.
-- Identity for navigation is typed: search, history, activity, and jobs return conversation,
-  message, run, and job ids rather than web URLs, so native deep links can target ids.
+- Navigation targets are ids, not web URLs, where a target exists. Search `conversation` rows,
+  history chat rows, activity, and jobs return conversation, message, run, or job ids that native
+  deep links can use. Two exceptions are covered in §4.6: search `asset_rollup` rows are aggregates
+  with no transcript anchor, and history rows may have a null `conversation_id`.
 - Account class and capabilities come from the server (`profile.py:50-67`), so native gating can
   render them without re-deriving guest policy.
 - The `X-Argus-Client-Capabilities` handshake already lets a client opt into additive presentation;
@@ -133,7 +146,7 @@ All `/api/v1` product routes in the table marked **Reuse**. The shared propertie
 
 | Dependency | Where | Native consequence |
 | --- | --- | --- |
-| Cloudflare Turnstile browser widget | `web/lib/guest-captcha.ts:1-35`; required by `schemas.py:986,1003,1058,1151` | No native path to guest start, sign-in, or sign-up |
+| Cloudflare Turnstile browser widget | `web/lib/guest-captcha.ts:1-35`; required by `schemas.py:986,1003,1058,1151` | No implemented native way to obtain the token yet; an integration gap, not an inherent barrier (§8.2 E1) |
 | HttpOnly handoff cookies | `auth.py:343, 369-389, 417, 603-604, 861-862` | Guest conversion needs a cookie jar or another secret transport |
 | Browser Supabase session storage and auto-refresh | `web/lib/supabase-client.ts`; `argus-api-transport.ts:40-48` | Native owns token storage and refresh |
 | Next.js route for password recovery | `web/app/api/auth/recovery/route.ts`; `auth-security.ts:141` | Native recovery request has no Argus API endpoint |
@@ -160,11 +173,12 @@ Web today
 ```
 
 - **Sign-in and sign-up**: the API returns the session in JSON (`argus-api.ts:570-590` reads it),
-  so a native client can store tokens in Keychain/Keystore. The only blocker is the captcha token (G1).
+  so a native client can store tokens in Keychain/Keystore. The remaining gap for these routes is
+  obtaining the captcha token (G1).
 - **Refresh**: implemented only in the browser Supabase client. The smallest adaptation that matches
   today's web ownership is for native clients to refresh directly against Supabase Auth with the
-  public URL and anon key, as the web does. The alternative is an Argus refresh endpoint. Either is a
-  founder/architecture choice (F3). Note that `supabase/config.toml:183-186` enables refresh-token
+  public URL and anon key, as the web does. The alternative is an Argus refresh endpoint. This is an
+  engineering choice with a recommended default (§8.2 E2). Note that `supabase/config.toml:183-186` enables refresh-token
   rotation with a 10-second reuse window locally; concurrent refreshes from one app must be serialized.
 - **Logout**: `POST /auth/logout` deletes cookies and does not revoke (`auth.py:940-946`). Revocation
   is a Supabase `signOut`. Because `current_user` checks `auth.sessions`, a revoked access token fails
@@ -178,7 +192,7 @@ Web today
   the same jar would also capture `sb-auth-token` cookies that `current_user` accepts when no bearer
   is sent (`dependencies.py:422-445`). The smallest safe choices are (a) a jar limited to
   `/api/v1/auth` with `sb-*` cookies discarded, or (b) an additive body/header transport of the
-  handoff secret for bearer clients. Either needs an owner decision (F4).
+  handoff secret for bearer clients. This is an engineering choice (§8.2 E3).
 - **Account switching**: the server is stateless per request. The client must drop tokens, stop
   in-flight streams, and discard account-scoped caches before issuing a new identity. The web does
   this with an account epoch (`chat-request-session.ts:209-216`) and still has a stale-tab resend gap
@@ -202,17 +216,17 @@ Disconnect ─▶ documented rule: GET /conversations/{id}/messages (no token re
   timeout (`agent.py:157`), durable lifecycle states and a 15-minute stale-turn reconciler that runs
   on the next POST or message read (`docs/API_CONTRACT.md:537-640`), and retry by
   `failed_assistant_id` (`docs/API_CONTRACT.md:3467-3494`).
-- **Inferred, not executed**: when the response generator closes, the threaded runtime worker is
+- **Inferred from code, not executed or measured**: when the response generator closes, the threaded runtime worker is
   cancelled (`src/argus/api/chat/runtime_worker.py:111-125`). Only the result breakdown is explicitly
   shielded (`agent.py:1018`) and tested to survive disconnect (`tests/test_result_breakdown_jobs.py:60`).
   An ordinary turn cut off before its terminal message persists stays `running` until the reconciler
   marks it `abandoned` with a retry offer (`tests/test_chat_turn_route_matrix.py:1090`).
-- **Phone impact**: backgrounding the app during an answer is routine on iOS and Android. Under the
-  inferred behavior, the user returns to a conversation shown as working for up to 15 minutes and
+- **Phone impact (inferred, unmeasured)**: backgrounding the app during an answer is routine on iOS
+  and Android. If the inference above holds, the user returns to a conversation shown as working for up to 15 minutes and
   then a retry prompt. A resend with a new `Idempotency-Key` spends another turn
   ([#700](https://github.com/lagarcess/argus/issues/700)). Mobile web shares this path.
-- **User cancellation**: there is no stop-generation endpoint and no web stop control; aborts occur
-  only on navigation or account change. Confirmation cancellation is a structured action
+- **User cancellation**: no stop-generation endpoint or web stop control was found; the web aborts
+  requests on navigation or account change. Confirmation cancellation is a structured action
   (`src/argus/api/chat/cancellation.py`).
 - **Async work**: backtests and thorough research are durable jobs; native polls
   `GET /backtest-jobs/{id}`, as the web does. Supabase Realtime is documented as the target but is
@@ -239,19 +253,36 @@ Yes for data, partially for presentation.
 
 ### 4.6 How history, search, calculations, research, and backtests connect
 
-All four connect through ids that resolve to one conversation transcript:
+Most results connect through ids that resolve to a conversation transcript. Aggregate results do not.
 
 ```text
-/search row ──conversation_id, match.message_id, dossier.run_id / result_message_id──┐
-/history row ──conversation_id, latest_message_id, activity──────────────────────────┤
-job poll ──result_run_id (backtest) | result_message (research)─────────────────────┤
-                                                                                     ▼
-GET /conversations/{id}/messages?anchor_message_id=…  →  metadata.result_card / tool_result_cards / computation
+/search conversation row ──conversation_id (always)
+                          ──match.message_id (only when match.layer = "message")
+                          ──dossier.run_id, dossier.result_message_id (optional)
+                          ──answer_dossier.message_id (when a computed answer exists)──┐
+/history chat row ──conversation_id, activity.latest_message_id───────────────────────┤
+job poll ──result_run_id (backtest) | result_message (research)──────────────────────┤
+                                                                                      ▼
+GET /conversations/{id}/messages[?anchor_message_id=…] → metadata.result_card / tool_result_cards / computation
 GET /backtests/{run_id}, GET /conversations/{id}/run-dossiers, GET /decisions/{id}
+
+/search asset_rollup row ──symbol, run_count, result_count, decision_counts, last_touched_at
+                          (no conversation, message, or run id: not transcript-addressable)
 ```
 
-A native client can open any search or history result by id and render the anchored transcript
-page. Computed answers carry `metadata.computation` and are listed by `GET /computations/answers`.
+- **Conversation search rows** always open a conversation. They open at a specific message only
+  when the row carries a message anchor (`schemas.py:621-631`: `message_id` is present only for
+  message-layer matches) or a dossier `result_message_id`. Otherwise a client opens the
+  conversation at its default position.
+- **Asset rollups** (`SearchAssetRollup`, `schemas.py:698-714`) summarize every result involving a
+  symbol and carry no anchor. The web command palette renders the first rollup as a
+  non-interactive summary and builds openable rows only from conversation items
+  (`web/components/sidebar/ChatCommandPalette.tsx:522-584`,
+  `web/components/sidebar/command-palette/AssetHistoryRollup.tsx`). No drill-down contract from a
+  rollup to its runs exists; a native client should present it the same way unless one is defined.
+- **History rows** of legacy `strategy` or `collection` type may have `conversation_id: null`
+  (`schemas.py:523-536`); only chat rows carry the activity projection.
+- Computed answers carry `metadata.computation` and are listed by `GET /computations/answers`.
 
 ### 4.7 Uploads and files today versus planned ingestion
 
@@ -272,10 +303,10 @@ simulations), tool-result cards with sources and recompute, jobs, Omnisearch wit
 dossiers, computed answers and decisions, the client-capability handshake, Problem Details, and the
 shared display-policy package.
 
-**Undefined:** financial accounts, transactions, balances, currency handling for DOP/USD records,
+**No implemented contract found:** financial accounts, transactions, balances, currency handling for DOP/USD records,
 plans (budget, goal, debt), households, membership, sharing and edit permissions with RLS,
 chat-to-record proposal and confirmation actions, file and voice ingestion, notification inbox and
-delivery, device registration, and account deletion. The
+delivery (documented status per §5), device registration, and self-service account deletion. The
 [authority map](../DOCUMENTATION_AUTHORITY.md#what-remains-technical-or-undecided) already names
 these as open. The existing `AccountCapabilities` (`schemas.py:191`) is a guest/registered switch,
 not a resource permission model, and should not be stretched into household permissions.
@@ -284,27 +315,27 @@ not a resource permission model, and should not be stretched into household perm
 
 | Statement | Where documented | What the source shows |
 | --- | --- | --- |
-| Notifications are "Hidden/flagged for Alpha" | [PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes) | No user-facing notification inbox, delivery, or flag code was found in `src/`, `web/lib/`, or `web/components/` at this SHA. Either it lives elsewhere or the row describes a design surface. Owner should confirm |
+| Notifications: current production state "Hidden/flagged for Alpha"; approved to enable in the next product push | [PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes) | The documented status stands; this report does not revise it. A case-insensitive search at `ab9143c` for `notification`, `push_token`, `device_token`, `apns`, `fcm`, `web-push`, `pushManager`, and `serviceWorker` across `src/`, `web/lib/`, `web/components/`, `web/app/`, `supabase/`, `render.yaml`, `.env.example`, and `web/.env.local.example` found no user-facing inbox, delivery, device-registration, or notification flag code. Matches were limited to team feedback email (`src/argus/api/feedback_notification.py`), chart range events, and commented Supabase email-template examples. The search did not cover hosted configuration, dashboards, other branches, or other names for the feature, so it does not show the capability is absent from production. The PRODUCT.md owner can reconcile the wording if needed |
 | Supabase Realtime is the job-status target transport | `docs/API_CONTRACT.md:1879` | Polling only |
 | Auth transport "Supabase Auth session cookie or bearer token" | `docs/API_CONTRACT.md:67-75` | Accurate for requests; refresh, revoke, and recovery are outside the Argus API |
 
 ## 6. Contract gaps
 
-Ordered by how directly they block the native clients while preserving existing behavior.
+Ordered by how directly they affect native integration while preserving existing behavior.
 
 | # | Gap | User impact | Smallest plausible adaptation |
 | --- | --- | --- | --- |
-| G1 | Captcha token only obtainable from the Turnstile browser widget | Native users cannot start a guest chat, sign in, or sign up | Decide the native bot-protection path (F2); then an additive contract note. No backend change if the token stays a Turnstile token |
-| G2 | Session refresh, revoke, password change, and recovery live in the browser Supabase client and a Next.js route | Native sessions expire hourly (local config) with no documented refresh path; logout could leave refresh tokens live | Document the native session contract: either direct Supabase Auth use mirroring web, or thin Argus endpoints (F3) |
-| G3 | Guest handoff secret travels only as HttpOnly cookies | Guest-to-account conversion loses the temporary conversation on native unless a jar is managed | Scoped cookie jar with `sb-*` discard, or additive body/header transport for bearer clients (F4) |
-| G4 | Email confirmation and recovery links target the web origin; no app/universal link association | Users leave the app to finish signup or recovery | Decide web-completion versus app links (F5); association files are web-hosted assets |
-| G5 | Ordinary turn continuity across disconnect is unmeasured on phones | Backgrounded answers may show "working" up to 15 minutes, then a paid retry | Measure first (WP-D). Only then decide whether server-side completion after disconnect is warranted |
-| G6 | Deterministic presentation composed in web TypeScript from typed facts | Native must port well over 1,000 lines of TypeScript per platform, creating three owners of the same copy | Inventory projections; per projection, choose backend-resolved text or a shared catalog plus ported template (F6) |
+| G1 | No implemented native flow obtains the Turnstile token that guest start, sign-in, and sign-up require | Native entry is not integrated until a token path exists | Spike the recommended default (E1). No backend change if the token remains a Turnstile token |
+| G2 | Session refresh, revoke, password change, and recovery live in the browser Supabase client and a Next.js route | Native sessions expire hourly (local config) with no documented refresh path; logout could leave refresh tokens live | Document the native session contract using the recommended default (E2) |
+| G3 | Guest handoff secret travels only as HttpOnly cookies | Guest-to-account conversion loses the temporary conversation on native unless a jar is managed | Additive header/body transport read by the same server helper (E3), or a scoped cookie jar |
+| G4 | Email confirmation and recovery links target the web origin; no app/universal link association | Users leave the app to finish signup or recovery | Founder choice X1; app/universal links need association files hosted by the web app |
+| G5 | Ordinary turn continuity across disconnect is inferred from code and unmeasured on phones | If the inference holds, backgrounded answers show "working" for up to 15 minutes, then a retry that spends another turn | Measure first (WP-D). Founder choice X4 only after evidence |
+| G6 | Deterministic presentation composed in web TypeScript from typed facts | Native must port well over 1,000 lines of TypeScript per platform, creating three owners of the same copy | Inventory projections, then apply the recommended default (E4) |
 | G7 | Wire payloads untyped in OpenAPI | No generated Swift/Kotlin models; drift found only at runtime | Publish JSON Schema for SSE frames and metadata envelopes from existing Pydantic models, plus golden fixtures |
 | G8 | Web i18n catalog is the de-facto key namespace for backend `locale_key`/`label_key` | Native strings drift from web or show raw keys | Package the catalog as a shared contract, like `argus_display_contract` |
-| G9 | Temporary chat opt-out is device-local | Opt-out on one device is ignored on another | Decide device-local versus account-synced (F7) |
-| G10 | Account deletion only by feedback request | App-store review risk; unclear user path | Founder decision on in-app deletion scope (F8) |
-| G11 | No upload, record, household, permission, notification, or device contracts | New MVEE surfaces cannot be built on either platform | Contract definition packages after founder decisions; not native prerequisites |
+| G9 | Temporary chat opt-out is device-local | Opt-out on one device is ignored on another | Founder choice X2 |
+| G10 | Account deletion only by feedback request | App-store review risk; unclear user path | Founder choice X3 |
+| G11 | No upload, financial-record, household, permission, or device-registration contract found (notification status per §5) | New MVEE record surfaces have no backend contract to build on, on any client | Contract definitions after the relevant MVEE §9 decisions (WP-E); not native prerequisites |
 
 ## 7. Proposed independent work packages
 
@@ -316,7 +347,7 @@ These are proposals for assignment, not created issues. Each preserves existing 
   sign in, sign up, refresh, revoke, recover, convert a guest, and switch accounts.
 - **Owns:** a new API_CONTRACT §7 subsection (by its owner), any additive handoff transport in
   `src/argus/api/routers/auth.py` and `schemas.py`, and tests.
-- **Prerequisites:** F2, F3, F4, F5.
+- **Prerequisites:** R0; E1 spike result; E2 and E3 accepted by the architecture reviewer; founder choice X1.
 - **No-touch:** interpreter prompts and schema descriptions, LangGraph runtime, web auth UI,
   cookie names in `browser_cookies.py` (unless the privacy disclosure is updated with them).
 - **Acceptance evidence:** a scripted bearer-only client (no cookies, no `Origin`) completing guest
@@ -341,7 +372,7 @@ These are proposals for assignment, not created issues. Each preserves existing 
   with a per-item recommendation (backend-resolved or shared catalog plus template), and a packaged
   shared locale catalog.
 - **Owns:** a docs report and catalog packaging similar to `web/argus_display_contract/`.
-- **Prerequisites:** F6.
+- **Prerequisites:** E4 accepted by the architecture reviewer.
 - **No-touch:** visible web copy and layout, backend prose, model-facing text.
 - **Acceptance evidence:** inventory cross-referenced to files; a test proving backend-emitted
   `locale_key`/`label_key` values exist in the packaged catalog for both languages.
@@ -364,19 +395,37 @@ These are proposals for assignment, not created issues. Each preserves existing 
 - **No-touch:** existing chat, simulation, and search contracts; legacy Strategy/Collection rows.
 - **Acceptance evidence:** reviewed contract documents; no implementation.
 
-## 8. Decisions needing founder input
+## 8. Outstanding reconciliation, founder choices, and engineering recommendations
 
-| # | Decision | Why it blocks |
+### 8.1 Documentation reconciliation (already decided)
+
+| # | Work | Note |
 | --- | --- | --- |
-| F1 | Record the native stack (Swift/SwiftUI with UIKit, Kotlin/Compose with Views) in the decision log and point ARCHITECTURE §5 to it | Canon docs still say native frameworks are unselected |
-| F2 | Bot protection for native guest start and sign-in: keep Turnstile via an embedded web view, or approve another mechanism | G1 blocks all native entry |
-| F3 | Whether native apps call Supabase Auth directly for refresh, revoke, and password changes (as web does), or through Argus endpoints | Determines who owns native session lifecycle |
-| F4 | Guest-conversion secret transport for native (scoped cookie jar or body/header) | Preserves the guest conversation on signup |
-| F5 | Where email confirmation and password recovery complete for native users (web or in-app links) | Determines association files and redirect allow-list changes |
-| F6 | Presentation ownership: backend-resolved localized text versus a shared catalog with ported templates | Avoids three copies of result and recovery copy |
-| F7 | Temporary chat (memory opt-out): device-local or account-synced | Consistency across devices |
-| F8 | In-app account deletion scope for store submission | Only a feedback-request path exists |
-| F9 | Acceptable behavior for answers interrupted by app backgrounding, after WP-D evidence | Cost versus continuity trade-off |
+| R0 | Publish the founder-approved native stack documentation from its local branch and reconcile the pointers in the decision log, ARCHITECTURE.md §5, and DOCUMENTATION_AUTHORITY.md | Publication and reconciliation, not an open framework choice. Owned by whoever holds that branch |
+
+### 8.2 Founder-facing experience choices
+
+Each has a recommended default so work can proceed if the founder accepts it.
+
+| # | Choice | Recommended default | Tradeoff |
+| --- | --- | --- | --- |
+| X1 | Where native users finish email confirmation and password recovery | Return to the app through app/universal links; until those exist, finish on the web with a clear step back to the app | App links need association files, a redirect allow-list change, and hosted email template review; web completion is available now but breaks the flow |
+| X2 | Whether temporary chat (memory opt-out) follows the user across devices | Keep today's device-local behavior on each client and label it as applying to this device | Syncing needs a server-side flag and a privacy review; device-local can surprise someone who switches devices |
+| X3 | How account deletion is offered in the native apps | An in-app entry point that starts the existing deletion request and explains what happens next; self-service deletion is a separate contract | The request path exists today; store policy fit should be checked by the release owner before submission |
+| X4 | What a user sees when an answer is interrupted by leaving the app (after WP-D evidence) | Keep the current durable retry path unless measurement shows it is common and slow to recover | Finishing turns server-side after disconnect improves continuity but spends model cost on answers nobody may read |
+
+### 8.3 Engineering recommendations (owner: architecture reviewer and release captain)
+
+These are technical defaults with tradeoffs, not founder blockers. Escalate only if a spike fails
+or a user-visible tradeoff emerges.
+
+| # | Topic | Recommended default | Tradeoff / alternative |
+| --- | --- | --- | --- |
+| E1 | Native bot-protection token | Spike: host the existing Turnstile widget in a native web view and pass its token to the unchanged endpoints | Keeps one provider and no backend change; web-view friction and Cloudflare's behavior in embedded contexts must be verified. A platform-attestation path would need backend and Supabase Auth configuration changes |
+| E2 | Session refresh, revoke, and password change | Native apps use the official Supabase client SDKs, mirroring the web's ownership; logout always revokes | No backend change; auth logic lives in three clients. Refresh must be serialized under token rotation. Alternative: thin Argus endpoints, one more owner to keep in sync with Supabase |
+| E3 | Guest-handoff secret transport | Additive header or body field for bearer clients, read through the same server helper as the cookies | Small contract change with tests. Alternative: a cookie jar scoped to `/api/v1/auth` that discards `sb-*` cookies; no backend change, but each platform must enforce the scoping |
+| E4 | Presentation ownership | Package the web locale catalog as a shared artifact first; move deterministic fallback composition server-side one projection at a time, only where web output stays identical | Shared catalog is cheap and removes key drift; porting templates to Swift and Kotlin creates three owners of the same copy |
+| E5 | Wire schemas | Generate JSON Schema from existing Pydantic models (WP-B) | Some metadata has no model yet; adding models must not change `Field(description=...)` text in the eval-reachable tree |
 
 Guest onboarding, offline synchronization, financial schemas, notification providers, and ingestion
 providers are deliberately not selected here.
@@ -401,5 +450,10 @@ found at the time of this audit.
 
 - Every `path:line` reference above was read at `ab9143c`.
 - Relative documentation links in this report were checked to resolve to existing files.
+- Search navigation claims were re-verified against `SearchItem`, `SearchMatch`, and
+  `SearchAssetRollup` in `schemas.py` and against the web command palette, after review feedback
+  on this PR.
+- The notification search terms and scope are recorded in §5.
+- No native or bearer-only client was run; every "Reuse candidate" status is a source-reading result.
 - The docs-reading pytest selection (`.github/docs-reading-tests.sh`, 42 files) could not run locally: project dependencies are not installed in this container and installation was out of scope. CI owns that gate.
 - No runtime, test, or migration file was changed; no service was started; no provider was called.
