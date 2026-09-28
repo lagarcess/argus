@@ -236,6 +236,36 @@ def edits_that_move_money_need_review() -> dict:
         "redating_the_opening_onto_untimed_activity": _redate_opening_onto_day(),
         "purchase_edits_recheck_refunds": _purchase_edits_recheck_refunds(),
         "custom_category_blocks_a_move": _custom_category_blocks_move(),
+        "anchors_keep_their_account": _anchor_account_fixed(),
+    }
+
+
+def _anchor_account_fixed() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    other = scene.account("Monedero", "cash", "DOP", "0.00")
+    check = scene.observe(cash, "8000.00", 5)
+    scene.now = local(6)
+    late = scene.act("expense", cash, "2000.00", 3)
+    scene.store.resolve(late.id, answers={check.id: "included"})
+    expense = scene.confirm(late)
+    moved = outcome(
+        lambda: scene.store.correct(check.id, 1, "wrong", account_id=other.id)
+    )
+    flip = outcome(
+        lambda: scene.store.correct(
+            expense.id, 1, "it was after", answers={check.id: "not_included"}
+        )
+    )
+    balance_after_flip = scene.amount(cash)
+    scene.store.remove(check.id, 1, "typo")
+    return {
+        "check_to_other_account": moved,
+        "own_answer_flip": flip,
+        "balance_after_flip": balance_after_flip,
+        "answers_on_a_check_restore": outcome(
+            lambda: scene.store.restore(check.id, 2, "x", answers={expense.id: "x"})
+        ),
     }
 
 

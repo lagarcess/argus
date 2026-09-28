@@ -181,4 +181,10 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "other_category": "ReviewRequired:refund_category_mismatch",
         },
         "custom_category_blocks_a_move": {"move": "ReviewRequired:account_has_links"},
+        "anchors_keep_their_account": {
+            "check_to_other_account": "InvalidInput:anchor_account_immutable",
+            "own_answer_flip": "ok",
+            "balance_after_flip": 600_000,
+            "answers_on_a_check_restore": "InvalidInput:answers_not_applicable",
+        },
     }

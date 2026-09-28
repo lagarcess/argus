@@ -437,9 +437,15 @@ class Store:
         body = replace(record.body, **changes)
         if self.book.accounts[body.account_id].currency != currency:
             raise InvalidInput("currency_mismatch", body.account_id)
+        if not isinstance(body, Activity) and body.account_id != record.body.account_id:
+            raise InvalidInput("anchor_account_immutable", body.account_id)
         found = blocking(validate(self.book, body, self.tz, record_id))
+        left = accounts_of(record.body) - accounts_of(body)
+        trial = with_trial(self.book, body, record_id, self.tz)
+        found.extend(_open_questions(trial, left, self.tz))
         found.extend(self._linked_refund_issues(record_id, body))
-        if not found and not accept_reordering:
+        only_answers = set(changes) == {"answers"}
+        if not found and not accept_reordering and not only_answers:
             found.extend(self._placement_changes(record, body))
         if found:
             raise ReviewRequired(found)
@@ -482,6 +488,8 @@ class Store:
         if not record.removed:
             raise InvalidInput("record_not_removed", record_id)
         body = record.body
+        if answers and not isinstance(body, Activity):
+            raise InvalidInput("answers_not_applicable", record_id)
         if answers:
             body = replace(body, answers=_merged_answers(body.answers, answers))
         found = blocking(validate(self.book, body, self.tz, record_id))
