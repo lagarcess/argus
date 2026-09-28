@@ -89,6 +89,18 @@ Existing production owners for a later real account journey:
 | Profile | `components/sidebar/ProfileDetailsDialog.tsx`, `ProfileMenu.tsx`, `lib/profile-writes.ts` | Preserve serialized writes and canonical readback. Financial accounts do not belong in profile fields. |
 | Account-form presentation | Shared `AdaptivePanel`, `ConfirmDialog`, `useModalSurface`; preview-local `AccountPanels` | Dialog infrastructure is reusable. No existing production financial-account form or correction controller exists. |
 
+A concrete proposed backend handoff now exists in [PR #735](https://github.com/lagarcess/argus/pull/735),
+verified open and unmerged at `35f77c9fbbd308f4ed01b1280dbbdf22d6101dbe`.
+Read its pinned [API contract section 17.3](https://github.com/lagarcess/argus/blob/35f77c9fbbd308f4ed01b1280dbbdf22d6101dbe/docs/API_CONTRACT.md#L6367),
+[data model section 12.1.4](https://github.com/lagarcess/argus/blob/35f77c9fbbd308f4ed01b1280dbbdf22d6101dbe/docs/DATA_MODEL.md#L1821)
+and [bounded slice](https://github.com/lagarcess/argus/blob/35f77c9fbbd308f4ed01b1280dbbdf22d6101dbe/docs/specs/lanes/financial-accounts-first-slice.md)
+for the proposed registered-only create/list/read/edit/opening-correction surface,
+behind default-off `ARGUS_FINANCIAL_ACCOUNTS_ENABLED`. It remains a proposal;
+this lane neither accepts nor wires it. Its opening-balance correction does not
+implement this preview's broader Check balance flow, sample activity or Plan.
+A later assignment must adapt displayed input to the accepted wire format and
+server validation; the local preview syntax guard is not a financial validator.
+
 The accepted financial API and data contract must supply durable account identity,
 allowed facts and validation, authoritative detail/readback, permission and action
 availability, source/freshness, correction history and concurrency behavior.
@@ -122,8 +134,9 @@ contracts remain with the backend owner.
 | First reconciled integration | `3fa0dd92167791d82ce81c167c490396358c4316` |
 | First one-way reconciliation merge | `2b3e6cf2589d87c1bc206e8a93511e4c32b95005` |
 | iOS reconciliation merge | `9baf573c992a47a16e3cb3132ae723d30c20ffa3` |
-| Latest reconciled integration | `a8e09b72339c7bc676715dabf8a9cceaac81cf03` |
-| Latest one-way reconciliation merge | `7785b252a2ba487e5bb545a3e8e4804cf08c301c` |
+| Android reconciliation merge | `7785b252a2ba487e5bb545a3e8e4804cf08c301c` |
+| Latest reconciled integration | `acf6639a23be368dbf3848a2b873f4a69d7579c4` |
+| Latest one-way reconciliation merge | `524d9d45711c852914992a833de1422266230a1b` |
 | Committed browser evidence head | `efe2ec66631ad43395de5746b578528bf432c4a6` |
 
 The intervening integration changes are Supabase server-client isolation, Render
@@ -142,7 +155,9 @@ does not touch either surface. Native implementation deltas since the previously
 inspected #729/#730 heads are empty; their newer heads reconcile integration.
 The mobile archive remains unchanged. The final native reconciliation preserves
 the entire web tree `a28f139399b28d053491be3e609c7c34a3c1b2ee`, so all
-browser, production and build evidence is retained. No rebase or worker-to-integration merge
+browser, production and build evidence is retained. The last integration
+advance, #734, only records the already-landed #695 outcome in two documents.
+It has no runtime, contract, UI, migration, environment or test overlap. No rebase or worker-to-integration merge
 was performed.
 
 The [evidence index](evidence/pr-732/README.md) contains 35 screenshots, their
@@ -176,8 +191,11 @@ later documentation/evidence-only delta. It is written after the final review.
   issues: incomplete evidence-input checking and unvalidated balance drafts.
   Both are fixed and tested. Drafts use existing React-state form patterns and
   localized accessible errors; no shared dependency or financial rule was added.
-  Hosted CI and the final Codex review are recorded in
-  [PR #732](https://github.com/lagarcess/argus/pull/732).
+  The [final code-delta review](https://github.com/lagarcess/argus/pull/732#issuecomment-5879242797)
+  returned clean at `3b7c3f9ac3383ffe695c49f4eacf0456e5b224e0`, with zero
+  unresolved threads. The later #734 reconciliation and proposed-backend
+  reference only change documentation; the reviewed web tree is identical.
+  Exact final-head CI is recorded in the terminal PR audit.
 
 Runtime: macOS 27.0 arm64, Bun 1.4.2, Node v26.10.0, Next 16.2.4,
 Playwright 1.59.1 / Chromium 147.0.7727.15. CI uses repository-pinned Bun 1.3.14.

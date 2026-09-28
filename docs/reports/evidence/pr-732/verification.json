@@ -4,8 +4,8 @@
   "webTree": "a28f139399b28d053491be3e609c7c34a3c1b2ee",
   "previewTree": "9a4f4f07f68b71425ef3649c3a4674f6c080a995",
   "originalIntegration": "4b84e054a0d8079b21f38784335ad3241809b4cd",
-  "reconciledIntegration": "a8e09b72339c7bc676715dabf8a9cceaac81cf03",
-  "reconciliationMerge": "7785b252a2ba487e5bb545a3e8e4804cf08c301c",
+  "reconciledIntegration": "acf6639a23be368dbf3848a2b873f4a69d7579c4",
+  "reconciliationMerge": "524d9d45711c852914992a833de1422266230a1b",
   "browserCases": 33,
   "browserPassed": true,
   "screenshots": 35,
@@ -33,7 +33,11 @@
   ],
   "priorReconciliationMerges": [
     "2b3e6cf2589d87c1bc206e8a93511e4c32b95005",
-    "9baf573c992a47a16e3cb3132ae723d30c20ffa3"
+    "9baf573c992a47a16e3cb3132ae723d30c20ffa3",
+    "7785b252a2ba487e5bb545a3e8e4804cf08c301c"
   ],
-  "reconciliationDisposition": "Merged #727/#729/#730 and integration housekeeping one way. No shared web runtime, contract, state, migration or environment overlap. Android CI is path-scoped to Android. Entire web tree unchanged after capture; all evidence retained."
+  "reconciliationDisposition": "Merged #727/#729/#730 and integration housekeeping one way. No shared web runtime, contract, state, migration or environment overlap. Android CI is path-scoped to Android. Entire web tree unchanged after capture; all evidence retained. The final #734 landing-register documentation has no semantic overlap; clean review retained.",
+  "reviewedHead": "3b7c3f9ac3383ffe695c49f4eacf0456e5b224e0",
+  "reviewOutcome": "Clean latest code-delta review; zero unresolved findings. Subsequent documentation-only reconciliation retains the identical reviewed web tree.",
+  "reviewUrl": "https://github.com/lagarcess/argus/pull/732#issuecomment-5879242797"
 }
