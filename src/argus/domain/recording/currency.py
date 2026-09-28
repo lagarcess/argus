@@ -28,6 +28,10 @@ def currency_exponent(currency: str) -> int:
     return get_currency_precision(normalize_currency(currency))
 
 
+# Stored amounts are Postgres bigint; the domain refuses what storage cannot hold.
+MAX_MINOR_UNITS = 2**63 - 1
+
+
 def parse_minor_units(text: str, currency: str) -> int:
     """Parse a dot-decimal string into signed minor units without rounding."""
 
@@ -45,6 +49,10 @@ def parse_minor_units(text: str, currency: str) -> int:
             f"{text!r} has more than {digits} fraction digits for {currency}",
         )
     minor = int(whole) * 10**digits + int(fraction.ljust(digits, "0") or "0")
+    if minor > MAX_MINOR_UNITS:
+        raise RecordingInputError(
+            "amount_out_of_range", f"{text!r} exceeds the largest amount Argus can record"
+        )
     return -minor if negative else minor
 
 

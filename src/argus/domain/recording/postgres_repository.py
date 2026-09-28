@@ -136,15 +136,17 @@ class PostgresFinancialAccountRepository:
         user_id: str,
         account_id: str,
         expected_revision: int | None,
+        expected_version: int,
         write: OpeningWrite,
     ) -> StoredAccount:
         with self._pool.connection() as connection:
             row = connection.execute(
-                "select public.write_financial_opening(%s, %s, %s, %s, %s, %s, %s)",
+                "select public.write_financial_opening(%s, %s, %s, %s, %s, %s, %s, %s)",
                 (
                     user_id,
                     account_id,
                     expected_revision,
+                    expected_version,
                     write.amount_minor,
                     write.as_of,
                     write.time_zone,

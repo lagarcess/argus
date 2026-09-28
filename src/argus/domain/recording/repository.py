@@ -84,6 +84,7 @@ class FinancialAccountRepository(Protocol):
         user_id: str,
         account_id: str,
         expected_revision: int | None,
+        expected_version: int,
         write: OpeningWrite,
     ) -> StoredAccount: ...
 
@@ -187,12 +188,13 @@ class InMemoryFinancialAccountRepository:
         user_id: str,
         account_id: str,
         expected_revision: int | None,
+        expected_version: int,
         write: OpeningWrite,
     ) -> StoredAccount:
         with self._lock:
             stored = self._owned(user_id, account_id)
             current = stored.opening.current.revision if stored.opening else None
-            if current != expected_revision:
+            if current != expected_revision or stored.account.version != expected_version:
                 raise StaleVersion()
             now = self._clock()
             next_revision = (current or 0) + 1

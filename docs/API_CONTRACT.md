@@ -6481,8 +6481,9 @@ the user; another user's identical key is a different reservation.
 
 - `amount` is optional; omitting it leaves the balance unknown. More fraction
   digits than the currency allows is `422 amount_precision`; anything but
-  digits with one optional dot and leading minus is `422 amount_invalid`. Input
-  is never rounded.
+  digits with one optional dot and leading minus is `422 amount_invalid`; a
+  value whose minor units exceed what storage holds (signed 64-bit) is
+  `422 amount_out_of_range`. Input is never rounded.
 - `as_of` is optional and defaults to the creation instant. A future instant
   is `422 date_in_future`; a missing UTC offset is `422 date_invalid`. An
   unknown zone is `422 time_zone_invalid`. A nickname over 60 code points is
@@ -6498,8 +6499,10 @@ first, archived accounts included and flagged.
 
 ## `GET /api/v1/financial-accounts/{id}`
 
-**Response:** the account shape. An account that does not exist or belongs to
-another user is `404 financial_account_not_found`; the shape never differs.
+**Response:** the account shape. An account that does not exist, belongs to
+another user, or has an id that is not a UUID is
+`404 financial_account_not_found`; the shape never differs. The same rule
+applies to `PATCH` and `PUT …/opening`.
 
 ## `PATCH /api/v1/financial-accounts/{id}`
 
@@ -6544,7 +6547,10 @@ Record the starting balance on an account that has none, or correct it.
 
 - `expected_revision` is the current opening revision, or `null` when the
   account has no opening yet. A mismatch is `409 stale_version` and writes
-  nothing.
+  nothing. The server also signs and scales the amount under the account
+  `version` it reads for the request and commits only if that version still
+  holds, so a concurrent currency or type edit on an empty account makes the
+  write stale instead of storing units under the old metadata.
 - A first opening needs `amount`; `reason` is optional. A correction needs a
   non-empty `reason` of at most 200 code points (`422 reason_required`,
   `422 reason_invalid`) and at least one of `amount`, `as_of`, `time_zone`

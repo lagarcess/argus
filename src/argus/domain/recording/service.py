@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+from uuid import UUID
 
 from argus.domain.backtest_admission import canonical_hash
 from argus.domain.recording.accounts import (
@@ -105,6 +106,12 @@ class FinancialAccountService:
         return self._repository.list_accounts(user_id=user_id)
 
     def get(self, *, user_id: str, account_id: str) -> StoredAccount:
+        try:
+            # A malformed id names nothing the caller can own; same answer as
+            # another user's account, so probes learn nothing from the shape.
+            account_id = str(UUID(account_id))
+        except ValueError:
+            raise AccountNotFound() from None
         stored = self._repository.get_account(user_id=user_id, account_id=account_id)
         if stored is None:
             raise AccountNotFound()
@@ -135,7 +142,7 @@ class FinancialAccountService:
         )
         return self._repository.update_account(
             user_id=user_id,
-            account_id=account_id,
+            account_id=stored.account.id,
             expected_version=request.expected_version,
             changes=changes,
         )
@@ -165,7 +172,10 @@ class FinancialAccountService:
         )
         return self._repository.write_opening(
             user_id=user_id,
-            account_id=account_id,
+            account_id=stored.account.id,
             expected_revision=request.expected_revision,
+            # The amount was signed and scaled under this read's type and currency;
+            # storage refuses the write if the account moved since.
+            expected_version=stored.account.version,
             write=write,
         )

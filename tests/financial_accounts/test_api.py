@@ -78,6 +78,11 @@ def test_a_liability_typed_as_amount_owed_reads_negative_to_the_owner(
         ({"type": "cash", "currency": "DOP", "amount": "1.005"}, "amount_precision"),
         ({"type": "cash", "currency": "DOP", "amount": "12,50"}, "amount_invalid"),
         ({"type": "cash", "currency": "DOP", "amount": "abc"}, "amount_invalid"),
+        (
+            {"type": "cash", "currency": "DOP", "amount": "92233720368547758.08"},
+            "amount_out_of_range",
+        ),
+        ({"type": "cash", "currency": "JPY", "amount": "9" * 40}, "amount_out_of_range"),
         ({"type": "cash", "currency": "ZZZ", "amount": "1"}, "currency_unsupported"),
         ({"type": "cash", "currency": "XXX"}, "currency_unsupported"),
         ({"type": "cash", "currency": "DOP", "nickname": "x" * 61}, "nickname_invalid"),
@@ -218,6 +223,18 @@ def test_unauthenticated_and_guest_requests_are_refused(
         assert response.status_code == 403, response.text
         assert response.json()["code"] == "account_conversion_required"
     assert alice.get(owned["id"]).json() == owned
+
+
+def test_a_malformed_account_id_is_not_found(alice: AccountsApi) -> None:
+    for response in (
+        alice.get("not-a-uuid"),
+        alice.edit("not-a-uuid", {"expected_version": 1, "nickname": "x"}),
+        alice.opening("not-a-uuid", {"expected_revision": None, "amount": "1"}),
+    ):
+        assert (response.status_code, response.json()["code"]) == (
+            404,
+            "financial_account_not_found",
+        ), response.text
 
 
 def test_two_users_cannot_read_or_mutate_each_others_accounts(

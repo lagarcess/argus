@@ -61,7 +61,8 @@ never reads as zero.
    `home_country.currency_codes()`. The minor-unit exponent comes from babel
    after that check. Every stored amount is an integer count of minor units.
    Input is a dot-decimal string; more fraction digits than the exponent allows
-   is `amount_precision`. The server never rounds input.
+   is `amount_precision`; minor units beyond signed 64-bit storage are
+   `amount_out_of_range`. The server never rounds input.
 3. Sign: the person types a liability as a positive amount owed. The domain
    flips it once. A stored balance is the signed value to the owner.
 4. Unknown: an account without an opening record has no known balance. Its
@@ -79,8 +80,9 @@ never reads as zero.
 9. Archive: organizational. It changes no record and no balance. Restore is the
    same edit with `archived=false`.
 10. Concurrency: account edits carry `expected_version`; opening corrections
-    carry `expected_revision`. A mismatch is `409 stale_version` and changes
-    nothing.
+    carry `expected_revision`, and the server additionally commits an opening
+    only under the account version it read to sign and scale the amount. A
+    mismatch is `409 stale_version` and changes nothing.
 11. Idempotency: create requires `Idempotency-Key` with the contract grammar.
     The identity is the canonical hash of the validated request. Same key and
     identity replays the original account with no second write; same key with

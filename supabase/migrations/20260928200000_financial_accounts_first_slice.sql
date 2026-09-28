@@ -185,11 +185,14 @@ grant execute on function public.create_financial_account(
 ) to service_role;
 
 -- Record a first opening (p_expected_revision null) or append a correction
--- (p_expected_revision = the current revision). A mismatch writes nothing.
+-- (p_expected_revision = the current revision). The caller signed and scaled
+-- the amount under the account version it read, so that version is compared
+-- too. Any mismatch writes nothing.
 create or replace function public.write_financial_opening(
     p_user_id uuid,
     p_account_id uuid,
     p_expected_revision integer,
+    p_expected_version integer,
     p_amount_minor bigint,
     p_as_of timestamptz,
     p_zone text,
@@ -219,6 +222,9 @@ begin
     for update;
     if not found then
         return jsonb_build_object('decision', 'not_found');
+    end if;
+    if v_account.version is distinct from p_expected_version then
+        return jsonb_build_object('decision', 'stale');
     end if;
 
     select * into v_record
@@ -263,10 +269,10 @@ end;
 $$;
 
 revoke all on function public.write_financial_opening(
-    uuid, uuid, integer, bigint, timestamptz, text, text
+    uuid, uuid, integer, integer, bigint, timestamptz, text, text
 ) from public, anon, authenticated;
 grant execute on function public.write_financial_opening(
-    uuid, uuid, integer, bigint, timestamptz, text, text
+    uuid, uuid, integer, integer, bigint, timestamptz, text, text
 ) to service_role;
 
 -- Owner-only, registered-only reads. Supabase anonymous users share the

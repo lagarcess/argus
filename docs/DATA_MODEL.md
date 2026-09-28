@@ -1871,10 +1871,11 @@ conflicts. Rows cascade with their account.
   revision 1, and the reservation in one transaction. A concurrent duplicate
   blocks on the reservation primary key and then re-reads to replay or
   conflict. It returns `registered_required` for an anonymous `auth.users` row.
-- `write_financial_opening(...)` locks the account, compares the caller's
-  `expected_revision` (null when no opening exists) with `current_revision`,
-  and either appends the next revision and bumps `version` or returns `stale`
-  having written nothing.
+- `write_financial_opening(...)` locks the account, compares the account
+  `version` the API read (under which it signed and scaled the amount) and the
+  caller's `expected_revision` (null when no opening exists) with
+  `current_revision`, and either appends the next revision and bumps `version`
+  or returns `stale` having written nothing.
 
 Both are `security definer`, executable by `service_role` only. The API calls
 them over `DATABASE_URL`; there is no client write path.

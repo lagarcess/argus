@@ -250,6 +250,7 @@ def test_edit_and_opening_compare_and_set_write_nothing_when_stale(
         user_id=owner,
         account_id=account_id,
         expected_revision=1,
+        expected_version=2,
         write=OpeningWrite(1_200_000, NOW, "America/Santo_Domingo", "typo"),
     )
     assert corrected.account.version == 3
@@ -264,6 +265,7 @@ def test_edit_and_opening_compare_and_set_write_nothing_when_stale(
             user_id=owner,
             account_id=account_id,
             expected_revision=1,
+            expected_version=3,
             write=OpeningWrite(1, NOW, "America/Santo_Domingo", "late"),
         )
     with pytest.raises(StaleVersion):
@@ -271,6 +273,7 @@ def test_edit_and_opening_compare_and_set_write_nothing_when_stale(
             user_id=owner,
             account_id=account_id,
             expected_revision=None,
+            expected_version=3,
             write=OpeningWrite(1, NOW, "America/Santo_Domingo", None),
         )
     assert repository.get_account(user_id=owner, account_id=account_id) == corrected
@@ -287,16 +290,46 @@ def test_edit_and_opening_compare_and_set_write_nothing_when_stale(
             user_id=owner,
             account_id=unknown.account.id,
             expected_revision=1,
+            expected_version=1,
             write=OpeningWrite(5, NOW, "America/Santo_Domingo", "r"),
         )
     first_opening = repository.write_opening(
         user_id=owner,
         account_id=unknown.account.id,
         expected_revision=None,
+        expected_version=1,
         write=OpeningWrite(525, NOW, "America/Santo_Domingo", None),
     )
     assert first_opening.opening.current.revision == 1
     assert first_opening.account.version == 2
+
+    # An opening scaled and signed under one read of the account must not land
+    # after the account moved (a concurrent currency or type edit on an empty
+    # account), even when the revision basis still matches.
+    moved = repository.create(
+        user_id=owner,
+        idempotency_key="cas-moved",
+        identity_hash="sha256:m",
+        account=NewAccount("cash", "USD", None, 10_000),
+        opening=None,
+    ).stored
+    repository.update_account(
+        user_id=owner,
+        account_id=moved.account.id,
+        expected_version=1,
+        changes={"currency": "JPY"},
+    )
+    with pytest.raises(StaleVersion):
+        repository.write_opening(
+            user_id=owner,
+            account_id=moved.account.id,
+            expected_revision=None,
+            expected_version=1,
+            write=OpeningWrite(123, NOW, "America/Santo_Domingo", None),
+        )
+    assert (
+        repository.get_account(user_id=owner, account_id=moved.account.id).opening is None
+    )
 
 
 def test_another_user_cannot_reach_the_account_through_the_repository(
@@ -325,6 +358,7 @@ def test_another_user_cannot_reach_the_account_through_the_repository(
             user_id=other,
             account_id=account_id,
             expected_revision=1,
+            expected_version=1,
             write=OpeningWrite(0, NOW, "America/Santo_Domingo", "drain"),
         )
     assert (
@@ -401,7 +435,7 @@ def test_rls_reads_are_owner_only_and_registered_only_and_writes_have_no_client_
                 (owner,),
             ),
             (
-                "select public.write_financial_opening(%s, %s, 1, 0, now(), 'UTC', 'drain')",
+                "select public.write_financial_opening(%s, %s, 1, 1, 0, now(), 'UTC', 'drain')",
                 (owner, account_id),
             ),
         )
