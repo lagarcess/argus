@@ -16,9 +16,9 @@ Its last automated review, of `66eb4e214`, found three more gaps in its syntheti
 
 The experiment built on the kit merged in pull request 709 instead of inventing a second corpus.
 
-- `build_corpus(71)` in [`factories.py`](/tests/synthetic_ingestion/factories.py) supplied the four statement rows that became checking observations, the two same-day purchases from the Faker merchant, the USD 40.00 purchase, the three manual cash records, and the malformed `1.234,56` row used to break a batch.
+- `build_corpus(71)` in [`factories.py`](/tests/synthetic_ingestion/factories.py) supplied the four statement rows that became checking observations `T-0001` to `T-0004`, the two same-day purchases from the Faker merchant, the USD 40.00 purchase, the three manual cash records, and the malformed `1.234,56` row used to break a batch.
 - `field_issues` in [`harness.py`](/tests/synthetic_ingestion/harness.py) validated every connector proposal and every confirmed record, so a connector record met the same eight-field contract as a manual, CSV, or PDF record from the kit.
-- The kit's `Harness` acted as an independent oracle and reproduced the connector's totals from the confirmed records.
+- The kit's `Harness` acted as an independent oracle. After the second refresh, the script wrote every confirmed record to a kit JSON file, ingested it into a fresh `Harness`, confirmed it, and compared the kit's totals with the connector's totals. They matched.
 
 ## The data shape
 
@@ -33,7 +33,7 @@ The retrieval method is the only replaceable part. Everything after it belongs t
 | Proposal | The kit's eight fields plus counterpart, keys, notes, and issues | Argus proposal id | The owner resolves, links, or confirms it |
 | Record | Confirmed fields, provenance list, owner-edited field names, revision history, flags | Argus record id | The owner. A source revision needs the owner's acceptance. |
 
-The connection had seven states: `pending_consent`, `mfa_required`, `active`, `degraded`, `reauth_required`, `cancelled`, and `revoked`. Any move outside the transition table was refused. The owner could revoke from any state except `cancelled` and `revoked`.
+The connection had seven states: `pending_consent`, `mfa_required`, `active`, `degraded`, `reauth_required`, `cancelled`, and `revoked`. The `TRANSITIONS` table in the script listed every legal move, and any other move raised `IllegalTransition`. The owner could revoke from any state except `cancelled` and `revoked`. The diagram shows the common revocation paths.
 
 ```mermaid
 stateDiagram-v2
@@ -55,7 +55,7 @@ stateDiagram-v2
 
 ## Findings
 
-Each row is a behavior the historical script asserted at `66eb4e214`, named by its check in that report. They are research findings for a future contract, not tests this delivery runs.
+Each row is a behavior the historical script asserted at `66eb4e214`, named by its check in that report. They are research findings for a future contract, not tests this delivery runs. The historical report at that head lists every check as passed, from a run on Python 3.10.20 and Faker 30.10.0, which match `poetry.lock`. Two runs wrote identical bytes, and the kit's own 46 checks passed in the same environment before the experiment reused them.
 
 | Historical check | Assignment case | What it established |
 | --- | --- | --- |
@@ -108,7 +108,7 @@ Three findings follow from the table.
 
 1. Re-observation costs the owner nothing. Stable identity absorbed 1,930 repeated rows in daily mode.
 2. Refresh frequency and review frequency are separate choices. Daily refresh with weekly review kept balances fresh and cost the same 12 actions as weekly refresh.
-3. The column for automatic acceptance is a measurement, not a policy. MVEE section 4.7 requires an explicit policy before any trusted feed skips review.
+3. The column for automatic acceptance is a measurement, not a policy. MVEE section 4.7 requires an explicit policy before any trusted feed skips review. The script did not adopt one.
 
 ## Why the kit's file identity cannot run recurring sync
 
@@ -134,10 +134,10 @@ The script made each choice below so that it could run. None of these choices is
 1. **Pending holds.** The script showed pending holds and never let the owner confirm them. Whether a hold reduces "what remains until your next income" is a product decision.
 2. **Credit meaning.** Bank feeds report direction, not meaning. The script blocked unclassified credits. A saved classification rule or a model suggestion would reduce the 3 actions, but either one is a policy decision.
 3. **Transfer pairing.** The script paired automatically only with a shared bank reference and held amount-and-date look-alikes for review. The threshold for inferred pairs is open.
-4. **Field ownership.** Source revisions changed only source-owned fields and never overwrote owner edits. A newer source change replaced an unreviewed one. The split between source-owned and owner-owned fields needs a contract.
+4. **Field ownership.** Source revisions changed only source-owned fields and never overwrote owner edits. A newer source change replaced an unreviewed one. Every source-owned value, including pending status and reference, came from one derivation of the latest observation. The split between source-owned and owner-owned fields needs a contract.
 5. **Deletion scope.** Deleting imported data removed records whose only provenance was the connection, including owner corrections on those records, and every proposal the connection created. Records with manual or other provenance stayed. Product and privacy owners must confirm that rule.
-6. **Batch rejection.** A connector refresh applied all rows or none, and a rejected batch wrote only the connection's error state. The kit keeps row-level issues for file uploads. The right unit depends on the retrieval method and needs a stated rule.
-7. **Cross-currency transfers.** The script kept two linked records in their own currencies and applied no rate. Any later conversion must show its rate, date, and source per MVEE section 2. A card that carries both pesos and dollars needs a rule the script did not make.
+6. **Batch rejection.** A connector refresh applied all rows or none. Every provider field was checked in one place before anything was written. A rejected batch wrote only the connection's error state and one event, and not even its attempt time, which came from the batch. A batch that reported two different facts for one identity was rejected, while a later batch that reported a new fact for the same identity was a correction. The kit keeps row-level issues for file uploads. The right unit depends on the retrieval method and needs a stated rule.
+7. **Cross-currency transfers.** The script kept two linked records in their own currencies and applied no rate. Any later conversion must show its rate, date, and source per MVEE section 2. A source account, balance, or row in another currency than the chosen Argus account waited for the owner. A card that carries both pesos and dollars needs a rule the script did not make.
 8. **Household scope.** Every proposal landed in the owner's personal context. Sharing an account with a household shares records, not the connection. Cross-person account identity for a joint account imported by both partners was untested.
 
 ## What the experiment did not show
