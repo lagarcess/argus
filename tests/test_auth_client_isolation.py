@@ -143,7 +143,7 @@ def test_argus_never_refreshes_a_session_it_returned(fake_auth) -> None:
     assert fake.grants("refresh_token") == []
 
 
-def test_concurrent_sign_ins_keep_identities_apart(fake_auth) -> None:
+def test_concurrent_sign_ins_send_no_user_token_and_return_their_own_identity(fake_auth) -> None:
     fake, gateway = fake_auth
     _login(gateway, "earlier@example.com")
     emails = [f"user-{index}@example.com" for index in range(12)]
