@@ -77,16 +77,32 @@ def holds_contact(text: str) -> bool:
     return bool(CONTACT.search(contact_surfaces(text)))
 
 
+def fully_decode(text: str, *, bound: int = 8) -> str:
+    """Percent- and HTML-decode until the value stops changing.
+
+    A single `unquote` leaves `%44` / `%40` behind when the server double-
+    encodes a redirect (`%2544`, `%2540`). Bound the loop so a pathological
+    input cannot spin forever; eight rounds cover any realistic Location.
+    """
+    current = text
+    for _ in range(bound):
+        nxt = unquote(html.unescape(current))
+        if nxt == current:
+            return current
+        current = nxt
+    return current
+
+
 def sanitize_location(location: str | None) -> str | None:
     """Persist only Locations that do not carry seller or contact shapes.
 
-    Percent-encoding is normalized before the contact filter so
-    `/%44ealers/...` and `/contacto/vendedor%40example.invalid` cannot bypass
-    the same guard that catches the literal forms.
+    Percent-encoding is fully normalized before the contact filter so
+    `/%44ealers/...`, `/%2544ealers/...`, and `/contacto/vendedor%2540...`
+    cannot bypass the same guard that catches the literal forms.
     """
     if not location:
         return None
-    decoded = unquote(html.unescape(location))
+    decoded = fully_decode(location)
     if holds_contact(location) or holds_contact(decoded):
         return None
     return location

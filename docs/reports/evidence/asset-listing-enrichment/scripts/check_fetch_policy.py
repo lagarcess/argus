@@ -57,6 +57,8 @@ MARKUP_SPLIT_PHONE = DETAIL.replace(
 DEALER_REDIRECT = "/Dealers/Vendedor-Ficticio/"
 ENCODED_DEALER_REDIRECT = "/%44ealers/Vendedor-Ficticio/"
 ENCODED_EMAIL_REDIRECT = "/contacto/vendedor%40example.invalid"
+DOUBLE_ENCODED_DEALER_REDIRECT = "/%2544ealers/Vendedor-Ficticio/"
+DOUBLE_ENCODED_EMAIL_REDIRECT = "/contacto/vendedor%2540example.invalid"
 SAFE_ROBOTS_REDIRECT = "https://m.supercarros.com/robots.txt"
 PAGES = {
     f"{HOST}/robots.txt": ROBOTS,
@@ -73,6 +75,16 @@ REDIRECTS = {
     f"{HOST}/marca-ejemplo-modelo-x/0000007/": (302, DEALER_REDIRECT, b""),
     f"{HOST}/marca-ejemplo-modelo-x/0000008/": (302, ENCODED_DEALER_REDIRECT, b""),
     f"{HOST}/marca-ejemplo-modelo-x/0000009/": (302, ENCODED_EMAIL_REDIRECT, b""),
+    f"{HOST}/marca-ejemplo-modelo-x/0000010/": (
+        302,
+        DOUBLE_ENCODED_DEALER_REDIRECT,
+        b"",
+    ),
+    f"{HOST}/marca-ejemplo-modelo-x/0000011/": (
+        302,
+        DOUBLE_ENCODED_EMAIL_REDIRECT,
+        b"",
+    ),
 }
 PHONE_SHAPES = (
     "8090000000",
@@ -192,6 +204,14 @@ def main():
         "a percent-encoded email Location was allowed through sanitize_location",
     )
     check(
+        retention.sanitize_location(DOUBLE_ENCODED_DEALER_REDIRECT) is None,
+        "a double-encoded dealer Location was allowed through sanitize_location",
+    )
+    check(
+        retention.sanitize_location(DOUBLE_ENCODED_EMAIL_REDIRECT) is None,
+        "a double-encoded email Location was allowed through sanitize_location",
+    )
+    check(
         retention.sanitize_location(SAFE_ROBOTS_REDIRECT) == SAFE_ROBOTS_REDIRECT,
         "a safe robots Location was dropped",
     )
@@ -307,6 +327,14 @@ def main():
                 (
                     f"{HOST}/marca-ejemplo-modelo-x/0000009/",
                     ENCODED_EMAIL_REDIRECT,
+                ),
+                (
+                    f"{HOST}/marca-ejemplo-modelo-x/0000010/",
+                    DOUBLE_ENCODED_DEALER_REDIRECT,
+                ),
+                (
+                    f"{HOST}/marca-ejemplo-modelo-x/0000011/",
+                    DOUBLE_ENCODED_EMAIL_REDIRECT,
                 ),
             ):
                 meta = fetch_ledger.fetch(url)
