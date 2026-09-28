@@ -1,5 +1,5 @@
 ### Page
-- Page URL: http://127.0.0.1:3138/chat?conversation=8691910b-35f6-450b-a1b9-02646b9995fc
+- Page URL: http://127.0.0.1:3138/chat?conversation=<redacted-reader-conversation-id>
 - Page Title: Monthly Investment Scenario · Argus
 - Console: 3 errors, 2 warnings
 ### Snapshot

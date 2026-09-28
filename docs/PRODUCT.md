@@ -98,6 +98,8 @@ flags or rollout configuration.
 | --- | --- | --- |
 | Notifications | Hidden/flagged for Alpha | Enable as part of the next product push; behavior follows the MVEE Updates experience. Implementation and rollout still need their assigned work. |
 | Subscriptions | Hidden/flagged for Alpha | No enablement change approved; preserve the existing gate. |
+| Personalization memory | Shipped and flag-on in production (`ARGUS_ENABLE_PERSONALIZATION_MEMORY=true`). Exposure limited to `admin` and `developer` (`MEMORY_EXPOSURE_ROLES`). Semantic recall off (`ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL=false`). Ordinary registered accounts see the unavailable state. | Widen to registered users only with earned opt-in plus inspect/edit/delete/reset/disable/"why was this used?" controls. Memory must not be required for the idea/evidence/comparison loop. |
+| Evidence receipt sharing | On in production on `main` (`ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED` both `true`). Integration Blueprint may still declare both `false` until the next promotion aligns it. | Preserve shareable-by-default with owner turn selection and exact preview as the privacy boundary. |
 
 An approved future experience does not contradict a currently hidden feature.
 Update this table when the corresponding release changes availability. Design

@@ -75,6 +75,6 @@
         - button "Close sharing" [ref=f1e192] [cursor=pointer]
       - generic [ref=f1e197]:
         - generic [ref=f1e257]:
-          - textbox "Copy link" [ref=f1e258]: http://127.0.0.1:3138/r/B8CJ9GWVjm7rfmtvCDuH6GPXPTfp3D3X
+          - textbox "Copy link" [ref=f1e258]: http://127.0.0.1:3138/r/<redacted-receipt-slug>
           - button "Copy link" [ref=f1e259] [cursor=pointer]
         - paragraph [ref=f1e263]: Your name is not on it, search engines cannot find it, and you can take it down any time from Data Controls.

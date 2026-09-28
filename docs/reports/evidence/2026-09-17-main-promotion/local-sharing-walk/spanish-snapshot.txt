@@ -1,5 +1,5 @@
 ### Page
-- Page URL: http://127.0.0.1:3138/r/B8CJ9GWVjm7rfmtvCDuH6GPXPTfp3D3X
+- Page URL: http://127.0.0.1:3138/r/<redacted-receipt-slug>
 - Page Title: I have $1,200 saved. If I save another $300 each month with no interest, how many months until I reach $3,000? · Probado con Argus
 - Console: 0 errors, 1 warnings
 ### Snapshot

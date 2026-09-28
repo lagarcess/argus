@@ -50,12 +50,10 @@ live and gating shipped code, so renaming it moves the release contract
 QA scripts) together. Do it when something else touches that surface, not as a
 standalone edit.
 
-> Correction 2026-09-25: Memory is shipped and
-> `ARGUS_ENABLE_PERSONALIZATION_MEMORY` is on in production. Exposure remains
-> limited to `admin` and `developer` accounts. Semantic recall
-> (`ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL`) is off. Widening to every registered
-> user remains future work. The "default-off flag" wording below is the
-> landing-time state, not the current production state.
+> Correction 2026-09-25: The "default-off flag" wording below is the
+> landing-time state, not the current production state. Current memory
+> availability is owned by
+> [PRODUCT.md Current production availability and planned changes](../PRODUCT.md#current-production-availability-and-planned-changes).
 
 ## Operating rules (founder-locked 2026-08-06)
 
@@ -980,9 +978,8 @@ profile and fall back to the nameless pool.
   explain, edit, delete, disable, reset, export, and temporary chat. Guests
   denied before any side effect.
 
-  Correction 2026-09-25: the production Blueprint now sets
-  `ARGUS_ENABLE_PERSONALIZATION_MEMORY=true`. The role gate is unchanged.
-  Semantic recall remains off.
+  Correction 2026-09-25: current production memory availability is owned by
+  [PRODUCT.md](../PRODUCT.md#current-production-availability-and-planned-changes).
 
   **Follow-up is specced and ready to dispatch, not pending decisions.** The
   recall loop is locked in

@@ -775,15 +775,12 @@ Semantic retrieval (Vector embeddings) is deferred from Alpha.
 
 P2 continuity comes from owner-scoped `Idea`, `IdeaVersion`,
 `EvidenceArtifact`, `DecisionNote`, conversation, and run records in Supabase.
-That structured recall is not memory. Memory has shipped: the production
-Blueprint sets `ARGUS_ENABLE_PERSONALIZATION_MEMORY=true`, exposure is limited
-to `admin` and `developer` accounts (`MEMORY_EXPOSURE_ROLES` in
-`src/argus/api/personalization_memory.py`), and semantic recall stays off
-(`ARGUS_ENABLE_MEMORY_SEMANTIC_RECALL=false`). Widening memory to every
-registered user, with earned opt-in plus
-inspect/edit/delete/reset/disable/"why was this used?" controls, remains
-future work. Memory must not be required for the idea/evidence/comparison
-loop.
+That structured recall is not memory. Current production availability for
+personalization memory (flag, role gate, semantic recall) and its approved
+transition are owned by
+[PRODUCT.md Current production availability and planned changes](PRODUCT.md#current-production-availability-and-planned-changes).
+Other docs link there rather than restate rollout state. Memory must not be
+required for the idea/evidence/comparison loop.
 
 # 15. Deletion / Archival Model
 

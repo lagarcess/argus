@@ -1545,13 +1545,10 @@ the guardrail lane alone; every other lane was told to stay out of it.
 | Sharing on | Sharing | **LANDED, switched off** `c8e05b4f`, PR #632, closing #604. Answers are shareable by default: selection happens inside the conversation, a question and its final answer are one unit, and the owner's choice and exact preview are the privacy boundary. Argus's own ids and account data never reach the page. The founder turns the flags on at promotion, and migration `20260914120000_share_plain_answer_receipts.sql` runs then. |
 | Share the answer | The calculations | **LANDED** `ba5a9fb7`, PR #574, 2026-09-09. Answers are shared from a header turn selection, behind `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED`, which is off in production. Calculations become eligible turns in Any grounded math. |
 
-> Correction 2026-09-25: Sharing is on in production. `origin/main`
-> `render.yaml` sets `ARGUS_EVIDENCE_RECEIPT_SHARING_ENABLED` and
-> `NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED` to `true`. The 2026-09-17
-> promotion (`a9286b21`) shipped with sharing on, matching the shipped note
-> above. This row's "off in production" is the landing-time state, not the
-> current production state. The integration Blueprint still has both flags
-> `false`; that is not the production value.
+> Correction 2026-09-25: This row's "off in production" is the landing-time
+> state, not the current production state. Current sharing availability is
+> owned by
+> [PRODUCT.md Current production availability and planned changes](../PRODUCT.md#current-production-availability-and-planned-changes).
 | Lift the loop, Lane A | The spine | **Landed** `f7c9192b`. |
 | Lift the loop, Lane C | The spine | **Ran, report landed** `6fa3f55a`, docs only. Its finding is that Lane A did not make the loop reusable, and its import probes are the failing test the catalog-edge lane inherits. |
 | Subtract the guardrails | The spine | **LANDED** `695d9250`, PR #565. Ordinary chat first outcome went from 35.27s to 15.63s p50 and its guardrail share from 44.2 percent to 2.3 percent, measured head/base/head/base interleaved so provider drift cannot fake it. The compute-shaped probe went 25.85s to 16.14s. Composer starvation went from 9 turns in 2 runs to zero. Its three eval failures were re-run on head and on a lane-free tree: two pass on both, one fails on both and is pre-existing. |
