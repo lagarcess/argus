@@ -148,8 +148,10 @@ not another list asking for already approved experience.
   localized defaults plus permitted custom labels. Account-only creation has no
   category input; do not make a full catalog a false dependency of that slice.
 - F12: follow the [founder-locked guest access boundary](../argus-minimum-viable-ecosystem-experience.md#guest-access-and-registration).
-  Registered-account access is settled; implement server enforcement without
-  changing existing guest-chat capabilities or quotas.
+  Registered-account access is settled. Define the enforcement contract and
+  acceptance criteria for a later, separately authorized runtime lane, preserving
+  existing guest-chat capabilities and quotas. This assignment updates the
+  proposal and isolated proof only; it does not implement server enforcement.
 
 Audit missing scenarios for 200-character notes across record types, partial and
 unlinked refunds, cross-account returns, credit balances, linked refund limits,
