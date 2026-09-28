@@ -42,7 +42,8 @@ Three things stand between that contract and production:
 
 Android is unverified at every level above source. The Kotlin probe is
 written but has never been compiled, because this machine has no Android SDK
-or JDK.
+or JDK. Its network and secure-storage I/O runs on an injected I/O dispatcher,
+never the caller's, and has regression tests that have also never run.
 
 ## 2. Evidence levels and environment
 
@@ -60,11 +61,12 @@ Evidence levels are kept separate throughout, as the assignment requires:
 | --- | --- |
 | Original integration base | `f0a90763b` |
 | Current integration at capture | `3b9313f3d` (#721, agent-runtime log fields only; no overlap, §10) |
-| Reconciliation merge | `8e88294f7`. Final evidence was captured at this head, except the T4 cancel capture, taken just before the merge with the same app code |
+| Reconciliation merge | `8e88294f7` |
+| Evidence capture head | `8f4b05de0`, clean tree, every file. Later commits change only Markdown and evidence, which the gate checks (§2.1) |
 | Local auth stack | Supabase CLI 2.117.0, GoTrue v2.196.0, project `argus-native-auth-proof` on ports 57450 to 57459, created from this branch's migrations. Overrides: `jwt_expiry = 60`, email confirmations on, one synthetic redirect `argusnativeproof://auth-callback` |
 | Argus API | Unchanged source at the head above, port 57460, provider keys blank, synthetic market data, guest access on, public account access off |
 | iOS | Xcode 27.0 (27A266a), iOS 27.0 simulator "Argus Native Auth Proof" (iPhone 17 Pro), supabase-swift 2.55.2 pinned |
-| Android | No SDK, emulator, or JDK on this machine. Source only |
+| Android | No SDK, emulator, or JDK on this machine. Source only, never compiled |
 | Captcha | Cloudflare published test secrets in local Supabase Auth, and test sitekeys in the web view. No production keys |
 | Paid calls | None. No chat turn, model, market-data, or email provider call |
 
@@ -72,6 +74,31 @@ Durable evidence is in
 [`evidence/native-auth-session-proof/`](evidence/native-auth-session-proof/).
 Probes and reproduction steps are in
 [`probes/native-auth/`](../../probes/native-auth/README.md).
+
+### 2.1 Current acceptance versus historical observations
+
+**Current acceptance** is only what the evidence gate verifies at the head it
+is run against. `probes/native-auth/expectations.json` declares every check
+each suite must produce and the only documented failures, A14 and I11.
+`probes/native-auth/evidence_gate.py` fails on a missing, repeated, or
+undeclared check, any other failure, a documented failure that now passes, an
+iOS run whose xcodebuild counts disagree, an app log that departs from the
+declared steps, or a capture from a dirty tree or from runtime code that
+changed after the capture. Every runner exits with the gate's verdict. To
+re-verify:
+
+```bash
+python3 probes/native-auth/evidence_gate.py docs/reports/evidence/native-auth-session-proof
+```
+
+**Historical observations** are things seen during development that are not
+current acceptance and are not claimed as such:
+
+- An iOS "Open in ArgusAuthProbeApp?" prompt before custom-scheme delivery,
+  seen in three runs but not in the current capture (§3.6).
+- Earlier captures at `8e88294f7` and before. They showed the same outcomes but
+  were taken from a tree the runners did not record as clean, before the gate
+  existed. They are replaced, not cited.
 
 ## 3. Recommended native contract
 
@@ -169,9 +196,10 @@ in §6. Everything else works against unchanged Argus.
   script message handler. The token goes unchanged to the existing endpoints.
 - On the simulator with test sitekeys: the pass key returned a token and Argus
   started a guest, with Supabase verifying the token against Cloudflare's test
-  secret (T1). The fail key surfaced error `600010` to the app (T2). The
-  interactive key rendered the "Verify you are human" checkbox (T3). Cancel
-  closed the sheet without sending a request (T4).
+  secret (T1). The fail key surfaced its error to the app, with no token and
+  no request (T2). The interactive key made Turnstile report an interactive
+  challenge, which the app logged (T3). A UI test tapped Cancel without
+  completing the challenge, and the sheet closed without sending a request (T4).
 - Supabase also requires a captcha token on `/recover` (T5), so native
   recovery runs behind the same check.
 - Tokens are single-use and valid for 300 seconds, per Cloudflare. The app
@@ -194,10 +222,12 @@ in §6. Everything else works against unchanged Argus.
   requests recovery on the phone and opens the email on a laptop cannot finish
   on the laptop through this flow. This is the substance of founder decision
   X1 (§7).
-- In the first demo run, iOS asked "Open in ArgusAuthProbeApp?" before
-  delivering each custom-scheme URL. Later runs delivered directly, including
-  from another app (`app/callback-from-other-app.png`). The prompt was seen
-  but not captured to a file, and the conditions that trigger it were not
+- iOS sometimes asks "Open in ArgusAuthProbeApp?" before delivering a
+  custom-scheme URL. In the current capture it did not ask, and a UI test
+  that would have accepted the prompt recorded 0 prompts (`app/run.json`).
+  As a historical observation, not current acceptance: iOS did ask in three
+  earlier runs, including a clean-tree run at `9045f4798`
+  (`historical/callback-prompt-9045f4798.png`). What triggers it was not
   isolated. Universal links avoid scheme prompts and scheme hijacking, but
   they need identifiers and hosting that do not exist (§6 P8).
 
@@ -224,10 +254,10 @@ Client: `ArgusNativeAuth` with supabase-swift 2.55.2, XCTest hosted in
 | I10 | Recovery callbacks: valid, repeated, other device, forged, error | Unchanged + lane redirect | Only the first valid callback on the requesting device works | Session, `/me` 200; others refused | Pass | P4, P7, P8, F-X1 |
 | I11 | Tokens stay out of logs | Unchanged | No token in SDK log output or `Session` description | Both contain tokens | Fail (finding) | Ship with `logger: nil`; never log `Session` |
 | T1 | Turnstile pass sitekey in `WKWebView`, then guest start | Unchanged + test secret | Token to app; guest session; `/me` 200 | As expected | Pass with test keys | P6; production sitekey on a device (§8) |
-| T2 | Turnstile fail sitekey | Test sitekey | Error reaches app, no request | `600010`, no request | Pass with test keys | Same as T1 |
-| T3 | Turnstile interactive sitekey | Test sitekey | Interactive challenge renders in the web view | Checkbox rendered | Partial. Not completed by the agent | Human completion on a device |
-| T4 | User cancels the check | Test sitekey | Sheet closes; no request sent | No request | Pass | None |
-| T5 | Recovery behind Turnstile, callbacks delivered one at a time with `simctl openurl` | Unchanged + lane redirect | Custom scheme reaches app; issued code gives session; repeated and forged refused | Session, `/me` 200; repeated and forged `validation_failed` | Pass for custom scheme | Universal links unverified (P8) |
+| T2 | Turnstile fail sitekey | Test sitekey | Error reaches app, no token, no request | As expected | Pass with test keys | Same as T1 |
+| T3 | Turnstile interactive sitekey | Test sitekey | Turnstile reports an interactive challenge in the web view | `turnstile.interactive` logged; screenshot | Pass for rendering. The challenge was never completed | Human completion on a device |
+| T4 | Cancel the check (UI test tap) | Test sitekey | Sheet closes; no token, no request | `request_sent=false`; no `guest.start` | Pass | None |
+| T5 | Recovery behind Turnstile, callbacks delivered one at a time with `simctl openurl`; a UI test accepts iOS's first-delivery prompt | Unchanged + lane redirect | Custom scheme reaches app; issued code gives session; repeated and forged refused | Session, `/me` 200; repeated and forged refused; no prompt in this capture | Pass for custom scheme | Universal links unverified (P8) |
 
 ### 4.2 Android (Kotlin/Compose)
 
@@ -243,6 +273,8 @@ toolchain on this machine, so nothing below executed.
 | K7 | Guest conversion, scoped handoff cookies | Unchanged | Claimed | Not run | Unverified | Same |
 | K8 | Guest conversion, header transport | Synthetic (level 2) | Claimed | Not run | Unverified | Same, then P2 |
 | K-TS | Turnstile in Android `WebView` | Not built | Token to app | Not built | Unverified | Needs an app module |
+| K-MT | Transport and secure store called from the main thread under StrictMode | Unchanged | No main-thread network or disk access; `/me` 401; value round-trips | Not run | Unverified | `MainThreadSafetyTest` on an emulator |
+| K-IO | `send` runs on the injected I/O dispatcher, not the caller's thread | MockWebServer | Only the I/O thread executes the request | Not run | Unverified | `TransportDispatcherTest` (JVM, needs SDK to compile) |
 | K-AL | App Links callback | Not built | Intent delivered | Not built | Unverified | Signing SHA-256, `assetlinks.json` (P8) |
 
 The contract in §3 is platform-neutral. It assumes nothing Android-specific
@@ -269,7 +301,7 @@ finding F1. Per-check expected and observed values are in the evidence JSON.
 | F7 | Argus maps a rejected captcha to 401 "Invalid email or password" on sign-in, and to 503 on guest start | B3 | Low. A native user may retype a correct password | P5 |
 | F8 | Supabase requires a captcha token on `/recover` | T5, GoTrue `api.go` | Informational. Native recovery needs the web-view check | Contract §3.5 |
 | F9 | Recovery with PKCE works only on the requesting device | D4, I10 | User-visible | Founder decision X1 |
-| F10 | iOS showed an "Open in" confirmation for custom-scheme callbacks in one run, not in later runs. Custom schemes can also be claimed by another app | T5, §3.6 | User-visible polish and link integrity | P8 when identifiers exist |
+| F10 | iOS sometimes shows an "Open in" confirmation before a custom-scheme callback (three earlier runs; not the current capture). Custom schemes can also be claimed by another app | §2.1, §3.6 | User-visible friction and link integrity | P8 when identifiers exist |
 | F11 | A password reset through recovery already revoked other sessions in this GoTrue version. The web also signs out globally | D6 | Informational | Contract §3.6 |
 | F12 | Always-pass test secret accepted a non-dummy token, although Cloudflare documents that test secrets accept only the dummy token | B2 | Informational. Test keys prove the plumbing, not token validity | §8 |
 
@@ -336,13 +368,15 @@ on any device, as today.
 ## 10. Delivery record
 
 - Original integration base `f0a90763b`. Current integration `3b9313f3d`.
-  Reconciled by merge `8e88294f7`.
+  Reconciled by merge `8e88294f7`. Evidence captured at `8f4b05de0`.
 - Overlap disposition: #721 changes agent-runtime debug log fields
   (`discovery_focused_read.py`, `knowledge_answer.py`, one test). This lane
   adds only `probes/native-auth/`, this report, and evidence. There is no shared
   runtime owner, API or data contract, UI state, migration, environment
-  variable, or test. Final evidence was captured after the merge.
-- The HTTP probe records the checkout head in each evidence file. The Argus
-  code exercised is unchanged `src/` at that head.
+  variable, or test.
+- Every evidence file records its capture head and whether the tree was clean.
+  The Argus code exercised is unchanged `src/` at that head. PR #728 fixes A14
+  separately; this branch does not contain it, so A14 stays a documented
+  failure here and the gate will fail if it starts passing.
 - No production system, real account, paid provider, or hosted setting was
   touched.

@@ -1,9 +1,10 @@
 {
   "client": "Swift ArgusNativeAuth (supabase-swift 2.55.2) XCTest hosted in ArgusAuthProbeApp on iOS Simulator",
   "environment": "Xcode 27.0; simulator 'Argus Native Auth Proof' (iPhone 17 Pro), iOS-27-0; lane stack argus-native-auth-proof",
-  "captured_at": "2026-09-28T03:42:53+00:00",
-  "argus_source_head": "8e88294f7f9748069c805517971e60729d944afd",
-  "xcodebuild_summary": "Executed 11 tests, with 1 failure (0 unexpected) in 35.366 (35.372) seconds",
+  "captured_at": "2026-09-28T18:42:45+00:00",
+  "argus_source_head": "8f4b05de0c01b3ab2067a439d13921a2d0498726",
+  "source_dirty": false,
+  "xcodebuild_summary": "Executed 11 tests, with 1 failure (0 unexpected) in 36.099 (36.106) seconds",
   "results": [
     {
       "area": "sign-in",

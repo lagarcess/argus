@@ -1,0 +1,8 @@
+{
+  "client": "ArgusAuthProbeApp on iOS Simulator",
+  "environment": "simulator 'Argus Native Auth Proof', iOS-27-0; lane stack in turnstile-pass mode",
+  "captured_at": "2026-09-28T18:49:50+00:00",
+  "argus_source_head": "8f4b05de0c01b3ab2067a439d13921a2d0498726",
+  "source_dirty": false,
+  "scheme_prompts_accepted": "0"
+}
