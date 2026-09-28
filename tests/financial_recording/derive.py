@@ -364,7 +364,7 @@ def balance(
     moves = [
         record
         for record in activities(book, account_id)
-        if at is None or _on_or_before(record.body, at, tz)
+        if at is None or _on_or_before(record.body, at)
     ]
     if not ordered:
         return Unknown(sum(legs(record.body)[account_id] for record in moves))
@@ -597,10 +597,11 @@ def _same_source(first: Record, second: Record) -> bool:
     return bool(_digests(first) & _digests(second))
 
 
-def _on_or_before(activity: Activity, at: datetime, tz: ZoneInfo) -> bool:
+def _on_or_before(activity: Activity, at: datetime) -> bool:
     if activity.occurred_at is not None:
         return activity.occurred_at <= at
-    return activity.occurred_on <= at.astimezone(tz).date()
+    # Cutoff day uses the activity's stored zone, not the reader zone.
+    return activity.occurred_on <= at.astimezone(activity_zone(activity)).date()
 
 
 def _basis(anchor: Anchor, account: Account) -> str:

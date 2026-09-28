@@ -357,6 +357,10 @@
     "same_key_different_body": "IdempotencyConflict"
   },
   "edits_that_move_money_need_review": {
+    "activity_zone_honors_historical_as_of": {
+      "balance_stable_across_reader_tz": true,
+      "historic_balance": 100000
+    },
     "activity_zone_survives_reader_tz_change": {
       "activity_zone": "America/Santo_Domingo",
       "note_edit_after_tz_change": "ok"

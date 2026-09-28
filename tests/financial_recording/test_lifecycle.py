@@ -338,4 +338,8 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "note_edit_after_tz_change": "ok",
             "activity_zone": "America/Santo_Domingo",
         },
+        "activity_zone_honors_historical_as_of": {
+            "balance_stable_across_reader_tz": True,
+            "historic_balance": 100_000,
+        },
     }

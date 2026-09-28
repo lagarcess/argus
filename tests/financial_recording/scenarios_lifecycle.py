@@ -279,6 +279,7 @@ def edits_that_move_money_need_review() -> dict:
         "position_gaps_honor_as_of": _position_gaps_honor_as_of(),
         "future_activity_is_refused": _future_activity_is_refused(),
         "activity_zone_survives_reader_tz_change": _activity_zone_stable(),
+        "activity_zone_honors_historical_as_of": _activity_zone_honors_as_of(),
     }
 
 
@@ -871,6 +872,22 @@ def _activity_zone_stable() -> dict:
     return {
         "note_edit_after_tz_change": note_only,
         "activity_zone": scene.store.book.records[expense.id].body.zone,
+    }
+
+
+def _activity_zone_honors_as_of() -> dict:
+    """Date-only historical reads keep the stored activity zone, not the reader zone."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    scene.record("expense", cash, "100.00", 3)
+    # 01:00Z on the 3rd is still the 2nd in America/Santo_Domingo, so the
+    # Sept 3 expense stays out of the as-of balance under the stored zone.
+    at = datetime(2026, 9, 3, 1, 0, tzinfo=ZoneInfo("UTC"))
+    in_stored = balance(scene.store.book, cash.id, at=at, tz=DEFAULT_TZ).amount
+    in_utc = balance(scene.store.book, cash.id, at=at, tz=ZoneInfo("UTC")).amount
+    return {
+        "balance_stable_across_reader_tz": in_stored == in_utc,
+        "historic_balance": in_stored,
     }
 
 
