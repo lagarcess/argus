@@ -210,8 +210,8 @@
 .field :is(input, select, textarea) { border: 1px solid var(--line); border-radius: .75rem; color: var(--fg); background: var(--bg); padding: .8rem; font-family: inherit; min-height: 3rem; width: 100%; min-width: 0; font-size: 1rem; }
 .field textarea { resize: vertical; }
 .amountInput { display: flex; align-items: center; border: 1px solid var(--line); border-radius: .75rem; padding-left: .8rem; }
-.amountInput > span { color: var(--quiet); }
-.amountInput input { border: 0; }
+.amountInput > span { color: var(--quiet); flex-shrink: 0; white-space: nowrap; }
+.amountInput input { border: 0; flex: 1; }
 .draftBadge { display: flex; align-items: center; gap: .6rem; font-size: .8rem; color: var(--quiet); }
 .draftName { font-size: 1.5rem; margin-top: 1.2rem; }
 .noteQuote { border-left: 2px solid var(--line); padding-left: 1rem; color: var(--quiet); margin: 1rem 0; }
