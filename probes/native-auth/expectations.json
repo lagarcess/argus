@@ -16,6 +16,7 @@
   "app": {
     "app/turnstile-test-pass.json": {
       "id": "T1",
+      "allowed_incidental_steps": ["launch"],
       "screenshots": ["app/turnstile-test-pass.png"],
       "steps": [
         {"step": "turnstile.open", "observed": {"sitekey": "1x00000000000000000000AA"}},
@@ -26,6 +27,7 @@
     },
     "app/turnstile-test-fail.json": {
       "id": "T2",
+      "allowed_incidental_steps": ["launch"],
       "screenshots": ["app/turnstile-test-fail.png"],
       "steps": [
         {"step": "turnstile.open", "observed": {"sitekey": "2x00000000000000000000AB"}},
@@ -35,6 +37,7 @@
     },
     "app/turnstile-cancelled.json": {
       "id": "T3, T4",
+      "allowed_incidental_steps": ["launch"],
       "screenshots": ["app/turnstile-test-interactive.png", "app/turnstile-cancelled.png"],
       "steps": [
         {"step": "turnstile.open", "observed": {"sitekey": "3x00000000000000000000FF"}},
@@ -45,8 +48,10 @@
     },
     "app/callback-delivery.json": {
       "id": "T5",
+      "allowed_incidental_steps": ["launch"],
       "screenshots": ["app/callback-delivery.png"],
       "steps": [
+        {"step": "turnstile.open", "observed": {"sitekey": "1x00000000000000000000AA"}},
         {"step": "turnstile.token", "observed": {"token_received": "true"}},
         {"step": "recovery.requested", "observed": {"result": "ok"}},
         {"step": "callback.received", "observed": {"code_kind": "issued", "scheme": "argusnativeproof"}},

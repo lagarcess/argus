@@ -23,8 +23,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 EXPECTATIONS = HERE / "expectations.json"
-# Anything that can change what a capture observed: the probes and the Argus
-# API, its schema, and its packaged contract. Prose cannot, so Markdown is out.
+# Anything that can change what a capture observed: the probe producers and
+# the Argus API, its schema, and its packaged contract. Prose cannot, so
+# Markdown is out. The evidence gate, its declaration, and its unit tests
+# only judge captures; they do not produce them.
 RUNTIME_PATHS = (
     "probes/native-auth",
     "src",
@@ -33,6 +35,9 @@ RUNTIME_PATHS = (
     "pyproject.toml",
     "poetry.lock",
     ":(exclude,glob)**/*.md",
+    ":(exclude)probes/native-auth/evidence_gate.py",
+    ":(exclude)probes/native-auth/expectations.json",
+    ":(exclude,glob)probes/native-auth/tests/**",
 )
 APP_RUN_RECORD = "app/run.json"
 
@@ -135,7 +140,18 @@ def app_problems(root: Path, name: str, spec: dict) -> list[str]:
     ]
     log = json.loads(path.read_text())
     declared = [s["step"] for s in spec["steps"]]
-    relevant = [e for e in log if e.get("step") in set(declared)]
+    declared_set = set(declared)
+    incidental = set(spec.get("allowed_incidental_steps", []))
+    seen = [e.get("step") for e in log]
+    undeclared = sorted(
+        {step for step in seen if step not in declared_set and step not in incidental}
+    )
+    if undeclared:
+        problems.append(
+            f"{spec['id']} {name}: undeclared steps {undeclared}; "
+            f"only declared steps plus allowed incidentals {sorted(incidental)} are permitted"
+        )
+    relevant = [e for e in log if e.get("step") in declared_set]
     if [e["step"] for e in relevant] != declared:
         problems.append(
             f"{spec['id']} {name}: steps {[e['step'] for e in relevant]} differ from declared {declared}"
@@ -151,6 +167,19 @@ def app_problems(root: Path, name: str, spec: dict) -> list[str]:
     if forbidden:
         problems.append(f"{spec['id']} {name}: forbidden steps present {forbidden}")
     return problems
+
+
+def app_run_problems(doc: dict) -> list[str]:
+    """The report relies on a numeric scheme-prompt count from the UI test."""
+    raw = doc.get("scheme_prompts_accepted")
+    if isinstance(raw, bool) or not isinstance(raw, (str, int)):
+        return [f"{APP_RUN_RECORD}: scheme_prompts_accepted is missing or not numeric"]
+    text = str(raw).strip()
+    if not text.isdigit():
+        return [
+            f"{APP_RUN_RECORD}: scheme_prompts_accepted={raw!r} is not a non-negative integer"
+        ]
+    return []
 
 
 def verify(
@@ -184,9 +213,9 @@ def verify(
         if not record.is_file():
             problems.append(f"{APP_RUN_RECORD}: missing")
         else:
-            problems += capture_problems(
-                APP_RUN_RECORD, json.loads(record.read_text()), changed_since
-            )
+            run_doc = json.loads(record.read_text())
+            problems += capture_problems(APP_RUN_RECORD, run_doc, changed_since)
+            problems += app_run_problems(run_doc)
         for name, app_spec in spec["app"].items():
             problems += app_problems(root, name, app_spec)
     return problems

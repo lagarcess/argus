@@ -292,7 +292,7 @@ finding F1. Per-check expected and observed values are in the evidence JSON.
 
 | # | Finding | Evidence | Severity | Where it goes |
 | --- | --- | --- | --- | --- |
-| F1 | Argus's shared server-side `supabase-py` auth client (`SupabaseGateway.auth_client`, created with default `ClientOptions`) stores the last session it signed in and refreshes it on a timer 10 s before expiry. A session left alone after Argus sign-in had 3 refresh tokens, 2 revoked, 55 s later with no client activity. The client's own refresh then failed with `refresh_token_already_used`. It also means the API process holds a user's live tokens in memory | A14; `supabase_auth/_sync/gotrue_client.py` `_save_session`; `src/argus/domain/supabase_gateway.py` `from_env` | High. Intermittent sign-outs for web and native. The timer fires once per access-token lifetime (hosted value not inspected; 3600 s is the repository default), for the most recent sign-in on each API process, so it bites idle workers and apps that sleep through two lifetimes | P1, assignment N1 |
+| F1 | Argus's shared server-side `supabase-py` auth client (`SupabaseGateway.auth_client`, created with default `ClientOptions`) stores the last session it signed in and refreshes it on a timer 10 s before expiry. A session left alone after Argus sign-in had 3 refresh tokens, 2 revoked, 55 s later with no client activity. The client's own refresh then failed with `refresh_token_already_used`. It also means the API process holds a user's live tokens in memory | A14; `supabase_auth/_sync/gotrue_client.py` `_save_session`; `src/argus/domain/supabase_gateway.py` `from_env` | High. Intermittent sign-outs for web and native. The timer fires once per access-token lifetime (hosted value not inspected; 3600 s is the repository default), for the most recent sign-in on each API process, so it bites idle workers and apps that sleep through two lifetimes | Separate fix: [PR #728](https://github.com/lagarcess/argus/pull/728). This evidence PR does not contain that fix; A14 remains a documented failure here |
 | F2 | A platform-default cookie store captures `sb-auth-token` from `/auth/login`, and a later request without a bearer is authenticated as that user | A11. The first build of this lane's own probe harness and its synthetic adapter both hit this (fixed; S7 pins it) | High for any native client that keeps default cookie handling | Contract §3.1 |
 | F3 | Wrong-account sign-in during guest conversion returns 403 with the new session only in `Set-Cookie`. A bearer client gets no tokens for a live session | C7 | Medium. Orphaned session the user cannot see or revoke | P3 |
 | F4 | A bearer-only client cannot convert a guest against unchanged Argus | C3 | Medium. Temporary conversation lost | Contract §3.4, P2 |
@@ -311,7 +311,7 @@ Each is a separate proposal. None is implemented here.
 
 | # | Proposal | Type | Why | Size |
 | --- | --- | --- | --- | --- |
-| P1 | Create `SupabaseGateway.auth_client` with `auto_refresh_token=False` and `persist_session=False` (or sign out of it after each call), with a failing test first that asserts no user session is retained | Backend fix | F1. Needed by web today | Small |
+| P1 | Create `SupabaseGateway.auth_client` with `auto_refresh_token=False` and `persist_session=False` (or sign out of it after each call), with a failing test first that asserts no user session is retained. **Owned by [PR #728](https://github.com/lagarcess/argus/pull/728)**; not implemented in this evidence PR | Backend fix | F1 / A14. Needed by web today | Small |
 | P2 | Additive handoff transport for bearer clients in `src/argus/api/routers/auth.py`, read through the same helper as the cookies: opt-in request header, `handoff_secret` in the create response, `Argus-Guest-Handoff-Id` and `-Secret` request headers, a "cleared" signal, and no `Set-Cookie` for that transport. `API_CONTRACT.md` first | API contract + backend | F4, and removes cookie parsing from both apps | Small to medium |
 | P3 | When sign-in succeeds but the claim fails, return the session in the body for the header transport | API contract + backend | F3 | Small, with P2 |
 | P4 | Let Argus `/auth/signup` and `/auth/guest/signup` pass an allowlisted `emailRedirectTo`, and review hosted confirmation and recovery email templates (the `token_hash` pattern if scanners pre-open links) | Backend + hosted | D1. Confirmation returns to the app | Small backend, hosted review |
@@ -349,14 +349,14 @@ on any device, as today.
 | Token expiry and reuse against real Cloudflare | Test secrets do not model them (F12) | On staging, obtain a token, wait over 300 s, submit it, and expect `timeout-or-duplicate`. Then submit one token twice |
 | Hosted Supabase settings (JWT lifetime, rotation, reuse interval, captcha provider, redirect list, templates) | Dashboard not inspected; production access out of scope | Owner exports the auth settings. Rerun A4, A5, A6, and B1 against a staging project |
 | Universal links and App Links | No identifiers or hosting | After P8, test on physical devices with `?mode=developer` (iOS) and `adb shell pm verify-app-links` (Android) |
-| Android client | No toolchain | `probes/native-auth/android/README.md` |
-| F1 in production | Local stack only | After P1 ships, rerun A14. Before that, the effect is predicted from source and local timing |
+| Android client | No toolchain on the evidence machine; Android probe verification is tracked on this PR and must not block #730 sample landing | `probes/native-auth/android/README.md`. Production mobile auth stays unverified until that follow-up compiles and passes |
+| F1 in production | Local stack only; production mobile auth remains unverified until #728 lands and this probe follow-up is solid | After #728 ships, rerun A14 against the fixed API. Before that, the effect is predicted from source and local timing. Do not treat production mobile auth as verified |
 
 ## 9. Implementation assignments
 
 | # | Assignment | Owner | Depends on |
 | --- | --- | --- | --- |
-| N1 | P1: stop the server auth client from retaining and refreshing user sessions; failing test first; A14 as acceptance | Backend auth (`supabase_gateway.py`) | None |
+| N1 | P1: stop the server auth client from retaining and refreshing user sessions; failing test first; A14 as acceptance. **In flight as [PR #728](https://github.com/lagarcess/argus/pull/728)** | Backend auth (`supabase_gateway.py`) | None |
 | N2 | Write the native session subsection of `API_CONTRACT.md` §7 from §3 of this report | API contract owner | None |
 | N3 | P2 and P3: header handoff transport and session beside a claim failure | Backend auth router | N2 |
 | N4 | P5: captcha-specific problem code | Backend auth router | N2 |

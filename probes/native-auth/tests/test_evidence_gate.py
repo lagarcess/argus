@@ -49,7 +49,7 @@ def app_log(spec: dict) -> list[dict]:
 def complete(tmp_path: Path) -> Path:
     for name, checks in SPEC["automated"].items():
         write(tmp_path, name, suite_doc(name, checks))
-    write(tmp_path, evidence_gate.APP_RUN_RECORD, CLEAN)
+    write(tmp_path, evidence_gate.APP_RUN_RECORD, {**CLEAN, "scheme_prompts_accepted": 0})
     for name, spec in SPEC["app"].items():
         write(tmp_path, name, app_log(spec))
         for shot in spec["screenshots"]:
@@ -150,7 +150,12 @@ def edit_callbacks(root: Path, change) -> None:
 @pytest.mark.parametrize(
     ("change", "expected"),
     [
-        (lambda log: log[3]["observed"].update(result="refused"), "result='refused'"),
+        (
+            lambda log: next(
+                e for e in log if e["observed"].get("result") == "session"
+            )["observed"].update(result="refused"),
+            "result='refused'",
+        ),
         (lambda log: log.pop(), "differ from declared"),
         (
             lambda log: log.insert(2, {"step": "callback.completed", "observed": {}}),
@@ -172,6 +177,39 @@ def test_forbidden_app_step_and_missing_screenshot_are_refused(complete: Path) -
     found = problems(complete, scope="app")
     assert any("forbidden steps present ['guest.start']" in p for p in found)
     assert "T3, T4 app/turnstile-test-interactive.png: missing" in found
+
+
+def test_undeclared_app_step_is_refused_even_when_declared_steps_match(
+    complete: Path,
+) -> None:
+    path = complete / "app/callback-delivery.json"
+    log = json.loads(path.read_text())
+    log.append({"step": "callback.crashed", "observed": {"reason": "synthetic"}})
+    path.write_text(json.dumps(log))
+    found = problems(complete, scope="app")
+    assert any("undeclared steps ['callback.crashed']" in p for p in found)
+
+
+def test_allowed_incidental_launch_step_is_not_a_problem(complete: Path) -> None:
+    path = complete / "app/callback-delivery.json"
+    log = json.loads(path.read_text())
+    path.write_text(json.dumps([{"step": "launch", "observed": {}}] + log))
+    assert problems(complete, scope="app") == []
+
+
+@pytest.mark.parametrize("value", [None, "unknown", "", "1.5", True, []])
+def test_missing_or_nonnumeric_scheme_prompt_count_is_refused(
+    complete: Path, value
+) -> None:
+    path = complete / evidence_gate.APP_RUN_RECORD
+    doc = json.loads(path.read_text())
+    if value is None:
+        doc.pop("scheme_prompts_accepted", None)
+    else:
+        doc["scheme_prompts_accepted"] = value
+    path.write_text(json.dumps(doc))
+    found = problems(complete, scope="app")
+    assert any("scheme_prompts_accepted" in p for p in found)
 
 
 def test_command_line_exits_nonzero_on_any_problem(tmp_path: Path) -> None:
