@@ -293,6 +293,8 @@ def edits_that_move_money_need_review() -> dict:
         "observation_preview_requires_check": _observation_preview_requires_check(),
         "remove_rejects_empty_answer_map": _remove_rejects_empty_answer_map(),
         "zone_change_restamps_check": _zone_change_restamps_check(),
+        "correction_dry_run_keeps_seq": _correction_dry_run_keeps_seq(),
+        "reordering_bound_to_account_state": _reordering_bound_to_account_state(),
     }
 
 
@@ -427,6 +429,7 @@ def _move_across_accounts() -> dict:
         account_id=savings.id,
         answers={check.id: "included"},
         accept_reordering=True,
+        account_basis=scene.account_basis(checking, savings),
     )
     return {
         "unaccepted_move": blocked,
@@ -717,7 +720,13 @@ def _linked_digest_placement() -> dict:
     scene.store.confirm(scene.store.preview(check.id), "stmt-check")
     shifted = outcome(lambda: scene.store.restore(record.id, 2, "back"))
     restored = outcome(
-        lambda: scene.store.restore(record.id, 2, "back", accept_reordering=True)
+        lambda: scene.store.restore(
+            record.id,
+            2,
+            "back",
+            accept_reordering=True,
+            account_basis=scene.account_basis(cash),
+        )
     )
     return {
         "restore_needs_reordering": shifted,
@@ -806,12 +815,24 @@ def _restore_reviews_placement() -> dict:
     expense = scene.record("expense", cash, "100.00", 3)
     scene.observe(cash, "900.00", 5)
     # Removing contained activity also shifts placement.
-    scene.store.remove(expense.id, 1, "wrong", accept_reordering=True)
+    scene.store.remove(
+        expense.id,
+        1,
+        "wrong",
+        accept_reordering=True,
+        account_basis=scene.account_basis(cash),
+    )
     # Contained at confirmation, so restore needs no inclusion answer — but
     # landing still shifts the remaining difference.
     shifted = outcome(lambda: scene.store.restore(expense.id, 2, "keep"))
     restored = outcome(
-        lambda: scene.store.restore(expense.id, 2, "keep", accept_reordering=True)
+        lambda: scene.store.restore(
+            expense.id,
+            2,
+            "keep",
+            accept_reordering=True,
+            account_basis=scene.account_basis(cash),
+        )
     )
     return {
         "unaccepted": shifted,
@@ -1120,6 +1141,7 @@ def _remove_check_with_dependents() -> dict:
             1,
             "typo",
             accept_reordering=True,
+            account_basis=scene.account_basis(cash),
             answers={record.id: {second.id: "included"}},
         )
     )
@@ -1413,6 +1435,7 @@ def _remove_answers_limited_to_exposed() -> dict:
             1,
             "typo",
             accept_reordering=True,
+            account_basis=scene.account_basis(cash),
             answers={record.id: {second.id: "included"}},
         )
     )
@@ -1474,9 +1497,118 @@ def _remove_rejects_empty_answer_map() -> dict:
                 1,
                 "typo",
                 accept_reordering=True,
+                account_basis=scene.account_basis(cash),
                 answers={record.id: {second.id: "included"}},
             )
         ),
+    }
+
+
+def _correction_dry_run_keeps_seq() -> dict:
+    """Same-instant check dry-runs must keep the record's sequence.
+
+    With seq forced to 0, a later same-time check sorts before its peer and
+    accepts evidence that `_revise` then stamps differently.
+    """
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    stamp = local(5, 18)
+    scene.now = stamp
+    first = scene.confirm(
+        scene.draft(
+            kind="balance_observation",
+            account_id=cash.id,
+            amount="1000.00",
+            as_of=stamp.isoformat(),
+            basis="user_check",
+        )
+    )
+    second = scene.confirm(
+        scene.draft(
+            kind="balance_observation",
+            account_id=cash.id,
+            amount="900.00",
+            as_of=stamp.isoformat(),
+            basis="user_check",
+        )
+    )
+    scene.now = local(6)
+    late = scene.act("expense", cash, "100.00", 4)
+    scene.store.resolve(
+        late.id,
+        answers={first.id: "included", second.id: "included"},
+        expected_revision=late.revision,
+    )
+    scene.confirm(late)
+    # Evidence matching a seq=0 dry-run (prior 90k) must be refused.
+    wrong_order = outcome(
+        lambda: scene.store.correct(
+            second.id,
+            1,
+            "typo",
+            amount="850.00",
+            account_basis=scene.account_basis(cash),
+            check={"prior": 90_000, "observed": 85_000, "difference": -5_000},
+        )
+    )
+    scene.store.correct(
+        second.id,
+        1,
+        "typo",
+        amount="850.00",
+        account_basis=scene.account_basis(cash),
+        check={"prior": 100_000, "observed": 85_000, "difference": -15_000},
+    )
+    stamped = scene.store.book.records[second.id].revisions[-1]
+    return {
+        "wrong_order_evidence": wrong_order,
+        "confirmed_expected": stamped.confirmed_expected,
+        "confirmed_difference": stamped.confirmed_difference,
+    }
+
+
+def _reordering_bound_to_account_state() -> dict:
+    """accept_reordering must bind to the account versions that produced review."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00", as_of=local(5))
+    opening = anchors(scene.store.book, cash.id)[0].id
+    first = scene.record("expense", cash, "100.00", 6)
+    scene.now = local(7)
+    unreviewed = outcome(
+        lambda: scene.store.correct(opening, 1, "was the 7th", as_of=local(7))
+    )
+    prepared = scene.account_basis(cash)
+    missing = outcome(
+        lambda: scene.store.correct(
+            opening, 1, "was the 7th", as_of=local(7), accept_reordering=True
+        )
+    )
+    # Concurrent activity after the review bumps the account version.
+    scene.record("expense", cash, "50.00", 6)
+    stale = outcome(
+        lambda: scene.store.correct(
+            opening,
+            1,
+            "was the 7th",
+            as_of=local(7),
+            accept_reordering=True,
+            account_basis=prepared,
+        )
+    )
+    scene.store.correct(
+        opening,
+        1,
+        "was the 7th",
+        as_of=local(7),
+        accept_reordering=True,
+        account_basis=scene.account_basis(cash),
+    )
+    return {
+        "unreviewed": unreviewed,
+        "missing_basis": missing,
+        "stale_basis": stale,
+        "accepted": scene.store.book.records[opening].body.as_of.date().isoformat(),
+        "first_still_present": first.id in scene.store.book.records,
     }
 
 
@@ -1522,7 +1654,7 @@ def _zone_change_restamps_check() -> dict:
         "reread",
         as_of=as_of,
         accept_reordering=True,
-        account_basis={cash.id: scene.store.book.accounts[cash.id].version},
+        account_basis=scene.account_basis(cash),
         check={"prior": 90_000, "observed": 100_000, "difference": 10_000},
     )
     revised = scene.store.book.records[check.id]

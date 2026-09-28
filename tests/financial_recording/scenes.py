@@ -181,6 +181,13 @@ class Scene:
         current = balance(self.store.book, account.id, tz=self.store.tz)
         return getattr(current, "amount", None)
 
+    def account_basis(self, *accounts: Account) -> dict[str, int]:
+        """Touched account versions for reordering or check-correction binds."""
+        return {
+            account.id: self.store.book.accounts[account.id].version
+            for account in accounts
+        }
+
     def gaps(self, account: Account) -> list:
         return [
             [gap.recorded, gap.remaining, gap.label]

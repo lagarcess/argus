@@ -439,7 +439,12 @@ def opening_date_correction() -> dict:
         )
     )
     scene.store.correct(
-        opening_id, 1, "balance was on the 7th", as_of=local(7), accept_reordering=True
+        opening_id,
+        1,
+        "balance was on the 7th",
+        as_of=local(7),
+        accept_reordering=True,
+        account_basis=scene.account_basis(cash),
     )
     history = scene.store.book.records[opening_id].revisions
     return {
@@ -479,7 +484,9 @@ def duplicate_submission() -> dict:
     create_replay = scene.account("Efectivo", "cash", "DOP", "1000.00")
     scene.store.correct(first.id, 1, "typo", amount="50.00")
     after_correct = scene.store.confirm(preview, "k1")
-    scene.store.remove(first.id, 2, "undo", accept_reordering=True)
+    scene.store.remove(
+        first.id, 2, "undo", accept_reordering=True, account_basis=scene.account_basis(cash)
+    )
     after_remove = scene.store.confirm(preview, "k1")
     return {
         **before_later_edits,

@@ -444,6 +444,11 @@
         ]
       ]
     },
+    "correction_dry_run_keeps_seq": {
+      "confirmed_difference": -15000,
+      "confirmed_expected": 100000,
+      "wrong_order_evidence": "StaleVersion"
+    },
     "correction_rejects_bogus_kind": {
       "bogus_kind": "ReviewRequired:kind_unsupported"
     },
@@ -686,6 +691,13 @@
         ]
       ]
     },
+    "reordering_bound_to_account_state": {
+      "accepted": "2026-09-07",
+      "first_still_present": true,
+      "missing_basis": "InvalidInput:reordering_basis_required",
+      "stale_basis": "StaleVersion",
+      "unreviewed": "ReviewRequired:inclusion_changed"
+    },
     "restamp_honors_not_included": {
       "confirmed_expected": 100000,
       "excluded_from_contents": true,
@@ -759,7 +771,7 @@
       "expense_outside_before": true,
       "restamped_zone": "UTC",
       "zone_change_moves_inclusion": "ReviewRequired:inclusion_changed",
-      "zone_change_requires_basis": "InvalidInput:check_correction_basis_required"
+      "zone_change_requires_basis": "InvalidInput:reordering_basis_required"
     }
   },
   "equal_amount_not_a_match": {

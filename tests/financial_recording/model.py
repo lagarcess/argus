@@ -559,7 +559,8 @@ class Store:
         Amount/date corrections on a check restamp confirmation evidence. Pass
         `account_basis` (touched account versions) and reviewed `check` evidence
         from the correction screen so concurrent included activity cannot rewrite
-        what the person accepted. The observation field `basis` stays in `changes`.
+        what the person accepted. `accept_reordering` also requires `account_basis`
+        for every touched account. The observation field `basis` stays in `changes`.
         """
         record = self._current(record_id, expected_revision, reason)
         currency = self.book.accounts[record.body.account_id].currency
@@ -598,7 +599,10 @@ class Store:
         found.extend(inclusion_issues(trial, left, self.tz))
         found.extend(self._linked_refund_issues(record_id, body))
         only_answers = set(changes) == {"answers"}
-        if not found and not accept_reordering and not only_answers:
+        touched = accounts_of(record.body) | accounts_of(body)
+        if accept_reordering:
+            self._assert_reordering_basis(touched, account_basis, record_id)
+        elif not found and not only_answers:
             found.extend(self._placement_changes(record, body))
         if found:
             raise ReviewRequired(found)
@@ -618,6 +622,7 @@ class Store:
         reason: str,
         *,
         accept_reordering: bool = False,
+        account_basis: Optional[Mapping[str, int]] = None,
         answers: Optional[Mapping[str, Mapping[str, str]]] = None,
     ) -> Record:
         """Remove a record. When removing a check, `answers` carries
@@ -701,7 +706,9 @@ class Store:
         questions = inclusion_issues(after, touched, self.tz)
         if questions:
             raise ReviewRequired(questions)
-        if not accept_reordering:
+        if accept_reordering:
+            self._assert_reordering_basis(touched, account_basis, record_id)
+        else:
             moved = self._placement_changes_against(after, touched)
             if moved:
                 raise ReviewRequired(moved)
@@ -719,6 +726,7 @@ class Store:
         *,
         answers: Optional[Mapping[str, str]] = None,
         accept_reordering: bool = False,
+        account_basis: Optional[Mapping[str, int]] = None,
     ) -> Record:
         """Restores the original record, never a copy; both legs return together."""
         record = self.book.records[record_id]
@@ -736,11 +744,12 @@ class Store:
         found = blocking(validate(self.book, body, self.tz, record_id, now=self.clock()))
         if found:
             raise ReviewRequired(found)
+        touched = accounts_of(record.body) | accounts_of(body)
         after = with_trial(self.book, body, record_id, self.tz)
-        if not accept_reordering:
-            moved = self._placement_changes_against(
-                after, accounts_of(record.body) | accounts_of(body)
-            )
+        if accept_reordering:
+            self._assert_reordering_basis(touched, account_basis, record_id)
+        else:
+            moved = self._placement_changes_against(after, touched)
             if moved:
                 raise ReviewRequired(moved)
         return self._revise(record, body, reason, removed=False)
@@ -923,6 +932,24 @@ class Store:
             raise InvalidInput("reason_required", record_id)
         return record
 
+    def _assert_reordering_basis(
+        self,
+        account_ids: set[str],
+        basis: Optional[Mapping[str, int]],
+        ref: str,
+    ) -> None:
+        """Refuse unbound reordering after concurrent writes on touched accounts."""
+        if basis is None:
+            raise InvalidInput("reordering_basis_required", ref)
+        required = {account_id for account_id in account_ids if account_id in self.book.accounts}
+        for account_id in sorted(required):
+            if account_id not in basis:
+                raise StaleVersion(account_id)
+        for account_id, version in basis.items():
+            account = self.book.accounts.get(account_id)
+            if account is None or account.version != version:
+                raise StaleVersion(account_id)
+
     def _assert_check_correction_basis(
         self,
         record_id: str,
@@ -938,10 +965,12 @@ class Store:
             account = self.book.accounts.get(account_id)
             if account is None or account.version != version:
                 raise StaleVersion(account_id)
-        # Dry-run with the real check id so not_included answers still apply.
+        # Dry-run with the real check id and sequence so same-instant anchors
+        # keep the order `_revise` will stamp.
+        current = self.book.records[record_id]
         placeholder = Record(
             record_id,
-            0,
+            current.seq,
             (
                 Revision(
                     body,

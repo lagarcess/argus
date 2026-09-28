@@ -405,9 +405,21 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "entry_zone": "America/Santo_Domingo",
             "expense_outside_before": True,
             "zone_change_moves_inclusion": "ReviewRequired:inclusion_changed",
-            "zone_change_requires_basis": "InvalidInput:check_correction_basis_required",
+            "zone_change_requires_basis": "InvalidInput:reordering_basis_required",
             "restamped_zone": "UTC",
             "expense_in_contents": True,
             "confirmed_difference": 10_000,
+        },
+        "correction_dry_run_keeps_seq": {
+            "wrong_order_evidence": "StaleVersion",
+            "confirmed_expected": 100_000,
+            "confirmed_difference": -15_000,
+        },
+        "reordering_bound_to_account_state": {
+            "unreviewed": "ReviewRequired:inclusion_changed",
+            "missing_basis": "InvalidInput:reordering_basis_required",
+            "stale_basis": "StaleVersion",
+            "accepted": "2026-09-07",
+            "first_still_present": True,
         },
     }
