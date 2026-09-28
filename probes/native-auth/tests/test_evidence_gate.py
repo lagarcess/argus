@@ -17,6 +17,14 @@ FIXED_API = "c" * 40
 DOCUMENTED = set(SPEC["documented_failures"]) | set(SPEC["conditional_failures"])
 HEAD = "a" * 40
 CLEAN = {"argus_source_head": HEAD, "source_dirty": False}
+IDENTITY = {
+    **CLEAN,
+    "argus_api_head": UNFIXED_API,
+    "api_dirty": False,
+    "captured_at": "2026-09-28T00:00:00+00:00",
+    "client": "test",
+    "environment": "test",
+}
 
 
 def unchanged(_: str) -> list[str]:
@@ -36,11 +44,21 @@ def write(root: Path, name: str, doc: object) -> None:
 def suite_doc(name: str, checks: list[str], fixed: bool = False) -> dict:
     expected = set(SPEC["documented_failures"]) if fixed else DOCUMENTED
     doc = {
-        **CLEAN,
+        **IDENTITY,
         "argus_api_head": FIXED_API if fixed else UNFIXED_API,
-        "api_dirty": False,
         "results": [
-            {"id": c, "verdict": "fail" if c in expected else "pass"} for c in checks
+            {
+                "id": c,
+                "area": "a",
+                "scenario": "s",
+                "path": "p",
+                "evidence_level": 3,
+                "expected": "e",
+                "observed": {"status": 200},
+                "verdict": "fail" if c in expected else "pass",
+                "note": "",
+            }
+            for c in checks
         ],
     }
     if name == "ios-simulator.json":
@@ -52,7 +70,10 @@ def suite_doc(name: str, checks: list[str], fixed: bool = False) -> dict:
 
 
 def app_log(spec: dict) -> list[dict]:
-    return [{"step": s["step"], "observed": dict(s["observed"])} for s in spec["steps"]]
+    steps = [{"step": "launch", "observed": {"configured": "true"}}] + [
+        {"step": s["step"], "observed": dict(s["observed"])} for s in spec["steps"]
+    ]
+    return [{"id": str(index), **step} for index, step in enumerate(steps)]
 
 
 @pytest.fixture
@@ -61,12 +82,21 @@ def complete(tmp_path: Path) -> Path:
         write(tmp_path, name, suite_doc(name, checks))
     for name, entry in SPEC["cross_version"].items():
         write(tmp_path, name, suite_doc(name, entry["checks"], fixed=True))
-    write(tmp_path, evidence_gate.APP_RUN_RECORD, CLEAN)
+    write(
+        tmp_path, evidence_gate.APP_RUN_RECORD, {**IDENTITY, "scheme_prompts_accepted": 0}
+    )
     for name, spec in SPEC["app"].items():
         write(tmp_path, name, app_log(spec))
         for shot in spec["screenshots"]:
             (tmp_path / shot).write_bytes(b"png")
     return tmp_path
+
+
+def edit(root: Path, name: str, change) -> None:
+    path = root / name
+    doc = json.loads(path.read_text())
+    change(doc)
+    path.write_text(json.dumps(doc))
 
 
 def problems(root: Path, **kwargs) -> list[str]:
@@ -165,11 +195,18 @@ def edit_callbacks(root: Path, change) -> None:
 @pytest.mark.parametrize(
     ("change", "expected"),
     [
-        (lambda log: log[3]["observed"].update(result="refused"), "result='refused'"),
-        (lambda log: log.pop(), "differ from declared"),
         (
-            lambda log: log.insert(2, {"step": "callback.completed", "observed": {}}),
-            "differ from declared",
+            lambda log: next(e for e in log if e["step"] == "callback.completed")[
+                "observed"
+            ].update(result="refused"),
+            "result='refused'",
+        ),
+        (lambda log: log.pop(), "are not exactly"),
+        (
+            lambda log: log.insert(
+                2, {"id": "x", "step": "callback.completed", "observed": {}}
+            ),
+            "are not exactly",
         ),
     ],
 )
@@ -178,15 +215,100 @@ def test_app_log_departures_are_refused(complete: Path, change, expected: str) -
     assert any(expected in p for p in problems(complete, scope="app"))
 
 
-def test_forbidden_app_step_and_missing_screenshot_are_refused(complete: Path) -> None:
-    path = complete / "app/turnstile-cancelled.json"
-    log = json.loads(path.read_text())
-    log.append({"step": "guest.start", "observed": {"result": "ok"}})
-    path.write_text(json.dumps(log))
+def test_missing_screenshot_is_refused(complete: Path) -> None:
     (complete / "app/turnstile-test-interactive.png").unlink()
+    assert "T3, T4 app/turnstile-test-interactive.png: missing" in problems(
+        complete, scope="app"
+    )
+
+
+def append_step(step: str):
+    return lambda log: log.append({"id": "extra", "step": step, "observed": {}})
+
+
+@pytest.mark.parametrize(
+    ("name", "change", "expected"),
+    [
+        (
+            "app/callback-delivery.json",
+            append_step("callback.crashed"),
+            "are not exactly",
+        ),
+        ("app/turnstile-cancelled.json", append_step("guest.start"), "are not exactly"),
+        ("app/turnstile-test-pass.json", lambda log: log.pop(0), None),
+        ("app/turnstile-test-pass.json", append_step("launch"), None),
+        (
+            "app/turnstile-test-pass.json",
+            lambda log: log[1].update(extra="x"),
+            "undeclared field 'extra'",
+        ),
+        (
+            "app/turnstile-test-pass.json",
+            lambda log: log[1].pop("id"),
+            "missing field 'id'",
+        ),
+        (
+            "app/turnstile-test-pass.json",
+            lambda log: log[1].update(observed={"n": 1}),
+            "is not observed",
+        ),
+        (
+            "app/turnstile-test-pass.json",
+            lambda log: log.append("text"),
+            "not a JSON object",
+        ),
+    ],
+)
+def test_app_logs_allow_only_declared_and_incidental_steps(
+    complete: Path, name: str, change, expected: str | None
+) -> None:
+    edit(complete, name, change)
     found = problems(complete, scope="app")
-    assert any("forbidden steps present ['guest.start']" in p for p in found)
-    assert "T3, T4 app/turnstile-test-interactive.png: missing" in found
+    if expected is None:
+        assert found == []
+    else:
+        assert any(expected in p for p in found), found
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        (lambda r: r.update(scheme_prompts_accepted="unknown"), "is not count"),
+        (lambda r: r.update(scheme_prompts_accepted=-1), "is not count"),
+        (lambda r: r.update(scheme_prompts_accepted=True), "is not count"),
+        (
+            lambda r: r.pop("scheme_prompts_accepted"),
+            "missing field 'scheme_prompts_accepted'",
+        ),
+        (lambda r: r.update(note="x"), "undeclared field 'note'"),
+        (lambda r: r.update(argus_api_head="short"), "is not sha"),
+        (lambda r: r.update(api_dirty=True), "API captured from a dirty"),
+    ],
+)
+def test_app_run_record_fields_are_declared_and_typed(
+    complete: Path, change, expected
+) -> None:
+    edit(complete, evidence_gate.APP_RUN_RECORD, change)
+    assert any(expected in p for p in problems(complete, scope="app"))
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        (lambda d: d.update(unexpected=1), "undeclared field 'unexpected'"),
+        (lambda d: d.pop("captured_at"), "missing field 'captured_at'"),
+        (lambda d: d.update(source_dirty="no"), "is not bool"),
+        (lambda d: d["results"][0].update(verdict="skipped"), "is not verdict"),
+        (lambda d: d["results"][0].pop("observed"), "missing field 'observed'"),
+        (lambda d: d["results"][0].update(extra=True), "undeclared field 'extra'"),
+        (lambda d: d["results"][0].update(evidence_level="3"), "is not count"),
+    ],
+)
+def test_suite_document_fields_are_declared_and_typed(
+    complete: Path, change, expected
+) -> None:
+    edit(complete, "http-guest.json", change)
+    assert any(expected in p for p in problems(complete, scope="suites"))
 
 
 def test_command_line_exits_nonzero_on_any_problem(tmp_path: Path) -> None:
@@ -230,13 +352,6 @@ def test_staleness_follows_runtime_code_not_prose(tmp_path: Path, monkeypatch) -
     assert evidence_gate.runtime_changes_since(captured) == [
         "probes/native-auth/probe.py"
     ]
-
-
-def edit(root: Path, name: str, change) -> None:
-    path = root / name
-    doc = json.loads(path.read_text())
-    change(doc)
-    path.write_text(json.dumps(doc))
 
 
 def a14(doc: dict) -> dict:

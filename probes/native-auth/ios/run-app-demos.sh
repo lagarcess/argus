@@ -126,12 +126,15 @@ deliver "argusnativeproof://auth-callback?code=00000000-0000-0000-0000-000000000
 if ! wait "$PROMPTS" || ! grep -q "Executed 1 test, with 0 failures" "$PROMPT_LOG"; then
   echo "scheme prompt UI test failed; see $PROMPT_LOG" >&2; exit 1
 fi
-ACCEPTED="$(sed -n 's/.*SCHEME_PROMPTS_ACCEPTED \([0-9][0-9]*\).*/\1/p' "$PROMPT_LOG" | tail -1)"
-python3 - "$OUT/run.json" "${ACCEPTED:-unknown}" <<'PY'
+ACCEPTED="$(sed -n 's/.*SCHEME_PROMPTS_ACCEPTED \([0-9][0-9]*\)$/\1/p' "$PROMPT_LOG" | tail -1)"
+if [ -z "$ACCEPTED" ]; then
+  echo "scheme prompt UI test reported no prompt count; see $PROMPT_LOG" >&2; exit 1
+fi
+python3 - "$OUT/run.json" "$ACCEPTED" <<'PY'
 import json, sys
 path, accepted = sys.argv[1:3]
 record = json.load(open(path))
-record["scheme_prompts_accepted"] = accepted
+record["scheme_prompts_accepted"] = int(accepted)
 open(path, "w").write(json.dumps(record, indent=2) + "\n")
 PY
 capture callback-delivery 2

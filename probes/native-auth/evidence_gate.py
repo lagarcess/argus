@@ -1,13 +1,14 @@
 """Decide whether native-auth evidence is complete, expected, and current.
 
-`expectations.json` declares every check a suite must produce and the only
-failures that are expected. A conditional failure is expected only against an
-API whose source lacks the named fix, and must pass against one that has it.
-Anything the declaration does not describe fails the gate: a missing, extra,
-or repeated check; an unexpected failure; an expected failure that now passes;
-a partial iOS run; an app log that departs from the declared steps; an API
-version the gate cannot determine; or a capture taken from a dirty tree or
-from code that differs from HEAD.
+`expectations.json` declares every check a suite must produce, the only
+failures that are expected, and the exact fields of every evidence document.
+A conditional failure is expected only against an API whose source lacks the
+named fix, and must pass against one that has it. Anything the declaration
+does not describe fails the gate: an undeclared, missing, or mistyped field; a
+missing, extra, or repeated check; an unexpected failure; an expected failure
+that now passes; a partial iOS run; an app log step that is not declared; an
+API version the gate cannot determine; or a capture taken from a dirty tree
+or from code that differs from HEAD.
 
 Usage: evidence_gate.py <evidence-dir> [--scope automated|cross|suites|app|all] [--only FILE ...]
 (`suites` is automated plus cross.)
@@ -52,6 +53,35 @@ ChangedSince = Callable[[str], list[str]]
 # (api head, path, text) -> whether that file at that head contains the text,
 # or None when the head or the file cannot be read.
 ApiContains = Callable[[str, str, str], "bool | None"]
+
+FIELD_TYPES: dict[str, Callable[[object], bool]] = {
+    "str": lambda v: isinstance(v, str),
+    "bool": lambda v: isinstance(v, bool),
+    "sha": lambda v: isinstance(v, str) and re.fullmatch(r"[0-9a-f]{40}", v) is not None,
+    "count": lambda v: isinstance(v, int) and not isinstance(v, bool) and v >= 0,
+    "list": lambda v: isinstance(v, list),
+    "object": lambda v: isinstance(v, dict),
+    "observed": lambda v: isinstance(v, dict)
+    and all(isinstance(k, str) and isinstance(x, str) for k, x in v.items()),
+    "verdict": lambda v: v in ("pass", "fail"),
+}
+
+
+def schema_problems(label: str, doc: object, schema: dict[str, str]) -> list[str]:
+    """Every field must be declared, present unless marked optional, and typed."""
+    if not isinstance(doc, dict):
+        return [f"{label}: not a JSON object"]
+    fields = {key.rstrip("?"): (kind, key.endswith("?")) for key, kind in schema.items()}
+    problems = [
+        f"{label}: undeclared field {key!r}" for key in sorted(set(doc) - set(fields))
+    ]
+    for key, (kind, optional) in fields.items():
+        if key not in doc:
+            if not optional:
+                problems.append(f"{label}: missing field {key!r}")
+        elif not FIELD_TYPES[kind](doc[key]):
+            problems.append(f"{label}: {key}={doc[key]!r} is not {kind}")
+    return problems
 
 
 def git(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -133,13 +163,21 @@ def expected_failures(
 
 
 def suite_problems(
-    name: str, doc: dict, checks: list[str], expected: set[str]
+    name: str,
+    doc: dict,
+    checks: list[str],
+    expected: set[str],
+    result_schema: dict[str, str],
 ) -> list[str]:
     results = doc.get("results")
     if not isinstance(results, list):
         return [f"{name}: no results list"]
-    ids = [str(r.get("id")) for r in results]
     problems = []
+    for index, result in enumerate(results):
+        check = result.get("id", index) if isinstance(result, dict) else index
+        problems += schema_problems(f"{name} result {check}", result, result_schema)
+    results = [r for r in results if isinstance(r, dict)]
+    ids = [str(r.get("id")) for r in results]
     repeated = sorted(i for i, n in Counter(ids).items() if n > 1)
     missing = [c for c in checks if c not in ids]
     extra = sorted(set(ids) - set(checks))
@@ -181,7 +219,8 @@ def ios_run_problems(
     return []
 
 
-def app_problems(root: Path, name: str, spec: dict) -> list[str]:
+def app_problems(root: Path, name: str, spec: dict, expectations: dict) -> list[str]:
+    """The log must be exactly the declared steps plus declared incidental ones."""
     path = root / name
     if not path.is_file():
         return [f"{name}: missing"]
@@ -191,24 +230,29 @@ def app_problems(root: Path, name: str, spec: dict) -> list[str]:
         if not (root / shot).is_file()
     ]
     log = json.loads(path.read_text())
-    declared = [s["step"] for s in spec["steps"]]
-    relevant = [e for e in log if e.get("step") in set(declared)]
-    if [e["step"] for e in relevant] != declared:
-        problems.append(
-            f"{spec['id']} {name}: steps {[e['step'] for e in relevant]} "
-            f"differ from declared {declared}"
+    if not isinstance(log, list):
+        return problems + [f"{spec['id']} {name}: not a list of steps"]
+    entry_schema = expectations["documents"]["app_log_entry"]
+    for index, entry in enumerate(log):
+        problems += schema_problems(
+            f"{spec['id']} {name} entry {index}", entry, entry_schema
         )
-    else:
-        for want, got in zip(spec["steps"], relevant, strict=True):
-            for key, value in want["observed"].items():
-                seen = got.get("observed", {}).get(key)
-                if seen != value:
-                    problems.append(
-                        f"{spec['id']} {name}: {want['step']} {key}={seen!r}, expected {value!r}"
-                    )
-    forbidden = sorted({e.get("step") for e in log} & set(spec["forbidden_steps"]))
-    if forbidden:
-        problems.append(f"{spec['id']} {name}: forbidden steps present {forbidden}")
+    incidental = set(expectations["app_incidental_steps"])
+    flow = [e for e in log if isinstance(e, dict) and e.get("step") not in incidental]
+    declared = [s["step"] for s in spec["steps"]]
+    if [e.get("step") for e in flow] != declared:
+        problems.append(
+            f"{spec['id']} {name}: steps {[e.get('step') for e in flow]} "
+            f"are not exactly the declared {declared}"
+        )
+        return problems
+    for want, got in zip(spec["steps"], flow, strict=True):
+        for key, value in want["observed"].items():
+            seen = got.get("observed", {}).get(key)
+            if seen != value:
+                problems.append(
+                    f"{spec['id']} {name}: {want['step']} {key}={seen!r}, expected {value!r}"
+                )
     return problems
 
 
@@ -237,6 +281,9 @@ def verify(
             problems.append(f"{name}: missing")
             continue
         doc = json.loads(path.read_text())
+        problems += schema_problems(name, doc, spec["documents"]["suite"])
+        if not isinstance(doc, dict):
+            continue
         problems += capture_problems(name, doc, changed_since)
         expected, api_problems = expected_failures(name, doc, spec, contains)
         problems += api_problems
@@ -245,7 +292,9 @@ def verify(
             problems.append(
                 f"{name}: the API it tested does not contain the fix for {fix}"
             )
-        problems += suite_problems(name, doc, checks, expected)
+        problems += suite_problems(
+            name, doc, checks, expected, spec["documents"]["result"]
+        )
         if name == "ios-simulator.json":
             problems += ios_run_problems(name, doc, checks, expected)
     if scope in ("automated", "cross", "suites", "all"):
@@ -257,11 +306,16 @@ def verify(
         if not record.is_file():
             problems.append(f"{APP_RUN_RECORD}: missing")
         else:
-            problems += capture_problems(
-                APP_RUN_RECORD, json.loads(record.read_text()), changed_since
-            )
+            run = json.loads(record.read_text())
+            problems += schema_problems(APP_RUN_RECORD, run, spec["documents"]["app_run"])
+            if isinstance(run, dict):
+                problems += capture_problems(APP_RUN_RECORD, run, changed_since)
+                if run.get("api_dirty") is not False:
+                    problems.append(
+                        f"{APP_RUN_RECORD}: API captured from a dirty or unrecorded tree"
+                    )
         for name, app_spec in spec["app"].items():
-            problems += app_problems(root, name, app_spec)
+            problems += app_problems(root, name, app_spec, spec)
     return problems
 
 

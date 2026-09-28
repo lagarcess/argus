@@ -11,6 +11,47 @@
       }
     }
   },
+  "documents": {
+    "_types": "str: string; bool: true or false; sha: 40 lowercase hex; count: whole number >= 0; list: array; object: JSON object; observed: object of strings; verdict: pass or fail. Every field of a document must be declared here.",
+    "suite": {
+      "argus_source_head": "sha",
+      "source_dirty": "bool",
+      "argus_api_head": "sha",
+      "api_dirty": "bool",
+      "captured_at": "str",
+      "client": "str",
+      "environment": "str",
+      "suite?": "str",
+      "xcodebuild_summary?": "str",
+      "results": "list"
+    },
+    "result": {
+      "id": "str",
+      "area": "str",
+      "scenario": "str",
+      "path": "str",
+      "evidence_level": "count",
+      "expected": "str",
+      "observed": "object",
+      "verdict": "verdict",
+      "note": "str"
+    },
+    "app_run": {
+      "argus_source_head": "sha",
+      "source_dirty": "bool",
+      "argus_api_head": "sha",
+      "api_dirty": "bool",
+      "captured_at": "str",
+      "client": "str",
+      "environment": "str",
+      "scheme_prompts_accepted": "count"
+    },
+    "app_log_entry": {
+      "id": "str",
+      "step": "str",
+      "observed": "observed"
+    }
+  },
   "automated": {
     "http-session.json": [
       "A1",
@@ -105,6 +146,9 @@
       "api_must_contain_fix_for": "A14"
     }
   },
+  "app_incidental_steps": [
+    "launch"
+  ],
   "app": {
     "app/turnstile-test-pass.json": {
       "id": "T1",
@@ -131,10 +175,6 @@
             "me_status": "200"
           }
         }
-      ],
-      "forbidden_steps": [
-        "turnstile.error",
-        "turnstile.cancelled"
       ]
     },
     "app/turnstile-test-fail.json": {
@@ -155,10 +195,6 @@
             "token_received": "false"
           }
         }
-      ],
-      "forbidden_steps": [
-        "turnstile.token",
-        "guest.start"
       ]
     },
     "app/turnstile-cancelled.json": {
@@ -184,10 +220,6 @@
             "request_sent": "false"
           }
         }
-      ],
-      "forbidden_steps": [
-        "turnstile.token",
-        "guest.start"
       ]
     },
     "app/callback-delivery.json": {
@@ -196,6 +228,12 @@
         "app/callback-delivery.png"
       ],
       "steps": [
+        {
+          "step": "turnstile.open",
+          "observed": {
+            "sitekey": "1x00000000000000000000AA"
+          }
+        },
         {
           "step": "turnstile.token",
           "observed": {
@@ -246,8 +284,7 @@
             "result": "refused"
           }
         }
-      ],
-      "forbidden_steps": []
+      ]
     }
   }
 }
