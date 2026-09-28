@@ -12,8 +12,8 @@ $ next build
   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
 
-  	- include was updated to add '.next-ecosystem-production/types/**/*.ts'
-  	- include was updated to add '.next-ecosystem-production/dev/types/**/*.ts'
+    - include was updated to add '.next-ecosystem-production/types/**/*.ts'
+    - include was updated to add '.next-ecosystem-production/dev/types/**/*.ts'
 
   Finished TypeScript in 7.8s ...
   Collecting page data using 17 workers ...
@@ -47,4 +47,3 @@ Route (app)
 
 ○  (Static)   prerendered as static content
 ƒ  (Dynamic)  server-rendered on demand
-
