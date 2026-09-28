@@ -145,6 +145,28 @@ def cancel_by_file(original):
     return cancel
 
 
+def retry_rebuilds_the_batch(original):
+    def confirm_in_order(self, session, key):
+        confirmed = []
+        for step, checks in (("activity", False), ("checks", True)):
+            previews = [self.store.preview(item) for item in self.pending(session.id)]
+            ready = [
+                item
+                for item in previews
+                if not proof.blocking(item)
+                and (
+                    self.store.state.drafts[item.draft_id].fields.get("kind")
+                    == "balance_observation"
+                )
+                == checks
+            ]
+            if ready:
+                confirmed += self.store.confirm_batch(ready, f"{session.id}:{key}:{step}")
+        return confirmed
+
+    return confirm_in_order
+
+
 def completion_keeps_file(original):
     def confirm_ready(self, session, key):
         return self._confirm_in_order(session, key)
@@ -251,6 +273,11 @@ def mutations():
             "cancel rejects every draft of the file",
             [(proof.Importer, "cancel", cancel_by_file)],
             {"cancelling_a_second_selection_keeps_the_first_review"},
+        ),
+        (
+            "importer retry rebuilds its batch instead of replaying it",
+            [(proof.Importer, "_confirm_in_order", retry_rebuilds_the_batch)],
+            {"retry_with_same_key"},
         ),
         (
             "completed review keeps the stored file",

@@ -538,10 +538,12 @@
     },
     {
       "case": "retry_with_same_key",
-      "claim": "Retrying a confirmation with the same key returns the same records and writes nothing new.",
+      "claim": "Retrying the importer's confirmation with the same key returns the same records and writes nothing new, including after the app restarts.",
       "group": "retry",
       "observed": {
+        "first": 4,
         "records_unchanged": true,
+        "same_after_restart": true,
         "same_records": true
       },
       "status": "passed"

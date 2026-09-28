@@ -173,6 +173,7 @@ class Importer:
     def __init__(self, store, workdir: Path) -> None:
         self.store = store
         self.sources = workdir / "sources"
+        self.plans = workdir / "confirmations"
         self.selections: dict[str, Selection] = {}
         self._ids = itertools.count(self._next_review())
         self.sweep()
@@ -282,21 +283,30 @@ class Importer:
         return confirmed
 
     def _confirm_in_order(self, session: Session, key: str) -> list:
+        name = hashlib.sha256(f"{session.id}:{key}".encode()).hexdigest()
+        plan_path = self.plans / f"{name}.json"
+        plan = json.loads(plan_path.read_text()) if plan_path.exists() else {}
         confirmed = []
         for step, checks in (("activity", False), ("checks", True)):
-            previews = [self.store.preview(item) for item in self.pending(session.id)]
-            ready = [
-                item
-                for item in previews
-                if not blocking(item)
-                and (
-                    self.store.state.drafts[item.draft_id].fields.get("kind")
-                    == "balance_observation"
+            if step not in plan:
+                previews = [self.store.preview(item) for item in self.pending(session.id)]
+                plan[step] = [
+                    item.draft_id
+                    for item in previews
+                    if not blocking(item)
+                    and (
+                        self.store.state.drafts[item.draft_id].fields.get("kind")
+                        == "balance_observation"
+                    )
+                    == checks
+                ]
+                self.plans.mkdir(exist_ok=True)
+                plan_path.write_text(json.dumps(plan))
+            if plan[step]:
+                previews = [self.store.preview(item) for item in plan[step]]
+                confirmed += self.store.confirm_batch(
+                    previews, f"{session.id}:{key}:{step}"
                 )
-                == checks
-            ]
-            if ready:
-                confirmed += self.store.confirm_batch(ready, f"{key}:{step}")
         return confirmed
 
     def cancel(self, session: Session) -> None:
@@ -1325,24 +1335,28 @@ def cancel_second_selection(fx, workdir):
 @case(
     "retry_with_same_key",
     "retry",
-    "Retrying a confirmation with the same key returns the same records and writes nothing new.",
+    "Retrying the importer's confirmation with the same key returns the same records and writes nothing new, including after the app restarts.",
 )
 def retry_same_key(fx, workdir):
     env = make_env(workdir)
     session = _csv_session(env)
-    ready = [
-        p
-        for p in (env.store.preview(i) for i in env.importer.pending(session.id))
-        if not blocking(p)
-    ]
-    first = env.store.confirm_batch(ready, "batch-1")
+    first = [r.id for r in env.importer.confirm_ready(session, "batch-1")]
     count = len(env.store.book.records)
-    second = env.store.confirm_batch(ready, "batch-1")
+    again = [r.id for r in env.importer.confirm_ready(session, "batch-1")]
+    env.importer = Importer(env.store, workdir)
+    after_restart = [r.id for r in env.importer.confirm_ready(session, "batch-1")]
     observed = {
-        "same_records": [r.id for r in first] == [r.id for r in second],
+        "first": len(first),
+        "same_records": again == first,
+        "same_after_restart": after_restart == first,
         "records_unchanged": count == len(env.store.book.records),
     }
-    return observed == {"same_records": True, "records_unchanged": True}, observed
+    return observed == {
+        "first": 4,
+        "same_records": True,
+        "same_after_restart": True,
+        "records_unchanged": True,
+    }, observed
 
 
 @case(
