@@ -48,6 +48,7 @@ struct HomeSampleView: View {
                 Text("home.balances").font(ArgusStyle.body(12, relativeTo: .caption))
                     .foregroundStyle(ArgusStyle.secondary)
             }
+            .accessibilityElement(children: .combine)
             VStack(spacing: 0) {
                 SampleRow(title: "home.cash", subtitle: "sample.fixture", trailing: SampleFinancialSnapshot.cashAndBankAccounts)
                 SampleRow(title: "home.owe", subtitle: "sample.fixture", trailing: SampleFinancialSnapshot.owed)

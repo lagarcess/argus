@@ -148,6 +148,7 @@ struct SampleRow: View {
             }
         }
         .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .combine)
         .padding(.vertical, 16)
         .frame(minHeight: 60)
         .overlay(alignment: .bottom) { Rectangle().fill(ArgusStyle.line).frame(height: 1) }
