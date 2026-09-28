@@ -1,7 +1,7 @@
 {
-  "verified_at": "2026-09-28T21:05:05.513336+00:00",
-  "verified_against_source_head": "f5f4f4467fe53c3a1990cda9574b353c8b72d83f",
-  "current_integration": "c978927e167f57369f27391ac65995a3d6e5520a",
+  "verified_at": "2026-09-28T21:11:49.708356+00:00",
+  "verified_against_source_head": "41c2b77da708e3c2e668c03d060aba4a566f9f3b",
+  "current_integration": "f61e47f1243d94fe5d5fa631c4bd9f67906fcfc9",
   "fixture_sha256": "a12a24634763f951f6daad7d200614dd777e83785d9ed4da9907720e5bdf418f",
   "visual_style_sha256": "d1ab2aee8e20f5fe032759114e271d998406926e352d879b3b468aebe59ede72",
   "platforms": [

@@ -29,7 +29,8 @@ All references were inspected as OPEN/unmerged:
 | #730 | `edc43cb7961b68e7ca699a4101510a79667d1a7f` | AGP 9.1.1 / Gradle 9.3.1 / Compose 2.2.10 setup; API 26 configured floor |
 
 These were inspected references, not assumed merged dependencies. #727 later
-landed in integration and was reconciled as described below. No foundation shell or shared
+landed in integration; #729 subsequently landed too. Both were reconciled as
+described below. No foundation shell or shared
 build configuration changes. Installed Xcode is 27.0 (27A266a). Web retains the
 repository's Lightweight Charts 5.2.0. Platform reports own verified dependency
 versions, official documentation citations and compatibility limitations.
@@ -100,6 +101,16 @@ palette, fonts, quiet controls and accessible hit areas follow that direction.
 No runtime, API/data, migration or native build owner changed. One-way merge:
 `b6aecdfdaf964f81aeb411110c003d9662bd5e68`. Final visual captures cover the affected
 presentation; original pre-refinement screenshots are superseded, not reused.
+
+The next fetch found `f61e47f1243d94fe5d5fa631c4bd9f67906fcfc9`: #713's
+integration landing report and #729's iPhone foundation. The latter is a separate
+Xcode project/app and does not own this prototype's resource bundle, selection
+state, API/data contract or build configuration. Fonts previously inspected from
+#729 remain unchanged in the prototype. No runtime/test or environment-variable
+overlap invalidates its captured behavior. One-way merge:
+`41c2b77da708e3c2e668c03d060aba4a566f9f3b`. Relevant prototype/style/fixture/font/
+web-lockfile diffs are empty; final source hashes and merged-tree modularity were
+revalidated. CI runs against this reconciled lineage.
 
 The initial captures were superseded where the visual refinement changed sources.
 Platform provenance identifies the final capture heads; original source identities
