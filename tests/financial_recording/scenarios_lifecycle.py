@@ -15,9 +15,11 @@ from tests.financial_recording.derive import (
     expectation_status,
     forecast,
     observation_gaps,
-    position as position_at,
     space_scope,
     standing,
+)
+from tests.financial_recording.derive import (
+    position as position_at,
 )
 from tests.financial_recording.model import Store
 from tests.financial_recording.scenes import Scene, jsonable, local, outcome
