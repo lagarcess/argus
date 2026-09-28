@@ -72,9 +72,10 @@ the iOS XCTests hosted in the probe app on a simulator named
 "Argus Native Auth Proof", which it creates if missing.
 
 App-level demos (Turnstile in the web view and callback delivery) need the
-pass-mode test secret, the page server, and a person at the simulator. The
-script tells that person when to tap Cancel on the interactive check (never to
-complete it) and to tap Open if iOS asks before delivering a callback:
+pass-mode test secret and the page server. The cancel demo runs as a UI test
+(`ArgusAuthProbeUITests`) that taps Cancel without completing the challenge.
+If iOS asks "Open in ArgusAuthProbeApp?" before a callback, someone must tap
+Open; otherwise the script fails after 90 seconds:
 
 ```bash
 bash probes/native-auth/stack/restart-auth.sh turnstile-pass

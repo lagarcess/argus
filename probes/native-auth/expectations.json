@@ -38,6 +38,7 @@
       "screenshots": ["app/turnstile-test-interactive.png", "app/turnstile-cancelled.png"],
       "steps": [
         {"step": "turnstile.open", "observed": {"sitekey": "3x00000000000000000000FF"}},
+        {"step": "turnstile.interactive", "observed": {}},
         {"step": "turnstile.cancelled", "observed": {"request_sent": "false"}}
       ],
       "forbidden_steps": ["turnstile.token", "guest.start"]

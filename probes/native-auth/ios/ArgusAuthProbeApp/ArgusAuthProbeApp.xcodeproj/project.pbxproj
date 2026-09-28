@@ -18,17 +18,26 @@
 			remoteGlobalIDString = A10000000000000000000050;
 			remoteInfo = ArgusAuthProbeApp;
 		};
+		A10000000000000000000003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000040 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000050;
+			remoteInfo = ArgusAuthProbeApp;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A10000000000000000000010 /* ArgusAuthProbeApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ArgusAuthProbeApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000011 /* ArgusAuthProbeAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArgusAuthProbeAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000013 /* ArgusAuthProbeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ArgusAuthProbeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A10000000000000000000020 /* ArgusAuthProbeApp */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ArgusAuthProbeApp; sourceTree = "<group>"; };
 		A10000000000000000000021 /* ArgusNativeAuthTests */ = {isa = PBXFileSystemSynchronizedRootGroup; name = ArgusNativeAuthTests; path = ../ArgusNativeAuth/Tests/ArgusNativeAuthTests; sourceTree = "<group>"; };
+		A10000000000000000000022 /* ArgusAuthProbeUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; path = ArgusAuthProbeUITests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,6 +56,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000000000000000000062 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -56,6 +72,7 @@
 				A10000000000000000000012 /* Info.plist */,
 				A10000000000000000000020 /* ArgusAuthProbeApp */,
 				A10000000000000000000021 /* ArgusNativeAuthTests */,
+				A10000000000000000000022 /* ArgusAuthProbeUITests */,
 				A10000000000000000000071 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -65,6 +82,7 @@
 			children = (
 				A10000000000000000000010 /* ArgusAuthProbeApp.app */,
 				A10000000000000000000011 /* ArgusAuthProbeAppTests.xctest */,
+				A10000000000000000000013 /* ArgusAuthProbeUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -116,6 +134,27 @@
 			productReference = A10000000000000000000011 /* ArgusAuthProbeAppTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		A10000000000000000000053 /* ArgusAuthProbeUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000093 /* Build configuration list for PBXNativeTarget "ArgusAuthProbeUITests" */;
+			buildPhases = (
+				A10000000000000000000084 /* Sources */,
+				A10000000000000000000062 /* Frameworks */,
+				A10000000000000000000085 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A10000000000000000000054 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A10000000000000000000022 /* ArgusAuthProbeUITests */,
+			);
+			name = ArgusAuthProbeUITests;
+			productName = ArgusAuthProbeUITests;
+			productReference = A10000000000000000000013 /* ArgusAuthProbeUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -130,6 +169,10 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					A10000000000000000000051 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = A10000000000000000000050;
+					};
+					A10000000000000000000053 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = A10000000000000000000050;
 					};
@@ -154,6 +197,7 @@
 			targets = (
 				A10000000000000000000050 /* ArgusAuthProbeApp */,
 				A10000000000000000000051 /* ArgusAuthProbeAppTests */,
+				A10000000000000000000053 /* ArgusAuthProbeUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -167,6 +211,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A10000000000000000000083 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A10000000000000000000085 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -190,6 +241,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A10000000000000000000084 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -197,6 +255,11 @@
 			isa = PBXTargetDependency;
 			target = A10000000000000000000050 /* ArgusAuthProbeApp */;
 			targetProxy = A10000000000000000000002 /* PBXContainerItemProxy */;
+		};
+		A10000000000000000000054 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000050 /* ArgusAuthProbeApp */;
+			targetProxy = A10000000000000000000003 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -290,6 +353,32 @@
 			};
 			name = Release;
 		};
+		A100000000000000000000A6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "local.argus.native-auth-proof.uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = ArgusAuthProbeApp;
+			};
+			name = Debug;
+		};
+		A100000000000000000000A7 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "local.argus.native-auth-proof.uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = ArgusAuthProbeApp;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -316,6 +405,15 @@
 			buildConfigurations = (
 				A100000000000000000000A4 /* Debug */,
 				A100000000000000000000A5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000000093 /* Build configuration list for PBXNativeTarget "ArgusAuthProbeUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A100000000000000000000A6 /* Debug */,
+				A100000000000000000000A7 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

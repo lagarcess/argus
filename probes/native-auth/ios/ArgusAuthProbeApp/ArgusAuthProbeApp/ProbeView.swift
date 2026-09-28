@@ -28,7 +28,7 @@ struct ProbeView: View {
         .sheet(isPresented: Binding(get: { model.turnstilePage != nil }, set: { if !$0 { model.cancelTurnstile() } })) {
             if let page = model.turnstilePage {
                 NavigationStack {
-                    TurnstileWebView(page: page) { event, token, detail in
+                    TurnstileWebView(page: page, onInteractive: { model.log("turnstile.interactive", [:]) }) { event, token, detail in
                         Task { await model.turnstileEvent(event, token: token, detail: detail) }
                     }
                     .navigationTitle("Security check")

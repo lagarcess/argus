@@ -50,24 +50,34 @@ capture() {
 launch -autorun turnstile -sitekey 1x00000000000000000000AA; capture turnstile-test-pass 15
 launch -autorun turnstile -sitekey 2x00000000000000000000AB; capture turnstile-test-fail 15
 app_log() { echo "$(xcrun simctl get_app_container "$UDID" "$BUNDLE" data)/Documents/probe-log.json"; }
-# Waits until the app logs one more $1 step, after a person acts on the prompt $2.
-wait_for_step() {
-  local log before
-  log="$(app_log)"
-  count() { { grep -o "\"$1\"" "$log" || true; } | wc -l; }
-  before="$(count "$1")"
-  echo "Now: $2"
-  for _ in $(seq 1 90); do
-    if [ "$(count "$1")" -gt "$before" ]; then return; fi
+# Waits up to $2 seconds for the app log to mention $1.
+wait_for_log() {
+  for _ in $(seq 1 "$2"); do
+    if grep -q "\"$1\"" "$(app_log)" 2>/dev/null; then return; fi
     sleep 1
   done
-  echo "no $1 step after: $2" >&2; exit 1
+  echo "app never logged $1" >&2; exit 1
 }
 
-launch -autorun turnstile -sitekey 3x00000000000000000000FF; sleep 12
+# T3 and T4 run as a UI test, which taps Cancel without completing the
+# challenge, so no person is needed. Screenshots come from outside the test.
+UI_LOG="$NATIVE_AUTH_WORK/ui-test.log"
+rm -f "$(app_log)"
+(cd "$HERE/ArgusAuthProbeApp" && TEST_RUNNER_NATIVE_AUTH_ANON_KEY="$ANON_KEY" \
+  TEST_RUNNER_NATIVE_AUTH_SUPABASE_URL="$API_URL" \
+  TEST_RUNNER_NATIVE_AUTH_ARGUS_API="http://127.0.0.1:$NATIVE_AUTH_API_PORT" \
+  xcodebuild test -project ArgusAuthProbeApp.xcodeproj -scheme ArgusAuthProbeUITests \
+    -destination "id=$UDID" -derivedDataPath "$NATIVE_AUTH_WORK/DerivedData" \
+    -collect-test-diagnostics never > "$UI_LOG" 2>&1) &
+UI_TEST=$!
+wait_for_log turnstile.interactive 300
+sleep 3
 xcrun simctl io "$UDID" screenshot "$OUT/turnstile-test-interactive.png" > /dev/null 2>&1
-wait_for_step turnstile.cancelled "tap Cancel on the security check (do not complete the challenge)"
+wait_for_log turnstile.cancelled 60
 capture turnstile-cancelled 1
+if ! wait "$UI_TEST" || ! grep -q "Executed 1 test, with 0 failures" "$UI_LOG"; then
+  echo "cancel UI test failed; see $UI_LOG" >&2; exit 1
+fi
 
 EMAIL="$(cd "$HERE/../http_probe" && API_URL="$API_URL" ANON_KEY="$ANON_KEY" SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
   DB_URL="$DB_URL" MAILPIT_URL="$MAILPIT_URL" NATIVE_AUTH_ARGUS_API=unused \
