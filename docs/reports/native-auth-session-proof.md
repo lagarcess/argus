@@ -79,13 +79,25 @@ Probes and reproduction steps are in
 
 **Current acceptance** is only what the evidence gate verifies at the head it
 is run against. `probes/native-auth/expectations.json` declares every check
-each suite must produce and the only documented failures, A14 and I11.
-`probes/native-auth/evidence_gate.py` fails on a missing, repeated, or
-undeclared check, any other failure, a documented failure that now passes, an
-iOS run whose xcodebuild counts disagree, an app log that departs from the
-declared steps, or a capture from a dirty tree or from runtime code that
-changed after the capture. Every runner exits with the gate's verdict. To
-re-verify:
+each suite must produce and the only expected failures. I11 is an SDK logging
+finding and is always expected. A14 depends on the API tested: it is expected
+to fail against an API without the PR #728 fix, which is this branch's API, and
+must pass against one with it (`http-session-fixed-api.json`, run against the
+#728 head). The gate reads the tested API's source to decide, so when this
+branch absorbs #728 from integration, A14 must pass here as well.
+`probes/native-auth/evidence_gate.py` fails on:
+
+- any undeclared, missing, or mistyped field in an evidence document (every
+  document kind has a declared schema);
+- a missing, repeated, or undeclared check, any unexpected failure, or an
+  expected failure that now passes;
+- an iOS run whose xcodebuild counts disagree;
+- an app log step that is neither declared nor the declared incidental
+  `launch`;
+- an API version it cannot determine;
+- a capture from a dirty tree or from runtime code that changed after it.
+
+Every runner exits with the gate's verdict. To re-verify:
 
 ```bash
 python3 probes/native-auth/evidence_gate.py docs/reports/evidence/native-auth-session-proof
@@ -292,7 +304,7 @@ finding F1. Per-check expected and observed values are in the evidence JSON.
 
 | # | Finding | Evidence | Severity | Where it goes |
 | --- | --- | --- | --- | --- |
-| F1 | Argus's shared server-side `supabase-py` auth client (`SupabaseGateway.auth_client`, created with default `ClientOptions`) stores the last session it signed in and refreshes it on a timer 10 s before expiry. A session left alone after Argus sign-in had 3 refresh tokens, 2 revoked, 55 s later with no client activity. The client's own refresh then failed with `refresh_token_already_used`. It also means the API process holds a user's live tokens in memory | A14; `supabase_auth/_sync/gotrue_client.py` `_save_session`; `src/argus/domain/supabase_gateway.py` `from_env` | High. Intermittent sign-outs for web and native. The timer fires once per access-token lifetime (hosted value not inspected; 3600 s is the repository default), for the most recent sign-in on each API process, so it bites idle workers and apps that sleep through two lifetimes | P1, assignment N1 |
+| F1 | Fixed by PR #728; this branch's API does not contain it (A14 fails here and passes in `http-session-fixed-api.json`). Argus's shared server-side `supabase-py` auth client (`SupabaseGateway.auth_client`, created with default `ClientOptions`) stores the last session it signed in and refreshes it on a timer 10 s before expiry. A session left alone after Argus sign-in had 3 refresh tokens, 2 revoked, 55 s later with no client activity. The client's own refresh then failed with `refresh_token_already_used`. It also means the API process holds a user's live tokens in memory | A14; `supabase_auth/_sync/gotrue_client.py` `_save_session`; `src/argus/domain/supabase_gateway.py` `from_env` | High. Intermittent sign-outs for web and native. The timer fires once per access-token lifetime (hosted value not inspected; 3600 s is the repository default), for the most recent sign-in on each API process, so it bites idle workers and apps that sleep through two lifetimes | P1, assignment N1 |
 | F2 | A platform-default cookie store captures `sb-auth-token` from `/auth/login`, and a later request without a bearer is authenticated as that user | A11. The first build of this lane's own probe harness and its synthetic adapter both hit this (fixed; S7 pins it) | High for any native client that keeps default cookie handling | Contract §3.1 |
 | F3 | Wrong-account sign-in during guest conversion returns 403 with the new session only in `Set-Cookie`. A bearer client gets no tokens for a live session | C7 | Medium. Orphaned session the user cannot see or revoke | P3 |
 | F4 | A bearer-only client cannot convert a guest against unchanged Argus | C3 | Medium. Temporary conversation lost | Contract §3.4, P2 |

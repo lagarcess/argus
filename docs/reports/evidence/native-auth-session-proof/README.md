@@ -19,16 +19,21 @@ runtime code that changed after the capture. Re-verify at any later head:
 python3 probes/native-auth/evidence_gate.py docs/reports/evidence/native-auth-session-proof
 ```
 
-Documented failures, and only these, are expected:
+Only these failures are expected:
 
-- **A14.** The API's shared Supabase Auth client refreshes sessions it
-  returned. PR #728 fixes it; this branch does not contain that fix.
-- **I11.** supabase-swift logs tokens when given a logger, and a `Session`
-  description contains them.
+- **A14, against an API without the #728 fix.** The API's shared Supabase Auth
+  client refreshes sessions it returned. This branch's API lacks the fix, so
+  A14 fails in `http-session.json`. `http-session-fixed-api.json` runs the same
+  suite against the #728 head, where A14 must pass. The gate decides from each
+  file's `argus_api_head`.
+- **I11, always.** supabase-swift logs tokens when given a logger, and a
+  `Session` description contains them. This is an SDK finding, separate from
+  A14.
 
 | File | Client | Level | Checks |
 | --- | --- | --- | --- |
-| `http-session.json` | Python HTTP probe, not native | 3 | A1 to A14 |
+| `http-session.json` | Python HTTP probe, not native, against this branch's API | 3 | A1 to A14 |
+| `http-session-fixed-api.json` | The same suite against the API at the #728 head | 3 | A1 to A14 |
 | `http-guest.json` | Python HTTP probe | 3 | C1 to C10 |
 | `http-callbacks.json` | Python HTTP probe | 3 | D1 to D7 |
 | `http-captcha-turnstile-*.json` | Python HTTP probe, Cloudflare test secrets | 3 | B1 to B4 |

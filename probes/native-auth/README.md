@@ -38,7 +38,10 @@ unchanged Argus API.
 
 Every runner exits with the verdict of `evidence_gate.py`, not with the raw
 tool status. The gate compares each evidence file with `expectations.json` and
-fails on a missing, repeated, or undeclared check, on any unexpected failure,
+fails on any undeclared, missing, or mistyped field in any evidence document
+(every document kind has a declared schema), on an app log step that is
+neither declared nor a declared incidental step (`launch`), on a missing,
+repeated, or undeclared check, on any unexpected failure,
 on an expected failure that now passes, on an iOS run whose xcodebuild counts
 disagree, on an app log that departs from the declared steps, on an API
 version it cannot determine, and on a capture taken from a dirty tree or from
