@@ -28,7 +28,8 @@ final class FoundationUITests: XCTestCase {
             if destination == "plan" {
                 for section in ["overview", "goals", "budgets", "debts"] {
                     let button = app.buttons["plan.\(section)"]
-                    XCTAssertGreaterThanOrEqual(button.frame.width, 44)
+                    // Accessibility frames cross pixel/point conversions.
+                    XCTAssertGreaterThanOrEqual(button.frame.width + 0.000_001, 44)
                     XCTAssertGreaterThanOrEqual(button.frame.height, 44)
                 }
             }
@@ -47,6 +48,19 @@ final class FoundationUITests: XCTestCase {
             app.buttons["sheet.close"].tap()
             XCTAssertTrue(app.buttons["tab.argus"].isSelected)
         }
+    }
+
+    func testDarkNavigation() {
+        openPreferences()
+        app.buttons["appearance.dark"].tap()
+        app.buttons["sheet.close"].tap()
+        for destination in destinations {
+            app.buttons["tab.\(destination)"].tap()
+            XCTAssertTrue(app.buttons["tab.\(destination)"].isSelected)
+            capture("dark-\(destination)")
+        }
+        openPreferences()
+        app.buttons["appearance.system"].tap()
     }
 
     func testAppearancePersistsAcrossRelaunch() {
