@@ -207,8 +207,8 @@ The code check 1C-4 is agreed. Every chip must pass it, now and later.
 4. The chip audience carried on the chat request so `first_answer_shown`
    gets `chip_audience`.
 5. The manifest name and description.
-6. The `card_payoff` calculation (12th in the registry) with a pure Decimal
-   engine, one side per currency, the 25% comparison row, and the edge cases.
+6. The `card_payoff` calculation with a pure Decimal engine, one side per
+   currency, the 25% comparison row, and the edge cases.
 7. "Antes de impuestos" / "Before taxes" on every calculated result.
 8. Field-specific missing-input questions, asked one at a time for card
    payoff.
@@ -231,9 +231,9 @@ There is no Tools page and no Tools API in stage 1.
   UTC). The server accepts it only within one day of the server's UTC date;
   outside that window, or when absent, the server's UTC date is used. It is
   not stored and not sent to analytics.
-- `docs/ARCHITECTURE.md` registered-calculations table goes from 11 to 12
-  (the table arrives with docs PR #672; if it is not merged, 1C-2 adds the
-  row after it lands).
+- Register the new calculation in `get_calculation_declarations()` only.
+  `docs/ARCHITECTURE.md` already points at that runtime owner; do not add or
+  grow a hand-maintained registered-calculations table.
 - `.agent/designs/argus/DESIGN.md` navigation and landing sections;
   `docs/BREAKPOINTS.md` gains the 360 px check.
 

@@ -1,0 +1,32 @@
+{
+  "target": "disposable-local-argus-share-walk-7e84",
+  "production_access": false,
+  "constraints": [
+    {
+      "name": "public_excerpt_snapshots_kind_check",
+      "definition": "CHECK ((kind = ANY (ARRAY['backtest'::text, 'research_answer'::text, 'calculation'::text, 'answer'::text, 'mixed'::text])))"
+    },
+    {
+      "name": "route_receipts_tier_check",
+      "definition": "CHECK ((tier = ANY (ARRAY['utility'::text, 'chat'::text, 'structured'::text, 'context'::text, 'readout'::text])))"
+    }
+  ],
+  "functions": [
+    {
+      "signature": "claim_research_usage(text,text,text,integer,integer)",
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true,
+      "definition_sha256": "b50767bbd0f32e50731b4b1f605dbe1a2a9006455f60ed09b85e260e82a310a6"
+    },
+    {
+      "signature": "release_research_usage(text,text,text,timestamp with time zone)",
+      "security_definer": true,
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_role_execute": true,
+      "definition_sha256": "51d9efd402a3a894f992391202c53949c77bdb9240331aac6b9e950428fb60b4"
+    }
+  ]
+}

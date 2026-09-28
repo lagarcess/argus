@@ -1,0 +1,62 @@
+{
+  "recorded_at": "2026-09-17T23:43:30.090455+00:00",
+  "decision": "waiting_for_founder_staging_disposition",
+  "reviewed_candidate_sha": "2523e3a3dcb64fc713d978cc0e503904373de307",
+  "measured_candidate_sha": "3cecda6933399e53f6ea00edc8004a88d7eefad4",
+  "original_integration_base": "cfc1988dd80ca1a8007b8f336c107700dd57e009",
+  "current_integration_sha": "cfc1988dd80ca1a8007b8f336c107700dd57e009",
+  "main_sha": "3d189204c6a685b7f3bb1818b38e34a33d1f10de",
+  "reconciliation_merge_sha": null,
+  "overlap": "integration did not advance; candidate contains the full pinned cut",
+  "ci": {
+    "status": "success",
+    "head_sha": "2523e3a3dcb64fc713d978cc0e503904373de307",
+    "url": "https://github.com/lagarcess/argus/actions/runs/35287311691",
+    "jobs": [
+      "ownership-gate",
+      "backend-checks",
+      "frontend-checks",
+      "guest-release-gates",
+      "ci"
+    ],
+    "draft_pr_event": "skipped; real push jobs all passed"
+  },
+  "review": {
+    "status": "clean",
+    "head_sha": "2523e3a3dcb64fc713d978cc0e503904373de307",
+    "url": "https://github.com/lagarcess/argus/pull/655#issuecomment-5722695333",
+    "unresolved_threads": 0,
+    "addressed_finding": "candidate and measured SHA distinction"
+  },
+  "founder_accepted_typed_failures": [
+    "compound_benchmark_start_date_preserves_confirmation_issue_339",
+    "dca_capital_semantics_only_have_amount_is_ceiling_issue_455"
+  ],
+  "supabase_preview": {
+    "project_ref": "pqpgepkpzvliyutbcwjk",
+    "with_data": false,
+    "status": "ACTIVE_HEALTHY",
+    "creation": "automatic PR integration",
+    "migration_versions": [
+      "20260912190000",
+      "20260913213100",
+      "20260913230000",
+      "20260914120000"
+    ],
+    "readback": "version/name readback only; not production gate clearance"
+  },
+  "production": {
+    "backup_taken": false,
+    "migrations_applied": 0,
+    "main_promoted": false,
+    "services_deployed": false,
+    "shared_link_walk_performed": false
+  },
+  "cleanup": {
+    "dotenv_link_restored": true,
+    "temporary_eval_worktrees_removed": true,
+    "disposable_local_supabase_stopped": true,
+    "git_stash_used": false,
+    "pr_managed_supabase_preview_retained": true
+  }
+}
