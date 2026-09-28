@@ -48,6 +48,7 @@ from tests.financial_recording.derive import (
 )
 from tests.financial_recording.money import InvalidInput, exponent, parse_minor
 from tests.financial_recording.review import (
+    TRIAL_ID,
     Issue,
     ReviewRequired,
     blocking,
@@ -106,6 +107,7 @@ class Preview:
     basis: Mapping[str, int]
     effects: Mapping[str, int]
     issues: tuple[Issue, ...]
+    check: Optional[Mapping[str, Optional[int]]] = None
 
 
 @dataclass(frozen=True)
@@ -383,6 +385,25 @@ class Store:
         draft = self.state.drafts[draft_id]
         body, found = review(self.state, draft, self.tz, now=self.clock())
         touched = sorted(accounts_of(body)) if body is not None else []
+        effects: Mapping[str, int] = {}
+        check = None
+        if isinstance(body, Activity):
+            effects = legs(body)
+        elif isinstance(body, Observation):
+            trial = with_trial(self.book, body, None, self.tz, draft.provenance)
+            gap = next(
+                item
+                for item in observation_gaps(trial, body.account_id, self.tz)
+                if item.record_id == TRIAL_ID
+            )
+            prior = None if gap.remaining is None else body.amount - gap.remaining
+            check = {
+                "prior": prior,
+                "observed": body.amount,
+                "difference": gap.remaining,
+            }
+            if gap.remaining is not None:
+                effects = {body.account_id: gap.remaining}
         return Preview(
             draft_id=draft.id,
             draft_revision=draft.revision,
@@ -391,8 +412,9 @@ class Store:
                 for account_id in touched
                 if account_id in self.book.accounts
             },
-            effects=legs(body) if isinstance(body, Activity) else {},
+            effects=effects,
             issues=found,
+            check=check,
         )
 
     def confirm(self, preview: Preview, idempotency_key: str) -> Record:

@@ -572,10 +572,17 @@ def forecast(book: Book, scope: Iterable[str]) -> dict[str, int]:
     return dict(sorted(totals.items()))
 
 
+def _digests(record: Record) -> set[str]:
+    found = set()
+    for provenance in (record.revisions[0].provenance, *record.linked):
+        digest = (provenance.source_ref or {}).get("digest")
+        if digest is not None:
+            found.add(digest)
+    return found
+
+
 def _same_source(first: Record, second: Record) -> bool:
-    digest = (first.revisions[0].provenance.source_ref or {}).get("digest")
-    other = (second.revisions[0].provenance.source_ref or {}).get("digest")
-    return digest is not None and digest == other
+    return bool(_digests(first) & _digests(second))
 
 
 def _on_or_before(activity: Activity, at: datetime, tz: ZoneInfo) -> bool:

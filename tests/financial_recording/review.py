@@ -166,10 +166,13 @@ def validate(
         and is_future_anchor(body.as_of, now)
     ):
         found.append(issue("date_in_future"))
-    if isinstance(body, Observation) and body.basis == "value_estimate":
-        account = book.accounts[body.account_id]
-        if account.type not in ESTIMATED_TYPES:
-            found.append(issue("basis_not_applicable", account.type))
+    if isinstance(body, Observation):
+        if body.basis not in GAP_LABEL:
+            found.append(issue("choice_invalid", body.basis))
+        elif body.basis == "value_estimate":
+            account = book.accounts[body.account_id]
+            if account.type not in ESTIMATED_TYPES:
+                found.append(issue("basis_not_applicable", account.type))
     if isinstance(body, Activity):
         if body.occurred_at is not None:
             local_day = body.occurred_at.astimezone(tz).date()

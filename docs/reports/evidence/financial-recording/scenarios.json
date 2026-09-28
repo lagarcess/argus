@@ -368,6 +368,20 @@
       "check_to_other_account": "InvalidInput:anchor_account_immutable",
       "own_answer_flip": "ok"
     },
+    "balance_check_preview_exposes_effect": {
+      "preview_check": {
+        "difference": -5000,
+        "observed": 85000,
+        "prior": 90000
+      },
+      "preview_effects": {
+        "acct-1": -5000
+      },
+      "stamped": [
+        90000,
+        -5000
+      ]
+    },
     "contradicting_answers_stop_for_review": {
       "after_correcting_the_answer": "ok",
       "anchor_answers": "InvalidInput:answers_not_applicable",
@@ -384,6 +398,16 @@
         [
           0,
           20000,
+          "unexplained"
+        ]
+      ]
+    },
+    "corrected_observation_basis_is_canonical": {
+      "bogus_basis": "ReviewRequired:choice_invalid",
+      "gaps_still_readable": [
+        [
+          0,
+          0,
           "unexplained"
         ]
       ]
@@ -440,6 +464,10 @@
       "after_check": -220000,
       "opening_after_correction": -250000,
       "still_owed": true
+    },
+    "linked_digest_places_restored_activity": {
+      "balance": 1000000,
+      "restore": "ok"
     },
     "linked_duplicate_keeps_import_account": {
       "linked_import_account": true,

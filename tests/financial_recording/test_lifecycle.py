@@ -288,4 +288,21 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "issues": {"category_other_space": BLOCKING},
             "confirm": "ReviewRequired:category_other_space",
         },
+        "corrected_observation_basis_is_canonical": {
+            "bogus_basis": "ReviewRequired:choice_invalid",
+            "gaps_still_readable": [[0, 0, "unexplained"]],
+        },
+        "linked_digest_places_restored_activity": {
+            "restore": "ok",
+            "balance": 1_000_000,
+        },
+        "balance_check_preview_exposes_effect": {
+            "preview_check": {
+                "prior": 90_000,
+                "observed": 85_000,
+                "difference": -5_000,
+            },
+            "preview_effects": {"acct-1": -5_000},
+            "stamped": [90_000, -5_000],
+        },
     }

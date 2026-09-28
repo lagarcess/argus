@@ -6,6 +6,7 @@ share the driver in scenes.py and feed the same evidence file as scenarios.py.
 
 from tests.financial_recording.derive import (
     DEFAULT_TZ,
+    Provenance,
     anchors,
     balance,
     expectation_status,
@@ -262,6 +263,9 @@ def edits_that_move_money_need_review() -> dict:
         "first_observation_keeps_recorded_difference": _first_obs_keeps_difference(),
         "cross_space_transfer_stays_unresolved": _cross_space_transfer(),
         "refund_inherits_category_space": _refund_inherits_category_space(),
+        "corrected_observation_basis_is_canonical": _corrected_basis_canonical(),
+        "linked_digest_places_restored_activity": _linked_digest_placement(),
+        "balance_check_preview_exposes_effect": _check_preview_effect(),
     }
 
 
@@ -639,6 +643,62 @@ def _refund_inherits_category_space() -> dict:
     return {
         "issues": scene.issues(draft),
         "confirm": outcome(lambda: scene.confirm(draft)),
+    }
+
+
+def _corrected_basis_canonical() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    obs = scene.observe(cash, "1000.00", 5)
+    refused = outcome(lambda: scene.store.correct(obs.id, 1, "typo", basis="bogus"))
+    return {"bogus_basis": refused, "gaps_still_readable": scene.gaps(cash)}
+
+
+def _linked_digest_placement() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "10000.00")
+    record = scene.record("expense", cash, "500.00", 4)
+    twin = scene.store.draft(
+        {
+            "kind": "expense",
+            "account_id": cash.id,
+            "amount": "500.00",
+            "occurred_on": local(4).date().isoformat(),
+        },
+        Provenance("document", local(5), {"digest": "stmt-digest", "row": "1"}),
+    )
+    scene.store.resolve(twin.id, duplicate_of=record.id, expected_revision=twin.revision)
+    scene.store.remove(record.id, 1, "wrong")
+    scene.now = local(5, 18)
+    check = scene.store.draft(
+        {
+            "kind": "balance_observation",
+            "account_id": cash.id,
+            "amount": "10000.00",
+            "as_of": local(5, 18).isoformat(),
+            "basis": "statement",
+        },
+        Provenance("document", local(5), {"digest": "stmt-digest", "row": "bal"}),
+    )
+    scene.store.confirm(scene.store.preview(check.id), "stmt-check")
+    return {
+        "restore": outcome(lambda: scene.store.restore(record.id, 2, "back")),
+        "balance": scene.amount(cash),
+    }
+
+
+def _check_preview_effect() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    scene.record("expense", cash, "100.00", 3)
+    draft = scene.observation(cash, "850.00", 5)
+    preview = scene.store.preview(draft.id)
+    confirmed = scene.confirm(draft)
+    stamped = confirmed.revisions[-1]
+    return {
+        "preview_check": dict(preview.check or {}),
+        "preview_effects": dict(preview.effects),
+        "stamped": [stamped.confirmed_expected, stamped.confirmed_difference],
     }
 
 
