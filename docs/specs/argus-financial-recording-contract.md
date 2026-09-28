@@ -354,10 +354,10 @@ PR #727's reconciliation contract also names a "recovery destination" as a found
 
 **Dependencies to bind in the assignment, before code.**
 
-1. **Guest policy (G1).** Still open in the authority docs. Intended direction is registered accounts for ecosystem features, with existing guest chat and quotas unchanged and guests seeing no accounts surface. The assignment either waits for those authorities to close G1 or builds that registered-only path behind a default-off flag; do not invent guest financial-record persistence. The flag's release criteria must name the authority close.
+1. **Guest policy (G1).** Still open in the authority docs. Intended direction is registered accounts for ecosystem features, with existing guest chat and quotas unchanged and guests seeing no accounts surface. The assignment waits for those authorities to close G1. It does not build the registered-only path before that close. Guests are authenticated Supabase users (`PRODUCT.md`), so hiding Accounts in the client and owner RLS via `auth.uid()` alone are not enforceable; a guest can still call the API. The assignment also waits on a real server/database anonymous (or guest) rejection with an acceptance test. Do not invent guest financial-record persistence.
 2. **API and data ownership.** Amend API_CONTRACT and DATA_MODEL first (Never-Violate 1). Audit SQL and RLS against `postgres-best-practices` (Never-Violate 10).
 3. **Opening-date correction behavior.** Adopt section 7. With no activity yet, a date correction reorders nothing, but the revision and reason are still stored.
-4. **A database acceptance gate.** Postgres tests for confirm-or-replay, version checks and owner-only RLS, in the `tests/test_*_postgres.py` family CI already gates.
+4. **A database acceptance gate.** Postgres tests for confirm-or-replay, version checks, owner-only RLS, and the anonymous (or guest) rejection required by dependency 1, in the `tests/test_*_postgres.py` family CI already gates.
 
 **Owned contracts and production owners.**
 
@@ -368,7 +368,7 @@ PR #727's reconciliation contract also names a "recovery destination" as a found
 | Opening anchor, revisions, balance derivation | `src/argus/domain/recording/records.py` |
 | Persistence | One migration: `financial_accounts` (with `space_id` defaulting to Personal, `archived`, `ownership_share_bps`, `version`) and `financial_records` with `financial_record_revisions`, plus one create-or-replay SQL function. Owner-only RLS on `auth.uid()`. No household columns. |
 | HTTP | `src/argus/api/routers/financial_accounts.py`: create with `Idempotency-Key`, read, edit with `expected_version`, and correct the opening with `expected_revision`. OpenAPI regenerated. |
-| Client | Per the ARCHITECTURE platform decision. A surface ships only behind the flag above. |
+| Client | Per the ARCHITECTURE platform decision. No Accounts surface ships until dependency 1 is bound: authority-closed G1 and a real server/database anonymous (or guest) rejection with its acceptance test. |
 
 **Acceptance.** Run `clavito_large_opening`, `blank_opening_unknown`, `first_slice_create_reopen_edit` (including its opening-date edit with no activity), `multiple_precisions` and the create part of `duplicate_submission` through a production driver, using the literal outcomes already committed. Add the Postgres gate above. A double-submitted create makes one account. A stale edit returns 409 and changes nothing. An unknown balance never reads as RD$0. An archived account stays in totals.
 
