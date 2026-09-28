@@ -3,11 +3,19 @@
 Status: Integration staging/process context with a historical product ledger.
 Use [documentation authority](../DOCUMENTATION_AUTHORITY.md) for approved
 experience and assigned-work ownership. Check current PRs and release evidence
-for landing/deployment status; the ledger below stops at August 2, 2026.
+for landing/deployment status. The historical ledger below stops at August 2,
+2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-08-02 (header pointer added 2026-09-12)
+Last reconciled: 2026-09-28 (PR #721 landing register; historical ledger still
+through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
+
+## Later bounded landings
+
+- September 28, 2026: [PR #721 integration landing](../reports/2026-09-28-pr-721-integration-landing.md), merged as `3b9313f3dcf80e3ff9eddfcce8818a829a081225`. Two OpenRouter DEBUG catchers log error class and origin instead of exception text. Issue #710 proposed for separate closure. No deployment or main promotion.
+
+## Historical product ledger through August 2, 2026
 
 Latest product change: PR #366 at `2b023576`, which makes grounded
 discovery's failures as honest as its successes — typed routing for current
