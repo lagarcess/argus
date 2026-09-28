@@ -22,7 +22,7 @@ One documentation-only pull request to `codex/private-alpha-next` that adds a co
 
 1. **Records.** Accounts, transactions, balance snapshots, balance checks, import batches, and source documents. For each one, give its fields, identity, owner, and intended row-level security.
 2. **Money.** An amount type in integer minor units or `Decimal`, per-currency fraction digits for DOP and USD, parsing of `RD$`, `US$`, and `1.234,56`, and the rule that an unqualified amount is never read as dollars or pesos.
-3. **Observation identity.** Strong identity from an institution id. Derived identity with an occurrence index when no id exists. Overlapping files, pending holds, reversals, source revisions, and rows a source stops reporting.
+3. **Observation identity.** Strong identity from an institution id. Derived identity when no id exists, where a row keeps the identity of the stored observation it matches exactly and a copy that cannot be told apart is reported as ambiguous. Overlapping files, pending holds, reversals, source revisions, and rows a source stops reporting.
 4. **Review.** Batch confirmation with exceptions first, the list of blocking and informational issues, matching against manual and chat records, and transfer pairing with and without a bank reference.
 5. **Provenance and dates.** Source kinds for entered, extracted, connected, and calculated facts. Activity date, statement date, and capture or refresh time.
 6. **Field ownership.** Which fields a source may revise and which fields become owner-owned after an edit.
@@ -30,11 +30,11 @@ One documentation-only pull request to `codex/private-alpha-next` that adds a co
 8. **Privacy.** Record content stays out of logs, analytics, the shared research cache, sharing snapshots, and model prompts until a separate decision says otherwise. Name the test or lint that enforces each rule.
 9. **Connections, reserved.** The connection states, consent record, vault handle, and refresh health from the experiment, marked as reserved for a later lane and not built now.
 10. **Decision 8.** A proposed reconciliation of archived decision 8 with MVEE section 4, marked for founder approval. Do not settle it silently.
-11. **Acceptance tests.** One behavior test per case in the experiment's 26 checks, stated so an implementation lane can write them first.
+11. **Acceptance tests.** One behavior test per check in the experiment's committed report, stated so an implementation lane can write them first.
 
 ## Acceptance criteria
 
-- Every one of the experiment's 22 cases maps to a contract rule and an acceptance test.
+- Every check in the experiment's committed report maps to a contract rule and an acceptance test.
 - Every item in the integration map's unresolved contracts has a proposed rule or a named open question for the founder.
 - The contract changes no runtime code, schema, migration, prompt, model-facing text, analytics event, or dependency.
 - The contract proposes, and does not apply, any change to `docs/API_CONTRACT.md` or `docs/DATA_MODEL.md`.

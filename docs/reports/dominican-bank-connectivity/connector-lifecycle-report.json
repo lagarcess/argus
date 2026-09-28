@@ -437,6 +437,87 @@
         }
       },
       "passed": true
+    },
+    {
+      "case": "chosen_account_must_be_eligible",
+      "claim": "A source account is mapped only to an account the connection's owner holds in the same currency. Another person's account or an unknown one becomes an owner decision",
+      "observed": {
+        "mapping": {},
+        "outcome": {
+          "applied": true,
+          "discarded_unconsented": 1,
+          "missing": 0,
+          "new_proposals": 0,
+          "new_source_accounts": 0,
+          "revisions": 0,
+          "seen": 0,
+          "state": "active"
+        },
+        "owner_decisions": [
+          [
+            "src-chk",
+            true
+          ],
+          [
+            "src-sav",
+            true
+          ]
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "owner_decisions_per_connection",
+      "claim": "Two connections that each report a new source account with the same id each ask their own owner",
+      "observed": {
+        "owner_decisions": [
+          [
+            "conn-0001",
+            "checking"
+          ],
+          [
+            "conn-0002",
+            "checking"
+          ]
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "pending_row_posts_in_place",
+      "claim": "A held row that posts under the same institution id takes every source value from the latest observation, including its posted status and reference, and becomes confirmable",
+      "observed": {
+        "amount": "118.40",
+        "held": {
+          "prop-0002": [
+            "pending"
+          ]
+        },
+        "posted": [
+          "prop-0002"
+        ],
+        "reference": "R-2"
+      },
+      "passed": true
+    },
+    {
+      "case": "derived_identity_stable",
+      "claim": "Rows without an institution id keep their identity when a later window drops or reorders them. The row that left is the one flagged, and a dropped copy of an identical row is flagged as ambiguous",
+      "observed": {
+        "confirmed": 4,
+        "flagged": [
+          [
+            "identical_row_no_longer_reported",
+            "-"
+          ],
+          [
+            "source_no_longer_reports",
+            "REF-A"
+          ]
+        ],
+        "revisions": 0
+      },
+      "passed": true
     }
   ],
   "failed": [],
@@ -484,7 +565,7 @@
       "rows_in_export": 52
     }
   ],
-  "passed": 26,
+  "passed": 30,
   "review_workload": [
     {
       "actions_if_clean_rows_were_auto_accepted": 3,

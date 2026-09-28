@@ -16,7 +16,7 @@ poetry run python docs/reports/dominican-bank-connectivity/connector_lifecycle.p
 cmp temp/connector-lifecycle-report.json docs/reports/dominican-bank-connectivity/connector-lifecycle-report.json
 ```
 
-The script prints `26/26 checks passed` and exits with code 0. It exits with code 1 and names each failed case otherwise. The report is deterministic. Two runs on the inspected base produced identical bytes. A Faker or Python version change can change incidental merchant names in the workload section, so regenerate and inspect before treating a byte difference as a regression.
+The script prints how many of its checks passed and exits with code 0 when every check passes. It exits with code 1 and names each failed case otherwise. The report is deterministic. Two runs on the inspected base produced identical bytes. A Faker or Python version change can change incidental merchant names in the workload section, so regenerate and inspect before treating a byte difference as a regression.
 
 The run used Python 3.10.20 and Faker 30.10.0, which match `poetry.lock`. The kit's own 46 checks passed in the same environment before the experiment reused them.
 
@@ -36,7 +36,7 @@ The retrieval method is the only replaceable part. Everything after it belongs t
 | --- | --- | --- | --- |
 | Connection | Owner, method, consent scope, declined accounts, state, vault handle, coverage, last attempt, last success | Argus connection id | The owner only |
 | Source account | Institution account id, display name, currency, mapped Argus account | Connection plus source account id. A display name is never identity. | The source renames it. The owner maps or declines it. |
-| Observation | One transaction as the source reported it, including pending status and references | Institution transaction id when present, otherwise a derived fingerprint with an occurrence index | The source, on each refresh |
+| Observation | One transaction as the source reported it, including pending status and references | Institution transaction id when present, otherwise a derived fingerprint, matched to a stored observation before a new occurrence index is assigned | The source, on each refresh |
 | Balance snapshot | Amount, currency, and the source's own as-of time | Connection, account, as-of time | Append only |
 | Proposal | The kit's eight fields plus counterpart, keys, notes, and issues | Argus proposal id | The owner resolves, links, or confirms it |
 | Record | Confirmed fields, provenance list, owner-edited field names, revision history, flags | Argus record id | The owner. A source revision needs the owner's acceptance. |
@@ -63,7 +63,7 @@ stateDiagram-v2
 
 ## Results
 
-All 26 checks passed. Each row names the assignment's failure case and the behavior the script asserts.
+Every check passed. Each row names the assignment's failure case and the behavior the script asserts.
 
 | Check | Assignment case | Asserted behavior |
 | --- | --- | --- |
@@ -93,6 +93,10 @@ All 26 checks passed. Each row names the assignment's failure case and the behav
 | `stale_revision_superseded` | Revised transactions | Three source changes before review leave one pending revision, built from the latest observation. Accepting it gives DOP 60.00 with the newer description. Accepting a superseded revision is refused, so a stale value cannot return. |
 | `currency_mismatch_held` | Multiple accounts and currencies | A USD source account chosen for a DOP account is not mapped and becomes an owner decision. A USD balance reported for a DOP account is not stored. A USD row on a DOP account waits with `currency_mismatch`. The DOP row and balance proceed. |
 | `provider_input_boundary` | Source failure without erasing data | Every field of a provider batch is checked in one place before anything is written, covering the attempt time, the failure code, source accounts, balances, transactions, and coverage dates. Each of 14 malformed fields rejects the whole batch by name and writes only the connection's error state and one event. A baseline batch, and one with a negative balance, a zero balance, an empty description, and no institution id, still apply. |
+| `chosen_account_must_be_eligible` | Initial connection and account selection | A source account maps only to an account its owner holds in the same currency. A choice naming another person's account or an unknown one becomes an owner decision, and no row or balance lands on it. |
+| `owner_decisions_per_connection` | Stable account identity | Two connections that each report a new source account with the same id each ask their own owner. |
+| `pending_row_posts_in_place` | Pending becoming posted | A held row that posts under the same institution id takes every source value from the latest observation, including its posted status and reference, and becomes confirmable. |
+| `derived_identity_stable` | Missing institution transaction ids | Rows without an institution id keep their identity when a later window drops or reorders them. The row that left is flagged, and a dropped copy of an identical row is flagged as ambiguous instead of guessed. |
 
 ## Review workload for recurring sync
 
@@ -136,7 +140,7 @@ The script makes each choice below so that it can run. None of these choices is 
 1. **Pending holds.** The script shows pending holds and never lets the owner confirm them. Whether a hold reduces "what remains until your next income" is a product decision.
 2. **Credit meaning.** Bank feeds report direction, not meaning. The script blocks unclassified credits. A saved classification rule or a model suggestion would reduce the 3 actions, but either one is a policy decision.
 3. **Transfer pairing.** The script pairs automatically only with a shared bank reference. It holds amount-and-date look-alikes for review. The threshold for inferred pairs is open.
-4. **Field ownership.** Source revisions change only source-owned fields and never overwrite owner edits. A newer source change replaces an unreviewed one. The split between source-owned and owner-owned fields needs a contract.
+4. **Field ownership.** Source revisions change only source-owned fields and never overwrite owner edits. A newer source change replaces an unreviewed one. Every source-owned value, including pending status and reference, comes from one derivation of the latest observation. The split between source-owned and owner-owned fields needs a contract.
 5. **Deletion scope.** Deleting imported data removes records whose only provenance is the connection, including owner corrections on those records, and every proposal the connection created. Records with manual or other provenance stay. Product and privacy owners must confirm that rule.
 6. **Batch rejection.** A connector refresh applies all rows or none. Every provider field is checked in one place before anything is written. A rejected batch writes only the connection's error state and one event, and not even its attempt time, which comes from the batch. The kit keeps row-level issues for file uploads. The right unit depends on the retrieval method and needs a stated rule.
 7. **Cross-currency transfers.** The script keeps two linked records in their own currencies and applies no rate. Any later conversion must show its rate, date, and source per MVEE section 2. A source account, balance, or row in another currency than the chosen Argus account waits for the owner. A card that carries both pesos and dollars needs a rule the script does not make.

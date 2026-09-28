@@ -8,6 +8,7 @@ import re
 import sys
 import tempfile
 import unicodedata
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta
@@ -137,6 +138,22 @@ def observation_key(connection_id: str, txn: Txn, occurrence: int) -> str:
         f"fp:{connection_id}:{txn.account}:{txn.booked}|{txn.direction}|{txn.amount}"
         f"|{txn.currency}|{occurrence}|{_norm(txn.description)}"
     )
+
+
+def _identity(store: Store, connection_id: str, txn: Txn, claimed: set[str]) -> str:
+    if txn.institution_id:
+        return observation_key(connection_id, txn, 0)
+    known, index = [], 0
+    while (key := observation_key(connection_id, txn, index)) in store.observations:
+        if key not in claimed:
+            known.append(key)
+        index += 1
+    exact = [key for key in known if store.observations[key]["txn"] == asdict(txn)]
+    if exact or known:
+        return (exact or known)[0]
+    while (key := observation_key(connection_id, txn, index)) in claimed:
+        index += 1
+    return key
 
 
 def _scope(key: str) -> tuple[str, str]:
@@ -394,9 +411,11 @@ def _apply(store: Store, connection: dict, result: Refresh) -> dict:
                     "name": account.name,
                     "currency": account.currency,
                 }
-            elif store.accounts[argus_id]["currency"] != account.currency:
+            elif argus_id not in _eligible_accounts(
+                store, connection["owner"], account.currency
+            ):
                 _ask_owner(
-                    store, connection, source_id, account.currency, "currency_mismatch"
+                    store, connection, source_id, account.currency, "account_not_eligible"
                 )
                 continue
             connection["account_map"][source_id] = argus_id
@@ -427,23 +446,12 @@ def _apply(store: Store, connection: dict, result: Refresh) -> dict:
                 "currency": balance.currency,
             }
         )
-    occurrences: dict[tuple, int] = {}
     seen: set[str] = set()
     for txn in result.txns:
         if txn.account not in mapped:
             summary["discarded_unconsented"] += 1
             continue
-        base = (
-            txn.account,
-            txn.booked,
-            txn.direction,
-            txn.amount,
-            txn.currency,
-            _norm(txn.description),
-        )
-        occurrence = occurrences.get(base, 0)
-        occurrences[base] = occurrence + 1
-        key = observation_key(connection["id"], txn, occurrence)
+        key = _identity(store, connection["id"], txn, seen)
         seen.add(key)
         known = store.observations.get(key)
         if known is None:
@@ -471,7 +479,8 @@ def _ask_owner(
     store: Store, connection: dict, source_id: str, currency: str, reason: str
 ) -> bool:
     if any(
-        link["source_id"] == source_id and link["currency"] == currency
+        (link["connection"], link["source_id"], link["currency"])
+        == (connection["id"], source_id, currency)
         for link in store.account_links
     ):
         return False
@@ -487,6 +496,14 @@ def _ask_owner(
     return True
 
 
+def _eligible_accounts(store: Store, owner: str, currency: str) -> set[str]:
+    return {
+        account_id
+        for account_id, account in store.accounts.items()
+        if account["owner"] == owner and account["currency"] == currency
+    }
+
+
 def _holder(store: Store, key: str) -> str | None:
     for record in store.records.values():
         if key in _record_keys(record):
@@ -497,31 +514,50 @@ def _holder(store: Store, key: str) -> str | None:
     return None
 
 
-def _propose(store: Store, connection: dict, key: str, txn: Txn) -> str:
-    fields = {
-        "source_id": key,
+def _reversed_holder(store: Store, connection: dict, txn: Txn) -> str | None:
+    if not txn.reverses_ref:
+        return None
+    return _holder(store, f"id:{connection['id']}:{txn.account}:{txn.reverses_ref}")
+
+
+def _source_state(store: Store, connection: dict, txn: Txn) -> dict:
+    if _reversed_holder(store, connection, txn):
+        kind = "refund"
+    else:
+        kind = "expense" if txn.direction == "debit" else ""
+    return {
         "date": txn.booked,
         "description": txn.description,
         "amount": txn.amount,
         "currency": txn.currency,
-        "kind": "expense" if txn.direction == "debit" else "",
+        "kind": kind,
         "account": connection["account_map"][txn.account],
-        "destination": "personal",
+        "direction": txn.direction,
+        "status": "pending" if txn.pending else "proposed",
+        "reference": txn.reference,
     }
+
+
+def _propose(store: Store, connection: dict, key: str, txn: Txn) -> str:
+    state = _source_state(store, connection, txn)
     proposal = {
         "id": store.new_id("prop"),
         "owner": connection["owner"],
         "connection": connection["id"],
         "keys": [key],
-        "direction": txn.direction,
-        "status": "pending" if txn.pending else "proposed",
-        "fields": fields,
+        "direction": state["direction"],
+        "status": state["status"],
+        "fields": {
+            "source_id": key,
+            **{name: state[name] for name in FIELDS if name in state},
+            "destination": "personal",
+        },
         "counterpart": None,
         "notes": [],
         "acknowledged": [],
         "cross_currency": [],
         "issues": [],
-        "reference": txn.reference,
+        "reference": state["reference"],
     }
     if txn.pending_ref:
         pending_key = f"id:{connection['id']}:{txn.account}:{txn.pending_ref}"
@@ -529,43 +565,32 @@ def _propose(store: Store, connection: dict, key: str, txn: Txn) -> str:
             if pending_key in other["keys"] and other["status"] == "pending":
                 other["status"] = "superseded"
                 proposal["notes"].append(f"replaces_pending:{other['id']}")
-    if txn.reverses_ref:
-        original = _holder(
-            store, f"id:{connection['id']}:{txn.account}:{txn.reverses_ref}"
-        )
-        if original:
-            fields["kind"] = "refund"
-            proposal["notes"].append(f"reverses:{original}")
+    original = _reversed_holder(store, connection, txn)
+    if original:
+        proposal["notes"].append(f"reverses:{original}")
     store.proposals[proposal["id"]] = proposal
     return proposal["id"]
 
 
 def _revise(store: Store, connection: dict, key: str, before: dict, txn: Txn) -> int:
-    changed = {
-        name: value
-        for name, source, value in (
-            ("date", "booked", txn.booked),
-            ("amount", "amount", txn.amount),
-            ("description", "description", txn.description),
-        )
-        if before[source] != value
-    }
+    previous = _source_state(store, connection, Txn(**before))
+    latest = _source_state(store, connection, txn)
+    delta = {name: value for name, value in latest.items() if previous[name] != value}
     holder = _holder(store, key)
     if holder in store.records:
         record = store.records[holder]
+        carried: dict = {}
         for other in store.proposals.values():
             if other["status"] == "revision" and other["record"] == holder:
+                carried.update(other["changes"])
                 other["status"] = "superseded"
                 other["issues"] = []
-        latest = {
-            "date": txn.booked,
-            "amount": txn.amount,
-            "description": txn.description,
-        }
         changes = {
             name: value
-            for name, value in latest.items()
-            if record["fields"][name] != value and name not in record["user_fields"]
+            for name, value in {**carried, **delta}.items()
+            if name in record["fields"]
+            and name not in record["user_fields"]
+            and record["fields"][name] != value
         }
         if not changes:
             return 0
@@ -589,8 +614,13 @@ def _revise(store: Store, connection: dict, key: str, before: dict, txn: Txn) ->
         }
         return 1
     if holder in store.proposals:
-        store.proposals[holder]["fields"].update(changed)
-        store.proposals[holder]["notes"].append("source_updated_before_review")
+        proposal = store.proposals[holder]
+        for name, value in delta.items():
+            if name in proposal["fields"]:
+                proposal["fields"][name] = value
+            elif name != "status" or proposal["status"] in ("pending", "proposed"):
+                proposal[name] = value
+        proposal["notes"].append("source_updated_before_review")
         return 1
     return 0
 
@@ -661,15 +691,23 @@ def _mark_missing(store: Store, connection: dict, coverage: tuple, seen: set) ->
             ):
                 store.proposals[holder]["status"] = "expired"
             continue
+        code = _missing_code(store, key, seen)
         if holder in store.records:
-            flag = f"source_no_longer_reports:{key}"
+            flag = f"{code}:{key}"
             if flag not in store.records[holder]["flags"]:
                 store.records[holder]["flags"].append(flag)
                 missing += 1
         elif holder in store.proposals:
-            store.proposals[holder]["notes"].append("source_no_longer_reports")
+            store.proposals[holder]["notes"].append(code)
             missing += 1
     return missing
+
+
+def _missing_code(store: Store, key: str, seen: set[str]) -> str:
+    txn = store.observations[key]["txn"]
+    if key.startswith("fp:") and any(store.observations[k]["txn"] == txn for k in seen):
+        return "identical_row_no_longer_reported"
+    return "source_no_longer_reports"
 
 
 def _matches(store: Store, proposal: dict) -> list[str]:
@@ -1922,6 +1960,8 @@ def edge_cases(checks: Checks) -> None:
         held=held,
     )
     input_boundary(checks)
+    account_choices(checks)
+    source_changes(checks)
 
 
 def input_boundary(checks: Checks) -> None:
@@ -2027,6 +2067,181 @@ def input_boundary(checks: Checks) -> None:
         },
         rejected=rejected,
         accepted=accepted,
+    )
+
+
+def _attempt(action) -> object:
+    try:
+        return action()
+    except Exception as error:
+        return {"raised": type(error).__name__}
+
+
+def account_choices(checks: Checks) -> None:
+    at = "2026-09-10T06:00"
+    store = Store()
+    store.accounts["acct-alice"] = {"owner": "alice", "name": "Ahorro", "currency": "DOP"}
+    bob = connect(
+        store,
+        "bob",
+        "aggregator_api",
+        {"src-chk": "acct-alice", "src-sav": "acct-missing"},
+    )
+    authenticate(store, "bob", bob, "authenticated")
+    outcome = _attempt(
+        lambda: refresh(
+            store,
+            "bob",
+            bob,
+            Refresh(
+                at=at,
+                accounts=(
+                    SourceAccount("src-chk", "Cuenta", "DOP"),
+                    SourceAccount("src-sav", "Ahorro", "DOP"),
+                ),
+                balances=(Balance("src-chk", at, "900.00", "DOP"),),
+                txns=(
+                    tx("src-chk", "2026-09-09", "50.00", "debit", "COLMADO", "A-0001"),
+                ),
+                coverage=("2026-09-01", "2026-09-10"),
+            ),
+        )
+    )
+    decisions = sorted(
+        (link["source_id"], link["connection"] == bob) for link in store.account_links
+    )
+    checks.add(
+        "chosen_account_must_be_eligible",
+        "A source account is mapped only to an account the connection's owner holds in the same currency. Another person's account or an unknown one becomes an owner decision",
+        isinstance(outcome, dict)
+        and outcome.get("applied") is True
+        and store.connections[bob]["account_map"] == {}
+        and decisions == [("src-chk", True), ("src-sav", True)]
+        and not store.snapshots
+        and not store.proposals,
+        outcome=outcome,
+        mapping=store.connections[bob]["account_map"],
+        owner_decisions=decisions,
+    )
+
+    store = Store()
+    connections = {}
+    for owner in ("ana", "luis"):
+        store.accounts[f"acct-{owner}"] = {
+            "owner": owner,
+            "name": "Cuenta",
+            "currency": "DOP",
+        }
+        conn = connect(store, owner, "aggregator_api", {"main": f"acct-{owner}"})
+        authenticate(store, owner, conn, "authenticated")
+        for when, accounts in (
+            ("2026-09-10T06:00", (SourceAccount("main", "Cuenta", "DOP"),)),
+            (
+                "2026-09-11T06:00",
+                (
+                    SourceAccount("main", "Cuenta", "DOP"),
+                    SourceAccount("checking", "Cuenta nueva", "DOP"),
+                ),
+            ),
+        ):
+            refresh(store, owner, conn, Refresh(at=when, accounts=accounts))
+        connections[owner] = conn
+    decisions = sorted(
+        (link["connection"], link["source_id"]) for link in store.account_links
+    )
+    checks.add(
+        "owner_decisions_per_connection",
+        "Two connections that each report a new source account with the same id each ask their own owner",
+        decisions
+        == sorted((connections[owner], "checking") for owner in ("ana", "luis")),
+        owner_decisions=decisions,
+    )
+
+
+def source_changes(checks: Checks) -> None:
+    owner = "user-a"
+
+    def start(source_id: str) -> tuple[Store, str, Callable[..., None]]:
+        store = Store()
+        store.accounts["acct-dop"] = {"owner": owner, "name": "Cuenta", "currency": "DOP"}
+        conn = connect(store, owner, "aggregator_api", {source_id: "acct-dop"})
+        authenticate(store, owner, conn, "authenticated")
+        accounts = (SourceAccount(source_id, "Cuenta", "DOP"),)
+
+        def pull(at: str, *rows: Txn) -> None:
+            refresh(
+                store,
+                owner,
+                conn,
+                Refresh(
+                    at=at, accounts=accounts, txns=rows, coverage=("2026-09-01", at[:10])
+                ),
+            )
+
+        return store, conn, pull
+
+    store, conn, pull = start("src-card")
+    hold = tx(
+        "src-card",
+        "2026-09-09",
+        "120.00",
+        "debit",
+        "HOTEL",
+        "H-0001",
+        pending=True,
+        reference="R-1",
+    )
+    pull("2026-09-10T06:00", hold)
+    [proposal] = store.proposals.values()
+    held = confirm(store, owner, [proposal["id"]])["skipped"]
+    pull(
+        "2026-09-11T06:00", replace(hold, amount="118.40", pending=False, reference="R-2")
+    )
+    posted = confirm(store, owner, [proposal["id"]])["confirmed"]
+    record = store.records.get(proposal["id"], {"fields": {}})
+    reference = store.proposals[proposal["id"]]["reference"]
+    checks.add(
+        "pending_row_posts_in_place",
+        "A held row that posts under the same institution id takes every source value from the latest observation, including its posted status and reference, and becomes confirmable",
+        held == {proposal["id"]: ["pending"]}
+        and posted == [proposal["id"]]
+        and record["fields"].get("amount") == "118.40"
+        and reference == "R-2",
+        held=held,
+        posted=posted,
+        amount=record["fields"].get("amount"),
+        reference=reference,
+    )
+
+    store, conn, pull = start("src-chk")
+    toll_a = tx("src-chk", "2026-09-09", "80.00", "debit", "PEAJE", reference="REF-A")
+    toll_b = replace(toll_a, reference="REF-B")
+    parking = tx("src-chk", "2026-09-09", "25.00", "debit", "PARQUEO")
+    pull("2026-09-10T06:00", toll_a, toll_b, parking, parking)
+    confirmed = confirm(store, owner, _open_ids(store, conn))["confirmed"]
+    pull("2026-09-11T06:00", toll_b, parking)
+    flagged = sorted(
+        (
+            flag.split(":", 1)[0],
+            store.observations[flag.split(":", 1)[1]]["txn"]["reference"] or "-",
+        )
+        for record in store.records.values()
+        for flag in record["flags"]
+    )
+    revisions = [p for p in store.proposals.values() if p["status"] == "revision"]
+    checks.add(
+        "derived_identity_stable",
+        "Rows without an institution id keep their identity when a later window drops or reorders them. The row that left is the one flagged, and a dropped copy of an identical row is flagged as ambiguous",
+        len(confirmed) == 4
+        and flagged
+        == [
+            ("identical_row_no_longer_reported", "-"),
+            ("source_no_longer_reports", "REF-A"),
+        ]
+        and not revisions,
+        confirmed=len(confirmed),
+        flagged=flagged,
+        revisions=len(revisions),
     )
 
 
