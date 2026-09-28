@@ -1108,24 +1108,40 @@ def earlier_day_check(fx, workdir):
     except model.ReviewRequired:
         direct = "refused"
     written_directly = len(env.store.book.records) - records_before
-    env.decide(rows["statement-03"], distinct=True)
-    for item in rows.values():
+    still_open = {
+        label: item
+        for label, item in rows.items()
+        if env.store.state.drafts[item].status == "proposed"
+    }
+    if "statement-03" in still_open:
+        env.decide(still_open["statement-03"], distinct=True)
+    for item in still_open.values():
         env.decide(item, answers={check_id: "included"})
     confirmed_answered = env.importer.confirm_ready(session, "batch-2")
-    [gap] = [
-        item
-        for item in derive.observation_gaps(env.store.book, env.ids["Cuenta corriente"])
-        if item.record_id == check_id
-    ]
+    try:
+        [gap] = [
+            item
+            for item in derive.observation_gaps(
+                env.store.book, env.ids["Cuenta corriente"]
+            )
+            if item.record_id == check_id
+        ]
+        difference = {
+            "check_difference_at_confirmation": gap.recorded,
+            "check_difference_remaining": gap.remaining,
+            "rows_explaining_the_check": len(gap.explained_by),
+        }
+    except derive.Unanswered as error:
+        difference = {
+            "check_difference": f"not derivable, rows behind {error} unanswered"
+        }
     observed = {
         "asked_about_the_check": asked,
         "confirmed_without_answer": len(confirmed_unanswered),
         "direct_confirmation": direct,
         "written_by_direct_confirmation": written_directly,
         "confirmed_after_answer": len(confirmed_answered),
-        "check_difference_at_confirmation": gap.recorded,
-        "check_difference_remaining": gap.remaining,
-        "rows_explaining_the_check": len(gap.explained_by),
+        **difference,
     }
     return observed == {
         "asked_about_the_check": STATEMENT_ROWS,

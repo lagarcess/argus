@@ -16,7 +16,7 @@ sys.modules["proof"] = proof
 spec.loader.exec_module(proof)
 
 
-def run(case_ids: set[str]) -> dict[str, bool]:
+def run(case_ids: set[str]) -> dict[str, tuple[bool, dict]]:
     results = {}
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
@@ -26,7 +26,7 @@ def run(case_ids: set[str]) -> dict[str, bool]:
             if case_id in case_ids:
                 workdir = root / case_id
                 workdir.mkdir()
-                results[case_id] = proof.run_case(function, workdir)[0]
+                results[case_id] = proof.run_case(function, workdir)
     return results
 
 
@@ -43,19 +43,19 @@ def patched(changes):
 
 
 def ignore_encryption(original):
-    def classify(data):
+    def classify(data, *args, **kwargs):
         if data.startswith(b"%PDF-"):
             return "accepted", "pdf", "pdf"
-        return original(data)
+        return original(data, *args, **kwargs)
 
     return classify
 
 
 def refuse_every_encrypted_pdf(original):
-    def classify(data):
+    def classify(data, *args, **kwargs):
         if data.startswith(b"%PDF-") and b"/Encrypt" in data:
             return "password_protected", "pdf", "pdf"
-        return original(data)
+        return original(data, *args, **kwargs)
 
     return classify
 
@@ -103,8 +103,8 @@ def answer_for_the_person(original):
 
 
 def stop_asking(original):
-    def review(state, draft, tz):
-        body, found = original(state, draft, tz)
+    def review(*args, **kwargs):
+        body, found = original(*args, **kwargs)
         return body, tuple(item for item in found if item.code != "inclusion_unanswered")
 
     return review
@@ -321,11 +321,19 @@ def main() -> int:
     for label, changes, case_ids in mutations():
         with patched(changes):
             results = run(case_ids)
-        caught = not any(results.values())
+        crashed = sorted(case for case, (_, seen) in results.items() if "error" in seen)
+        caught = not crashed and not any(passed for passed, _ in results.values())
         ok &= caught
-        print(f"{'caught' if caught else 'MISSED'}: {label} {sorted(results)}")
+        verdict = (
+            "caught"
+            if caught
+            else f"MISSED (crashed: {crashed})"
+            if crashed
+            else "MISSED"
+        )
+        print(f"{verdict}: {label} {sorted(results)}")
     baseline = run({case_id for case_id, *_ in proof.CASES})
-    clean = all(baseline.values())
+    clean = all(passed for passed, _ in baseline.values())
     ok &= clean
     print(f"unbroken: {len(baseline)} cases, all pass {clean}")
     return 0 if ok else 1
