@@ -56,7 +56,7 @@ reconciliation on September 28, 2026 verified the states below:
 | --- | --- | --- |
 | [#727](https://github.com/lagarcess/argus/pull/727) | Merged as `3fa0dd92167791d82ce81c167c490396358c4316` | `f0a64ffb9d70ce5b82491cf8e1803bb8a6ec7431` |
 | [#729](https://github.com/lagarcess/argus/pull/729) | Merged as `f61e47f1243d94fe5d5fa631c4bd9f67906fcfc9` | `e035894215e48ab85af3ffce31b1eaaa106030f4` |
-| [#730](https://github.com/lagarcess/argus/pull/730) | Open, unmerged | `0f9a378277ced2647072862afcb401c0ac40c1f0` |
+| [#730](https://github.com/lagarcess/argus/pull/730) | Merged as `a8e09b72339c7bc676715dabf8a9cceaac81cf03` | `0f9a378277ced2647072862afcb401c0ac40c1f0` |
 
 The frozen archive passed CRC and matched SHA-256
 `c55e565aa142e38eec61b570510af1c4c2cb9629c24f3ce2d01387639f0ea0e6`.
@@ -121,8 +121,9 @@ contracts remain with the backend owner.
 | Original fetched integration base | `4b84e054a0d8079b21f38784335ad3241809b4cd` |
 | First reconciled integration | `3fa0dd92167791d82ce81c167c490396358c4316` |
 | First one-way reconciliation merge | `2b3e6cf2589d87c1bc206e8a93511e4c32b95005` |
-| Latest reconciled integration | `f61e47f1243d94fe5d5fa631c4bd9f67906fcfc9` |
-| Latest one-way reconciliation merge | `9baf573c992a47a16e3cb3132ae723d30c20ffa3` |
+| iOS reconciliation merge | `9baf573c992a47a16e3cb3132ae723d30c20ffa3` |
+| Latest reconciled integration | `a8e09b72339c7bc676715dabf8a9cceaac81cf03` |
+| Latest one-way reconciliation merge | `7785b252a2ba487e5bb545a3e8e4804cf08c301c` |
 | Committed browser evidence head | `efe2ec66631ad43395de5746b578528bf432c4a6` |
 
 The intervening integration changes are Supabase server-client isolation, Render
@@ -132,12 +133,16 @@ package, route contract or migration changed. Render's hostname setting does not
 control this local preview. Affected integration tests are backend/auth/release
 checks. The design-authority overlap was inspected: the merged publication
 retains the exact archive already used here. The combined tree passes the
-modularity budget. The later reconciliation adds the #711 landing register and
-the merged #729 iOS foundation. Its native source, evidence and documentation
-have no shared web runtime, API/data, UI state, migration, environment or test
-owner with this lane. Native implementation deltas since the previously
+modularity budget. Later reconciliations add the #711 landing register,
+merged #729 iOS foundation and merged #730 Android foundation. Their native
+source, evidence and documentation have no shared web runtime, API/data, UI
+state, migration, environment or test owner with this lane. The new Android CI
+workflow watches only Android files and its own configuration; this preview
+does not touch either surface. Native implementation deltas since the previously
 inspected #729/#730 heads are empty; their newer heads reconcile integration.
-The mobile archive remains unchanged. No rebase or worker-to-integration merge
+The mobile archive remains unchanged. The final native reconciliation preserves
+the entire web tree `a28f139399b28d053491be3e609c7c34a3c1b2ee`, so all
+browser, production and build evidence is retained. No rebase or worker-to-integration merge
 was performed.
 
 The [evidence index](evidence/pr-732/README.md) contains 35 screenshots, their

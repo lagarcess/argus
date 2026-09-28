@@ -4,8 +4,8 @@
   "webTree": "a28f139399b28d053491be3e609c7c34a3c1b2ee",
   "previewTree": "9a4f4f07f68b71425ef3649c3a4674f6c080a995",
   "originalIntegration": "4b84e054a0d8079b21f38784335ad3241809b4cd",
-  "reconciledIntegration": "f61e47f1243d94fe5d5fa631c4bd9f67906fcfc9",
-  "reconciliationMerge": "9baf573c992a47a16e3cb3132ae723d30c20ffa3",
+  "reconciledIntegration": "a8e09b72339c7bc676715dabf8a9cceaac81cf03",
+  "reconciliationMerge": "7785b252a2ba487e5bb545a3e8e4804cf08c301c",
   "browserCases": 33,
   "browserPassed": true,
   "screenshots": 35,
@@ -25,11 +25,15 @@
   "localBackendLimit": "Nine mocked-harness files:235 passed,2 failed on existing macOS SciPy _spropack binary import; trajectory file cannot collect for same reason. Linux CI remains required.",
   "externalServices": "None. Browser API/external requests fail closed. Production entry checks use inert localhost configuration without credentials/cookies.",
   "priorCaptureFailure": "Reload raced a shared overlay history traversal in one test. Test now waits for the actual popstate; focused rerun and full29-case run passed.",
-  "priorReconciliationMerge": "2b3e6cf2589d87c1bc206e8a93511e4c32b95005",
   "evidenceGuardTests": 12,
   "reviewFixes": [
     "Check all worktree code/test inputs except the exact evidence output directory",
     "Validate raw numeric draft syntax with localized accessible errors; no financial calculations",
     "Keep currency prefix on one line in the draft amount field"
-  ]
+  ],
+  "priorReconciliationMerges": [
+    "2b3e6cf2589d87c1bc206e8a93511e4c32b95005",
+    "9baf573c992a47a16e3cb3132ae723d30c20ffa3"
+  ],
+  "reconciliationDisposition": "Merged #727/#729/#730 and integration housekeeping one way. No shared web runtime, contract, state, migration or environment overlap. Android CI is path-scoped to Android. Entire web tree unchanged after capture; all evidence retained."
 }
