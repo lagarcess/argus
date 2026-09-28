@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Check, ChevronRight, Landmark, LockKeyhole, Plus } from "lucide-react";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
+import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import { ACCOUNT_TYPES, SAMPLE, type AccountType, type PreviewCopy, type SampleAccount } from "./preview-content";
 import { AccountIcon, Money, DetailRow } from "./PreviewPrimitives";
 import styles from "./ecosystem-preview.module.css";
@@ -10,6 +11,13 @@ import styles from "./ecosystem-preview.module.css";
 export type AccountPanel = { mode: "create" } | { mode: "detail"; account: SampleAccount };
 type Screen = "detail" | "create" | "edit" | "draft" | "correction" | "adjustment";
 type Draft = { type: AccountType | null; currency: string; nickname: string; balance: string; institution: string; reference: string };
+
+// Syntax for this preview's displayed decimal format only. Keep the raw string:
+// money precision, limits and posting belong to the future financial contract.
+function isBalanceDraft(value: string): boolean {
+  const text = value.trim();
+  return text === "" || /^[+−-]?(?:(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?|\.\d+)$/.test(text);
+}
 
 export default function AccountPanels({ panel, copy, onClose, onActivity, onLimited }: {
   panel: AccountPanel; copy: PreviewCopy; onClose: () => void;
@@ -25,7 +33,10 @@ export default function AccountPanels({ panel, copy, onClose, onActivity, onLimi
     nickname: account ? copy[account.name] : "", balance: account?.balance ?? "", institution: "", reference: "",
   });
   const [note, setNote] = useState("");
+  const [balanceValidationRequested, setBalanceValidationRequested] = useState(false);
+  const invalidBalance = balanceValidationRequested && !isBalanceDraft(draft.balance);
   const fieldId = useId();
+  const balanceInputRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const typeRef = useRef<HTMLFieldSetElement>(null);
   const lastScreen = useRef(screen);
@@ -71,7 +82,18 @@ export default function AccountPanels({ panel, copy, onClose, onActivity, onLimi
         </div>) : <div className={styles.quietBox}><strong>{copy.noActivity}</strong><p>{copy.openingBalance}</p></div>}
       </> : null}
 
-      {(screen === "create" || screen === "edit") ? <form onSubmit={(event) => { event.preventDefault(); if (!draft.type) return; setDraftFrom(screen); setScreen("draft"); }}>
+      {(screen === "create" || screen === "edit") ? <form onSubmit={(event) => {
+        event.preventDefault();
+        if (!draft.type) return;
+        setBalanceValidationRequested(true);
+        if (!isBalanceDraft(draft.balance)) {
+          balanceInputRef.current?.focus();
+          return;
+        }
+        setDraft((previous) => ({ ...previous, balance: previous.balance.trim() }));
+        setDraftFrom(screen);
+        setScreen("draft");
+      }}>
         <p className={styles.intro}>{screen === "create" ? copy.createIntro : copy.draftOnly}</p>
         <fieldset ref={typeRef} tabIndex={-1} className={styles.fieldset}>
           <legend className={styles.fieldLabel}>{copy.chooseType}</legend>
@@ -91,8 +113,9 @@ export default function AccountPanels({ panel, copy, onClose, onActivity, onLimi
             <input id={`${fieldId}-nickname`} value={draft.nickname} maxLength={120} autoComplete="off" onChange={(event) => editField("nickname", event.target.value)} />
           </label>
           <label className={styles.field} htmlFor={`${fieldId}-balance`}><span>{copy.startingBalance}</span>
-            <div className={styles.amountInput}><span>{draft.currency}</span><input id={`${fieldId}-balance`} type="text" inputMode="decimal" value={draft.balance} maxLength={30} autoComplete="off" aria-describedby={`${fieldId}-balance-hint`} onChange={(event) => editField("balance", event.target.value)} /></div>
+            <div className={styles.amountInput}><span>{draft.currency}</span><input ref={balanceInputRef} id={`${fieldId}-balance`} type="text" inputMode="decimal" value={draft.balance} maxLength={30} autoComplete="off" aria-invalid={invalidBalance || undefined} aria-describedby={`${fieldId}-balance-hint${invalidBalance ? ` ${fieldId}-balance-error` : ""}`} onChange={(event) => editField("balance", event.target.value)} /></div>
             <small id={`${fieldId}-balance-hint`}>{copy.leaveBlank}</small>
+            {invalidBalance ? <span id={`${fieldId}-balance-error`} role="alert" className={`text-xs ${inlineFailureTextClass}`}>{copy.invalidBalance}</span> : null}
           </label>
           {screen === "edit" ? <fieldset className={styles.fieldset}><legend className={styles.fieldLabel}>{copy.moreDetails}</legend>
             <label className={styles.field} htmlFor={`${fieldId}-institution`}><span>{copy.institution}</span><input id={`${fieldId}-institution`} value={draft.institution} maxLength={120} autoComplete="off" onChange={(event) => editField("institution", event.target.value)} /></label>

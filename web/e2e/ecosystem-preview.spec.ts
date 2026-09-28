@@ -283,6 +283,57 @@ test("sample account creation remains an unsaved draft and leaves sample balance
   expect(await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } }))).toEqual(storageBefore);
 });
 
+for (const language of ["en", "es-419"] as const) {
+  for (const mode of ["create", "edit"] as const) {
+    test(`account balance syntax blocks invalid text and recovers in ${mode}: ${language}`, async ({ page, networkAudit }, testInfo) => {
+      const labels = previewCopy(language);
+      await openPreview(page, { view: "accounts", audience: "sample", language });
+      const main = page.getByTestId("preview-main");
+      const originalAccounts = await main.innerText();
+      if (mode === "create") {
+        await page.getByRole("button", { name: labels.addAccount, exact: true }).first().click();
+        await page.getByTestId("account-create").getByRole("button", { name: labels.cash, exact: true }).click();
+      } else {
+        await main.getByRole("button", { name: new RegExp(`^${labels.everyday}`) }).click();
+        await page.getByRole("button", { name: labels.editDetails, exact: true }).click();
+      }
+      const form = page.getByTestId(`account-${mode}`);
+      const balance = form.getByLabel(labels.startingBalance);
+      const nickname = labels.pocket;
+      await form.getByLabel(labels.nickname, { exact: true }).fill(nickname);
+      for (const invalid of ["abc", "12,34"]) {
+        await balance.fill(invalid);
+        await form.getByRole("button", { name: labels.reviewDraft, exact: true }).click();
+        await expect(form).toBeVisible();
+        await expect(page.getByTestId("account-draft")).toHaveCount(0);
+        await expect(balance).toHaveValue(invalid);
+        await expect(balance).toHaveAttribute("aria-invalid", "true");
+        await expect(balance).toBeFocused();
+        await expect(form.getByRole("alert")).toHaveText(labels.invalidBalance);
+        await expect(balance).toHaveAccessibleDescription(`${labels.leaveBlank} ${labels.invalidBalance}`);
+        if (mode === "create" && invalid === "abc") {
+          await capture(page, testInfo, networkAudit, `account-balance-invalid-${language}`);
+        }
+      }
+      for (const valid of [SAMPLE.accounts[0].balance, `  ${SAMPLE.accounts[0].balance}  `, "-1250.50", "0", "", "   "]) {
+        await balance.fill(valid);
+        await expect(form.getByRole("alert")).toHaveCount(0);
+        await balance.press("Enter");
+        const review = page.getByTestId("account-draft");
+        await expect(review).toBeVisible();
+        await expect(review).toContainText(labels.draftNotice);
+        await expect(review.getByText(nickname, { exact: true })).toBeVisible();
+        await expect(review.getByText(valid.trim() || labels.unknownBalance, { exact: true })).toBeVisible();
+        await review.getByRole("button", { name: labels.returnDraft, exact: true }).click();
+        await expect(balance).toHaveValue(valid.trim());
+        await expect(form.getByLabel(labels.nickname, { exact: true })).toHaveValue(nickname);
+      }
+      await page.keyboard.press("Escape");
+      await expect(main).toHaveText(originalAccounts, { useInnerText: true });
+    });
+  }
+}
+
 test("reopening an account exposes edit details and a transparent correction review", async ({ page, networkAudit }, testInfo) => {
   await openPreview(page, { view: "accounts", audience: "sample" });
   const main = page.getByTestId("preview-main");
