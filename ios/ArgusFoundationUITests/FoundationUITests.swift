@@ -25,6 +25,13 @@ final class FoundationUITests: XCTestCase {
             XCTAssertTrue(tab.isSelected)
             XCTAssertTrue(app.descendants(matching: .any)["screen.\(destination)"].exists)
             XCTAssertTrue(app.staticTexts["sample.notice"].exists)
+            if destination == "plan" {
+                for section in ["overview", "goals", "budgets", "debts"] {
+                    let button = app.buttons["plan.\(section)"]
+                    XCTAssertGreaterThanOrEqual(button.frame.width, 44)
+                    XCTAssertGreaterThanOrEqual(button.frame.height, 44)
+                }
+            }
             capture(destination)
         }
         app.buttons["tab.home"].tap()

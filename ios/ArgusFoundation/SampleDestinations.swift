@@ -148,7 +148,8 @@ struct PlanSampleView: View {
                         Button { section = item } label: {
                             Text(item.title)
                                 .font(ArgusStyle.body(14, relativeTo: .subheadline))
-                                .frame(minHeight: 48)
+                                .frame(minWidth: 44, minHeight: 48)
+                                .contentShape(Rectangle())
                                 .foregroundStyle(section == item ? ArgusStyle.ink : ArgusStyle.secondary)
                                 .overlay(alignment: .bottom) {
                                     Rectangle().fill(section == item ? ArgusStyle.ink : .clear).frame(height: 2)
