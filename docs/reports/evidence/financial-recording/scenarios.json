@@ -644,7 +644,9 @@
     },
     "restamp_honors_not_included": {
       "confirmed_expected": 100000,
-      "excluded_from_contents": true
+      "excluded_from_contents": true,
+      "observed": 95000,
+      "reconfirmed": true
     },
     "restore_needs_a_reason": {
       "blank": "InvalidInput:reason_required"

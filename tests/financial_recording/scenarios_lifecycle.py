@@ -928,9 +928,13 @@ def _restamp_honors_not_included() -> dict:
         expected_revision=scene.store.state.drafts[late.id].revision,
     )
     expense = scene.confirm(late)
-    scene.store.correct(check.id, 1, "typo", amount="1000.00")
-    stamped = scene.store.book.records[check.id].revisions[-1]
+    # Amount must change so `_revise` clears contained and restamps.
+    scene.store.correct(check.id, 1, "typo", amount="950.00")
+    revised = scene.store.book.records[check.id]
+    stamped = revised.revisions[-1]
     return {
+        "reconfirmed": len(revised.revisions) == 2,
+        "observed": stamped.body.amount,
         "excluded_from_contents": expense.id not in (stamped.contained or ()),
         "confirmed_expected": stamped.confirmed_expected,
     }

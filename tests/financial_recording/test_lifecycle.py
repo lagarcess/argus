@@ -349,6 +349,8 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "accepted": True,
         },
         "restamp_honors_not_included": {
+            "reconfirmed": True,
+            "observed": 95_000,
             "excluded_from_contents": True,
             "confirmed_expected": 100_000,
         },
