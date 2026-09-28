@@ -379,7 +379,13 @@ class Store:
                     if matches
                     else [issue("duplicate_target_invalid", duplicate_of)]
                 )
-            target = records[duplicate_of]
+            # Targets are confirmed records only; draft ids appear in match
+            # lists during batch review but cannot receive a source link.
+            target = records.get(duplicate_of)
+            if target is None:
+                raise ReviewRequired(
+                    [issue("duplicate_target_invalid", duplicate_of)]
+                )
             linked = replace(
                 draft.provenance,
                 account_id=(draft.fields.get("account_id") or "").strip() or None,
@@ -649,9 +655,12 @@ class Store:
                 continue
             if body.account_id != account.id:
                 continue
-            if isinstance(body, Observation) and body.basis == "value_estimate":
-                if account.type not in ESTIMATED_TYPES:
+            if isinstance(body, Observation):
+                estimated = account.type in ESTIMATED_TYPES
+                if body.basis == "value_estimate" and not estimated:
                     raise InvalidInput("basis_not_applicable", account.type)
+                if estimated and body.basis != "value_estimate":
+                    raise InvalidInput("basis_not_applicable", body.basis)
 
     def _linked_refund_issues(self, record_id: str, body: Body) -> list[Issue]:
         """A corrected purchase is re-checked through the same refund rule."""

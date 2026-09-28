@@ -237,6 +237,7 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
         "value_estimate_only_on_estimated_assets": {
             "on_checking": {"basis_not_applicable": "blocking"},
             "on_vehicle": "ok",
+            "user_check_on_vehicle": {"basis_not_applicable": "blocking"},
         },
         "anchor_zone_survives_reader_tz_change": {
             "readable_after_tz_change": True,
@@ -353,5 +354,9 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "observed": 95_000,
             "excluded_from_contents": True,
             "confirmed_expected": 100_000,
+        },
+        "duplicate_of_draft_is_refused": {
+            "lists_the_other_draft": True,
+            "link_to_draft": "ReviewRequired:duplicate_target_invalid",
         },
     }

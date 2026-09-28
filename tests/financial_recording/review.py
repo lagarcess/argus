@@ -132,8 +132,15 @@ def parse_fields(
         values["zone"] = str(tz)
         if values["amount"] is not None:
             values["amount"] = signed_to_owner(values["amount"], account.type)
-        if values["basis"] == "value_estimate" and account.type not in ESTIMATED_TYPES:
+        estimated = account.type in ESTIMATED_TYPES
+        if values["basis"] == "value_estimate" and not estimated:
             found.append(issue("basis_not_applicable", account.type))
+        if (
+            estimated
+            and values["basis"] is not None
+            and values["basis"] != "value_estimate"
+        ):
+            found.append(issue("basis_not_applicable", values["basis"]))
         return (None if found else Observation(**values)), tuple(found)
     values.update(
         kind=kind,
@@ -177,10 +184,13 @@ def validate(
     if isinstance(body, Observation):
         if body.basis not in GAP_LABEL:
             found.append(issue("choice_invalid", body.basis))
-        elif body.basis == "value_estimate":
+        else:
             account = book.accounts[body.account_id]
-            if account.type not in ESTIMATED_TYPES:
+            estimated = account.type in ESTIMATED_TYPES
+            if body.basis == "value_estimate" and not estimated:
                 found.append(issue("basis_not_applicable", account.type))
+            if estimated and body.basis != "value_estimate":
+                found.append(issue("basis_not_applicable", body.basis))
     if isinstance(body, Activity):
         entry_tz = activity_zone(body) if body.zone else tz
         if now is not None and _activity_is_future(body, now, entry_tz):

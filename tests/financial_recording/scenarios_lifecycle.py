@@ -282,6 +282,7 @@ def edits_that_move_money_need_review() -> dict:
         "activity_zone_honors_historical_as_of": _activity_zone_honors_as_of(),
         "expectation_direction_is_canonical": _expectation_direction_canonical(),
         "restamp_honors_not_included": _restamp_honors_not_included(),
+        "duplicate_of_draft_is_refused": _duplicate_of_draft_refused(),
     }
 
 
@@ -448,7 +449,14 @@ def _value_estimate_restricted() -> dict:
         scene.observation(checking, "900.00", 5, basis="value_estimate")
     )
     on_car = outcome(lambda: scene.observe(car, "90000.00", 5, basis="value_estimate"))
-    return {"on_checking": on_checking, "on_vehicle": on_car}
+    user_check_on_car = scene.issues(
+        scene.observation(car, "90000.00", 5, basis="user_check")
+    )
+    return {
+        "on_checking": on_checking,
+        "on_vehicle": on_car,
+        "user_check_on_vehicle": user_check_on_car,
+    }
 
 
 def _anchor_zone_stable() -> dict:
@@ -912,6 +920,25 @@ def _expectation_direction_canonical() -> dict:
         "negative_amount": negative,
         "zero_amount": zero,
         "accepted": ok in scene.store.book.expectations,
+    }
+
+
+def _duplicate_of_draft_refused() -> dict:
+    """Same-signature proposed drafts cannot be linked until one is a record."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "5000.00")
+    first = scene.act("expense", cash, "100.00", 3)
+    twin = scene.act("expense", cash, "100.00", 3, method="chat")
+    refused = outcome(
+        lambda: scene.store.resolve(
+            twin.id,
+            duplicate_of=first.id,
+            expected_revision=scene.store.state.drafts[twin.id].revision,
+        )
+    )
+    return {
+        "lists_the_other_draft": scene.refs(twin, "possible_duplicate") == [first.id],
+        "link_to_draft": refused,
     }
 
 

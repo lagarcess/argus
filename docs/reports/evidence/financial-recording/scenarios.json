@@ -462,6 +462,10 @@
       "distinct_without_match": "InvalidInput:distinct_not_applicable",
       "matches_the_other_expense": true
     },
+    "duplicate_of_draft_is_refused": {
+      "link_to_draft": "ReviewRequired:duplicate_target_invalid",
+      "lists_the_other_draft": true
+    },
     "expectation_direction_is_canonical": {
       "accepted": true,
       "bogus_direction": "InvalidInput:direction_unsupported",
@@ -699,7 +703,10 @@
       "on_checking": {
         "basis_not_applicable": "blocking"
       },
-      "on_vehicle": "ok"
+      "on_vehicle": "ok",
+      "user_check_on_vehicle": {
+        "basis_not_applicable": "blocking"
+      }
     }
   },
   "equal_amount_not_a_match": {

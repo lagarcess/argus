@@ -51,7 +51,7 @@ Argus stores **accounts** and **confirmed records**. A record is either an **anc
 
 ### 3.1 Estimated assets and linked debts
 
-A vehicle, property or other asset records its whole estimated value as its opening anchor, or stays unknown. Its later estimates are `value_estimate` checks. The difference between estimates is labeled a revaluation. It changes position, never income or spending. Personal views count the person's share. A linked loan stays a separate debt with its own share and is counted once. Linking never subtracts the loan a second time. Listing-based valuation remains a future candidate (MVEE, PR #723) and is not needed here.
+A vehicle, property or other asset records its whole estimated value as its opening anchor, or stays unknown. Its later estimates are `value_estimate` checks; `user_check` and `statement` are refused on those account types (`basis_not_applicable`), so a value change cannot be mislabeled unexplained. The difference between estimates is labeled a revaluation. It changes position, never income or spending. Personal views count the person's share. A linked loan stays a separate debt with its own share and is counted once. Linking never subtracts the loan a second time. Listing-based valuation remains a future candidate (MVEE, PR #723) and is not needed here.
 
 ### 3.2 Archiving and removing accounts
 
@@ -221,7 +221,7 @@ A plan's dated expectation is fulfilled by at most one live activity, and one ac
 ## 11. Duplicates, overlap and late information
 
 1. **Identity.** The same file digest and row, or the same institution `external_id` on the same account, is `already_recorded`. This covers confirmed records, removed records and pending drafts. Re-importing a file or an overlapping statement creates nothing, and a removed row does not return with the next import.
-2. **Signature.** Any leg with the same account, amount and date, without shared identity, is `possible_duplicate`. It blocks until the person chooses. "Same as that record" links the new source to the existing record and creates nothing. "Different" saves it. The kind is ignored, so a card statement's payment row meets the payment recorded from checking. Notes are ignored too.
+2. **Signature.** Any leg with the same account, amount and date, without shared identity, is `possible_duplicate`. It blocks until the person chooses. "Same as that record" links the new source to an existing confirmed record and creates nothing; a still-proposed draft id is `duplicate_target_invalid`. "Different" saves it. The kind is ignored, so a card statement's payment row meets the payment recorded from checking. Notes are ignored too.
 
 Equal amounts alone never match. The same amount on another account or another date raises nothing. Nothing is merged or deleted automatically. The synthetic kit confirms two identical rows from one file silently. This contract asks once, because a row with no reference cannot prove two purchases happened.
 
