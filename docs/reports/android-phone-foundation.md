@@ -61,6 +61,14 @@ fetching several Maven artifacts while the PR run succeeded with the same
 source; this is recorded as an infrastructure failure, not a passing run.
 Final-head CI and remote Codex review are recorded in the PR closeout.
 
+Codex review of `af6e27392b65da14778ff54ab95090d320451dab` found one
+confirmed issue: ordinary activity recreation discarded the sample draft.
+`2df05cd88725b1d00160bdc111c651ed650a0e03` uses Android saved UI state for the
+draft. The existing disconnected-input test now recreates the activity before
+checking the draft. Build, 3 JVM tests, lint and 9/9 tests on each phone pass.
+English screenshots were refreshed. Unchanged Spanish rendering, appearance
+persistence and IME/Back evidence is explicitly retained by the source diff.
+
 The required mocked backend harness was attempted once locally. Collection
 failed in `scipy.linalg` importing `_spropack` with the Mach-O `__thread_bss`
 zero-fill-section error. It did not execute and is not reported as passing.
@@ -71,7 +79,8 @@ No runtime code changed; repository CI is the remaining backend gate.
 - This sample app has no network permission. Composer input never dispatches a
   turn. Sample actions demonstrate registration boundaries, not server enforcement.
 - Financial displays are localized fixtures, not financial calculations, records
-  or API models. Only appearance is durable; settings cannot save product data.
+  or API models. Only appearance uses preference storage; the sample draft uses
+  Android saved UI state. Settings cannot save product data.
 - Active conversations, full temporary-chat behavior, voice, attachments, sharing,
   account setup and ecosystem writes are explicitly unavailable.
 - Native navigation uses a floating tonal surface and Android ripple; no claim of

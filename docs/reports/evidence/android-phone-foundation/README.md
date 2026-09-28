@@ -1,7 +1,14 @@
 # Android foundation device evidence
 
-Source commit: `8fe35fd32abf0c27ffbc08312db082a4478ba964`.
+Initial source commit: `8fe35fd32abf0c27ffbc08312db082a4478ba964`.
 App main tree: `a5618ee4b264947e4d0f27741dee1e5354522d8e`.
+English captures and logs were refreshed after the draft-recreation fix at
+`2df05cd88725b1d00160bdc111c651ed650a0e03` (app main tree
+`b54c201a96b643eb10330d6632eb864f5bcf0d7b`). Both full 9-test suites pass,
+including the added draft-after-recreation assertion. Spanish layout and manual
+appearance/IME evidence remain valid: only the composer state holder changed;
+rendering, strings, theme, navigation and preference storage are unchanged.
+
 All captures are direct unedited emulator screenshots of the disconnected sample.
 Only fictional fixtures and a synthetic draft are present.
 

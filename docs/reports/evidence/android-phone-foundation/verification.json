@@ -53,5 +53,14 @@
       "passed": 9,
       "failed": 0
     }
-  ]
+  ],
+  "review_fix": {
+    "source_commit": "2df05cd88725b1d00160bdc111c651ed650a0e03",
+    "app_main_tree": "b54c201a96b643eb10330d6632eb864f5bcf0d7b",
+    "change": "Remember sample composer in Android saved UI state; assert draft after activity recreation",
+    "english_tests_per_phone": 9,
+    "english_failures": 0,
+    "english_tab_captures": "recaptured",
+    "retained_evidence": "Spanish layout, appearance cold restart, and IME/Back behavior retained: the only production delta changes the composer state holder, with no rendering, localization, theme, navigation, or storage-owner changes."
+  }
 }
