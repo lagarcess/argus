@@ -1,6 +1,7 @@
 # Argus documentation authority
 
-**Updated:** September 26, 2026. Founder-approved documentation reconciliation.
+**Updated:** September 28, 2026. Founder-approved documentation reconciliation,
+plus the September 28 implementation-batch ownership and deferral handoff.
 **Purpose:** Help an agent distinguish approved product direction, existing technical contracts, historical rationale, and authorized implementation work.
 
 ## Start here
@@ -81,6 +82,49 @@ No replacement execution schedule is created by this PR. Wave 1's assigned packa
 In particular, Wave 1's two-audience landing, limited navigation, hidden account/upload/budget surfaces, and earlier onboarding assumptions are package-era choices, not permanent limits on the ecosystem. A temporary shipping subset may still be appropriate, but the assigned spec must say so explicitly. Before implementing a conflicting experience requirement, reconcile that package with the founder-approved MVEE and record what is retained, revised, or deferred. Do not expose unfinished surfaces just because they are approved in the vision.
 
 Safety fixes, instrumentation, and existing calculator work are not discarded by a pivot. Assess actual semantic overlap with the assignment; unchanged applicable safeguards continue to apply.
+
+## Current implementation batch (September 28, 2026)
+
+Founder-authorized coordination while the founder steps away. Source handoff:
+[PR #727 comment](https://github.com/lagarcess/argus/pull/727#issuecomment-5878051744).
+Target: a real local create/reopen/edit financial-account journey on iPhone,
+Android, and web by reusing and connecting existing Argus capabilities, not by
+replacing production auth or the chat runtime.
+
+### Ownership
+
+| Surface | Owner | Boundary |
+| --- | --- | --- |
+| Integration landing / merges to `codex/private-alpha-next` | VM integration orchestrator | Only landing executor under the founder's existing bounded merge authorization. Product-lead coordination does not push to integration or edit branches another lane already owns. |
+| Account domain, API, persistence; `API_CONTRACT` / `DATA_MODEL` amendments | Existing VM account-backend worker | Sole backend owner for this batch. No competing backend worker. Clients bind to its accepted first-slice payload contract once published. |
+| `ios/` continuation | Existing iPhone owner (Build iPhone iOS foundation) | Maps real sessions; continuation branches after foundations/dependencies land. Does not rewrite #729/#730 during their landing. |
+| `mobile/android/` continuation and pending #726 probe validation | Existing Android owner (Android phone foundation) | Same continuation rules as iPhone. Does not rewrite #729/#730 during their landing. |
+| Isolated responsive preview, then later account API wiring | Existing web owner (Build responsive Argus preview) | Finishes the isolated preview first; wires to the accepted backend contract afterward. No production-auth rewrite. |
+| Chart validation | Existing chart owner under `prototypes/chart-validation` | Remains isolated. Not a prerequisite for the account journey. |
+
+**Exclusive write ownership:** original lanes retain exclusive write on
+[#723](https://github.com/lagarcess/argus/pull/723),
+[#725](https://github.com/lagarcess/argus/pull/725),
+[#726](https://github.com/lagarcess/argus/pull/726), and
+[#724](https://github.com/lagarcess/argus/pull/724). Do not push concurrent
+fixes to those branches. Continue gated landing of #727, #729/#730, and #724 as
+their applicable gates close. Do not hold independent ready foundations for
+unrelated research.
+
+**Shared rules for this batch:** fetch current integration at start and before
+readiness; one-way reconciliation only (no rebase); one canonical server
+financial-rule owner; reuse existing Argus login/signup/resend/recovery/guest/
+profile behavior as the baseline; check browser recovery/PKCE/app return
+technically before any callback change; no new production app identities,
+hosted settings, paid calls, or deployments from this coordination; new
+continuation PRs are not implicitly added to the earlier bounded merge list.
+
+### Founder deferral
+
+Revenue, pricing, paywalls, billing integrations, and user trials are parked
+while core journeys become functional. Existing usage and cost safeguards
+remain in force. Do not open a separate status-only documentation PR for this
+handoff; record it here and in the [decision log](specs/argus-decision-log.md).
 
 ## Handoff rule
 
