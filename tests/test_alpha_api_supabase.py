@@ -205,31 +205,29 @@ def test_gateway_auth_flows_use_separate_auth_client():
     signup_response = MagicMock()
     signup_response.user = object()
     signup_response.model_dump.return_value = {"user": {"id": "auth-user"}}
-    auth_client.auth.sign_up.return_value = signup_response
+    auth_client.sign_up.return_value = signup_response
 
     login_response = MagicMock()
     login_response.session = object()
     login_response.model_dump.return_value = {"session": {"access_token": "token"}}
-    auth_client.auth.sign_in_with_password.return_value = login_response
+    auth_client.sign_in_with_password.return_value = login_response
 
-    gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
+    gateway = SupabaseGateway(
+        client=service_client, auth_client_factory=lambda: auth_client
+    )
 
     assert gateway.signup(
         email="alpha@example.com",
         password="password",
         captcha_token="captcha-proof",
-    ) == {
-        "user": {"id": "auth-user"}
-    }
+    ) == {"user": {"id": "auth-user"}}
     assert gateway.login(
         email="alpha@example.com",
         password="password",
         captcha_token="captcha-proof",
-    ) == {
-        "session": {"access_token": "token"}
-    }
+    ) == {"session": {"access_token": "token"}}
 
-    auth_client.auth.sign_up.assert_called_once_with(
+    auth_client.sign_up.assert_called_once_with(
         {
             "email": "alpha@example.com",
             "password": "password",
@@ -243,7 +241,7 @@ def test_gateway_auth_flows_use_separate_auth_client():
             },
         }
     )
-    auth_client.auth.sign_in_with_password.assert_called_once_with(
+    auth_client.sign_in_with_password.assert_called_once_with(
         {
             "email": "alpha@example.com",
             "password": "password",
@@ -260,8 +258,10 @@ def test_gateway_signup_records_language_for_profile_bootstrap():
     signup_response = MagicMock()
     signup_response.user = object()
     signup_response.model_dump.return_value = {"user": {"id": "auth-user"}}
-    auth_client.auth.sign_up.return_value = signup_response
-    gateway = SupabaseGateway(client=service_client, auth_client=auth_client)
+    auth_client.sign_up.return_value = signup_response
+    gateway = SupabaseGateway(
+        client=service_client, auth_client_factory=lambda: auth_client
+    )
 
     gateway.signup(
         email="alpha@example.com",
@@ -270,7 +270,7 @@ def test_gateway_signup_records_language_for_profile_bootstrap():
         language="es-419",
     )
 
-    auth_client.auth.sign_up.assert_called_once_with(
+    auth_client.sign_up.assert_called_once_with(
         {
             "email": "alpha@example.com",
             "password": "password",
@@ -1199,9 +1199,7 @@ def test_supabase_activity_get_and_patch_use_verified_source_identity(
     assert current.status_code == 200
     assert current.json()["attention"]["status"] == "new_activity"
     cursor = current.json()["attention"]["cursor"]
-    assert cursor == encode_attention_cursor(
-        Boundary("chat_turn", source_id, now)
-    )
+    assert cursor == encode_attention_cursor(Boundary("chat_turn", source_id, now))
 
     mock_gateway.mutate_conversation_activity_read_state.return_value = {
         "outcome": "applied",
@@ -1308,9 +1306,7 @@ def test_run_backtest_supabase_persists_normalized_snapshot_and_assumptions(
         "fee_bps": 0.0,
         "slippage_bps": 0.0,
     }
-    assert mock_gateway.admit_backtest_job.call_args.kwargs[
-        "execution_metadata"
-    ] == {
+    assert mock_gateway.admit_backtest_job.call_args.kwargs["execution_metadata"] == {
         "source": "api_direct",
         "openrouter_traffic_class": "registered",
     }
@@ -1371,9 +1367,7 @@ def test_guest_run_backtest_supabase_persists_guest_traffic_class(
     )
 
     assert response.status_code == 200, response.text
-    assert mock_gateway.admit_backtest_job.call_args.kwargs[
-        "execution_metadata"
-    ] == {
+    assert mock_gateway.admit_backtest_job.call_args.kwargs["execution_metadata"] == {
         "source": "api_direct",
         "openrouter_traffic_class": "guest",
     }
@@ -2221,8 +2215,6 @@ def test_signup_allows_email_on_private_alpha_allowlist(mock_gateway, monkeypatc
     assert response.cookies.get("sb-auth-token") == "access-token-123"
 
 
-
-
 def test_signup_duplicate_obfuscated_user_does_not_emit_product_event(
     mock_gateway,
     monkeypatch,
@@ -2584,14 +2576,18 @@ def test_public_signup_allowlist_denial_matches_provider_failure(
         == provider_failed.headers["X-Request-Id"]
         == headers["X-Request-Id"]
     )
-    assert allowlist_denied.json() == provider_failed.json() == {
-        "type": "https://api.argus.app/problems/auth-signup-failed",
-        "title": "Signup Failed",
-        "status": 400,
-        "detail": "Signup failed. Please try again.",
-        "code": "auth_signup_failed",
-        "request_id": "signup-enumeration-regression",
-    }
+    assert (
+        allowlist_denied.json()
+        == provider_failed.json()
+        == {
+            "type": "https://api.argus.app/problems/auth-signup-failed",
+            "title": "Signup Failed",
+            "status": 400,
+            "detail": "Signup failed. Please try again.",
+            "code": "auth_signup_failed",
+            "request_id": "signup-enumeration-regression",
+        }
+    )
     assert "provider rejected captcha" not in provider_failed.text
 
 
@@ -3728,13 +3724,9 @@ def test_history_supabase_chat_items_carry_title_source(mock_gateway):
     )
 
     assert response.status_code == 200
-    chat_items = [
-        item for item in response.json()["items"] if item["type"] == "chat"
-    ]
+    chat_items = [item for item in response.json()["items"] if item["type"] == "chat"]
     assert [item["title_source"] for item in chat_items] == ["ai_generated"]
-    non_chat_items = [
-        item for item in response.json()["items"] if item["type"] != "chat"
-    ]
+    non_chat_items = [item for item in response.json()["items"] if item["type"] != "chat"]
     assert non_chat_items
     assert all("title_source" not in item for item in non_chat_items)
     assert all("activity" not in item for item in non_chat_items)
@@ -4259,10 +4251,7 @@ def test_message_malformed_pivot_uses_existing_invalid_cursor_problem(mock_gatew
     mock_gateway.get_conversation.return_value = conversation
 
     response = client.get(
-        (
-            f"/api/v1/conversations/{conversation.id}/messages"
-            f"?limit=2&cursor={cursor}"
-        ),
+        (f"/api/v1/conversations/{conversation.id}/messages" f"?limit=2&cursor={cursor}"),
         headers={"Authorization": "Bearer test-token"},
     )
 
