@@ -321,7 +321,7 @@
     },
     {
       "case": "provider_input_boundary",
-      "claim": "Every provider field is checked once before anything is written. Each malformed field rejects the whole batch by name and writes only the connection's error state, while well-formed batches, including edge values, still apply",
+      "claim": "Every provider field is checked once before anything is written, and one batch may not report two different facts for one identity. Each malformed field or conflict rejects the whole batch by name and writes only the connection's error state, while well-formed batches, including edge values, still apply",
       "observed": {
         "accepted": {
           "baseline": {
@@ -385,6 +385,13 @@
             ],
             "writes_only_the_rejection": true
           },
+          "balances[1]": {
+            "applied": false,
+            "invalid": [
+              "balances[1]"
+            ],
+            "writes_only_the_rejection": true
+          },
           "coverage": {
             "applied": false,
             "invalid": [
@@ -431,6 +438,13 @@
             "applied": false,
             "invalid": [
               "txns[0].pending"
+            ],
+            "writes_only_the_rejection": true
+          },
+          "txns[1]": {
+            "applied": false,
+            "invalid": [
+              "txns[1]"
             ],
             "writes_only_the_rejection": true
           }
@@ -518,6 +532,32 @@
         "revisions": 0
       },
       "passed": true
+    },
+    {
+      "case": "snapshot_identity",
+      "claim": "A balance reported again for the same connection, account, currency, and as-of time replaces the stored one, so a retry adds nothing and reconciliation reads the correction",
+      "observed": {
+        "implied_at_check": "120.00",
+        "stored": [
+          "120.00"
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "account_references_must_be_owned",
+      "claim": "Every account id a caller supplies, as a transfer counterpart, a manual entry, or a correction, must be one of the owner's accounts. Someone else's or an unknown account is refused before anything changes",
+      "observed": {
+        "outcomes": {
+          "correction onto someone else's account": "PermissionError",
+          "counterpart owned by someone else": "PermissionError",
+          "manual entry on someone else's account": "PermissionError",
+          "own counterpart in another currency": "accepted",
+          "unknown counterpart": "PermissionError"
+        },
+        "records_on_other_account": []
+      },
+      "passed": true
     }
   ],
   "failed": [],
@@ -565,7 +605,7 @@
       "rows_in_export": 52
     }
   ],
-  "passed": 30,
+  "passed": 32,
   "review_workload": [
     {
       "actions_if_clean_rows_were_auto_accepted": 3,

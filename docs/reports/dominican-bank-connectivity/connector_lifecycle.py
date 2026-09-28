@@ -347,7 +347,25 @@ def input_problems(result: Refresh) -> list[str]:
         and result.coverage[0] <= result.coverage[1]
     ):
         problems.append("coverage")
-    return problems
+    return problems + _conflicting_facts(result)
+
+
+def _conflicting_facts(result: Refresh) -> list[str]:
+    facts: dict[tuple, object] = {}
+    conflicts = []
+    rows = [
+        (f"balances[{index}]", ("balance", item.account, item.currency, item.as_of), item)
+        for index, item in enumerate(result.balances)
+        if isinstance(item, Balance)
+    ] + [
+        (f"txns[{index}]", ("txn", item.account, item.institution_id), item)
+        for index, item in enumerate(result.txns)
+        if isinstance(item, Txn) and item.institution_id
+    ]
+    for path, identity, fact in rows:
+        if facts.setdefault(identity, fact) != fact:
+            conflicts.append(path)
+    return conflicts
 
 
 def _record_problems(path: str, item, kind: type, fields: dict[str, bool]) -> list[str]:
@@ -437,6 +455,12 @@ def _apply(store: Store, connection: dict, result: Refresh) -> dict:
                 store, connection, balance.account, balance.currency, "currency_mismatch"
             )
             continue
+        identity = (connection["id"], account_id, balance.currency, balance.as_of)
+        store.snapshots = [
+            s
+            for s in store.snapshots
+            if (s["connection"], s["account"], s["currency"], s["as_of"]) != identity
+        ]
         store.snapshots.append(
             {
                 "connection": connection["id"],
@@ -496,12 +520,28 @@ def _ask_owner(
     return True
 
 
-def _eligible_accounts(store: Store, owner: str, currency: str) -> set[str]:
+def _owned_accounts(store: Store, owner: str) -> set[str]:
     return {
         account_id
         for account_id, account in store.accounts.items()
-        if account["owner"] == owner and account["currency"] == currency
+        if account["owner"] == owner
     }
+
+
+def _eligible_accounts(store: Store, owner: str, currency: str) -> set[str]:
+    return {
+        account_id
+        for account_id in _owned_accounts(store, owner)
+        if store.accounts[account_id]["currency"] == currency
+    }
+
+
+def _require_owned(store: Store, owner: str, *account_ids: str | None) -> None:
+    foreign = [
+        a for a in account_ids if a is not None and a not in _owned_accounts(store, owner)
+    ]
+    if foreign:
+        raise PermissionError("an account reference must be one of the owner's accounts")
 
 
 def _holder(store: Store, key: str) -> str | None:
@@ -771,6 +811,7 @@ def classify(
     store: Store, actor: str, proposal_id: str, kind: str, counterpart: str | None = None
 ) -> None:
     proposal = _proposal(store, actor, proposal_id)
+    _require_owned(store, actor, counterpart)
     proposal["fields"]["kind"] = kind
     if counterpart:
         proposal["counterpart"] = counterpart
@@ -876,6 +917,7 @@ def add_manual(
 ) -> str:
     if field_issues(fields):
         raise ValueError(f"manual entry incomplete: {field_issues(fields)}")
+    _require_owned(store, owner, fields["account"], counterpart)
     record_id = store.new_id("rec")
     store.records[record_id] = {
         "id": record_id,
@@ -894,6 +936,7 @@ def correct(store: Store, actor: str, record_id: str, reason: str, **changes) ->
     record = store.records[record_id]
     if record["owner"] != actor or not reason.strip():
         raise ValueError("owner correction with a reason required")
+    _require_owned(store, actor, changes.get("account"))
     before = dict(record["fields"])
     record["fields"].update(changes)
     if field_issues(record["fields"]):
@@ -1962,6 +2005,7 @@ def edge_cases(checks: Checks) -> None:
     input_boundary(checks)
     account_choices(checks)
     source_changes(checks)
+    snapshots_and_references(checks)
 
 
 def input_boundary(checks: Checks) -> None:
@@ -1998,6 +2042,10 @@ def input_boundary(checks: Checks) -> None:
         "txns[0].description": replace(valid, txns=(replace(row, description=None),)),
         "txns[0].pending": replace(valid, txns=(replace(row, pending="yes"),)),
         "coverage": replace(valid, coverage=("2026-09-10", "2026-09-01")),
+        "balances[1]": replace(
+            valid, balances=(balance, replace(balance, amount="1600.00"))
+        ),
+        "txns[1]": replace(valid, txns=(row, replace(row, amount="301.00"))),
     }
 
     def attempt(batch: Refresh) -> tuple[dict, dict, Store]:
@@ -2041,7 +2089,10 @@ def input_boundary(checks: Checks) -> None:
         }
     edge = replace(
         valid,
-        balances=(replace(balance, amount="-35.20"), replace(balance, amount="0.00")),
+        balances=(
+            replace(balance, amount="-35.20"),
+            replace(balance, amount="0.00", as_of="2026-09-09T06:00"),
+        ),
         txns=(replace(row, description="", institution_id=None),),
     )
     accepted = {}
@@ -2054,7 +2105,7 @@ def input_boundary(checks: Checks) -> None:
         }
     checks.add(
         "provider_input_boundary",
-        "Every provider field is checked once before anything is written. Each malformed field rejects the whole batch by name and writes only the connection's error state, while well-formed batches, including edge values, still apply",
+        "Every provider field is checked once before anything is written, and one batch may not report two different facts for one identity. Each malformed field or conflict rejects the whole batch by name and writes only the connection's error state, while well-formed batches, including edge values, still apply",
         all(
             value
             == {"applied": False, "invalid": [field], "writes_only_the_rejection": True}
@@ -2242,6 +2293,116 @@ def source_changes(checks: Checks) -> None:
         confirmed=len(confirmed),
         flagged=flagged,
         revisions=len(revisions),
+    )
+
+
+def snapshots_and_references(checks: Checks) -> None:
+    at = "2026-09-10T06:00"
+    source = (SourceAccount("src", "Cuenta", "DOP"),)
+    store = Store()
+    store.accounts["acct-dop"] = {"owner": "ana", "name": "Cuenta", "currency": "DOP"}
+    conn = connect(store, "ana", "aggregator_api", {"src": "acct-dop"})
+    authenticate(store, "ana", conn, "authenticated")
+    for amount in ("100.00", "100.00", "120.00"):
+        refresh(
+            store,
+            "ana",
+            conn,
+            Refresh(
+                at=at,
+                accounts=source,
+                balances=(Balance("src", at, amount, "DOP"),),
+                coverage=("2026-09-01", "2026-09-10"),
+            ),
+        )
+    stored = [s["amount"] for s in store.snapshots if s["account"] == "acct-dop"]
+    compared = reconcile(
+        store,
+        "acct-dop",
+        {
+            "account": "acct-dop",
+            "as_of": "2026-09-10",
+            "amount": "120.00",
+            "currency": "DOP",
+        },
+    )
+    checks.add(
+        "snapshot_identity",
+        "A balance reported again for the same connection, account, currency, and as-of time replaces the stored one, so a retry adds nothing and reconciliation reads the correction",
+        stored == ["120.00"] and compared["implied_at_check"] == "120.00",
+        stored=stored,
+        implied_at_check=compared["implied_at_check"],
+    )
+
+    store = Store()
+    store.accounts["bob-chk"] = {"owner": "bob", "name": "Cuenta", "currency": "DOP"}
+    store.accounts["bob-usd"] = {"owner": "bob", "name": "Dolares", "currency": "USD"}
+    store.accounts["alice-chk"] = {"owner": "alice", "name": "Cuenta", "currency": "DOP"}
+    conn = connect(store, "bob", "aggregator_api", {"src": "bob-chk"})
+    authenticate(store, "bob", conn, "authenticated")
+    refresh(
+        store,
+        "bob",
+        conn,
+        Refresh(
+            at=at,
+            accounts=source,
+            txns=(tx("src", "2026-09-09", "70.00", "credit", "TRANSFERENCIA", "T-0001"),),
+            coverage=("2026-09-01", "2026-09-10"),
+        ),
+    )
+    [credit] = store.proposals.values()
+    manual = {
+        "source_id": "manual-1",
+        "date": "2026-09-09",
+        "description": "EFECTIVO",
+        "amount": "10.00",
+        "currency": "DOP",
+        "kind": "expense",
+        "account": "bob-chk",
+        "destination": "personal",
+    }
+    own_record = add_manual(store, "bob", manual)
+    attempts = {
+        "counterpart owned by someone else": lambda: classify(
+            store, "bob", credit["id"], "transfer", "alice-chk"
+        ),
+        "unknown counterpart": lambda: classify(
+            store, "bob", credit["id"], "transfer", "acct-missing"
+        ),
+        "manual entry on someone else's account": lambda: add_manual(
+            store, "bob", {**manual, "source_id": "manual-2", "account": "alice-chk"}
+        ),
+        "correction onto someone else's account": lambda: correct(
+            store, "bob", own_record, "move it", account="alice-chk"
+        ),
+        "own counterpart in another currency": lambda: classify(
+            store, "bob", credit["id"], "transfer", "bob-usd"
+        ),
+    }
+    outcomes = {}
+    for name, action in attempts.items():
+        result = _attempt(action)
+        refused = isinstance(result, dict) and "raised" in result
+        outcomes[name] = result["raised"] if refused else "accepted"
+    on_alice = [
+        r["id"] for r in store.records.values() if r["fields"]["account"] == "alice-chk"
+    ]
+    checks.add(
+        "account_references_must_be_owned",
+        "Every account id a caller supplies, as a transfer counterpart, a manual entry, or a correction, must be one of the owner's accounts. Someone else's or an unknown account is refused before anything changes",
+        outcomes
+        == {
+            "counterpart owned by someone else": "PermissionError",
+            "unknown counterpart": "PermissionError",
+            "manual entry on someone else's account": "PermissionError",
+            "correction onto someone else's account": "PermissionError",
+            "own counterpart in another currency": "accepted",
+        }
+        and on_alice == []
+        and store.proposals[credit["id"]]["counterpart"] == "bob-usd",
+        outcomes=outcomes,
+        records_on_other_account=on_alice,
     )
 
 
