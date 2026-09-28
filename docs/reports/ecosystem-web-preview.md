@@ -50,13 +50,13 @@ under `web/app/dev/ecosystem`; none establishes a second production owner.
 ## Reference and consistency
 
 Intake inspected all three PRs while open. A fresh GitHub read before
-reconciliation verified the updated states below:
+reconciliation on September 28, 2026 verified the states below:
 
 | Reference | Current state | Exact current head |
 | --- | --- | --- |
 | [#727](https://github.com/lagarcess/argus/pull/727) | Merged as `3fa0dd92167791d82ce81c167c490396358c4316` | `f0a64ffb9d70ce5b82491cf8e1803bb8a6ec7431` |
-| [#729](https://github.com/lagarcess/argus/pull/729) | Open, unmerged | `f4457f2b44ec7a437743563ebfd9f9fd701118fa` |
-| [#730](https://github.com/lagarcess/argus/pull/730) | Open, unmerged | `3f01a7f79493c8a9dae0ec2d30c12bd38898a175` |
+| [#729](https://github.com/lagarcess/argus/pull/729) | Merged as `f61e47f1243d94fe5d5fa631c4bd9f67906fcfc9` | `e035894215e48ab85af3ffce31b1eaaa106030f4` |
+| [#730](https://github.com/lagarcess/argus/pull/730) | Open, unmerged | `0f9a378277ced2647072862afcb401c0ac40c1f0` |
 
 The frozen archive passed CRC and matched SHA-256
 `c55e565aa142e38eec61b570510af1c4c2cb9629c24f3ce2d01387639f0ea0e6`.
@@ -119,9 +119,11 @@ contracts remain with the backend owner.
 | Item | Full SHA |
 | --- | --- |
 | Original fetched integration base | `4b84e054a0d8079b21f38784335ad3241809b4cd` |
-| Fetched integration at reconciliation | `3fa0dd92167791d82ce81c167c490396358c4316` |
-| One-way reconciliation merge | `2b3e6cf2589d87c1bc206e8a93511e4c32b95005` |
-| Committed browser evidence head | `356720b044133a69da2889314d4f3571813f2968` |
+| First reconciled integration | `3fa0dd92167791d82ce81c167c490396358c4316` |
+| First one-way reconciliation merge | `2b3e6cf2589d87c1bc206e8a93511e4c32b95005` |
+| Latest reconciled integration | `f61e47f1243d94fe5d5fa631c4bd9f67906fcfc9` |
+| Latest one-way reconciliation merge | `9baf573c992a47a16e3cb3132ae723d30c20ffa3` |
+| Committed browser evidence head | `efe2ec66631ad43395de5746b578528bf432c4a6` |
 
 The intervening integration changes are Supabase server-client isolation, Render
 hostname/benchmark configuration, and the mobile design publication. Runtime
@@ -130,34 +132,47 @@ package, route contract or migration changed. Render's hostname setting does not
 control this local preview. Affected integration tests are backend/auth/release
 checks. The design-authority overlap was inspected: the merged publication
 retains the exact archive already used here. The combined tree passes the
-modularity budget. No rebase or worker-to-integration merge was performed.
+modularity budget. The later reconciliation adds the #711 landing register and
+the merged #729 iOS foundation. Its native source, evidence and documentation
+have no shared web runtime, API/data, UI state, migration, environment or test
+owner with this lane. Native implementation deltas since the previously
+inspected #729/#730 heads are empty; their newer heads reconcile integration.
+The mobile archive remains unchanged. No rebase or worker-to-integration merge
+was performed.
 
-The [evidence index](evidence/pr-732/README.md) contains 33 screenshots, their
-metadata and 29 interaction records. Capture-only hiding of the Next development
-indicator is disclosed. Images and metadata are committed together. Local
-source/build checks at the reconciliation merge remain applicable to the evidence
-head: the two intervening commits alter only the focused production/browser tests.
+The [evidence index](evidence/pr-732/README.md) contains 35 screenshots, their
+metadata and 33 interaction records. Capture-only hiding of the Next development
+indicator is disclosed. Images and metadata are committed together. The final
+production build and browser/production gates use the committed evidence head.
+All captures were refreshed after the review fixes. The evidence guard checks
+all non-ignored worktree inputs, excluding only the selected evidence output
+directory; 12 temporary-repository tests cover dirty shared/source/test/config,
+staged/untracked files, and output-path bypass attempts.
 The terminal PR audit records the final PR head and explicitly revalidates any
 later documentation/evidence-only delta. It is written after the final review.
 
 ## Verification
 
-- Full fixture browser suite: **29 passed**. Every destination at desktop,
+- Full fixture browser suite: **33 passed**. Every destination at desktop,
   tablet and narrow widths; English/es-419; Light/Dark/System persistence;
-  keyboard/focus/history; draft, correction, Recents and recovery behavior;
+  keyboard/focus/history; draft validation, correction, Recents and recovery behavior;
   long labels and 200% text. Zero API/external requests or browser exceptions.
 - Production gate: **5 passed**. Preview produces the server not-found result;
   existing root/login/signup render and unauthenticated chat keeps its sign-in
   redirect. Inert localhost Supabase configuration avoids live services.
-- Frontend suite: **2,193 passed**, 204 files, zero failures.
+- Frontend suite: **2,205 passed**, 205 files, zero failures.
 - Frontend lint: zero errors; eight existing warnings in shared production
   components, none added by this lane.
 - Production build and TypeScript: passed. Only Next-generated custom-dist
   additions to `tsconfig.json` were restored; no shared config change is in the PR.
 - Changed documentation links, whitespace and combined-tree modularity: passed.
 - Independent latest-delta review: clean after fixing overlay handoff and
-  empty/no-match Recents recovery. Hosted CI and the final Codex review are
-  recorded in [PR #732](https://github.com/lagarcess/argus/pull/732).
+  empty/no-match Recents recovery. The first GitHub review found two valid
+  issues: incomplete evidence-input checking and unvalidated balance drafts.
+  Both are fixed and tested. Drafts use existing React-state form patterns and
+  localized accessible errors; no shared dependency or financial rule was added.
+  Hosted CI and the final Codex review are recorded in
+  [PR #732](https://github.com/lagarcess/argus/pull/732).
 
 Runtime: macOS 27.0 arm64, Bun 1.4.2, Node v26.10.0, Next 16.2.4,
 Playwright 1.59.1 / Chromium 147.0.7727.15. CI uses repository-pinned Bun 1.3.14.

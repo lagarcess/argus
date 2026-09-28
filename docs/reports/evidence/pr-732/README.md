@@ -1,6 +1,6 @@
 # PR #732: responsive ecosystem preview evidence
 
-Code and test head: `356720b044133a69da2889314d4f3571813f2968`.
+Code and test head: `efe2ec66631ad43395de5746b578528bf432c4a6`.
 Every PNG has a sibling JSON file with its exact head, URL, viewport, language,
 theme, browser and capture time. `interactions/` records every acceptance case
 and its network audit. This is local fixture evidence, not financial API or
@@ -20,6 +20,7 @@ authentication evidence.
 | Settings | [Desktop](desktop-en-light-settings.png), [Spanish System resolving Dark](settings-spanish-system-dark-persistence.png) |
 | Guest action handoff | [Desktop](desktop-en-light-guest-registration-handoff.png), [Spanish narrow](narrow-es-dark-guest-registration-handoff.png) |
 | Account forms | [Unsaved creation review](account-create-unsaved-review.png), [reopen/edit](account-reopen-edit-details.png), [correction review](account-correction-review.png) |
+| Invalid balance recovery | [English](account-balance-invalid-en.png), [Spanish](account-balance-invalid-es-419.png) |
 | Recents recovery | [Empty](recents-empty-state.png), [no match](recents-unmatched-state.png) |
 | Sample states | [Empty](home-empty-state.png), [loading](home-loading-state.png), [error](home-error-state.png) |
 | Larger text / long labels | [Desktop at 200% text](desktop-en-light-enlarged-text-long-label.png), [360px Spanish at 200%](compact-es-light-enlarged-text-long-label.png) |
@@ -29,6 +30,9 @@ authentication evidence.
 - Seven matrix cells visit all seven destinations at 1440, 834, 390 and 360px.
   English/es-419 and Light/Dark are covered; a separate interaction checks
   System following OS changes, reload persistence and language changes.
+- Durable capture rejects dirty source, shared components, tests and config
+  anywhere in the worktree. Only this run's generated evidence directory is
+  excluded so successive images can be written.
 - Browser requests to any API or external origin are blocked and fail the test.
   WebSocket traffic is also guarded. All expected traffic is local assets,
   locale catalogs and the development server.

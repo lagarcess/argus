@@ -1,14 +1,14 @@
 {
-  "test": "account dialog traps focus and restores it on Escape and Back at 390px",
+  "test": "account balance syntax blocks invalid text and recovers in create: es-419",
   "codeHead": "efe2ec66631ad43395de5746b578528bf432c4a6",
-  "recordedAt": "2026-09-28T21:20:08.045Z",
+  "recordedAt": "2026-09-28T21:20:30.291Z",
   "status": "passed",
-  "elapsedMs": 1177,
+  "elapsedMs": 1751,
   "browser": "147.0.7727.15",
   "baseURL": "http://127.0.0.1:3197",
   "network": {
     "forbidden": [],
-    "allowedRequests": 31,
+    "allowedRequests": 32,
     "pageErrors": []
   },
   "errors": []

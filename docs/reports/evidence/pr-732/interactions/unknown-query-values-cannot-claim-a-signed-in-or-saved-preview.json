@@ -1,9 +1,9 @@
 {
   "test": "unknown query values cannot claim a signed-in or saved preview",
-  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
-  "recordedAt": "2026-09-28T20:56:05.120Z",
+  "codeHead": "efe2ec66631ad43395de5746b578528bf432c4a6",
+  "recordedAt": "2026-09-28T21:20:39.458Z",
   "status": "passed",
-  "elapsedMs": 1139,
+  "elapsedMs": 1199,
   "browser": "147.0.7727.15",
   "baseURL": "http://127.0.0.1:3197",
   "network": {

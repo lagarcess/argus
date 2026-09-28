@@ -1,9 +1,9 @@
 {
   "test": "reopening an account exposes edit details and a transparent correction review",
-  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
-  "recordedAt": "2026-09-28T20:55:59.394Z",
+  "codeHead": "efe2ec66631ad43395de5746b578528bf432c4a6",
+  "recordedAt": "2026-09-28T21:20:33.733Z",
   "status": "passed",
-  "elapsedMs": 2038,
+  "elapsedMs": 1716,
   "browser": "147.0.7727.15",
   "baseURL": "http://127.0.0.1:3197",
   "network": {

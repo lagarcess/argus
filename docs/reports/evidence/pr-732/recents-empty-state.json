@@ -1,8 +1,8 @@
 {
   "name": "recents-empty-state",
-  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
-  "surfaceChanges": null,
-  "capturedAt": "2026-09-28T20:55:53.174Z",
+  "codeHead": "efe2ec66631ad43395de5746b578528bf432c4a6",
+  "worktreeChanges": null,
+  "capturedAt": "2026-09-28T21:20:21.109Z",
   "url": "http://127.0.0.1:3197/dev/ecosystem?view=argus&audience=guest&state=empty",
   "viewport": {
     "width": 1440,

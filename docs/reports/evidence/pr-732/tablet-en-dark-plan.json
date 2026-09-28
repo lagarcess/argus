@@ -1,8 +1,8 @@
 {
   "name": "tablet-en-dark-plan",
-  "codeHead": "356720b044133a69da2889314d4f3571813f2968",
-  "surfaceChanges": null,
-  "capturedAt": "2026-09-28T20:55:29.161Z",
+  "codeHead": "efe2ec66631ad43395de5746b578528bf432c4a6",
+  "worktreeChanges": null,
+  "capturedAt": "2026-09-28T21:19:54.179Z",
   "url": "http://127.0.0.1:3197/dev/ecosystem?view=plan&state=sample&audience=sample",
   "viewport": {
     "width": 834,
