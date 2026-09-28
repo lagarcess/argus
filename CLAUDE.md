@@ -1,6 +1,9 @@
 # Argus Claude Review Contract
 
-Read `AGENTS.md` first. It is the primary operating guide for this repo.
+Read `AGENTS.md` first. Use [documentation authority](docs/DOCUMENTATION_AUTHORITY.md)
+to identify the approved experience and assigned scope. Review the ecosystem
+against the MVEE and implementation changes against their technical contracts;
+preserve runtime safeguards.
 
 For any code review, also use:
 
@@ -9,7 +12,7 @@ For any code review, also use:
 - `docs/API_CONTRACT.md`
 - `docs/DATA_MODEL.md`
 - `.agent/designs/argus/DESIGN.md`
-- the active roadmap, lane spec, or release document for the change
+- the explicitly assigned package/spec and applicable release document
 
 Review against the named parent branch. Do not assume `main` is the correct
 comparison base for stacked or lane work.

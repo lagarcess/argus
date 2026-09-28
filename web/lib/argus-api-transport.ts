@@ -1,4 +1,6 @@
-import { getSupabaseClient } from "./supabase-client";
+import { authenticatedRequestHeaders } from "./chat-auth-ownership";
+
+export type AccountRequestOptions = RequestInit & { expectedUserId?: string };
 
 export const ARGUS_API_BASE_URL = (() => {
   if (process.env.NEXT_PUBLIC_ARGUS_API_URL) {
@@ -32,26 +34,16 @@ export function argusApiRequestHeaders(
 
 export async function apiFetch<T>(
   path: string,
-  options?: RequestInit,
+  options?: AccountRequestOptions,
 ): Promise<T> {
-  const isMockAuth = process.env.NEXT_PUBLIC_MOCK_AUTH === "true";
-  const authHeaders: Record<string, string> = {};
-
-  if (!isMockAuth) {
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      throw new Error("Supabase auth client is unavailable in non-mock mode.");
-    }
-    const { data, error } = await supabase.auth.getSession();
-    if (!error && data.session) {
-      authHeaders.Authorization = `Bearer ${data.session.access_token}`;
-    }
-  }
+  const { expectedUserId, ...requestOptions } = options ?? {};
+  const authHeaders = await authenticatedRequestHeaders(expectedUserId);
+  requestOptions.signal?.throwIfAborted();
 
   const response = await fetch(`${ARGUS_API_BASE_URL}${path}`, {
-    credentials: "include",
-    ...options,
-    headers: argusApiRequestHeaders(options?.headers, authHeaders),
+    ...requestOptions,
+    credentials: expectedUserId === undefined ? "include" : "omit",
+    headers: argusApiRequestHeaders(requestOptions.headers, authHeaders),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));

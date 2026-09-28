@@ -2,9 +2,11 @@
 
 > [!NOTE]
 > Current operational gate for Private Alpha candidate validation. Use
+> `docs/DOCUMENTATION_AUTHORITY.md` for product ownership and assigned work.
 > `docs/specs/private-alpha-next-roadmap.md` and
-> `docs/specs/private-alpha-next-decision-memo.md` for product sequencing; use
-> this runbook with `docs/specs/private-alpha-ci-cd-sota.md` and
+> `docs/specs/private-alpha-next-decision-memo.md` are historical references,
+> not product-sequencing authorities. Use this runbook with
+> `docs/specs/private-alpha-ci-cd-sota.md` and
 > `docs/release-manifests/TEMPLATE.md` for release gating.
 > For CI/CD promotion decisions, the decision memo is a later-context document, not part of this release gate.
 
@@ -1079,11 +1081,12 @@ Guest usage never merges into registered hour/day counters. Cleanup
 re-verifies anonymous source truth and must not delete a permanent account or
 the transferred graph.
 
-Guest funnel capture uses the shared metadata-only server envelope. Only the two
-typed browser-owned facts cross `POST /api/v1/analytics/guest-events`; PostHog
-keys, autocapture, session replay, prompts, assistant prose, exact
-capital/dates, email, Auth material, private titles/previews, provider/model
-names, and raw transcripts stay out.
+Product analytics reach PostHog only through the closed wave 1 event registry
+(`docs/DATA_MODEL.md` section 12.1.1); the earlier guest funnel events and the
+browser `POST /api/v1/analytics/guest-events` relay were removed in SPEC 0
+package 0C-1. PostHog keys, autocapture, session replay, prompts, assistant
+prose, amounts, exact capital/dates, email, Auth material, private
+titles/previews, provider/model names, and raw transcripts stay out.
 
 Rollback order:
 

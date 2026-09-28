@@ -1,9 +1,9 @@
 # Private Alpha Next Integration
 
-Status: Active integration staging/process context. Current product state,
-running lanes and landing status live in
-[`argus-answers-that-stay-true-roadmap.md`](argus-answers-that-stay-true-roadmap.md); the
-product-change ledger below stops at 2026-08-02 and is history.
+Status: Integration staging/process context with a historical product ledger.
+Use [documentation authority](../DOCUMENTATION_AUTHORITY.md) for approved
+experience and assigned-work ownership. Check current PRs and release evidence
+for landing/deployment status; the ledger below stops at August 2, 2026.
 Date: 2026-06-10
 Last reconciled: 2026-08-02 (header pointer added 2026-09-12)
 Branch: `codex/private-alpha-next`
@@ -254,14 +254,14 @@ in-repo evidence sets with probe-vs-proof labeling; provider-mode breadth is
 parked as #377. This was the cycle's final landing before the promotion
 freeze.
 
-Current note: while the interim pivot is active, use
-`docs/specs/private-alpha-interim-roadmap.md` as the founder-outcome and live-QA
-slate, `docs/specs/private-alpha-next-roadmap.md` as the parent execution board,
-and `docs/specs/private-alpha-next-decision-memo.md` as the strategic north
-star. This document remains staging and branch-process context for
-`codex/private-alpha-next`.
-For release-gate and canary decisions, the decision memo is later-context only;
-use the CI/CD SOTA spec, launch runbook, and release manifest template instead.
+Current product and assignment ownership follows
+[documentation authority](../DOCUMENTATION_AUTHORITY.md). The interim roadmap,
+P2 roadmap, and earlier decision memo are historical references. This document
+preserves staging/process safeguards and a dated integration ledger; it does
+not assign current product work.
+
+For release-gate and canary decisions, the archived decision memo is
+later-context only; it does not replace the release references below.
 
 For smoke, canary, manifest, and deployment discipline, use
 `docs/specs/private-alpha-ci-cd-sota.md`, `docs/PRIVATE_LAUNCH_RUNBOOK.md`, and
@@ -269,9 +269,10 @@ For smoke, canary, manifest, and deployment discipline, use
 
 ## Purpose
 
-This document is the working source of truth for the next integration branch
-after the private-alpha conversation trust checkpoint. It exists so every agent
-starts from the current `main` reality, not from stale milestone debt.
+This document preserves integration branch-process context after the
+private-alpha conversation trust checkpoint. Start new work from the current
+remote integration branch and its explicit assignment, using AGENTS.md for
+current delivery rules.
 
 The integration branch is a staging lane. It is allowed to collect reviewed work
 before a future PR, but it is not a release branch and must not be merged or
@@ -624,9 +625,10 @@ The clean reintegration strategy is now part of the process model:
 - quarantine commits may be inspected for ideas, tests, and failure evidence,
   but runtime code should not be broadly cherry-picked.
 
-## Remaining High-Leverage Work
+## Historical Follow-Up Register (August 2, 2026)
 
-Codex should own or closely supervise this:
+This register preserves the checkpoint's follow-ups. Verify current issue state
+and obtain an explicit assignment before taking work from it:
 
 1. **Finish the remaining interim product outcome and activation gates**
    - Grounded discovery now includes the PR #295 continuity pass at
@@ -665,10 +667,10 @@ Codex should own or closely supervise this:
      the source thesis that informed
      `docs/specs/private-alpha-next-decision-memo.md`. It is not the active
      sequencing document.
-   - Use the decision memo for current strategy and
-     `docs/specs/private-alpha-next-roadmap.md` for current execution. This
-     branch may refine the source thesis, but it must not implement the
-     evidence-aware idea loop without explicit approval.
+   - The decision memo and P2 roadmap preserve historical rationale and
+     contracts. Use [documentation authority](../DOCUMENTATION_AUTHORITY.md)
+     and the explicit assignment for current work. This source thesis does
+     not authorize implementation.
 
 ## Integrated Guest Checkpoint And Later Promotion Gates
 
@@ -743,10 +745,11 @@ mark them as completed execution records or superseded observations. Moving
 those files into `docs/archive/` would break evidence lineage without reducing
 active ambiguity.
 
-The active command sources are only the interim roadmap, the parent roadmap,
-the decision memo, and this integration-process document. Completed
-Always Progresses plans and dated reports are regression evidence, not active
-dispatch instructions.
+Current document ownership is defined by the authority map. The MVEE owns
+experience; explicit packages own assigned work; this document and release
+references supply applicable process safeguards. Retired strategic narratives
+have archive copies and compatibility pointers. Completed Always Progresses
+plans and dated reports remain regression evidence, not dispatch instructions.
 
 ## Known Non-Blocking Debt
 
