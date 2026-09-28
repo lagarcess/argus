@@ -251,6 +251,7 @@ def duplicates(
     account_id: str,
     body: Optional[Body],
     distinct: bool,
+    distinct_of: Sequence[str] = (),
 ) -> list[Issue]:
     existing = [
         (
@@ -285,14 +286,19 @@ def duplicates(
     if same_source:
         return [issue("already_recorded", *same_source)]
     signature = _signature(body)
-    if not signature or distinct:
+    if not signature:
         return []
     matches = [
         item_id
         for item_id, item_body, _, _ in existing
         if signature & _signature(item_body)
     ]
-    return [issue("possible_duplicate", *matches)] if matches else []
+    if not matches:
+        return []
+    # A distinct decision only covers the match set reviewed at resolve time.
+    if distinct and set(matches) <= set(distinct_of):
+        return []
+    return [issue("possible_duplicate", *matches)]
 
 
 def _activity_issues(book: Book, body: Activity, record_id: Optional[str]) -> list[Issue]:

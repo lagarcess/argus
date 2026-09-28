@@ -12,7 +12,7 @@ import json
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 from zoneinfo import ZoneInfo
 
 from tests.financial_recording.catalog import (
@@ -97,6 +97,7 @@ class Draft:
     status: Literal["proposed", "confirmed", "rejected"] = "proposed"
     revision: int = 1
     distinct: bool = False
+    distinct_of: tuple[str, ...] = ()
     record_id: Optional[str] = None
     answers: Answers = ()
 
@@ -139,11 +140,31 @@ def review(
     ]
     account_id = (draft.fields.get("account_id") or "").strip()
     found.extend(
-        duplicates(book, earlier, draft.provenance, account_id, body, draft.distinct)
+        duplicates(
+            book,
+            earlier,
+            draft.provenance,
+            account_id,
+            body,
+            draft.distinct,
+            _materialized_distinct_of(state, draft.distinct_of),
+        )
     )
     if body is not None and not blocking(found):
         found.extend(notices(book, body, tz, draft.provenance))
     return body, tuple(found)
+
+
+def _materialized_distinct_of(state: State, distinct_of: Sequence[str]) -> tuple[str, ...]:
+    """Map reviewed draft ids to the records they became after confirm."""
+    resolved = []
+    for ref in distinct_of:
+        other = state.drafts.get(ref)
+        if other is not None and other.record_id is not None:
+            resolved.append(other.record_id)
+        else:
+            resolved.append(ref)
+    return tuple(resolved)
 
 
 class Store:
@@ -335,6 +356,7 @@ class Store:
             fields={**draft.fields, **fields},
             revision=draft.revision + 1,
             distinct=False,
+            distinct_of=(),
             answers=(),
         )
         self._swap(drafts={**self.state.drafts, draft_id: edited})
@@ -369,8 +391,10 @@ class Store:
             if not matches:
                 raise InvalidInput("distinct_not_applicable", draft_id)
             changes["distinct"] = True
+            changes["distinct_of"] = matches
         else:
             changes["distinct"] = draft.distinct
+            changes["distinct_of"] = draft.distinct_of
         if duplicate_of is not None:
             matches = self._live_duplicate_matches(draft)
             if duplicate_of not in matches:
@@ -515,11 +539,24 @@ class Store:
         *,
         accept_reordering: bool = False,
         answers: Optional[Mapping[str, str]] = None,
+        basis: Optional[Union[Mapping[str, int], str]] = None,
+        check: Optional[Mapping[str, Optional[int]]] = None,
         **changes,
     ) -> Record:
         """A correction that moves any activity between a balance and a difference
-        stops for review; `accept_reordering` records that the person saw it."""
+        stops for review; `accept_reordering` records that the person saw it.
+
+        Amount/date corrections on a check restamp confirmation evidence. Pass the
+        account-version `basis` (Preview.basis) and reviewed `check` evidence from
+        the correction screen so a concurrent included activity cannot rewrite what
+        the person accepted. A string `basis` is the observation field change.
+        """
         record = self._current(record_id, expected_revision, reason)
+        account_basis: Optional[Mapping[str, int]] = None
+        if isinstance(basis, str):
+            changes["basis"] = basis
+        elif basis is not None:
+            account_basis = basis
         currency = self.book.accounts[record.body.account_id].currency
         if "amount" in changes:
             typed = parse_minor(changes["amount"], currency)
@@ -560,6 +597,14 @@ class Store:
             found.extend(self._placement_changes(record, body))
         if found:
             raise ReviewRequired(found)
+        will_reconfirm = isinstance(body, Observation) and (
+            body.amount,
+            body.as_of,
+        ) != (record.body.amount, record.body.as_of)
+        if will_reconfirm:
+            if account_basis is None or check is None:
+                raise InvalidInput("check_correction_basis_required", record_id)
+            self._assert_check_correction_basis(record_id, body, account_basis, check)
         return self._revise(record, body, reason, removed=False)
 
     def remove(
@@ -806,6 +851,40 @@ class Store:
         if not reason.strip():
             raise InvalidInput("reason_required", record_id)
         return record
+
+    def _assert_check_correction_basis(
+        self,
+        record_id: str,
+        body: Observation,
+        basis: Mapping[str, int],
+        check: Mapping[str, Optional[int]],
+    ) -> None:
+        """Refuse a restamp when the reviewed account state or evidence moved."""
+        for account_id, version in basis.items():
+            account = self.book.accounts.get(account_id)
+            if account is None or account.version != version:
+                raise StaleVersion(account_id)
+        # Dry-run with the real check id so not_included answers still apply.
+        placeholder = Record(
+            record_id,
+            0,
+            (
+                Revision(
+                    body,
+                    self.clock(),
+                    Provenance("manual", self.clock()),
+                    contained=None,
+                ),
+            ),
+        )
+        stamped = self._stamped(self.book, placeholder)
+        last = stamped.revisions[-1]
+        if (
+            last.confirmed_expected != check.get("prior")
+            or last.confirmed_difference != check.get("difference")
+            or body.amount != check.get("observed")
+        ):
+            raise StaleVersion(body.account_id)
 
     def _revise(
         self, record: Record, body: Body, reason: str, *, removed: bool

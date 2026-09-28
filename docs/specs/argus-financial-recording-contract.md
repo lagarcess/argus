@@ -202,7 +202,7 @@ Notices inform and never block. `negative_asset_balance` flags cash or a bank ac
 
 **Stale previews.** Confirmation succeeds only if the preview's basis still holds. Otherwise it writes nothing and returns `stale_preview` with a refreshed preview. The draft and the person's edits are kept. The person sees the changed effects and confirms again. Two confirmations of one stale preview both fail.
 
-**Stale edits.** Corrections carry `expected_revision`, and account edits carry `expected_version`. A mismatch is `stale_version` and changes nothing. One partner never silently overwrites another's work.
+**Stale edits.** Corrections carry `expected_revision`, and account edits carry `expected_version`. A mismatch is `stale_version` and changes nothing. One partner never silently overwrites another's work. An amount or date correction on a balance check is a re-confirmation: it must carry the same account-version `basis` and reviewed `check` evidence a preview would show for the new values, or the write is refused (`check_correction_basis_required` / `stale_version`) so concurrent included activity cannot rewrite the evidence the person accepted.
 
 **Correction, not reversal.** A correction keeps the fact at its true date and appends a revision. The payment ledger's reversal postings would move a corrected September expense into October. A record also keeps its currency. A correction may move it only to an account in the same currency.
 
@@ -221,7 +221,7 @@ A plan's dated expectation is fulfilled by at most one live activity, and one ac
 ## 11. Duplicates, overlap and late information
 
 1. **Identity.** The same file digest and row, or the same institution `external_id` on the same account, is `already_recorded`. This covers confirmed records, removed records and pending drafts. Re-importing a file or an overlapping statement creates nothing, and a removed row does not return with the next import.
-2. **Signature.** Any leg with the same account, amount and date, without shared identity, is `possible_duplicate`. It blocks until the person chooses. "Same as that record" links the new source to an existing confirmed record and creates nothing; a still-proposed draft id is `duplicate_target_invalid`. "Different" saves it. The kind is ignored, so a card statement's payment row meets the payment recorded from checking. Notes are ignored too.
+2. **Signature.** Any leg with the same account, amount and date, without shared identity, is `possible_duplicate`. It blocks until the person chooses. "Same as that record" links the new source to an existing confirmed record and creates nothing; a still-proposed draft id is `duplicate_target_invalid`. "Different" binds to the match ids reviewed at that resolve and clears on edit; a later candidate outside that set reopens `possible_duplicate`. The kind is ignored, so a card statement's payment row meets the payment recorded from checking. Notes are ignored too.
 
 Equal amounts alone never match. The same amount on another account or another date raises nothing. Nothing is merged or deleted automatically. The synthetic kit confirms two identical rows from one file silently. This contract asks once, because a row with no reference cannot prove two purchases happened.
 
@@ -243,7 +243,7 @@ An import row whose destination is ambiguous keeps its account unresolved until 
 
 **Coverage** is part of every position. It lists known accounts, unknown accounts, archived accounts included, the oldest anchor date and open unexplained differences. A total over partial data is never presented as the whole picture.
 
-**Personal and household.** Personal totals use the person's ownership share. Household totals count each authorized shared account once. Scopes are never added together. A transfer from a private account into a joint account is money moved in from outside the household scope, never household income. The recommended account detail shows the full balance with an explicit personal-share readout. Where ownership data is absent, the production contract must resolve it explicitly rather than assume a share.
+**Personal and household.** Personal totals use the person's ownership share. Household totals count each authorized shared account once. Scopes are never added together. A transfer from a private account into a joint account is money moved in from outside the household scope, never household income. The recommended account detail shows the full balance with an explicit personal-share readout. Where ownership data is absent, the production contract must resolve it explicitly rather than assume a share. Position weighting is closed: only `full` and `owner_share` are accepted; any other value is `weighting_unsupported`, never a silent fall-through to full ownership.
 
 ## 13. Categories
 

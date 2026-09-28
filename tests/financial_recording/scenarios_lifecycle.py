@@ -283,6 +283,9 @@ def edits_that_move_money_need_review() -> dict:
         "expectation_direction_is_canonical": _expectation_direction_canonical(),
         "restamp_honors_not_included": _restamp_honors_not_included(),
         "duplicate_of_draft_is_refused": _duplicate_of_draft_refused(),
+        "unsupported_weighting_is_refused": _unsupported_weighting_is_refused(),
+        "check_correction_bound_to_account_state": _check_correction_bound_to_account(),
+        "distinct_bound_to_reviewed_matches": _distinct_bound_to_reviewed_matches(),
     }
 
 
@@ -956,7 +959,14 @@ def _restamp_honors_not_included() -> dict:
     )
     expense = scene.confirm(late)
     # Amount must change so `_revise` clears contained and restamps.
-    scene.store.correct(check.id, 1, "typo", amount="950.00")
+    scene.store.correct(
+        check.id,
+        1,
+        "typo",
+        amount="950.00",
+        basis={cash.id: scene.store.book.accounts[cash.id].version},
+        check={"prior": 100_000, "observed": 95_000, "difference": -5_000},
+    )
     revised = scene.store.book.records[check.id]
     stamped = revised.revisions[-1]
     return {
@@ -977,7 +987,15 @@ def _redated_check_restamps() -> dict:
     unanswered = outcome(lambda: scene.store.correct(check.id, 1, "9th", **redate))
     scene.store.correct(expense.id, 1, "seen on the 9th", answers={check.id: "included"})
     unaccepted = outcome(lambda: scene.store.correct(check.id, 1, "9th", **redate))
-    scene.store.correct(check.id, 1, "9th", accept_reordering=True, **redate)
+    scene.store.correct(
+        check.id,
+        1,
+        "9th",
+        accept_reordering=True,
+        basis={cash.id: scene.store.book.accounts[cash.id].version},
+        check={"prior": 90_000, "observed": 90_000, "difference": 0},
+        **redate,
+    )
     gap = observation_gaps(scene.store.book, cash.id, scene.store.tz)[0]
     return {
         "unanswered": unanswered,
@@ -1211,6 +1229,93 @@ def _custom_category_blocks_move() -> dict:
     version = scene.store.book.accounts[shop.id].version
     return {
         "move": outcome(lambda: scene.store.move_account(shop.id, version, "personal"))
+    }
+
+
+def _unsupported_weighting_is_refused() -> dict:
+    scene = Scene()
+    car = scene.account("Carro", "vehicle", "DOP", "1000000.00", ownership_share_bps=5000)
+    return {
+        "unsupported": outcome(lambda: scene.position(car, weighting="half")),
+        "full_still_works": scene.position(car, weighting="full")["DOP"]["assets"],
+    }
+
+
+def _check_correction_bound_to_account() -> dict:
+    """A restamp refuses when concurrent activity moves the reviewed evidence."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    check = scene.observe(cash, "1000.00", 5)
+    prepared_basis = {cash.id: scene.store.book.accounts[cash.id].version}
+    prepared_check = {"prior": 100_000, "observed": 95_000, "difference": -5_000}
+    missing = outcome(
+        lambda: scene.store.correct(check.id, 1, "typo", amount="950.00")
+    )
+    scene.now = local(8)
+    late = scene.act("expense", cash, "100.00", 3)
+    scene.store.resolve(
+        late.id,
+        answers={check.id: "included"},
+        expected_revision=scene.store.state.drafts[late.id].revision,
+    )
+    scene.confirm(late)
+    stale_basis = outcome(
+        lambda: scene.store.correct(
+            check.id,
+            1,
+            "typo",
+            amount="950.00",
+            basis=prepared_basis,
+            check=prepared_check,
+        )
+    )
+    fresh_basis = {cash.id: scene.store.book.accounts[cash.id].version}
+    stale_evidence = outcome(
+        lambda: scene.store.correct(
+            check.id,
+            1,
+            "typo",
+            amount="950.00",
+            basis=fresh_basis,
+            check=prepared_check,
+        )
+    )
+    accepted = outcome(
+        lambda: scene.store.correct(
+            check.id,
+            1,
+            "typo",
+            amount="950.00",
+            basis=fresh_basis,
+            check={"prior": 90_000, "observed": 95_000, "difference": 5_000},
+        )
+    )
+    return {
+        "missing_basis": missing,
+        "stale_account_basis": stale_basis,
+        "stale_check_evidence": stale_evidence,
+        "accepted": accepted,
+    }
+
+
+def _distinct_bound_to_reviewed_matches() -> dict:
+    """Distinct only covers the match set reviewed at resolve; a new match reopens."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "5000.00")
+    first = scene.record("expense", cash, "500.00", 3)
+    twin = scene.act("expense", cash, "500.00", 3, method="chat")
+    scene.store.resolve(twin.id, distinct=True, expected_revision=twin.revision)
+    after_distinct = scene.issues(twin)
+    bound = scene.store.state.drafts[twin.id].distinct_of == (first.id,)
+    other = scene.record("expense", cash, "400.00", 4)
+    scene.store.correct(other.id, 1, "was 500 on the 3rd", amount="500.00", occurred_on=local(3).date().isoformat())
+    after_new_match = scene.issues(twin)
+    return {
+        "suppressed_while_bound": after_distinct,
+        "bound_to_reviewed_match": bound,
+        "reopens_for_new_match": after_new_match,
+        "lists_both": sorted(scene.refs(twin, "possible_duplicate"))
+        == sorted([first.id, other.id]),
     }
 
 

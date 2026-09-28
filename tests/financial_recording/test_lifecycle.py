@@ -359,4 +359,20 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "lists_the_other_draft": True,
             "link_to_draft": "ReviewRequired:duplicate_target_invalid",
         },
+        "unsupported_weighting_is_refused": {
+            "unsupported": "InvalidInput:weighting_unsupported",
+            "full_still_works": 100_000_000,
+        },
+        "check_correction_bound_to_account_state": {
+            "missing_basis": "InvalidInput:check_correction_basis_required",
+            "stale_account_basis": "StaleVersion",
+            "stale_check_evidence": "StaleVersion",
+            "accepted": "ok",
+        },
+        "distinct_bound_to_reviewed_matches": {
+            "suppressed_while_bound": {},
+            "bound_to_reviewed_match": True,
+            "reopens_for_new_match": {"possible_duplicate": "blocking"},
+            "lists_both": True,
+        },
     }

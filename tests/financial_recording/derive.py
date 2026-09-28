@@ -25,7 +25,7 @@ from tests.financial_recording.catalog import (
     Category,
     Kind,
 )
-from tests.financial_recording.money import round_half_up
+from tests.financial_recording.money import InvalidInput, round_half_up
 
 DEFAULT_TZ = ZoneInfo("America/Santo_Domingo")
 INCLUDED, NOT_INCLUDED = "included", "not_included"
@@ -488,6 +488,8 @@ def position(
     weighting: Weighting = "full",
     tz: ZoneInfo = DEFAULT_TZ,
 ) -> dict[str, Position]:
+    if weighting not in ("full", "owner_share"):
+        raise InvalidInput("weighting_unsupported", repr(weighting))
     groups: dict[str, dict] = {}
     for account_id in sorted(set(scope)):
         account = book.accounts[account_id]
