@@ -64,7 +64,7 @@ The [next assignment](next-assignment.md) is independent of all seven and can st
 - The experiment uses fictional data from the synthetic ingestion kit and Faker. It makes no network call and imports nothing from `src/argus`.
 - No paid service, no paid evaluation, and no broad runtime suite ran.
 - The session's shared web-search allowance ran out partway through. Later research used direct fetches of known official pages.
-- The assignment names a balance-reconciliation handoff. No such document, issue, or pull request exists on the inspected base. The closest material is the "Decisions exposed, not settled" section of `tests/synthetic_ingestion/README.md` and the two reports merged on 2026-09-27, [synthetic-ingestion-evaluation.md](../synthetic-ingestion-evaluation.md) and [payment-ledger-reuse-assessment.md](../payment-ledger-reuse-assessment.md).
+- The assignment names a balance-reconciliation handoff. It was not on the inspected base. It now exists as `docs/specs/argus-account-balance-reconciliation-handoff.md` in pull request 727, and the [selected-file import proof](selected-file-import/README.md) uses its rule for activity dated behind a balance check. At the time of the report the closest material is the "Decisions exposed, not settled" section of `tests/synthetic_ingestion/README.md` and the two reports merged on 2026-09-27, [synthetic-ingestion-evaluation.md](../synthetic-ingestion-evaluation.md) and [payment-ledger-reuse-assessment.md](../payment-ledger-reuse-assessment.md).
 
 ## Files
 
@@ -81,5 +81,7 @@ The [next assignment](next-assignment.md) is independent of all seven and can st
 | [partnership-evidence.md](partnership-evidence.md) | Bank partnership evidence and the connectivity-business question |
 | [rexi-product-discovery-appendix.md](rexi-product-discovery-appendix.md) | Rexi and official product-fact sources |
 | [next-assignment.md](next-assignment.md) | The bounded next assignment |
+| [selected-file-import/](selected-file-import/README.md) | The selected-file import proof, its acceptance matrix, and its dependencies |
+| [evidence-index.md](evidence-index.md) | Pull request, commits, and every class of evidence with its limits |
 | [research-notes/](research-notes/README.md) | The dated research notes behind the matrices, with every source |
 | [decision-trail.tsv](decision-trail.tsv) | One row per decision and verification in this lane |
