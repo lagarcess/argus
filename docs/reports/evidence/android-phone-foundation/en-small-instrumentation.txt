@@ -1,0 +1,8 @@
+
+ai.argus.foundation.FoundationTest:.........
+
+Time: 47.781
+
+OK (9 tests)
+
+

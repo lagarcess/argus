@@ -37,12 +37,29 @@ intentionally pins this verified API/toolchain instead of automatically upgradin
 
 ## Acceptance record
 
-Final candidate/device acceptance and durable captures are being gathered.
-Initial runs built and launched both phones, passed 3 JVM tests and 8/9 device
-checks on each; the sole failure was a stale test expecting “Argus” instead of
-reference-owned “Ask Argus.” The expectation was corrected. Initial visual
-inspection corrected the space pill, Home wordmark and uncontained tab ripple.
-Those first captures are superseded and are not final acceptance evidence.
+The app source at `8fe35fd32abf0c27ffbc08312db082a4478ba964` passed build,
+3 JVM tests, lint, and all 9 instrumented tests on both API 36 phones. The full
+9-test suite also passed on each phone in es-419 at 130% font size (36 passing
+checks across the four configurations). Tests cover five ordered accessible
+48dp tab targets, registration notices for direct and chat actions, disconnected
+finance input, native Back, settings origin, all appearance choices across
+activity recreation, and live System appearance changes.
+
+Manual small-phone checks confirmed Dark survives force-stop/relaunch, the
+keyboard hides bottom navigation, and Back dismisses it while preserving the
+sample draft. Appearance was restored to System. Screenshots were inspected
+for the compact phone, large phone and enlarged Spanish text. This is basic
+semantics/layout coverage, not a TalkBack certification.
+
+[Durable device evidence](evidence/android-phone-foundation/README.md) contains
+raw captures, instrumentation outputs and a source-tree manifest. English tab
+captures were taken after settling ripple animations. Evidence-only changes
+must be explicitly revalidated against the recorded app source tree at closeout.
+
+The Android PR workflow at this source head passed. A duplicate push run failed
+fetching several Maven artifacts while the PR run succeeded with the same
+source; this is recorded as an infrastructure failure, not a passing run.
+Final-head CI and remote Codex review are recorded in the PR closeout.
 
 The required mocked backend harness was attempted once locally. Collection
 failed in `scipy.linalg` importing `_spropack` with the Mach-O `__thread_bss`
