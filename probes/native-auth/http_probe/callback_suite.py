@@ -70,7 +70,11 @@ def run(stack: Stack, ids: Identities, rec: Recorder, *, wait_for_expiry: bool) 
             "language": "en",
         },
     )
-    confirm = _callback(gotrue.verify_link(mail.latest_link(newcomer, after=sent_at)).headers.get("location", ""))
+    confirm = _callback(
+        gotrue.verify_link(mail.latest_link(newcomer, after=sent_at)).headers.get(
+            "location", ""
+        )
+    )
     rec.check(
         "D1",
         area="confirmation",
@@ -83,12 +87,15 @@ def run(stack: Stack, ids: Identities, rec: Recorder, *, wait_for_expiry: bool) 
             "callback_target": confirm["target"],
             "carries_session_fragment": "access_token" in confirm,
         },
-        ok=signup.status_code == 200 and confirm["target"].startswith("http://localhost:3000"),
+        ok=signup.status_code == 200
+        and confirm["target"].startswith("http://localhost:3000"),
         note="Hosted: lands on the web app with an implicit-flow session in the URL fragment. A native return needs Argus to pass emailRedirectTo (proposal P4).",
     )
 
     user = ids.create("recover")
-    requested, link, verifier = _request_recovery(gotrue, mail, user.email, NATIVE_CALLBACK)
+    requested, link, verifier = _request_recovery(
+        gotrue, mail, user.email, NATIVE_CALLBACK
+    )
     landed = _callback(gotrue.verify_link(link).headers.get("location", ""))
     exchanged = gotrue.exchange_pkce(landed.get("code", ""), verifier)
     session = exchanged.json() if exchanged.status_code == 200 else {}
@@ -152,7 +159,9 @@ def run(stack: Stack, ids: Identities, rec: Recorder, *, wait_for_expiry: bool) 
         note="PKCE binds the link to the device that requested it. A user who requests recovery on the phone and opens the email on a laptop cannot finish on the laptop through this flow.",
     )
 
-    unlisted_requested, unlisted_link, _ = _request_recovery(gotrue, mail, user.email, UNLISTED_CALLBACK)
+    unlisted_requested, unlisted_link, _ = _request_recovery(
+        gotrue, mail, user.email, UNLISTED_CALLBACK
+    )
     unlisted = _callback(gotrue.verify_link(unlisted_link).headers.get("location", ""))
     rec.check(
         "D5",
@@ -161,20 +170,33 @@ def run(stack: Stack, ids: Identities, rec: Recorder, *, wait_for_expiry: bool) 
         path=UNCHANGED,
         level=3,
         expected="Supabase ignores the unlisted redirect and falls back to site_url",
-        observed={"recover_status": unlisted_requested.status_code, "callback_target": unlisted["target"]},
+        observed={
+            "recover_status": unlisted_requested.status_code,
+            "callback_target": unlisted["target"],
+        },
         ok=unlisted["target"] != UNLISTED_CALLBACK,
     )
 
-    before = argus_login(Device(stack, "other-device", device_ip(41), "none"), user.email, user.password)
-    other_access = (before.json().get("session") or {}).get("access_token") if before.status_code == 200 else None
+    before = argus_login(
+        Device(stack, "other-device", device_ip(41), "none"), user.email, user.password
+    )
+    other_access = (
+        (before.json().get("session") or {}).get("access_token")
+        if before.status_code == 200
+        else None
+    )
     _, link3, verifier3 = _request_recovery(gotrue, mail, user.email, NATIVE_CALLBACK)
     recovered = gotrue.exchange_pkce(
-        _callback(gotrue.verify_link(link3).headers.get("location", "")).get("code", ""), verifier3
+        _callback(gotrue.verify_link(link3).headers.get("location", "")).get("code", ""),
+        verifier3,
     ).json()
     updated = gotrue.http.put(
         f"{stack.supabase_url}/auth/v1/user",
         json={"password": ids.new_password()},
-        headers={"apikey": stack.anon_key, "Authorization": f"Bearer {recovered.get('access_token', '')}"},
+        headers={
+            "apikey": stack.anon_key,
+            "Authorization": f"Bearer {recovered.get('access_token', '')}",
+        },
     )
     other_after_update = device.argus("GET", "/me", token=other_access)
     global_out = gotrue.logout(recovered.get("access_token", ""), "global")
