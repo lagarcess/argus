@@ -34,6 +34,26 @@ def test_default_outputs_stay_under_temp_render_benchmark_directory() -> None:
     assert output_dir == REPO_ROOT / "temp" / "benchmarks" / "render-internet"
 
 
+def test_api_url_fallback_derives_from_release_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load_benchmark_module()
+    contract_url = module._release_contract_value(
+        REPO_ROOT, "ARGUS_PRIVATE_LAUNCH_API_URL"
+    )
+
+    assert contract_url == "https://api.arguschat.ai"
+    assert "argus-ohr5.onrender.com" not in contract_url
+    assert not hasattr(module, "DEFAULT_API_URL")
+
+    monkeypatch.delenv("ARGUS_CANARY_API_URL", raising=False)
+    monkeypatch.delenv("ARGUS_PRIVATE_LAUNCH_API_URL", raising=False)
+    assert module._resolved_api_url(REPO_ROOT, None) == contract_url
+    assert module._resolved_api_url(REPO_ROOT, " https://example.test ") == (
+        "https://example.test"
+    )
+
+
 def test_parse_sse_events_accepts_canonical_data_frames() -> None:
     module = _load_benchmark_module()
 
@@ -223,7 +243,7 @@ def test_markdown_summary_reports_live_timings_and_unavailable_metrics() -> None
     report = {
         "schema_version": "argus_render_internet_benchmark/v1",
         "generated_at": "2026-06-07T12:00:00+00:00",
-        "api_url": "https://argus-ohr5.onrender.com",
+        "api_url": "https://api.arguschat.ai",
         "app_url": "https://argus-app-suz5.onrender.com",
         "runs": [
             {
