@@ -3,25 +3,26 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { Bell, ChevronDown, CircleHelp, History, House, Plus, Search, SlidersHorizontal, SquarePen, Target, UserRound, Wallet, X } from "lucide-react";
-import { ArgusLogo } from "@/components/ArgusLogo";
+import { Bell, ChevronDown, CircleHelp, History, Plus, SlidersHorizontal, SquarePen, UserRound, X } from "lucide-react";
 import ChatHeaderTitle from "@/components/chat/ChatHeaderTitle";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
 import { consumeOverlayEntriesForNavigation } from "@/lib/overlay-history";
 import AccountPanels, { type AccountPanel } from "./AccountPanels";
+import { AccountInspector } from "./AccountDetail";
 import PreviewChat from "./PreviewChat";
 import PreviewDialogs, { type SimpleDialog } from "./PreviewDialogs";
+import PreviewNavigation from "./PreviewNavigation";
 import { AccountsView, HomeView, PlanView, SearchView, SettingsView, UpdatesView, type SearchCategory, type ViewActions } from "./PreviewViews";
 import { EmptyState } from "./PreviewPrimitives";
-import { PREVIEW_STATES, PREVIEW_VIEWS, previewCopy, previewLocation, type PreviewView, type RecentId, type SampleAccount } from "./preview-content";
+import { PREVIEW_STATES, PREVIEW_VIEWS, SAMPLE, previewCopy, previewHref, previewLocation, type PreviewView, type RecentId, type SampleAccount } from "./preview-content";
 import styles from "./ecosystem-preview.module.css";
-
-const MAIN_DESTINATIONS = PREVIEW_VIEWS.slice(0, 5);
-const NAV_ICONS = { home: House, accounts: Wallet, argus: ArgusLogo, plan: Target, search: Search };
 
 export default function EcosystemPreview() {
   const searchParams = useSearchParams();
   const location = previewLocation(searchParams);
   const { view, state, audience } = location;
+  const { isBelowDesktop } = useResponsiveLayout();
+  const selectedAccount = SAMPLE.accounts.find((account) => account.id === location.account) ?? null;
   const { i18n } = useTranslation();
   const copy = previewCopy(i18n.resolvedLanguage ?? i18n.language ?? "en");
   const [dialog, setDialog] = useState<SimpleDialog | null>(null);
@@ -35,6 +36,8 @@ export default function EcosystemPreview() {
   const mainRef = useRef<HTMLElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const inspectorOpenerRef = useRef<HTMLElement | null>(null);
+  const previousAccount = useRef(location.account);
   const previousView = useRef(view);
   const hadDialog = useRef(false);
   const hasDialog = dialog !== null || accountPanel !== null;
@@ -42,18 +45,22 @@ export default function EcosystemPreview() {
   useEffect(() => {
     if (previousView.current !== view) {
       mainRef.current?.focus({ preventScroll: true });
-      window.scrollTo({ top: 0, behavior: "instant" });
-    } else if (hadDialog.current && !hasDialog && openerRef.current?.isConnected) {
-      openerRef.current.focus({ preventScroll: true });
+      mainRef.current?.scrollTo({ top: 0, behavior: "instant" });
+    } else if (hadDialog.current && !hasDialog) {
+      (openerRef.current?.isConnected ? openerRef.current : mainRef.current)?.focus({ preventScroll: true });
+    } else if (previousAccount.current && !location.account && !hasDialog) {
+      (inspectorOpenerRef.current?.isConnected ? inspectorOpenerRef.current : mainRef.current)?.focus();
+    }
+    if (location.account) {
+      const row = mainRef.current?.querySelector<HTMLElement>(`[data-preview-account="${location.account}"]`);
+      if (row) inspectorOpenerRef.current = row;
     }
     previousView.current = view;
+    previousAccount.current = location.account;
     hadDialog.current = hasDialog;
-  }, [view, hasDialog]);
+  }, [view, hasDialog, location.account]);
 
-  const href = (changes: Partial<typeof location> = {}) => {
-    const next = { ...location, ...changes };
-    return `/dev/ecosystem?${new URLSearchParams(next).toString()}`;
-  };
+  const href = (changes: Partial<typeof location> = {}) => previewHref({ ...location, account: undefined, ...changes });
   const updateLocation = (changes: Partial<typeof location>) => {
     const replacingOverlay = consumeOverlayEntriesForNavigation();
     setDialog(null);
@@ -74,7 +81,15 @@ export default function EcosystemPreview() {
   const closeDialog = () => { setDialog(null); setAccountPanel(null); };
   const withSample = (action: () => void) => { if (audience === "guest") openDialog("registration"); else action(); };
   const limited = () => withSample(() => openDialog("limited"));
-  const openAccount = (account: SampleAccount) => withSample(() => { rememberOpener(); setAccountPanel({ mode: "detail", account }); });
+  const openAccount = (account: SampleAccount) => withSample(() => {
+    rememberOpener();
+    if (!isBelowDesktop && (view === "accounts" || view === "search")) {
+      if (document.activeElement instanceof HTMLElement) inspectorOpenerRef.current = document.activeElement;
+      if (location.account !== account.id) updateLocation({ account: account.id });
+    } else setAccountPanel({ mode: "detail", account });
+  });
+  const accountTask = (account: SampleAccount, mode: "edit" | "correction") => { rememberOpener(); setAccountPanel({ mode, account }); };
+  const accountActivity = (account: SampleAccount) => { setAccountFilter(account); setSearchCategory("activity"); setSearchQuery(""); navigate("search"); };
   const createAccount = () => withSample(() => { rememberOpener(); setAccountPanel({ mode: "create" }); });
   const openRecent = (selection: RecentId) => {
     setRecent(selection);
@@ -92,6 +107,7 @@ export default function EcosystemPreview() {
   };
   const actions: ViewActions = { navigate, createAccount, openAccount, limited, preferences: () => openDialog("preferences"), openRecent };
   const viewProps = { copy, state, actions };
+  const inspector = selectedAccount ? <AccountInspector account={selectedAccount} copy={copy} onClose={() => updateLocation({ account: undefined })} onEdit={() => accountTask(selectedAccount, "edit")} onCorrection={() => accountTask(selectedAccount, "correction")} onActivity={accountActivity} /> : null;
   const descriptions = { home: copy.recordedAsOf, accounts: copy.accountIntro, plan: copy.planIntro, search: copy.searchTitle, updates: copy.updateIntro, settings: copy.settingsIntro, argus: "" };
 
   return <div className={styles.preview} data-testid="ecosystem-preview" data-preview-view={view} data-preview-audience={audience}>
@@ -108,18 +124,11 @@ export default function EcosystemPreview() {
       </details>
     </div>
     <div className={styles.shell}>
-      <aside className={styles.rail}>
-        <div className={styles.brand}><ArgusLogo aria-hidden="true" /><span>argus</span></div>
-        <nav className={styles.primaryNav} aria-label={copy.primaryNav}>{MAIN_DESTINATIONS.map((destination) => {
-          const Icon = NAV_ICONS[destination as keyof typeof NAV_ICONS];
-          return <a key={destination} href={href({ view: destination })} onClick={(event) => followLink(event, destination)} aria-label={copy[destination]} aria-current={view === destination ? "page" : undefined}><span className={styles.navIcon}><Icon aria-hidden="true" /></span><span>{copy[destination]}</span></a>;
-        })}</nav>
-        <div className={styles.railFoot}><span className={styles.workspaceMark}><UserRound size={16} /></span><p>{audience === "guest" ? copy.guest : copy.sampleWorkspace}<small>{copy.localOnly}</small></p></div>
-      </aside>
+      <PreviewNavigation copy={copy} view={view} audience={audience} href={(destination) => href({ view: destination })} onNavigate={followLink} />
       <div className={styles.workspace}>
-        <header className={styles.header}>
+        <header className={`${styles.header} ${view === "argus" && recent ? styles.headerWithTitle : ""}`}>
           {view === "argus" ? <div className={styles.chatHeaderLeft}><button className={styles.headerButton} aria-label={copy.recents} onClick={() => openDialog("recents")}><History size={20} /><span>{copy.recents}</span></button><button className={styles.iconButton} aria-label={copy.newChat} onClick={() => newChat()}><SquarePen size={20} /></button></div> : <button className={styles.contextButton} onClick={() => openDialog("context")}>{copy.personal}<ChevronDown size={14} /></button>}
-          {view === "argus" && recent ? <div className={styles.chatHeaderTitle}><ChatHeaderTitle conversationId={`sample-${recent}`} title={copy[recent]} titleSource={null} /></div> : null}
+          {view === "argus" && recent ? <h1 className={styles.chatHeaderTitle}><ChatHeaderTitle conversationId={`sample-${recent}`} title={copy[recent]} titleSource={null} /></h1> : null}
           <div className={styles.headerRight}>
             {view === "argus" ? <button className={styles.temporaryButton} onClick={() => openDialog("temporary")}>{copy.temporary}</button> : null}
             <a className={styles.iconButton} href={href({ view: "updates" })} onClick={(event) => followLink(event, "updates")} aria-label={copy.updates} aria-current={view === "updates" ? "page" : undefined}><Bell size={20} strokeWidth={1.6} /></a>
@@ -132,9 +141,9 @@ export default function EcosystemPreview() {
             : state === "error" && view !== "settings" ? <EmptyState title={copy.errorTitle} body={copy.errorBody} action={copy.retry} onAction={() => updateLocation({ state: "sample" })}><CircleHelp size={30} strokeWidth={1.3} /></EmptyState>
               : <>
                 {view === "home" ? <HomeView {...viewProps} /> : null}
-                {view === "accounts" ? <AccountsView {...viewProps} /> : null}
+                {view === "accounts" ? <AccountsView {...viewProps} inspector={inspector} selectedAccountId={location.account} /> : null}
                 {view === "plan" ? <PlanView {...viewProps} /> : null}
-                {view === "search" ? <SearchView {...viewProps} accountFilter={accountFilter} clearAccountFilter={() => setAccountFilter(null)} query={searchQuery} setQuery={setSearchQuery} category={searchCategory} setCategory={setSearchCategory} /> : null}
+                {view === "search" ? <SearchView {...viewProps} inspector={inspector} selectedAccountId={location.account} accountFilter={accountFilter} clearAccountFilter={() => setAccountFilter(null)} query={searchQuery} setQuery={setSearchQuery} category={searchCategory} setCategory={setSearchCategory} /> : null}
                 {view === "updates" ? <UpdatesView {...viewProps} /> : null}
                 {view === "settings" ? <SettingsView {...viewProps} /> : null}
                 {view === "argus" ? <PreviewChat copy={copy} draft={draft} onDraft={setDraft} recent={recent} onNotice={() => setNotice("sendNotice")} onLimited={limited} inputRef={composerRef} /> : null}
@@ -144,6 +153,6 @@ export default function EcosystemPreview() {
     </div>
     {notice ? <div className={styles.toast} data-testid="preview-notice"><p role="status">{copy[notice]}</p><button className={styles.iconButton} aria-label={copy.close} onClick={() => setNotice(null)}><X size={17} /></button></div> : null}
     {dialog ? <PreviewDialogs dialog={dialog} copy={copy} state={state} onClose={() => setDialog(null)} onDialog={setDialog} onRecent={openRecent} onNewChat={newChat} /> : null}
-    {accountPanel ? <AccountPanels panel={accountPanel} copy={copy} onClose={closeDialog} onActivity={(account) => { setAccountFilter(account); setSearchCategory("activity"); setSearchQuery(""); navigate("search"); }} onLimited={limited} /> : null}
+    {accountPanel ? <AccountPanels panel={accountPanel} copy={copy} onClose={closeDialog} onActivity={accountActivity} onLimited={limited} /> : null}
   </div>;
 }

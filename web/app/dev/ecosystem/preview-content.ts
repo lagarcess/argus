@@ -9,16 +9,26 @@ export type PreviewAudience = "guest" | "sample";
 export function previewLocation(params: { get: (name: string) => string | null }) {
   const candidateView = params.get("view");
   const candidateState = params.get("state");
+  const view = PREVIEW_VIEWS.find((item) => item === candidateView) ?? "argus";
+  const state = PREVIEW_STATES.find((item) => item === candidateState) ?? "sample";
+  const audience = params.get("audience") === "sample" ? "sample" as const : "guest" as const;
+  const account: string | undefined = audience === "sample" && state === "sample" && (view === "accounts" || view === "search")
+    ? SAMPLE.accounts.find((item) => item.id === params.get("account"))?.id : undefined;
   return {
-    view: PREVIEW_VIEWS.find((view) => view === candidateView) ?? "argus",
-    state: PREVIEW_STATES.find((state) => state === candidateState) ?? "sample",
-    audience: params.get("audience") === "sample" ? "sample" as const : "guest" as const,
+    view, state, audience, ...(account ? { account } : {}),
   };
+}
+
+export function previewHref(location: ReturnType<typeof previewLocation>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(location)) if (value !== undefined) params.set(key, value);
+  return `/dev/ecosystem?${params.toString()}`;
 }
 
 const en = {
   home: "Home", accounts: "Accounts", argus: "Argus", plan: "Plan", search: "Search", updates: "Updates", settings: "Settings",
   primaryNav: "Primary navigation", skip: "Skip to content", preview: "Ecosystem preview", previewControls: "Preview controls",
+  expandNavigation: "Expand navigation", collapseNavigation: "Collapse navigation", closeAccountDetails: "Close account details",
   previewNote: "Fictional data. No model calls or financial records are saved.", controlsNote: "These controls change the demonstration only. Sample workspace does not sign you in.",
   destination: "Destination", audience: "Audience", state: "State", guest: "Guest view", sampleWorkspace: "Sample workspace",
   sample: "Sample populated", empty: "Empty", loading: "Loading", error: "Error", sampleLabel: "Sample", localOnly: "Local preview",
@@ -79,6 +89,7 @@ export type PreviewCopy = Record<CopyKey, string>;
 const es: PreviewCopy = {
   home: "Inicio", accounts: "Cuentas", argus: "Argus", plan: "Plan", search: "Buscar", updates: "Novedades", settings: "Configuración",
   primaryNav: "Navegación principal", skip: "Ir al contenido", preview: "Vista previa del ecosistema", previewControls: "Controles de vista previa",
+  expandNavigation: "Expandir navegación", collapseNavigation: "Contraer navegación", closeAccountDetails: "Cerrar detalles de la cuenta",
   previewNote: "Datos ficticios. No se llama a modelos ni se guardan registros financieros.", controlsNote: "Estos controles solo cambian la demostración. El espacio de ejemplo no inicia sesión.",
   destination: "Destino", audience: "Público", state: "Estado", guest: "Vista de visitante", sampleWorkspace: "Espacio de ejemplo",
   sample: "Con ejemplos", empty: "Vacío", loading: "Cargando", error: "Error", sampleLabel: "Ejemplo", localOnly: "Vista previa local",

@@ -49,7 +49,11 @@ feature scope or assigning any production/shared owner to this lane.
 4. Use desktop list/detail space for reopened account inspection on Accounts
    and Search, based on the existing Omnisearch dossier pattern. Retain the
    list while inspecting; edits, creation and correction remain explicit
-   focused panels. Tablet/narrow detail uses the existing `AdaptivePanel`.
+   focused panels. New tablet/narrow detail opens use the existing
+   `AdaptivePanel`. A URL-selected inspector remains the same nonmodal reading
+   panel across resize, stacking above the list below 1024px; direct links use
+   that same presentation. The URL continues to own this selection and Back /
+   Forward history. Resizing must not create an extra overlay/history entry.
    One preview account-detail renderer owns the displayed facts. Do not add a
    second financial projection or API contract.
 5. Improve Home hierarchy and tablet reflow so Coming up remains connected to

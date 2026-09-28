@@ -12,8 +12,8 @@ export function Money({ account, copy }: { account: SampleAccount; copy: Preview
   return <span className={styles.accountMoney}>{account.balance === null ? copy.unknownBalance : <>{account.currency} <span>{account.balance}</span></>}{account.isDebt ? <small>{copy.owed}</small> : null}</span>;
 }
 
-export function AccountRow({ account, copy, onClick }: { account: SampleAccount; copy: PreviewCopy; onClick: () => void }) {
-  return <button type="button" className={styles.accountRow} onClick={onClick}>
+export function AccountRow({ account, copy, onClick, selected }: { account: SampleAccount; copy: PreviewCopy; onClick: () => void; selected?: boolean }) {
+  return <button type="button" className={styles.accountRow} onClick={onClick} aria-pressed={selected} data-preview-account={account.id}>
     <span className={styles.accountIcon}><AccountIcon type={account.type} /></span>
     <span className={styles.rowText}><strong>{copy[account.name]}</strong><small>{copy[account.type]} · {copy.asOf}</small></span>
     <Money account={account} copy={copy} /><ChevronRight className={styles.rowChevron} size={17} aria-hidden="true" />

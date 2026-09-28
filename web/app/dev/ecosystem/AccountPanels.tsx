@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Check, ChevronRight, Landmark, LockKeyhole, Plus } from "lucide-react";
+import { Check, Landmark, Plus } from "lucide-react";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import { ACCOUNT_TYPES, SAMPLE, type AccountType, type PreviewCopy, type SampleAccount } from "./preview-content";
-import { AccountIcon, Money, DetailRow } from "./PreviewPrimitives";
+import AccountDetail from "./AccountDetail";
+import { AccountIcon, DetailRow } from "./PreviewPrimitives";
 import styles from "./ecosystem-preview.module.css";
 
-export type AccountPanel = { mode: "create" } | { mode: "detail"; account: SampleAccount };
+export type AccountPanel = { mode: "create" } | { mode: "detail" | "edit" | "correction"; account: SampleAccount };
 type Screen = "detail" | "create" | "edit" | "draft" | "correction" | "adjustment";
 type Draft = { type: AccountType | null; currency: string; nickname: string; balance: string; institution: string; reference: string };
 
@@ -23,8 +24,7 @@ export default function AccountPanels({ panel, copy, onClose, onActivity, onLimi
   panel: AccountPanel; copy: PreviewCopy; onClose: () => void;
   onActivity: (account: SampleAccount) => void; onLimited: () => void;
 }) {
-  const account = panel.mode === "detail" ? panel.account : null;
-  const accountActivity = SAMPLE.activity.filter((item) => item.account === account?.id);
+  const account = panel.mode === "create" ? null : panel.account;
   const [screen, setScreen] = useState<Screen>(panel.mode);
   const [draftFrom, setDraftFrom] = useState<"create" | "edit">("create");
   const [showTypes, setShowTypes] = useState(panel.mode === "create");
@@ -51,36 +51,15 @@ export default function AccountPanels({ panel, copy, onClose, onActivity, onLimi
   const title = screen === "detail" ? (account ? copy[account.name] : copy.accountDetails)
     : screen === "create" ? copy.createTitle : screen === "edit" ? copy.editDetails
       : screen === "draft" ? copy.draftTitle : screen === "correction" ? copy.correctionTitle : copy.adjustmentTitle;
-  const back = screen === "edit" || screen === "correction" ? () => setScreen("detail")
+  const back = screen === "edit" || screen === "correction" ? () => { if (panel.mode === "detail") setScreen("detail"); else onClose(); }
     : screen === "draft" ? () => setScreen(draftFrom)
       : screen === "adjustment" ? () => setScreen("correction") : undefined;
 
   return <AdaptivePanel title={title} closeLabel={copy.close} onClose={onClose} width="lg"
     onBack={back} backLabel={screen === "draft" ? copy.returnDraft : copy.backAccount}>
-    <div ref={contentRef} tabIndex={-1} aria-label={title} className={styles.panel} data-testid={screen === "create" ? "account-create" : screen === "edit" ? "account-edit" : screen === "correction" || screen === "adjustment" ? "correction-review" : screen === "draft" ? "account-draft" : "account-detail"}>
-      <p className={styles.eyebrow}>{copy.localOnly}</p>
-      {screen === "detail" && account ? <>
-        <div className={styles.detailBalance}><AccountIcon type={account.type} /><div><span className={styles.muted}>{account.isDebt ? copy.balanceOwed : copy.balance}</span><Money account={account} copy={copy} /></div></div>
-        <p className={styles.fine}>{copy.recordedAsOf}</p>
-        <div className={styles.buttonRow}>
-          <button className={styles.primaryButton} onClick={() => { setShowTypes(false); setScreen("edit"); }}>{copy.editDetails}</button>
-          {account.id === "everyday" ? <button className={styles.secondaryButton} onClick={() => setScreen("correction")}>{copy.checkBalance}</button> : null}
-        </div>
-        <dl className={styles.details}>
-          <DetailRow label={copy.type}>{copy[account.type]}</DetailRow>
-          <DetailRow label={copy.currency}>{account.currency}</DetailRow>
-          <DetailRow label={copy.source}>{copy.manualSource}</DetailRow>
-          <DetailRow label={copy.account}>{copy.individual}</DetailRow>
-        </dl>
-        <p className={styles.inlineNote}><LockKeyhole size={16} aria-hidden="true" />{copy.private}</p>
-        <p className={styles.fine}>{copy.samplePrivacy}</p>
-        <div className={styles.sectionHeading}><h3>{copy.recentActivity}</h3><button className={styles.textButton} onClick={() => onActivity(account)}>{copy.viewAll}<ChevronRight size={16} /></button></div>
-        {accountActivity.length ? accountActivity.map((item) => <div className={styles.activityRow} key={item.id}>
-          <span className={styles.smallIcon}>{item.id === "transfer" ? <ArrowLeftRight size={18} /> : item.id === "income" ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}</span>
-          <span className={styles.rowText}><strong>{copy[item.title]}</strong><small>{copy.yesterday}</small></span>
-          <span className={styles.amount}>{item.amount}</span>
-        </div>) : <div className={styles.quietBox}><strong>{copy.noActivity}</strong><p>{copy.openingBalance}</p></div>}
-      </> : null}
+    <div ref={contentRef} tabIndex={-1} aria-label={title} className={styles.panel} data-testid={screen === "create" ? "account-create" : screen === "edit" ? "account-edit" : screen === "correction" || screen === "adjustment" ? "correction-review" : screen === "draft" ? "account-draft" : undefined}>
+      {screen !== "detail" ? <p className={styles.eyebrow}>{copy.localOnly}</p> : null}
+      {screen === "detail" && account ? <AccountDetail account={account} copy={copy} onEdit={() => { setShowTypes(false); setScreen("edit"); }} onCorrection={() => setScreen("correction")} onActivity={onActivity} /> : null}
 
       {(screen === "create" || screen === "edit") ? <form onSubmit={(event) => {
         event.preventDefault();

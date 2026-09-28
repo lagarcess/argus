@@ -12,12 +12,14 @@ export default function PreviewChat({ copy, draft, onDraft, recent, onNotice, on
   onNotice: () => void; onLimited: () => void;
   inputRef: RefObject<HTMLTextAreaElement | null>;
 }) {
-  return <div className={styles.chatCanvas}>
-    {recent ? <section className={styles.sampleTranscript}>
-      <p className={styles.eyebrow}>{copy.recentSample}</p><h1>{copy[recent]}</h1><p>{copy.sampleConversationBody}</p>
+  return <div className={`${styles.chatCanvas} ${recent ? styles.activeChat : styles.coldChat}`}>
+    {recent ? <section className={styles.sampleTranscript} data-testid="preview-transcript" role="region" aria-label={copy.recentSample} tabIndex={0}>
+      <div className={styles.transcriptContent}>
+      <p className={styles.eyebrow}>{copy.recentSample}</p><p>{copy.sampleConversationBody}</p>
       {recent === "recentInvest" ? <div className={styles.artifactExample}><h2 className={styles.eyebrow}>{copy.artifactTitle}</h2><StrategyConfirmationCard confirmation={DCA_CONFIRMATION} disabled /><p className={styles.fine}>{copy.artifactNote}</p></div> : null}
       <a href="/chat" className={styles.textButton}>{copy.existingChat}<span aria-hidden="true">↗</span></a>
       <p className={styles.fine}>{copy.registrationNote}</p>
+      </div>
     </section> : <section className={styles.chatColdStart} aria-label={copy.argus}>
       <h1 className="sr-only">{copy.argus}</h1>
       <EmptyChatGreeting isGuest />

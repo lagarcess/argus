@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Bell, CalendarDays, Check, ChevronRight, CircleHelp, FileText, Globe2, Landmark, LockKeyhole, Plus, Search, Settings2, ShieldCheck, SlidersHorizontal, Target, UserRound, Wallet } from "lucide-react";
 import { SAMPLE, RECENTS, type CopyKey, type PreviewCopy, type PreviewState, type PreviewView, type RecentId, type SampleAccount } from "./preview-content";
 import { AccountRow, DetailRow, EmptyState } from "./PreviewPrimitives";
@@ -12,6 +12,7 @@ export type ViewActions = {
   preferences: () => void; openRecent: (recent: RecentId) => void;
 };
 type ViewProps = { copy: PreviewCopy; state: PreviewState; actions: ViewActions };
+type DetailViewProps = ViewProps & { inspector: ReactNode; selectedAccountId?: string };
 
 function SectionHeading({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return <div className={styles.sectionHeading}><h2>{title}</h2>{action && onAction ? <button type="button" className={styles.textButton} onClick={onAction}>{action}<ChevronRight size={16} aria-hidden="true" /></button> : null}</div>;
@@ -19,8 +20,7 @@ function SectionHeading({ title, action, onAction }: { title: string; action?: s
 
 export function HomeView({ copy, state, actions }: ViewProps) {
   if (state === "empty") return <EmptyState title={copy.homeEmpty} body={copy.homeEmptyBody} action={copy.addAccount} onAction={actions.createAccount}><Landmark size={30} strokeWidth={1.3} /></EmptyState>;
-  return <div className={styles.twoColumns}>
-    <div className={styles.primaryColumn}>
+  return <div className={styles.homeLayout}>
       <section className={styles.position} aria-label={copy.recordedPosition}>
         <div className={styles.positionLabel}><span>{copy.recordedPosition}</span><span className={styles.currencyBadge}>DOP</span></div>
         <p className={styles.positionAmount}><span>RD$</span>{SAMPLE.position}</p>
@@ -28,18 +28,17 @@ export function HomeView({ copy, state, actions }: ViewProps) {
         <dl className={styles.positionDetails}><DetailRow label={copy.cashAndBank}>DOP {SAMPLE.cashAndBank}</DetailRow><DetailRow label={copy.youOwe}>DOP {SAMPLE.owed}</DetailRow></dl>
         <p className={styles.fine}>{copy.recordedAsOf}</p>
       </section>
-      <section><SectionHeading title={copy.accounts} action={copy.viewAll} onAction={() => actions.navigate("accounts")} />
+      <section className={`${styles.contextCard} ${styles.homeComingUp}`} data-testid="home-coming-up"><SectionHeading title={copy.comingUp} action={copy.plan} onAction={() => actions.navigate("plan")} /><p className={styles.fine}>{copy.comingUpNote}</p><Commitments copy={copy} onClick={actions.limited} limit={2} /></section>
+      <section className={styles.homeAccounts}><SectionHeading title={copy.accounts} action={copy.viewAll} onAction={() => actions.navigate("accounts")} />
         {SAMPLE.accounts.slice(0, 3).map((account) => <AccountRow key={account.id} account={account} copy={copy} onClick={() => actions.openAccount(account)} />)}
       </section>
-      <section><SectionHeading title={copy.recentActivity} action={copy.viewAll} onAction={() => actions.navigate("search")} />
+      <section className={styles.homeActivity}><SectionHeading title={copy.recentActivity} action={copy.viewAll} onAction={() => actions.navigate("search")} />
         {SAMPLE.activity.map((item) => <button className={styles.activityRow} onClick={actions.limited} key={item.id}>
           <span className={styles.smallIcon}>{item.id === "transfer" ? <ArrowLeftRight size={18} /> : item.id === "income" ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}</span>
           <span className={styles.rowText}><strong>{copy[item.title]}</strong><small>{copy[item.account]} · {copy.yesterday}</small></span><span className={styles.amount}>{item.amount}</span>
         </button>)}<p className={styles.fine}>{copy.activityNote}</p>
       </section>
-    </div>
-    <aside className={styles.contextColumn}>
-      <section className={styles.contextCard}><SectionHeading title={copy.comingUp} action={copy.plan} onAction={() => actions.navigate("plan")} /><p className={styles.fine}>{copy.comingUpNote}</p><Commitments copy={copy} onClick={actions.limited} /><p className={styles.fine}>{copy.expectedNote}</p></section>
+    <aside className={`${styles.contextColumn} ${styles.homeContext}`}>
       <section className={styles.contextCard}><div className={styles.eyebrow}>{copy.separateCurrencies}</div><p className={styles.secondaryAmount}>USD {SAMPLE.accounts[4].balance}</p><p className={styles.fine}>{copy.usdBasis}</p></section>
       <div className={styles.coverageNote}><CircleHelp size={18} aria-hidden="true" /><p>{copy.unknownBasis}</p></div>
       <button className={styles.primaryButton} onClick={actions.limited}><Plus size={18} />{copy.record}</button>
@@ -47,20 +46,20 @@ export function HomeView({ copy, state, actions }: ViewProps) {
   </div>;
 }
 
-export function AccountsView({ copy, state, actions }: ViewProps) {
+export function AccountsView({ copy, state, actions, inspector, selectedAccountId }: DetailViewProps) {
   if (state === "empty") return <EmptyState title={copy.accountsEmpty} body={copy.accountsEmptyBody} action={copy.addAccount} onAction={actions.createAccount}><Wallet size={30} strokeWidth={1.3} /></EmptyState>;
-  return <div className={styles.twoColumns}>
+  return <div className={inspector ? styles.detailLayout : styles.twoColumns}>
     <section className={styles.primaryColumn}>
       <SectionHeading title={copy.accountCount} action={copy.manage} onAction={actions.limited} />
-      <div className={styles.accountList}>{SAMPLE.accounts.map((account) => <AccountRow key={account.id} account={account} copy={copy} onClick={() => actions.openAccount(account)} />)}</div>
+      <div className={styles.accountList}>{SAMPLE.accounts.map((account) => <AccountRow key={account.id} account={account} copy={copy} selected={selectedAccountId === account.id} onClick={() => actions.openAccount(account)} />)}</div>
       <button className={styles.primaryButton} onClick={actions.createAccount}><Plus size={18} />{copy.addAccount}</button>
     </section>
-    <aside className={styles.contextColumn}><section className={styles.contextCard}><Landmark size={24} strokeWidth={1.4} /><h2>{copy.accountCoverage}</h2><p>{copy.accountCoverageBody}</p><div className={styles.inlineNote}><LockKeyhole size={15} />{copy.private}</div><p className={styles.fine}>{copy.samplePrivacy}</p></section><p className={styles.fine}>{copy.separateCurrencies}. {copy.recordedAsOf}.</p></aside>
+    {inspector ?? <aside className={styles.contextColumn}><section className={styles.contextCard}><Landmark size={24} strokeWidth={1.4} /><h2>{copy.accountCoverage}</h2><p>{copy.accountCoverageBody}</p><div className={styles.inlineNote}><LockKeyhole size={15} />{copy.private}</div><p className={styles.fine}>{copy.samplePrivacy}</p></section><p className={styles.fine}>{copy.separateCurrencies}. {copy.recordedAsOf}.</p></aside>}
   </div>;
 }
 
-function Commitments({ copy, onClick }: { copy: PreviewCopy; onClick: () => void }) {
-  return <div className={styles.commitments}>{SAMPLE.commitments.map((item) => <button className={styles.commitment} key={item.id} onClick={onClick}>
+function Commitments({ copy, onClick, limit }: { copy: PreviewCopy; onClick: () => void; limit?: number }) {
+  return <div className={styles.commitments}>{SAMPLE.commitments.slice(0, limit).map((item) => <button className={styles.commitment} key={item.id} onClick={onClick}>
     <span className={styles.dateBadge}>{copy[item.date]}</span><span><strong>{copy[item.title]}</strong><span className={styles.commitmentAmount}>{item.amount}</span><small>{copy.planned}</small></span>
   </button>)}</div>;
 }
@@ -91,7 +90,7 @@ export function PlanView({ copy, state, actions }: ViewProps) {
 }
 
 export type SearchCategory = "all" | "accounts" | "activity" | "conversations" | "plans";
-export function SearchView({ copy, state, actions, accountFilter, clearAccountFilter, query, setQuery, category, setCategory }: ViewProps & { accountFilter: SampleAccount | null; clearAccountFilter: () => void; query: string; setQuery: (query: string) => void; category: SearchCategory; setCategory: (category: SearchCategory) => void }) {
+export function SearchView({ copy, state, actions, inspector, selectedAccountId, accountFilter, clearAccountFilter, query, setQuery, category, setCategory }: DetailViewProps & { accountFilter: SampleAccount | null; clearAccountFilter: () => void; query: string; setQuery: (query: string) => void; category: SearchCategory; setCategory: (category: SearchCategory) => void }) {
   const records: { id: string; title: CopyKey; category: typeof category; detail: string; open: () => void; accountId?: string }[] = [
     ...SAMPLE.accounts.map((account) => ({ id: account.id, title: account.name, category: "accounts" as const, detail: `${copy[account.type]} · ${account.currency}`, open: () => actions.openAccount(account), accountId: account.id })),
     ...SAMPLE.activity.map((item) => ({ id: `activity-${item.id}`, title: item.title, category: "activity" as const, detail: `${copy[item.account]} · ${item.amount}`, open: actions.limited, accountId: item.account })),
@@ -100,13 +99,13 @@ export function SearchView({ copy, state, actions, accountFilter, clearAccountFi
   ];
   const filtered = records.filter((record) => (category === "all" || record.category === category) && (!accountFilter || record.accountId === accountFilter.id) && `${copy[record.title]} ${record.detail}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   if (state === "empty") return <EmptyState title={copy.searchEmpty} body={copy.searchEmptyBody}><Search size={30} strokeWidth={1.3} /></EmptyState>;
-  return <div className={styles.searchCanvas}>
+  return <div className={inspector ? styles.detailLayout : undefined}><div className={styles.searchCanvas}>
     <label className={styles.searchField}><Search size={21} aria-hidden="true" /><input type="search" aria-label={copy.searchLabel} placeholder={copy.searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} /></label>
     <div className={styles.filterRow} role="group" aria-label={copy.searchCategories}>{(["all", "accounts", "activity", "conversations", "plans"] as const).map((item) => <button key={item} className={styles.filterChip} aria-pressed={category === item} onClick={() => setCategory(item)}>{copy[item]}</button>)}</div>
     {accountFilter ? <button className={styles.filterChip} onClick={clearAccountFilter} aria-label={copy.clearFilter}>{copy[accountFilter.name]} ×</button> : null}
     <div className={styles.sectionHeading}><p className={styles.eyebrow}>{copy.sampleResults}</p>{query || category !== "all" || accountFilter ? <button className={styles.textButton} onClick={() => { setQuery(""); setCategory("all"); clearAccountFilter(); }}>{copy.clearSearch}</button> : null}</div>
-    {filtered.length ? filtered.map((record) => <button key={record.id} className={styles.searchResult} onClick={record.open}><span className={styles.smallIcon}>{record.category === "accounts" ? <Wallet size={20} /> : record.category === "plans" ? <Target size={20} /> : <FileText size={20} />}</span><span className={styles.rowText}><strong>{copy[record.title]}</strong><small>{record.detail}</small></span><span className={styles.resultCategory}>{copy[record.category]}</span><ChevronRight size={16} aria-hidden="true" /></button>) : <EmptyState title={copy.noResults} body={copy.noResultsBody} />}
-  </div>;
+    {filtered.length ? filtered.map((record) => <button key={record.id} className={styles.searchResult} onClick={record.open} data-preview-account={record.category === "accounts" ? record.id : undefined} aria-pressed={record.category === "accounts" ? selectedAccountId === record.id : undefined}><span className={styles.smallIcon}>{record.category === "accounts" ? <Wallet size={20} /> : record.category === "plans" ? <Target size={20} /> : <FileText size={20} />}</span><span className={styles.rowText}><strong>{copy[record.title]}</strong><small>{record.detail}</small></span><span className={styles.resultCategory}>{copy[record.category]}</span><ChevronRight size={16} aria-hidden="true" /></button>) : <EmptyState title={copy.noResults} body={copy.noResultsBody} />}
+  </div>{inspector}</div>;
 }
 
 export function UpdatesView({ copy, state, actions }: ViewProps) {
@@ -131,6 +130,6 @@ export function SettingsView({ copy, actions }: ViewProps) {
   return <div className={styles.settingsCanvas}>
     <button className={styles.profileRow} onClick={actions.limited}><span className={styles.avatar}><UserRound size={28} strokeWidth={1.4} /></span><span className={styles.rowText}><strong>{copy.personalDetails}</strong><small>{copy.personalDetailsBody}</small></span><ChevronRight size={18} /></button>
     <p className={styles.fine}>{copy.profileSample}</p>
-    {groups.map((group) => <section key={group.title} className={styles.settingsGroup}><h2 className={styles.eyebrow}>{copy[group.title]}</h2>{group.rows.map((row) => <button key={row.title} className={styles.settingsRow} onClick={row.action}><row.icon size={20} strokeWidth={1.5} /><span className={styles.rowText}><strong>{copy[row.title]}</strong><small>{copy[row.body]}</small></span><ChevronRight size={17} /></button>)}</section>)}
+    {groups.map((group) => <section key={group.title} className={styles.settingsGroup}><h2 className={styles.eyebrow}>{copy[group.title]}</h2><div>{group.rows.map((row) => <button key={row.title} className={styles.settingsRow} onClick={row.action}><row.icon size={20} strokeWidth={1.5} /><span className={styles.rowText}><strong>{copy[row.title]}</strong><small>{copy[row.body]}</small></span><ChevronRight size={17} /></button>)}</div></section>)}
   </div>;
 }

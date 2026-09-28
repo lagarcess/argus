@@ -26,7 +26,7 @@ does not assert that a hosted deployment currently matches that source.
 | Width bands | `lib/responsive-layout`, `layout/useResponsiveLayout`; 720/1024px | Derive rail/pane behavior from the existing owner; narrow bottom navigation remains the mobile-lock adaptation |
 | Starting conversation | `chat/EmptyChatSurface`; centered 672px composer composition | Keep greeting, chips and disconnected composer together |
 | Open conversation | `chat/ChatInterface`; 1024px canvas, 768px composer, independent transcript scroll | Keep sample header and composer visible while the transcript scrolls |
-| Account inspection | `sidebar/ChatCommandPalette`; list plus dossier on desktop, sheet below 1024px | Use one local account-detail body in a side pane or existing AdaptivePanel; create/edit/correction keep focused dialogs |
+| Account inspection | `sidebar/ChatCommandPalette`; list plus dossier on desktop, sheet below 1024px | One local detail body serves the side pane and shared sheet. An already selected URL keeps its nonmodal panel across resize, stacked above the list; new tablet/narrow opens use the sheet. Create/edit/correction keep focused dialogs |
 | Typography and surface density | `globals.css`, `SidebarNavButton`, existing chat/settings | Use web canvas/surface contrast and compact rows with 44px targets; do not add global tokens |
 | Settings and overlays | `sidebar/ProfileMenu`, `ui/AdaptivePanel`, existing appearance/language dialogs | Retain approved App/Account/Support hierarchy and reuse safe dialogs; never mount profile writes |
 

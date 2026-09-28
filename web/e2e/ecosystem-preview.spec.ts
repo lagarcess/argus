@@ -1,6 +1,7 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { LANGUAGE_STORAGE_KEY, THEME_STORAGE_KEY } from "../lib/browser-storage";
-import { DCA_CONFIRMATION, PREVIEW_VIEWS, RECENTS, SAMPLE, previewCopy } from "../app/dev/ecosystem/preview-content";
+import { DESKTOP_MIN_WIDTH_PX, TABLET_MIN_WIDTH_PX } from "../lib/responsive-layout";
+import { DCA_CONFIRMATION, PREVIEW_VIEWS, RECENTS, SAMPLE, previewCopy, type SampleAccount } from "../app/dev/ecosystem/preview-content";
 import en from "../public/locales/en/common.json";
 import es from "../public/locales/es-419/common.json";
 import {
@@ -49,10 +50,31 @@ async function closeControls(page: Page) {
   }
 }
 
-async function openPreferences(page: Page) {
-  if (await page.getByRole("dialog", { name: copy.preferences, exact: true }).count() === 0) {
-    await page.getByRole("button", { name: new RegExp(`^${copy.preferences}`) }).click();
+async function openPreferences(page: Page, labels = copy) {
+  if (await page.getByRole("dialog", { name: labels.preferences, exact: true }).count() === 0) {
+    await page.getByRole("button", { name: new RegExp(`^${labels.preferences}`) }).click();
   }
+}
+
+async function closeInspector(page: Page, labels = copy) {
+  await page.getByTestId("account-inspector").getByRole("button", { name: labels.closeAccountDetails, exact: true }).click();
+  await expect(page.getByTestId("account-inspector")).toHaveCount(0);
+}
+
+async function rectangle(locator: Locator) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  return box!;
+}
+
+async function assertUnobscured(locator: Locator) {
+  await expect(locator).toBeVisible();
+  expect(await locator.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+    return hit !== null && element.contains(hit);
+  }), "The control must be reachable in the visible viewport").toBe(true);
 }
 
 for (const cell of CELLS) {
@@ -329,6 +351,10 @@ for (const language of ["en", "es-419"] as const) {
         await expect(form.getByLabel(labels.nickname, { exact: true })).toHaveValue(nickname);
       }
       await page.keyboard.press("Escape");
+      if (mode === "edit") {
+        await expect(page.getByTestId("account-inspector")).toContainText(SAMPLE.accounts[0].balance);
+        await closeInspector(page, labels);
+      }
       await expect(main).toHaveText(originalAccounts, { useInnerText: true });
     });
   }
@@ -348,7 +374,7 @@ test("reopening an account exposes edit details and a transparent correction rev
   await expect(edit.getByLabel(copy.reference, { exact: true })).toBeVisible();
   await capture(page, testInfo, networkAudit, "account-reopen-edit-details");
   await page.keyboard.press("Escape");
-  await main.getByRole("button", { name: new RegExp(`^${copy.everyday}`) }).click();
+  await expect(page.getByTestId("account-inspector")).toBeVisible();
   await page.getByRole("button", { name: copy.checkBalance, exact: true }).click();
   await assertFocusInsideDialog(page);
   const review = page.getByTestId("correction-review");
@@ -369,6 +395,8 @@ test("reopening an account exposes edit details and a transparent correction rev
   await assertFocusInsideDialog(page);
   await expect(page.getByRole("dialog")).toContainText(copy.adjustmentNotice);
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("account-inspector")).toContainText(SAMPLE.accounts[0].balance);
+  await closeInspector(page);
   await expect(main).toHaveText(original, { useInnerText: true });
 });
 
@@ -395,7 +423,8 @@ test("recents and search preserve context without running a conversation", async
   await expect(search).toHaveValue(copy.everyday);
   await page.getByTestId("preview-main").getByRole("button", { name: new RegExp(`^${copy.everyday}`) }).click();
   await expect(page.getByTestId("account-detail")).toBeVisible();
-  await expect(page.getByRole("dialog", { name: copy.everyday, exact: true })).toBeVisible();
+  await expect(page.getByTestId("account-inspector")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("account activity uses its canonical entries and replaces stale search filters", async ({ page, networkAudit }, testInfo) => {
@@ -441,13 +470,36 @@ test("empty, loading and error layouts recover only to local sample content", as
 
 test("unknown query values cannot claim a signed-in or saved preview", async ({ page }) => {
   await openPreview(page);
-  await page.goto("/dev/ecosystem?view=unknown&state=saved&audience=registered&authenticated=true");
+  await page.goto("/dev/ecosystem?view=unknown&state=saved&audience=registered&authenticated=true&account=private-account");
   await controls(page);
   await expect(page.getByTestId("preview-view")).toHaveValue("argus");
   await expect(page.getByTestId("preview-state")).toHaveValue("sample");
   await expect(page.getByTestId("preview-audience")).toHaveValue("guest");
+  await expect(page.getByTestId("account-inspector")).toHaveCount(0);
+  await expect(page.getByTestId("account-detail")).toHaveCount(0);
   await expect(page.getByText(copy.previewNote, { exact: true })).toBeVisible();
 });
+
+for (const scenario of [
+  { audience: "guest", state: "sample" },
+  { audience: "sample", state: "empty" },
+  { audience: "sample", state: "error" },
+] as const) {
+  test(`an account deep link respects the ${scenario.audience}/${scenario.state} presentation`, async ({ page }) => {
+    await openPreview(page, { view: "accounts", ...scenario });
+    const query = new URLSearchParams({ view: "accounts", ...scenario, account: SAMPLE.accounts[0].id });
+    await page.goto(`/dev/ecosystem?${query}`, { waitUntil: "networkidle" });
+    await expect(page.getByTestId("account-inspector")).toHaveCount(0);
+    await expect(page.getByTestId("account-detail")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    if (scenario.audience === "guest") {
+      await page.getByRole("button", { name: copy.addAccount, exact: true }).first().click();
+      await expect(page.getByRole("dialog", { name: copy.registration, exact: true })).toContainText(copy.registrationBody);
+    } else {
+      await expect(page.getByTestId("preview-main")).toContainText(scenario.state === "empty" ? copy.accountsEmpty : copy.errorBody);
+    }
+  });
+}
 
 for (const cell of [CELLS[0], CELLS[6]]) {
   test(`200% text and a long account label remain usable: ${cell.name}`, async ({ page, networkAudit }, testInfo) => {
@@ -459,6 +511,11 @@ for (const cell of [CELLS[0], CELLS[6]]) {
       await enlargeText(page);
       await assertNoHorizontalOverflow(page);
       await assertLastControlReachable(page);
+      for (const link of await page.getByRole("navigation").getByRole("link").all()) {
+        const bounds = await rectangle(link);
+        expect(bounds.width).toBeGreaterThanOrEqual(44);
+        expect(bounds.height).toBeGreaterThanOrEqual(44);
+      }
     }
     await chooseView(page, "accounts");
     await closeControls(page);
@@ -473,7 +530,9 @@ for (const cell of [CELLS[0], CELLS[6]]) {
     await assertFocusInsideDialog(page);
     await enlargeText(page);
     const dialog = page.getByRole("dialog");
-    await expect(dialog).toContainText(longLabel);
+    const visibleName = dialog.getByRole("heading", { name: longLabel, exact: true });
+    await expect(visibleName).toBeVisible();
+    expect(await visibleName.evaluate((element) => element.scrollHeight <= element.clientHeight + 1 && element.scrollWidth <= element.clientWidth + 1), "The long draft name must wrap without clipping").toBe(true);
     await expect(dialog).toContainText(labels.draftNotice);
     const dimensions = await dialog.evaluate((element) => ({ scroll: element.scrollWidth, client: element.clientWidth }));
     expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client + 1);
@@ -482,3 +541,275 @@ for (const cell of [CELLS[0], CELLS[6]]) {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 }
+
+for (const cell of [CELLS[0], CELLS[3]]) {
+  test(`web rail keeps local geometry through preferences and history: ${cell.name}`, async ({ page, networkAudit }, testInfo) => {
+    const labels = previewCopy(cell.language);
+    await openPreview(page, { ...cell, view: "home" });
+    const rail = page.getByTestId("preview-rail");
+    const initiallyExpanded = cell.width >= DESKTOP_MIN_WIDTH_PX;
+    const storageBefore = await page.evaluate(() => ({ ...localStorage }));
+    await expect(rail).toHaveAttribute("data-expanded", String(initiallyExpanded));
+    expect((await rectangle(rail)).width).toBeCloseTo(initiallyExpanded ? 288 : 56, 0);
+    const toggle = rail.getByRole("button", { name: initiallyExpanded ? labels.collapseNavigation : labels.expandNavigation, exact: true });
+    await toggle.focus();
+    await page.keyboard.press("Enter");
+    await expect(rail).toHaveAttribute("data-expanded", String(!initiallyExpanded));
+    expect((await rectangle(rail)).width).toBeCloseTo(initiallyExpanded ? 56 : 288, 0);
+    for (const view of PREVIEW_VIEWS.slice(0, 5)) {
+      const link = rail.getByRole("link", { name: labels[view], exact: true });
+      const bounds = await rectangle(link);
+      expect(bounds.width).toBeGreaterThanOrEqual(44);
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+      await assertUnobscured(link);
+    }
+    await destination(page, "accounts").click();
+    await page.goBack();
+    await expect(destination(page, "home")).toHaveAttribute("aria-current", "page");
+    await expect(rail).toHaveAttribute("data-expanded", String(!initiallyExpanded));
+    expect(await page.evaluate(() => ({ ...localStorage }))).toEqual(storageBefore);
+
+    await destination(page, "settings").click();
+    await openPreferences(page, labels);
+    await page.getByRole("button", { name: new RegExp(`^${labels.language}`) }).click();
+    const nextLanguage = cell.language === "en" ? "es-419" : "en";
+    await page.getByRole("dialog").getByRole("button", { name: nextLanguage === "en" ? /^English/ : /^Español/ }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", nextLanguage);
+    const nextCopy = previewCopy(nextLanguage);
+    const nextCatalog = nextLanguage === "en" ? en : es;
+    await page.getByRole("button", { name: new RegExp(`^${nextCopy.appearance}`) }).click();
+    await page.getByRole("dialog").getByRole("button", { name: nextCatalog.settings.app.appearance_options.dark, exact: true }).click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+    await expect(rail).toHaveAttribute("data-expanded", String(!initiallyExpanded));
+    await expect(rail.getByRole("link", { name: nextCopy.accounts, exact: true })).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem("argus:sidebar_mode"))).toBeNull();
+    await assertNoHorizontalOverflow(page);
+    await capture(page, testInfo, networkAudit, `${cell.name}-rail-preferences-local-state`);
+  });
+}
+
+for (const cell of [CELLS[0], CELLS[2], CELLS[4]]) {
+  test(`cold chat groups its composer and active chat scrolls independently: ${cell.name}`, async ({ page, networkAudit }, testInfo) => {
+    await openPreview(page, { ...cell, view: "argus", audience: "sample" });
+    const composer = page.getByTestId("preview-composer");
+    const input = page.getByTestId("preview-composer-input");
+    const recents = page.getByRole("button", { name: copy.recents, exact: true });
+    const main = page.getByTestId("preview-main");
+    const cold = await rectangle(composer);
+    const reading = await rectangle(main);
+    const chips = await rectangle(page.getByRole("group", { name: copy.suggestions, exact: true }));
+    expect(Math.abs(cold.x + cold.width / 2 - reading.x - reading.width / 2)).toBeLessThanOrEqual(2);
+    expect(cold.width).toBeLessThanOrEqual(672);
+    expect(cold.y - chips.y - chips.height, "The cold composer stays with the suggestions").toBeGreaterThanOrEqual(0);
+    expect(cold.y - chips.y - chips.height).toBeLessThanOrEqual(40);
+    await assertUnobscured(input);
+    const headerBefore = await rectangle(recents);
+    const draft = "@NVDA this stays an unsent preview draft";
+    await input.fill(draft);
+    await recents.click();
+    await page.getByRole("dialog").getByRole("button", { name: copy.recentInvest, exact: true }).click();
+    const transcript = page.getByTestId("preview-transcript");
+    await expect(transcript).toBeVisible();
+    await expect(input).toHaveValue(draft);
+    const active = await rectangle(composer);
+    const transcriptBounds = await rectangle(transcript);
+    expect(active.width).toBeLessThanOrEqual(768);
+    expect(transcriptBounds.y + transcriptBounds.height).toBeLessThanOrEqual(active.y + 1);
+    if (cell.width >= TABLET_MIN_WIDTH_PX) expect(active.y - cold.y, "Active chat docks its composer below the central cold layout").toBeGreaterThan(60);
+    expect((await rectangle(recents)).x).toBeCloseTo(headerBefore.x, 0);
+    expect((await rectangle(recents)).y).toBeCloseTo(headerBefore.y, 0);
+    await capture(page, testInfo, networkAudit, `${cell.name}-active-chat-docked`);
+
+    // The real fixed DCA sample at 200% text supplies overflow without adding
+    // invented messages or changing the product's fixture data.
+    await enlargeText(page);
+    await expect.poll(() => transcript.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    const dockBefore = await rectangle(composer);
+    const headerAtLargeText = await rectangle(recents);
+    const documentScrollBefore = await page.evaluate(() => window.scrollY);
+    await transcript.hover();
+    await page.mouse.wheel(0, 1800);
+    await expect.poll(() => transcript.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    const dockAfter = await rectangle(composer);
+    expect(dockAfter.y).toBeCloseTo(dockBefore.y, 0);
+    expect(dockAfter.height).toBeCloseTo(dockBefore.height, 0);
+    expect((await rectangle(recents)).y).toBeCloseTo(headerAtLargeText.y, 0);
+    expect(await page.evaluate(() => window.scrollY)).toBe(documentScrollBefore);
+    await assertUnobscured(input);
+    await assertNoHorizontalOverflow(page);
+    await expect(input).toHaveValue(draft);
+    await capture(page, testInfo, networkAudit, `${cell.name}-active-chat-text-200-scroll`);
+  });
+}
+
+test("desktop account inspection retains the list, keyboard access and route history", async ({ page, networkAudit }, testInfo) => {
+  for (const view of ["accounts", "search"] as const) {
+    await openPreview(page, { view, audience: "sample", width: 1440, height: 1000 });
+    const main = page.getByTestId("preview-main");
+    const inspector = page.getByTestId("account-inspector");
+    const [first, second] = SAMPLE.accounts;
+    const row = (account: SampleAccount) => main.getByRole("button", { name: new RegExp(`^${copy[account.name]}`) });
+    const selected = () => new URL(page.url()).searchParams.get("account");
+    await row(first).focus();
+    await page.keyboard.press("Enter");
+    await expect(inspector).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(selected()).toBe(first.id);
+    await expect(inspector).toContainText(first.balance!);
+    await expect.poll(() => inspector.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    const listRow = await rectangle(row(first));
+    const detail = await rectangle(inspector);
+    expect(listRow.x + listRow.width, "The list remains beside the detail pane").toBeLessThanOrEqual(detail.x + 1);
+    await assertUnobscured(row(second));
+    await inspector.getByRole("button", { name: copy.closeAccountDetails, exact: true }).focus();
+    await page.keyboard.press("Shift+Tab");
+    expect(await inspector.evaluate((element) => element.contains(document.activeElement)), "The ordinary inspector does not trap keyboard focus").toBe(false);
+
+    await row(second).click();
+    await expect(inspector).toContainText(second.balance!);
+    expect(selected()).toBe(second.id);
+    await page.goBack();
+    await expect(inspector).toContainText(first.balance!);
+    expect(selected()).toBe(first.id);
+    await page.goBack();
+    await expect(inspector).toHaveCount(0);
+    await expect(row(first)).toBeFocused();
+    expect(selected()).toBeNull();
+    await page.goForward();
+    await expect(inspector).toBeVisible();
+    expect(selected()).toBe(first.id);
+    await capture(page, testInfo, networkAudit, `${view}-desktop-account-inspector`);
+    await closeInspector(page);
+    await expect(row(first)).toBeFocused();
+    expect(selected()).toBeNull();
+    await page.goBack();
+    await expect(inspector).toBeVisible();
+    expect(selected()).toBe(first.id);
+    await page.goForward();
+    await expect(inspector).toHaveCount(0);
+    expect(selected()).toBeNull();
+
+    await page.setViewportSize({ width: DESKTOP_MIN_WIDTH_PX, height: 580 });
+    const lowerAccount = SAMPLE.accounts.at(-1)!;
+    await row(lowerAccount).scrollIntoViewIfNeeded();
+    await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await row(lowerAccount).click();
+    const heading = inspector.getByRole("heading", { name: copy[lowerAccount.name], level: 2, exact: true });
+    await expect(heading).toBeFocused();
+    const mainViewport = await rectangle(main);
+    const headingBounds = await rectangle(heading);
+    expect(headingBounds.y, "Opening a lower account reveals its focused detail heading").toBeGreaterThanOrEqual(mainViewport.y);
+    expect(headingBounds.y + headingBounds.height).toBeLessThanOrEqual(mainViewport.y + mainViewport.height);
+    await assertUnobscured(heading);
+    await closeInspector(page);
+    await expect(row(lowerAccount)).toBeFocused();
+    const restoredRow = await rectangle(row(lowerAccount));
+    expect(restoredRow.y, "Closing account detail reveals the row receiving focus").toBeGreaterThanOrEqual(mainViewport.y);
+    expect(restoredRow.y + restoredRow.height).toBeLessThanOrEqual(mainViewport.y + mainViewport.height);
+    await assertUnobscured(row(lowerAccount));
+  }
+});
+
+for (const entry of [
+  { view: "accounts", kind: "navigation" },
+  { view: "search", kind: "navigation" },
+  { view: "accounts", kind: "direct-link" },
+] as const) test(`account inspection stays in its URL across the desktop boundary without duplicate history: ${entry.view}/${entry.kind}`, async ({ page, networkAudit }, testInfo) => {
+  await openPreview(page, { view: "home", audience: "sample", width: DESKTOP_MIN_WIDTH_PX, height: 1000 });
+  const homeURL = page.url();
+  const account = SAMPLE.accounts[0];
+  const inspector = page.getByTestId("account-inspector");
+  const trigger = page.getByTestId("preview-main").getByRole("button", { name: new RegExp(`^${copy[account.name]}`) });
+  let listURL: string | undefined;
+  if (entry.kind === "navigation") {
+    await destination(page, entry.view).click();
+    await expect(page).toHaveURL(new RegExp(`view=${entry.view}(?:&|$)`));
+    listURL = page.url();
+    await trigger.click();
+  } else {
+    const query = new URLSearchParams({ view: entry.view, audience: "sample", state: "sample", account: account.id });
+    await page.goto(`/dev/ecosystem?${query}`, { waitUntil: "networkidle" });
+  }
+  await expect(inspector).toBeVisible();
+  const selectedURL = page.url();
+  const selectedHistoryLength = await page.evaluate(() => history.length);
+  expect(new URL(selectedURL).searchParams.get("account")).toBe(account.id);
+  await expect.poll(() => inspector.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  await page.setViewportSize({ width: DESKTOP_MIN_WIDTH_PX - 1, height: 1000 });
+  await expect(page).toHaveURL(selectedURL);
+  expect(await page.evaluate(() => history.length)).toBe(selectedHistoryLength);
+  await expect(inspector).toContainText(account.balance!);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect.poll(() => inspector.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  const stackedDetail = await rectangle(inspector);
+  expect(stackedDetail.y + stackedDetail.height, "Selected detail stacks above the account list below desktop").toBeLessThanOrEqual((await rectangle(trigger)).y);
+  await page.setViewportSize({ width: 834, height: 1112 });
+  await assertNoHorizontalOverflow(page);
+  if (entry.view === "accounts" && entry.kind === "navigation") {
+    await capture(page, testInfo, networkAudit, "tablet-account-inspector-stacked-after-resize");
+  }
+
+  // A resize adds no history step: selection returns to its original list,
+  // while a direct selected URL returns straight to the preceding Home page.
+  if (listURL) {
+    await page.goBack();
+    await expect(page).toHaveURL(listURL);
+    await expect(inspector).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
+  await page.goBack();
+  await expect(page).toHaveURL(homeURL);
+  await expect(page.getByTestId("ecosystem-preview")).toHaveAttribute("data-preview-view", "home");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.goForward();
+  if (listURL) {
+    await expect(page).toHaveURL(listURL);
+    await expect(inspector).toHaveCount(0);
+    await page.goForward();
+  }
+  await expect(page).toHaveURL(selectedURL);
+  await expect(inspector).toContainText(account.balance!);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect.poll(() => inspector.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+  await closeInspector(page);
+  await expect(trigger).toBeFocused();
+  expect(new URL(page.url()).searchParams.has("account")).toBe(false);
+  const closedURL = page.url();
+  await trigger.click();
+  await assertDialogFocus(page);
+  await expect(page.getByRole("dialog")).toContainText(account.balance!);
+  await expect(inspector).toHaveCount(0);
+  await expect(page).toHaveURL(closedURL);
+  if (entry.view === "accounts" && entry.kind === "navigation") {
+    await capture(page, testInfo, networkAudit, "tablet-account-detail-after-resize");
+  }
+  await page.goBack();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(page).toHaveURL(closedURL);
+  await page.setViewportSize({ width: DESKTOP_MIN_WIDTH_PX, height: 1000 });
+  await expect(inspector).toHaveCount(0);
+  await trigger.press("Enter");
+  await expect(inspector).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("Home keeps two upcoming commitments ahead of account browsing on narrow screens", async ({ page, networkAudit }, testInfo) => {
+  await openPreview(page, { view: "home", audience: "sample", width: 1440, height: 1000 });
+  const comingUp = page.getByTestId("home-coming-up");
+  await expect(comingUp).toContainText(copy.comingUpNote);
+  for (const commitment of SAMPLE.commitments.slice(0, 2)) await expect(comingUp).toContainText(copy[commitment.title]);
+  for (const commitment of SAMPLE.commitments.slice(2)) await expect(comingUp.getByRole("button", { name: new RegExp(copy[commitment.title]) })).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const upcomingBounds = await rectangle(comingUp);
+  const firstAccount = await rectangle(page.getByTestId("preview-main").getByRole("button", { name: new RegExp(`^${copy.everyday}`) }));
+  expect(upcomingBounds.y + upcomingBounds.height).toBeLessThanOrEqual(firstAccount.y);
+  await comingUp.getByRole("button", { name: copy.plan, exact: true }).click();
+  await expect(page).toHaveURL(/view=plan(?:&|$)/);
+  await page.goBack();
+  await expect(comingUp).toBeVisible();
+  await capture(page, testInfo, networkAudit, "narrow-home-upcoming-priority");
+});
