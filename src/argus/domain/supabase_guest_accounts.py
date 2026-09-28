@@ -52,8 +52,7 @@ class GuestAccountPersistenceMixin:
         language: Language,
     ) -> dict[str, Any]:
         try:
-            auth_client = self.auth_client or self.client
-            response = auth_client.auth.sign_in_anonymously(
+            response = self._auth().sign_in_anonymously(
                 {
                     "options": {
                         "captcha_token": captcha_token,
