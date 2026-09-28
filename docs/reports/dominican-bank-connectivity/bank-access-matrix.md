@@ -30,6 +30,18 @@ Three conclusions follow.
 2. Popular and BHD contracts forbid sharing online-banking credentials with third parties. Credential-based access, whether Argus builds it or buys it, runs against those contracts.
 3. The public evidence barely separates the banks on statements. Popular's documents mention the most channels, including SFTP delivery, and those lines already appear in its April 2026 schedule. No institution states its file format, PDF text layer, file password, or history window on the public pages checked. That is an absence finding. One consenting holder's session per bank settles all four.
 
+## Documented statement availability versus observed file formats
+
+A bank saying that statements exist is different from anyone having seen the file. No file or email attachment from these institutions was observed in this lane. An email that only links to the bank's sign-in page is not an importable statement.
+
+| Institution | Statement availability the institution documents | Label | File or attachment format observed | Label |
+| --- | --- | --- | --- | --- |
+| Banco Popular Dominicano | In-app statement generation ("primeros 4 años"), automatic delivery by email or SFTP, and printed branch statements | Verified through documentation | None. A 2021 broker guide shows the older web banking printing movements to PDF through the browser. | Requires an authorized account test |
+| Banreservas | Monthly statements to home, office, email, or branch, and on-screen or printed movements | Observed on public pages | None from the bank. A 2022 software vendor says movements export as CSV, and a 2021 broker guide shows an Exportar button. | Vendor claim only |
+| Banco BHD | Branch pickup or download in digital channels, and email statements on request | Verified through documentation for the contract. Observed on public pages for email. | None. A 2021 broker guide shows a Descargar movimientos button. | Vendor claim only |
+| Scotiabank República Dominicana | Free statements in online banking and the app, sent to the postal or email address on file | Verified through documentation | None. A tutorial about allowing Safari pop-ups to generate statements suggests a document rendered in the browser. | Observed on public pages |
+| APAP | Twelve months of filterable web history. Only the business portal exports PDF or Excel. | Verified through documentation | None for personal banking | Requires an authorized account test |
+
 ## Banco Popular Dominicano
 
 | Dimension | Finding | Label | Source |
