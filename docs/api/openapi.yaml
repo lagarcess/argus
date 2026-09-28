@@ -3815,14 +3815,11 @@ components:
           - type: string
             maxLength: 40
           - type: 'null'
-          description: Starting balance as the person typed it, dot-decimal. A liability is
-            the positive amount owed. Omit it to leave the balance unknown.
         as_of:
           anyOf:
           - type: string
             format: date-time
           - type: 'null'
-          description: Instant the balance describes; defaults to now.
         time_zone:
           anyOf:
           - type: string
@@ -7450,7 +7447,6 @@ components:
           - type: integer
             minimum: 1.0
           - type: 'null'
-          description: Current opening revision, or null when the account has no opening yet.
         amount:
           anyOf:
           - type: string

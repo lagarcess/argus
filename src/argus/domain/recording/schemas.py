@@ -30,17 +30,10 @@ class CreateFinancialAccountRequest(BaseModel):
     type: AccountType
     currency: str = Field(min_length=3, max_length=3)
     nickname: str | None = Field(default=None, max_length=200)
-    amount: str | None = Field(
-        default=None,
-        max_length=40,
-        description=(
-            "Starting balance as the person typed it, dot-decimal. A liability is the"
-            " positive amount owed. Omit it to leave the balance unknown."
-        ),
-    )
-    as_of: datetime | None = Field(
-        default=None, description="Instant the balance describes; defaults to now."
-    )
+    # Starting balance as typed, dot-decimal; a liability is the positive amount
+    # owed. Omitted means the balance stays unknown. `as_of` defaults to now.
+    amount: str | None = Field(default=None, max_length=40)
+    as_of: datetime | None = None
     time_zone: str | None = Field(default=None, max_length=64)
     ownership_share_bps: int = Field(default=FULL_SHARE_BPS, ge=1, le=FULL_SHARE_BPS)
 
@@ -59,11 +52,8 @@ class EditFinancialAccountRequest(BaseModel):
 class WriteOpeningRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    expected_revision: int | None = Field(
-        default=None,
-        ge=1,
-        description="Current opening revision, or null when the account has no opening yet.",
-    )
+    # The current opening revision, or null when the account has no opening yet.
+    expected_revision: int | None = Field(default=None, ge=1)
     amount: str | None = Field(default=None, max_length=40)
     as_of: datetime | None = None
     time_zone: str | None = Field(default=None, max_length=64)
