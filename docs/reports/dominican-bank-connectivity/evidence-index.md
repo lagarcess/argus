@@ -11,6 +11,8 @@ This file lets a reviewer verify where every finding in this report comes from. 
 | Lane base | `f0a90763b79e5625ac0a4789cdfa171cda023963`, fetched 2026-09-27 |
 | Integration at last reconciliation | `3b9313f3dcf80e3ff9eddfcce8818a829a081225`. The unpublished branch fast-forwarded to it before the first commit. |
 | Head before the selected-file proof | `7a262986c4b02ec5d14a9e0caf24963d4228cb13` |
+| Head the first automated review covered | `54a359dea7f332da3da80e81ef28a33e6b304a14` |
+| Recording model the proof runs against | Pull request 724 at `8cdfc6a09e2fb1001b6a7c8694b67e3bd08fa491`, fetched 2026-09-28. The refresh started at `0df86aa8c7f4171331ec8319b8b771a577de42da`, the head the lane named, and gave the same observations there. The proof first ran at `720aad3fdee1357e3dbe5c928176a6e458b01b0d`. |
 | Current head | Reported on the pull request. Every commit after `7a262986c` is listed there. |
 
 Commits up to `7a262986c`, oldest first:
@@ -58,14 +60,14 @@ The [research notes](research-notes/README.md) hold every other source, each wit
 | Evidence | Command | Result |
 | --- | --- | --- |
 | Connector lifecycle experiment | `poetry run python docs/reports/dominican-bank-connectivity/connector_lifecycle.py --report temp/connector-lifecycle-report.json` | 23 of 23 checks. The 23rd was added after the automated review of `54a359dea` found that a balance such as N/A escaped as an exception instead of rejecting the batch. Repeated runs write the committed [report](connector-lifecycle-report.json) byte for byte. |
-| Selected-file import proof | `selected-file-import/proof.py` with pull request 724's reference model at `720aad3fd` on the path, as its [rerun steps](selected-file-import/README.md#rerun) list | 35 of 36 cases pass, and 1 is a known gap in pull request 724. Byte-identical to the committed [report](selected-file-import/proof-report.json). Without pull request 724, 15 pass and 21 report blocked. The committed [breakage check](selected-file-import/mutation_check.py) makes seven deliberate breakages, and each fails its target cases. |
+| Selected-file import proof | `selected-file-import/proof.py` with and without pull request 724's reference model at `8cdfc6a09` on the path, as its [rerun steps](selected-file-import/README.md#rerun) list | With the model, 37 of 37 cases pass. Without it, 15 pass and 22 report blocked, which is not a pass. Both runs write their committed reports, [with](selected-file-import/proof-report.json) and [without](selected-file-import/proof-report-without-724.json), byte for byte. The committed [breakage check](selected-file-import/mutation_check.py) makes eleven deliberate breakages, and each fails its target cases. |
 | Synthetic ingestion kit | `poetry run pytest tests/synthetic_ingestion --confcutdir=tests/synthetic_ingestion --no-cov -q` | 46 passed |
 | Tests that walk the docs, source, or evidence trees | `poetry run pytest tests/test_private_alpha_release_docs.py tests/test_backtest_job_scopes.py tests/test_spine_guardrails.py tests/research/test_evidence_driver_calls.py -q --no-cov` | 72 passed |
 | Docs gates | `git diff --check`, `scripts/check_docs_links.py --base origin/codex/private-alpha-next`, `.github/docs-only-changes.sh --from-git origin/codex/private-alpha-next` | Clean, `docs_only=true` |
 
 ## Repository evidence
 
-The selected-file proof follows the lane text, the recording decision response, and the balance reconciliation handoff in pull request 727 at `a1c294319`, read on 2026-09-28. The known gap it records was observed by running pull request 724's model at `720aad3fd`.
+The selected-file proof follows the lane text, the recording decision response, and the balance reconciliation handoff in pull request 727 at `a1c294319`, read on 2026-09-28. The three documents are unchanged at `d7faac770`. With pull request 724's model at `720aad3fd`, statement rows dated the day before a confirmed balance check confirmed without review. At `0df86aa8c` and `8cdfc6a09` they wait for the person's answer, and the proof now asserts that behavior as a regression case.
 
 The integration map's 34 code links resolve at `f0a90763b`. Their cited line ranges are unchanged at `3b9313f3d`. Pull request 721 changed only the log-privacy test among the cited files, and the map's sentence about it was updated.
 

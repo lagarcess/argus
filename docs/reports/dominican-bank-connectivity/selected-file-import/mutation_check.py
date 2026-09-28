@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import importlib.util
-import io
 import sys
 import tempfile
 from pathlib import Path
@@ -22,22 +21,24 @@ def run(case_ids: set[str]) -> dict[str, bool]:
         root = Path(folder)
         proof.FIXTURES.clear()
         proof.FIXTURES.update(proof.build_fixtures(root / "fixtures"))
-        for case_id, _, _, _, _, function in proof.CASES:
+        for case_id, _, _, _, function in proof.CASES:
             if case_id in case_ids:
                 workdir = root / case_id
                 workdir.mkdir()
-                results[case_id] = bool(function(proof.FIXTURES, workdir)[0])
+                results[case_id] = proof.run_case(function, workdir)[0]
     return results
 
 
 @contextlib.contextmanager
-def patched(target, name: str, replacement):
-    original = getattr(target, name)
-    setattr(target, name, replacement(original))
+def patched(changes):
+    originals = [(target, name, getattr(target, name)) for target, name, _ in changes]
+    for target, name, replacement in changes:
+        setattr(target, name, replacement(getattr(target, name)))
     try:
         yield
     finally:
-        setattr(target, name, original)
+        for target, name, original in originals:
+            setattr(target, name, original)
 
 
 def ignore_encryption(original):
@@ -68,12 +69,36 @@ def keep_duplicates(original):
     return add
 
 
+def answer_for_the_person(original):
+    def add(self, session, label, fields, reference):
+        before = len(session.drafts)
+        original(self, session, label, fields, reference)
+        account = fields.get("account_id")
+        if (
+            len(session.drafts) > before
+            and account
+            and fields["kind"] != "balance_observation"
+        ):
+            anchors = proof.derive.anchors(self.store.book, account)
+            self.store.resolve(
+                session.drafts[-1], answers={record.id: "included" for record in anchors}
+            )
+
+    return add
+
+
+def stop_asking(original):
+    def review(state, draft, tz):
+        body, found = original(state, draft, tz)
+        return body, tuple(item for item in found if item.code != "inclusion_unanswered")
+
+    return review
+
+
 def cancel_without_reject(original):
     def cancel(self, session):
         self.selections.pop(session.id, None)
-        if session.source:
-            session.source.unlink(missing_ok=True)
-            session.source = None
+        self._release(session)
         session.status = "cancelled"
 
     return cancel
@@ -81,12 +106,39 @@ def cancel_without_reject(original):
 
 def cancel_keeps_file(original):
     def cancel(self, session):
-        for item in self.pending(session):
+        for item in self.pending(session.intake.digest):
             self.store.reject(item)
         self.selections.pop(session.id, None)
         session.status = "cancelled"
 
     return cancel
+
+
+def completion_keeps_file(original):
+    def confirm_ready(self, session, key):
+        previews = [
+            self.store.preview(item) for item in self.pending(session.intake.digest)
+        ]
+        ready = [item for item in previews if not proof.blocking(item)]
+        return self.store.confirm_batch(ready, key) if ready else []
+
+    return confirm_ready
+
+
+def remember_reviews(original):
+    def review(self, session, account_map, stub=None):
+        self.__dict__.setdefault("seen", set()).add(session.intake.digest)
+        return original(self, session, account_map, stub)
+
+    return review
+
+
+def only_remembered_reviews(original):
+    def open_reviews(self):
+        seen = self.__dict__.get("seen", set())
+        return {digest: ids for digest, ids in original(self).items() if digest in seen}
+
+    return open_reviews
 
 
 def store_under_original_name(original):
@@ -107,72 +159,76 @@ def hold_refused(original):
     return select
 
 
-def close_known_gap(original):
-    def rows(env, as_of):
-        return {
-            label: sorted(set(codes) | {"observation_order_unknown"})
-            for label, codes in original(env, as_of).items()
-        }
-
-    return rows
-
-
-MUTATIONS = (
-    (
-        "encryption ignored",
-        proof,
-        "_classify",
-        ignore_encryption,
-        {"password_protected_pdf"},
-    ),
-    (
-        "every encrypted PDF refused",
-        proof,
-        "_classify",
-        refuse_every_encrypted_pdf,
-        {"pdf_with_copy_restriction_only"},
-    ),
-    (
-        "duplicates kept",
-        proof.Importer,
-        "_add",
-        keep_duplicates,
-        {
-            "same_file_from_two_entry_points",
-            "overlapping_statement",
-            "pause_and_resume",
-            "reimport_after_partial_confirmation",
-        },
-    ),
-    (
-        "cancel keeps drafts",
-        proof.Importer,
-        "cancel",
-        cancel_without_reject,
-        {"cancel_during_review", "cancel_after_partial_confirmation"},
-    ),
-    (
-        "cancel keeps the stored file",
-        proof.Importer,
-        "cancel",
-        cancel_keeps_file,
-        {"cancel_during_review", "cancel_after_partial_confirmation"},
-    ),
-    (
-        "file stored under its original name",
-        proof,
-        "extract",
-        store_under_original_name,
-        {"source_file_visibility"},
-    ),
-    (
-        "refused file held",
-        proof.Importer,
-        "select",
-        hold_refused,
-        {"too_large", "password_protected_pdf", "unlocked_copy_after_refusal"},
-    ),
-)
+def mutations():
+    balance_checks = {
+        "same_day_balance_check_hands_off",
+        "earlier_day_rows_behind_a_balance_check",
+    }
+    return (
+        (
+            "encryption ignored",
+            [(proof, "_classify", ignore_encryption)],
+            {"password_protected_pdf"},
+        ),
+        (
+            "every encrypted PDF refused",
+            [(proof, "_classify", refuse_every_encrypted_pdf)],
+            {"pdf_with_copy_restriction_only"},
+        ),
+        (
+            "duplicates kept",
+            [(proof.Importer, "_add", keep_duplicates)],
+            {
+                "same_file_from_two_entry_points",
+                "overlapping_statement",
+                "pause_and_resume",
+                "reimport_after_partial_confirmation",
+            },
+        ),
+        (
+            "importer answers balance-check questions for the person",
+            [(proof.Importer, "_add", answer_for_the_person)],
+            balance_checks,
+        ),
+        (
+            "recording model stops asking about activity behind a check",
+            [(proof.model, "review", stop_asking)],
+            balance_checks,
+        ),
+        (
+            "cancel keeps drafts",
+            [(proof.Importer, "cancel", cancel_without_reject)],
+            {"cancel_during_review", "cancel_after_partial_confirmation"},
+        ),
+        (
+            "cancel keeps the stored file",
+            [(proof.Importer, "cancel", cancel_keeps_file)],
+            {"cancel_during_review", "cancel_after_partial_confirmation"},
+        ),
+        (
+            "completed review keeps the stored file",
+            [(proof.Importer, "confirm_ready", completion_keeps_file)],
+            {"completed_review_deletes_the_file"},
+        ),
+        (
+            "open reviews tracked only in memory",
+            [
+                (proof.Importer, "review", remember_reviews),
+                (proof.Importer, "open_reviews", only_remembered_reviews),
+            ],
+            {"pause_and_resume"},
+        ),
+        (
+            "file stored under its original name",
+            [(proof, "extract", store_under_original_name)],
+            {"source_file_visibility"},
+        ),
+        (
+            "refused file held",
+            [(proof.Importer, "select", hold_refused)],
+            {"too_large", "password_protected_pdf", "unlocked_copy_after_refusal"},
+        ),
+    )
 
 
 def main() -> int:
@@ -183,29 +239,16 @@ def main() -> int:
     if proof.model is None:
         parser.error("put pull request 724's tests/financial_recording on PYTHONPATH")
     ok = True
-    for label, target, name, replacement, case_ids in MUTATIONS:
-        with patched(target, name, replacement):
+    for label, changes, case_ids in mutations():
+        with patched(changes):
             results = run(case_ids)
         caught = not any(results.values())
         ok &= caught
         print(f"{'caught' if caught else 'MISSED'}: {label} {sorted(results)}")
-    gaps = {case_id for case_id, *_, known_gap, _ in proof.CASES if known_gap}
     baseline = run({case_id for case_id, *_ in proof.CASES})
-    clean = all(passed for case_id, passed in baseline.items() if case_id not in gaps)
-    gaps_open = not any(baseline[case_id] for case_id in gaps)
-    ok &= clean and gaps_open
-    print(
-        f"unbroken: {len(baseline)} cases, others pass {clean}, known gaps fail {gaps_open}"
-    )
-    with (
-        tempfile.TemporaryDirectory() as folder,
-        patched(proof, "_rows_behind_balance_check", close_known_gap),
-        contextlib.redirect_stdout(io.StringIO()),
-    ):
-        sys.argv = ["proof.py", "--report", str(Path(folder) / "report.json")]
-        closed_exit = proof.main()
-    ok &= closed_exit == 1
-    print(f"a closed known gap makes the proof exit {closed_exit}")
+    clean = all(baseline.values())
+    ok &= clean
+    print(f"unbroken: {len(baseline)} cases, all pass {clean}")
     return 0 if ok else 1
 
 

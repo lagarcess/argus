@@ -21,9 +21,9 @@ from tests.synthetic_ingestion.extract import load_input
 from tests.synthetic_ingestion.generate import generate
 
 try:
-    from tests.financial_recording import derive, model
+    from tests.financial_recording import catalog, derive, model
 except ImportError:
-    derive = model = None
+    catalog = derive = model = None
 
 SIZE_LIMIT = 10 * 1024 * 1024
 AST = timezone(timedelta(hours=-4))
@@ -41,6 +41,14 @@ RECOVERY = {
 }
 SUFFIX = {"pdf": ".pdf", "csv": ".csv", "png": ".png", "jpeg": ".jpg", "heic": ".heic"}
 REFERENCE_KEYS = {"digest", "file", "row", "page", "external_id", "entry", "stub_digest"}
+HOUSEHOLD = "household"
+ASSUMPTIONS = {
+    "status": "Experimental choices made to run the proof. Unresolved, and not approved production defaults.",
+    "source_file_retention": "A stored file is deleted once no row from it is left in review.",
+    "password_entry": "None. A file that needs a password is refused, and the person is asked for an unlocked copy.",
+    "upload_limit_bytes": SIZE_LIMIT,
+    "household_source_file_visibility": "Not modeled. Records carry a reference to the file, never the file.",
+}
 
 
 @dataclass(frozen=True)
@@ -112,10 +120,14 @@ def pdf_text(data: bytes, password: str | None = None) -> str | None:
     return result.stdout.decode("utf-8", "replace") if result.returncode == 0 else None
 
 
+def stored_path(directory: Path, intake: Intake) -> Path:
+    return directory / f"{intake.digest[:16]}{SUFFIX[intake.subtype]}"
+
+
 def extract(
     workdir: Path, selection: Selection, intake: Intake, stub: Path | None = None
 ):
-    path = workdir / f"{intake.digest[:16]}{SUFFIX[intake.subtype]}"
+    path = stored_path(workdir, intake)
     path.write_bytes(selection.data)
     return path, load_input(path, stub)
 
@@ -131,7 +143,6 @@ class Session:
     drafts: list[str] = field(default_factory=list)
     already_imported: list[str] = field(default_factory=list)
     balances: dict | None = None
-    source: Path | None = None
 
 
 def blocking(preview) -> list[str]:
@@ -167,11 +178,7 @@ class Importer:
         path, loaded = extract(
             self.sources, self.selections.pop(session.id), session.intake, stub
         )
-        session.mode, session.errors, session.source = (
-            loaded["mode"],
-            list(loaded["errors"]),
-            path,
-        )
+        session.mode, session.errors = loaded["mode"], list(loaded["errors"])
         rows = loaded["proposals"]
         for proposal in rows:
             row = proposal["fields"]
@@ -207,6 +214,7 @@ class Importer:
                 {"digest": session.intake.digest, "file": path.name, "row": "closing"},
             )
         session.status = "in_review"
+        self._release(session)
         return session
 
     def _add(self, session: Session, label: str, fields: dict, reference: dict) -> None:
@@ -220,23 +228,36 @@ class Importer:
         else:
             session.drafts.append(draft.id)
 
-    def pending(self, session: Session) -> list[str]:
-        drafts = self.store.state.drafts
-        return [item for item in session.drafts if drafts[item].status == "proposed"]
+    def open_reviews(self) -> dict[str, list[str]]:
+        found: dict[str, list[str]] = {}
+        for draft in self.store.state.drafts.values():
+            digest = (draft.provenance.source_ref or {}).get("digest")
+            if draft.status == "proposed" and digest:
+                found.setdefault(digest, []).append(draft.id)
+        return found
+
+    def pending(self, digest: str) -> list[str]:
+        return self.open_reviews().get(digest, [])
 
     def confirm_ready(self, session: Session, key: str) -> list:
-        previews = [self.store.preview(item) for item in self.pending(session)]
+        previews = [
+            self.store.preview(item) for item in self.pending(session.intake.digest)
+        ]
         ready = [item for item in previews if not blocking(item)]
-        return self.store.confirm_batch(ready, key) if ready else []
+        confirmed = self.store.confirm_batch(ready, key) if ready else []
+        self._release(session)
+        return confirmed
 
     def cancel(self, session: Session) -> None:
-        for item in self.pending(session):
+        for item in self.pending(session.intake.digest):
             self.store.reject(item)
         self.selections.pop(session.id, None)
-        if session.source:
-            session.source.unlink(missing_ok=True)
-            session.source = None
+        self._release(session)
         session.status = "cancelled"
+
+    def _release(self, session: Session) -> None:
+        if session.intake.subtype in SUFFIX and not self.pending(session.intake.digest):
+            stored_path(self.sources, session.intake).unlink(missing_ok=True)
 
     def summary(self, session: Session) -> dict[str, int]:
         states = [self.store.state.drafts[item].status for item in session.drafts]
@@ -253,7 +274,6 @@ class Env:
     store: object
     importer: Importer
     ids: dict[str, str]
-    spaces: dict[str, str]
 
     def label(self, draft_id: str) -> str:
         reference = self.store.state.drafts[draft_id].provenance.source_ref or {}
@@ -263,30 +283,30 @@ class Env:
         return {self.label(item): item for item in session.drafts}
 
     def scope(self, space: str) -> list[str]:
-        return [account for account, owner in self.spaces.items() if owner == space]
+        return derive.space_scope(self.store.book, space)
 
 
 def make_env(workdir: Path) -> Env:
     store = model.Store(clock=lambda: CLOCK, ids=itertools.count(1))
     opened = datetime(2026, 9, 1, tzinfo=AST)
-    ids, spaces = {}, {}
+    ids = {}
     for nickname, kind, currency, opening, space in (
-        ("Cuenta corriente", "checking", "DOP", "1000.00", "Personal"),
-        ("Efectivo", "cash", "DOP", None, "Personal"),
-        ("Dolares", "savings", "USD", None, "Personal"),
-        ("Cuenta de la casa", "checking", "DOP", None, "Household"),
+        ("Cuenta corriente", "checking", "DOP", "1000.00", catalog.PERSONAL_SPACE),
+        ("Efectivo", "cash", "DOP", None, catalog.PERSONAL_SPACE),
+        ("Dolares", "savings", "USD", None, catalog.PERSONAL_SPACE),
+        ("Cuenta de la casa", "checking", "DOP", None, HOUSEHOLD),
     ):
         account = store.create_account(
-            nickname,
             kind,
             currency,
             opening,
             idempotency_key=f"create:{nickname}",
+            nickname=nickname,
             as_of=opened if opening else None,
+            space_id=space,
         )
         ids[nickname] = account.id
-        spaces[account.id] = space
-    return Env(store, Importer(store, workdir), ids, spaces)
+    return Env(store, Importer(store, workdir), ids)
 
 
 def _rc4(key: bytes, data: bytes) -> bytes:
@@ -393,18 +413,12 @@ def build_fixtures(directory: Path) -> dict[str, bytes]:
     return files
 
 
-CASES: list[tuple[str, str, bool, str, str | None, object]] = []
+CASES: list[tuple[str, str, bool, str, object]] = []
 
 
-def case(
-    case_id: str,
-    group: str,
-    claim: str,
-    recording: bool = True,
-    known_gap: str | None = None,
-):
+def case(case_id: str, group: str, claim: str, recording: bool = True):
     def register(function):
-        CASES.append((case_id, group, recording, claim, known_gap, function))
+        CASES.append((case_id, group, recording, claim, function))
         return function
 
     return register
@@ -693,7 +707,7 @@ def identical_rows(fx, workdir):
 @case(
     "statement_balance_reconciles",
     "review",
-    "A statement's closing balance becomes one observation, needs a person-confirmed date, and reconciles to zero against its rows.",
+    "A statement's closing balance becomes one observation, needs a person-confirmed date, and reconciles to zero against its rows when confirmed and afterwards.",
 )
 def statement_balance(fx, workdir):
     env = make_env(workdir)
@@ -703,8 +717,7 @@ def statement_balance(fx, workdir):
     env.store.resolve(rows["statement-03"], distinct=True)
     env.store.edit_draft(rows["closing"], as_of="2026-09-30T23:59:59-04:00")
     env.importer.confirm_ready(session, "batch-1")
-    checking = env.ids["Cuenta corriente"]
-    gaps = derive.observation_gaps(env.store.book, checking)
+    gap = derive.observation_gaps(env.store.book, env.ids["Cuenta corriente"])[-1]
     activity = [
         r
         for r in derive.live_records(env.store.book)
@@ -713,13 +726,15 @@ def statement_balance(fx, workdir):
     observed = {
         "closing_before_date": closing_codes,
         "statement_balances": session.balances,
-        "gap_minor_units": gaps[-1].amount if gaps else None,
+        "difference_at_confirmation": gap.recorded,
+        "difference_remaining": gap.remaining,
         "activity_records": len(activity),
         "summary": env.importer.summary(session),
     }
     return (
         closing_codes == ["field_missing"]
-        and observed["gap_minor_units"] == 0
+        and gap.recorded == 0
+        and gap.remaining == 0
         and len(activity) == 4
         and observed["summary"]["unresolved"] == 0
     ), observed
@@ -762,10 +777,10 @@ def destination_space(fx, workdir):
     before = blocking(env.store.preview(row))
     env.store.edit_draft(row, account_id=env.ids["Cuenta de la casa"])
     env.importer.confirm_ready(session, "batch-1")
-    personal = derive.activity_totals(env.store.book, env.scope("Personal"))[
+    personal = derive.activity_totals(env.store.book, env.scope(catalog.PERSONAL_SPACE))[
         "DOP"
     ].spending
-    household = derive.activity_totals(env.store.book, env.scope("Household"))[
+    household = derive.activity_totals(env.store.book, env.scope(HOUSEHOLD))[
         "DOP"
     ].spending
     observed = {
@@ -810,7 +825,7 @@ def source_visibility(fx, workdir):
     row = env.by_label(session)["tx-household"]
     env.store.edit_draft(row, account_id=env.ids["Cuenta de la casa"])
     env.importer.confirm_ready(session, "batch-1")
-    household = set(env.scope("Household"))
+    household = set(env.scope(HOUSEHOLD))
     keys, values, household_rows = set(), [], []
     for record in derive.live_records(env.store.book):
         for revision in record.revisions:
@@ -829,6 +844,36 @@ def source_visibility(fx, workdir):
         and not observed["original_name_in_records"]
         and household_rows == ["tx-household"]
     ), observed
+
+
+@case(
+    "completed_review_deletes_the_file",
+    "review",
+    "Once no row from a file is left in review, the stored file is deleted, and the records still name it by digest.",
+)
+def completed_review(fx, workdir):
+    env = make_env(workdir)
+    session = _statement_session(env)
+    rows = env.by_label(session)
+    env.store.resolve(rows["statement-03"], distinct=True)
+    env.store.edit_draft(rows["closing"], as_of="2026-09-30T23:59:59-04:00")
+    files_in_review = len(env.importer.held()["on_disk"])
+    confirmed = env.importer.confirm_ready(session, "batch-1")
+    digests = {
+        record.revisions[-1].provenance.source_ref.get("digest") for record in confirmed
+    }
+    observed = {
+        "files_in_review": files_in_review,
+        "confirmed": len(confirmed),
+        "held_after_completion": env.importer.held(),
+        "records_name_file_by_digest": digests == {session.intake.digest},
+    }
+    return observed == {
+        "files_in_review": 1,
+        "confirmed": 5,
+        "held_after_completion": NOTHING_HELD,
+        "records_name_file_by_digest": True,
+    }, observed
 
 
 @case(
@@ -922,37 +967,79 @@ def manual_then_import(fx, workdir):
     ) == 2 and linked == 1, observed
 
 
+STATEMENT_ROWS = ["statement-01", "statement-02", "statement-03", "statement-04"]
+
+
 @case(
     "same_day_balance_check_hands_off",
     "review",
-    "Untimed rows on the same day as a timed balance check go to account review.",
+    "Untimed rows on the same day as a confirmed balance check wait until the person says whether the check included them.",
 )
 def same_day_check(fx, workdir):
-    codes = _rows_behind_balance_check(make_env(workdir), "2026-09-10T12:00:00-04:00")
-    observed = {"blocking": codes}
-    return all("observation_order_unknown" in value for value in codes.values()) and len(
-        codes
-    ) == 4, observed
+    env = make_env(workdir)
+    check_id, _, rows = _checked_statement(env, "2026-09-10T12:00:00-04:00")
+    observed = {
+        "asked_about_the_check": sorted(
+            label for label, item in rows.items() if _asked_about(env, item) == [check_id]
+        )
+    }
+    return observed == {"asked_about_the_check": STATEMENT_ROWS}, observed
 
 
 @case(
     "earlier_day_rows_behind_a_balance_check",
     "review",
-    "Rows dated the day before a confirmed balance check also go to account review.",
-    known_gap="Pull request 724 at 720aad3fd asks only about same-day rows. The recording decision response in pull request 727 settles that review is not restricted to same-day records.",
+    "Rows dated the day before a confirmed balance check wait for the person's answer, nothing confirms them without it, and the answer reaches the check's remaining difference.",
 )
 def earlier_day_check(fx, workdir):
-    codes = _rows_behind_balance_check(make_env(workdir), "2026-09-11T12:00:00-04:00")
-    held = {
-        label: sorted(set(value) - {"possible_duplicate"})
-        for label, value in codes.items()
+    env = make_env(workdir)
+    check_id, session, rows = _checked_statement(env, "2026-09-11T12:00:00-04:00")
+    asked = sorted(
+        label for label, item in rows.items() if _asked_about(env, item) == [check_id]
+    )
+    confirmed_unanswered = env.importer.confirm_ready(session, "batch-1")
+    records_before = len(env.store.book.records)
+    try:
+        env.store.confirm_batch(
+            [env.store.preview(item) for item in rows.values()], "direct-1"
+        )
+        direct = "confirmed"
+    except model.ReviewRequired:
+        direct = "refused"
+    written_directly = len(env.store.book.records) - records_before
+    env.store.resolve(rows["statement-03"], distinct=True)
+    for item in rows.values():
+        env.store.resolve(item, answers={check_id: "included"})
+    confirmed_answered = env.importer.confirm_ready(session, "batch-2")
+    [gap] = [
+        item
+        for item in derive.observation_gaps(env.store.book, env.ids["Cuenta corriente"])
+        if item.record_id == check_id
+    ]
+    observed = {
+        "asked_about_the_check": asked,
+        "confirmed_without_answer": len(confirmed_unanswered),
+        "direct_confirmation": direct,
+        "written_by_direct_confirmation": written_directly,
+        "confirmed_after_answer": len(confirmed_answered),
+        "check_difference_at_confirmation": gap.recorded,
+        "check_difference_remaining": gap.remaining,
+        "rows_explaining_the_check": len(gap.explained_by),
     }
-    observed = {"held_for_review": held}
-    return len(held) == 4 and all(held.values()), observed
+    return observed == {
+        "asked_about_the_check": STATEMENT_ROWS,
+        "confirmed_without_answer": 0,
+        "direct_confirmation": "refused",
+        "written_by_direct_confirmation": 0,
+        "confirmed_after_answer": 4,
+        "check_difference_at_confirmation": 100000,
+        "check_difference_remaining": 2550,
+        "rows_explaining_the_check": 4,
+    }, observed
 
 
-def _rows_behind_balance_check(env: Env, as_of: str) -> dict[str, list[str]]:
-    check_draft = env.store.draft(
+def _checked_statement(env: Env, as_of: str) -> tuple[str, Session, dict[str, str]]:
+    check = env.store.draft(
         {
             "kind": "balance_observation",
             "account_id": env.ids["Cuenta corriente"],
@@ -962,13 +1049,20 @@ def _rows_behind_balance_check(env: Env, as_of: str) -> dict[str, list[str]]:
         },
         derive.Provenance("manual", CLOCK),
     )
-    env.store.confirm_batch([env.store.preview(check_draft.id)], "check-1")
+    [record] = env.store.confirm_batch([env.store.preview(check.id)], "check-1")
     session = _statement_session(env)
-    return {
-        env.label(item): blocking(env.store.preview(item))
-        for item in session.drafts
-        if env.label(item) != "closing"
+    rows = {
+        label: item for label, item in env.by_label(session).items() if label != "closing"
     }
+    return record.id, session, rows
+
+
+def _asked_about(env: Env, draft_id: str) -> list[str]:
+    return sorted(
+        found.refs[0]
+        for found in env.store.preview(draft_id).issues
+        if found.code == "inclusion_unanswered"
+    )
 
 
 @case(
@@ -1059,23 +1153,28 @@ def cancel_after_partial(fx, workdir):
 @case(
     "pause_and_resume",
     "cancellation",
-    "Leaving a review open keeps its drafts, and after the app restarts the same file adds no second copy.",
+    "Leaving a review open keeps its drafts and its file. After the app restarts, the review is found again from the stored drafts alone, and the same file adds no second copy.",
 )
 def pause_resume(fx, workdir):
     env = make_env(workdir)
     session = _csv_session(env)
-    pending_before = env.importer.pending(session)
+    digest = session.intake.digest
+    pending_before = env.importer.pending(digest)
     env.importer = Importer(env.store, workdir)
+    found_after_restart = env.importer.open_reviews()
+    files_after_restart = len(env.importer.held()["on_disk"])
     reopened = _csv_session(env, "share_extension")
     observed = {
-        "pending": len(pending_before),
-        "pending_kept": env.importer.pending(session) == pending_before,
+        "pending_before_restart": len(pending_before),
+        "found_after_restart": found_after_restart == {digest: pending_before},
+        "files_after_restart": files_after_restart,
         "second_copy_drafts": len(reopened.drafts),
         "already_imported": len(reopened.already_imported),
     }
     return observed == {
-        "pending": 11,
-        "pending_kept": True,
+        "pending_before_restart": 11,
+        "found_after_restart": True,
+        "files_after_restart": 1,
         "second_copy_drafts": 0,
         "already_imported": 11,
     }, observed
@@ -1091,7 +1190,9 @@ def retry_same_key(fx, workdir):
     session = _csv_session(env)
     ready = [
         p
-        for p in (env.store.preview(i) for i in env.importer.pending(session))
+        for p in (
+            env.store.preview(i) for i in env.importer.pending(session.intake.digest)
+        )
         if not blocking(p)
     ]
     first = env.store.confirm_batch(ready, "batch-1")
@@ -1195,6 +1296,14 @@ def nothing_posts(fx, workdir):
 FIXTURES: dict[str, bytes] = {}
 
 
+def run_case(function, workdir: Path) -> tuple[bool, dict]:
+    try:
+        passed, observed = function(FIXTURES, workdir)
+    except Exception as error:
+        return False, {"error": f"{type(error).__name__}: {error}"}
+    return bool(passed), observed
+
+
 def _digest(paths: list[Path]) -> str:
     return hashlib.sha256(b"".join(path.read_bytes() for path in paths)).hexdigest()
 
@@ -1217,16 +1326,14 @@ def main() -> int:
         package = Path(model.__file__).parent
         recording = {
             "ref": args.recording_ref,
-            "digest": _digest(
-                [package / "model.py", package / "derive.py", package / "money.py"]
-            ),
+            "digest": _digest(sorted(package.glob("*.py"))),
         }
     kit = Path(load_input.__code__.co_filename).parent
     results = []
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
         FIXTURES.update(build_fixtures(root / "fixtures"))
-        for case_id, group, needs_recording, claim, known_gap, function in CASES:
+        for case_id, group, needs_recording, claim, function in CASES:
             workdir = root / case_id
             workdir.mkdir()
             if needs_recording and model is None:
@@ -1237,10 +1344,8 @@ def main() -> int:
                     },
                 )
             else:
-                passed, observed = function(FIXTURES, workdir)
+                passed, observed = run_case(function, workdir)
                 status = "passed" if passed else "failed"
-                if known_gap:
-                    status = "unexpected_pass" if passed else "known_gap"
             results.append(
                 {
                     "case": case_id,
@@ -1248,18 +1353,17 @@ def main() -> int:
                     "claim": claim,
                     "status": status,
                     "observed": observed,
-                    **({"known_gap": known_gap} if known_gap else {}),
                 }
             )
     report = {
-        "format": "selected-file-import-proof-v1",
+        "format": "selected-file-import-proof-v2",
         "fictional": True,
-        "size_limit_bytes": SIZE_LIMIT,
+        "assumptions": ASSUMPTIONS,
         "recording_model": recording,
         "kit_digest": _digest(sorted(kit.glob("*.py"))),
         "counts": {
             s: sum(r["status"] == s for r in results)
-            for s in ("passed", "failed", "blocked", "known_gap", "unexpected_pass")
+            for s in ("passed", "failed", "blocked")
         },
         "cases": results,
     }
@@ -1275,7 +1379,7 @@ def main() -> int:
     for item in results:
         if item["status"] != "passed":
             print(f"{item['status'].upper()}: {item['case']}")
-    return 1 if counts["failed"] or counts["unexpected_pass"] else 0
+    return 1 if counts["failed"] else 0
 
 
 if __name__ == "__main__":

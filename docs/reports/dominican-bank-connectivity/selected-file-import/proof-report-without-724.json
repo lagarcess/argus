@@ -195,370 +195,207 @@
       "claim": "Clean rows confirm in one batch, and each uncertain row stays a draft with a named reason.",
       "group": "review",
       "observed": {
-        "blocking": {
-          "tx-currency": [
-            "currency_unsupported"
-          ],
-          "tx-date": [
-            "date_invalid"
-          ],
-          "tx-dop-03": [
-            "possible_duplicate"
-          ],
-          "tx-dop-05": [
-            "counter_account_missing"
-          ],
-          "tx-household": [
-            "field_missing"
-          ],
-          "tx-missing": [
-            "field_missing"
-          ],
-          "tx-number": [
-            "amount_invalid"
-          ]
-        },
-        "summary": {
-          "added": 4,
-          "already_imported": 0,
-          "discarded": 0,
-          "unresolved": 7
-        }
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "identical_rows_asked_once",
       "claim": "Two identical rows in one file are asked about once, then both confirm as distinct purchases.",
       "group": "review",
       "observed": {
-        "after_resolution": [
-          "confirmed",
-          "confirmed"
-        ],
-        "first": [],
-        "second": [
-          "possible_duplicate"
-        ]
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "statement_balance_reconciles",
       "claim": "A statement's closing balance becomes one observation, needs a person-confirmed date, and reconciles to zero against its rows when confirmed and afterwards.",
       "group": "review",
       "observed": {
-        "activity_records": 4,
-        "closing_before_date": [
-          "field_missing"
-        ],
-        "difference_at_confirmation": 0,
-        "difference_remaining": 0,
-        "statement_balances": {
-          "closing": "1974.50",
-          "currency": "DOP",
-          "opening": "1000.00"
-        },
-        "summary": {
-          "added": 5,
-          "already_imported": 0,
-          "discarded": 0,
-          "unresolved": 0
-        }
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "scanned_image_with_stub",
       "claim": "A scanned image with an authored stub standing in for OCR proposes rows, and an unreadable amount stays blocked.",
       "group": "review",
       "observed": {
-        "blocking": {
-          "scan-01": [],
-          "scan-02": [
-            "field_missing"
-          ]
-        },
-        "mode": "stub"
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "destination_space_chosen_before_confirming",
       "claim": "A household row waits for the person to pick an account, then counts only in that account's space.",
       "group": "review",
       "observed": {
-        "before": [
-          "field_missing"
-        ],
-        "household_dop_spending": 70000,
-        "personal_dop_spending": 10000
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "currency_mismatch_destination",
       "claim": "A USD row pointed at a DOP account is blocked until the person picks a USD account.",
       "group": "review",
       "observed": {
-        "after": [],
-        "before": [
-          "currency_mismatch"
-        ]
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "source_file_visibility",
       "claim": "A Household account receives only the row confirmed into it, and records reference the source file without its contents or its original name.",
       "group": "review",
       "observed": {
-        "household_rows": [
-          "tx-household"
-        ],
-        "original_name_in_records": false,
-        "record_reference_keys": [
-          "digest",
-          "entry",
-          "external_id",
-          "file",
-          "row"
-        ]
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "completed_review_deletes_the_file",
       "claim": "Once no row from a file is left in review, the stored file is deleted, and the records still name it by digest.",
       "group": "review",
       "observed": {
-        "confirmed": 5,
-        "files_in_review": 1,
-        "held_after_completion": {
-          "in_memory": [],
-          "on_disk": []
-        },
-        "records_name_file_by_digest": true
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "same_file_from_two_entry_points",
       "claim": "The same file selected again from the share extension creates nothing new.",
       "group": "duplicates",
       "observed": {
-        "first_drafts": 11,
-        "second_already_imported": 11,
-        "second_new_drafts": 0,
-        "third_new_drafts": 0
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "overlapping_statement",
       "claim": "An overlapping statement adds only its new row and its own closing balance.",
       "group": "duplicates",
       "observed": {
-        "already_imported": [
-          "statement-01",
-          "statement-02",
-          "statement-03",
-          "statement-04"
-        ],
-        "new": [
-          "closing",
-          "statement-05"
-        ]
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "manual_entry_then_import",
       "claim": "A purchase already entered by hand links to the imported row instead of counting twice.",
       "group": "duplicates",
       "observed": {
-        "import_row_codes": [
-          "possible_duplicate"
-        ],
-        "links_on_manual_record": 1,
-        "purchases_of_125_50": 2
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "same_day_balance_check_hands_off",
       "claim": "Untimed rows on the same day as a confirmed balance check wait until the person says whether the check included them.",
       "group": "review",
       "observed": {
-        "asked_about_the_check": [
-          "statement-01",
-          "statement-02",
-          "statement-03",
-          "statement-04"
-        ]
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "earlier_day_rows_behind_a_balance_check",
       "claim": "Rows dated the day before a confirmed balance check wait for the person's answer, nothing confirms them without it, and the answer reaches the check's remaining difference.",
       "group": "review",
       "observed": {
-        "asked_about_the_check": [
-          "statement-01",
-          "statement-02",
-          "statement-03",
-          "statement-04"
-        ],
-        "check_difference_at_confirmation": 100000,
-        "check_difference_remaining": 2550,
-        "confirmed_after_answer": 4,
-        "confirmed_without_answer": 0,
-        "direct_confirmation": "refused",
-        "rows_explaining_the_check": 4,
-        "written_by_direct_confirmation": 0
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "cancel_before_review",
       "claim": "Cancelling after choosing a file and before review creates nothing and drops the file.",
       "group": "cancellation",
       "observed": {
-        "drafts": 0,
-        "held_after": {
-          "in_memory": [],
-          "on_disk": []
-        },
-        "held_before": {
-          "in_memory": [
-            "import-1"
-          ],
-          "on_disk": []
-        },
-        "status": "cancelled"
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "cancel_during_review",
       "claim": "Cancelling during review records nothing, deletes the stored file, and lets the same file be imported afresh later.",
       "group": "cancellation",
       "observed": {
-        "files_in_review": 1,
-        "fresh_drafts_on_reimport": 11,
-        "held_after_cancel": {
-          "in_memory": [],
-          "on_disk": []
-        },
-        "records_added": 0,
-        "summary": {
-          "added": 0,
-          "already_imported": 0,
-          "discarded": 11,
-          "unresolved": 0
-        }
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "cancel_after_partial_confirmation",
       "claim": "Cancelling after a batch keeps the confirmed records, which still name the file by digest, and discards the unresolved rows and the file.",
       "group": "cancellation",
       "observed": {
-        "confirmed": 4,
-        "held_after_cancel": {
-          "in_memory": [],
-          "on_disk": []
-        },
-        "records_name_file_by_digest": true,
-        "summary": {
-          "added": 4,
-          "already_imported": 0,
-          "discarded": 7,
-          "unresolved": 0
-        }
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "pause_and_resume",
       "claim": "Leaving a review open keeps its drafts and its file. After the app restarts, the review is found again from the stored drafts alone, and the same file adds no second copy.",
       "group": "cancellation",
       "observed": {
-        "already_imported": 11,
-        "files_after_restart": 1,
-        "found_after_restart": true,
-        "pending_before_restart": 11,
-        "second_copy_drafts": 0
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "retry_with_same_key",
       "claim": "Retrying a confirmation with the same key returns the same records and writes nothing new.",
       "group": "retry",
       "observed": {
-        "records_unchanged": true,
-        "same_records": true
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "retry_after_stale_preview",
       "claim": "A confirmation against a stale preview writes nothing, and a fresh preview then confirms.",
       "group": "retry",
       "observed": {
-        "confirmed_after_refresh": "confirmed",
-        "stale_refused": true,
-        "written_by_stale": 0
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "unlocked_copy_after_refusal",
       "claim": "After a password-protected file is refused, an unlocked copy imports cleanly with nothing left from the refusal.",
       "group": "retry",
       "observed": {
-        "drafts_from_unlocked_copy": 5,
-        "held_after_refusal": {
-          "in_memory": [],
-          "on_disk": []
-        },
-        "refused_status": "refused"
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "reimport_after_partial_confirmation",
       "claim": "Re-importing after a partial batch re-adds neither confirmed rows nor rows still in review.",
       "group": "retry",
       "observed": {
-        "already_imported": 11,
-        "new_drafts": 0
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     },
     {
       "case": "nothing_posts_without_confirmation",
       "claim": "Import creates drafts only. Records change only when the person confirms.",
       "group": "boundary",
       "observed": {
-        "records_added_by_import": 0
+        "reason": "requires the recording contract's reference model (pull request 724)"
       },
-      "status": "passed"
+      "status": "blocked"
     }
   ],
   "counts": {
-    "blocked": 0,
+    "blocked": 22,
     "failed": 0,
-    "passed": 37
+    "passed": 15
   },
   "fictional": true,
   "format": "selected-file-import-proof-v2",
   "kit_digest": "48c407674242beec8cdb8d3d322ec7937aecb20ad7ca78ff1670828fcd99925c",
-  "recording_model": {
-    "digest": "f27de4c44915f322e2bea4177f8b20a44aac45c693022bebb3452985f48862f2",
-    "ref": "lagarcess/argus#724 at 8cdfc6a09e2fb1001b6a7c8694b67e3bd08fa491"
-  }
+  "recording_model": null
 }
