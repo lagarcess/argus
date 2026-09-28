@@ -29,7 +29,7 @@ All references were inspected as OPEN/unmerged:
 | #730 | `edc43cb7961b68e7ca699a4101510a79667d1a7f` | AGP 9.1.1 / Gradle 9.3.1 / Compose 2.2.10 setup; API 26 configured floor |
 
 These were inspected references, not assumed merged dependencies. #727 later
-landed in integration; #729 subsequently landed too. Both were reconciled as
+landed in integration; #729 and #730 subsequently landed too. All were reconciled as
 described below. No foundation shell or shared
 build configuration changes. Installed Xcode is 27.0 (27A266a). Web retains the
 repository's Lightweight Charts 5.2.0. Platform reports own verified dependency
@@ -111,6 +111,16 @@ overlap invalidates its captured behavior. One-way merge:
 `41c2b77da708e3c2e668c03d060aba4a566f9f3b`. Relevant prototype/style/fixture/font/
 web-lockfile diffs are empty; final source hashes and merged-tree modularity were
 revalidated. CI runs against this reconciled lineage.
+
+The final native foundation landing advanced integration to
+`a8e09b72339c7bc676715dabf8a9cceaac81cf03` (#730). One-way merge:
+`dd59bde8b1c458a6f8bf061d61d11addb25ba425`. Its `mobile/android/` app, Gradle
+project, navigation state and path-filtered foundation workflow are separate from
+this prototype. AGP/Compose compiler/Gradle versions and font assets match the
+inspected reference. The Vico dependency uplift remains a separate adoption
+condition. No chart sources, shared fixtures, presentation tokens, web fonts or
+lockfile changed; preserve visual/performance evidence and the reviewed worker
+source delta. Run normal final-head CI and merged-tree modularity again.
 
 The initial captures were superseded where the visual refinement changed sources.
 Platform provenance identifies the final capture heads; original source identities
