@@ -22,5 +22,14 @@ for (const route of ["/", "/chat", "/?auth=login", "/?auth=signup"]) {
     const body = await response.text();
     expect(body).not.toContain('data-testid="ecosystem-preview"');
     expect(body).not.toContain("NEXT_HTTP_ERROR_FALLBACK;404");
+    if (route === "/chat") {
+      // No cookies, live Supabase service, or CAPTCHA in this local fixture
+      // environment. The existing chat entry must hand off to real sign-in.
+      expect(body).toContain("NEXT_REDIRECT");
+      expect(body).toContain("auth=login");
+    } else {
+      // HTTP 200 alone can hide a streamed server error, as it can a 404.
+      expect(body).not.toContain("digest");
+    }
   });
 }
