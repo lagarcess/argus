@@ -348,4 +348,8 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "zero_amount": "InvalidInput:amount_not_positive",
             "accepted": True,
         },
+        "restamp_honors_not_included": {
+            "excluded_from_contents": True,
+            "confirmed_expected": 100_000,
+        },
     }

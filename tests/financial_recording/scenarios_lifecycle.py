@@ -281,6 +281,7 @@ def edits_that_move_money_need_review() -> dict:
         "activity_zone_survives_reader_tz_change": _activity_zone_stable(),
         "activity_zone_honors_historical_as_of": _activity_zone_honors_as_of(),
         "expectation_direction_is_canonical": _expectation_direction_canonical(),
+        "restamp_honors_not_included": _restamp_honors_not_included(),
     }
 
 
@@ -911,6 +912,27 @@ def _expectation_direction_canonical() -> dict:
         "negative_amount": negative,
         "zero_amount": zero,
         "accepted": ok in scene.store.book.expectations,
+    }
+
+
+def _restamp_honors_not_included() -> dict:
+    """A check re-confirmation must not stamp excluded late activity as contained."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    check = scene.observe(cash, "1000.00", 5)
+    scene.now = local(8)
+    late = scene.act("expense", cash, "100.00", 3)
+    scene.store.resolve(
+        late.id,
+        answers={check.id: "not_included"},
+        expected_revision=scene.store.state.drafts[late.id].revision,
+    )
+    expense = scene.confirm(late)
+    scene.store.correct(check.id, 1, "typo", amount="1000.00")
+    stamped = scene.store.book.records[check.id].revisions[-1]
+    return {
+        "excluded_from_contents": expense.id not in (stamped.contained or ()),
+        "confirmed_expected": stamped.confirmed_expected,
     }
 
 

@@ -709,7 +709,9 @@ class Store:
         contained = (
             last.contained
             if last.contained is not None
-            else contained_at_confirmation(book, record.body, self.tz)
+            else contained_at_confirmation(
+                book, record.body, self.tz, check_id=record.id
+            )
         )
         record = replace(
             record, revisions=(*record.revisions[:-1], replace(last, contained=contained))

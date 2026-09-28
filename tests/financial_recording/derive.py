@@ -282,13 +282,22 @@ def dated_after(activity: Activity, anchor: Anchor, tz: ZoneInfo) -> bool:
 
 
 def contained_at_confirmation(
-    book: Book, anchor: Observation, tz: ZoneInfo
+    book: Book,
+    anchor: Observation,
+    tz: ZoneInfo,
+    *,
+    check_id: Optional[str] = None,
 ) -> frozenset[str]:
-    """What a check's preview showed as the prior recorded amount."""
+    """What a check's preview showed as the prior recorded amount.
+
+    Explicit `not_included` answers win, so a re-confirmation cannot stamp
+    contents that contradict the expected amount placement derives.
+    """
     return frozenset(
         record.id
         for record in activities(book, anchor.account_id)
         if not dated_after(record.body, anchor, tz)
+        and dict(record.body.answers).get(check_id) != NOT_INCLUDED
     )
 
 

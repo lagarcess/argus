@@ -106,7 +106,7 @@ Every derivation needs one answer: does an anchor's balance already contain a gi
 
 1. Activity dated after the anchor is never contained.
 2. An explicit answer from the person wins. It is stored on the activity against that one anchor.
-3. For a balance check, activity in the check's stored contents is contained. When a check is confirmed, its revision stores the ids of the live activity dated on or before it. That is exactly what its preview showed as the prior recorded amount. Recording order is never used, so activity redated or restored later is asked about, not assumed.
+3. For a balance check, activity in the check's stored contents is contained. When a check is confirmed, its revision stores the ids of the live activity dated on or before it, except activity the person already marked `not_included` for that check. That is exactly what its preview showed as the prior recorded amount, and a re-confirmation restamps the same way so contents never contradict the expected amount. Recording order is never used, so activity redated or restored later is asked about, not assumed.
 4. Activity from the same source document as the check is contained. A statement's rows do not ask about the statement's own closing balance.
 5. For an opening balance, activity dated before its day is contained.
 6. Anything else is asked. That covers activity recorded after a check and dated on or before it, including older activity, and untimed activity on an opening's own day.
