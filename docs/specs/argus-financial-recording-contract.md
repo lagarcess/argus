@@ -177,7 +177,7 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 | Confirmed record, revision 1 | Yes | One confirm call. A batch that would store check evidence different from `Preview.check` returns `stale_preview`. |
 | Corrected record, revision n | Yes | `correct(expected_revision, reason, changes)` |
 | Removed record | No | `remove(expected_revision, reason, accept_reordering=False)` appends a tombstone. A check removal that shifts activity placement needs `accept_reordering`, same as correct. |
-| Restored record | Yes | `restore(expected_revision, reason, answers)` returns the same record, both legs together, after the same review. A restored activity takes inclusion answers for checks confirmed while it was removed. A restored check takes none, because answers belong to activity. |
+| Restored record | Yes | `restore(expected_revision, reason, answers, accept_reordering=False)` returns the same record, both legs together, after the same review. A restored activity takes inclusion answers for checks confirmed while it was removed. A restored check takes none, because answers belong to activity. A restore that shifts activity placement needs `accept_reordering`, same as correct and remove. |
 | Rejected draft | No | Terminal. Its source is released. |
 
 **Issues.** Blocking issues stop confirmation. The proof's codes are:

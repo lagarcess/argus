@@ -450,6 +450,13 @@
       "distinct_without_match": "InvalidInput:distinct_not_applicable",
       "matches_the_other_expense": true
     },
+    "external_id_bound_to_confirm_account": {
+      "bound_account": "acct-1",
+      "confirm": "ReviewRequired:already_recorded",
+      "reimport": {
+        "already_recorded": "blocking"
+      }
+    },
     "first_observation_keeps_recorded_difference": {
       "after_opening_removed": [
         -5000,
@@ -483,7 +490,8 @@
     },
     "linked_digest_places_restored_activity": {
       "balance": 1000000,
-      "restore": "ok"
+      "restore": "ok",
+      "restore_needs_reordering": "ReviewRequired:inclusion_changed"
     },
     "linked_duplicate_keeps_import_account": {
       "linked_import_account": true,
@@ -529,6 +537,13 @@
     },
     "oldest_anchor_in_coverage": {
       "oldest_anchor_as_of": "2026-09-01T09:00:00-04:00"
+    },
+    "position_gaps_honor_as_of": {
+      "full_gap_count": 2,
+      "historic_as_of_days": [
+        "2026-09-05"
+      ],
+      "historic_gap_count": 1
     },
     "purchase_edits_recheck_refunds": {
       "later_date": "ReviewRequired:refund_before_purchase",
@@ -605,6 +620,18 @@
     },
     "restore_needs_a_reason": {
       "blank": "InvalidInput:reason_required"
+    },
+    "restore_reviews_placement": {
+      "accepted": "ok",
+      "balance": 90000,
+      "gaps": [
+        [
+          0,
+          0,
+          "unexplained"
+        ]
+      ],
+      "unaccepted": "ReviewRequired:inclusion_changed"
     },
     "restoring_activity_the_check_never_saw": {
       "balance": 950000,

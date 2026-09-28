@@ -577,6 +577,7 @@ class Store:
         reason: str,
         *,
         answers: Optional[Mapping[str, str]] = None,
+        accept_reordering: bool = False,
     ) -> Record:
         """Restores the original record, never a copy; both legs return together."""
         record = self.book.records[record_id]
@@ -594,6 +595,13 @@ class Store:
         found = blocking(validate(self.book, body, self.tz, record_id, now=self.clock()))
         if found:
             raise ReviewRequired(found)
+        after = with_trial(self.book, body, record_id, self.tz)
+        if not accept_reordering:
+            moved = self._placement_changes_against(
+                after, accounts_of(record.body) | accounts_of(body)
+            )
+            if moved:
+                raise ReviewRequired(moved)
         return self._revise(record, body, reason, removed=False)
 
     def _live_duplicate_matches(self, draft: Draft) -> tuple[str, ...]:
@@ -804,7 +812,14 @@ class Store:
     def _new_record(
         self, body: Body, provenance: Provenance, records: Mapping[str, Record]
     ) -> Record:
-        revision = Revision(body, self.clock(), provenance, recorded_by=self.actor)
+        # Bind external_id identity to the account at confirmation so later
+        # corrections cannot retarget the source row to another account.
+        bound = (
+            provenance
+            if provenance.account_id is not None
+            else replace(provenance, account_id=body.account_id)
+        )
+        revision = Revision(body, self.clock(), bound, recorded_by=self.actor)
         return Record(self._id("rec"), len(records) + 1, (revision,))
 
     def _id(self, prefix: str) -> str:

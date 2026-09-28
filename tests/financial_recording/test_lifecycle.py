@@ -294,6 +294,7 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
             "gaps_still_readable": [[0, 0, "unexplained"]],
         },
         "linked_digest_places_restored_activity": {
+            "restore_needs_reordering": "ReviewRequired:inclusion_changed",
             "restore": "ok",
             "balance": 1_000_000,
         },
@@ -312,5 +313,21 @@ def test_edits_that_move_money_stop_for_review_and_keep_evidence():
         },
         "correction_rejects_bogus_kind": {
             "bogus_kind": "ReviewRequired:kind_unsupported",
+        },
+        "external_id_bound_to_confirm_account": {
+            "bound_account": "acct-1",
+            "reimport": {"already_recorded": BLOCKING},
+            "confirm": "ReviewRequired:already_recorded",
+        },
+        "restore_reviews_placement": {
+            "unaccepted": "ReviewRequired:inclusion_changed",
+            "accepted": "ok",
+            "gaps": [[0, 0, "unexplained"]],
+            "balance": 90_000,
+        },
+        "position_gaps_honor_as_of": {
+            "full_gap_count": 2,
+            "historic_gap_count": 1,
+            "historic_as_of_days": ["2026-09-05"],
         },
     }

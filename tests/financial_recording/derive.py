@@ -503,7 +503,9 @@ def position(
         group["gaps"].extend(
             gap
             for gap in observation_gaps(book, account_id, tz)
-            if gap.label == "unexplained" and gap.remaining
+            if gap.label == "unexplained"
+            and gap.remaining
+            and (at is None or gap.as_of <= at)
         )
     return {
         currency: Position(

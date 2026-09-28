@@ -12,11 +12,12 @@ from tests.financial_recording.derive import (
     expectation_status,
     forecast,
     observation_gaps,
+    position as position_at,
     space_scope,
     standing,
 )
 from tests.financial_recording.model import Store
-from tests.financial_recording.scenes import Scene, local, outcome
+from tests.financial_recording.scenes import Scene, jsonable, local, outcome
 
 
 def refund_partial_and_limits() -> dict:
@@ -268,6 +269,9 @@ def edits_that_move_money_need_review() -> dict:
         "balance_check_preview_exposes_effect": _check_preview_effect(),
         "batch_checks_bind_to_previewed_prior": _batch_checks_bind_prior(),
         "correction_rejects_bogus_kind": _correction_rejects_bogus_kind(),
+        "external_id_bound_to_confirm_account": _external_id_bound_account(),
+        "restore_reviews_placement": _restore_reviews_placement(),
+        "position_gaps_honor_as_of": _position_gaps_honor_as_of(),
     }
 
 
@@ -683,8 +687,13 @@ def _linked_digest_placement() -> dict:
         Provenance("document", local(5), {"digest": "stmt-digest", "row": "bal"}),
     )
     scene.store.confirm(scene.store.preview(check.id), "stmt-check")
+    shifted = outcome(lambda: scene.store.restore(record.id, 2, "back"))
+    restored = outcome(
+        lambda: scene.store.restore(record.id, 2, "back", accept_reordering=True)
+    )
     return {
-        "restore": outcome(lambda: scene.store.restore(record.id, 2, "back")),
+        "restore_needs_reordering": shifted,
+        "restore": restored,
         "balance": scene.amount(cash),
     }
 
@@ -731,6 +740,76 @@ def _correction_rejects_bogus_kind() -> dict:
         "bogus_kind": outcome(
             lambda: scene.store.correct(expense.id, 1, "typo", kind="bogus")
         ),
+    }
+
+
+def _external_id_bound_account() -> dict:
+    scene = Scene()
+    checking = scene.account("Corriente", "checking", "DOP", "5000.00")
+    savings = scene.account("Ahorros", "savings", "DOP", "5000.00")
+    draft = scene.draft(
+        "document",
+        {"external_id": "row-42"},
+        kind="expense",
+        account_id=checking.id,
+        amount="100.00",
+        occurred_on=local(3).date().isoformat(),
+    )
+    record = scene.confirm(draft)
+    scene.store.correct(record.id, 1, "was savings", account_id=savings.id)
+    again = scene.draft(
+        "document",
+        {"external_id": "row-42"},
+        kind="expense",
+        account_id=checking.id,
+        amount="100.00",
+        occurred_on=local(3).date().isoformat(),
+    )
+    return {
+        "bound_account": scene.store.book.records[record.id].revisions[0].provenance.account_id,
+        "reimport": scene.issues(again),
+        "confirm": outcome(lambda: scene.confirm(again)),
+    }
+
+
+def _restore_reviews_placement() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    expense = scene.record("expense", cash, "100.00", 3)
+    scene.observe(cash, "900.00", 5)
+    # Removing contained activity also shifts placement.
+    scene.store.remove(expense.id, 1, "wrong", accept_reordering=True)
+    # Contained at confirmation, so restore needs no inclusion answer — but
+    # landing still shifts the remaining difference.
+    shifted = outcome(lambda: scene.store.restore(expense.id, 2, "keep"))
+    restored = outcome(
+        lambda: scene.store.restore(expense.id, 2, "keep", accept_reordering=True)
+    )
+    return {
+        "unaccepted": shifted,
+        "accepted": restored,
+        "gaps": scene.gaps(cash),
+        "balance": scene.amount(cash),
+    }
+
+
+def _position_gaps_honor_as_of() -> dict:
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    scene.record("expense", cash, "50.00", 3)
+    scene.observe(cash, "900.00", 5)
+    scene.observe(cash, "800.00", 10)
+    early = local(6, 12)
+    full = scene.position(cash)
+    historic = jsonable(
+        position_at(scene.store.book, [cash.id], at=early, tz=scene.store.tz)
+    )
+    return {
+        "full_gap_count": len(full["DOP"]["coverage"]["unexplained_gaps"]),
+        "historic_gap_count": len(historic["DOP"]["coverage"]["unexplained_gaps"]),
+        "historic_as_of_days": [
+            gap["as_of"][:10] for gap in historic["DOP"]["coverage"]["unexplained_gaps"]
+        ],
     }
 
 
