@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -15,7 +16,6 @@ import httpx
 from dotenv import load_dotenv
 
 DEFAULT_APP_URL = "https://argus-app-suz5.onrender.com"
-DEFAULT_API_URL = "https://api.arguschat.ai"
 DEFAULT_PROMPT = (
     "Test an equal-weight AAPL and MSFT buy-and-hold strategy from January 1, "
     "2025 through June 5, 2026 with 10,000 dollars"
@@ -1089,6 +1089,35 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _release_contract_value(repo_root: Path, name: str) -> str | None:
+    """Read one quoted assignment from the canonical release env contract."""
+    contract_path = repo_root / ".github" / "argus-env.sh"
+    match = re.search(
+        rf'^{re.escape(name)}="([^"]+)"\s*$',
+        contract_path.read_text(encoding="utf-8"),
+        flags=re.MULTILINE,
+    )
+    if match is None:
+        return None
+    value = match.group(1).strip()
+    return value or None
+
+
+def _resolved_api_url(repo_root: Path, explicit: str | None) -> str:
+    resolved = (
+        (explicit.strip() if explicit and explicit.strip() else None)
+        or _env_first("ARGUS_CANARY_API_URL", "ARGUS_PRIVATE_LAUNCH_API_URL")
+        or _release_contract_value(repo_root, "ARGUS_PRIVATE_LAUNCH_API_URL")
+    )
+    if not resolved:
+        raise SystemExit(
+            "API URL required: pass --api-url or set ARGUS_CANARY_API_URL / "
+            "ARGUS_PRIVATE_LAUNCH_API_URL, or keep ARGUS_PRIVATE_LAUNCH_API_URL "
+            "in .github/argus-env.sh."
+        )
+    return resolved
+
+
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Benchmark the deployed Argus Render internet backtest path."
@@ -1130,9 +1159,7 @@ def main(argv: list[str] | None = None) -> int:
     report = run_benchmark(
         repo_root=repo_root,
         output_dir=args.output_dir or default_output_dir(repo_root),
-        api_url=args.api_url
-        or _env_first("ARGUS_CANARY_API_URL", "ARGUS_PRIVATE_LAUNCH_API_URL")
-        or DEFAULT_API_URL,
+        api_url=_resolved_api_url(repo_root, args.api_url),
         app_url=args.app_url
         or _env_first("ARGUS_CANARY_APP_URL", "ARGUS_PRIVATE_LAUNCH_APP_URL")
         or DEFAULT_APP_URL,
