@@ -282,10 +282,10 @@
   .controls summary > span, .controls summary > svg:last-child { display: none; }
   .controls summary { width: 2.75rem; justify-content: center; }
   .controlsPanel { position: fixed; top: 4.7rem; right: 1rem; max-height: calc(100dvh - 7rem); overflow-y: auto; }
-  .shell { display: flex; }
+  .shell { flex-direction: column-reverse; }
   .rail { display: contents; }
   .railHeader, .railFoot { display: none; }
-  .primaryNav { position: fixed; z-index: 30; bottom: max(.7rem, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); width: min(30rem, calc(100% - 1.5rem)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .15rem; padding: .4rem; border: 1px solid var(--line); border-radius: 1.8rem; background: color-mix(in srgb, var(--preview-surface) 94%, transparent); backdrop-filter: blur(20px); box-shadow: 0 5px 20px #00000010; }
+  .primaryNav { flex: 0 0 auto; z-index: 30; margin: .7rem auto max(.7rem, env(safe-area-inset-bottom)); width: min(30rem, calc(100% - 1.5rem)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .15rem; padding: .4rem; border: 1px solid var(--line); border-radius: 1.8rem; background: color-mix(in srgb, var(--preview-surface) 94%, transparent); backdrop-filter: blur(20px); box-shadow: 0 5px 20px #00000010; }
   .primaryNav a { min-height: 3.3rem; margin: 0; flex-direction: column; justify-content: center; padding: .4rem .15rem; gap: .25rem; border-radius: 1.3rem; line-height: 1.35; }
   .navIcon { min-height: 0; width: auto; }
   .navIcon svg { width: 21px; height: 21px; }
@@ -297,7 +297,7 @@
   .headerButton { padding: .3rem .45rem; }
   .headerButton > span { display: none; }
   .temporaryButton { padding: .35rem .65rem; font-size: .7rem; }
-  .main { padding: 1rem 1.25rem 8rem; }
+  .main { padding: 1rem 1.25rem 2rem; }
   .pageHeading { gap: 1rem; margin-bottom: 1.8rem; }
   .pageHeading h1 { font-size: 1.85rem; }
   .pageHeading p { font-size: .8rem; }
@@ -329,7 +329,7 @@
   .settingsGroup { display: block; margin-top: 1.1rem; }
   .settingsGroup > h2 { padding: .5rem 0; }
   .settingsRow { padding: .65rem .1rem; }
-  .chatMain { padding: 0 1rem 7.5rem; }
+  .chatMain { padding: 0 1rem .75rem; }
   .coldChat { padding-top: clamp(1.5rem, 8vh, 5rem); }
   .chatColdStart { padding: 0; }
   .starterChips { gap: .4rem; }

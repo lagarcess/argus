@@ -35,8 +35,10 @@ feature scope or assigning any production/shared owner to this lane.
    44px action lanes, 14px row corners and display-font navigation. Use the
    existing responsive-layout owner for 720px/1024px behavior. Desktop begins
    expanded; tablet begins collapsed with a local expand control. Keep the
-   locked five-destination bottom navigation at narrow widths. Do not write a
-   new global sidebar preference or mount live history/session hooks.
+   locked five-destination bottom navigation at narrow widths. Navigation owns
+   its actual height in the shell so the reading area and focused controls stay
+   above it, including when labels grow. Do not write a new global sidebar
+   preference or mount live history/session hooks.
 2. Restore the web canvas/surface relationship and bounded reading widths.
    Use existing global colors/fonts and web density instead of oversized
    navigation pills and custom tablet tiles. Maintain readable labels and
