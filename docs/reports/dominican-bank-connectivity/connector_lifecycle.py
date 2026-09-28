@@ -306,35 +306,39 @@ def _apply(store: Store, connection: dict, result: Refresh) -> dict:
                     "name": account.name,
                     "currency": account.currency,
                 }
+            elif store.accounts[argus_id]["currency"] != account.currency:
+                _ask_owner(
+                    store, connection, source_id, account.currency, "currency_mismatch"
+                )
+                continue
             connection["account_map"][source_id] = argus_id
             connection["names"][source_id] = account.name
         elif first:
             connection["declined"].append(source_id)
-        elif source_id not in connection["declined"] and not any(
-            link["source_id"] == source_id for link in store.account_links
+        elif source_id not in connection["declined"] and _ask_owner(
+            store, connection, source_id, account.currency, "new_source_account"
         ):
-            store.account_links.append(
-                {
-                    "connection": connection["id"],
-                    "source_id": source_id,
-                    "currency": account.currency,
-                    "status": "needs_owner_decision",
-                }
-            )
             summary["new_source_accounts"] += 1
     connection["refreshed"] = True
     mapped = connection["account_map"]
     for balance in result.balances:
-        if balance.account in mapped:
-            store.snapshots.append(
-                {
-                    "connection": connection["id"],
-                    "account": mapped[balance.account],
-                    "as_of": balance.as_of,
-                    "amount": balance.amount,
-                    "currency": balance.currency,
-                }
+        account_id = mapped.get(balance.account)
+        if account_id is None:
+            continue
+        if balance.currency != store.accounts[account_id]["currency"]:
+            _ask_owner(
+                store, connection, balance.account, balance.currency, "currency_mismatch"
             )
+            continue
+        store.snapshots.append(
+            {
+                "connection": connection["id"],
+                "account": account_id,
+                "as_of": balance.as_of,
+                "amount": balance.amount,
+                "currency": balance.currency,
+            }
+        )
     occurrences: dict[tuple, int] = {}
     seen: set[str] = set()
     for txn in result.txns:
@@ -373,6 +377,26 @@ def _apply(store: Store, connection: dict, result: Refresh) -> dict:
     for proposal in store.proposals.values():
         _refresh_issues(store, proposal)
     return summary
+
+
+def _ask_owner(
+    store: Store, connection: dict, source_id: str, currency: str, reason: str
+) -> bool:
+    if any(
+        link["source_id"] == source_id and link["currency"] == currency
+        for link in store.account_links
+    ):
+        return False
+    store.account_links.append(
+        {
+            "connection": connection["id"],
+            "source_id": source_id,
+            "currency": currency,
+            "status": "needs_owner_decision",
+            "reason": reason,
+        }
+    )
+    return True
 
 
 def _holder(store: Store, key: str) -> str | None:
@@ -441,7 +465,20 @@ def _revise(store: Store, connection: dict, key: str, before: dict, txn: Txn) ->
     holder = _holder(store, key)
     if holder in store.records:
         record = store.records[holder]
-        changes = {k: v for k, v in changed.items() if k not in record["user_fields"]}
+        for other in store.proposals.values():
+            if other["status"] == "revision" and other["record"] == holder:
+                other["status"] = "superseded"
+                other["issues"] = []
+        latest = {
+            "date": txn.booked,
+            "amount": txn.amount,
+            "description": txn.description,
+        }
+        changes = {
+            name: value
+            for name, value in latest.items()
+            if record["fields"][name] != value and name not in record["user_fields"]
+        }
         if not changes:
             return 0
         revision_id = store.new_id("prop")
@@ -579,6 +616,9 @@ def _refresh_issues(store: Store, proposal: dict) -> None:
         proposal["issues"] = []
         return
     issues = list(field_issues(proposal["fields"]))
+    account = store.accounts.get(proposal["fields"]["account"])
+    if account is not None and proposal["fields"]["currency"] != account["currency"]:
+        issues.append("currency_mismatch")
     if proposal["status"] == "pending":
         issues.append("pending")
     if any(k.startswith("fp:") for k in proposal["keys"]):
@@ -790,10 +830,16 @@ def delete_imported(store: Store, actor: str, connection_id: str) -> dict:
             deleted.append(record_id)
     before = len(store.snapshots)
     store.snapshots = [s for s in store.snapshots if s["connection"] != connection_id]
+    proposals = [
+        p for p, item in store.proposals.items() if item["connection"] == connection_id
+    ]
+    for proposal_id in proposals:
+        del store.proposals[proposal_id]
     summary = {
         "records_deleted": len(deleted),
         "records_kept_other_provenance": len(kept),
         "snapshots_deleted": before - len(store.snapshots),
+        "proposals_deleted": len(proposals),
     }
     store.events.append(
         {"code": "imported_data_deleted", "connection": connection_id, **summary}
@@ -1597,6 +1643,11 @@ def scenario(checks: Checks) -> dict:
     )
 
     confirm(store, owner, _open_ids(store, bank))
+    imported = {
+        p["fields"]["description"]
+        for p in store.proposals.values()
+        if p["connection"] == bank
+    }
     revoked = revoke(store, owner, bank)
     mark("person disconnects", bank)
     try:
@@ -1607,9 +1658,11 @@ def scenario(checks: Checks) -> dict:
     deleted = delete_imported(store, owner, bank)
     mark("person deletes imported data", bank)
     survivors = store.records
+    kept = {r["fields"]["description"] for r in survivors.values()}
+    leftover = sorted((imported - kept) & _strings(store.without_vault()))
     checks.add(
         "revocation_and_deletion",
-        "Revoking destroys the secret and stops refresh; deletion removes connection-only records and keeps shared or manual ones",
+        "Revoking destroys the secret and stops refresh. Deletion removes every copy of rows only the connection supplied, proposals included, and keeps shared or manual records",
         refused_after_revoke
         and SECRET not in store.vault.values()
         and not any(o["connection"] == bank for o in store.observations.values())
@@ -1619,9 +1672,12 @@ def scenario(checks: Checks) -> dict:
         == 4
         and deleted["records_deleted"] > 0
         and not any(s["connection"] == bank for s in store.snapshots)
+        and not any(p["connection"] == bank for p in store.proposals.values())
+        and not leftover
         and len(store.balance_checks) == 2,
         revoke=revoked,
         delete=deleted,
+        leftover_descriptions=leftover,
     )
 
     public = json.dumps(
@@ -1643,6 +1699,139 @@ def scenario(checks: Checks) -> dict:
         events=len(store.events),
     )
     return {"timeline": timeline, "reconciliation": [reconciled, too_old]}
+
+
+def _strings(value) -> set[str]:
+    if isinstance(value, dict):
+        return set().union(*map(_strings, value.values())) if value else set()
+    if isinstance(value, (list, tuple, set)):
+        return set().union(*map(_strings, value)) if value else set()
+    return {value} if isinstance(value, str) else set()
+
+
+def edge_cases(checks: Checks) -> None:
+    owner = "user-a"
+    store = Store()
+    store.accounts["acct-chk-dop"] = {"owner": owner, "name": "Cuenta", "currency": "DOP"}
+    source = (SourceAccount("src-chk", "Cuenta", "DOP"),)
+    conn = connect(store, owner, "aggregator_api", {"src-chk": "acct-chk-dop"})
+    authenticate(store, owner, conn, "authenticated")
+
+    def pull(at: str, amount: str, description: str) -> dict:
+        row = tx("src-chk", "2026-09-08", amount, "debit", description, "R-0001")
+        return refresh(
+            store,
+            owner,
+            conn,
+            Refresh(
+                at=at, accounts=source, txns=(row,), coverage=("2026-09-01", at[:10])
+            ),
+        )
+
+    pull("2026-09-10T06:00", "45.00", "FARMACIA")
+    [record_id] = confirm(store, owner, _open_ids(store, conn))["confirmed"]
+    pull("2026-09-11T06:00", "54.00", "FARMACIA")
+    pull("2026-09-12T06:00", "54.00", "FARMACIA CENTRO")
+    pull("2026-09-13T06:00", "60.00", "FARMACIA CENTRO")
+    revisions = [p for p in store.proposals.values() if p.get("record") == record_id]
+    accept_revision(store, owner, revisions[-1]["id"])
+    try:
+        accept_revision(store, owner, revisions[0]["id"])
+        stale_applied = True
+    except ValueError:
+        stale_applied = False
+    fields = store.records[record_id]["fields"]
+    checks.add(
+        "stale_revision_superseded",
+        "A newer source change supersedes an unreviewed one and carries every changed field, and the stale change can no longer be applied",
+        [p["status"] for p in revisions] == ["superseded", "superseded", "applied"]
+        and not stale_applied
+        and (fields["amount"], fields["description"]) == ("60.00", "FARMACIA CENTRO"),
+        statuses=[p["status"] for p in revisions],
+        stale_applied=stale_applied,
+        amount=fields["amount"],
+        description=fields["description"],
+    )
+
+    store = Store()
+    store.accounts["acct-card-dop"] = {
+        "owner": owner,
+        "name": "Tarjeta",
+        "currency": "DOP",
+    }
+    store.accounts["acct-sav-dop"] = {"owner": owner, "name": "Ahorro", "currency": "DOP"}
+    conn = connect(
+        store,
+        owner,
+        "aggregator_api",
+        {"src-card": "acct-card-dop", "src-usd": "acct-sav-dop"},
+    )
+    authenticate(store, owner, conn, "authenticated")
+    at = "2026-09-10T06:00"
+    refresh(
+        store,
+        owner,
+        conn,
+        Refresh(
+            at=at,
+            accounts=(
+                SourceAccount("src-card", "Tarjeta dual", "DOP"),
+                SourceAccount("src-usd", "Cuenta en dolares", "USD"),
+            ),
+            balances=(
+                Balance("src-card", at, "500.00", "DOP"),
+                Balance("src-card", at, "40.00", "USD"),
+                Balance("src-usd", at, "900.00", "USD"),
+            ),
+            txns=(
+                tx("src-card", "2026-09-09", "300.00", "debit", "SUPERMERCADO", "D-0001"),
+                tx(
+                    "src-card",
+                    "2026-09-09",
+                    "25.00",
+                    "debit",
+                    "TIENDA EN LINEA",
+                    "D-0002",
+                    currency="USD",
+                ),
+                tx(
+                    "src-usd",
+                    "2026-09-09",
+                    "10.00",
+                    "debit",
+                    "CAFE",
+                    "U-0001",
+                    currency="USD",
+                ),
+            ),
+            coverage=("2026-09-01", "2026-09-10"),
+        ),
+    )
+    held = {
+        p["fields"]["description"]: blocking(p)
+        for p in store.proposals.values()
+        if p["connection"] == conn
+    }
+    outcome = confirm(store, owner, _open_ids(store, conn))
+    checks.add(
+        "currency_mismatch_held",
+        "A value never lands under an account of another currency. A mismatched account choice, balance, or row waits for the owner",
+        "src-usd" not in store.connections[conn]["account_map"]
+        and sorted((link["source_id"], link["currency"]) for link in store.account_links)
+        == [("src-card", "USD"), ("src-usd", "USD")]
+        and [(s["account"], s["currency"]) for s in store.snapshots]
+        == [("acct-card-dop", "DOP")]
+        and held == {"SUPERMERCADO": [], "TIENDA EN LINEA": ["currency_mismatch"]}
+        and outcome["confirmed"] != []
+        and [store.records[r]["fields"]["description"] for r in outcome["confirmed"]]
+        == ["SUPERMERCADO"],
+        mapping=store.connections[conn]["account_map"],
+        owner_decisions=sorted(
+            (link["source_id"], link["currency"]) for link in store.account_links
+        ),
+        snapshots=[(s["account"], s["currency"]) for s in store.snapshots],
+        held=held,
+    )
 
 
 def routine_feed(seed: int = 71, days: int = 60) -> list[tuple[int, Txn]]:
@@ -1883,6 +2072,7 @@ def main() -> int:
     args = parser.parse_args()
     checks = Checks()
     story = scenario(checks)
+    edge_cases(checks)
     report = {
         "format": "dominican-bank-connectivity-lifecycle-v1",
         "fictional": True,

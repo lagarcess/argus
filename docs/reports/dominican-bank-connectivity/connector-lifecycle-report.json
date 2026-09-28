@@ -244,13 +244,15 @@
     },
     {
       "case": "revocation_and_deletion",
-      "claim": "Revoking destroys the secret and stops refresh; deletion removes connection-only records and keeps shared or manual ones",
+      "claim": "Revoking destroys the secret and stops refresh. Deletion removes every copy of rows only the connection supplied, proposals included, and keeps shared or manual records",
       "observed": {
         "delete": {
+          "proposals_deleted": 23,
           "records_deleted": 14,
           "records_kept_other_provenance": 5,
           "snapshots_deleted": 9
         },
+        "leftover_descriptions": [],
         "revoke": {
           "observations_purged": 22,
           "records_retained": 19,
@@ -264,6 +266,53 @@
       "claim": "Events carry codes and counts only; the secret never leaves the vault; a partner cannot refresh",
       "observed": {
         "events": 34
+      },
+      "passed": true
+    },
+    {
+      "case": "stale_revision_superseded",
+      "claim": "A newer source change supersedes an unreviewed one and carries every changed field, and the stale change can no longer be applied",
+      "observed": {
+        "amount": "60.00",
+        "description": "FARMACIA CENTRO",
+        "stale_applied": false,
+        "statuses": [
+          "superseded",
+          "superseded",
+          "applied"
+        ]
+      },
+      "passed": true
+    },
+    {
+      "case": "currency_mismatch_held",
+      "claim": "A value never lands under an account of another currency. A mismatched account choice, balance, or row waits for the owner",
+      "observed": {
+        "held": {
+          "SUPERMERCADO": [],
+          "TIENDA EN LINEA": [
+            "currency_mismatch"
+          ]
+        },
+        "mapping": {
+          "src-card": "acct-card-dop"
+        },
+        "owner_decisions": [
+          [
+            "src-card",
+            "USD"
+          ],
+          [
+            "src-usd",
+            "USD"
+          ]
+        ],
+        "snapshots": [
+          [
+            "acct-card-dop",
+            "DOP"
+          ]
+        ]
       },
       "passed": true
     }
@@ -313,7 +362,7 @@
       "rows_in_export": 52
     }
   ],
-  "passed": 23,
+  "passed": 25,
   "review_workload": [
     {
       "actions_if_clean_rows_were_auto_accepted": 3,

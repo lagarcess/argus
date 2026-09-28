@@ -16,7 +16,7 @@ poetry run python docs/reports/dominican-bank-connectivity/connector_lifecycle.p
 cmp temp/connector-lifecycle-report.json docs/reports/dominican-bank-connectivity/connector-lifecycle-report.json
 ```
 
-The script prints `23/23 checks passed` and exits with code 0. It exits with code 1 and names each failed case otherwise. The report is deterministic. Two runs on the inspected base produced identical bytes. A Faker or Python version change can change incidental merchant names in the workload section, so regenerate and inspect before treating a byte difference as a regression.
+The script prints `25/25 checks passed` and exits with code 0. It exits with code 1 and names each failed case otherwise. The report is deterministic. Two runs on the inspected base produced identical bytes. A Faker or Python version change can change incidental merchant names in the workload section, so regenerate and inspect before treating a byte difference as a regression.
 
 The run used Python 3.10.20 and Faker 30.10.0, which match `poetry.lock`. The kit's own 46 checks passed in the same environment before the experiment reused them.
 
@@ -63,7 +63,7 @@ stateDiagram-v2
 
 ## Results
 
-All 23 checks passed. Each row names the assignment's failure case and the behavior the script asserts.
+All 25 checks passed. Each row names the assignment's failure case and the behavior the script asserts.
 
 | Check | Assignment case | Asserted behavior |
 | --- | --- | --- |
@@ -86,10 +86,12 @@ All 23 checks passed. Each row names the assignment's failure case and the behav
 | `source_failure_keeps_last_good` | Source failure without erasing data | A source outage and a malformed batch leave records, observations, the last success time, and balance freshness unchanged. The malformed batch applies none of its rows, including a valid one. |
 | `unreadable_balance_rejected` | Source failure without erasing data | A balance of N/A rejects the whole batch with `parse_error`, like a malformed row. Records and observations do not change. An automated review found that this case escaped as an exception before the fix. |
 | `idempotent_refresh` | Repeated imports | After recovery, 16 known rows are seen again and only the 1 new row becomes a proposal. |
-| `revocation_and_deletion` | Revocation, disconnect, and deletion | Revoking drops the vault entry, stops refresh, withdraws open proposals, and purges observations. Deleting imported data removes records whose only source is the connection. Manual records and records that also came from the CSV file stay. |
+| `revocation_and_deletion` | Revocation, disconnect, and deletion | Revoking drops the vault entry, stops refresh, withdraws open proposals, and purges observations. Deleting imported data removes records whose only source is the connection and every proposal the connection created, so no row that only the connection supplied survives anywhere in the store. Manual records and records that also came from the CSV file stay. |
 | `kit_contract_and_totals` | Observations to proposals to records | Every confirmed connector record passes the kit's `field_issues` and the kit's `Harness` reproduces the connector's totals. |
 | `currencies_stay_separate` | Multiple accounts and currencies | DOP and USD totals never combine. No conversion runs. |
 | `privacy_boundaries` | Private data boundaries | Events carry codes and counts only. The synthetic secret appears nowhere outside the vault. The partner account cannot refresh the owner's connection. |
+| `stale_revision_superseded` | Revised transactions | Three source changes before review leave one pending revision, built from the latest observation. Accepting it gives DOP 60.00 with the newer description. Accepting a superseded revision is refused, so a stale value cannot return. |
+| `currency_mismatch_held` | Multiple accounts and currencies | A USD source account chosen for a DOP account is not mapped and becomes an owner decision. A USD balance reported for a DOP account is not stored. A USD row on a DOP account waits with `currency_mismatch`. The DOP row and balance proceed. |
 
 ## Review workload for recurring sync
 
@@ -133,10 +135,10 @@ The script makes each choice below so that it can run. None of these choices is 
 1. **Pending holds.** The script shows pending holds and never lets the owner confirm them. Whether a hold reduces "what remains until your next income" is a product decision.
 2. **Credit meaning.** Bank feeds report direction, not meaning. The script blocks unclassified credits. A saved classification rule or a model suggestion would reduce the 3 actions, but either one is a policy decision.
 3. **Transfer pairing.** The script pairs automatically only with a shared bank reference. It holds amount-and-date look-alikes for review. The threshold for inferred pairs is open.
-4. **Field ownership.** Source revisions change only source-owned fields and never overwrite owner edits. The split between source-owned and owner-owned fields needs a contract.
-5. **Deletion scope.** Deleting imported data removes records whose only provenance is the connection, including owner corrections on those records. Records with manual or other provenance stay. Product and privacy owners must confirm that rule.
+4. **Field ownership.** Source revisions change only source-owned fields and never overwrite owner edits. A newer source change replaces an unreviewed one. The split between source-owned and owner-owned fields needs a contract.
+5. **Deletion scope.** Deleting imported data removes records whose only provenance is the connection, including owner corrections on those records, and every proposal the connection created. Records with manual or other provenance stay. Product and privacy owners must confirm that rule.
 6. **Batch rejection.** A connector refresh applies all rows or none. The kit keeps row-level issues for file uploads. The right unit depends on the retrieval method and needs a stated rule.
-7. **Cross-currency transfers.** The script keeps two linked records in their own currencies and applies no rate. Any later conversion must show its rate, date, and source per MVEE section 2.
+7. **Cross-currency transfers.** The script keeps two linked records in their own currencies and applies no rate. Any later conversion must show its rate, date, and source per MVEE section 2. A source account, balance, or row in another currency than the chosen Argus account waits for the owner. A card that carries both pesos and dollars needs a rule the script does not make.
 8. **Household scope.** Every proposal lands in the owner's personal context. Sharing an account with a household shares records, not the connection. Cross-person account identity for a joint account imported by both partners is untested.
 
 ## What the experiment does not show
@@ -144,4 +146,5 @@ The script makes each choice below so that it can run. None of these choices is 
 - It does not show that any Dominican bank, aggregator, or file format supplies these fields. The bank access matrix owns that evidence.
 - It does not show secure credential handling. The vault is a Python dictionary that stands for a secret manager.
 - It does not model Postgres, row-level security, concurrency, or retention timers.
+- It does not validate a balance's timestamp. A malformed as-of time is accepted and can distort freshness and reconciliation. An automated review raised it as a second finding on balance validation, so it waits for a decision instead of another fix.
 - It does not test parsing of real bank files. The kit's README lists the consented-document evaluation that must come first.

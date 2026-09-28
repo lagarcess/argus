@@ -30,7 +30,7 @@ One documentation-only pull request to `codex/private-alpha-next` that adds a co
 8. **Privacy.** Record content stays out of logs, analytics, the shared research cache, sharing snapshots, and model prompts until a separate decision says otherwise. Name the test or lint that enforces each rule.
 9. **Connections, reserved.** The connection states, consent record, vault handle, and refresh health from the experiment, marked as reserved for a later lane and not built now.
 10. **Decision 8.** A proposed reconciliation of archived decision 8 with MVEE section 4, marked for founder approval. Do not settle it silently.
-11. **Acceptance tests.** One behavior test per case in the experiment's 23 checks, stated so an implementation lane can write them first.
+11. **Acceptance tests.** One behavior test per case in the experiment's 25 checks, stated so an implementation lane can write them first.
 
 ## Acceptance criteria
 
