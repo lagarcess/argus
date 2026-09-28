@@ -30,21 +30,31 @@ ROBOTS = (
     b"User-agent: *\nDisallow: /buscar/\nDisallow: /carros/\nDisallow: /Motos/\n\n"
     b"Sitemap: https://m.supercarros.com/sitemap.xml\n"
 )
+SELLER_SUBDOMAIN = (
+    "https://vendedor-ficticio.supercarros.com/marca-ejemplo-modelo-x/0000009/"
+)
+TEN_DIGIT_ID = "1234567890"
+TEN_DIGIT_BUILD = "2026092705"
+SEARCH_URL = f"{CARS}/assets/js/searchvalues.js?{TEN_DIGIT_BUILD}"
 KEPT_SITEMAP_ROWS = [
     f"<url><loc>{CARS}/marca-ejemplo-modelo-x/0000001/</loc>"
     "<lastmod>2026-09-20</lastmod></url>",
     f"<url><loc>{CARS}/marca-ejemplo-modelo-x/0000008/</loc></url>",
+    f"<url><loc>{CARS}/marca-ejemplo-modelo-x/{TEN_DIGIT_ID}/</loc>"
+    "<lastmod>2026-09-21</lastmod></url>",
 ]
 SITEMAP = (
     '<?xml version="1.0" encoding="UTF-8"?>\n'
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
     f"{KEPT_SITEMAP_ROWS[0]}\n"
     f"<url><loc>{CARS}/dealers/vendedor-ficticio/</loc></url>\n"
+    f"<url><loc>{SELLER_SUBDOMAIN}</loc></url>\n"
     "<url><loc>https://vendedor-ficticio.example.invalid/marca-ejemplo-modelo-x/0000006/"
     "</loc></url>\n"
     f"<url><loc>{CARS}/marca-ejemplo-modelo-x/0000007/?ref=vendedor-ficticio</loc></url>\n"
     f"<url><loc>{CARS}/marca-ejemplo-modelo-x/0000008/</loc>"
     "<lastmod>Vendedor Ficticio</lastmod></url>\n"
+    f"{KEPT_SITEMAP_ROWS[2]}\n"
     "</urlset>\n"
 ).encode()
 KEPT_HOMES_SITEMAP_ROWS = [
@@ -109,8 +119,16 @@ KEEPS_NOTHING = {
             b'<li class="notable">US$ 25,000 wa&period;me/18090000000</li>',
         )
     ),
+    "a phone number read as a mileage in the ad text": edit(
+        (b"con 40,000 km.", b"con 8095550000 km.")
+    ),
 }
+TEN_DIGIT_DETAIL = edit(
+    (b"var adId = '0000001';", f"var adId = '{TEN_DIGIT_ID}';".encode()),
+    (b"<br>#0000001</li>", f"<br>#{TEN_DIGIT_ID}</li>".encode()),
+)
 SELLER_ATTRIBUTES = edit(
+    (b"var adModel = 130;", b"var adModel = 'Vendedor-Ficticio';"),
     (b"<li>Gasolina</li>", b'<li data-seller="Vendedor Ficticio">Gasolina</li>'),
     (b"<li>Alarma</li>", b'<li><img src="https://img.example.invalid/1.jpg">Alarma</li>'),
 )
@@ -151,8 +169,9 @@ def home(number):
 PAGES = {
     f"{CARS}/robots.txt": (200, ROBOTS, {"Content-Type": "text/plain"}),
     f"{CARS}/sitemap.xml": (200, SITEMAP, {"Content-Type": "text/xml"}),
-    f"{CARS}/assets/js/searchvalues.js?20260927053": (200, SEARCH_VALUES, {}),
+    SEARCH_URL: (200, SEARCH_VALUES, {}),
     listing(1): (200, DETAIL, HTML),
+    listing(int(TEN_DIGIT_ID)): (200, TEN_DIGIT_DETAIL, HTML),
     listing(2): (200, SELLER_ATTRIBUTES, HTML),
     listing(3): (200, CONTACT_ATTRIBUTES, SELLER_HEADERS),
     **{
@@ -204,7 +223,7 @@ REFUSED_AFTER_ROBOTS = {
     "a mixed-case robots rule": f"{CARS}/motos/0000009/",
     "an uppercase listing slug": f"{CARS}/Marca-Ejemplo-Modelo-X/0000001/",
     "a phone number in a listing slug": f"{CARS}/marca-ejemplo-809-000-0000/0000009/",
-    "a dealer path shaped like a listing": f"{CARS}/dealers/0000009/",
+    "a seller-named subdomain": SELLER_SUBDOMAIN,
     "dot segments": f"{CARS}/robots.txt/../carros/0000009/",
     "percent-encoded dot segments": f"{CARS}/x/%2E%2E/carros/0000009/",
     "a backslash": f"{CARS}/x%5C..%5Ccarros/0000009/",
@@ -257,6 +276,18 @@ def main():
         check(retention.holds_contact(shape), f"the contact guard missed {shape}")
     for value in LISTING_VALUES:
         check(not retention.holds_contact(value), f"the contact guard flagged {value}")
+    for url, kind in (
+        (listing(int(TEN_DIGIT_ID)), "detail"),
+        (SEARCH_URL, "search-values"),
+    ):
+        check(
+            retention.page_kind(url) == ("supercarros", kind),
+            f"a declared URL with a ten-digit token was refused: {url}",
+        )
+    check(
+        retention.page_kind(SELLER_SUBDOMAIN) is None,
+        "a seller-named subdomain was treated as an audited host",
+    )
     with tempfile.TemporaryDirectory() as scratch:
         os.chdir(scratch)
         try:
@@ -297,7 +328,10 @@ def main():
             )
 
             def kept(url):
-                body_path, meta_path = fetch_ledger.cache_paths(url)
+                try:
+                    body_path, meta_path = fetch_ledger.cache_paths(url)
+                except SystemExit:
+                    return None, {}
                 if not meta_path.exists():
                     return None, {}
                 meta = json.loads(meta_path.read_text())
@@ -320,7 +354,7 @@ def main():
                 rows == KEPT_HOMES_SITEMAP_ROWS,
                 f"a sitemap with a contact detail in one row kept these rows: {rows}",
             )
-            body, _ = kept(f"{CARS}/assets/js/searchvalues.js?20260927053")
+            body, _ = kept(SEARCH_URL)
             check(body == SEARCH_BRANDS, f"the search values script kept {body!r}")
             body, meta = kept(listing(1))
             check(
@@ -335,6 +369,14 @@ def main():
                 meta.get("content_type") == "text/html; charset=utf-8"
                 and meta.get("server") == "cloudflare",
                 f"declared headers were not recorded: {meta}",
+            )
+            body, meta = kept(listing(int(TEN_DIGIT_ID)))
+            check(
+                body is not None
+                and f"<li><label>Anuncio:</label><br>#{TEN_DIGIT_ID}</li>".encode()
+                in body
+                and f"var adId = '{TEN_DIGIT_ID}';".encode() in body,
+                f"a detail page with a ten-digit listing ID was not kept: {meta.get('retention')}",
             )
             body, _ = kept(listing(2))
             check(
@@ -385,7 +427,8 @@ def main():
                 f"a redirect to a listing was not recorded: {meta.get('location')}",
             )
             planted = [*expected["seller_strings"], *PLANTED]
-            for path, found in leaks_in_directory(scratch, planted).items():
+            allowed = (TEN_DIGIT_ID, TEN_DIGIT_BUILD)
+            for path, found in leaks_in_directory(scratch, planted, allowed).items():
                 failures.append(f"{path} holds {found}")
         finally:
             os.chdir(previous)

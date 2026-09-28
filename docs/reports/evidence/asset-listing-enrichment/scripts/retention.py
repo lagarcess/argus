@@ -4,9 +4,14 @@
 The fetcher holds each response in memory. It records response headers only in
 the shapes `header_facts` declares, and writes a body only as the projection
 `retain` returns. A projection writes decoded text into fixed markup. Of the
-page's attributes it keeps only the meta description. `retain` keeps nothing
-when the projection, or any text a reader could take from the page elements it
-keeps, holds a contact detail.
+page's attributes it keeps only the meta description.
+
+Every written value is either free text or a declared token. Free text is
+what a seller or the site could word freely: a listing slug, a title, a list
+item, the meta description, and facts drawn from the ad text. `retain` keeps
+nothing when any free text holds a contact detail. A declared token, such as a
+host, a listing ID, a build number, a date, or a page variable, is kept only
+when it fits its declared shape, and is never read as free text.
 """
 
 from __future__ import annotations
@@ -21,8 +26,13 @@ from urllib.parse import urljoin, urlsplit
 from common import JS_VAR, squash
 from normalize import text_facts
 
-SITES = {"supercarros": "supercarros.com", "supercasas": "supercasas.com"}
-DETAIL_PATH = re.compile(r"/[a-z0-9,-]+/\d+/")
+HOSTS = {
+    "supercarros": frozenset(
+        {"supercarros.com", "m.supercarros.com", "www.supercarros.com"}
+    ),
+    "supercasas": frozenset({"supercasas.com", "m.supercasas.com", "www.supercasas.com"}),
+}
+DETAIL_PATH = re.compile(r"/(?P<slug>[a-z0-9,-]+)/\d+/")
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 W3C_DATE = re.compile(
     r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?"
@@ -63,6 +73,8 @@ LISTING_VARS = frozenset(
         "adObjectType",
     }
 )
+LISTING_VALUE = re.compile(r"(?:-?\d+(?:\.\d+)?)?")
+LISTING_NUMBER = re.compile(r"#\d+")
 SEARCH_VARS = ("SearchBrands",)
 SELLER_KINDS = frozenset({"Vendedor", "Inmobiliaria", "Particular"})
 PLACE = re.compile(r"[^\W\d_](?:[^\W\d_]|[ .'-]){1,39}")
@@ -95,14 +107,7 @@ def page_kind(url: str) -> tuple[str, str] | None:
     except ValueError:
         return None
     host = (parts.hostname or "").lower()
-    site = next(
-        (
-            key
-            for key, domain in SITES.items()
-            if host == domain or host.endswith("." + domain)
-        ),
-        None,
-    )
+    site = next((key for key, hosts in HOSTS.items() if host in hosts), None)
     if (
         site is None
         or parts.scheme != "https"
@@ -110,7 +115,6 @@ def page_kind(url: str) -> tuple[str, str] | None:
         or parts.password
         or port is not None
         or parts.fragment
-        or holds_contact(url)
     ):
         return None
     path, query = parts.path, parts.query
@@ -120,7 +124,8 @@ def page_kind(url: str) -> tuple[str, str] | None:
         return site, "sitemap"
     if path == "/assets/js/searchvalues.js" and re.fullmatch(r"\d*", query):
         return site, "search-values"
-    if DETAIL_PATH.fullmatch(path) and not query:
+    detail = DETAIL_PATH.fullmatch(path)
+    if detail and not query and not holds_contact(detail["slug"]):
         return site, "detail"
     return None
 
@@ -159,28 +164,30 @@ def retain(url: str, status: int, body: bytes) -> tuple[bytes | None, str]:
         return None, f"not kept: status {status}"
     site, kind = found
     projections = {
-        "robots": lambda: (robots_rules(body), ()),
-        "sitemap": lambda: (listing_sitemap(site, body), ()),
-        "search-values": lambda: (search_lists(body), ()),
-        "detail": lambda: project_detail(body) or (None, ()),
+        "robots": lambda: robots_rules(body),
+        "sitemap": lambda: listing_sitemap(site, body),
+        "search-values": lambda: search_lists(body),
+        "detail": lambda: project_detail(body),
     }
-    kept, texts = projections[kind]()
-    if kept is None:
+    projection = projections[kind]()
+    if projection is None:
         return None, "not kept: expected structure not found"
-    if any(holds_contact(text) for text in (kept.decode("utf-8", "replace"), *texts)):
+    kept, free_text = projection
+    if any(holds_contact(text) for text in free_text):
         return None, "not kept: a contact detail survived the projection"
     return kept, "kept projection"
 
 
-def robots_rules(body: bytes) -> bytes:
+def robots_rules(body: bytes) -> tuple[bytes, list[str]]:
     lines = [
         line.split("#", 1)[0].rstrip()
         for line in body.decode("utf-8", "replace").splitlines()
     ]
-    return ("\n".join(lines) + "\n").encode()
+    rules = "\n".join(lines) + "\n"
+    return rules.encode(), [rules]
 
 
-def listing_sitemap(site: str, body: bytes) -> bytes | None:
+def listing_sitemap(site: str, body: bytes) -> tuple[bytes, list[str]] | None:
     try:
         root = ET.fromstring(body)
     except ET.ParseError:
@@ -194,12 +201,12 @@ def listing_sitemap(site: str, body: bytes) -> bytes | None:
         dated = f"<lastmod>{lastmod}</lastmod>" if W3C_DATE.fullmatch(lastmod) else ""
         rows.append(f"<url><loc>{html.escape(loc)}</loc>{dated}</url>")
     rows.append("</urlset>")
-    return ("\n".join(rows) + "\n").encode()
+    return ("\n".join(rows) + "\n").encode(), []
 
 
-def search_lists(body: bytes) -> bytes | None:
+def search_lists(body: bytes) -> tuple[bytes, list[str]] | None:
     script = body.decode("utf-8", "replace")
-    kept = []
+    kept, free_text = [], []
     for name in SEARCH_VARS:
         match = re.search(rf"\bvar\s+{name}\s*=\s*(\[.*?\])\s*;", script, re.S)
         try:
@@ -209,7 +216,8 @@ def search_lists(body: bytes) -> bytes | None:
         if not isinstance(values, list) or not all(isinstance(v, str) for v in values):
             return None
         kept.append(f"var {name} = {json.dumps(values, ensure_ascii=False)};\n")
-    return "".join(kept).encode()
+        free_text += values
+    return "".join(kept).encode(), free_text
 
 
 class Element:
@@ -266,12 +274,18 @@ def whole(node: Element) -> str:
 
 
 def list_item(name: str, li: Element) -> tuple[str, list[str]] | None:
-    """Rebuild a list item the way both parsers read it, with every text it can yield."""
+    """Rebuild a list item the way both parsers read it, with every text it can yield.
+
+    An item whose own text is a listing number is a declared token, so that
+    number is left out of the texts the contact guard reads.
+    """
     label = next(elements(li, "label"), None)
     label_text = whole(label) if label is not None else None
     own = squash(" ".join(child for child in li.children if isinstance(child, str)))
     texts = [own, whole(li), squash(" ".join(strings(li)))]
     texts += [label_text] if label_text is not None else []
+    if LISTING_NUMBER.fullmatch(own):
+        texts = [text.replace(own, "") for text in texts]
     head = f"<label>{html.escape(label_text)}</label>" if label_text is not None else ""
     if name == "feature-list" and "notable" in li.classes:
         return f'<li class="notable">{head}{html.escape(own)}</li>', texts
@@ -317,12 +331,13 @@ def project_detail(body: bytes) -> tuple[bytes, list[str]] | None:
         )
     ad_text = next(elements(listing, "p", "ad-text"), None)
     facts = text_facts("\n".join(strings(ad_text)) if ad_text is not None else None)
+    texts.append(json.dumps(facts))
     meta = first(r'<meta name="description" content="([^"]*)"', page, 1)
     description = html.unescape(meta) if meta is not None else None
     texts += [description] if description is not None else []
     variables = {}
     for name, value in JS_VAR.findall(page):
-        if name in LISTING_VARS and re.fullmatch(r"[\w.-]*", value.strip()):
+        if name in LISTING_VARS and LISTING_VALUE.fullmatch(value.strip()):
             variables.setdefault(name, value.strip())
     heading = plain(first(rf"{HEADING}.*?</h1>", seller))
     city = first(

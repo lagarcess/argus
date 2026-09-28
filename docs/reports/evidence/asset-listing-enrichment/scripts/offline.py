@@ -2,7 +2,8 @@
 
 The fake network records each request and sends nothing. The leak scan reads a
 file the way a person or a parser could: raw, with entities decoded, and with
-tags removed or replaced by spaces.
+tags removed or replaced by spaces. A check passes the declared tokens it wrote
+on purpose, such as a ten-digit listing ID, as `allowed`.
 """
 
 import html
@@ -30,7 +31,7 @@ class FakeOpener:
         return FakeResponse(status, body, headers)
 
 
-def leaks(text, planted):
+def leaks(text, planted, allowed=()):
     decoded = html.unescape(text)
     views = [
         text,
@@ -41,15 +42,20 @@ def leaks(text, planted):
     found = {
         value for value in planted for view in views if value.lower() in view.lower()
     }
-    found |= {match.group(0) for view in views for match in CONTACT.finditer(view)}
+    found |= {
+        match.group(0)
+        for view in views
+        for match in CONTACT.finditer(view)
+        if match.group(0) not in allowed
+    }
     return sorted(found)
 
 
-def leaks_in_directory(root, planted):
+def leaks_in_directory(root, planted, allowed=()):
     found = {}
     for path in sorted(Path(root).rglob("*")):
         if path.is_file():
-            hits = leaks(path.read_text("utf-8", "replace"), planted)
+            hits = leaks(path.read_text("utf-8", "replace"), planted, allowed)
             if hits:
                 found[str(path.relative_to(root))] = hits
     return found
