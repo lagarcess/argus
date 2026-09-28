@@ -8,7 +8,7 @@
 
 This document recommends one contract for recording money facts. It approves no schema, migration, API route, permission model or chat change. API_CONTRACT, DATA_MODEL and ARCHITECTURE stay authoritative until an approved change amends them.
 
-**Sources and their state.** PR #727 (`codex/native-interface-decision`, head `a1c294319`) publishes the final September 28 mobile baseline, the MVEE sections above, the reconciliation handoff and the [recording decision response](lanes/financial-recording-decision-response.md). It was an open draft when this revision was written. The founder restated the same answers in the lane conversation on September 28, again marking duplicate rows, stale previews and localized categories as recommendations and guest persistence as pending. Where this document says "approved", it cites the MVEE text published by #727. PR #714's older September 27 sketch is superseded by #727 and is no longer a source here.
+**Sources and their state.** PR #727 (`codex/native-interface-decision`, head `a1c294319`) publishes the final September 28 mobile baseline, the MVEE sections above, the reconciliation handoff and the [recording decision response](lanes/financial-recording-decision-response.md). It was an open draft when this revision was written. The founder restated the same answers in the lane conversation on September 28, again marking duplicate rows, stale previews and localized categories as recommendations. A later published guest decision requires registered accounts for ecosystem features and leaves existing guest chat and quotas unchanged; this contract treats that decision as closing G1. Where this document says "approved", it cites the MVEE text published by #727, except G1, which cites that published guest decision. PR #714's older September 27 sketch is superseded by #727 and is no longer a source here.
 
 ## 1. What a person must be able to observe
 
@@ -289,8 +289,9 @@ Creating an account uses no category. A first slice without activity has no cate
 | Private spaces, organizational account moves, custom Business categories | MVEE financial spaces and reassigning accounts |
 | Plan occurrences counted once, with derived status | MVEE connected plan status |
 | Restore returns the original record into its original space and account, with both legs together | MVEE account activity (recovery) |
+| Registered accounts are required for durable financial records and other ecosystem features. Existing guest chat and quotas stay unchanged. Guests see no accounts surface. | Published guest decision, closing G1 |
 
-**Historical Decision 8, corrected.** An earlier version of this contract said Decision 8 kept typed personal figures out of storage. That was wrong. Decision 8 (September 8, 2026, archived grounded-finance roadmap) left typed figures inside conversation messages and put them on the never-store list for personalization memory. The MVEE published by #727 supersedes its prohibition on a new personal-figure storage surface only for explicit financial-record confirmation. Unconfirmed figures keep the existing conversation policy. They are not deleted from chat history, and nothing new enters personalization memory. Guest financial-record persistence is a separate open decision.
+**Historical Decision 8, corrected.** An earlier version of this contract said Decision 8 kept typed personal figures out of storage. That was wrong. Decision 8 (September 8, 2026, archived grounded-finance roadmap) left typed figures inside conversation messages and put them on the never-store list for personalization memory. The MVEE published by #727 supersedes its prohibition on a new personal-figure storage surface only for explicit financial-record confirmation. Unconfirmed figures keep the existing conversation policy. They are not deleted from chat history, and nothing new enters personalization memory. Durable guest financial records are out of scope: registered accounts are required for ecosystem features, and existing guest chat and quotas stay unchanged.
 
 ### Recommended engineering choices
 
@@ -313,11 +314,12 @@ Creating an account uses no category. A first slice without activity has no cate
 
 | # | Decision | Owner | Recommendation |
 | --- | --- | --- | --- |
-| G1 | Durable guest financial records | Founder, pending | Sign-in required for durable accounts at first. Guest chat unchanged. |
 | G2 | Recovery period, retention and purge for removed entries and accounts | Founder with the data-retention contract | Session-level restore in the baseline only. No invented deadline. |
 | G3 | Cross-currency transfer contract (actual amounts on both sides) | Founder, later | Keep blocked. It is separate from unlinked foreign refunds. |
 | G4 | Household authorization, RLS, sharing links during moves | Household contract | Unproved here. Do not infer it from ownership. |
 | G5 | Partial payment allocation and loan principal, interest and fee breakdown | Later recording contract | Use Check balance until defined. |
+
+G1 is closed under Approved experience: registered accounts for ecosystem features; existing guest chat and quotas unchanged.
 
 PR #727's reconciliation contract also names a "recovery destination" as a founder decision. No published text defines the term. This contract restores into the original space and account, as the MVEE states. G2 covers the period and retention.
 
@@ -354,7 +356,7 @@ PR #727's reconciliation contract also names a "recovery destination" as a found
 
 **Dependencies to bind in the assignment, before code.**
 
-1. **Guest policy (G1).** The founder has not answered. The assignment either waits for the answer or builds registered-only behind a default-off flag, with guests seeing no accounts surface. That second path does not change onboarding. The flag's release criteria must name the guest answer.
+1. **Guest policy (G1).** Bound: registered accounts only. Guests see no accounts surface. Existing guest chat and quotas stay unchanged. Ship the first slice behind a default-off flag; do not invent guest financial-record persistence.
 2. **API and data ownership.** Amend API_CONTRACT and DATA_MODEL first (Never-Violate 1). Audit SQL and RLS against `postgres-best-practices` (Never-Violate 10).
 3. **Opening-date correction behavior.** Adopt section 7. With no activity yet, a date correction reorders nothing, but the revision and reason are still stored.
 4. **A database acceptance gate.** Postgres tests for confirm-or-replay, version checks and owner-only RLS, in the `tests/test_*_postgres.py` family CI already gates.
