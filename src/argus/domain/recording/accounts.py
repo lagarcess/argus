@@ -6,10 +6,9 @@ amount owed becomes a negative owner-signed balance here and nowhere else.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Literal, get_args
 
 from argus.domain.recording.currency import normalize_currency
 from argus.domain.recording.errors import RecordingInputError
@@ -27,18 +26,14 @@ AccountType = Literal[
 ]
 Nature = Literal["asset", "liability"]
 
-NATURE: Mapping[str, Nature] = {
-    "cash": "asset",
-    "checking": "asset",
-    "savings": "asset",
-    "investment": "asset",
-    "credit_card": "liability",
-    "other_debt": "liability",
-    "property": "asset",
-    "vehicle": "asset",
-    "other_asset": "asset",
-}
-ACCOUNT_TYPES: tuple[str, ...] = tuple(NATURE)
+ACCOUNT_TYPES: tuple[str, ...] = get_args(AccountType)
+LIABILITY_TYPES = frozenset({"credit_card", "other_debt"})
+
+
+def nature_of(account_type: str) -> Nature:
+    return "liability" if account_type in LIABILITY_TYPES else "asset"
+
+
 FULL_SHARE_BPS = 10_000
 NICKNAME_MAX_CODE_POINTS = 60
 PERSONAL_SPACE = "personal"
@@ -61,11 +56,11 @@ class AccountFacts:
 
     @property
     def nature(self) -> Nature:
-        return NATURE[self.type]
+        return nature_of(self.type)
 
 
 def validate_type(value: str) -> str:
-    if value not in NATURE:
+    if value not in ACCOUNT_TYPES:
         raise RecordingInputError(
             "account_type_unsupported", f"{value!r} is not an account type"
         )
@@ -75,7 +70,7 @@ def validate_type(value: str) -> str:
 def signed_to_owner(typed_minor: int, account_type: str) -> int:
     """The person types a debt as a positive amount owed; the server flips once."""
 
-    return -typed_minor if NATURE[account_type] == "liability" else typed_minor
+    return -typed_minor if nature_of(account_type) == "liability" else typed_minor
 
 
 def normalize_nickname(text: str | None) -> str | None:
@@ -139,7 +134,7 @@ def plan_account_edit(
             raise RecordingInputError(
                 "type_locked", "the type is kept with its recorded activity"
             )
-        if has_records and NATURE[edit.type] != NATURE[account.type]:
+        if has_records and nature_of(edit.type) != nature_of(account.type):
             raise RecordingInputError(
                 "nature_change_requires_empty_account",
                 "an account with a recorded balance keeps its nature",

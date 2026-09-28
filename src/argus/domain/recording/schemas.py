@@ -14,33 +14,20 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field
 
 from argus.domain.recording.accounts import (
-    ACCOUNT_TYPES,
     FULL_SHARE_BPS,
     AccountFacts,
+    AccountType,
     Nature,
 )
 from argus.domain.recording.currency import currency_exponent, format_minor_units
 from argus.domain.recording.records import Balance, OpeningRecord, balance_of
 from argus.domain.recording.repository import StoredAccount
 
-AccountTypeName = Literal[
-    "cash",
-    "checking",
-    "savings",
-    "investment",
-    "credit_card",
-    "other_debt",
-    "property",
-    "vehicle",
-    "other_asset",
-]
-assert set(AccountTypeName.__args__) == set(ACCOUNT_TYPES)  # one type table
-
 
 class CreateFinancialAccountRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: AccountTypeName
+    type: AccountType
     currency: str = Field(min_length=3, max_length=3)
     nickname: str | None = Field(default=None, max_length=200)
     amount: str | None = Field(
@@ -63,7 +50,7 @@ class EditFinancialAccountRequest(BaseModel):
 
     expected_version: int = Field(ge=1)
     nickname: str | None = Field(default=None, max_length=200)
-    type: AccountTypeName | None = None
+    type: AccountType | None = None
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     archived: bool | None = None
     ownership_share_bps: int | None = Field(default=None, ge=1, le=FULL_SHARE_BPS)
@@ -117,7 +104,7 @@ class OpeningResponse(BaseModel):
 
 class FinancialAccountResponse(BaseModel):
     id: str
-    type: AccountTypeName
+    type: AccountType
     nature: Nature
     currency: str
     currency_fraction_digits: int
