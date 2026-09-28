@@ -1118,6 +1118,8 @@ produces `unavailable`, never a saved-prose fallback.
 - `system`
 - `tool`
 
+Saved-message fields and stream frame fields are recorded in [Message and stream shapes](message-and-stream-shapes.md). `Message` in `src/argus/api/schemas.py` owns the saved object. The OpenAPI component `Message` is generated from that model. The metadata keys below are not fields of the model.
+
 Message `metadata` may include structured continuity artifacts. Assistant
 messages may store `pending_strategy`, `confirmation_card`,
 `confirmation_payload`, `result_card`, `result_run_id`, `latest_run_id`,
@@ -3909,6 +3911,8 @@ If the stream disconnects, the client should reconnect by re-fetching the conver
 
 **Stream Events:**
 
+Frame fields are recorded in [Message and stream shapes](message-and-stream-shapes.md). The examples below describe turn behavior.
+
 All events follow the SSE format: `data: {json}\n\n`.
 
 Events are emitted in this order per turn:
@@ -3946,12 +3950,7 @@ Frontend appends tokens progressively. Applies to `clarify`, `explain`, and `nex
 { "type": "stage_outcome", "outcome": "ready_to_respond" }
 ```
 
-**4. `title`** — AI-generated conversation title (fires once, after first meaningful turn)
-```json
-{ "type": "title", "conversation_id": "uuid", "title": "Tesla Dip Strategy" }
-```
-
-**5. `final`** — last event, carries the complete response payload
+**4. `final`** — last event, carries the complete response payload
 ```json
 {
   "type": "final",
@@ -4177,15 +4176,15 @@ specific clarification prompt. A short affirmative answer such as "yes" may
 accept that candidate only for that pending field; it does not bypass normal LLM
 interpretation for unrelated turns.
 
-**6. `done`** — signals stream end (no data payload required beyond SSE `data: [DONE]`)
+**5. `done`** — signals stream end (no data payload required beyond SSE `data: [DONE]`)
 ```
 data: [DONE]
 ```
 
+The stream does not write an SSE `retry` field. Clients own reconnect timing.
+
 > [!IMPORTANT]
 > Frontend must never use local timers to fake progress states. Progress labels must be driven by `stage_start` events from the backend. This is the binding contract between DESIGN.md Section 11 and the agent runtime pipeline.
-
-*Note: Server may include `retry: 3000` in the stream, but clients should implement their own backoff/reconnect logic.*
 
 ---
 
