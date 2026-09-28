@@ -67,6 +67,19 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]) {
       }
     }
     if(['empty','single'].includes(scenario.id)) {await page.locator('#chart').scrollIntoViewIfNeeded();await page.screenshot({path:new URL(`${name}-${scenario.id}.png`,evidence).pathname,fullPage:true});}
+    if(scenario.points.length===1) {
+      // Rendered-pixel acceptance: one observation must stay an isolated dot,
+      // not the library's default horizontal line across a singleton time slot.
+      const dot=await page.evaluate(()=>{
+        const canvas=document.querySelector('#chart canvas');
+        const rgb=getComputedStyle(document.documentElement).getPropertyValue('--actual').trim().slice(1).match(/.{2}/g).map(hex=>parseInt(hex,16));
+        const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+        let min=canvas.width,max=-1;
+        for(let i=0;i<pixels.length;i+=4) if(rgb.every((value,j)=>pixels[i+j]===value) && pixels[i+3]===255) {const x=(i/4)%canvas.width;min=Math.min(min,x);max=Math.max(max,x);}
+        return {width:max<0?0:max-min+1,pixelRatio:canvas.width/canvas.clientWidth};
+      });
+      assert.ok(dot.width>0 && dot.width<=12*dot.pixelRatio,`singleton rendered width ${dot.width}px`);
+    }
     results.push(`${scenario.id}: endpoints, reset, independent values, segment structure, formatting pass`);
   }
   const scenario=fixture.cases.find(c=>c.id==='stress');

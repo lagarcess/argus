@@ -75,7 +75,7 @@ function render() {
   anchor.setData(scenario.points.map(({time})=>({time})));
   for (const key of ['actual','projected']) {
     for (const data of segments(scenario.points,key)) {
-      const series = chart.addSeries(LineSeries, {lineWidth:2,lineType:LineType.Simple,lineStyle:key === 'actual'?LineStyle.Solid:LineStyle.Dashed,pointMarkersVisible:scenario.points.length < 100 || data.length === 1,pointMarkersRadius:3,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
+      const series = chart.addSeries(LineSeries, {lineWidth:2,lineVisible:data.length>1,lineType:LineType.Simple,lineStyle:key === 'actual'?LineStyle.Solid:LineStyle.Dashed,pointMarkersVisible:scenario.points.length < 100 || data.length === 1,pointMarkersRadius:3,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false});
       series.setData(data);
       plotted.push({series,key});
     }
