@@ -70,11 +70,17 @@ In another terminal:
 
 ```sh
 export ANDROID_SERIAL=emulator-5584
-./gradlew :app:connectedDebugAndroidTest
-adb -s "$ANDROID_SERIAL" pull /sdcard/Download/argus-chart-proof/ ./device-evidence
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug
+adb -s "$ANDROID_SERIAL" install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s "$ANDROID_SERIAL" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb -s "$ANDROID_SERIAL" shell am instrument -w \
+  ai.argus.chartprototype.test/androidx.test.runner.AndroidJUnitRunner
+adb -s "$ANDROID_SERIAL" pull /sdcard/Android/data/ai.argus.chartprototype/files/ ./device-evidence
 adb -s "$ANDROID_SERIAL" shell dumpsys gfxinfo ai.argus.chartprototype
 adb -s "$ANDROID_SERIAL" emu kill
 ```
+
+The explicit adb runner keeps the app installed until evidence is pulled; Gradle's connected-test runner automatically uninstalls it.
 
 The instrumented suite exercises every fixture, missing-row segment preservation,
 endpoint readouts, English/es-419, theme modes, horizontal release/cancel/reset,

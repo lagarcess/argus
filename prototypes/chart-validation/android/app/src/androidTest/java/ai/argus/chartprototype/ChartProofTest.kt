@@ -8,7 +8,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import org.junit.Assert.*
-import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -27,13 +26,6 @@ class ChartProofTest {
     private fun screenshot(name: String) {
         compose.waitForIdle()
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).takeScreenshot(File(context.getExternalFilesDir(null), "$name.png"))
-    }
-    // AGP removes the test app after the run, so preserve artifacts outside its sandbox.
-    @After fun preserveEvidenceBeforeUninstall() {
-        val source = context.getExternalFilesDir(null)!!.absolutePath
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).executeShellCommand(
-            "sh -c 'mkdir -p /sdcard/Download/argus-chart-proof && cp -R $source/. /sdcard/Download/argus-chart-proof/'"
-        )
     }
     @Test fun fixturesAndSegmentsPreserveEveryFact() {
         cases.forEach { case ->
