@@ -179,7 +179,7 @@ This is the "explicitly labeled balance adjustment" the MVEE requires. The adjus
 | Preview | No | Shows effects and records its basis: every touched account's version and the draft revision. A balance-check preview also carries the prior recorded amount, observed amount and difference that confirm will store. |
 | Confirmed record, revision 1 | Yes | One confirm call. A batch that would store check evidence different from `Preview.check` returns `stale_preview`. |
 | Corrected record, revision n | Yes | `correct(expected_revision, reason, changes)` |
-| Removed record | No | `remove(expected_revision, reason, accept_reordering=False)` appends a tombstone. A check removal that shifts activity placement needs `accept_reordering`, same as correct. |
+| Removed record | No | `remove(expected_revision, reason, accept_reordering=False, answers=None)` appends a tombstone. A check removal that exposes inclusion questions on later checks takes those activity answers in the same call; a shift in landing still needs `accept_reordering`, same as correct. |
 | Restored record | Yes | `restore(expected_revision, reason, answers, accept_reordering=False)` returns the same record, both legs together, after the same review. A restored activity takes inclusion answers for checks confirmed while it was removed. A restored check takes none, because answers belong to activity. A restore that shifts activity placement needs `accept_reordering`, same as correct and remove. |
 | Rejected draft | No | Terminal. Its source is released. |
 
@@ -202,7 +202,7 @@ Notices inform and never block. `negative_asset_balance` flags cash or a bank ac
 
 **Stale previews.** Confirmation succeeds only if the preview's basis still holds. Otherwise it writes nothing and returns `stale_preview` with a refreshed preview. The draft and the person's edits are kept. The person sees the changed effects and confirms again. Two confirmations of one stale preview both fail.
 
-**Stale edits.** Corrections carry `expected_revision`, and account edits carry `expected_version`. A mismatch is `stale_version` and changes nothing. One partner never silently overwrites another's work. An amount or date correction on a balance check is a re-confirmation: it must carry the same account-version `basis` and reviewed `check` evidence a preview would show for the new values, or the write is refused (`check_correction_basis_required` / `stale_version`) so concurrent included activity cannot rewrite the evidence the person accepted.
+**Stale edits.** Corrections carry `expected_revision`, and account edits carry `expected_version`. A mismatch is `stale_version` and changes nothing. One partner never silently overwrites another's work. An amount or date correction on a balance check is a re-confirmation: it must carry `account_basis` with the touched account's version (empty is not enough) and the reviewed `check` evidence a preview would show for the new values, or the write is refused (`check_correction_basis_required` / `stale_version`) so concurrent included activity cannot rewrite the evidence the person accepted. The observation field `basis` is a separate change and may be updated in the same call.
 
 **Correction, not reversal.** A correction keeps the fact at its true date and appends a revision. The payment ledger's reversal postings would move a corrected September expense into October. A record also keeps its currency. A correction may move it only to an account in the same currency.
 

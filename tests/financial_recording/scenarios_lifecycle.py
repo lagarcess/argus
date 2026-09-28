@@ -285,6 +285,7 @@ def edits_that_move_money_need_review() -> dict:
         "duplicate_of_draft_is_refused": _duplicate_of_draft_refused(),
         "unsupported_weighting_is_refused": _unsupported_weighting_is_refused(),
         "check_correction_bound_to_account_state": _check_correction_bound_to_account(),
+        "observation_basis_and_restamp_together": _observation_basis_and_restamp_together(),
         "distinct_bound_to_reviewed_matches": _distinct_bound_to_reviewed_matches(),
     }
 
@@ -964,7 +965,7 @@ def _restamp_honors_not_included() -> dict:
         1,
         "typo",
         amount="950.00",
-        basis={cash.id: scene.store.book.accounts[cash.id].version},
+        account_basis={cash.id: scene.store.book.accounts[cash.id].version},
         check={"prior": 100_000, "observed": 95_000, "difference": -5_000},
     )
     revised = scene.store.book.records[check.id]
@@ -992,7 +993,7 @@ def _redated_check_restamps() -> dict:
         1,
         "9th",
         accept_reordering=True,
-        basis={cash.id: scene.store.book.accounts[cash.id].version},
+        account_basis={cash.id: scene.store.book.accounts[cash.id].version},
         check={"prior": 90_000, "observed": 90_000, "difference": 0},
         **redate,
     )
@@ -1098,18 +1099,27 @@ def _remove_check_with_dependents() -> dict:
     )
     record = scene.confirm(late)
     blocked = outcome(lambda: scene.store.remove(first.id, 1, "typo"))
-    scene.store.correct(
-        record.id, 1, "also in the later check", answers={second.id: "included"}
+    # Same call can carry the activity answer the removal would expose.
+    still_shifted = outcome(
+        lambda: scene.store.remove(
+            first.id,
+            1,
+            "typo",
+            answers={record.id: {second.id: "included"}},
+        )
     )
-    # Contained by the later check too, so inclusion is answered — but landing
-    # still shifts. Removal needs the same placement acknowledgement as correct.
-    shifted = outcome(lambda: scene.store.remove(first.id, 1, "typo"))
     removed = outcome(
-        lambda: scene.store.remove(first.id, 1, "typo", accept_reordering=True)
+        lambda: scene.store.remove(
+            first.id,
+            1,
+            "typo",
+            accept_reordering=True,
+            answers={record.id: {second.id: "included"}},
+        )
     )
     return {
         "blocked": blocked,
-        "after_answering": shifted,
+        "answered_still_needs_reordering": still_shifted,
         "accepted_reordering": removed,
         "balance": scene.amount(cash),
         "gaps": scene.gaps(cash),
@@ -1251,6 +1261,16 @@ def _check_correction_bound_to_account() -> dict:
     missing = outcome(
         lambda: scene.store.correct(check.id, 1, "typo", amount="950.00")
     )
+    empty_basis = outcome(
+        lambda: scene.store.correct(
+            check.id,
+            1,
+            "typo",
+            amount="950.00",
+            account_basis={},
+            check=prepared_check,
+        )
+    )
     scene.now = local(8)
     late = scene.act("expense", cash, "100.00", 3)
     scene.store.resolve(
@@ -1265,7 +1285,7 @@ def _check_correction_bound_to_account() -> dict:
             1,
             "typo",
             amount="950.00",
-            basis=prepared_basis,
+            account_basis=prepared_basis,
             check=prepared_check,
         )
     )
@@ -1276,7 +1296,7 @@ def _check_correction_bound_to_account() -> dict:
             1,
             "typo",
             amount="950.00",
-            basis=fresh_basis,
+            account_basis=fresh_basis,
             check=prepared_check,
         )
     )
@@ -1286,15 +1306,37 @@ def _check_correction_bound_to_account() -> dict:
             1,
             "typo",
             amount="950.00",
-            basis=fresh_basis,
+            account_basis=fresh_basis,
             check={"prior": 90_000, "observed": 95_000, "difference": 5_000},
         )
     )
     return {
         "missing_basis": missing,
+        "empty_account_basis": empty_basis,
         "stale_account_basis": stale_basis,
         "stale_check_evidence": stale_evidence,
         "accepted": accepted,
+    }
+
+
+def _observation_basis_and_restamp_together() -> dict:
+    """Observation field `basis` and account-version basis are separate params."""
+    scene = Scene()
+    cash = scene.account("Efectivo", "cash", "DOP", "1000.00")
+    check = scene.observe(cash, "1000.00", 5)
+    both = scene.store.correct(
+        check.id,
+        1,
+        "statement and typo",
+        amount="950.00",
+        basis="statement",
+        account_basis={cash.id: scene.store.book.accounts[cash.id].version},
+        check={"prior": 100_000, "observed": 95_000, "difference": -5_000},
+    )
+    return {
+        "observation_basis": both.body.basis,
+        "observed": both.body.amount,
+        "revisions": len(both.revisions),
     }
 
 

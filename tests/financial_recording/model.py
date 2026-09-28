@@ -12,7 +12,7 @@ import json
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime
-from typing import Literal, Optional, Union
+from typing import Literal, Optional
 from zoneinfo import ZoneInfo
 
 from tests.financial_recording.catalog import (
@@ -539,24 +539,19 @@ class Store:
         *,
         accept_reordering: bool = False,
         answers: Optional[Mapping[str, str]] = None,
-        basis: Optional[Union[Mapping[str, int], str]] = None,
+        account_basis: Optional[Mapping[str, int]] = None,
         check: Optional[Mapping[str, Optional[int]]] = None,
         **changes,
     ) -> Record:
         """A correction that moves any activity between a balance and a difference
         stops for review; `accept_reordering` records that the person saw it.
 
-        Amount/date corrections on a check restamp confirmation evidence. Pass the
-        account-version `basis` (Preview.basis) and reviewed `check` evidence from
-        the correction screen so a concurrent included activity cannot rewrite what
-        the person accepted. A string `basis` is the observation field change.
+        Amount/date corrections on a check restamp confirmation evidence. Pass
+        `account_basis` (touched account versions) and reviewed `check` evidence
+        from the correction screen so concurrent included activity cannot rewrite
+        what the person accepted. The observation field `basis` stays in `changes`.
         """
         record = self._current(record_id, expected_revision, reason)
-        account_basis: Optional[Mapping[str, int]] = None
-        if isinstance(basis, str):
-            changes["basis"] = basis
-        elif basis is not None:
-            account_basis = basis
         currency = self.book.accounts[record.body.account_id].currency
         if "amount" in changes:
             typed = parse_minor(changes["amount"], currency)
@@ -614,7 +609,11 @@ class Store:
         reason: str,
         *,
         accept_reordering: bool = False,
+        answers: Optional[Mapping[str, Mapping[str, str]]] = None,
     ) -> Record:
+        """Remove a record. When removing a check, `answers` carries
+        activity_id → {check_id: included|not_included} for questions the removal
+        would expose against later checks."""
         record = self._current(record_id, expected_revision, reason)
         refunds = [
             other.id
@@ -623,14 +622,52 @@ class Store:
         ]
         if refunds:
             raise ReviewRequired([issue("linked_refunds_present", *refunds)])
-        tombstone = replace(record.revisions[-1], removed=True)
-        after = replace(
-            self.book,
-            records={
-                **self.book.records,
-                record_id: replace(record, revisions=(*record.revisions, tombstone)),
-            },
+        if answers and isinstance(record.body, Activity):
+            raise InvalidInput("answers_not_applicable", record_id)
+        now = self.clock()
+        records = dict(self.book.records)
+        touched = set(accounts_of(record.body))
+        if answers:
+            for activity_id, activity_answers in answers.items():
+                target = records.get(activity_id)
+                if (
+                    target is None
+                    or target.removed
+                    or not isinstance(target.body, Activity)
+                ):
+                    raise InvalidInput("answer_target_invalid", activity_id)
+                new_body = replace(
+                    target.body,
+                    answers=_merged_answers(target.body.answers, activity_answers),
+                )
+                previous = target.revisions[-1]
+                revised = replace(
+                    target,
+                    revisions=(
+                        *target.revisions,
+                        replace(
+                            previous,
+                            body=new_body,
+                            recorded_at=now,
+                            provenance=Provenance("manual", now),
+                            reason=reason,
+                            recorded_by=self.actor,
+                        ),
+                    ),
+                )
+                records[activity_id] = revised
+                touched |= accounts_of(new_body)
+        tombstone = replace(
+            record.revisions[-1],
+            removed=True,
+            recorded_at=now,
+            provenance=Provenance("manual", now),
+            reason=reason,
+            recorded_by=self.actor,
         )
+        removed = replace(record, revisions=(*record.revisions, tombstone))
+        records[record_id] = removed
+        after = replace(self.book, records=records)
         questions = inclusion_issues(after, accounts_of(record.body), self.tz)
         if questions:
             raise ReviewRequired(questions)
@@ -638,7 +675,11 @@ class Store:
             moved = self._placement_changes_against(after, accounts_of(record.body))
             if moved:
                 raise ReviewRequired(moved)
-        return self._revise(record, record.body, reason, removed=True)
+        self._swap(
+            accounts={**self.book.accounts, **_bumped(self.book.accounts, touched)},
+            records=records,
+        )
+        return removed
 
     def restore(
         self,
@@ -860,6 +901,9 @@ class Store:
         check: Mapping[str, Optional[int]],
     ) -> None:
         """Refuse a restamp when the reviewed account state or evidence moved."""
+        # The observation's own account version must be present; `{}` is not enough.
+        if body.account_id not in basis:
+            raise StaleVersion(body.account_id)
         for account_id, version in basis.items():
             account = self.book.accounts.get(account_id)
             if account is None or account.version != version:

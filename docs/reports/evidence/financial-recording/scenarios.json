@@ -409,6 +409,7 @@
     },
     "check_correction_bound_to_account_state": {
       "accepted": "ok",
+      "empty_account_basis": "StaleVersion",
       "missing_basis": "InvalidInput:check_correction_basis_required",
       "stale_account_basis": "StaleVersion",
       "stale_check_evidence": "StaleVersion"
@@ -571,6 +572,11 @@
         ]
       ]
     },
+    "observation_basis_and_restamp_together": {
+      "observation_basis": "statement",
+      "observed": 95000,
+      "revisions": 2
+    },
     "occurred_on_and_at_must_agree": {
       "confirm": "ReviewRequired:date_mismatch",
       "issues": {
@@ -649,7 +655,7 @@
     },
     "removing_a_check_others_depend_on": {
       "accepted_reordering": "ok",
-      "after_answering": "ReviewRequired:inclusion_changed",
+      "answered_still_needs_reordering": "ReviewRequired:inclusion_changed",
       "balance": 800000,
       "blocked": "ReviewRequired:inclusion_unanswered",
       "gaps": [
